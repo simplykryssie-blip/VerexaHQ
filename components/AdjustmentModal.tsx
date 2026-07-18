@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const ADJUSTMENT_TYPES = ["Bank Fee", "Interest Earned", "NSF Fee", "Correction", "Other"];
 
@@ -86,14 +87,12 @@ export default function AdjustmentModal({
               onChange={(e) => setDate(e.target.value)}
               className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
             />
-            <input
+            <CurrencyInput
               required
-              type="number"
-              step="0.01"
               placeholder="Amount (+/-)"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setAmount}
+              className="w-1/2"
             />
           </div>
           <p className="text-xs text-muted">

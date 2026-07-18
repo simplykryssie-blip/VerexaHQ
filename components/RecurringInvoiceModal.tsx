@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, RecurringInvoice } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const FREQUENCIES = ["weekly", "monthly", "quarterly", "annually"];
 
@@ -157,14 +158,12 @@ export default function RecurringInvoiceModal({
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
           <div className="flex gap-2">
-            <input
+            <CurrencyInput
               required
-              type="number"
-              step="0.01"
               placeholder="Amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setAmount}
+              className="w-1/2"
             />
             <select
               value={frequency}

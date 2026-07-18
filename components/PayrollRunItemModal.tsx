@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollEmployee, PayrollRunItem } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 export default function PayrollRunItemModal({
   payrollRunId,
@@ -148,47 +149,37 @@ export default function PayrollRunItemModal({
             />
           </div>
           <div className="flex gap-2">
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Regular pay"
               value={regularPay}
-              onChange={(e) => setRegularPay(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setRegularPay}
+              className="w-1/2"
             />
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="OT pay"
               value={overtimePay}
-              onChange={(e) => setOvertimePay(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setOvertimePay}
+              className="w-1/2"
             />
           </div>
-          <input
-            type="number"
-            step="0.01"
+          <CurrencyInput
             placeholder="Other pay (bonus, commission)"
             value={otherPay}
-            onChange={(e) => setOtherPay(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+            onChange={setOtherPay}
+            className="w-full"
           />
           <div className="flex gap-2">
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Employee taxes withheld"
               value={employeeTaxes}
-              onChange={(e) => setEmployeeTaxes(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setEmployeeTaxes}
+              className="w-1/2"
             />
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Other deductions"
               value={deductions}
-              onChange={(e) => setDeductions(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setDeductions}
+              className="w-1/2"
             />
           </div>
 

@@ -12,6 +12,7 @@ import type {
   TaxOrganizerTemplate,
 } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
+import OrganizerQuestionnaire from "@/components/OrganizerQuestionnaire";
 
 export default function PortalOrganizerPage() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -25,6 +26,7 @@ export default function PortalOrganizerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -114,6 +116,31 @@ export default function PortalOrganizerPage() {
     setSavingQuestionId(null);
   }
 
+  async function submitForReview() {
+    if (!assignment) return;
+    const missing = questions.filter((question) => {
+      if (!question.is_required) return false;
+      const value = answers.get(question.id)?.answer_value;
+      return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
+    });
+    if (missing.length > 0) {
+      setError(`Complete ${missing.length} required question${missing.length === 1 ? "" : "s"} before submitting.`);
+      return;
+    }
+    setSubmitting(true);
+    const { error: submitError } = await supabasePortal
+      .from("tax_organizer_assignments")
+      .update({ assignment_status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", assignment.id);
+    setSubmitting(false);
+    if (submitError) {
+      setError(submitError.message);
+      return;
+    }
+    setAssignment({ ...assignment, assignment_status: "submitted", submitted_at: new Date().toISOString() });
+    setError(null);
+  }
+
   if (loading) return <div className="text-sm text-muted">Loading…</div>;
 
   if (error || !assignment) {
@@ -144,105 +171,28 @@ export default function PortalOrganizerPage() {
         {assignment.due_date ? ` · Due ${assignment.due_date}` : ""}
       </div>
 
-      <div className="space-y-8">
-        {sections.map((section) => (
-          <section key={section.id}>
-            <div className="border-b border-line pb-3 mb-4">
-              <h2 className="font-slab text-lg font-bold text-ink">{section.section_title}</h2>
-              {section.section_description && (
-                <p className="text-xs text-muted mt-1">{section.section_description}</p>
-              )}
-            </div>
-            <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-              {questions
-                .filter((q) => q.section_id === section.id)
-                .map((q) => {
-                  const answer = answers.get(q.id);
-                  const value = answer?.answer_value as string | boolean | undefined;
-                  return (
-                    <div key={q.id} className="px-5 py-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-ink">
-                            {q.question_text}
-                            {q.is_required && <span className="text-brick"> *</span>}
-                          </div>
-                          {q.help_text && (
-                            <div className="text-xs text-muted mt-0.5">{q.help_text}</div>
-                          )}
-                        </div>
+      {error && (
+        <div className="mb-6 text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">
+          {error}
+        </div>
+      )}
 
-                        <div className="shrink-0">
-                          {q.question_type === "boolean" && (
-                            <div className="flex gap-2">
-                              {["Yes", "No"].map((opt) => (
-                                <button
-                                  key={opt}
-                                  onClick={() => saveAnswer(q, opt === "Yes")}
-                                  className="text-xs font-semibold px-3 py-1.5 rounded-sm border"
-                                  style={{
-                                    borderColor:
-                                      value === (opt === "Yes") ? "#0D1B2A" : "#DDE3EC",
-                                    backgroundColor:
-                                      value === (opt === "Yes") ? "#0D1B2A" : "white",
-                                    color: value === (opt === "Yes") ? "white" : "#0D1B2A",
-                                  }}
-                                >
-                                  {opt}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+      <OrganizerQuestionnaire
+        sections={sections}
+        questions={questions}
+        answers={answers}
+        savingQuestionId={savingQuestionId}
+        onSave={saveAnswer}
+      />
 
-                          {q.question_type === "select" && (
-                            <select
-                              value={(value as string) ?? ""}
-                              onChange={(e) => saveAnswer(q, e.target.value)}
-                              className="border border-line rounded-sm px-3 py-1.5 text-sm"
-                            >
-                              <option value="">—</option>
-                              {q.options.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          {(q.question_type === "text" || q.question_type === "number") && (
-                            <input
-                              type={q.question_type === "number" ? "number" : "text"}
-                              defaultValue={(value as string) ?? ""}
-                              onBlur={(e) => saveAnswer(q, e.target.value)}
-                              className="border border-line rounded-sm px-3 py-1.5 text-sm w-48"
-                            />
-                          )}
-
-                          {q.question_type === "date" && (
-                            <input
-                              type="date"
-                              defaultValue={(value as string) ?? ""}
-                              onBlur={(e) => saveAnswer(q, e.target.value)}
-                              className="border border-line rounded-sm px-3 py-1.5 text-sm"
-                            />
-                          )}
-                        </div>
-                      </div>
-                      {savingQuestionId === q.id && (
-                        <div className="text-[11px] text-muted mt-1">Saving…</div>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          </section>
-        ))}
+      <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
+        <p className="text-xs text-muted flex-1">Your answers save automatically. Submit only when the organizer is complete.</p>
+        {assignment.assignment_status !== "submitted" && assignment.assignment_status !== "accepted" && (
+          <button type="button" onClick={submitForReview} disabled={submitting} className="px-4 py-2 rounded-sm bg-ink text-white text-sm font-semibold disabled:opacity-60">
+            {submitting ? "Submitting…" : "Submit for Review"}
+          </button>
+        )}
       </div>
-
-      <p className="text-xs text-muted mt-6">
-        Your answers save automatically as you go — there&apos;s nothing to submit.
-        Your accountant will follow up once they&apos;ve reviewed everything.
-      </p>
     </div>
   );
 }

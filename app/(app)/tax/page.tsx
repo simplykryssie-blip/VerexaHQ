@@ -73,16 +73,17 @@ export default function TaxPrepPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Filing Season
           </div>
-          <h1 className="font-slab text-2xl font-bold text-ink">Tax Prep</h1>
+          <h1 className="font-slab text-2xl font-bold text-ink">Tax Returns</h1>
+          <p className="text-xs text-muted mt-1 max-w-xl">Track each client return from document gathering through preparation, review, filing, refund, or balance due. Organizers collect the information used to prepare these returns.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold px-3 py-1.5 rounded-sm bg-ink text-white">
-            Returns
+            Tax Returns
           </span>
           <Link
             href="/tax/organizers"
@@ -108,7 +109,7 @@ export default function TaxPrepPage() {
             onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 bg-ink text-white text-sm font-semibold px-3.5 py-2 rounded-sm hover:bg-[#14273A] transition-colors"
           >
-            <Plus size={15} /> New Return
+            <Plus size={15} /> Add Tax Return
           </button>
         </div>
       </div>
@@ -137,8 +138,8 @@ export default function TaxPrepPage() {
         </div>
       )}
 
-      <div className="bg-white border border-line rounded-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-line rounded-sm overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-widest text-muted">
               <th className="px-5 py-3 font-semibold">Client</th>
@@ -159,7 +160,7 @@ export default function TaxPrepPage() {
             {!loading && visible.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-5 py-6 text-muted">
-                  No tax returns yet. Click &quot;New Return&quot; to add the first one.
+                  No tax returns yet. Click &quot;Add Tax Return&quot; to start tracking a client&apos;s filing.
                 </td>
               </tr>
             )}

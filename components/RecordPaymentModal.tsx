@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Invoice } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const METHODS = ["Check", "ACH", "Cash", "Credit Card (manual)", "Other"];
 
@@ -81,14 +82,12 @@ export default function RecordPaymentModal({
           <div className="text-sm text-muted">
             Balance due: <span className="font-mono font-semibold text-ink">${balanceDue.toFixed(2)}</span>
           </div>
-          <input
+          <CurrencyInput
             required
-            type="number"
-            step="0.01"
             placeholder="Amount received"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+            onChange={setAmount}
+            className="w-full"
           />
           <select
             value={method}

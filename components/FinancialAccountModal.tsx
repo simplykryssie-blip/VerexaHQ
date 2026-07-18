@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { BookkeepingFinancialAccount } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const ACCOUNT_TYPES = ["checking", "savings", "credit_card", "loan", "cash", "other"];
 
@@ -130,13 +131,11 @@ export default function FinancialAccountModal({
             onChange={(e) => setMaskedNumber(e.target.value)}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
-          <input
-            type="number"
-            step="0.01"
+          <CurrencyInput
             placeholder="Opening balance"
             value={openingBalance}
-            onChange={(e) => setOpeningBalance(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+            onChange={setOpeningBalance}
+            className="w-full"
           />
 
           {error && (

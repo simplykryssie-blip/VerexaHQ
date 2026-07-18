@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { BookkeepingTransaction, BookkeepingTransactionCategory } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 export default function TransactionModal({
   clientId,
@@ -156,14 +157,12 @@ export default function TransactionModal({
             onChange={(e) => setPayee(e.target.value)}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
-          <input
+          <CurrencyInput
             required
-            type="number"
-            step="0.01"
             placeholder="Amount (negative for money out)"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+            onChange={setAmount}
+            className="w-full"
           />
 
           <select

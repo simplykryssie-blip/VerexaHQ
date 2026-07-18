@@ -13,6 +13,8 @@ import type {
   TaxOrganizerTemplate,
 } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
+import OrganizerQuestionnaire from "@/components/OrganizerQuestionnaire";
+import { organizerPrefillValue } from "@/lib/organizerPrefill";
 
 const STATUS_STEPS = ["draft", "sent", "submitted", "reviewed", "accepted"];
 
@@ -64,6 +66,7 @@ export default function OrganizerFillPage() {
     setTemplate((templateRes.data as TaxOrganizerTemplate) ?? null);
     setSections(sectionList);
 
+    let questionList: TaxOrganizerQuestion[] = [];
     if (sectionList.length > 0) {
       const { data: questionData } = await supabase
         .from("tax_organizer_questions")
@@ -73,13 +76,37 @@ export default function OrganizerFillPage() {
           sectionList.map((s) => s.id)
         )
         .order("sort_order");
-      setQuestions((questionData as TaxOrganizerQuestion[]) ?? []);
+      questionList = (questionData as TaxOrganizerQuestion[]) ?? [];
+      setQuestions(questionList);
     }
 
     const answersMap = new Map<string, TaxOrganizerAnswer>();
     (answersRes.data as TaxOrganizerAnswer[] | null)?.forEach((ans) =>
       answersMap.set(ans.question_id, ans)
     );
+
+    const clientRecord = clientRes.data as Client | null;
+    if (clientRecord) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const missingPrefills = questionList.flatMap((question) => {
+        if (answersMap.has(question.id)) return [];
+        const value = organizerPrefillValue(question, clientRecord);
+        return value === undefined ? [] : [{
+          workspace_id: a.workspace_id,
+          assignment_id: a.id,
+          question_id: question.id,
+          answer_value: value,
+          answered_by: sessionData.session?.user.id,
+        }];
+      });
+      if (missingPrefills.length > 0) {
+        const { data: inserted } = await supabase
+          .from("tax_organizer_answers")
+          .upsert(missingPrefills, { onConflict: "assignment_id,question_id", ignoreDuplicates: true })
+          .select();
+        (inserted as TaxOrganizerAnswer[] | null)?.forEach((ans) => answersMap.set(ans.question_id, ans));
+      }
+    }
     setAnswers(answersMap);
 
     setError(null);
@@ -205,100 +232,13 @@ export default function OrganizerFillPage() {
         </span>
       </div>
 
-      <div className="space-y-8">
-        {sections.map((section) => (
-          <section key={section.id}>
-            <div className="border-b border-line pb-3 mb-4">
-              <h2 className="font-slab text-lg font-bold text-ink">{section.section_title}</h2>
-              {section.section_description && (
-                <p className="text-xs text-muted mt-1">{section.section_description}</p>
-              )}
-            </div>
-            <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-              {questions
-                .filter((q) => q.section_id === section.id)
-                .map((q) => {
-                  const answer = answers.get(q.id);
-                  const value = answer?.answer_value as string | boolean | undefined;
-                  return (
-                    <div key={q.id} className="px-5 py-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="text-sm font-semibold text-ink">
-                            {q.question_text}
-                            {q.is_required && <span className="text-brick"> *</span>}
-                          </div>
-                          {q.help_text && (
-                            <div className="text-xs text-muted mt-0.5">{q.help_text}</div>
-                          )}
-                        </div>
-
-                        <div className="shrink-0">
-                          {q.question_type === "boolean" && (
-                            <div className="flex gap-2">
-                              {["Yes", "No"].map((opt) => (
-                                <button
-                                  key={opt}
-                                  onClick={() => saveAnswer(q, opt === "Yes")}
-                                  className="text-xs font-semibold px-3 py-1.5 rounded-sm border"
-                                  style={{
-                                    borderColor:
-                                      value === (opt === "Yes") ? "#0D1B2A" : "#DDE3EC",
-                                    backgroundColor:
-                                      value === (opt === "Yes") ? "#0D1B2A" : "white",
-                                    color: value === (opt === "Yes") ? "white" : "#0D1B2A",
-                                  }}
-                                >
-                                  {opt}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          {q.question_type === "select" && (
-                            <select
-                              value={(value as string) ?? ""}
-                              onChange={(e) => saveAnswer(q, e.target.value)}
-                              className="border border-line rounded-sm px-3 py-1.5 text-sm"
-                            >
-                              <option value="">—</option>
-                              {q.options.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          {(q.question_type === "text" || q.question_type === "number") && (
-                            <input
-                              type={q.question_type === "number" ? "number" : "text"}
-                              defaultValue={(value as string) ?? ""}
-                              onBlur={(e) => saveAnswer(q, e.target.value)}
-                              className="border border-line rounded-sm px-3 py-1.5 text-sm w-48"
-                            />
-                          )}
-
-                          {q.question_type === "date" && (
-                            <input
-                              type="date"
-                              defaultValue={(value as string) ?? ""}
-                              onBlur={(e) => saveAnswer(q, e.target.value)}
-                              className="border border-line rounded-sm px-3 py-1.5 text-sm"
-                            />
-                          )}
-                        </div>
-                      </div>
-                      {savingQuestionId === q.id && (
-                        <div className="text-[11px] text-muted mt-1">Saving…</div>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          </section>
-        ))}
-      </div>
+      <OrganizerQuestionnaire
+        sections={sections}
+        questions={questions}
+        answers={answers}
+        savingQuestionId={savingQuestionId}
+        onSave={saveAnswer}
+      />
     </div>
   );
 }

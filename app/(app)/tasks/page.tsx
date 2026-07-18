@@ -76,7 +76,7 @@ export default function TasksPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Firm-Wide

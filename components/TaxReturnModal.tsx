@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, TaxReturn } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
-const RETURN_TYPES = ["1040", "1120", "1120-S", "1065", "990", "1041"];
+const RETURN_TYPES = ["1040", "1120", "1120-S", "1065", "990", "1041", "706", "709"];
 const STATUSES = [
   "not_started",
-  "gathering_documents",
   "in_progress",
-  "in_review",
-  "ready_to_file",
+  "review",
+  "waiting_on_client",
+  "ready_for_signature",
   "filed",
-  "amended",
+  "accepted",
+  "rejected",
+  "completed",
+  "archived",
 ];
 
 export default function TaxReturnModal({
@@ -72,8 +76,9 @@ export default function TaxReturnModal({
     setSaving(true);
     setError(null);
 
+    const parsedTaxYear = parseInt(taxYear, 10);
     const payload = {
-      tax_year: parseInt(taxYear, 10),
+      tax_year: parsedTaxYear,
       return_type: returnType,
       filing_status: filingStatus || null,
       return_status: returnStatus,
@@ -109,9 +114,41 @@ export default function TaxReturnModal({
       return;
     }
 
+    const { data: existingTaxYear } = await supabase
+      .from("client_tax_years")
+      .select("id")
+      .eq("workspace_id", client.workspace_id)
+      .eq("client_id", selectedClientId)
+      .eq("tax_year", parsedTaxYear)
+      .eq("return_type", returnType)
+      .maybeSingle();
+
+    let clientTaxYearId = existingTaxYear?.id ?? null;
+    if (!clientTaxYearId) {
+      const { data: createdTaxYear, error: taxYearError } = await supabase
+        .from("client_tax_years")
+        .insert({
+          workspace_id: client.workspace_id,
+          client_id: selectedClientId,
+          tax_year: parsedTaxYear,
+          return_type: returnType,
+          filing_status: filingStatus || null,
+          tax_status: "not_started",
+        })
+        .select("id")
+        .single();
+      if (taxYearError) {
+        setSaving(false);
+        setError(taxYearError.message);
+        return;
+      }
+      clientTaxYearId = createdTaxYear.id;
+    }
+
     const { error } = await supabase.from("tax_returns").insert({
       workspace_id: client.workspace_id,
       client_id: selectedClientId,
+      client_tax_year_id: clientTaxYearId,
       ...payload,
     });
 
@@ -149,6 +186,7 @@ export default function TaxReturnModal({
         <h3 className="font-slab text-lg font-bold text-ink mb-4">
           {isEditing ? "Edit Tax Return" : "New Tax Return"}
         </h3>
+        <p className="text-sm text-muted mb-4">Track preparation, review, signature, filing, refund, and balance-due status. Client details come from the CRM profile; only return-specific information belongs here.</p>
         <form onSubmit={handleSubmit} className="space-y-3">
           {!clientId && !isEditing && (
             <select
@@ -208,21 +246,17 @@ export default function TaxReturnModal({
           </select>
 
           <div className="flex gap-2">
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Federal refund"
               value={federalRefund}
-              onChange={(e) => setFederalRefund(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setFederalRefund}
+              className="w-1/2"
             />
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Federal balance due"
               value={federalBalanceDue}
-              onChange={(e) => setFederalBalanceDue(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setFederalBalanceDue}
+              className="w-1/2"
             />
           </div>
 

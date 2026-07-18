@@ -70,14 +70,14 @@ export default function BillingPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Billing
           </div>
           <h1 className="font-slab text-2xl font-bold text-ink">Invoices</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-semibold px-3 py-1.5 rounded-sm bg-ink text-white">
             One-Time
           </span>
@@ -140,8 +140,8 @@ export default function BillingPage() {
         ))}
       </div>
 
-      <div className="bg-white border border-line rounded-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-line rounded-sm overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-widest text-muted">
               <th className="px-5 py-3 font-semibold">Client</th>

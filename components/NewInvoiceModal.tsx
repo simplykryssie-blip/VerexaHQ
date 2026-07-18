@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 type DraftLineItem = { item_name: string; quantity: string; unit_price: string };
 
@@ -198,13 +199,11 @@ export default function NewInvoiceModal({
                     onChange={(e) => updateItem(idx, "quantity", e.target.value)}
                     className="w-16 border border-line rounded-sm px-2 py-2 text-sm"
                   />
-                  <input
-                    type="number"
-                    step="0.01"
+                  <CurrencyInput
                     placeholder="Price"
                     value={it.unit_price}
-                    onChange={(e) => updateItem(idx, "unit_price", e.target.value)}
-                    className="w-24 border border-line rounded-sm px-2 py-2 text-sm"
+                    onChange={(value) => updateItem(idx, "unit_price", value)}
+                    className="w-28"
                   />
                   <button
                     type="button"

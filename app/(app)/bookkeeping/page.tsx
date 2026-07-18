@@ -57,7 +57,7 @@ export default function BookkeepingPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Monthly Close
@@ -94,7 +94,7 @@ export default function BookkeepingPage() {
           <Link
             key={e.id}
             href={`/bookkeeping/${e.id}`}
-            className="flex items-center justify-between px-5 py-3.5 hover:bg-paper transition-colors"
+            className="flex flex-col gap-2 px-5 py-3.5 hover:bg-paper transition-colors sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
               <div className="font-semibold text-ink text-sm">{e.clientName}</div>
@@ -102,7 +102,7 @@ export default function BookkeepingPage() {
                 {e.bookkeeping_software || "No software set"} · {e.frequency ?? "monthly"}
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               {e.cleanup_needed && <StatusPill status="Needs Cleanup" />}
               <StatusPill status={e.engagement_status} />
             </div>

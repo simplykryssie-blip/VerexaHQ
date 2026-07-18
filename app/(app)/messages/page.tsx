@@ -108,14 +108,14 @@ export default function StaffMessagesPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Client Portal
           </div>
           <h1 className="font-slab text-2xl font-bold text-ink">Messages</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setFilter("all")}
             className="text-xs font-semibold px-3 py-1.5 rounded-sm border"

@@ -75,19 +75,19 @@ export default function OrganizersPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Client Intake
           </div>
           <h1 className="font-slab text-2xl font-bold text-ink">Tax Organizers</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/tax"
             className="text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
           >
-            Returns
+            Tax Returns
           </Link>
           <span className="text-xs font-semibold px-3 py-1.5 rounded-sm bg-ink text-white">
             Organizers
@@ -99,6 +99,13 @@ export default function OrganizersPage() {
             <Plus size={15} /> Assign Organizer
           </button>
         </div>
+      </div>
+
+      <div className="mb-4 rounded-sm border border-line bg-white px-4 py-3 text-sm text-muted">
+        Organizers collect the client&apos;s answers and documents before preparation.
+        VerexaHQ reuses known client identity and contact details, links the organizer to
+        the same client tax-year record, and leaves financial amounts for the client or
+        staff to enter only once.
       </div>
 
       {showModal && (
@@ -123,13 +130,13 @@ export default function OrganizersPage() {
           <Link
             key={a.id}
             href={`/tax/organizers/${a.id}`}
-            className="flex items-center justify-between px-5 py-3.5 hover:bg-paper transition-colors"
+            className="flex flex-col gap-2 px-5 py-3.5 hover:bg-paper transition-colors sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
               <div className="font-semibold text-ink text-sm">{a.clientName}</div>
               <div className="text-xs text-muted mt-0.5">{a.templateName}</div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <span className="text-xs tabular-nums font-mono text-muted">
                 {a.due_date ? `Due ${a.due_date}` : "No due date"}
               </span>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollEmployee } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 export default function PayrollEmployeeModal({
   payrollClientId,
@@ -144,22 +145,18 @@ export default function PayrollEmployeeModal({
           </div>
 
           {payType === "hourly" ? (
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Hourly rate"
               value={hourlyRate}
-              onChange={(e) => setHourlyRate(e.target.value)}
-              className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setHourlyRate}
+              className="w-full"
             />
           ) : (
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Annual salary"
               value={annualSalary}
-              onChange={(e) => setAnnualSalary(e.target.value)}
-              className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setAnnualSalary}
+              className="w-full"
             />
           )}
 

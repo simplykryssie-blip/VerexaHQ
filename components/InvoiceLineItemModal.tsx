@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { InvoiceLineItem } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 export default function InvoiceLineItemModal({
   invoiceId,
@@ -108,13 +109,11 @@ export default function InvoiceLineItemModal({
               onChange={(e) => setQuantity(e.target.value)}
               className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
             />
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Unit price"
               value={unitPrice}
-              onChange={(e) => setUnitPrice(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setUnitPrice}
+              className="w-1/2"
             />
           </div>
 

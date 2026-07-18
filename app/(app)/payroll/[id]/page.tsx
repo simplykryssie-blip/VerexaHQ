@@ -204,7 +204,7 @@ export default function PayrollClientDetailPage() {
             <Link
               key={r.id}
               href={`/payroll/runs/${r.id}`}
-              className="flex items-center justify-between px-5 py-3.5 hover:bg-paper transition-colors"
+              className="flex flex-col gap-2 px-5 py-3.5 hover:bg-paper transition-colors sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
                 <div className="font-semibold text-ink text-sm">

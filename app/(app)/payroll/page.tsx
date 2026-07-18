@@ -57,7 +57,7 @@ export default function PayrollPage() {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Payroll Services
@@ -94,7 +94,7 @@ export default function PayrollPage() {
           <Link
             key={p.id}
             href={`/payroll/${p.id}`}
-            className="flex items-center justify-between px-5 py-3.5 hover:bg-paper transition-colors"
+            className="flex flex-col gap-2 px-5 py-3.5 hover:bg-paper transition-colors sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
               <div className="font-semibold text-ink text-sm">{p.clientName}</div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollTaxDeposit } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const TAX_TYPES = ["941 Deposit", "State Withholding", "SUTA", "FUTA", "Local"];
 const STATUSES = ["scheduled", "paid", "late", "waived"];
@@ -123,13 +124,11 @@ export default function PayrollTaxDepositModal({
               onChange={(e) => setDueDate(e.target.value)}
               className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
             />
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="w-1/2 border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setAmount}
+              className="w-1/2"
             />
           </div>
           <select

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { TaxEstimate } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 export default function TaxEstimateModal({
   clientId,
@@ -128,13 +129,11 @@ export default function TaxEstimateModal({
             onChange={(e) => setDueDate(e.target.value)}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
-          <input
-            type="number"
-            step="0.01"
+          <CurrencyInput
             placeholder="Estimated amount"
             value={estimatedAmount}
-            onChange={(e) => setEstimatedAmount(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+            onChange={setEstimatedAmount}
+            className="w-full"
           />
           <select
             value={paymentStatus}
@@ -147,13 +146,11 @@ export default function TaxEstimateModal({
             <option value="waived">Waived</option>
           </select>
           {paymentStatus === "paid" && (
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               placeholder="Paid amount"
               value={paidAmount}
-              onChange={(e) => setPaidAmount(e.target.value)}
-              className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+              onChange={setPaidAmount}
+              className="w-full"
             />
           )}
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, BookkeepingEngagement } from "@/lib/types";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const STATUSES = ["active", "paused", "cleanup", "offboarding", "closed"];
 const FREQUENCIES = ["weekly", "monthly", "quarterly"];
@@ -183,13 +184,11 @@ export default function EngagementModal({
             onChange={(e) => setSoftware(e.target.value)}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
-          <input
-            type="number"
-            step="0.01"
+          <CurrencyInput
             placeholder="Monthly fee"
             value={monthlyFee}
-            onChange={(e) => setMonthlyFee(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+            onChange={setMonthlyFee}
+            className="w-full"
           />
 
           <label className="flex items-center gap-2 text-sm text-ink">

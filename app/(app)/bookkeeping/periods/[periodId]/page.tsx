@@ -20,6 +20,7 @@ import TransactionModal from "@/components/TransactionModal";
 import BankImportModal from "@/components/BankImportModal";
 import AdjustmentModal from "@/components/AdjustmentModal";
 import ReportDeliveryModal from "@/components/ReportDeliveryModal";
+import CurrencyInput from "@/components/CurrencyInput";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -50,6 +51,8 @@ export default function PeriodDetailPage() {
   const [adjustments, setAdjustments] = useState<BookkeepingAdjustment[]>([]);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
   const [startingRecon, setStartingRecon] = useState(false);
+  const [beginningBalanceInput, setBeginningBalanceInput] = useState("");
+  const [endingBalanceInput, setEndingBalanceInput] = useState("");
 
   const [reports, setReports] = useState<BookkeepingReportDelivery[]>([]);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -314,6 +317,11 @@ export default function PeriodDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period?.id]);
 
+  useEffect(() => {
+    setBeginningBalanceInput(String(reconSession?.beginning_balance ?? ""));
+    setEndingBalanceInput(String(reconSession?.ending_balance ?? ""));
+  }, [reconSession?.id]);
+
   async function approveReport(report: BookkeepingReportDelivery) {
     const { error } = await supabase.rpc("transition_bookkeeping_report", {
       p_workspace_id: report.workspace_id,
@@ -407,7 +415,7 @@ export default function PeriodDetailPage() {
         </div>
       </div>
 
-      <div className="flex items-end justify-between mb-4 border-b border-line pb-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
         <h2 className="font-slab text-lg font-bold text-ink">Ledger</h2>
         <div className="flex items-center gap-2">
           {accounts.length > 0 && (
@@ -446,8 +454,8 @@ export default function PeriodDetailPage() {
         </div>
       )}
 
-      <div className="bg-white border border-line rounded-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white border border-line rounded-sm overflow-x-auto">
+        <table className="w-full min-w-[720px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-widest text-muted">
               <th className="px-5 py-3 font-semibold">Date</th>
@@ -561,24 +569,22 @@ export default function PeriodDetailPage() {
                   <label className="text-[11px] uppercase tracking-widest text-muted font-semibold block mb-1">
                     Beginning Balance
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    defaultValue={reconSession.beginning_balance}
-                    onBlur={(e) => updateSessionBalance("beginning_balance", e.target.value)}
-                    className="w-full border border-line rounded-sm px-2 py-1.5 text-sm font-mono"
+                  <CurrencyInput
+                    value={beginningBalanceInput}
+                    onChange={setBeginningBalanceInput}
+                    onBlur={(value) => updateSessionBalance("beginning_balance", value)}
+                    className="w-full"
                   />
                 </div>
                 <div className="bg-white border border-line rounded-sm p-4">
                   <label className="text-[11px] uppercase tracking-widest text-muted font-semibold block mb-1">
                     Statement Ending Balance
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    defaultValue={reconSession.ending_balance}
-                    onBlur={(e) => updateSessionBalance("ending_balance", e.target.value)}
-                    className="w-full border border-line rounded-sm px-2 py-1.5 text-sm font-mono"
+                  <CurrencyInput
+                    value={endingBalanceInput}
+                    onChange={setEndingBalanceInput}
+                    onBlur={(value) => updateSessionBalance("ending_balance", value)}
+                    className="w-full"
                   />
                 </div>
                 <div className="bg-white border border-line rounded-sm p-4">

@@ -193,6 +193,7 @@ export type TaxOrganizerQuestion = {
   options: string[];
   is_required: boolean;
   mapped_field: string | null;
+  conditional_logic: Record<string, unknown> | null;
   sort_order: number;
 };
 
