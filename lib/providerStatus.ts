@@ -1,0 +1,20 @@
+// Server-side only. Each of these returns true once the corresponding
+// environment variables are set in .env.local — nothing else needs to
+// change in the app. Until then, the related feature falls back to its
+// manual/tracking-only behavior.
+
+export function isEmailConfigured() {
+  return !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM_ADDRESS;
+}
+
+export function isSmsConfigured() {
+  return (
+    !!process.env.TWILIO_ACCOUNT_SID &&
+    !!process.env.TWILIO_AUTH_TOKEN &&
+    !!process.env.TWILIO_FROM_NUMBER
+  );
+}
+
+export function isStripeConfigured() {
+  return !!process.env.STRIPE_SECRET_KEY;
+}
