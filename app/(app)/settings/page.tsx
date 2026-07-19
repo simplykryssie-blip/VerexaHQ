@@ -4,6 +4,7 @@ import { CheckCircle2, Plug } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { useWorkspace } from "@/components/WorkspaceProvider";
+import BrandCenter from "@/components/BrandCenter";
 type Providers = { email: boolean; sms: boolean; stripe: boolean };
 export default function SettingsPage() {
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
@@ -43,12 +44,12 @@ export default function SettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
-  const tabs = ["profile", "team", "integrations", "subscription"];
+  const tabs = ["profile", "branding", "team", "integrations", "subscription"];
   return (
     <div>
       <h1 className="text-2xl font-bold text-ink">Settings</h1>
       <p className="mt-1 text-sm text-muted">
-        Manage your firm, team, providers, and plan.
+        Manage your firm, branding, team, providers, and plan.
       </p>
       <div className="mt-6 flex gap-2 overflow-x-auto border-b border-line">
         {tabs.map((t) => (
@@ -76,6 +77,7 @@ export default function SettingsPage() {
             />
           </Panel>
         )}
+        {tab === "branding" && <BrandCenter />}
         {tab === "team" && (
           <Panel title="Team members">
             {team.length === 0 ? (
