@@ -7,15 +7,11 @@ import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 
-// clients.account_type still accepts individual | household | business |
-// estate | trust | nonprofit | other, but the create/edit form only offers
-// the two the practice actually uses day to day.
-const ACCOUNT_TYPES = [
+// save_workspace_client only accepts client_type = individual | business.
+const CLIENT_TYPES = [
   { value: "individual", label: "Individual" },
   { value: "business", label: "Business" },
 ];
-
-const ENTITY_TYPES = new Set(["business", "trust", "estate", "nonprofit", "other"]);
 
 function formatPhone(raw: string) {
   const digits = raw.replace(/\D/g, "").slice(0, 10);
@@ -37,9 +33,23 @@ function formatEIN(raw: string) {
   return `${digits.slice(0, 2)}-${digits.slice(2)}`;
 }
 
+// Vercel exposes NEXT_PUBLIC_VERCEL_ENV ("production" | "preview" |
+// "development") automatically on every deployment; fall back to
+// NODE_ENV for local dev where that variable isn't set at all.
+const IS_PREVIEW_OR_DEV = process.env.NEXT_PUBLIC_VERCEL_ENV
+  ? process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
+  : process.env.NODE_ENV !== "production";
+
+// Only rewrites messages that actually look like a permission/RLS denial —
+// and only in production, where showing the raw Postgres error isn't
+// useful to staff. It never claims the session expired; that specific
+// message is only ever shown right after getSession() itself confirms
+// there is no session, not guessed from an error string here.
 function friendlyError(message: string) {
-  if (message.toLowerCase().includes("row-level security")) {
-    return "Your session may have expired or your access changed. Refresh the page, sign in again, and retry.";
+  if (IS_PREVIEW_OR_DEV) return message;
+  const lower = message.toLowerCase();
+  if (lower.includes("row-level security") || lower.includes("not allowed") || lower.includes("permission")) {
+    return "You don't have permission to complete this action. Contact a workspace admin if this seems wrong.";
   }
   return message;
 }
@@ -58,28 +68,9 @@ const US_STATES = [
   ["WA", "Washington"], ["WV", "West Virginia"], ["WI", "Wisconsin"], ["WY", "Wyoming"],
 ] as const;
 
-const SERVICE_OPTIONS = [
-  "Bookkeeping",
-  "Tax Preparation",
-  "Payroll",
-  "Financial Statements",
-  "Sales Tax",
-  "Advisory & Consulting",
-  "Audit & Assurance",
-];
-
-// clients.client_type only allows individual | business | family — this app's
-// other pages branch on client_type === "business" to decide whether to show
-// business_name, so every entity-style account_type maps to "business" here
-// and "household" maps to the legacy "family" value.
-function deriveClientType(accountType: string): "individual" | "business" | "family" {
-  if (accountType === "individual") return "individual";
-  if (accountType === "household") return "family";
-  return "business";
-}
-
 type ContactSearchResult = { id: string; first_name: string; last_name: string; personal_email: string | null };
 type MaskedIdentity = { vault_id: string; identity_type: string; masked_value: string; last_four: string | null };
+type SetupOption = { option_code: string; option_label: string };
 
 export default function ClientModal({
   client,
@@ -102,15 +93,14 @@ export default function ClientModal({
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    account_type: client?.account_type ?? "individual",
-    account_name: client?.account_name ?? "",
+    client_type: client?.client_type === "business" ? "business" : "individual",
     business_name: client?.business_name ?? "",
     address: client?.address ?? "",
     city: client?.city ?? "",
     state: client?.state ?? "",
     zip_code: client?.zip_code ?? "",
     status: client?.status ?? "lead",
-    source: client?.source ?? "",
+    source: "",
     first_name: client?.first_name ?? "",
     middle_name: "",
     last_name: client?.last_name ?? "",
@@ -132,9 +122,11 @@ export default function ClientModal({
   const [availableMembers, setAvailableMembers] = useState<{ user_id: string; label: string }[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
+  const [sourceOptions, setSourceOptions] = useState<SetupOption[]>([]);
+  const [serviceOptions, setServiceOptions] = useState<SetupOption[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
-  const isEntity = ENTITY_TYPES.has(form.account_type);
+  const isEntity = form.client_type === "business";
   const identityType = isEntity ? "ein" : "ssn";
   const identityLabel = isEntity ? "EIN" : "SSN";
 
@@ -146,6 +138,31 @@ export default function ClientModal({
   const [revealedValue, setRevealedValue] = useState<string | null>(null);
   const [identityBusy, setIdentityBusy] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
+
+  // client_setup_options is a global reference table (no workspace scope),
+  // so this loads once regardless of workspaceId.
+  useEffect(() => {
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_source")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data, error: err }) => {
+        if (err) return;
+        setSourceOptions((data as SetupOption[]) ?? []);
+      });
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_service_type")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data, error: err }) => {
+        if (err) return;
+        setServiceOptions((data as SetupOption[]) ?? []);
+      });
+  }, []);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -182,6 +199,11 @@ export default function ClientModal({
       .select("user_id")
       .eq("client_id", client.id)
       .then(({ data }) => setSelectedMemberIds(((data as any[]) ?? []).map((r) => r.user_id)));
+    supabase
+      .from("client_service_interests")
+      .select("service_type")
+      .eq("client_id", client.id)
+      .then(({ data }) => setSelectedServices(((data as any[]) ?? []).map((r) => r.service_type)));
     supabase
       .from("account_contacts")
       .select("contact_id, contacts(middle_name, occupation, portal_access)")
@@ -247,15 +269,17 @@ export default function ClientModal({
       setTagInput("");
       return;
     }
-    const { data, error } = await supabase
+    const { data, error: tagCreateError } = await supabase
       .from("client_tags")
       .insert({ workspace_id: workspaceId, tag_name: name })
       .select("*")
       .single();
-    if (!error && data) {
-      setAvailableTags((prev) => [...prev, data as ClientTag]);
-      setSelectedTagIds((prev) => [...prev, (data as ClientTag).id]);
+    if (tagCreateError) {
+      setError(friendlyError(tagCreateError.message));
+      return;
     }
+    setAvailableTags((prev) => [...prev, data as ClientTag]);
+    setSelectedTagIds((prev) => [...prev, (data as ClientTag).id]);
     setTagInput("");
   }
 
@@ -263,10 +287,8 @@ export default function ClientModal({
     setSelectedMemberIds((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
   }
 
-  function toggleService(service: string) {
-    setSelectedServices((prev) =>
-      prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]
-    );
+  function toggleService(code: string) {
+    setSelectedServices((prev) => (prev.includes(code) ? prev.filter((s) => s !== code) : [...prev, code]));
   }
 
   function goToContacts(e: React.FormEvent) {
@@ -279,16 +301,6 @@ export default function ClientModal({
     if (selectedMemberIds.length === 0) {
       setError("Select at least one team member.");
       return;
-    }
-    if (isEntity) {
-      setForm((f) => ({ ...f, business_name: f.account_name }));
-    } else {
-      const parts = form.account_name.trim().split(/\s+/);
-      setForm((f) => ({
-        ...f,
-        first_name: parts[0] ?? "",
-        last_name: parts.slice(1).join(" "),
-      }));
     }
     setStep(2);
   }
@@ -343,7 +355,7 @@ export default function ClientModal({
     e.preventDefault();
     setError(null);
 
-    if (!isEditing && selectedServices.length === 0) {
+    if (selectedServices.length === 0) {
       setError("Select at least one service.");
       return;
     }
@@ -360,79 +372,51 @@ export default function ClientModal({
       setError("Your session has expired. Refresh the page and sign in again.");
       return;
     }
-    const userId = sessionData.session.user.id;
 
-    // Re-resolve the workspace directly from membership right before writing,
-    // rather than trusting the WorkspaceProvider context value, so this
-    // always matches exactly what the clients RLS policy itself checks.
-    let resolvedWorkspaceId = workspaceId;
-    if (!isEditing) {
-      const { data: memberRow, error: memberError } = await supabase
-        .from("workspace_members")
-        .select("workspace_id")
-        .eq("user_id", userId)
-        .eq("member_status", "Active")
-        .limit(1)
-        .maybeSingle();
-      if (memberError || !memberRow) {
-        setSaving(false);
-        setError("Could not confirm your workspace membership. Refresh the page and try again.");
-        return;
-      }
-      resolvedWorkspaceId = memberRow.workspace_id;
-    }
-    if (!resolvedWorkspaceId) {
+    if (!workspaceId) {
       setSaving(false);
       setError("Could not determine your workspace. Close this and try again.");
       return;
     }
 
-    const contactFullName = `${form.first_name} ${form.last_name}`.trim();
-    const resolvedAccountName = form.account_name.trim() || (isEntity ? form.business_name : contactFullName);
-
-    const clientPayload = {
-      client_type: deriveClientType(form.account_type),
-      account_type: form.account_type,
-      account_name: resolvedAccountName,
-      first_name: form.first_name,
-      last_name: form.last_name,
-      business_name: form.business_name,
-      email: form.email,
-      phone: form.phone,
-      status: form.status,
-      source: form.source,
-      address: form.address,
-      city: form.city,
-      state: form.state,
-      zip_code: form.zip_code,
-    };
-
-    let clientId = client?.id ?? "";
-
-    if (isEditing) {
-      const { error: updateError } = await supabase.from("clients").update(clientPayload).eq("id", client!.id);
-      if (updateError) {
-        setSaving(false);
-        setError(friendlyError(updateError.message));
-        return;
-      }
-    } else {
-      const { data: newClient, error: insertError } = await supabase
-        .from("clients")
-        .insert({ workspace_id: resolvedWorkspaceId, ...clientPayload, assigned_to: userId })
-        .select("id")
-        .single();
-      if (insertError) {
-        setSaving(false);
-        setError(friendlyError(insertError.message));
-        return;
-      }
-      clientId = newClient!.id;
+    // save_workspace_client is the approved write path for public.clients.
+    // It validates permission, status/source/service-type values, and
+    // upserts client_service_interests from p_service_types in one
+    // transaction (deleting anything unchecked on edit). It does not
+    // manage the legacy account_type/account_name display columns, so
+    // those are intentionally left untouched by this form.
+    const { data: saveResult, error: saveError } = await supabase.rpc("save_workspace_client", {
+      p_workspace_id: workspaceId,
+      p_client_id: client?.id ?? null,
+      p_client_type: form.client_type,
+      p_first_name: form.first_name,
+      p_last_name: form.last_name,
+      p_business_name: form.business_name,
+      p_email: form.email,
+      p_phone: form.phone,
+      p_address: form.address,
+      p_city: form.city,
+      p_state: form.state,
+      p_zip_code: form.zip_code,
+      p_status: form.status,
+      p_source: form.source || null,
+      p_service_types: selectedServices,
+    });
+    if (saveError) {
+      setSaving(false);
+      setError(friendlyError(saveError.message));
+      return;
+    }
+    const clientId: string | undefined = (saveResult as any)?.client_id;
+    if (!clientId) {
+      setSaving(false);
+      setError("The client save did not return a client ID.");
+      return;
     }
 
     if (form.first_name || form.last_name) {
       if (contactId) {
-        await supabase
+        const { error: contactUpdateError } = await supabase
           .from("contacts")
           .update({
             first_name: form.first_name,
@@ -444,27 +428,42 @@ export default function ClientModal({
             portal_access: form.portal_access,
           })
           .eq("id", contactId);
-        const { data: existingLink } = await supabase
+        if (contactUpdateError) {
+          setSaving(false);
+          setError(`Client saved, but the contact record failed to update: ${friendlyError(contactUpdateError.message)}`);
+          return;
+        }
+        const { data: existingLink, error: linkLookupError } = await supabase
           .from("account_contacts")
           .select("id")
           .eq("account_id", clientId)
           .eq("contact_id", contactId)
           .maybeSingle();
+        if (linkLookupError) {
+          setSaving(false);
+          setError(`Client saved, but checking the contact link failed: ${friendlyError(linkLookupError.message)}`);
+          return;
+        }
         if (!existingLink) {
-          await supabase.from("account_contacts").insert({
-            workspace_id: resolvedWorkspaceId,
+          const { error: linkInsertError } = await supabase.from("account_contacts").insert({
+            workspace_id: workspaceId,
             account_id: clientId,
             contact_id: contactId,
             relationship_type: "primary",
             is_primary: true,
             portal_access: form.portal_access,
           });
+          if (linkInsertError) {
+            setSaving(false);
+            setError(`Client saved, but linking the contact failed: ${friendlyError(linkInsertError.message)}`);
+            return;
+          }
         }
       } else {
         const { data: newContact, error: contactError } = await supabase
           .from("contacts")
           .insert({
-            workspace_id: resolvedWorkspaceId,
+            workspace_id: workspaceId,
             first_name: form.first_name,
             middle_name: form.middle_name || null,
             last_name: form.last_name,
@@ -475,59 +474,98 @@ export default function ClientModal({
           })
           .select("id")
           .single();
-        if (!contactError && newContact) {
-          await supabase.from("account_contacts").insert({
-            workspace_id: resolvedWorkspaceId,
-            account_id: clientId,
-            contact_id: newContact.id,
-            relationship_type: "primary",
-            is_primary: true,
-            portal_access: form.portal_access,
-          });
+        if (contactError) {
+          setSaving(false);
+          setError(`Client saved, but creating the contact record failed: ${friendlyError(contactError.message)}`);
+          return;
         }
+        const { error: linkInsertError } = await supabase.from("account_contacts").insert({
+          workspace_id: workspaceId,
+          account_id: clientId,
+          contact_id: newContact.id,
+          relationship_type: "primary",
+          is_primary: true,
+          portal_access: form.portal_access,
+        });
+        if (linkInsertError) {
+          setSaving(false);
+          setError(`Client saved, but linking the new contact failed: ${friendlyError(linkInsertError.message)}`);
+          return;
+        }
+        setContactId(newContact.id);
       }
     }
 
-    await supabase.from("client_tag_assignments").delete().eq("client_id", clientId);
+    const { error: tagDeleteError } = await supabase.from("client_tag_assignments").delete().eq("client_id", clientId);
+    if (tagDeleteError) {
+      setSaving(false);
+      setError(`Client saved, but clearing old tags failed: ${friendlyError(tagDeleteError.message)}`);
+      return;
+    }
     if (selectedTagIds.length > 0) {
-      await supabase
+      const { error: tagInsertError } = await supabase
         .from("client_tag_assignments")
-        .insert(selectedTagIds.map((tag_id) => ({ workspace_id: resolvedWorkspaceId, client_id: clientId, tag_id })));
+        .insert(selectedTagIds.map((tag_id) => ({ workspace_id: workspaceId, client_id: clientId, tag_id })));
+      if (tagInsertError) {
+        setSaving(false);
+        setError(`Client saved, but saving tags failed: ${friendlyError(tagInsertError.message)}`);
+        return;
+      }
     }
 
-    await supabase.from("client_team_members").delete().eq("client_id", clientId);
+    const { error: memberDeleteError } = await supabase.from("client_team_members").delete().eq("client_id", clientId);
+    if (memberDeleteError) {
+      setSaving(false);
+      setError(`Client saved, but clearing team assignment failed: ${friendlyError(memberDeleteError.message)}`);
+      return;
+    }
     if (selectedMemberIds.length > 0) {
-      await supabase
+      const { error: memberInsertError } = await supabase
         .from("client_team_members")
-        .insert(selectedMemberIds.map((user_id) => ({ workspace_id: resolvedWorkspaceId, client_id: clientId, user_id })));
+        .insert(selectedMemberIds.map((user_id) => ({ workspace_id: workspaceId, client_id: clientId, user_id })));
+      if (memberInsertError) {
+        setSaving(false);
+        setError(`Client saved, but saving team assignment failed: ${friendlyError(memberInsertError.message)}`);
+        return;
+      }
     }
 
     if (newIdentityValue.trim()) {
+      // The full value is only ever sent to save_identity_vault_value,
+      // which encrypts it server-side. If this fails, stop immediately —
+      // do not fall through to saving the last-four digits below.
       const { error: idError } = await supabase.rpc("save_identity_vault_value", {
-        p_workspace_id: resolvedWorkspaceId,
+        p_workspace_id: workspaceId,
         p_client_id: clientId,
         p_related_contact_id: null,
         p_identity_type: identityType,
         p_plain_value: newIdentityValue,
         p_reason: "Saved via client form",
       });
-      if (!idError && identityType === "ssn") {
-        const digits = newIdentityValue.replace(/\D/g, "");
-        await supabase.from("clients").update({ ssn_last_four: digits.slice(-4) }).eq("id", clientId);
+      if (idError) {
+        setSaving(false);
+        setError(`Client saved, but the ${identityLabel} could not be stored securely: ${friendlyError(idError.message)}`);
+        return;
       }
-    }
-
-    if (!isEditing && selectedServices.length > 0) {
-      const currentYear = new Date().getFullYear().toString();
-      await supabase.from("services").insert(
-        selectedServices.map((service_type) => ({
-          workspace_id: resolvedWorkspaceId,
-          client_id: clientId,
-          service_type,
-          service_status: "New",
-          service_year: currentYear,
-        }))
-      );
+      if (identityType === "ssn") {
+        const digits = newIdentityValue.replace(/\D/g, "");
+        // save_client_profile_details overwrites date_of_birth on every
+        // call rather than leaving it untouched — pass the client's
+        // existing value straight through so this can't silently null it.
+        const { error: profileError } = await supabase.rpc("save_client_profile_details", {
+          p_workspace_id: workspaceId,
+          p_client_id: clientId,
+          p_date_of_birth: client?.date_of_birth ?? null,
+          p_ssn_last_four: digits.slice(-4),
+        });
+        if (profileError) {
+          setSaving(false);
+          setError(
+            `Client and SSN saved securely, but the last-four display value failed to save: ${friendlyError(profileError.message)}`
+          );
+          return;
+        }
+      }
     }
 
     setSaving(false);
@@ -548,7 +586,7 @@ export default function ClientModal({
     const { error: deleteError } = await supabase.from("clients").delete().eq("id", client.id);
     setDeleting(false);
     if (deleteError) {
-      setError(deleteError.message);
+      setError(friendlyError(deleteError.message));
       return;
     }
     onDeleted?.();
@@ -584,13 +622,13 @@ export default function ClientModal({
           <form onSubmit={goToContacts} className="space-y-5">
             <Section label="Client type">
               <div className="flex flex-wrap gap-x-5 gap-y-2.5">
-                {ACCOUNT_TYPES.map((t) => (
+                {CLIENT_TYPES.map((t) => (
                   <label key={t.value} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
                     <input
                       type="radio"
-                      name="account_type"
-                      checked={form.account_type === t.value}
-                      onChange={() => setForm({ ...form, account_type: t.value })}
+                      name="client_type"
+                      checked={form.client_type === t.value}
+                      onChange={() => setForm({ ...form, client_type: t.value })}
                       className="h-4 w-4 accent-[#108A64]"
                     />
                     {t.label}
@@ -599,15 +637,42 @@ export default function ClientModal({
               </div>
             </Section>
 
-            <Section label={isEntity ? "Business name" : "Client's name"}>
-              <input
-                required
-                placeholder={isEntity ? "Greenleaf Consulting LLC" : "John Doe"}
-                value={form.account_name}
-                onChange={(e) => setForm({ ...form, account_name: e.target.value })}
-                className="client-input w-full"
-              />
-            </Section>
+            {isEntity ? (
+              <Section label="Business name">
+                <input
+                  required
+                  placeholder="Greenleaf Consulting LLC"
+                  value={form.business_name}
+                  onChange={(e) => setForm({ ...form, business_name: e.target.value })}
+                  className="client-input w-full"
+                />
+              </Section>
+            ) : (
+              <Section label="Client's name">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    required
+                    placeholder="First name"
+                    value={form.first_name}
+                    onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Middle name (optional)"
+                    value={form.middle_name}
+                    onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    placeholder="Last name"
+                    value={form.last_name}
+                    onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                </div>
+              </Section>
+            )}
 
             <Section label="Address">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -900,12 +965,18 @@ export default function ClientModal({
                   onChange={(e) => setForm({ ...form, occupation: e.target.value })}
                   className="client-input w-full"
                 />
-                <input
-                  placeholder="Referral source (e.g. Referral, Website, Google)"
+                <select
                   value={form.source}
                   onChange={(e) => setForm({ ...form, source: e.target.value })}
                   className="client-input w-full"
-                />
+                >
+                  <option value="">Referral source…</option>
+                  {sourceOptions.map((o) => (
+                    <option key={o.option_code} value={o.option_code}>
+                      {o.option_label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <label className="mt-3 flex items-center gap-2 text-sm text-ink">
                 <input
@@ -1019,26 +1090,24 @@ export default function ClientModal({
               </Section>
             )}
 
-            {!isEditing && (
-              <Section label="Services (required)">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {SERVICE_OPTIONS.map((service) => (
-                    <label
-                      key={service}
-                      className="flex items-center gap-2 text-sm text-ink border border-line rounded-xl px-3 py-2.5 cursor-pointer hover:bg-paper"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedServices.includes(service)}
-                        onChange={() => toggleService(service)}
-                        className="w-4 h-4 accent-[#108A64]"
-                      />
-                      {service}
-                    </label>
-                  ))}
-                </div>
-              </Section>
-            )}
+            <Section label="Services (required)">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {serviceOptions.map((opt) => (
+                  <label
+                    key={opt.option_code}
+                    className="flex items-center gap-2 text-sm text-ink border border-line rounded-xl px-3 py-2.5 cursor-pointer hover:bg-paper"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedServices.includes(opt.option_code)}
+                      onChange={() => toggleService(opt.option_code)}
+                      className="w-4 h-4 accent-[#108A64]"
+                    />
+                    {opt.option_label}
+                  </label>
+                ))}
+              </div>
+            </Section>
 
             {error && (
               <div className="text-xs text-brick bg-brick/10 border border-brick/30 rounded-xl px-3 py-2.5">
