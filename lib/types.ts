@@ -115,6 +115,81 @@ export type Service = {
   updated_at: string;
 };
 
+export type Engagement = {
+  id: string;
+  workspace_id: string;
+  account_id: string;
+  service_id: string | null;
+  engagement_name: string;
+  engagement_type: string | null;
+  tax_year: number | null;
+  period_start: string | null;
+  period_end: string | null;
+  pipeline_id: string | null;
+  pipeline_stage_id: string | null;
+  status: string;
+  priority: string | null;
+  assigned_to: string | null;
+  due_date: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  recurring_rule: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// Rollup view: v_engagement_workspace. security_invoker view, safe to
+// query directly — RLS on the underlying engagements table (portal_can_see)
+// still applies per-row.
+export type EngagementWorkspace = {
+  engagement_id: string;
+  workspace_id: string;
+  account_id: string;
+  account_name: string | null;
+  account_type: string | null;
+  engagement_name: string;
+  engagement_type: string | null;
+  tax_year: number | null;
+  period_start: string | null;
+  period_end: string | null;
+  status: string;
+  priority: string | null;
+  pipeline_id: string | null;
+  pipeline_stage_id: string | null;
+  stage_name: string | null;
+  assigned_to: string | null;
+  due_date: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  open_tasks: number;
+  missing_documents: number;
+  open_forms: number;
+  open_organizers: number;
+  open_invoices: number;
+  invoiced_total: number;
+  paid_total: number;
+  unmet_requirements: number;
+  current_stage_ready: boolean;
+};
+
+export type ServiceTemplate = {
+  id: string;
+  workspace_id: string | null;
+  template_name: string;
+  service_type: string;
+  description: string | null;
+  default_price: number | null;
+  default_pipeline_id: string | null;
+  is_active: boolean;
+  is_platform_template: boolean;
+  visibility_scope: string | null;
+  owner_user_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Task = {
   id: string;
   workspace_id: string;

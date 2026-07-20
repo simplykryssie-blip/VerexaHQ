@@ -56,6 +56,14 @@ export default function TasksPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowModal(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   async function toggleTask(task: TaskWithClient) {
     const nextStatus = task.task_status === "Done" ? "To Do" : "Done";
     const { error } = await supabase

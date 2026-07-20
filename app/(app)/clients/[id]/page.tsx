@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -19,10 +20,12 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { Client, Service, Task, Deadline, Document, DocumentFolder } from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
+import { isOpenServiceStatus } from "@/lib/status";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
 import NewServiceModal from "@/components/NewServiceModal";
+import ActivateServiceModal from "@/components/ActivateServiceModal";
 import ClientModal from "@/components/ClientModal";
 import InvitePortalModal from "@/components/InvitePortalModal";
 import UploadDocumentModal from "@/components/UploadDocumentModal";
@@ -57,6 +60,7 @@ export default function ClientDetailPage() {
 
   const [client, setClient] = useState<Client | null>(null);
   const [services, setServices] = useState<Service[]>([]);
+  const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
   const [tasks, setTasks] = useState<Task[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -72,16 +76,17 @@ export default function ClientDetailPage() {
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
-  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showActivateModal, setShowActivateModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
 
   async function load() {
     setLoading(true);
-    const [clientRes, servicesRes, tasksRes, deadlinesRes, documentsRes, foldersRes] = await Promise.all([
+    const [clientRes, servicesRes, engagementsRes, tasksRes, deadlinesRes, documentsRes, foldersRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", id).maybeSingle(),
       supabase.from("services").select("*").eq("client_id", id),
+      supabase.from("engagements").select("id, service_id").eq("account_id", id),
       supabase.from("tasks").select("*").eq("client_id", id).order("due_date"),
       supabase.from("deadlines").select("*").eq("client_id", id).order("due_date"),
       supabase.from("documents").select("*").eq("client_id", id).order("created_at", { ascending: false }),
@@ -96,6 +101,11 @@ export default function ClientDetailPage() {
 
     setClient(clientRes.data as Client);
     setServices((servicesRes.data as Service[]) ?? []);
+    const engMap = new Map<string, string>();
+    (engagementsRes.data ?? []).forEach((e: any) => {
+      if (e.service_id) engMap.set(e.service_id, e.id);
+    });
+    setServiceEngagements(engMap);
     setTasks((tasksRes.data as Task[]) ?? []);
     setDeadlines((deadlinesRes.data as Deadline[]) ?? []);
     setDocuments((documentsRes.data as Document[]) ?? []);
@@ -224,27 +234,53 @@ export default function ClientDetailPage() {
             <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
               <h2 className="font-bold text-ink">Services</h2>
               <button
-                onClick={() => setShowServiceModal(true)}
+                onClick={() => setShowActivateModal(true)}
                 className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
               >
-                <Plus size={13} /> Add
+                <Plus size={13} /> Add service
               </button>
             </div>
             <div className="divide-y divide-line">
-              {services.length === 0 && <Empty text="No services yet." />}
-              {services.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => setEditingService(s)}
-                  className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
-                >
-                  <div>
-                    <div className="font-semibold text-ink text-sm">{s.service_type}</div>
-                    <div className="text-xs text-muted mt-0.5">{s.service_year}</div>
-                  </div>
-                  <StatusPill status={s.service_status} />
-                </button>
-              ))}
+              {services.length === 0 && <Empty text="No services yet. Add one to open its Service Workspace." />}
+              {services.map((s) => {
+                const engagementId = serviceEngagements.get(s.id);
+                const content = (
+                  <>
+                    <div>
+                      <div className="font-semibold text-ink text-sm">{s.service_type}</div>
+                      <div className="text-xs text-muted mt-0.5">
+                        {s.service_year || "No year set"}
+                        {!engagementId && " · Legacy service, no workspace"}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isOpenServiceStatus(s.service_status) ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[#108A64]">Active</span>
+                      ) : (
+                        <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted">Closed</span>
+                      )}
+                      <StatusPill status={s.service_status} />
+                    </div>
+                  </>
+                );
+                return engagementId ? (
+                  <Link
+                    key={s.id}
+                    href={`/work/${engagementId}`}
+                    className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
+                  >
+                    {content}
+                  </Link>
+                ) : (
+                  <button
+                    key={s.id}
+                    onClick={() => setEditingService(s)}
+                    className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
+                  >
+                    {content}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -503,8 +539,13 @@ export default function ClientDetailPage() {
           onDeleted={load}
         />
       )}
-      {showServiceModal && (
-        <NewServiceModal clientId={client.id} onClose={() => setShowServiceModal(false)} onSaved={load} />
+      {showActivateModal && (
+        <ActivateServiceModal
+          clientId={client.id}
+          workspaceId={client.workspace_id}
+          onClose={() => setShowActivateModal(false)}
+          onActivated={load}
+        />
       )}
       {editingService && (
         <NewServiceModal

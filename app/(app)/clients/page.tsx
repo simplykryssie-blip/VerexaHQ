@@ -39,6 +39,14 @@ export default function ClientsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowNewModal(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   const stats = useMemo(
     () => ({
       total: clients.length,
