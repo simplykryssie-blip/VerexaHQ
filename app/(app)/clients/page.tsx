@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, ChevronRight, Building2, User, Pencil } from "lucide-react";
+import { Plus, Search, ChevronRight, Pencil, Users, UserCheck, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
+import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import StatusPill from "@/components/StatusPill";
 import ClientModal from "@/components/ClientModal";
 
-function clientDisplayName(c: Client) {
-  return c.client_type === "business" && c.business_name
-    ? c.business_name
-    : `${c.first_name} ${c.last_name}`.trim();
-}
+const STATUS_FILTERS = ["all", "lead", "active", "inactive", "archived"];
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
@@ -41,13 +39,24 @@ export default function ClientsPage() {
     load();
   }, []);
 
-  const filtered = clients.filter((c) =>
-    clientDisplayName(c).toLowerCase().includes(query.toLowerCase())
+  const stats = useMemo(
+    () => ({
+      total: clients.length,
+      active: clients.filter((c) => c.status === "active").length,
+      leads: clients.filter((c) => c.status === "lead").length,
+    }),
+    [clients]
   );
 
+  const filtered = clients.filter((c) => {
+    const matchesQuery = clientDisplayName(c).toLowerCase().includes(query.toLowerCase());
+    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    return matchesQuery && matchesStatus;
+  });
+
   return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
             Book of Business
@@ -56,75 +65,84 @@ export default function ClientsPage() {
         </div>
         <button
           onClick={() => setShowNewModal(true)}
-          className="flex items-center gap-1.5 bg-ink text-white text-sm font-semibold px-3.5 py-2 rounded-sm hover:bg-[#14273A] transition-colors"
+          className="flex items-center gap-1.5 bg-[#108A64] text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-[#0d7555] transition-colors"
         >
-          <Plus size={15} /> New Client
+          <Plus size={16} /> New Client
         </button>
       </div>
 
-      <div className="flex items-center gap-2 mb-4 bg-white border border-line rounded-sm px-3 py-2">
-        <Search size={15} className="text-muted" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search clients…"
-          className="flex-1 text-sm outline-none"
-        />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Metric icon={Users} label="Total clients" value={loading ? "—" : stats.total.toLocaleString()} />
+        <Metric icon={UserCheck} label="Active" value={loading ? "—" : stats.active.toLocaleString()} />
+        <Metric icon={UserPlus} label="Leads" value={loading ? "—" : stats.leads.toLocaleString()} />
+      </div>
+
+      <div className="app-card p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-1 items-center gap-2 rounded-xl border border-line bg-paper px-3 py-2.5">
+            <Search size={16} className="text-muted" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search clients…"
+              className="flex-1 bg-transparent text-sm outline-none"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-xl px-3 py-2 text-xs font-semibold capitalize transition-colors ${
+                  statusFilter === s
+                    ? "bg-[#108A64] text-white"
+                    : "border border-line text-muted hover:text-ink"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {error && (
-        <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3 mb-4">
-          {error}
-        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       )}
 
-      <div className="bg-white border border-line rounded-sm overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-[11px] uppercase tracking-widest text-muted">
-              <th className="px-5 py-3 font-semibold">Client</th>
-              <th className="px-5 py-3 font-semibold">Status</th>
-              <th className="px-5 py-3 font-semibold">Email</th>
-              <th className="px-5 py-3 font-semibold">Phone</th>
-              <th className="px-5 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-paperDim">
-            {loading && (
-              <tr>
-                <td colSpan={5} className="px-5 py-6 text-muted">
-                  Loading clients…
-                </td>
-              </tr>
-            )}
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-5 py-6 text-muted">
-                  No clients yet. Click &quot;New Client&quot; to add your first one.
-                </td>
-              </tr>
-            )}
-            {filtered.map((c) => (
-              <tr key={c.id} className="hover:bg-paper transition-colors">
-                <td className="px-5 py-4">
-                  <Link href={`/clients/${c.id}`} className="flex items-center gap-2.5">
-                    {c.client_type === "business" ? (
-                      <Building2 size={15} className="text-muted" />
-                    ) : (
-                      <User size={15} className="text-muted" />
-                    )}
-                    <span className="font-semibold text-ink">
-                      {clientDisplayName(c)}
-                    </span>
+      <div className="app-card overflow-hidden">
+        {loading && <div className="px-5 py-8 text-sm text-muted">Loading clients…</div>}
+        {!loading && filtered.length === 0 && (
+          <div className="mx-4 my-4 rounded-xl border border-dashed border-line p-8 text-center text-sm text-muted">
+            {clients.length === 0
+              ? 'No clients yet. Click "New Client" to add your first one.'
+              : "No clients match your search."}
+          </div>
+        )}
+        {!loading && filtered.length > 0 && (
+          <div className="divide-y divide-line">
+            {filtered.map((c) => {
+              const meta = accountTypeMeta(c.account_type);
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-paper"
+                >
+                  <Link href={`/clients/${c.id}`} className="flex flex-1 items-center gap-3.5 min-w-0">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-sm font-bold text-[#108A64]">
+                      {clientInitials(c)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-ink">{clientDisplayName(c)}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                        <span className={`rounded-full px-2 py-0.5 font-semibold ${meta.badge}`}>{meta.label}</span>
+                        {c.email && <span className="truncate">{c.email}</span>}
+                      </div>
+                    </div>
                   </Link>
-                </td>
-                <td className="px-5 py-4">
+                  <div className="hidden text-sm text-muted md:block">{c.phone || "—"}</div>
                   <StatusPill status={c.status} />
-                </td>
-                <td className="px-5 py-4 text-[#3E4A5B]">{c.email}</td>
-                <td className="px-5 py-4 text-[#3E4A5B]">{c.phone}</td>
-                <td className="px-5 py-4 text-right">
-                  <div className="flex items-center justify-end gap-3">
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => setEditingClient(c)}
                       className="text-muted hover:text-ink"
@@ -133,14 +151,14 @@ export default function ClientsPage() {
                       <Pencil size={14} />
                     </button>
                     <Link href={`/clients/${c.id}`}>
-                      <ChevronRight size={16} className="text-muted inline" />
+                      <ChevronRight size={16} className="text-muted" />
                     </Link>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {showNewModal && (
@@ -154,6 +172,18 @@ export default function ClientsPage() {
           onDeleted={load}
         />
       )}
+    </div>
+  );
+}
+
+function Metric({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="app-card p-5">
+      <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-[#108A64]">
+        <Icon size={19} />
+      </div>
+      <div className="mt-4 text-2xl font-bold tabular-nums text-ink">{value}</div>
+      <div className="mt-1 text-sm text-muted">{label}</div>
     </div>
   );
 }

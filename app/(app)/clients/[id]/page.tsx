@@ -2,9 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Building2, User, ArrowLeft, Plus, Pencil, UserPlus, Upload, Download } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  Pencil,
+  UserPlus,
+  Upload,
+  Download,
+  Mail,
+  Phone,
+  MapPin,
+  Cake,
+  ShieldCheck,
+  Tag,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Service, Task, Deadline, Document, DocumentFolder } from "@/lib/types";
+import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
@@ -14,6 +28,9 @@ import InvitePortalModal from "@/components/InvitePortalModal";
 import UploadDocumentModal from "@/components/UploadDocumentModal";
 import RequestDocumentModal from "@/components/RequestDocumentModal";
 import DocumentFolderModal from "@/components/DocumentFolderModal";
+
+const TABS = ["overview", "services", "tasks", "deadlines", "documents"] as const;
+type Tab = (typeof TABS)[number];
 
 function orderFoldersByTree(folders: DocumentFolder[]): { folder: DocumentFolder; depth: number }[] {
   const byParent = new Map<string, DocumentFolder[]>();
@@ -46,6 +63,7 @@ export default function ClientDetailPage() {
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("overview");
 
   const [showClientModal, setShowClientModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -131,272 +149,296 @@ export default function ClientDetailPage() {
 
   if (error || !client) {
     return (
-      <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">
+      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {error ?? "Client not found."}
       </div>
     );
   }
 
-  const displayName =
-    client.client_type === "business" && client.business_name
-      ? client.business_name
-      : `${client.first_name} ${client.last_name}`.trim();
+  const displayName = clientDisplayName(client);
+  const meta = accountTypeMeta(client.account_type);
+  const address = [client.address, [client.city, client.state, client.zip_code].filter(Boolean).join(", ")]
+    .filter(Boolean)
+    .join(", ");
 
   return (
-    <div>
+    <div className="space-y-6">
       <button
         onClick={() => router.push("/clients")}
-        className="flex items-center gap-1.5 text-xs text-muted mb-4 hover:text-ink"
+        className="flex items-center gap-1.5 text-xs text-muted hover:text-ink"
       >
         <ArrowLeft size={13} /> Back to Clients
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
-        {client.client_type === "business" ? (
-          <Building2 size={20} className="text-muted" />
-        ) : (
-          <User size={20} className="text-muted" />
-        )}
-        <h1 className="font-slab text-2xl font-bold text-ink">{displayName}</h1>
-        <StatusPill status={client.status} />
-        <button
-          onClick={() => setShowInviteModal(true)}
-          className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-        >
-          <UserPlus size={13} /> Invite to Portal
-        </button>
-        <button
-          onClick={() => setShowClientModal(true)}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-        >
-          <Pencil size={13} /> Edit
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="bg-white border border-line rounded-sm p-4">
-          <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
-            Email
+      <div className="app-card p-5">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-emerald-50 text-base font-bold text-[#108A64]">
+            {clientInitials(client)}
           </div>
-          <div className="text-sm text-ink">{client.email || "—"}</div>
-        </div>
-        <div className="bg-white border border-line rounded-sm p-4">
-          <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
-            Phone
-          </div>
-          <div className="text-sm text-ink">{client.phone || "—"}</div>
-        </div>
-        <div className="bg-white border border-line rounded-sm p-4">
-          <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
-            Source
-          </div>
-          <div className="text-sm text-ink">{client.source || "—"}</div>
-        </div>
-      </div>
-
-      <section className="mb-8">
-        <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-          <h2 className="font-slab text-lg font-bold text-ink">Services</h2>
-          <button
-            onClick={() => setShowServiceModal(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-          >
-            <Plus size={13} /> Add
-          </button>
-        </div>
-        <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-          {services.length === 0 && (
-            <div className="px-5 py-5 text-sm text-muted">No services yet.</div>
-          )}
-          {services.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => setEditingService(s)}
-              className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-paper transition-colors"
-            >
-              <div>
-                <div className="font-semibold text-ink text-sm">{s.service_type}</div>
-                <div className="text-xs text-muted mt-0.5">{s.service_year}</div>
-              </div>
-              <StatusPill status={s.service_status} />
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="mb-8">
-        <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-          <h2 className="font-slab text-lg font-bold text-ink">Tasks</h2>
-          <button
-            onClick={() => setShowTaskModal(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-          >
-            <Plus size={13} /> Add
-          </button>
-        </div>
-        <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-          {tasks.length === 0 && (
-            <div className="px-5 py-5 text-sm text-muted">No tasks yet.</div>
-          )}
-          {tasks.map((t) => (
-            <div key={t.id} className="flex items-center justify-between px-5 py-3.5">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={t.task_status === "Done"}
-                  onChange={() => toggleTask(t)}
-                  className="w-4 h-4 accent-[#0D1B2A]"
-                />
-                <span
-                  className="text-sm font-semibold text-ink"
-                  style={{
-                    textDecoration: t.task_status === "Done" ? "line-through" : "none",
-                    opacity: t.task_status === "Done" ? 0.5 : 1,
-                  }}
-                >
-                  {t.task_title}
-                </span>
-              </label>
-              <div className="flex items-center gap-3">
-                <span className="text-xs tabular-nums font-mono text-muted">
-                  {t.due_date ?? "No due date"}
-                </span>
-                <button
-                  onClick={() => setEditingTask(t)}
-                  className="text-muted hover:text-ink"
-                  aria-label="Edit task"
-                >
-                  <Pencil size={13} />
-                </button>
-              </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-slab text-xl font-bold text-ink">{displayName}</h1>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
+              <StatusPill status={client.status} />
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-          <h2 className="font-slab text-lg font-bold text-ink">Deadlines</h2>
-          <button
-            onClick={() => setShowDeadlineModal(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-          >
-            <Plus size={13} /> Add
-          </button>
-        </div>
-        <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-          {deadlines.length === 0 && (
-            <div className="px-5 py-5 text-sm text-muted">No deadlines yet.</div>
-          )}
-          {deadlines.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => setEditingDeadline(d)}
-              className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-paper transition-colors"
-            >
-              <div>
-                <div className="font-semibold text-ink text-sm">{d.deadline_title}</div>
-                <div className="text-xs text-muted mt-0.5">{d.deadline_type}</div>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-sm tabular-nums font-mono text-ink">
-                  {d.due_date}
-                </span>
-                <StatusPill status={d.deadline_status} />
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-          <h2 className="font-slab text-lg font-bold text-ink">Documents</h2>
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+              {client.email && <span className="flex items-center gap-1"><Mail size={12} /> {client.email}</span>}
+              {client.phone && <span className="flex items-center gap-1"><Phone size={12} /> {client.phone}</span>}
+              {client.source && <span className="flex items-center gap-1"><Tag size={12} /> {client.source}</span>}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowFolderModal(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
+              onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-xs font-semibold text-ink hover:bg-paper"
             >
-              <Plus size={13} /> Folders
+              <UserPlus size={13} /> Invite to Portal
             </button>
             <button
-              onClick={() => setShowRequestModal(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
+              onClick={() => setShowClientModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-xs font-semibold text-ink hover:bg-paper"
             >
-              <Plus size={13} /> Request
-            </button>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-            >
-              <Upload size={13} /> Upload
+              <Pencil size={13} /> Edit
             </button>
           </div>
         </div>
+      </div>
 
-        {documents.length === 0 && (
-          <div className="bg-white border border-line rounded-sm px-5 py-5 text-sm text-muted">
-            No documents yet.
+      <div className="flex gap-2 overflow-x-auto border-b border-line">
+        {TABS.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold capitalize ${
+              tab === t ? "border-[#108A64] text-[#108A64]" : "border-transparent text-muted"
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="app-card p-5">
+            <h2 className="font-bold text-ink">Contact</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <InfoRow icon={Mail} label="Email" value={client.email} />
+              <InfoRow icon={Phone} label="Phone" value={client.phone} />
+              <InfoRow icon={MapPin} label="Address" value={address} />
+              <InfoRow icon={Tag} label="Source" value={client.source} />
+            </div>
           </div>
-        )}
+          <div className="app-card p-5">
+            <h2 className="font-bold text-ink">Tax profile</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <InfoRow icon={Cake} label="Date of birth" value={client.date_of_birth} />
+              <InfoRow
+                icon={ShieldCheck}
+                label="SSN"
+                value={client.ssn_last_four ? `•••-••-${client.ssn_last_four}` : ""}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
-        {(() => {
-          const orderedFolders = orderFoldersByTree(folders);
-          return [...orderedFolders.map((o) => o.folder), null].map((folder, idx) => {
-            const depth = folder ? orderedFolders[idx]?.depth ?? 0 : 0;
-            const folderDocs = documents.filter((d) =>
-              folder ? d.folder_id === folder.id : !d.folder_id
-            );
-            if (folderDocs.length === 0) return null;
-            return (
-              <div
-                key={folder ? folder.id : "unfiled"}
-                className="mb-4"
-                style={{ marginLeft: folder ? depth * 20 : 0 }}
+      {tab === "services" && (
+        <div className="app-card p-5">
+          <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
+            <h2 className="font-bold text-ink">Services</h2>
+            <button
+              onClick={() => setShowServiceModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+            >
+              <Plus size={13} /> Add
+            </button>
+          </div>
+          <div className="divide-y divide-line">
+            {services.length === 0 && <Empty text="No services yet." />}
+            {services.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setEditingService(s)}
+                className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
               >
-                <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
-                  {folder ? folder.folder_name : "Unfiled"}
+                <div>
+                  <div className="font-semibold text-ink text-sm">{s.service_type}</div>
+                  <div className="text-xs text-muted mt-0.5">{s.service_year}</div>
                 </div>
-                <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-                  {folderDocs.map((d) => (
-                    <div key={d.id} className="flex items-center justify-between px-5 py-3.5">
-                      <div>
-                        <div className="font-semibold text-ink text-sm">{d.document_name}</div>
-                        <div className="text-xs text-muted mt-0.5">{d.document_category}</div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {folders.length > 0 && (
-                          <select
-                            value={d.folder_id ?? ""}
-                            onChange={(e) => moveDocumentToFolder(d, e.target.value)}
-                            className="text-xs border border-line rounded-sm px-2 py-1 text-muted"
-                          >
-                            <option value="">Unfiled</option>
-                            {orderedFolders.map(({ folder: f, depth: fd }) => (
-                              <option key={f.id} value={f.id}>
-                                {"—".repeat(fd)} {f.folder_name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <StatusPill status={d.document_status} />
-                        {d.storage_path && (
-                          <button
-                            onClick={() => downloadDocument(d)}
-                            className="text-muted hover:text-ink"
-                          >
-                            <Download size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <StatusPill status={s.service_status} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "tasks" && (
+        <div className="app-card p-5">
+          <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
+            <h2 className="font-bold text-ink">Tasks</h2>
+            <button
+              onClick={() => setShowTaskModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+            >
+              <Plus size={13} /> Add
+            </button>
+          </div>
+          <div className="divide-y divide-line">
+            {tasks.length === 0 && <Empty text="No tasks yet." />}
+            {tasks.map((t) => (
+              <div key={t.id} className="flex items-center justify-between py-3.5">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={t.task_status === "Done"}
+                    onChange={() => toggleTask(t)}
+                    className="w-4 h-4 accent-[#108A64]"
+                  />
+                  <span
+                    className="text-sm font-semibold text-ink"
+                    style={{
+                      textDecoration: t.task_status === "Done" ? "line-through" : "none",
+                      opacity: t.task_status === "Done" ? 0.5 : 1,
+                    }}
+                  >
+                    {t.task_title}
+                  </span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs tabular-nums font-mono text-muted">
+                    {t.due_date ?? "No due date"}
+                  </span>
+                  <button
+                    onClick={() => setEditingTask(t)}
+                    className="text-muted hover:text-ink"
+                    aria-label="Edit task"
+                  >
+                    <Pencil size={13} />
+                  </button>
                 </div>
               </div>
-            );
-          });
-        })()}
-      </section>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "deadlines" && (
+        <div className="app-card p-5">
+          <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
+            <h2 className="font-bold text-ink">Deadlines</h2>
+            <button
+              onClick={() => setShowDeadlineModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+            >
+              <Plus size={13} /> Add
+            </button>
+          </div>
+          <div className="divide-y divide-line">
+            {deadlines.length === 0 && <Empty text="No deadlines yet." />}
+            {deadlines.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setEditingDeadline(d)}
+                className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
+              >
+                <div>
+                  <div className="font-semibold text-ink text-sm">{d.deadline_title}</div>
+                  <div className="text-xs text-muted mt-0.5">{d.deadline_type}</div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm tabular-nums font-mono text-ink">{d.due_date}</span>
+                  <StatusPill status={d.deadline_status} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "documents" && (
+        <div className="app-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3 mb-4">
+            <h2 className="font-bold text-ink">Documents</h2>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowFolderModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+              >
+                <Plus size={13} /> Folders
+              </button>
+              <button
+                onClick={() => setShowRequestModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+              >
+                <Plus size={13} /> Request
+              </button>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+              >
+                <Upload size={13} /> Upload
+              </button>
+            </div>
+          </div>
+
+          {documents.length === 0 && <Empty text="No documents yet." />}
+
+          {(() => {
+            const orderedFolders = orderFoldersByTree(folders);
+            return [...orderedFolders.map((o) => o.folder), null].map((folder, idx) => {
+              const depth = folder ? orderedFolders[idx]?.depth ?? 0 : 0;
+              const folderDocs = documents.filter((d) =>
+                folder ? d.folder_id === folder.id : !d.folder_id
+              );
+              if (folderDocs.length === 0) return null;
+              return (
+                <div
+                  key={folder ? folder.id : "unfiled"}
+                  className="mb-4"
+                  style={{ marginLeft: folder ? depth * 20 : 0 }}
+                >
+                  <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
+                    {folder ? folder.folder_name : "Unfiled"}
+                  </div>
+                  <div className="divide-y divide-line rounded-xl border border-line">
+                    {folderDocs.map((d) => (
+                      <div key={d.id} className="flex items-center justify-between px-4 py-3.5">
+                        <div>
+                          <div className="font-semibold text-ink text-sm">{d.document_name}</div>
+                          <div className="text-xs text-muted mt-0.5">{d.document_category}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {folders.length > 0 && (
+                            <select
+                              value={d.folder_id ?? ""}
+                              onChange={(e) => moveDocumentToFolder(d, e.target.value)}
+                              className="text-xs border border-line rounded-lg px-2 py-1 text-muted"
+                            >
+                              <option value="">Unfiled</option>
+                              {orderedFolders.map(({ folder: f, depth: fd }) => (
+                                <option key={f.id} value={f.id}>
+                                  {"—".repeat(fd)} {f.folder_name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          <StatusPill status={d.document_status} />
+                          {d.storage_path && (
+                            <button onClick={() => downloadDocument(d)} className="text-muted hover:text-ink">
+                              <Download size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            });
+          })()}
+        </div>
+      )}
 
       {showClientModal && (
         <ClientModal
@@ -438,11 +480,7 @@ export default function ClientDetailPage() {
         />
       )}
       {showTaskModal && (
-        <NewTaskModal
-          clientId={client.id}
-          onClose={() => setShowTaskModal(false)}
-          onSaved={load}
-        />
+        <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={load} />
       )}
       {editingTask && (
         <NewTaskModal
@@ -454,11 +492,7 @@ export default function ClientDetailPage() {
         />
       )}
       {showDeadlineModal && (
-        <NewDeadlineModal
-          clientId={client.id}
-          onClose={() => setShowDeadlineModal(false)}
-          onSaved={load}
-        />
+        <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={load} />
       )}
       {editingDeadline && (
         <NewDeadlineModal
@@ -470,11 +504,7 @@ export default function ClientDetailPage() {
         />
       )}
       {showServiceModal && (
-        <NewServiceModal
-          clientId={client.id}
-          onClose={() => setShowServiceModal(false)}
-          onSaved={load}
-        />
+        <NewServiceModal clientId={client.id} onClose={() => setShowServiceModal(false)} onSaved={load} />
       )}
       {editingService && (
         <NewServiceModal
@@ -487,4 +517,20 @@ export default function ClientDetailPage() {
       )}
     </div>
   );
+}
+
+function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value?: string | null }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="mt-0.5 text-muted"><Icon size={14} /></div>
+      <div className="min-w-0">
+        <div className="text-[11px] uppercase tracking-wide text-muted font-semibold">{label}</div>
+        <div className="text-sm text-ink break-anywhere">{value || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="rounded-xl border border-dashed border-line p-5 text-sm text-muted">{text}</div>;
 }
