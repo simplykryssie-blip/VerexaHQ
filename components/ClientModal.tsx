@@ -209,26 +209,6 @@ export default function ClientModal({
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
-          <Section label="Account type">
-            <div className="flex flex-wrap gap-2">
-              {ACCOUNT_TYPES.map((t) => (
-                <button
-                  type="button"
-                  key={t.value}
-                  onClick={() => setForm({ ...form, account_type: t.value })}
-                  className="text-xs font-semibold py-2 px-3.5 rounded-xl border transition-colors"
-                  style={{
-                    borderColor: form.account_type === t.value ? "#108A64" : "#DDEAE5",
-                    backgroundColor: form.account_type === t.value ? "#108A64" : "white",
-                    color: form.account_type === t.value ? "white" : "#172622",
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </Section>
-
           <Section label={isEntity ? "Entity" : "Name"}>
             {isEntity ? (
               <input
@@ -313,33 +293,49 @@ export default function ClientModal({
             </div>
           </Section>
 
-          {!isEntity && (
-            <Section label="Tax profile">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="mb-1 block text-xs text-muted">Date of birth</span>
-                  <input
-                    type="date"
-                    value={form.date_of_birth}
-                    onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
-                    className="client-input w-full"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs text-muted">SSN (last 4)</span>
-                  <input
-                    maxLength={4}
-                    placeholder="1234"
-                    value={form.ssn_last_four}
-                    onChange={(e) =>
-                      setForm({ ...form, ssn_last_four: e.target.value.replace(/\D/g, "") })
-                    }
-                    className="client-input w-full"
-                  />
-                </label>
-              </div>
-            </Section>
-          )}
+          <Section label="Tax profile">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-xs text-muted">Account type</span>
+                <select
+                  value={form.account_type}
+                  onChange={(e) => setForm({ ...form, account_type: e.target.value })}
+                  className="client-input w-full"
+                >
+                  {ACCOUNT_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!isEntity && (
+                <>
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-muted">Date of birth</span>
+                    <input
+                      type="date"
+                      value={form.date_of_birth}
+                      onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                      className="client-input w-full"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs text-muted">SSN (last 4)</span>
+                    <input
+                      maxLength={4}
+                      placeholder="1234"
+                      value={form.ssn_last_four}
+                      onChange={(e) =>
+                        setForm({ ...form, ssn_last_four: e.target.value.replace(/\D/g, "") })
+                      }
+                      className="client-input w-full"
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+          </Section>
 
           {isEditing && (
             <Section label="Status">
