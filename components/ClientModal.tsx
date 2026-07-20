@@ -5,25 +5,37 @@ import { X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 
+// Values must match the live `clients.account_type` check constraint:
+// individual | household | business | estate | trust | nonprofit | other
 const ACCOUNT_TYPES = [
   { value: "individual", label: "Individual" },
-  { value: "family", label: "Family" },
+  { value: "household", label: "Household" },
   { value: "business", label: "Business" },
-  { value: "partnership", label: "Partnership" },
   { value: "trust", label: "Trust" },
   { value: "estate", label: "Estate" },
   { value: "nonprofit", label: "Nonprofit" },
+  { value: "other", label: "Other" },
 ];
 
-const ENTITY_TYPES = new Set(["business", "partnership", "trust", "estate", "nonprofit"]);
+const ENTITY_TYPES = new Set(["business", "trust", "estate", "nonprofit", "other"]);
 
 const ENTITY_NAME_LABEL: Record<string, string> = {
   business: "Business name",
-  partnership: "Partnership name",
   trust: "Trust name",
   estate: "Estate name",
   nonprofit: "Organization name",
+  other: "Account name",
 };
+
+// clients.client_type only allows individual | business | family — this app's
+// other pages branch on client_type === "business" to decide whether to show
+// business_name, so every entity-style account_type maps to "business" here
+// and "household" maps to the legacy "family" value.
+function deriveClientType(accountType: string): "individual" | "business" | "family" {
+  if (accountType === "individual") return "individual";
+  if (accountType === "household") return "family";
+  return "business";
+}
 
 const SERVICE_OPTIONS = [
   "Bookkeeping",
@@ -51,7 +63,7 @@ export default function ClientModal({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
-    client_type: client?.client_type ?? "individual",
+    account_type: client?.account_type ?? "individual",
     first_name: client?.first_name ?? "",
     last_name: client?.last_name ?? "",
     business_name: client?.business_name ?? "",
@@ -68,7 +80,7 @@ export default function ClientModal({
   });
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
-  const isEntity = ENTITY_TYPES.has(form.client_type);
+  const isEntity = ENTITY_TYPES.has(form.account_type);
 
   function toggleService(service: string) {
     setSelectedServices((prev) =>
@@ -82,7 +94,8 @@ export default function ClientModal({
     setError(null);
 
     const payload = {
-      client_type: form.client_type,
+      client_type: deriveClientType(form.account_type),
+      account_type: form.account_type,
       first_name: form.first_name,
       last_name: form.last_name,
       business_name: form.business_name,
@@ -95,7 +108,7 @@ export default function ClientModal({
       state: form.state,
       zip_code: form.zip_code,
       date_of_birth: form.date_of_birth || null,
-      ssn_last_four: form.ssn_last_four,
+      ssn_last_four: form.ssn_last_four.length === 4 ? form.ssn_last_four : null,
     };
 
     if (isEditing) {
@@ -207,12 +220,12 @@ export default function ClientModal({
                 <button
                   type="button"
                   key={t.value}
-                  onClick={() => setForm({ ...form, client_type: t.value })}
+                  onClick={() => setForm({ ...form, account_type: t.value })}
                   className="text-xs font-semibold py-2 px-3 rounded-sm border"
                   style={{
-                    borderColor: form.client_type === t.value ? "#0D1B2A" : "#DDE3EC",
-                    backgroundColor: form.client_type === t.value ? "#0D1B2A" : "white",
-                    color: form.client_type === t.value ? "white" : "#0D1B2A",
+                    borderColor: form.account_type === t.value ? "#0D1B2A" : "#DDE3EC",
+                    backgroundColor: form.account_type === t.value ? "#0D1B2A" : "white",
+                    color: form.account_type === t.value ? "white" : "#0D1B2A",
                   }}
                 >
                   {t.label}
@@ -224,7 +237,7 @@ export default function ClientModal({
           {isEntity ? (
             <input
               required
-              placeholder={ENTITY_NAME_LABEL[form.client_type]}
+              placeholder={ENTITY_NAME_LABEL[form.account_type]}
               value={form.business_name}
               onChange={(e) => setForm({ ...form, business_name: e.target.value })}
               className="w-full border border-line rounded-sm px-3 py-2 text-sm"
@@ -336,6 +349,7 @@ export default function ClientModal({
               <option value="lead">Lead</option>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
+              <option value="archived">Archived</option>
             </select>
           )}
 

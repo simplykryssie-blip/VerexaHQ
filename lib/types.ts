@@ -2,6 +2,15 @@ export type Client = {
   id: string;
   workspace_id: string;
   client_type: "individual" | "business" | "family" | string;
+  account_type:
+    | "individual"
+    | "household"
+    | "business"
+    | "estate"
+    | "trust"
+    | "nonprofit"
+    | "other"
+    | string;
   first_name: string;
   last_name: string;
   business_name: string;
@@ -17,7 +26,7 @@ export type Client = {
   created_at: string;
   updated_at: string;
   date_of_birth: string | null;
-  ssn_last_four: string;
+  ssn_last_four: string | null;
 };
 
 export type Pipeline = {
