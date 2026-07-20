@@ -84,7 +84,7 @@ npm run dev
 - Provider secrets remain in server routes.
 - Staff provider routes require a valid Supabase access token.
 - Stripe webhook events are signature-verified and de-duplicated.
-- Documents stay in the private `firmflow-client-documents` bucket and download through signed URLs.
+- Documents stay in the private `verexahq-client-documents` bucket and download through signed URLs.
 - Workspace isolation and permissions remain controlled by the existing Supabase RLS policies and approved RPCs.
 
 ## External limitations

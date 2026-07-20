@@ -62,7 +62,7 @@ export default function DocumentsPage() {
   async function handleDownload(doc: Document) {
     if (!doc.storage_path) return;
     const { data, error } = await supabase.storage
-      .from("firmflow-client-documents")
+      .from("verexahq-client-documents")
       .createSignedUrl(doc.storage_path, 60);
     if (error || !data) {
       setError(error?.message ?? "Could not generate download link.");
@@ -99,7 +99,7 @@ export default function DocumentsPage() {
   async function handleDelete(doc: Document) {
     if (!window.confirm(`Delete "${doc.document_name}"? This can't be undone.`)) return;
     if (doc.storage_path) {
-      await supabase.storage.from("firmflow-client-documents").remove([doc.storage_path]);
+      await supabase.storage.from("verexahq-client-documents").remove([doc.storage_path]);
     }
     const { error } = await supabase.from("documents").delete().eq("id", doc.id);
     if (!error) load();

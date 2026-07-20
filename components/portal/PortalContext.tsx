@@ -34,7 +34,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
       if (list.length === 1) {
         setAccess(list[0]);
       } else if (list.length > 1) {
-        const savedId = sessionStorage.getItem("firmflow-portal-selected-access");
+        const savedId = sessionStorage.getItem("verexahq-portal-selected-access");
         const match = list.find((a) => a.portal_access_id === savedId);
         if (match) setAccess(match);
       }
@@ -48,7 +48,7 @@ export function PortalProvider({ children }: { children: React.ReactNode }) {
 
   function selectAccess(a: PortalAccessListItem) {
     setAccess(a);
-    sessionStorage.setItem("firmflow-portal-selected-access", a.portal_access_id);
+    sessionStorage.setItem("verexahq-portal-selected-access", a.portal_access_id);
   }
 
   return (

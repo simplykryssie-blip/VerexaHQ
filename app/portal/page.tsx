@@ -82,7 +82,7 @@ export default function PortalHomePage() {
       .maybeSingle();
     if (!doc?.storage_path) return;
     const { data, error } = await supabasePortal.storage
-      .from("firmflow-client-documents")
+      .from("verexahq-client-documents")
       .createSignedUrl(doc.storage_path, 60);
     if (!error && data) window.open(data.signedUrl, "_blank");
   }

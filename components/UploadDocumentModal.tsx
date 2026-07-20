@@ -68,7 +68,7 @@ export default function UploadDocumentModal({
     const path = `${wsId}/${selectedClientId}/${Date.now()}-${safeName}`;
 
     const { error: uploadError } = await supabase.storage
-      .from("firmflow-client-documents")
+      .from("verexahq-client-documents")
       .upload(path, file);
 
     if (uploadError) {
@@ -87,7 +87,7 @@ export default function UploadDocumentModal({
       document_category: category || null,
       document_status: "Received",
       received_date: new Date().toISOString().slice(0, 10),
-      storage_bucket: "firmflow-client-documents",
+      storage_bucket: "verexahq-client-documents",
       storage_path: path,
       original_file_name: file.name,
       mime_type: file.type,

@@ -58,7 +58,7 @@ export default function PortalDocumentsPage() {
     const path = `${access.workspace_id}/${access.client_id}/${Date.now()}-${safeName}`;
 
     const { error: uploadError } = await supabasePortal.storage
-      .from("firmflow-client-documents")
+      .from("verexahq-client-documents")
       .upload(path, file);
 
     if (uploadError) {
@@ -86,7 +86,7 @@ export default function PortalDocumentsPage() {
   async function handleDownload(doc: Document) {
     if (!doc.storage_path) return;
     const { data, error } = await supabasePortal.storage
-      .from("firmflow-client-documents")
+      .from("verexahq-client-documents")
       .createSignedUrl(doc.storage_path, 60);
     if (!error && data) window.open(data.signedUrl, "_blank");
   }
