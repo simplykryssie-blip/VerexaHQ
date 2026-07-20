@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { ServiceTemplate, WorkspaceMember } from "@/lib/types";
-
-const BILLING_FREQUENCIES = ["One-time", "Monthly", "Quarterly", "Annually"];
+import type { ServiceTemplate } from "@/lib/types";
 
 export default function ActivateServiceModal({
   clientId,
@@ -22,17 +20,11 @@ export default function ActivateServiceModal({
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [templates, setTemplates] = useState<ServiceTemplate[]>([]);
-  const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [templateId, setTemplateId] = useState("");
   const [counts, setCounts] = useState({ tasks: 0, documents: 0, forms: 0 });
 
-  const [assignedTo, setAssignedTo] = useState("");
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
-  const [serviceYear, setServiceYear] = useState(String(new Date().getFullYear()));
-  const [price, setPrice] = useState("");
-  const [billingFrequency, setBillingFrequency] = useState("One-time");
-  const [isRecurring, setIsRecurring] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,19 +37,12 @@ export default function ActivateServiceModal({
       .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`)
       .order("template_name")
       .then(({ data }) => setTemplates((data as ServiceTemplate[]) ?? []));
-    supabase
-      .from("workspace_members")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .eq("member_status", "Active")
-      .then(({ data }) => setMembers((data as WorkspaceMember[]) ?? []));
   }, [workspaceId]);
 
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
 
   useEffect(() => {
     if (!templateId) return;
-    setPrice(selectedTemplate?.default_price != null ? String(selectedTemplate.default_price) : "");
     Promise.all([
       supabase.from("service_template_tasks").select("id", { count: "exact", head: true }).eq("service_template_id", templateId),
       supabase.from("service_template_documents").select("id", { count: "exact", head: true }).eq("service_template_id", templateId),
@@ -65,9 +50,13 @@ export default function ActivateServiceModal({
     ]).then(([t, d, f]) => {
       setCounts({ tasks: t.count ?? 0, documents: d.count ?? 0, forms: f.count ?? 0 });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
 
+  // apply_service_template_to_client's approved signature is
+  // (p_client_id, p_service_template_id, p_start_date, p_due_date) only —
+  // it has no parameters for owner, price, service year, billing frequency
+  // or recurring status. Those fields are intentionally not collected here;
+  // set them by editing the resulting service/Service Workspace afterward.
   async function activate() {
     setSaving(true);
     setError(null);
@@ -76,11 +65,6 @@ export default function ActivateServiceModal({
       p_service_template_id: templateId,
       p_start_date: startDate,
       p_due_date: dueDate || null,
-      p_assigned_to: assignedTo || null,
-      p_price: price ? Number(price) : null,
-      p_service_year: serviceYear || null,
-      p_billing_frequency: billingFrequency,
-      p_is_recurring: isRecurring,
     });
     if (rpcError) {
       setError(rpcError.message);
@@ -111,7 +95,7 @@ export default function ActivateServiceModal({
         <div className="mb-5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
           <span className={step >= 1 ? "text-[#108A64]" : ""}>1. Choose service</span>
           <ChevronRight size={12} />
-          <span className={step >= 2 ? "text-[#108A64]" : ""}>2. Confirm defaults</span>
+          <span className={step >= 2 ? "text-[#108A64]" : ""}>2. Dates</span>
           <ChevronRight size={12} />
           <span className={step >= 3 ? "text-[#108A64]" : ""}>3. Activate</span>
         </div>
@@ -158,42 +142,17 @@ export default function ActivateServiceModal({
         {step === 2 && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Owner">
-                <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm">
-                  <option value="">Unassigned</option>
-                  {members.map((m) => (
-                    <option key={m.user_id} value={m.user_id}>
-                      {m.display_name || m.job_title || "Team member"}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Service year">
-                <input value={serviceYear} onChange={(e) => setServiceYear(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
-              </Field>
               <Field label="Start date">
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
               </Field>
               <Field label="Due date">
                 <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
               </Field>
-              <Field label="Price">
-                <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
-              </Field>
-              <Field label="Billing frequency">
-                <select value={billingFrequency} onChange={(e) => setBillingFrequency(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm">
-                  {BILLING_FREQUENCIES.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </Field>
             </div>
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="h-4 w-4 accent-[#108A64]" />
-              This is a recurring service
-            </label>
+            <div className="rounded-lg border border-dashed border-line bg-paper px-3 py-2 text-xs text-muted">
+              Owner, price, billing frequency and recurring status aren't configurable during activation yet — that
+              needs a separately approved backend change. Set them on the service afterward if you use them.
+            </div>
             <div className="flex justify-between pt-2">
               <button onClick={() => setStep(1)} className="flex items-center gap-1 rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink">
                 <ChevronLeft size={14} /> Back
