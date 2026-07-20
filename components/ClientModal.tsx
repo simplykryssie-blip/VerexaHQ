@@ -7,16 +7,12 @@ import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 
-// Values must match the live `clients.account_type` check constraint:
-// individual | household | business | estate | trust | nonprofit | other
+// clients.account_type still accepts individual | household | business |
+// estate | trust | nonprofit | other, but the create/edit form only offers
+// the two the practice actually uses day to day.
 const ACCOUNT_TYPES = [
   { value: "individual", label: "Individual" },
-  { value: "household", label: "Household" },
   { value: "business", label: "Business" },
-  { value: "trust", label: "Trust" },
-  { value: "estate", label: "Estate" },
-  { value: "nonprofit", label: "Nonprofit" },
-  { value: "other", label: "Other" },
 ];
 
 const ENTITY_TYPES = new Set(["business", "trust", "estate", "nonprofit", "other"]);
@@ -28,6 +24,33 @@ const ENTITY_NAME_LABEL: Record<string, string> = {
   nonprofit: "Organization name",
   other: "Entity name",
 };
+
+function formatPhone(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  if (digits.length < 4) return digits;
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+function formatSSN(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 9);
+  if (digits.length < 4) return digits;
+  if (digits.length < 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+}
+
+function formatEIN(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 9);
+  if (digits.length < 3) return digits;
+  return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+}
+
+function friendlyError(message: string) {
+  if (message.toLowerCase().includes("row-level security")) {
+    return "Your session may have expired or your access changed. Refresh the page, sign in again, and retry.";
+  }
+  return message;
+}
 
 const SERVICE_OPTIONS = [
   "Bookkeeping",
@@ -294,11 +317,19 @@ export default function ClientModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!workspaceId) {
-      setError("Could not determine your workspace.");
+      setError("Could not determine your workspace. Close this and try again.");
       return;
     }
     setSaving(true);
     setError(null);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      setSaving(false);
+      setError("Your session has expired. Refresh the page and sign in again.");
+      return;
+    }
+    const userId = sessionData.session.user.id;
 
     const contactFullName = `${form.first_name} ${form.last_name}`.trim();
     const resolvedAccountName = form.account_name.trim() || (isEntity ? form.business_name : contactFullName);
@@ -326,12 +357,10 @@ export default function ClientModal({
       const { error: updateError } = await supabase.from("clients").update(clientPayload).eq("id", client!.id);
       if (updateError) {
         setSaving(false);
-        setError(updateError.message);
+        setError(friendlyError(updateError.message));
         return;
       }
     } else {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user.id;
       const { data: newClient, error: insertError } = await supabase
         .from("clients")
         .insert({ workspace_id: workspaceId, ...clientPayload, assigned_to: userId })
@@ -339,7 +368,7 @@ export default function ClientModal({
         .single();
       if (insertError) {
         setSaving(false);
-        setError(insertError.message);
+        setError(friendlyError(insertError.message));
         return;
       }
       clientId = newClient!.id;
@@ -497,7 +526,7 @@ export default function ClientModal({
 
         {step === 1 && (
           <form onSubmit={goToContacts} className="space-y-5">
-            <Section label="Account type">
+            <Section label="Client type">
               <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                 {ACCOUNT_TYPES.map((t) => (
                   <label key={t.value} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
@@ -517,9 +546,7 @@ export default function ClientModal({
             <Section label="Account info">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block sm:col-span-2">
-                  <span className="mb-1 block text-xs text-muted">
-                    Account name <span className="text-brick">*</span>
-                  </span>
+                  <span className="mb-1 block text-xs text-muted">Account name</span>
                   <input
                     placeholder="Shown on the Clients page — leave blank to auto-fill from the contact/entity name"
                     value={form.account_name}
@@ -806,9 +833,10 @@ export default function ClientModal({
                   className="client-input w-full"
                 />
                 <input
-                  placeholder="Phone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
                   className="client-input w-full"
                 />
                 <input
@@ -913,7 +941,9 @@ export default function ClientModal({
                 <input
                   placeholder={isEntity ? "12-3456789" : "123-45-6789"}
                   value={newIdentityValue}
-                  onChange={(e) => setNewIdentityValue(e.target.value)}
+                  onChange={(e) =>
+                    setNewIdentityValue(isEntity ? formatEIN(e.target.value) : formatSSN(e.target.value))
+                  }
                   className="client-input w-full"
                 />
               )}
