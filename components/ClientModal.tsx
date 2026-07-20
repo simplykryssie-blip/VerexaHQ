@@ -17,14 +17,6 @@ const ACCOUNT_TYPES = [
 
 const ENTITY_TYPES = new Set(["business", "trust", "estate", "nonprofit", "other"]);
 
-const ENTITY_NAME_LABEL: Record<string, string> = {
-  business: "Business name",
-  trust: "Trust name",
-  estate: "Estate name",
-  nonprofit: "Organization name",
-  other: "Entity name",
-};
-
 function formatPhone(raw: string) {
   const digits = raw.replace(/\D/g, "").slice(0, 10);
   if (digits.length < 4) return digits;
@@ -51,6 +43,20 @@ function friendlyError(message: string) {
   }
   return message;
 }
+
+const US_STATES = [
+  ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"], ["CA", "California"],
+  ["CO", "Colorado"], ["CT", "Connecticut"], ["DE", "Delaware"], ["DC", "District of Columbia"],
+  ["FL", "Florida"], ["GA", "Georgia"], ["HI", "Hawaii"], ["ID", "Idaho"], ["IL", "Illinois"],
+  ["IN", "Indiana"], ["IA", "Iowa"], ["KS", "Kansas"], ["KY", "Kentucky"], ["LA", "Louisiana"],
+  ["ME", "Maine"], ["MD", "Maryland"], ["MA", "Massachusetts"], ["MI", "Michigan"], ["MN", "Minnesota"],
+  ["MS", "Mississippi"], ["MO", "Missouri"], ["MT", "Montana"], ["NE", "Nebraska"], ["NV", "Nevada"],
+  ["NH", "New Hampshire"], ["NJ", "New Jersey"], ["NM", "New Mexico"], ["NY", "New York"],
+  ["NC", "North Carolina"], ["ND", "North Dakota"], ["OH", "Ohio"], ["OK", "Oklahoma"], ["OR", "Oregon"],
+  ["PA", "Pennsylvania"], ["RI", "Rhode Island"], ["SC", "South Carolina"], ["SD", "South Dakota"],
+  ["TN", "Tennessee"], ["TX", "Texas"], ["UT", "Utah"], ["VT", "Vermont"], ["VA", "Virginia"],
+  ["WA", "Washington"], ["WV", "West Virginia"], ["WI", "Wisconsin"], ["WY", "Wyoming"],
+] as const;
 
 const SERVICE_OPTIONS = [
   "Bookkeeping",
@@ -265,6 +271,25 @@ export default function ClientModal({
 
   function goToContacts(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    if (!form.address.trim() || !form.city.trim() || !form.state.trim() || !form.zip_code.trim()) {
+      setError("Address is required.");
+      return;
+    }
+    if (selectedMemberIds.length === 0) {
+      setError("Select at least one team member.");
+      return;
+    }
+    if (isEntity) {
+      setForm((f) => ({ ...f, business_name: f.account_name }));
+    } else {
+      const parts = form.account_name.trim().split(/\s+/);
+      setForm((f) => ({
+        ...f,
+        first_name: parts[0] ?? "",
+        last_name: parts.slice(1).join(" "),
+      }));
+    }
     setStep(2);
   }
 
@@ -316,12 +341,18 @@ export default function ClientModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!workspaceId) {
-      setError("Could not determine your workspace. Close this and try again.");
+    setError(null);
+
+    if (!isEditing && selectedServices.length === 0) {
+      setError("Select at least one service.");
       return;
     }
+    if (identityStage === "input" && !newIdentityValue.trim()) {
+      setError(`Enter the client's ${identityLabel}.`);
+      return;
+    }
+
     setSaving(true);
-    setError(null);
 
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
@@ -330,6 +361,31 @@ export default function ClientModal({
       return;
     }
     const userId = sessionData.session.user.id;
+
+    // Re-resolve the workspace directly from membership right before writing,
+    // rather than trusting the WorkspaceProvider context value, so this
+    // always matches exactly what the clients RLS policy itself checks.
+    let resolvedWorkspaceId = workspaceId;
+    if (!isEditing) {
+      const { data: memberRow, error: memberError } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", userId)
+        .eq("member_status", "Active")
+        .limit(1)
+        .maybeSingle();
+      if (memberError || !memberRow) {
+        setSaving(false);
+        setError("Could not confirm your workspace membership. Refresh the page and try again.");
+        return;
+      }
+      resolvedWorkspaceId = memberRow.workspace_id;
+    }
+    if (!resolvedWorkspaceId) {
+      setSaving(false);
+      setError("Could not determine your workspace. Close this and try again.");
+      return;
+    }
 
     const contactFullName = `${form.first_name} ${form.last_name}`.trim();
     const resolvedAccountName = form.account_name.trim() || (isEntity ? form.business_name : contactFullName);
@@ -363,7 +419,7 @@ export default function ClientModal({
     } else {
       const { data: newClient, error: insertError } = await supabase
         .from("clients")
-        .insert({ workspace_id: workspaceId, ...clientPayload, assigned_to: userId })
+        .insert({ workspace_id: resolvedWorkspaceId, ...clientPayload, assigned_to: userId })
         .select("id")
         .single();
       if (insertError) {
@@ -396,7 +452,7 @@ export default function ClientModal({
           .maybeSingle();
         if (!existingLink) {
           await supabase.from("account_contacts").insert({
-            workspace_id: workspaceId,
+            workspace_id: resolvedWorkspaceId,
             account_id: clientId,
             contact_id: contactId,
             relationship_type: "primary",
@@ -408,7 +464,7 @@ export default function ClientModal({
         const { data: newContact, error: contactError } = await supabase
           .from("contacts")
           .insert({
-            workspace_id: workspaceId,
+            workspace_id: resolvedWorkspaceId,
             first_name: form.first_name,
             middle_name: form.middle_name || null,
             last_name: form.last_name,
@@ -421,7 +477,7 @@ export default function ClientModal({
           .single();
         if (!contactError && newContact) {
           await supabase.from("account_contacts").insert({
-            workspace_id: workspaceId,
+            workspace_id: resolvedWorkspaceId,
             account_id: clientId,
             contact_id: newContact.id,
             relationship_type: "primary",
@@ -436,19 +492,19 @@ export default function ClientModal({
     if (selectedTagIds.length > 0) {
       await supabase
         .from("client_tag_assignments")
-        .insert(selectedTagIds.map((tag_id) => ({ workspace_id: workspaceId, client_id: clientId, tag_id })));
+        .insert(selectedTagIds.map((tag_id) => ({ workspace_id: resolvedWorkspaceId, client_id: clientId, tag_id })));
     }
 
     await supabase.from("client_team_members").delete().eq("client_id", clientId);
     if (selectedMemberIds.length > 0) {
       await supabase
         .from("client_team_members")
-        .insert(selectedMemberIds.map((user_id) => ({ workspace_id: workspaceId, client_id: clientId, user_id })));
+        .insert(selectedMemberIds.map((user_id) => ({ workspace_id: resolvedWorkspaceId, client_id: clientId, user_id })));
     }
 
     if (newIdentityValue.trim()) {
       const { error: idError } = await supabase.rpc("save_identity_vault_value", {
-        p_workspace_id: workspaceId,
+        p_workspace_id: resolvedWorkspaceId,
         p_client_id: clientId,
         p_related_contact_id: null,
         p_identity_type: identityType,
@@ -465,7 +521,7 @@ export default function ClientModal({
       const currentYear = new Date().getFullYear().toString();
       await supabase.from("services").insert(
         selectedServices.map((service_type) => ({
-          workspace_id: workspaceId,
+          workspace_id: resolvedWorkspaceId,
           client_id: clientId,
           service_type,
           service_status: "New",
@@ -543,55 +599,48 @@ export default function ClientModal({
               </div>
             </Section>
 
-            <Section label="Account info">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block sm:col-span-2">
-                  <span className="mb-1 block text-xs text-muted">Account name</span>
-                  <input
-                    placeholder="Shown on the Clients page — leave blank to auto-fill from the contact/entity name"
-                    value={form.account_name}
-                    onChange={(e) => setForm({ ...form, account_name: e.target.value })}
-                    className="client-input w-full"
-                  />
-                </label>
-                {isEntity && (
-                  <label className="block sm:col-span-2">
-                    <span className="mb-1 block text-xs text-muted">
-                      {ENTITY_NAME_LABEL[form.account_type]} <span className="text-brick">*</span>
-                    </span>
-                    <input
-                      required
-                      value={form.business_name}
-                      onChange={(e) => setForm({ ...form, business_name: e.target.value })}
-                      className="client-input w-full"
-                    />
-                  </label>
-                )}
-              </div>
+            <Section label={isEntity ? "Business name" : "Client's name"}>
+              <input
+                required
+                placeholder={isEntity ? "Greenleaf Consulting LLC" : "John Doe"}
+                value={form.account_name}
+                onChange={(e) => setForm({ ...form, account_name: e.target.value })}
+                className="client-input w-full"
+              />
             </Section>
 
             <Section label="Address">
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
+                  required
                   placeholder="Street address"
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   className="client-input w-full sm:col-span-2"
                 />
                 <input
+                  required
                   placeholder="City"
                   value={form.city}
                   onChange={(e) => setForm({ ...form, city: e.target.value })}
                   className="client-input w-full"
                 />
                 <div className="flex gap-3">
-                  <input
-                    placeholder="State"
+                  <select
+                    required
                     value={form.state}
                     onChange={(e) => setForm({ ...form, state: e.target.value })}
                     className="client-input w-1/2"
-                  />
+                  >
+                    <option value="">State…</option>
+                    {US_STATES.map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
                   <input
+                    required
                     placeholder="ZIP code"
                     value={form.zip_code}
                     onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
@@ -648,7 +697,7 @@ export default function ClientModal({
               </div>
             </Section>
 
-            <Section label="Team members">
+            <Section label="Team members (required)">
               <div className="flex flex-wrap gap-2 mb-2">
                 {selectedMemberIds.map((id) => {
                   const member = availableMembers.find((m) => m.user_id === id);
@@ -710,8 +759,7 @@ export default function ClientModal({
               </button>
               <button
                 type="submit"
-                disabled={isEntity && !form.business_name}
-                className="text-sm font-semibold py-2.5 px-5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555] disabled:opacity-60"
+                className="text-sm font-semibold py-2.5 px-5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555]"
               >
                 Continue
               </button>
@@ -795,37 +843,43 @@ export default function ClientModal({
               </div>
             )}
 
-            <Section label="Name">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <input
-                  required
-                  disabled={!!contactId}
-                  placeholder="First name"
-                  value={form.first_name}
-                  onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-                  className="client-input w-full disabled:opacity-60"
-                />
-                <input
-                  disabled={!!contactId}
-                  placeholder="Middle name"
-                  value={form.middle_name}
-                  onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
-                  className="client-input w-full disabled:opacity-60"
-                />
-                <input
-                  required
-                  disabled={!!contactId}
-                  placeholder="Last name"
-                  value={form.last_name}
-                  onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-                  className="client-input w-full disabled:opacity-60"
-                />
+            {isEntity && !contactId && (
+              <Section label="Contact name">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    required
+                    placeholder="First name"
+                    value={form.first_name}
+                    onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Middle name"
+                    value={form.middle_name}
+                    onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    placeholder="Last name"
+                    value={form.last_name}
+                    onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                </div>
+              </Section>
+            )}
+
+            {!isEntity && !contactId && (
+              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm text-ink">
+                Contact: <strong>{form.first_name} {form.last_name}</strong>
               </div>
-            </Section>
+            )}
 
             <Section label="Contact">
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
+                  required
                   type="email"
                   placeholder="Email"
                   value={form.email}
@@ -833,6 +887,7 @@ export default function ClientModal({
                   className="client-input w-full"
                 />
                 <input
+                  required
                   type="tel"
                   placeholder="(555) 123-4567"
                   value={form.phone}
@@ -863,7 +918,7 @@ export default function ClientModal({
               </label>
             </Section>
 
-            <Section label={identityLabel}>
+            <Section label={`${identityLabel} (required)`}>
               {isEditing && identityStage === "masked" && maskedIdentity && (
                 <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2.5 text-sm">
                   <span className="font-mono text-ink">{maskedIdentity.masked_value}</span>
@@ -965,7 +1020,7 @@ export default function ClientModal({
             )}
 
             {!isEditing && (
-              <Section label="Services (optional)">
+              <Section label="Services (required)">
                 <div className="grid gap-2 sm:grid-cols-2">
                   {SERVICE_OPTIONS.map((service) => (
                     <label
