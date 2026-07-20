@@ -20,37 +20,65 @@ export default function ActivateServiceModal({
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [templates, setTemplates] = useState<ServiceTemplate[]>([]);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [templateId, setTemplateId] = useState("");
   const [counts, setCounts] = useState({ tasks: 0, documents: 0, forms: 0 });
 
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Only templates apply_service_template_to_client can actually activate:
+  // workspace-owned templates, or global templates that are explicitly
+  // marked as platform templates (workspace_id is null alone isn't enough —
+  // the RPC also requires is_platform_template = true).
   useEffect(() => {
     supabase
       .from("service_templates")
       .select("*")
       .eq("is_active", true)
-      .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`)
+      .or(`workspace_id.eq.${workspaceId},and(workspace_id.is.null,is_platform_template.eq.true)`)
       .order("template_name")
-      .then(({ data }) => setTemplates((data as ServiceTemplate[]) ?? []));
+      .then(({ data, error: queryError }) => {
+        if (queryError) {
+          setTemplatesError(queryError.message);
+          setTemplates([]);
+          return;
+        }
+        setTemplatesError(null);
+        setTemplates((data as ServiceTemplate[]) ?? []);
+      });
   }, [workspaceId]);
 
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
 
   useEffect(() => {
+    setCounts({ tasks: 0, documents: 0, forms: 0 });
     if (!templateId) return;
     Promise.all([
       supabase.from("service_template_tasks").select("id", { count: "exact", head: true }).eq("service_template_id", templateId),
       supabase.from("service_template_documents").select("id", { count: "exact", head: true }).eq("service_template_id", templateId),
       supabase.from("service_template_forms").select("id", { count: "exact", head: true }).eq("service_template_id", templateId),
     ]).then(([t, d, f]) => {
+      if (t.error || d.error || f.error) {
+        setCounts({ tasks: 0, documents: 0, forms: 0 });
+        return;
+      }
       setCounts({ tasks: t.count ?? 0, documents: d.count ?? 0, forms: f.count ?? 0 });
     });
   }, [templateId]);
+
+  function goToPreview() {
+    if (dueDate && dueDate < startDate) {
+      setDateError("Due date can't be earlier than the start date.");
+      return;
+    }
+    setDateError(null);
+    setStep(3);
+  }
 
   // apply_service_template_to_client's approved signature is
   // (p_client_id, p_service_template_id, p_start_date, p_due_date) only —
@@ -102,7 +130,12 @@ export default function ActivateServiceModal({
 
         {step === 1 && (
           <div className="space-y-2">
-            {templates.length === 0 && (
+            {templatesError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                Couldn't load service templates: {templatesError}
+              </div>
+            )}
+            {!templatesError && templates.length === 0 && (
               <div className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
                 No service templates are set up for this workspace yet.
               </div>
@@ -146,9 +179,12 @@ export default function ActivateServiceModal({
                 <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
               </Field>
               <Field label="Due date">
-                <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
+                <input type="date" value={dueDate} onChange={(e) => { setDueDate(e.target.value); setDateError(null); }} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
               </Field>
             </div>
+            {dateError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</div>
+            )}
             <div className="rounded-lg border border-dashed border-line bg-paper px-3 py-2 text-xs text-muted">
               Owner, price, billing frequency and recurring status aren't configurable during activation yet — that
               needs a separately approved backend change. Set them on the service afterward if you use them.
@@ -157,7 +193,7 @@ export default function ActivateServiceModal({
               <button onClick={() => setStep(1)} className="flex items-center gap-1 rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink">
                 <ChevronLeft size={14} /> Back
               </button>
-              <button onClick={() => setStep(3)} className="rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white">
+              <button onClick={goToPreview} className="rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white">
                 Preview
               </button>
             </div>
