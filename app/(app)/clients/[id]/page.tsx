@@ -29,7 +29,7 @@ import UploadDocumentModal from "@/components/UploadDocumentModal";
 import RequestDocumentModal from "@/components/RequestDocumentModal";
 import DocumentFolderModal from "@/components/DocumentFolderModal";
 
-const TABS = ["overview", "services", "tasks", "deadlines", "documents"] as const;
+const TABS = ["overview", "tasks", "deadlines", "documents"] as const;
 type Tab = (typeof TABS)[number];
 
 function orderFoldersByTree(folders: DocumentFolder[]): { folder: DocumentFolder; depth: number }[] {
@@ -219,56 +219,56 @@ export default function ClientDetailPage() {
       </div>
 
       {tab === "overview" && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
           <div className="app-card p-5">
-            <h2 className="font-bold text-ink">Contact</h2>
-            <div className="mt-4 space-y-3 text-sm">
-              <InfoRow icon={Mail} label="Email" value={client.email} />
-              <InfoRow icon={Phone} label="Phone" value={client.phone} />
-              <InfoRow icon={MapPin} label="Address" value={address} />
-              <InfoRow icon={Tag} label="Source" value={client.source} />
-            </div>
-          </div>
-          <div className="app-card p-5">
-            <h2 className="font-bold text-ink">Tax profile</h2>
-            <div className="mt-4 space-y-3 text-sm">
-              <InfoRow icon={Cake} label="Date of birth" value={client.date_of_birth} />
-              <InfoRow
-                icon={ShieldCheck}
-                label="SSN"
-                value={client.ssn_last_four ? `•••-••-${client.ssn_last_four}` : ""}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === "services" && (
-        <div className="app-card p-5">
-          <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-            <h2 className="font-bold text-ink">Services</h2>
-            <button
-              onClick={() => setShowServiceModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-            >
-              <Plus size={13} /> Add
-            </button>
-          </div>
-          <div className="divide-y divide-line">
-            {services.length === 0 && <Empty text="No services yet." />}
-            {services.map((s) => (
+            <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
+              <h2 className="font-bold text-ink">Services</h2>
               <button
-                key={s.id}
-                onClick={() => setEditingService(s)}
-                className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
+                onClick={() => setShowServiceModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
               >
-                <div>
-                  <div className="font-semibold text-ink text-sm">{s.service_type}</div>
-                  <div className="text-xs text-muted mt-0.5">{s.service_year}</div>
-                </div>
-                <StatusPill status={s.service_status} />
+                <Plus size={13} /> Add
               </button>
-            ))}
+            </div>
+            <div className="divide-y divide-line">
+              {services.length === 0 && <Empty text="No services yet." />}
+              {services.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={() => setEditingService(s)}
+                  className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
+                >
+                  <div>
+                    <div className="font-semibold text-ink text-sm">{s.service_type}</div>
+                    <div className="text-xs text-muted mt-0.5">{s.service_year}</div>
+                  </div>
+                  <StatusPill status={s.service_status} />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="app-card p-5">
+              <h2 className="font-bold text-ink">Contact</h2>
+              <div className="mt-4 space-y-3 text-sm">
+                <InfoRow icon={Mail} label="Email" value={client.email} />
+                <InfoRow icon={Phone} label="Phone" value={client.phone} />
+                <InfoRow icon={MapPin} label="Address" value={address} />
+                <InfoRow icon={Tag} label="Source" value={client.source} />
+              </div>
+            </div>
+            <div className="app-card p-5">
+              <h2 className="font-bold text-ink">Tax profile</h2>
+              <div className="mt-4 space-y-3 text-sm">
+                <InfoRow icon={Cake} label="Date of birth" value={client.date_of_birth} />
+                <InfoRow
+                  icon={ShieldCheck}
+                  label="SSN"
+                  value={client.ssn_last_four ? `•••-••-${client.ssn_last_four}` : ""}
+                />
+              </div>
+            </div>
           </div>
         </div>
       )}
