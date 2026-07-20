@@ -27,6 +27,50 @@ export type Client = {
   updated_at: string;
   date_of_birth: string | null;
   ssn_last_four: string | null;
+  account_name: string | null;
+};
+
+export type Contact = {
+  id: string;
+  workspace_id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  personal_email: string | null;
+  personal_phone: string | null;
+  occupation: string | null;
+  portal_access: boolean;
+  date_of_birth: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AccountContact = {
+  id: string;
+  workspace_id: string;
+  account_id: string;
+  contact_id: string;
+  relationship_type: string | null;
+  is_primary: boolean;
+  portal_access: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ClientTag = {
+  id: string;
+  workspace_id: string;
+  tag_name: string;
+  tag_color: string | null;
+  is_active: boolean;
+};
+
+export type ClientTeamMember = {
+  id: string;
+  workspace_id: string;
+  client_id: string;
+  user_id: string;
+  created_at: string;
 };
 
 export type Pipeline = {

@@ -1,12 +1,19 @@
 import type { Client } from "@/lib/types";
 
-export function clientDisplayName(c: Pick<Client, "client_type" | "business_name" | "first_name" | "last_name">) {
+export function clientDisplayName(
+  c: Pick<Client, "client_type" | "business_name" | "first_name" | "last_name"> &
+    Partial<Pick<Client, "account_name">>
+) {
+  if (c.account_name && c.account_name.trim()) return c.account_name;
   return c.client_type === "business" && c.business_name
     ? c.business_name
     : `${c.first_name} ${c.last_name}`.trim();
 }
 
-export function clientInitials(c: Pick<Client, "client_type" | "business_name" | "first_name" | "last_name">) {
+export function clientInitials(
+  c: Pick<Client, "client_type" | "business_name" | "first_name" | "last_name"> &
+    Partial<Pick<Client, "account_name">>
+) {
   const name = clientDisplayName(c);
   const parts = name.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
