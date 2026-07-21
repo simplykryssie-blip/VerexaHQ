@@ -33,25 +33,51 @@ function formatEIN(raw: string) {
   return `${digits.slice(0, 2)}-${digits.slice(2)}`;
 }
 
-// Vercel exposes NEXT_PUBLIC_VERCEL_ENV ("production" | "preview" |
-// "development") automatically on every deployment; fall back to
-// NODE_ENV for local dev where that variable isn't set at all.
-const IS_PREVIEW_OR_DEV = process.env.NEXT_PUBLIC_VERCEL_ENV
-  ? process.env.NEXT_PUBLIC_VERCEL_ENV !== "production"
-  : process.env.NODE_ENV !== "production";
+// next build always bakes NODE_ENV=production into a Vercel deployment —
+// preview and production builds are identical on that axis, so NODE_ENV
+// can't tell them apart. Only treat this as "real production" when we can
+// positively confirm it: either Vercel's own NEXT_PUBLIC_VERCEL_ENV says
+// so, or the browser is actually on the production hostname. Anything
+// else (preview, local dev, unset) defaults to showing full error detail,
+// since hiding detail on an environment we can't positively identify as
+// production would make preview failures undebuggable — which is exactly
+// what happened before this was tightened.
+const PRODUCTION_HOSTNAME = "verexa-hq-phi.vercel.app";
+function computeIsPreviewOrDev(): boolean {
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") return false;
+  if (typeof window !== "undefined" && window.location.hostname === PRODUCTION_HOSTNAME) return false;
+  return true;
+}
+const IS_PREVIEW_OR_DEV = computeIsPreviewOrDev();
 
-// Only rewrites messages that actually look like a permission/RLS denial —
-// and only in production, where showing the raw Postgres error isn't
-// useful to staff. It never claims the session expired; that specific
-// message is only ever shown right after getSession() itself confirms
-// there is no session, not guessed from an error string here.
-function friendlyError(message: string) {
-  if (IS_PREVIEW_OR_DEV) return message;
-  const lower = message.toLowerCase();
+type SbError = { message: string; code?: string; details?: string | null; hint?: string | null };
+
+// Every follow-up write in the save flow reports its own failure through
+// this, tagged with a distinct step name, so a partial save always says
+// exactly which step broke instead of one generic message. It never
+// claims the session expired — that specific wording is only ever shown
+// right after getSession() itself confirms there is no session, never
+// guessed from an error string here.
+function stepError(step: string, err: SbError): string {
+  if (IS_PREVIEW_OR_DEV) {
+    const parts = [`[${step}] ${err.message}`];
+    if (err.code) parts.push(`code=${err.code}`);
+    if (err.details) parts.push(`details=${err.details}`);
+    if (err.hint) parts.push(`hint=${err.hint}`);
+    return parts.join(" — ");
+  }
+  const lower = err.message.toLowerCase();
   if (lower.includes("row-level security") || lower.includes("not allowed") || lower.includes("permission")) {
     return "You don't have permission to complete this action. Contact a workspace admin if this seems wrong.";
   }
-  return message;
+  // P0001 is the SQLSTATE Postgres assigns to a plain `raise exception` —
+  // every business-rule validation error this app's own RPCs raise uses
+  // that form, so its message is intentional and safe to show as-is. Any
+  // other code is an unexpected/internal database error (a genuine bug,
+  // not a validation message), which could name real tables or columns —
+  // that's kept out of production and only shown in preview/dev above.
+  if (err.code === "P0001") return err.message;
+  return "There was a problem saving. Please try again, and contact support if it keeps happening.";
 }
 
 const US_STATES = [
@@ -275,7 +301,7 @@ export default function ClientModal({
       .select("*")
       .single();
     if (tagCreateError) {
-      setError(friendlyError(tagCreateError.message));
+      setError(stepError("client_tags_insert", tagCreateError));
       return;
     }
     setAvailableTags((prev) => [...prev, data as ClientTag]);
@@ -404,7 +430,7 @@ export default function ClientModal({
     });
     if (saveError) {
       setSaving(false);
-      setError(friendlyError(saveError.message));
+      setError(stepError("save_workspace_client", saveError));
       return;
     }
     const clientId: string | undefined = (saveResult as any)?.client_id;
@@ -430,7 +456,7 @@ export default function ClientModal({
           .eq("id", contactId);
         if (contactUpdateError) {
           setSaving(false);
-          setError(`Client saved, but the contact record failed to update: ${friendlyError(contactUpdateError.message)}`);
+          setError(`Client saved, but the contact record failed to update: ${stepError("contact_update", contactUpdateError)}`);
           return;
         }
         const { data: existingLink, error: linkLookupError } = await supabase
@@ -441,7 +467,7 @@ export default function ClientModal({
           .maybeSingle();
         if (linkLookupError) {
           setSaving(false);
-          setError(`Client saved, but checking the contact link failed: ${friendlyError(linkLookupError.message)}`);
+          setError(`Client saved, but checking the contact link failed: ${stepError("account_contacts_link", linkLookupError)}`);
           return;
         }
         if (!existingLink) {
@@ -455,7 +481,7 @@ export default function ClientModal({
           });
           if (linkInsertError) {
             setSaving(false);
-            setError(`Client saved, but linking the contact failed: ${friendlyError(linkInsertError.message)}`);
+            setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
             return;
           }
         }
@@ -476,7 +502,7 @@ export default function ClientModal({
           .single();
         if (contactError) {
           setSaving(false);
-          setError(`Client saved, but creating the contact record failed: ${friendlyError(contactError.message)}`);
+          setError(`Client saved, but creating the contact record failed: ${stepError("contact_create", contactError)}`);
           return;
         }
         const { error: linkInsertError } = await supabase.from("account_contacts").insert({
@@ -489,7 +515,7 @@ export default function ClientModal({
         });
         if (linkInsertError) {
           setSaving(false);
-          setError(`Client saved, but linking the new contact failed: ${friendlyError(linkInsertError.message)}`);
+          setError(`Client saved, but linking the new contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
           return;
         }
         setContactId(newContact.id);
@@ -499,7 +525,7 @@ export default function ClientModal({
     const { error: tagDeleteError } = await supabase.from("client_tag_assignments").delete().eq("client_id", clientId);
     if (tagDeleteError) {
       setSaving(false);
-      setError(`Client saved, but clearing old tags failed: ${friendlyError(tagDeleteError.message)}`);
+      setError(`Client saved, but clearing old tags failed: ${stepError("client_tag_assignments_delete", tagDeleteError)}`);
       return;
     }
     if (selectedTagIds.length > 0) {
@@ -508,7 +534,7 @@ export default function ClientModal({
         .insert(selectedTagIds.map((tag_id) => ({ workspace_id: workspaceId, client_id: clientId, tag_id })));
       if (tagInsertError) {
         setSaving(false);
-        setError(`Client saved, but saving tags failed: ${friendlyError(tagInsertError.message)}`);
+        setError(`Client saved, but saving tags failed: ${stepError("client_tag_assignments_insert", tagInsertError)}`);
         return;
       }
     }
@@ -516,7 +542,7 @@ export default function ClientModal({
     const { error: memberDeleteError } = await supabase.from("client_team_members").delete().eq("client_id", clientId);
     if (memberDeleteError) {
       setSaving(false);
-      setError(`Client saved, but clearing team assignment failed: ${friendlyError(memberDeleteError.message)}`);
+      setError(`Client saved, but clearing team assignment failed: ${stepError("client_team_members_delete", memberDeleteError)}`);
       return;
     }
     if (selectedMemberIds.length > 0) {
@@ -525,7 +551,7 @@ export default function ClientModal({
         .insert(selectedMemberIds.map((user_id) => ({ workspace_id: workspaceId, client_id: clientId, user_id })));
       if (memberInsertError) {
         setSaving(false);
-        setError(`Client saved, but saving team assignment failed: ${friendlyError(memberInsertError.message)}`);
+        setError(`Client saved, but saving team assignment failed: ${stepError("client_team_members_insert", memberInsertError)}`);
         return;
       }
     }
@@ -544,7 +570,7 @@ export default function ClientModal({
       });
       if (idError) {
         setSaving(false);
-        setError(`Client saved, but the ${identityLabel} could not be stored securely: ${friendlyError(idError.message)}`);
+        setError(`Client saved, but the ${identityLabel} could not be stored securely: ${stepError("save_identity_vault_value", idError)}`);
         return;
       }
       if (identityType === "ssn") {
@@ -561,7 +587,7 @@ export default function ClientModal({
         if (profileError) {
           setSaving(false);
           setError(
-            `Client and SSN saved securely, but the last-four display value failed to save: ${friendlyError(profileError.message)}`
+            `Client and SSN saved securely, but the last-four display value failed to save: ${stepError("save_client_profile_details", profileError)}`
           );
           return;
         }
@@ -586,7 +612,7 @@ export default function ClientModal({
     const { error: deleteError } = await supabase.from("clients").delete().eq("id", client.id);
     setDeleting(false);
     if (deleteError) {
-      setError(friendlyError(deleteError.message));
+      setError(stepError("clients_delete", deleteError));
       return;
     }
     onDeleted?.();
