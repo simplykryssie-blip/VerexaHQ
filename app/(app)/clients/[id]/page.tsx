@@ -46,6 +46,15 @@ type LinkedContact = {
 const TABS = ["overview", "tasks", "deadlines", "documents"] as const;
 type Tab = (typeof TABS)[number];
 
+// A person linked via account_contacts is never a separate client account —
+// they're a contact person, so their label comes from the relationship to
+// the parent account (business vs. not), never from client_type/account_type
+// as if the contact themself were the client.
+function contactRoleLabel(parentClientType: string, isPrimary: boolean): string {
+  if (parentClientType === "business") return isPrimary ? "Primary Business Contact" : "Business Contact";
+  return isPrimary ? "Primary Contact" : "Contact";
+}
+
 function orderFoldersByTree(folders: DocumentFolder[]): { folder: DocumentFolder; depth: number }[] {
   const byParent = new Map<string, DocumentFolder[]>();
   for (const f of folders) {
@@ -185,7 +194,7 @@ export default function ClientDetailPage() {
   }
 
   const displayName = clientDisplayName(client);
-  const meta = accountTypeMeta(client.account_type);
+  const meta = accountTypeMeta(client);
   const address = [client.address, [client.city, client.state, client.zip_code].filter(Boolean).join(", ")]
     .filter(Boolean)
     .join(", ");
@@ -328,11 +337,13 @@ export default function ClientDetailPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {link.is_primary && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-[#108A64] text-[10px] font-semibold px-2 py-1">
-                          <Star size={11} /> Primary
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-1 ${
+                          link.is_primary ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
+                        }`}
+                      >
+                        {link.is_primary && <Star size={11} />} {contactRoleLabel(client.client_type, link.is_primary)}
+                      </span>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-1 ${
                           link.portal_access ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
@@ -553,6 +564,8 @@ export default function ClientDetailPage() {
           isPrimary={viewingContact.is_primary}
           relationshipType={viewingContact.relationship_type}
           portalAccess={viewingContact.portal_access}
+          contactTypeLabel={contactRoleLabel(client.client_type, viewingContact.is_primary)}
+          accountName={displayName}
           onClose={() => setViewingContact(null)}
         />
       )}

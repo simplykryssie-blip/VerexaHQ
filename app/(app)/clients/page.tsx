@@ -130,7 +130,7 @@ export default function ClientsPage() {
         {!loading && filtered.length > 0 && (
           <div className="divide-y divide-line">
             {filtered.map((c) => {
-              const meta = accountTypeMeta(c.account_type);
+              const meta = accountTypeMeta(c);
               return (
                 <div
                   key={c.id}

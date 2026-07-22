@@ -31,6 +31,15 @@ export const ACCOUNT_TYPE_META: Record<string, { label: string; badge: string }>
   other: { label: "Other", badge: "bg-slate-100 text-slate-600" },
 };
 
-export function accountTypeMeta(accountType: string | null | undefined) {
+// save_workspace_client writes client_type ('individual' | 'business') on
+// every save but has never written account_type — that column is NOT NULL
+// with a DB default of 'individual', so every client, business or not, is
+// stuck showing account_type = 'individual'. client_type is the field
+// that's actually kept correct, so it wins whenever the two disagree;
+// account_type's richer vocabulary (household/trust/estate/nonprofit/other)
+// only comes into play once client_type has already confirmed "individual".
+export function accountTypeMeta(client: Pick<Client, "client_type" | "account_type">) {
+  if (client.client_type === "business") return ACCOUNT_TYPE_META.business;
+  const accountType = client.account_type;
   return ACCOUNT_TYPE_META[accountType ?? ""] ?? { label: accountType || "—", badge: "bg-slate-100 text-slate-600" };
 }

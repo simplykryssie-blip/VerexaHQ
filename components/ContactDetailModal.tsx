@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, Phone, Briefcase, ShieldCheck, Star, X } from "lucide-react";
+import { Mail, Phone, Briefcase, Building2, Link2, ShieldCheck, Star, User, X } from "lucide-react";
 import type { Contact } from "@/lib/types";
 
 export default function ContactDetailModal({
@@ -8,12 +8,20 @@ export default function ContactDetailModal({
   isPrimary,
   relationshipType,
   portalAccess,
+  contactTypeLabel,
+  accountName,
   onClose,
 }: {
   contact: Contact;
   isPrimary: boolean;
   relationshipType: string | null;
   portalAccess: boolean;
+  // Derived from the account_contacts link's parent-account context (e.g.
+  // "Primary Business Contact" / "Business Contact") — never from the
+  // contact person's own client/account type, since this person is not a
+  // separate client account.
+  contactTypeLabel: string;
+  accountName: string;
   onClose: () => void;
 }) {
   const fullName = [contact.first_name, contact.middle_name, contact.last_name].filter(Boolean).join(" ");
@@ -33,27 +41,18 @@ export default function ContactDetailModal({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          {isPrimary && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-[#108A64] text-xs font-semibold px-2.5 py-1">
-              <Star size={12} /> Primary contact
-            </span>
-          )}
-          {relationshipType && (
-            <span className="rounded-full bg-paper border border-line text-xs font-semibold text-ink px-2.5 py-1 capitalize">
-              {relationshipType}
-            </span>
-          )}
-          <span
-            className={`inline-flex items-center gap-1 rounded-full text-xs font-semibold px-2.5 py-1 ${
-              portalAccess ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
-            }`}
-          >
-            <ShieldCheck size={12} /> {portalAccess ? "Portal access granted" : "No portal access"}
-          </span>
-        </div>
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-[#108A64] text-xs font-semibold px-2.5 py-1 mb-4">
+          {isPrimary && <Star size={12} />} {contactTypeLabel}
+        </span>
 
         <div className="space-y-3 text-sm">
+          <DetailRow icon={Building2} label="Business/account name" value={accountName} />
+          <DetailRow icon={Link2} label="Relationship type" value={relationshipType} />
+          <DetailRow icon={Star} label="Primary contact" value={isPrimary ? "Yes" : "No"} />
+          <DetailRow icon={ShieldCheck} label="Portal access" value={portalAccess ? "Enabled" : "Disabled"} />
+          <DetailRow icon={User} label="First name" value={contact.first_name} />
+          <DetailRow icon={User} label="Middle name" value={contact.middle_name} />
+          <DetailRow icon={User} label="Last name" value={contact.last_name} />
           <DetailRow icon={Mail} label="Email" value={contact.personal_email} />
           <DetailRow icon={Phone} label="Phone" value={contact.personal_phone} />
           <DetailRow icon={Briefcase} label="Occupation" value={contact.occupation} />
