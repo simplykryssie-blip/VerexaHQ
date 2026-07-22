@@ -15,10 +15,11 @@ import {
   MapPin,
   Cake,
   ShieldCheck,
+  Star,
   Tag,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Client, Service, Task, Deadline, Document, DocumentFolder } from "@/lib/types";
+import type { Client, Contact, Service, Task, Deadline, Document, DocumentFolder } from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import { isOpenServiceStatus } from "@/lib/status";
 import StatusPill from "@/components/StatusPill";
@@ -27,10 +28,20 @@ import NewDeadlineModal from "@/components/NewDeadlineModal";
 import NewServiceModal from "@/components/NewServiceModal";
 import ActivateServiceModal from "@/components/ActivateServiceModal";
 import ClientModal from "@/components/ClientModal";
+import ContactDetailModal from "@/components/ContactDetailModal";
 import InvitePortalModal from "@/components/InvitePortalModal";
 import UploadDocumentModal from "@/components/UploadDocumentModal";
 import RequestDocumentModal from "@/components/RequestDocumentModal";
 import DocumentFolderModal from "@/components/DocumentFolderModal";
+
+type LinkedContact = {
+  id: string;
+  contact_id: string;
+  relationship_type: string | null;
+  is_primary: boolean;
+  portal_access: boolean;
+  contacts: Contact | null;
+};
 
 const TABS = ["overview", "tasks", "deadlines", "documents"] as const;
 type Tab = (typeof TABS)[number];
@@ -61,6 +72,8 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<Client | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
+  const [contacts, setContacts] = useState<LinkedContact[]>([]);
+  const [viewingContact, setViewingContact] = useState<LinkedContact | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -83,10 +96,15 @@ export default function ClientDetailPage() {
 
   async function load() {
     setLoading(true);
-    const [clientRes, servicesRes, engagementsRes, tasksRes, deadlinesRes, documentsRes, foldersRes] = await Promise.all([
+    const [clientRes, servicesRes, engagementsRes, contactsRes, tasksRes, deadlinesRes, documentsRes, foldersRes] = await Promise.all([
       supabase.from("clients").select("*").eq("id", id).maybeSingle(),
       supabase.from("services").select("*").eq("client_id", id),
       supabase.from("engagements").select("id, service_id").eq("account_id", id),
+      supabase
+        .from("account_contacts")
+        .select("id, contact_id, relationship_type, is_primary, portal_access, contacts(*)")
+        .eq("account_id", id)
+        .order("is_primary", { ascending: false }),
       supabase.from("tasks").select("*").eq("client_id", id).order("due_date"),
       supabase.from("deadlines").select("*").eq("client_id", id).order("due_date"),
       supabase.from("documents").select("*").eq("client_id", id).order("created_at", { ascending: false }),
@@ -106,6 +124,7 @@ export default function ClientDetailPage() {
       if (e.service_id) engMap.set(e.service_id, e.id);
     });
     setServiceEngagements(engMap);
+    setContacts((contactsRes.data as unknown as LinkedContact[]) ?? []);
     setTasks((tasksRes.data as Task[]) ?? []);
     setDeadlines((deadlinesRes.data as Deadline[]) ?? []);
     setDocuments((documentsRes.data as Document[]) ?? []);
@@ -279,6 +298,50 @@ export default function ClientDetailPage() {
                   >
                     {content}
                   </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="app-card p-5">
+            <h2 className="font-bold text-ink">Contacts</h2>
+            <div className="mt-4 divide-y divide-line">
+              {contacts.length === 0 && <Empty text="No contacts linked yet." />}
+              {contacts.map((link) => {
+                const c = link.contacts;
+                if (!c) return null;
+                const fullName = [c.first_name, c.middle_name, c.last_name].filter(Boolean).join(" ");
+                return (
+                  <div key={link.id} className="flex flex-wrap items-center justify-between gap-2 py-3.5">
+                    <div className="min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setViewingContact(link)}
+                        className="font-semibold text-sm text-[#108A64] hover:underline text-left"
+                      >
+                        {fullName || "Unnamed contact"}
+                      </button>
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                        {c.personal_email && <span className="flex items-center gap-1"><Mail size={12} /> {c.personal_email}</span>}
+                        {c.personal_phone && <span className="flex items-center gap-1"><Phone size={12} /> {c.personal_phone}</span>}
+                        {c.occupation && <span>{c.occupation}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {link.is_primary && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-[#108A64] text-[10px] font-semibold px-2 py-1">
+                          <Star size={11} /> Primary
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-1 ${
+                          link.portal_access ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
+                        }`}
+                      >
+                        <ShieldCheck size={11} /> {link.portal_access ? "Portal access" : "No portal access"}
+                      </span>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -482,6 +545,15 @@ export default function ClientDetailPage() {
           onClose={() => setShowClientModal(false)}
           onSaved={load}
           onDeleted={() => router.push("/clients")}
+        />
+      )}
+      {viewingContact && viewingContact.contacts && (
+        <ContactDetailModal
+          contact={viewingContact.contacts}
+          isPrimary={viewingContact.is_primary}
+          relationshipType={viewingContact.relationship_type}
+          portalAccess={viewingContact.portal_access}
+          onClose={() => setViewingContact(null)}
         />
       )}
       {showInviteModal && (

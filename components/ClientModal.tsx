@@ -741,53 +741,6 @@ export default function ClientModal({
               </div>
             </Section>
 
-            <Section label="Tags">
-              <div className="flex flex-wrap gap-2 mb-2">
-                {selectedTagIds.map((id) => {
-                  const tag = availableTags.find((t) => t.id === id);
-                  if (!tag) return null;
-                  return (
-                    <span
-                      key={id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-[#108A64] text-xs font-semibold px-2.5 py-1"
-                    >
-                      {tag.tag_name}
-                      <button type="button" onClick={() => toggleTagId(id)} aria-label={`Remove ${tag.tag_name}`}>
-                        <X size={12} />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  list="tag-suggestions"
-                  placeholder="Add a tag…"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addTag();
-                    }
-                  }}
-                  className="client-input flex-1"
-                />
-                <datalist id="tag-suggestions">
-                  {availableTags.map((t) => (
-                    <option key={t.id} value={t.tag_name} />
-                  ))}
-                </datalist>
-                <button
-                  type="button"
-                  onClick={addTag}
-                  className="rounded-xl border border-line px-3 text-sm font-semibold text-ink hover:bg-paper"
-                >
-                  Add
-                </button>
-              </div>
-            </Section>
-
             <Section label="Team members (required)">
               <div className="flex flex-wrap gap-2 mb-2">
                 {selectedMemberIds.map((id) => {
@@ -1013,6 +966,56 @@ export default function ClientModal({
                 />
                 Give this contact portal access
               </label>
+            </Section>
+
+            {/* Tags lives here (Contact step, next to team members/portal access)
+               rather than on Account info — team assignment stays on Step 1
+               since it gates moving to this step. */}
+            <Section label="Tags">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selectedTagIds.map((id) => {
+                  const tag = availableTags.find((t) => t.id === id);
+                  if (!tag) return null;
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-[#108A64] text-xs font-semibold px-2.5 py-1"
+                    >
+                      {tag.tag_name}
+                      <button type="button" onClick={() => toggleTagId(id)} aria-label={`Remove ${tag.tag_name}`}>
+                        <X size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  list="tag-suggestions"
+                  placeholder="Add a tag…"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  className="client-input flex-1"
+                />
+                <datalist id="tag-suggestions">
+                  {availableTags.map((t) => (
+                    <option key={t.id} value={t.tag_name} />
+                  ))}
+                </datalist>
+                <button
+                  type="button"
+                  onClick={addTag}
+                  className="rounded-xl border border-line px-3 text-sm font-semibold text-ink hover:bg-paper"
+                >
+                  Add
+                </button>
+              </div>
             </Section>
 
             <Section label={`${identityLabel} (required)`}>
