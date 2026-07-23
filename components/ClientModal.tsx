@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronRight, Eye, EyeOff, Plus, Search, X } from "lucide-react";
+import { AlertCircle, Building2, Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
@@ -94,7 +94,25 @@ const US_STATES = [
   ["WA", "Washington"], ["WV", "West Virginia"], ["WI", "Wisconsin"], ["WY", "Wyoming"],
 ] as const;
 
-type ContactSearchResult = { id: string; first_name: string; last_name: string; personal_email: string | null };
+type LinkedAccountSummary = {
+  id: string;
+  client_type: string;
+  status: string;
+  label: string;
+};
+type ContactSearchResult = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  personal_email: string | null;
+  personal_phone: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  occupation: string | null;
+  portal_access: boolean;
+  linkedAccounts: LinkedAccountSummary[];
+};
 type MaskedIdentity = { vault_id: string; identity_type: string; masked_value: string; last_four: string | null };
 type SetupOption = { option_code: string; option_label: string };
 
@@ -136,10 +154,21 @@ export default function ClientModal({
     portal_access: false,
   });
   const [contactId, setContactId] = useState<string | null>(null);
+  // The primary contact that was actually loaded from account_contacts when
+  // editing — distinct from contactId, which changes as soon as the user
+  // selects a different existing contact. Comparing the two is how we know
+  // whether the primary is being replaced (needs the old link retired) or
+  // just being re-saved (no old link to touch).
+  const [originalContactId, setOriginalContactId] = useState<string | null>(null);
+  const [originalContactLabel, setOriginalContactLabel] = useState<string>("");
+  const [keepOldContactAsAdditional, setKeepOldContactAsAdditional] = useState(false);
   const [contactMode, setContactMode] = useState<"create" | "link">("create");
   const [contactQuery, setContactQuery] = useState("");
   const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchedOnce, setSearchedOnce] = useState(false);
+  const [includeArchivedContacts, setIncludeArchivedContacts] = useState(false);
 
   const [availableTags, setAvailableTags] = useState<ClientTag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -232,15 +261,18 @@ export default function ClientModal({
       .then(({ data }) => setSelectedServices(((data as any[]) ?? []).map((r) => r.service_type)));
     supabase
       .from("account_contacts")
-      .select("contact_id, contacts(middle_name, occupation, portal_access)")
+      .select("contact_id, contacts(first_name, middle_name, last_name, occupation, portal_access)")
       .eq("account_id", client.id)
       .eq("is_primary", true)
       .maybeSingle()
       .then(({ data }) => {
         if (!data) return;
         const c = (data as any).contacts;
-        setContactId((data as any).contact_id);
+        const id = (data as any).contact_id as string;
+        setContactId(id);
+        setOriginalContactId(id);
         if (c) {
+          setOriginalContactLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
           setForm((f) => ({
             ...f,
             middle_name: c.middle_name ?? "",
@@ -262,24 +294,106 @@ export default function ClientModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, client?.id]);
 
+  // Root cause of "search returns no usable results": the previous query
+  // only matched a single term against first_name OR last_name. Typing a
+  // full name ("Krystal Beloney") never matched either column alone, so it
+  // always came back empty — confirmed live: the old first_name-or-last_name
+  // query returns zero rows for "Krystal Beloney" even though that contact
+  // exists, while splitting into per-word AND (each word must match *some*
+  // field) correctly finds them. It also silently discarded the query error
+  // (`const { data } = await supabase...`), so an RLS or syntax failure
+  // looked identical to "no matches" — that's fixed below too.
   async function searchContacts() {
-    if (!workspaceId || contactQuery.trim().length < 2) return;
+    if (!workspaceId) return;
+    const trimmed = contactQuery.trim();
+    if (trimmed.length < 2) return;
     setSearching(true);
-    const { data } = await supabase
+    setSearchError(null);
+    setSearchedOnce(false);
+
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    let q = supabase
       .from("contacts")
-      .select("id, first_name, last_name, personal_email")
-      .eq("workspace_id", workspaceId)
-      .or(`first_name.ilike.%${contactQuery}%,last_name.ilike.%${contactQuery}%`)
-      .limit(8);
-    setContactResults((data as ContactSearchResult[]) ?? []);
+      .select(
+        "id, first_name, middle_name, last_name, personal_email, personal_phone, business_email, business_phone, occupation, portal_access, account_contacts(account_id, is_primary, clients(id, client_type, business_name, first_name, last_name, account_name, status))"
+      )
+      .eq("workspace_id", workspaceId);
+    for (const token of tokens) {
+      const t = token.replace(/[,()]/g, "");
+      q = q.or(
+        `first_name.ilike.%${t}%,middle_name.ilike.%${t}%,last_name.ilike.%${t}%,personal_email.ilike.%${t}%,personal_phone.ilike.%${t}%,business_email.ilike.%${t}%,business_phone.ilike.%${t}%`
+      );
+    }
+    const { data, error: searchErr } = await q.limit(20);
+
     setSearching(false);
+    setSearchedOnce(true);
+    if (searchErr) {
+      setSearchError(stepError("contact_search", searchErr));
+      setContactResults([]);
+      return;
+    }
+
+    const rows: ContactSearchResult[] = ((data as any[]) ?? []).map((r) => ({
+      id: r.id,
+      first_name: r.first_name,
+      middle_name: r.middle_name,
+      last_name: r.last_name,
+      personal_email: r.personal_email,
+      personal_phone: r.personal_phone,
+      business_email: r.business_email,
+      business_phone: r.business_phone,
+      occupation: r.occupation,
+      portal_access: r.portal_access,
+      linkedAccounts: ((r.account_contacts as any[]) ?? [])
+        .map((ac) => ac.clients)
+        .filter(Boolean)
+        .map((cl: any) => ({
+          id: cl.id,
+          client_type: cl.client_type,
+          status: cl.status,
+          label:
+            cl.account_name ||
+            (cl.client_type === "business" ? cl.business_name : [cl.first_name, cl.last_name].filter(Boolean).join(" ")) ||
+            "Unnamed account",
+        })),
+    }));
+
+    const visible = includeArchivedContacts
+      ? rows
+      : rows.filter((r) => !r.linkedAccounts.some((a) => a.client_type === "individual" && a.status === "archived"));
+
+    setContactResults(visible.slice(0, 8));
   }
 
+  // Fully hydrates the form from the selected contact's own record — the
+  // previous version only copied first/last name and email, so
+  // phone/occupation/middle name/portal access were left holding whatever
+  // was already in the form (stale data from a previously-loaded contact,
+  // or blank). Saving with that partial hydration would have overwritten
+  // the *newly selected* person's real phone/occupation with that leftover
+  // data. contactResults and contactQuery are kept so the result list stays
+  // visible with the selection highlighted, instead of vanishing.
   function selectExistingContact(c: ContactSearchResult) {
     setContactId(c.id);
-    setForm((f) => ({ ...f, first_name: c.first_name, last_name: c.last_name, email: c.personal_email ?? "" }));
-    setContactResults([]);
-    setContactQuery("");
+    setForm((f) => ({
+      ...f,
+      first_name: c.first_name,
+      middle_name: c.middle_name ?? "",
+      last_name: c.last_name,
+      email: c.personal_email ?? "",
+      phone: c.personal_phone ?? "",
+      occupation: c.occupation ?? "",
+      portal_access: c.portal_access ?? false,
+    }));
+  }
+
+  function clearSelectedContact(backToCreate: boolean) {
+    setContactId(null);
+    if (backToCreate) {
+      setContactMode("create");
+      setForm((f) => ({ ...f, first_name: "", middle_name: "", last_name: "", email: "", phone: "", occupation: "", portal_access: false }));
+    }
   }
 
   function toggleTagId(id: string) {
@@ -441,51 +555,9 @@ export default function ClientModal({
     }
 
     if (form.first_name || form.last_name) {
-      if (contactId) {
-        const { error: contactUpdateError } = await supabase
-          .from("contacts")
-          .update({
-            first_name: form.first_name,
-            middle_name: form.middle_name || null,
-            last_name: form.last_name,
-            personal_email: form.email || null,
-            personal_phone: form.phone || null,
-            occupation: form.occupation || null,
-            portal_access: form.portal_access,
-          })
-          .eq("id", contactId);
-        if (contactUpdateError) {
-          setSaving(false);
-          setError(`Client saved, but the contact record failed to update: ${stepError("contact_update", contactUpdateError)}`);
-          return;
-        }
-        const { data: existingLink, error: linkLookupError } = await supabase
-          .from("account_contacts")
-          .select("id")
-          .eq("account_id", clientId)
-          .eq("contact_id", contactId)
-          .maybeSingle();
-        if (linkLookupError) {
-          setSaving(false);
-          setError(`Client saved, but checking the contact link failed: ${stepError("account_contacts_link", linkLookupError)}`);
-          return;
-        }
-        if (!existingLink) {
-          const { error: linkInsertError } = await supabase.from("account_contacts").insert({
-            workspace_id: workspaceId,
-            account_id: clientId,
-            contact_id: contactId,
-            relationship_type: "primary",
-            is_primary: true,
-            portal_access: form.portal_access,
-          });
-          if (linkInsertError) {
-            setSaving(false);
-            setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
-            return;
-          }
-        }
-      } else {
+      let activeContactId = contactId;
+
+      if (!activeContactId) {
         const { data: newContact, error: contactError } = await supabase
           .from("contacts")
           .insert({
@@ -505,20 +577,100 @@ export default function ClientModal({
           setError(`Client saved, but creating the contact record failed: ${stepError("contact_create", contactError)}`);
           return;
         }
+        activeContactId = newContact.id;
+        setContactId(newContact.id);
+      } else {
+        // Whichever contact is currently selected — the original primary
+        // being re-saved, or a different existing contact just picked from
+        // search — the form was hydrated to match it exactly (see
+        // selectExistingContact), so writing it back here never overwrites
+        // a person with someone else's data.
+        const { error: contactUpdateError } = await supabase
+          .from("contacts")
+          .update({
+            first_name: form.first_name,
+            middle_name: form.middle_name || null,
+            last_name: form.last_name,
+            personal_email: form.email || null,
+            personal_phone: form.phone || null,
+            occupation: form.occupation || null,
+            portal_access: form.portal_access,
+          })
+          .eq("id", activeContactId);
+        if (contactUpdateError) {
+          setSaving(false);
+          setError(`Client saved, but the contact record failed to update: ${stepError("contact_update", contactUpdateError)}`);
+          return;
+        }
+      }
+
+      const { data: existingLink, error: linkLookupError } = await supabase
+        .from("account_contacts")
+        .select("id, is_primary")
+        .eq("account_id", clientId)
+        .eq("contact_id", activeContactId)
+        .maybeSingle();
+      if (linkLookupError) {
+        setSaving(false);
+        setError(`Client saved, but checking the contact link failed: ${stepError("account_contacts_link", linkLookupError)}`);
+        return;
+      }
+      if (existingLink) {
+        const { error: linkUpdateError } = await supabase
+          .from("account_contacts")
+          .update({ is_primary: true, relationship_type: "primary", portal_access: form.portal_access })
+          .eq("id", existingLink.id);
+        if (linkUpdateError) {
+          setSaving(false);
+          setError(`Client saved, but updating the contact link failed: ${stepError("account_contacts_link", linkUpdateError)}`);
+          return;
+        }
+      } else {
         const { error: linkInsertError } = await supabase.from("account_contacts").insert({
           workspace_id: workspaceId,
           account_id: clientId,
-          contact_id: newContact.id,
+          contact_id: activeContactId,
           relationship_type: "primary",
           is_primary: true,
           portal_access: form.portal_access,
         });
         if (linkInsertError) {
           setSaving(false);
-          setError(`Client saved, but linking the new contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
+          setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
           return;
         }
-        setContactId(newContact.id);
+      }
+
+      // The primary contact was switched to a different existing person —
+      // retire the old primary link so only one account_contacts row for
+      // this business ever has is_primary = true. The old contact's own
+      // record (name/email/phone) is never touched here. Per the user's
+      // choice: either demote it to a non-primary "additional" relationship,
+      // or remove just the relationship row (never the contact itself).
+      if (isEditing && originalContactId && originalContactId !== activeContactId) {
+        if (keepOldContactAsAdditional) {
+          const { error: demoteError } = await supabase
+            .from("account_contacts")
+            .update({ is_primary: false, relationship_type: "additional" })
+            .eq("account_id", clientId)
+            .eq("contact_id", originalContactId);
+          if (demoteError) {
+            setSaving(false);
+            setError(`Client saved, but updating the previous contact's relationship failed: ${stepError("account_contacts_demote", demoteError)}`);
+            return;
+          }
+        } else {
+          const { error: removeError } = await supabase
+            .from("account_contacts")
+            .delete()
+            .eq("account_id", clientId)
+            .eq("contact_id", originalContactId);
+          if (removeError) {
+            setSaving(false);
+            setError(`Client saved, but removing the previous contact's relationship failed: ${stepError("account_contacts_remove", removeError)}`);
+            return;
+          }
+        }
       }
     }
 
@@ -832,59 +984,138 @@ export default function ClientModal({
               </div>
             )}
 
-            {contactMode === "link" && !contactId && (
+            {contactId && (
+              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-0.5">
+                      Selected existing contact
+                    </span>
+                    <strong className="text-ink">{form.first_name} {form.last_name}</strong>
+                  </span>
+                  <div className="flex shrink-0 gap-3">
+                    <button type="button" onClick={() => clearSelectedContact(false)} className="text-xs font-semibold text-muted hover:text-ink">
+                      Clear
+                    </button>
+                    <button type="button" onClick={() => clearSelectedContact(true)} className="text-xs font-semibold text-muted hover:text-ink">
+                      Create new instead
+                    </button>
+                  </div>
+                </div>
+                {isEditing && originalContactId && contactId !== originalContactId && (
+                  <label className="flex items-start gap-2 text-xs text-ink pt-2 border-t border-line">
+                    <input
+                      type="checkbox"
+                      checked={keepOldContactAsAdditional}
+                      onChange={(e) => setKeepOldContactAsAdditional(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 accent-[#108A64]"
+                    />
+                    Keep {originalContactLabel || "the previous contact"} linked as an additional (non-primary) contact
+                    instead of removing them from this business
+                  </label>
+                )}
+              </div>
+            )}
+
+            {contactMode === "link" && (
               <Section label="Find a contact">
+                <p className="text-xs text-muted mb-2">
+                  Searches contacts and people who are already Individual clients — by name, email, or phone.
+                </p>
                 <div className="flex gap-2">
                   <input
-                    placeholder="Search by name…"
+                    placeholder="Search by name, email, or phone…"
                     value={contactQuery}
                     onChange={(e) => setContactQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchContacts();
+                      }
+                    }}
                     className="client-input flex-1"
                   />
                   <button
                     type="button"
                     onClick={searchContacts}
-                    className="flex items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-semibold text-ink hover:bg-paper"
+                    disabled={searching}
+                    className="flex items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-semibold text-ink hover:bg-paper disabled:opacity-60"
                   >
-                    <Search size={14} /> {searching ? "…" : "Search"}
+                    {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                    {searching ? "Searching…" : "Search"}
                   </button>
                 </div>
+
+                <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    checked={includeArchivedContacts}
+                    onChange={(e) => {
+                      setIncludeArchivedContacts(e.target.checked);
+                      if (contactQuery.trim().length >= 2) searchContacts();
+                    }}
+                    className="h-3.5 w-3.5 accent-[#108A64]"
+                  />
+                  Include archived
+                </label>
+
+                {searchError && (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-brick">
+                    <AlertCircle size={13} /> {searchError}
+                  </div>
+                )}
+
+                {!searching && searchedOnce && !searchError && contactResults.length === 0 && (
+                  <div className="mt-2 text-xs text-muted">No matching contacts found.</div>
+                )}
+
                 {contactResults.length > 0 && (
                   <div className="mt-2 divide-y divide-line rounded-xl border border-line">
-                    {contactResults.map((c) => (
-                      <button
-                        type="button"
-                        key={c.id}
-                        onClick={() => selectExistingContact(c)}
-                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-paper"
-                      >
-                        <div className="font-semibold text-ink">
-                          {c.first_name} {c.last_name}
-                        </div>
-                        {c.personal_email && <div className="text-xs text-muted">{c.personal_email}</div>}
-                      </button>
-                    ))}
+                    {contactResults.map((c) => {
+                      const isSelected = c.id === contactId;
+                      const isIndividualClient = c.linkedAccounts.some((a) => a.client_type === "individual");
+                      const linkedClient = c.linkedAccounts.find((a) => a.client_type === "individual");
+                      const businesses = c.linkedAccounts.filter((a) => a.client_type === "business");
+                      return (
+                        <button
+                          type="button"
+                          key={c.id}
+                          onClick={() => selectExistingContact(c)}
+                          className={`w-full text-left px-3 py-2.5 text-sm hover:bg-paper ${isSelected ? "bg-emerald-50" : ""}`}
+                        >
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-semibold text-ink">
+                              {[c.first_name, c.middle_name, c.last_name].filter(Boolean).join(" ")}
+                            </span>
+                            {isSelected && <Check size={13} className="text-[#108A64]" />}
+                            {isIndividualClient && (
+                              <span className="rounded-full bg-sky-50 text-sky-700 text-[10px] font-semibold px-2 py-0.5">
+                                Individual Client{linkedClient?.status ? ` · ${linkedClient.status}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                            {(c.personal_email || c.business_email) && <span>{c.personal_email || c.business_email}</span>}
+                            {(c.personal_phone || c.business_phone) && <span>{c.personal_phone || c.business_phone}</span>}
+                          </div>
+                          {businesses.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {businesses.map((b) => (
+                                <span
+                                  key={b.id}
+                                  className="inline-flex items-center gap-1 rounded-full bg-paper border border-line text-[10px] font-semibold text-muted px-2 py-0.5"
+                                >
+                                  <Building2 size={10} /> {b.label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </Section>
-            )}
-
-            {contactId && (
-              <div className="flex items-center justify-between rounded-xl border border-line bg-paper px-3 py-2.5 text-sm">
-                <span>
-                  Linked to <strong className="text-ink">{form.first_name} {form.last_name}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setContactId(null);
-                    setContactMode("create");
-                  }}
-                  className="text-xs font-semibold text-muted hover:text-ink"
-                >
-                  Change
-                </button>
-              </div>
             )}
 
             {isEntity && !contactId && (
