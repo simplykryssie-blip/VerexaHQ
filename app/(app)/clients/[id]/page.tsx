@@ -185,6 +185,7 @@ export default function ClientDetailPage() {
     label: string;
   } | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -192,17 +193,24 @@ export default function ClientDetailPage() {
   const [newNote, setNewNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
-  async function load() {
-    setLoading(true);
+  // The actual fetch — shared by both entry points below. Never toggles
+  // `loading` itself: `loading` gates the page's *only* render branch
+  // (see `if (loading) return ...` further down), which unmounts this
+  // entire tree, including any modal that's still open above it (e.g.
+  // ActivateServiceModal, which deliberately stays open across an
+  // activation). Toggling it mid-flow caused the tree — and whatever
+  // modal was open — to unmount and then remount from scratch once the
+  // fetch finished, wiping out the modal's own state and any props like
+  // `initialServiceType`, which is what silently reset activation back to
+  // its first step after every successful save.
+  async function fetchClientData() {
     const clientRes = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
     if (clientRes.error) {
       setError(clientRes.error.message);
-      setLoading(false);
       return;
     }
     if (!clientRes.data) {
       setClient(null);
-      setLoading(false);
       return;
     }
     const c = clientRes.data as Client;
@@ -291,12 +299,42 @@ export default function ClientDetailPage() {
     setNotes((notesRes.data as Note[]) ?? []);
 
     setError(null);
+  }
+
+  // Initial page load only — this is the one place a full-page "Loading
+  // client…" state is appropriate, since there's nothing meaningful to
+  // show yet anyway.
+  async function load() {
+    setLoading(true);
+    await fetchClientData();
     setLoading(false);
+  }
+
+  // Used by every in-place save/activate/delete callback below instead of
+  // `load()`, so refreshing data while a modal is open can never unmount
+  // (and silently reset) that modal.
+  async function refresh() {
+    await fetchClientData();
   }
 
   useEffect(() => {
     if (id) load();
   }, [id]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Refreshes this page's data (never the loading-toggling `load()`, so
+  // the still-open ActivateServiceModal doesn't get unmounted mid-flow —
+  // see fetchClientData's comment) and surfaces a lightweight success
+  // message, then the modal closes itself right after calling this.
+  async function handleServiceActivated(serviceName: string) {
+    await refresh();
+    setToast(`${serviceName} activated successfully.`);
+  }
 
   async function toggleTask(task: Task) {
     const nextStatus = task.task_status === "Done" ? "To Do" : "Done";
@@ -427,6 +465,11 @@ export default function ClientDetailPage() {
 
   return (
     <div className="space-y-6 pb-8">
+      {toast && (
+        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-[#108A64] shadow-lg">
+          {toast}
+        </div>
+      )}
       <button onClick={() => router.push("/clients")} className="flex items-center gap-1.5 text-xs text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Clients
       </button>
@@ -1010,9 +1053,9 @@ export default function ClientDetailPage() {
         </div>
       )}
 
-      {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={load} onDeleted={() => router.push("/clients")} />}
+      {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={refresh} onDeleted={() => router.push("/clients")} />}
       {showAddContactModal && (
-        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={load} />
+        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={refresh} />
       )}
       {viewingContact && viewingContact.link.contacts && (
         <ContactDetailModal
@@ -1041,14 +1084,14 @@ export default function ClientDetailPage() {
           }}
         />
       )}
-      {showUploadModal && <UploadDocumentModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowUploadModal(false)} onSaved={load} />}
-      {showRequestModal && <RequestDocumentModal clientId={client.id} onClose={() => setShowRequestModal(false)} onSaved={load} />}
-      {showFolderModal && <DocumentFolderModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowFolderModal(false)} onSaved={load} />}
-      {showTaskModal && <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={load} />}
-      {editingTask && <NewTaskModal clientId={client.id} task={editingTask} onClose={() => setEditingTask(null)} onSaved={load} onDeleted={load} />}
-      {showDeadlineModal && <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={load} />}
+      {showUploadModal && <UploadDocumentModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowUploadModal(false)} onSaved={refresh} />}
+      {showRequestModal && <RequestDocumentModal clientId={client.id} onClose={() => setShowRequestModal(false)} onSaved={refresh} />}
+      {showFolderModal && <DocumentFolderModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowFolderModal(false)} onSaved={refresh} />}
+      {showTaskModal && <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={refresh} />}
+      {editingTask && <NewTaskModal clientId={client.id} task={editingTask} onClose={() => setEditingTask(null)} onSaved={refresh} onDeleted={refresh} />}
+      {showDeadlineModal && <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={refresh} />}
       {editingDeadline && (
-        <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={load} onDeleted={load} />
+        <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={refresh} onDeleted={refresh} />
       )}
       {(showActivateModal || activatingRequestedService) && (
         <ActivateServiceModal
@@ -1061,13 +1104,13 @@ export default function ClientDetailPage() {
             setShowActivateModal(false);
             setActivatingRequestedService(null);
           }}
-          onActivated={load}
+          onActivated={handleServiceActivated}
         />
       )}
       {editingService && (
-        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={load} onDeleted={load} />
+        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={refresh} onDeleted={refresh} />
       )}
-      {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={load} />}
+      {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={refresh} />}
     </div>
   );
 }
@@ -1140,16 +1183,19 @@ function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: st
     <>
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-ink">{s.service_type}</div>
-        <div className="mt-0.5 text-xs text-muted">
-          {subtitle}
-          {!engagementId && " · Legacy service, no workspace"}
-        </div>
+        <div className="mt-0.5 text-xs text-muted">{subtitle}</div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {isOpenServiceStatus(s.service_status) ? (
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[#108A64]">Active</span>
         ) : (
           <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted">Closed</span>
+        )}
+        {/* No fabricated "Add Workflow" action here — no existing RPC
+            attaches an engagement to an already-created service, so this
+            only ever states the truthful current state. */}
+        {!engagementId && (
+          <span className="rounded-full bg-paper border border-line px-2 py-0.5 text-[10px] font-semibold text-muted">Workflow not added</span>
         )}
         <StatusPill status={s.service_status} />
       </div>

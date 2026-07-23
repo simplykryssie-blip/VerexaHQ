@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { X, ChevronLeft, ChevronRight, CheckCircle2, FileText, ClipboardList, FileCheck2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { ServiceTemplate, PipelineStage } from "@/lib/types";
@@ -54,18 +53,17 @@ type TemplateFormItem = {
 };
 type RequestedServiceChip = { serviceType: string; label: string };
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 // "Customize" was removed as a selectable mode: the live RPC has no
 // parameter for selective/edited activation, so offering it as a working
 // choice would be dishonest. Only these two are actually functional.
 type Method = "apply" | "create_only";
 
-const STEP_LABELS: Record<Exclude<Step, never>, string> = {
+const STEP_LABELS: Record<Step, string> = {
   1: "Service setup",
   2: "Workflow",
   3: "Starting stage",
   4: "Review",
-  5: "Complete",
 };
 
 export default function ActivateServiceModal({
@@ -90,14 +88,15 @@ export default function ActivateServiceModal({
   // is what actually keeps this list current.
   remainingRequestedServices?: RequestedServiceChip[];
   onClose: () => void;
-  onActivated: () => void;
+  // Called once, right before this component calls onClose() itself, with
+  // the name of the service that was just activated — the parent uses
+  // this to refresh its own data and show a success message. The modal
+  // never shows its own "success" screen or stays open after activating;
+  // see the note on fetchClientData in the client profile page for why
+  // that used to silently reset this whole modal back to step 1.
+  onActivated: (serviceName: string) => void;
 }) {
-  const router = useRouter();
   const [step, setStep] = useState<Step>(1);
-  // Starts from the prop, but "Activate another service" clears it —
-  // otherwise the banner would keep pointing at whichever request opened
-  // the modal even after staff has moved on to a different one.
-  const [sessionRequestedLabel, setSessionRequestedLabel] = useState(requestedServiceLabel);
 
   const [templates, setTemplates] = useState<ServiceTemplate[]>([]);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
@@ -143,7 +142,6 @@ export default function ActivateServiceModal({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successInfo, setSuccessInfo] = useState<{ serviceId: string; engagementId: string | null } | null>(null);
 
   // Only templates apply_service_template_to_client can actually activate:
   // workspace-owned templates, or global templates that are explicitly
@@ -294,25 +292,6 @@ export default function ActivateServiceModal({
     return "Work continues here after the previous stage.";
   }
 
-  function resetForAnother() {
-    setStep(1);
-    setTemplateId("");
-    setIsRecurring(false);
-    setServiceYear(new Date().getFullYear().toString());
-    setStartDate(new Date().toISOString().slice(0, 10));
-    setDeadlineDate("");
-    setDeadlineType("");
-    setBillingFrequency("");
-    setAssignedTo("");
-    setMethod("apply");
-    setPreviewOpen(false);
-    setStageId("");
-    setSetupError(null);
-    setError(null);
-    setSuccessInfo(null);
-    setSessionRequestedLabel(undefined);
-  }
-
   function goToWorkflow() {
     if (!templateId) {
       setSetupError("Choose a workflow template.");
@@ -411,9 +390,13 @@ export default function ActivateServiceModal({
     }
 
     setSaving(false);
-    onActivated();
-    setSuccessInfo({ serviceId: serviceId as string, engagementId });
-    setStep(5);
+    // Refresh + toast happen in the parent, then this modal closes itself
+    // immediately — it never lingers on its own "success" screen, and it
+    // never resets back to step 1, both of which only ever happened
+    // before because the parent's old refresh path unmounted this whole
+    // component out from under itself (see fetchClientData's comment).
+    onActivated(selectedTemplate?.template_name ?? "Service");
+    onClose();
   }
 
   // No existing RPC creates a service + engagement without also creating
@@ -465,9 +448,8 @@ export default function ActivateServiceModal({
     }
 
     setSaving(false);
-    onActivated();
-    setSuccessInfo({ serviceId: data.id as string, engagementId: null });
-    setStep(5);
+    onActivated(selectedTemplate?.template_name ?? "Service");
+    onClose();
   }
 
   function offsetLabel(offsetDays: number | null) {
@@ -493,21 +475,21 @@ export default function ActivateServiceModal({
         </div>
 
         <div className="mb-5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-semibold uppercase tracking-wide text-muted sm:text-[11px]">
-          {([1, 2, 3, 4, 5] as Step[]).map((n, idx) => (
+          {([1, 2, 3, 4] as Step[]).map((n, idx) => (
             <span key={n} className="flex items-center gap-1.5">
               <span className={step >= n ? "text-[#108A64]" : ""}>
                 {n}. {STEP_LABELS[n]}
               </span>
-              {idx < 4 && <ChevronRight size={11} />}
+              {idx < 3 && <ChevronRight size={11} />}
             </span>
           ))}
         </div>
 
         {step === 1 && (
           <div className="space-y-3">
-            {sessionRequestedLabel && (
+            {requestedServiceLabel && (
               <div className="rounded-lg border border-line bg-paper px-3 py-2 text-xs text-ink">
-                Activating for requested service: <strong>{sessionRequestedLabel}</strong>
+                Activating for requested service: <strong>{requestedServiceLabel}</strong>
               </div>
             )}
             {remainingRequestedServices && remainingRequestedServices.length > 0 && (
@@ -913,7 +895,7 @@ export default function ActivateServiceModal({
               <div>
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Service</div>
                 <div className="space-y-1">
-                  {sessionRequestedLabel && <ReviewRow label="Requested service" value={sessionRequestedLabel} />}
+                  {requestedServiceLabel && <ReviewRow label="Requested service" value={requestedServiceLabel} />}
                   <ReviewRow label="Template" value={selectedTemplate?.template_name ?? "—"} />
                   <ReviewRow label="Service type" value={selectedTemplate ? humanizeServiceType(selectedTemplate.service_type) : "—"} />
                 </div>
@@ -970,40 +952,6 @@ export default function ActivateServiceModal({
               >
                 <CheckCircle2 size={14} /> {saving ? "Activating…" : "Activate"}
               </button>
-            </div>
-          </div>
-        )}
-
-        {step === 5 && successInfo && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-[#108A64]">
-              <CheckCircle2 size={16} /> Service activated successfully.
-            </div>
-            <div className="space-y-2">
-              <button
-                onClick={resetForAnother}
-                className="w-full rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper"
-              >
-                Activate another service
-              </button>
-              <button
-                onClick={onClose}
-                className="w-full rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink hover:bg-paper"
-              >
-                Return to client
-              </button>
-              {successInfo.engagementId && (
-                <button
-                  onClick={() => {
-                    const id = successInfo.engagementId!;
-                    onClose();
-                    router.push(`/work/${id}`);
-                  }}
-                  className="w-full rounded-xl bg-[#108A64] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#0d7555]"
-                >
-                  Open Service Workspace
-                </button>
-              )}
             </div>
           </div>
         )}
