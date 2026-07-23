@@ -568,10 +568,15 @@ export default function ClientDetailPage() {
               ) : (
                 <div className="divide-y divide-line">
                   {openTasksAndDeadlines.map((item) => (
-                    <div key={`${item.kind}-${item.id}`} className="flex items-center justify-between py-2.5 text-sm">
+                    <button
+                      type="button"
+                      key={`${item.kind}-${item.id}`}
+                      onClick={() => setTab("work")}
+                      className="flex w-full items-center justify-between py-2.5 text-left text-sm hover:bg-paper transition-colors"
+                    >
                       <span className="text-ink">{item.title}</span>
                       <span className="text-xs text-muted tabular-nums font-mono">{item.due ?? "No due date"}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1114,14 +1119,23 @@ function RequestedServicesCard({
 }
 
 function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: string; onEdit: () => void }) {
-  const content = (
+  // service_year is a real column, but plenty of rows (legacy, or activated
+  // before this fix) never had it set — fall back to start/due date instead
+  // of a bare "No year set", and only say that when there's truly no date
+  // data of any kind to show.
+  const dateBits: string[] = [];
+  if (s.service_year) dateBits.push(s.service_year);
+  if (s.start_date) dateBits.push(`Start ${s.start_date}`);
+  if (s.due_date) dateBits.push(`Due ${s.due_date}`);
+  const subtitle = dateBits.length > 0 ? dateBits.join(" · ") : "No dates set";
+
+  const mainContent = (
     <>
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-ink">{s.service_type}</div>
         <div className="mt-0.5 text-xs text-muted">
-          {s.service_year || "No year set"}
+          {subtitle}
           {!engagementId && " · Legacy service, no workspace"}
-          {s.due_date && ` · Due ${s.due_date}`}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
@@ -1134,14 +1148,31 @@ function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: st
       </div>
     </>
   );
-  return engagementId ? (
-    <Link href={`/work/${engagementId}`} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
-      {content}
-    </Link>
-  ) : (
-    <button onClick={onEdit} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
-      {content}
-    </button>
+  // The Edit button is always rendered (never hover-only) so it's reachable
+  // on mobile — it used to only exist when a service had no engagement,
+  // meaning newly-activated services (which always get one) had no way to
+  // edit their dates/status/owner at all from this card.
+  return (
+    <div className="flex w-full items-center gap-1 py-3">
+      {engagementId ? (
+        <Link
+          href={`/work/${engagementId}`}
+          className="-mx-1 flex min-w-0 flex-1 items-center justify-between rounded-lg px-1 text-left transition-colors hover:bg-paper"
+        >
+          {mainContent}
+        </Link>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center justify-between">{mainContent}</div>
+      )}
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${s.service_type}`}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-paper hover:text-ink"
+      >
+        <Pencil size={14} />
+      </button>
+    </div>
   );
 }
 

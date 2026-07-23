@@ -25,6 +25,11 @@ export default function NewServiceModal({
   const [serviceType, setServiceType] = useState(service?.service_type ?? "");
   const [serviceStatus, setServiceStatus] = useState(service?.service_status ?? "New");
   const [serviceYear, setServiceYear] = useState(service?.service_year ?? new Date().getFullYear().toString());
+  const [startDate, setStartDate] = useState(service?.start_date ?? "");
+  const [dueDate, setDueDate] = useState(service?.due_date ?? "");
+  const [assignedTo, setAssignedTo] = useState(service?.assigned_to ?? "");
+  const [members, setMembers] = useState<{ user_id: string; label: string }[]>([]);
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState(service?.workspace_id ?? "");
   const [pipelineId, setPipelineId] = useState(service?.pipeline_id ?? "");
   const [stageId, setStageId] = useState(service?.pipeline_stage_id ?? "");
   const [saving, setSaving] = useState(false);
@@ -45,6 +50,41 @@ export default function NewServiceModal({
       .eq("is_active", true)
       .then(({ data }) => setPipelines((data as Pipeline[]) ?? []));
   }, [clientId]);
+
+  // Needed to populate the "Assigned to" dropdown from the right workspace.
+  // When editing, service.workspace_id is already known; when creating,
+  // it's resolved from whichever client is currently selected.
+  useEffect(() => {
+    if (service?.workspace_id) {
+      setResolvedWorkspaceId(service.workspace_id);
+      return;
+    }
+    if (!selectedClientId) {
+      setResolvedWorkspaceId("");
+      return;
+    }
+    supabase
+      .from("clients")
+      .select("workspace_id")
+      .eq("id", selectedClientId)
+      .maybeSingle()
+      .then(({ data }) => setResolvedWorkspaceId((data as { workspace_id: string } | null)?.workspace_id ?? ""));
+  }, [service?.workspace_id, selectedClientId]);
+
+  useEffect(() => {
+    if (!resolvedWorkspaceId) {
+      setMembers([]);
+      return;
+    }
+    supabase
+      .from("workspace_members")
+      .select("user_id, display_name, role")
+      .eq("workspace_id", resolvedWorkspaceId)
+      .eq("member_status", "Active")
+      .then(({ data }) =>
+        setMembers(((data as any[]) ?? []).map((m) => ({ user_id: m.user_id, label: m.display_name || m.role || "Team member" })))
+      );
+  }, [resolvedWorkspaceId]);
 
   useEffect(() => {
     if (!pipelineId) {
@@ -83,12 +123,17 @@ export default function NewServiceModal({
     setError(null);
 
     if (isEditing) {
+      // Same row, always — this only ever updates service!.id, never
+      // inserts, so editing can't create a duplicate service.
       const { error } = await supabase
         .from("services")
         .update({
           service_type: serviceType,
           service_status: serviceStatus,
-          service_year: serviceYear,
+          service_year: serviceYear || null,
+          start_date: startDate || null,
+          due_date: dueDate || null,
+          assigned_to: assignedTo || null,
           pipeline_id: pipelineId || null,
           pipeline_stage_id: stageId || null,
         })
@@ -120,7 +165,10 @@ export default function NewServiceModal({
       client_id: selectedClientId,
       service_type: serviceType,
       service_status: "New",
-      service_year: serviceYear,
+      service_year: serviceYear || null,
+      start_date: startDate || null,
+      due_date: dueDate || null,
+      assigned_to: assignedTo || null,
       pipeline_id: pipelineId || null,
       pipeline_stage_id: stageId || null,
     });
@@ -149,8 +197,8 @@ export default function NewServiceModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-sm border border-line w-full max-w-md p-6">
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4 py-8">
+      <div className="bg-white rounded-sm border border-line w-full max-w-md max-h-full overflow-y-auto p-6">
         <h3 className="font-slab text-lg font-bold text-ink mb-4">
           {isEditing ? "Edit Service" : "New Service"}
         </h3>
@@ -192,6 +240,40 @@ export default function NewServiceModal({
             onChange={(e) => setServiceYear(e.target.value)}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold text-muted">Start date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold text-muted">Due date</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <select
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+          >
+            <option value="">Unassigned</option>
+            {members.map((m) => (
+              <option key={m.user_id} value={m.user_id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
 
           <select
             value={pipelineId}

@@ -34,6 +34,12 @@ export default function ActivateServiceModal({
 
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dueDate, setDueDate] = useState("");
+  // services.service_year is a real (text) column, but apply_service_
+  // template_to_client also passes it straight into
+  // `nullif(p_service_year, '')::int` for engagements.tax_year — a
+  // non-numeric value would fail that cast mid-transaction, so this is
+  // validated up front as either blank or a plain 4-digit year.
+  const [serviceYear, setServiceYear] = useState(() => new Date().getFullYear().toString());
   const [dateError, setDateError] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -90,15 +96,21 @@ export default function ActivateServiceModal({
       setDateError("Due date can't be earlier than the start date.");
       return;
     }
+    if (serviceYear && !/^\d{4}$/.test(serviceYear)) {
+      setDateError("Service year must be a 4-digit year (e.g. 2026), or left blank.");
+      return;
+    }
     setDateError(null);
     setStep(3);
   }
 
-  // apply_service_template_to_client's approved signature is
-  // (p_client_id, p_service_template_id, p_start_date, p_due_date) only —
-  // it has no parameters for owner, price, service year, billing frequency
-  // or recurring status. Those fields are intentionally not collected here;
-  // set them by editing the resulting service/Service Workspace afterward.
+  // apply_service_template_to_client's approved signature (verified live)
+  // is (p_client_id, p_service_template_id, p_start_date, p_due_date,
+  // p_assigned_to, p_price, p_service_year, p_billing_frequency,
+  // p_is_recurring). Owner, price, billing frequency and recurring status
+  // are still not collected here — set them on the resulting service
+  // afterward — but start date, due date and service year are real,
+  // already-accepted parameters, so they're sent through directly.
   async function activate() {
     setSaving(true);
     setError(null);
@@ -107,6 +119,7 @@ export default function ActivateServiceModal({
       p_service_template_id: templateId,
       p_start_date: startDate,
       p_due_date: dueDate || null,
+      p_service_year: serviceYear || null,
     });
     if (rpcError) {
       setError(rpcError.message);
@@ -125,8 +138,8 @@ export default function ActivateServiceModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-line bg-white p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
+      <div className="w-full max-w-lg max-h-full overflow-y-auto rounded-2xl border border-line bg-white p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-slab text-lg font-bold text-ink">Activate a service</h3>
           <button onClick={onClose} className="text-muted hover:text-ink">
@@ -201,6 +214,18 @@ export default function ActivateServiceModal({
                 <input type="date" value={dueDate} onChange={(e) => { setDueDate(e.target.value); setDateError(null); }} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
               </Field>
             </div>
+            <Field label="Service year (optional)">
+              <input
+                placeholder="e.g. 2026"
+                inputMode="numeric"
+                value={serviceYear}
+                onChange={(e) => {
+                  setServiceYear(e.target.value.replace(/\D/g, "").slice(0, 4));
+                  setDateError(null);
+                }}
+                className="w-full rounded-lg border border-line px-2.5 py-2 text-sm"
+              />
+            </Field>
             {dateError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{dateError}</div>
             )}
