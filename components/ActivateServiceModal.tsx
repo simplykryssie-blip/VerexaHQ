@@ -29,6 +29,7 @@ const BILLING_FREQUENCY_OPTIONS = ["Monthly", "Quarterly", "Semi-Annually", "Ann
 
 type TemplateTaskItem = {
   id: string;
+  service_template_id: string;
   task_title: string;
   task_description: string | null;
   priority: string;
@@ -37,6 +38,7 @@ type TemplateTaskItem = {
 };
 type TemplateDocItem = {
   id: string;
+  service_template_id: string;
   document_name: string;
   document_category: string | null;
   is_required: boolean;
@@ -44,6 +46,7 @@ type TemplateDocItem = {
 };
 type TemplateFormItem = {
   id: string;
+  service_template_id: string;
   form_template_id: string;
   due_offset_days: number | null;
   sort_order: number;
@@ -52,7 +55,18 @@ type TemplateFormItem = {
 type RequestedServiceChip = { serviceType: string; label: string };
 
 type Step = 1 | 2 | 3 | 4 | 5;
-type Method = "quick" | "customize" | "blank";
+// "Customize" was removed as a selectable mode: the live RPC has no
+// parameter for selective/edited activation, so offering it as a working
+// choice would be dishonest. Only these two are actually functional.
+type Method = "apply" | "create_only";
+
+const STEP_LABELS: Record<Exclude<Step, never>, string> = {
+  1: "Service setup",
+  2: "Workflow",
+  3: "Starting stage",
+  4: "Review",
+  5: "Complete",
+};
 
 export default function ActivateServiceModal({
   clientId,
@@ -90,12 +104,21 @@ export default function ActivateServiceModal({
   const [templateId, setTemplateId] = useState("");
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
 
+  // Human-readable service-type labels, sourced from the same
+  // client_setup_options rows ClientModal uses for its "Services needed"
+  // checkboxes — never fabricated, falls back to a formatted version of
+  // the raw code (e.g. "business_tax" -> "Business Tax") only when no
+  // matching option exists (confirmed live: that's the case for
+  // "business_tax" specifically).
+  const [serviceTypeLabels, setServiceTypeLabels] = useState<Map<string, string>>(new Map());
+  const [pipelines, setPipelines] = useState<{ id: string; pipeline_name: string }[]>([]);
+
   const [isRecurring, setIsRecurring] = useState(false);
   const [serviceYear, setServiceYear] = useState(() => new Date().getFullYear().toString());
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   // "Deadline date" replaces the old vague "Due date" label for one-time
   // services only — recurring services never require one overall target
-  // deadline (see REQUIRED FIX in the originating request).
+  // deadline.
   const [deadlineDate, setDeadlineDate] = useState("");
   const [deadlineType, setDeadlineType] = useState("");
   const [billingFrequency, setBillingFrequency] = useState("");
@@ -103,10 +126,15 @@ export default function ActivateServiceModal({
   const [members, setMembers] = useState<{ user_id: string; label: string }[]>([]);
   const [setupError, setSetupError] = useState<string | null>(null);
 
-  const [method, setMethod] = useState<Method>("quick");
-  const [templateTasks, setTemplateTasks] = useState<TemplateTaskItem[]>([]);
-  const [templateDocs, setTemplateDocs] = useState<TemplateDocItem[]>([]);
-  const [templateForms, setTemplateForms] = useState<TemplateFormItem[]>([]);
+  const [method, setMethod] = useState<Method>("apply");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  // Loaded once for every visible template (not just the selected one), so
+  // the Step 1 picker can show real task/document/form counts per option
+  // without N extra queries — the selected template's own items (for the
+  // Preview) are just a client-side filter of the same arrays.
+  const [allTasks, setAllTasks] = useState<TemplateTaskItem[]>([]);
+  const [allDocs, setAllDocs] = useState<TemplateDocItem[]>([]);
+  const [allForms, setAllForms] = useState<TemplateFormItem[]>([]);
   const [itemsLoading, setItemsLoading] = useState(false);
 
   const [stages, setStages] = useState<PipelineStage[]>([]);
@@ -156,6 +184,25 @@ export default function ActivateServiceModal({
       );
   }, [workspaceId]);
 
+  useEffect(() => {
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_service_type")
+      .then(({ data }) =>
+        setServiceTypeLabels(new Map(((data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label])))
+      );
+  }, []);
+
+  useEffect(() => {
+    supabase
+      .from("pipelines")
+      .select("id, pipeline_name")
+      .eq("is_active", true)
+      .or(`workspace_id.eq.${workspaceId},workspace_id.is.null`)
+      .then(({ data }) => setPipelines((data as { id: string; pipeline_name: string }[]) ?? []));
+  }, [workspaceId]);
+
   // Picking a template resets the one-time/recurring default from its real
   // service_type — a heuristic, not a stored fact, so it's always editable.
   useEffect(() => {
@@ -163,39 +210,38 @@ export default function ActivateServiceModal({
     setIsRecurring(RECURRING_SERVICE_TYPES.has(selectedTemplate.service_type));
   }, [selectedTemplate?.id]);
 
-  // Loaded once per template regardless of activation method — Quick uses
-  // just the counts, Customize shows the full list, so one fetch covers
-  // both instead of two separate queries like the old count-only version.
   useEffect(() => {
-    if (!templateId) {
-      setTemplateTasks([]);
-      setTemplateDocs([]);
-      setTemplateForms([]);
+    if (templates.length === 0) {
+      setAllTasks([]);
+      setAllDocs([]);
+      setAllForms([]);
       return;
     }
+    const templateIds = templates.map((t) => t.id);
     setItemsLoading(true);
     Promise.all([
-      supabase.from("service_template_tasks").select("*").eq("service_template_id", templateId).order("sort_order"),
-      supabase.from("service_template_documents").select("*").eq("service_template_id", templateId).order("sort_order"),
+      supabase.from("service_template_tasks").select("*").in("service_template_id", templateIds).order("sort_order"),
+      supabase.from("service_template_documents").select("*").in("service_template_id", templateIds).order("sort_order"),
       supabase
         .from("service_template_forms")
         .select("*, form_templates(template_name)")
-        .eq("service_template_id", templateId)
+        .in("service_template_id", templateIds)
         .order("sort_order"),
     ]).then(([t, d, f]) => {
-      setTemplateTasks((t.data as TemplateTaskItem[]) ?? []);
-      setTemplateDocs((d.data as TemplateDocItem[]) ?? []);
-      setTemplateForms((f.data as unknown as TemplateFormItem[]) ?? []);
+      setAllTasks((t.data as TemplateTaskItem[]) ?? []);
+      setAllDocs((d.data as TemplateDocItem[]) ?? []);
+      setAllForms((f.data as unknown as TemplateFormItem[]) ?? []);
       setItemsLoading(false);
     });
-  }, [templateId]);
+  }, [templates]);
 
   // Real, workspace-configured stages for the template's default pipeline —
   // confirmed live that apply_service_template_to_client always
   // auto-selects the first one by sort_order with no way to override it,
   // which is why every Tax Preparation activation lands on that pipeline's
-  // literal first stage, "Awaiting Documents". Loading the real list here
-  // lets staff choose a different (still real) starting stage instead.
+  // literal first stage, "Awaiting Documents" (that's real workspace data,
+  // not hardcoded anywhere). Loading the real list here lets staff choose a
+  // different (still real) starting stage instead.
   useEffect(() => {
     if (!selectedTemplate?.default_pipeline_id) {
       setStages([]);
@@ -215,6 +261,39 @@ export default function ActivateServiceModal({
       });
   }, [selectedTemplate?.default_pipeline_id]);
 
+  function humanizeServiceType(code: string): string {
+    const known = serviceTypeLabels.get(code);
+    if (known) return known;
+    return code
+      .split("_")
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+  function pipelineNameFor(pipelineId: string | null | undefined): string | null {
+    if (!pipelineId) return null;
+    return pipelines.find((p) => p.id === pipelineId)?.pipeline_name ?? null;
+  }
+  function countsFor(id: string) {
+    return {
+      tasks: allTasks.filter((t) => t.service_template_id === id).length,
+      docs: allDocs.filter((d) => d.service_template_id === id).length,
+      forms: allForms.filter((f) => f.service_template_id === id).length,
+    };
+  }
+  const selectedTasks = allTasks.filter((t) => t.service_template_id === templateId);
+  const selectedDocs = allDocs.filter((d) => d.service_template_id === templateId);
+  const selectedForms = allForms.filter((f) => f.service_template_id === templateId);
+  const selectedCounts = { tasks: selectedTasks.length, docs: selectedDocs.length, forms: selectedForms.length };
+
+  function stageNeutralNote(s: PipelineStage, index: number, total: number, isDefault: boolean): string {
+    if (isDefault) return "This stage will be assigned when the service is activated.";
+    if (s.is_complete_stage) return "Marks this workflow as complete.";
+    if (index === 0) return "First stage in this pipeline.";
+    if (index === total - 1) return "Final stage in this pipeline.";
+    return "Work continues here after the previous stage.";
+  }
+
   function resetForAnother() {
     setStep(1);
     setTemplateId("");
@@ -225,7 +304,8 @@ export default function ActivateServiceModal({
     setDeadlineType("");
     setBillingFrequency("");
     setAssignedTo("");
-    setMethod("quick");
+    setMethod("apply");
+    setPreviewOpen(false);
     setStageId("");
     setSetupError(null);
     setError(null);
@@ -233,9 +313,9 @@ export default function ActivateServiceModal({
     setSessionRequestedLabel(undefined);
   }
 
-  function goToMethod() {
+  function goToWorkflow() {
     if (!templateId) {
-      setSetupError("Choose a service.");
+      setSetupError("Choose a workflow template.");
       return;
     }
     if (!startDate) {
@@ -261,9 +341,9 @@ export default function ActivateServiceModal({
   }
 
   function goToStage() {
-    // Nothing to skip past for Start blank (no engagement/pipeline), or
-    // when the template has no configured pipeline to choose a stage from.
-    if (method === "blank" || stages.length === 0) {
+    // Nothing to skip past for Create Service Only (no engagement/pipeline
+    // involved), or when the template has no configured pipeline at all.
+    if (method === "create_only" || stages.length === 0) {
       setStep(4);
       return;
     }
@@ -275,11 +355,9 @@ export default function ActivateServiceModal({
   // p_start_date, p_due_date, p_assigned_to, p_price, p_service_year,
   // p_billing_frequency, p_is_recurring). It always creates every template
   // task/document/form unconditionally — there is no parameter for
-  // selective inclusion, so "Customize" activates the same full set as
-  // "Quick" (the difference is only that staff reviewed it item-by-item
-  // first). It also always auto-picks the first pipeline stage by
-  // sort_order, so choosing a different real stage here requires a
-  // narrow, single-row follow-up update after the RPC returns.
+  // selective inclusion. It also always auto-picks the first pipeline
+  // stage by sort_order, so choosing a different real stage here requires
+  // a narrow, single-row follow-up update after the RPC returns.
   async function activate() {
     setSaving(true);
     setError(null);
@@ -347,7 +425,7 @@ export default function ActivateServiceModal({
   // deliberately limited to a plain `services` row only (the same direct
   // insert NewServiceModal already performs) until a new, approved RPC
   // exists for "service + engagement, no workflow items."
-  async function activateBlank() {
+  async function activateServiceOnly() {
     setSaving(true);
     setError(null);
     const { data, error: insertError } = await supabase
@@ -414,17 +492,16 @@ export default function ActivateServiceModal({
           </button>
         </div>
 
-        {step < 5 && (
-          <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            <span className={step >= 1 ? "text-[#108A64]" : ""}>1. Setup</span>
-            <ChevronRight size={12} />
-            <span className={step >= 2 ? "text-[#108A64]" : ""}>2. Method</span>
-            <ChevronRight size={12} />
-            <span className={step >= 3 ? "text-[#108A64]" : ""}>3. Stage</span>
-            <ChevronRight size={12} />
-            <span className={step >= 4 ? "text-[#108A64]" : ""}>4. Review</span>
-          </div>
-        )}
+        <div className="mb-5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-semibold uppercase tracking-wide text-muted sm:text-[11px]">
+          {([1, 2, 3, 4, 5] as Step[]).map((n, idx) => (
+            <span key={n} className="flex items-center gap-1.5">
+              <span className={step >= n ? "text-[#108A64]" : ""}>
+                {n}. {STEP_LABELS[n]}
+              </span>
+              {idx < 4 && <ChevronRight size={11} />}
+            </span>
+          ))}
+        </div>
 
         {step === 1 && (
           <div className="space-y-3">
@@ -461,6 +538,11 @@ export default function ActivateServiceModal({
               </div>
             )}
 
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">Workflow template</div>
+            <p className="text-xs text-muted">
+              The requested service is already known — this is the workflow used to deliver it.
+            </p>
+
             {templatesError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                 Couldn't load service templates: {templatesError}
@@ -468,31 +550,60 @@ export default function ActivateServiceModal({
             )}
             {!templatesError && templates.length === 0 && (
               <div className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-                No service templates are set up for this workspace yet.
+                No workflow templates are set up for this workspace yet.
               </div>
             )}
             <div className="space-y-2">
-              {templates.map((t) => (
-                <label
-                  key={t.id}
-                  className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 text-sm ${
-                    templateId === t.id ? "border-[#108A64] bg-emerald-50/40" : "border-line"
-                  }`}
-                >
-                  <div>
-                    <div className="font-semibold text-ink">{t.template_name}</div>
-                    <div className="text-xs text-muted">{t.service_type}</div>
-                  </div>
-                  <input
-                    type="radio"
-                    name="template"
-                    checked={templateId === t.id}
-                    onChange={() => setTemplateId(t.id)}
-                    className="h-4 w-4 accent-[#108A64]"
-                  />
-                </label>
-              ))}
+              {templates.map((t) => {
+                const counts = countsFor(t.id);
+                const pipelineName = pipelineNameFor(t.default_pipeline_id);
+                return (
+                  <label
+                    key={t.id}
+                    className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+                      templateId === t.id ? "border-[#108A64] bg-emerald-50/40" : "border-line"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-ink">{t.template_name}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                            t.is_platform_template ? "bg-sky-50 text-sky-700" : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {t.is_platform_template ? "Platform template" : "Firm template"}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted">
+                        {humanizeServiceType(t.service_type)}
+                        {pipelineName ? ` · ${pipelineName}` : " · No pipeline configured"}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-muted">
+                        {itemsLoading ? "Loading counts…" : `${counts.tasks} task(s) · ${counts.docs} document request(s) · ${counts.forms} form(s)`}
+                      </div>
+                    </div>
+                    <input
+                      type="radio"
+                      name="template"
+                      checked={templateId === t.id}
+                      onChange={() => setTemplateId(t.id)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[#108A64]"
+                    />
+                  </label>
+                );
+              })}
             </div>
+
+            <button
+              type="button"
+              disabled
+              title="Workflow template builder coming soon."
+              className="w-full cursor-not-allowed rounded-xl border border-dashed border-line px-4 py-2.5 text-left text-xs font-semibold text-muted"
+            >
+              Create a firm workflow template
+              <span className="ml-1.5 font-normal italic">— Workflow template builder coming soon.</span>
+            </button>
 
             {templateId && (
               <div className="space-y-3 border-t border-line pt-3">
@@ -601,7 +712,7 @@ export default function ActivateServiceModal({
             <div className="flex justify-end pt-2">
               <button
                 disabled={!templateId}
-                onClick={goToMethod}
+                onClick={goToWorkflow}
                 className="rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 Next
@@ -614,47 +725,70 @@ export default function ActivateServiceModal({
           <div className="space-y-3">
             <div className="space-y-2">
               <MethodCard
-                active={method === "quick"}
-                onClick={() => setMethod("quick")}
-                title="Quick activate"
-                description="Use this template exactly as configured. Fastest option, recommended for most services."
+                active={method === "apply"}
+                onClick={() => setMethod("apply")}
+                title="Apply selected workflow"
+                description="Use the chosen workflow template exactly as configured. Recommended for most services."
               />
+              <div className="flex cursor-not-allowed items-start gap-3 rounded-xl border border-dashed border-line px-4 py-3 text-sm opacity-70">
+                <input type="radio" disabled className="mt-0.5 h-4 w-4" readOnly />
+                <div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-semibold text-ink">Customize workflow</span>
+                    <span className="rounded-full bg-paper border border-line px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                      Coming after workflow builder setup
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted">Duplicate or edit a firm workflow template before using it for a client.</div>
+                </div>
+              </div>
               <MethodCard
-                active={method === "customize"}
-                onClick={() => setMethod("customize")}
-                title="Customize before activating"
-                description="Review every task, document request, and form this template creates before confirming."
-              />
-              <MethodCard
-                active={method === "blank"}
-                onClick={() => setMethod("blank")}
-                title="Start blank"
-                description="Create just the service record — no tasks, documents, or forms. No Service Workspace yet either (see note below)."
+                active={method === "create_only"}
+                onClick={() => setMethod("create_only")}
+                title="Create service only"
+                description="Creates the active service record without a workflow workspace, tasks, forms, or document requests."
               />
             </div>
 
-            {method === "quick" && (
-              <div className="rounded-xl border border-line bg-paper p-4 text-sm">
-                <div className="font-semibold text-ink">{selectedTemplate?.template_name}</div>
-                <div className="mt-1 text-xs text-muted">
-                  {itemsLoading
-                    ? "Loading…"
-                    : `${templateTasks.length} task(s) · ${templateDocs.length} document request(s) · ${templateForms.length} form(s) will be created automatically.`}
+            {method === "apply" && selectedTemplate && (
+              <div className="space-y-2 rounded-xl border border-line bg-paper p-4 text-sm">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-semibold text-ink">{selectedTemplate.template_name}</span>
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                      selectedTemplate.is_platform_template ? "bg-sky-50 text-sky-700" : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {selectedTemplate.is_platform_template ? "Platform template" : "Firm template"}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <ReviewRow label="Service type" value={humanizeServiceType(selectedTemplate.service_type)} />
+                  <ReviewRow label="Pipeline" value={pipelineNameFor(selectedTemplate.default_pipeline_id) ?? "No pipeline configured"} />
+                  <ReviewRow label="Starting stage" value={stages[0]?.stage_name ?? "No stages configured"} />
+                  <ReviewRow
+                    label="Will create"
+                    value={itemsLoading ? "Loading…" : `${selectedCounts.tasks} task(s) · ${selectedCounts.docs} document request(s) · ${selectedCounts.forms} form(s)`}
+                  />
+                </div>
+                <p className="pt-1 text-xs font-semibold text-ink">Quick Activate will apply this workflow exactly as configured.</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                  <button type="button" onClick={() => setStep(1)} className="text-xs font-semibold text-[#108A64] hover:underline">
+                    Choose a different template
+                  </button>
+                  <button type="button" onClick={() => setPreviewOpen((v) => !v)} className="text-xs font-semibold text-[#108A64] hover:underline">
+                    {previewOpen ? "Hide preview" : "Preview workflow"}
+                  </button>
                 </div>
               </div>
             )}
 
-            {method === "customize" && (
+            {method === "apply" && previewOpen && (
               <div className="space-y-2">
-                <p className="rounded-lg border border-dashed border-line bg-paper px-3 py-2 text-xs text-muted">
-                  Per-item include/exclude isn't available yet — that needs a new, separately approved RPC (the
-                  current activation function always creates every item below as a set). This review lets you see
-                  exactly what will be created and confirm the dates above before activating.
-                </p>
                 {itemsLoading && <div className="text-xs text-muted">Loading template items…</div>}
                 {!itemsLoading && (
                   <div className="divide-y divide-line rounded-xl border border-line">
-                    {templateTasks.map((t) => (
+                    {selectedTasks.map((t) => (
                       <ItemRow
                         key={`task-${t.id}`}
                         icon={ClipboardList}
@@ -666,7 +800,7 @@ export default function ActivateServiceModal({
                         basisLabel={offsetLabel(t.due_offset_days)}
                       />
                     ))}
-                    {templateDocs.map((d) => (
+                    {selectedDocs.map((d) => (
                       <ItemRow
                         key={`doc-${d.id}`}
                         icon={FileText}
@@ -678,7 +812,7 @@ export default function ActivateServiceModal({
                         basisLabel="No due date — this template item type has no date rule"
                       />
                     ))}
-                    {templateForms.map((f) => (
+                    {selectedForms.map((f) => (
                       <ItemRow
                         key={`form-${f.id}`}
                         icon={FileCheck2}
@@ -690,21 +824,25 @@ export default function ActivateServiceModal({
                         basisLabel={offsetLabel(f.due_offset_days)}
                       />
                     ))}
-                    {templateTasks.length + templateDocs.length + templateForms.length === 0 && (
+                    {selectedTasks.length + selectedDocs.length + selectedForms.length === 0 && (
                       <div className="p-3 text-xs text-muted">This template has no tasks, documents, or forms configured.</div>
                     )}
                   </div>
                 )}
+                <p className="text-xs text-muted">Per-item include/exclude isn't available yet — that needs a new, separately approved RPC.</p>
               </div>
             )}
 
-            {method === "blank" && (
-              <div className="rounded-lg border border-dashed border-line bg-paper px-3 py-2 text-xs text-muted">
-                No existing approved backend path creates an engagement/Service Workspace without also creating a
-                template's full task/document/form set — only apply_service_template_to_client creates an
-                engagement, and it can't skip those. This mode creates a bare services row only, matching what the
-                manual "New Service" form already does. A new RPC would be needed to also create an empty
-                Service Workspace here safely.
+            {method === "create_only" && (
+              <div className="space-y-1.5 rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                <p className="font-semibold">A Service Workspace will not be created.</p>
+                <p>
+                  No existing approved backend path creates an engagement/Service Workspace without also creating a
+                  template's full task/document/form set — only apply_service_template_to_client creates an
+                  engagement, and it can't skip those. This creates a bare service record only, the same as the
+                  manual "New Service" form. A new RPC would be needed to support "service + empty workspace"
+                  safely — treat this as an advanced option.
+                </p>
               </div>
             )}
 
@@ -714,41 +852,49 @@ export default function ActivateServiceModal({
               <button onClick={() => setStep(1)} className="flex items-center gap-1 rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink">
                 <ChevronLeft size={14} /> Back
               </button>
-              {method === "blank" ? (
-                <button
-                  onClick={activateBlank}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  <CheckCircle2 size={14} /> {saving ? "Creating…" : "Create service"}
-                </button>
-              ) : (
-                <button onClick={goToStage} className="rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white">
-                  Next
-                </button>
-              )}
+              <button onClick={goToStage} className="rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white">
+                Next
+              </button>
             </div>
           </div>
         )}
 
         {step === 3 && (
           <div className="space-y-3">
-            <p className="text-xs text-muted">
-              These are the real, workspace-configured stages for this template's pipeline. Every activation used
-              to always land on the first one automatically — pick a different one if that's not accurate here.
-            </p>
+            <div>
+              <div className="text-sm font-semibold text-ink">{pipelineNameFor(selectedTemplate?.default_pipeline_id) ?? "Pipeline"}</div>
+              <p className="mt-1 text-xs text-muted">
+                Real, workspace-configured stages for this workflow's pipeline. Choosing one here only sets where
+                the new engagement starts — it doesn't run any automation.
+              </p>
+            </div>
             <div className="space-y-2">
-              {stages.map((s) => (
-                <label
-                  key={s.id}
-                  className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 text-sm ${
-                    stageId === s.id ? "border-[#108A64] bg-emerald-50/40" : "border-line"
-                  }`}
-                >
-                  <span className="font-semibold text-ink">{s.stage_name}</span>
-                  <input type="radio" name="stage" checked={stageId === s.id} onChange={() => setStageId(s.id)} className="h-4 w-4 accent-[#108A64]" />
-                </label>
-              ))}
+              {stages.map((s, idx) => {
+                const isDefault = s.id === defaultStageId;
+                const note = s.stage_description || stageNeutralNote(s, idx, stages.length, isDefault);
+                return (
+                  <label
+                    key={s.id}
+                    className={`flex cursor-pointer items-start justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+                      stageId === s.id ? "border-[#108A64] bg-emerald-50/40" : "border-line"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-ink">{s.stage_name}</span>
+                        <span className="text-[10px] font-semibold text-muted">
+                          Stage {idx + 1} of {stages.length}
+                        </span>
+                        {isDefault && (
+                          <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#108A64]">Template default</span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted">{note}</div>
+                    </div>
+                    <input type="radio" name="stage" checked={stageId === s.id} onChange={() => setStageId(s.id)} className="mt-0.5 h-4 w-4 shrink-0 accent-[#108A64]" />
+                  </label>
+                );
+              })}
             </div>
             <div className="flex justify-between pt-2">
               <button onClick={() => setStep(2)} className="flex items-center gap-1 rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink">
@@ -763,43 +909,66 @@ export default function ActivateServiceModal({
 
         {step === 4 && (
           <div className="space-y-4">
-            <div className="space-y-2 rounded-xl border border-line bg-paper p-4 text-sm">
-              <ReviewRow label="Service" value={selectedTemplate?.template_name ?? "—"} />
-              <ReviewRow label="Type" value={isRecurring ? "Recurring" : "One-time / project"} />
-              {serviceYear && <ReviewRow label="Service year / period" value={serviceYear} />}
-              <ReviewRow label="Start date" value={startDate || "—"} />
-              {!isRecurring && deadlineDate && <ReviewRow label={`Deadline (${deadlineType || "type not set"})`} value={deadlineDate} />}
-              {isRecurring && <ReviewRow label="Frequency" value={billingFrequency || "Unspecified"} />}
-              <ReviewRow label="Assigned to" value={members.find((m) => m.user_id === assignedTo)?.label ?? "Unassigned"} />
-              <ReviewRow
-                label="Activation method"
-                value={method === "quick" ? "Quick activate" : method === "customize" ? "Customize (reviewed)" : "Start blank"}
-              />
-              {method !== "blank" && stageId && <ReviewRow label="Starting stage" value={stages.find((s) => s.id === stageId)?.stage_name ?? "—"} />}
-              {method !== "blank" && (
-                <ReviewRow
-                  label="Will create"
-                  value={`${templateTasks.length} internal task(s) · ${templateDocs.length} client document request(s) · ${templateForms.length} client form(s)`}
-                />
+            <div className="space-y-3 rounded-xl border border-line bg-paper p-4 text-sm">
+              <div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Service</div>
+                <div className="space-y-1">
+                  {sessionRequestedLabel && <ReviewRow label="Requested service" value={sessionRequestedLabel} />}
+                  <ReviewRow label="Template" value={selectedTemplate?.template_name ?? "—"} />
+                  <ReviewRow label="Service type" value={selectedTemplate ? humanizeServiceType(selectedTemplate.service_type) : "—"} />
+                </div>
+              </div>
+
+              {method === "apply" && (
+                <div className="border-t border-line pt-3">
+                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Workflow</div>
+                  <div className="space-y-1">
+                    <ReviewRow label="Pipeline" value={pipelineNameFor(selectedTemplate?.default_pipeline_id) ?? "No pipeline configured"} />
+                    <ReviewRow label="Starting stage" value={stages.find((s) => s.id === stageId)?.stage_name ?? "—"} />
+                    <ReviewRow label="Template owner" value={selectedTemplate?.is_platform_template ? "Platform" : "Firm"} />
+                    <ReviewRow label="Tasks" value={String(selectedCounts.tasks)} />
+                    <ReviewRow label="Document requests" value={String(selectedCounts.docs)} />
+                    <ReviewRow label="Forms" value={String(selectedCounts.forms)} />
+                  </div>
+                </div>
               )}
-              {method === "blank" && <ReviewRow label="Will create" value="Service record only — no tasks, documents, or forms" />}
+
+              <div className="border-t border-line pt-3">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Dates</div>
+                <div className="space-y-1">
+                  <ReviewRow label="Start date" value={startDate || "—"} />
+                  {serviceYear && <ReviewRow label="Service year / period" value={serviceYear} />}
+                  {!isRecurring && deadlineDate && <ReviewRow label={`Deadline (${deadlineType || "type not set"})`} value={deadlineDate} />}
+                  {isRecurring && <ReviewRow label="Frequency" value={billingFrequency || "Unspecified"} />}
+                </div>
+              </div>
+
+              <div className="border-t border-line pt-3">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Activation result</div>
+                <p className="text-sm font-semibold text-ink">
+                  {method === "apply" ? "Full workflow will be created." : "Service record only; no workspace will be created."}
+                </p>
+              </div>
             </div>
 
             {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
 
-            <div className="flex justify-between pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
               <button
-                onClick={() => (method === "blank" || stages.length === 0 ? setStep(2) : setStep(3))}
+                onClick={() => (method === "create_only" || stages.length === 0 ? setStep(2) : setStep(3))}
                 className="flex items-center gap-1 rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink"
               >
                 <ChevronLeft size={14} /> Back
               </button>
+              <button type="button" onClick={() => setStep(1)} className="text-xs font-semibold text-[#108A64] hover:underline">
+                Change workflow template
+              </button>
               <button
-                onClick={activate}
+                onClick={method === "apply" ? activate : activateServiceOnly}
                 disabled={saving}
                 className="flex items-center gap-1.5 rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
               >
-                <CheckCircle2 size={14} /> {saving ? "Activating…" : "Activate service"}
+                <CheckCircle2 size={14} /> {saving ? "Activating…" : "Activate"}
               </button>
             </div>
           </div>
