@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Building2, Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client, ClientTag } from "@/lib/types";
@@ -195,6 +195,14 @@ export default function ClientModal({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchedOnce, setSearchedOnce] = useState(false);
   const [includeArchivedContacts, setIncludeArchivedContacts] = useState(false);
+  // Whether the "Find a contact" search UI is shown. Search results used to
+  // stay rendered indefinitely once a contact was picked, which — combined
+  // with there being no sticky footer — pushed the Save/Update button far
+  // down the page on mobile, past the app's bottom nav, effectively
+  // stranding the user on Step 2 with no reachable way to finish. Selecting
+  // a result now collapses search back down to a compact summary.
+  const [searchExpanded, setSearchExpanded] = useState(false);
+  const selectedContactRef = useRef<HTMLDivElement>(null);
 
   const [availableTags, setAvailableTags] = useState<ClientTag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -219,6 +227,17 @@ export default function ClientModal({
   const [revealedValue, setRevealedValue] = useState<string | null>(null);
   const [identityBusy, setIdentityBusy] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
+
+  // Without this, the page behind the modal and the modal's own scroll
+  // region both scroll independently — on mobile especially, a touch-drag
+  // over the backdrop scrolls the page underneath while the modal is open.
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
 
   // client_setup_options is a global reference table (no workspace scope),
   // so this loads once regardless of workspaceId.
@@ -408,8 +427,9 @@ export default function ClientModal({
   // was already in the form (stale data from a previously-loaded contact,
   // or blank). Saving with that partial hydration would have overwritten
   // the *newly selected* person's real phone/occupation with that leftover
-  // data. contactResults and contactQuery are kept so the result list stays
-  // visible with the selection highlighted, instead of vanishing.
+  // data. Search results now collapse immediately on selection (previously
+  // left expanded, which on mobile pushed the Save button out of reach) —
+  // "Change selected contact" reopens the search without losing the pick.
   function selectExistingContact(c: ContactSearchResult) {
     setContactId(c.id);
     setForm((f) => ({
@@ -422,14 +442,28 @@ export default function ClientModal({
       occupation: c.occupation ?? "",
       portal_access: c.portal_access ?? false,
     }));
+    setContactResults([]);
+    setContactQuery("");
+    setSearchedOnce(false);
+    setSearchExpanded(false);
+    requestAnimationFrame(() => {
+      selectedContactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   function clearSelectedContact(backToCreate: boolean) {
     setContactId(null);
     if (backToCreate) {
       setContactMode("create");
+      setSearchExpanded(false);
       setForm((f) => ({ ...f, first_name: "", middle_name: "", last_name: "", email: "", phone: "", occupation: "", portal_access: false }));
+    } else {
+      setSearchExpanded(true);
     }
+  }
+
+  function reopenContactSearch() {
+    setSearchExpanded(true);
   }
 
   function toggleTagId(id: string) {
@@ -808,9 +842,18 @@ export default function ClientModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-8">
-      <div className="bg-white rounded-2xl border border-line shadow-lg w-full max-w-2xl max-h-full overflow-y-auto p-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 lg:items-center lg:p-4">
+      {/*
+        One controlled scroll region: header + step indicator are shrink-0
+        (always visible), the middle form area is the only scrolling child,
+        and the footer is a separate shrink-0 sibling below it — so it can
+        never be scrolled past, only reached by shrinking the middle region.
+        Full-height on mobile (matching the app shell's own `lg:hidden`
+        bottom-nav breakpoint) so the modal fully covers the viewport and
+        the fixed bottom nav sits behind it instead of overlapping it.
+      */}
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden border border-line bg-white shadow-lg lg:h-auto lg:max-h-[90vh] lg:w-full lg:max-w-2xl lg:rounded-2xl">
+        <div className="flex shrink-0 items-center justify-between px-6 pt-6 pb-4">
           <h3 className="font-slab text-lg font-bold text-ink">
             {isEditing ? "Edit Client" : "New Client"}
           </h3>
@@ -824,7 +867,7 @@ export default function ClientModal({
           </button>
         </div>
 
-        <div className="flex items-center gap-3 border-b border-line pb-4 mb-5">
+        <div className="flex shrink-0 items-center gap-3 border-b border-line px-6 pb-4">
           <StepBadge active={step === 1} done={step > 1}>1</StepBadge>
           <span className={`text-sm font-semibold ${step === 1 ? "text-ink" : "text-muted"}`}>Account info</span>
           <ChevronRight size={14} className="text-line" />
@@ -832,8 +875,9 @@ export default function ClientModal({
           <span className={`text-sm font-semibold ${step === 2 ? "text-ink" : "text-muted"}`}>Contact</span>
         </div>
 
+        <div className="flex-1 overflow-y-auto px-6 py-5">
         {step === 1 && (
-          <form onSubmit={goToContacts} className="space-y-5">
+          <form id="client-step1-form" onSubmit={goToContacts} className="space-y-5">
             <Section label="Client type">
               <div className="flex flex-wrap gap-x-5 gap-y-2.5">
                 {CLIENT_TYPES.map((t) => (
@@ -970,37 +1014,11 @@ export default function ClientModal({
                 {error}
               </div>
             )}
-
-            <div className="flex gap-2 pt-1">
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-sm font-semibold py-2.5 px-3.5 rounded-xl border border-brick text-brick disabled:opacity-60 hover:bg-brick/5"
-                >
-                  {deleting ? "Deleting…" : "Delete"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-sm font-semibold py-2.5 px-4 rounded-xl border border-line text-ink hover:bg-paper"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="text-sm font-semibold py-2.5 px-5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555]"
-              >
-                Continue
-              </button>
-            </div>
           </form>
         )}
 
         {step === 2 && (
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form id="client-step2-form" onSubmit={handleSubmit} className="space-y-5">
             {!contactId && (
               <div className="flex gap-2 text-xs font-semibold">
                 <button
@@ -1012,7 +1030,10 @@ export default function ClientModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setContactMode("link")}
+                  onClick={() => {
+                    setContactMode("link");
+                    setSearchExpanded(true);
+                  }}
                   className={`rounded-xl px-3 py-1.5 ${contactMode === "link" ? "bg-[#108A64] text-white" : "border border-line text-muted"}`}
                 >
                   Link existing contact
@@ -1021,7 +1042,7 @@ export default function ClientModal({
             )}
 
             {contactId && (
-              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm space-y-2">
+              <div ref={selectedContactRef} className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm space-y-2 scroll-mt-4">
                 <div className="flex items-center justify-between gap-2">
                   <span>
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-0.5">
@@ -1029,7 +1050,10 @@ export default function ClientModal({
                     </span>
                     <strong className="text-ink">{form.first_name} {form.last_name}</strong>
                   </span>
-                  <div className="flex shrink-0 gap-3">
+                  <div className="flex shrink-0 flex-wrap justify-end gap-3">
+                    <button type="button" onClick={reopenContactSearch} className="text-xs font-semibold text-muted hover:text-ink">
+                      Change selected contact
+                    </button>
                     <button type="button" onClick={() => clearSelectedContact(false)} className="text-xs font-semibold text-muted hover:text-ink">
                       Clear
                     </button>
@@ -1053,7 +1077,7 @@ export default function ClientModal({
               </div>
             )}
 
-            {contactMode === "link" && (
+            {contactMode === "link" && searchExpanded && (
               <Section label="Find a contact">
                 <p className="text-xs text-muted mb-2">
                   Searches contacts and people who are already Individual clients — by name, email, or phone.
@@ -1420,8 +1444,52 @@ export default function ClientModal({
                 {error}
               </div>
             )}
+          </form>
+        )}
+        </div>
 
-            <div className="flex gap-2 pt-1">
+        {/*
+          Footer lives outside the scrolling body as a plain (non-sticky)
+          flex sibling, so it's always visible without any scroll-position
+          math — the buttons use the HTML `form` attribute to submit the
+          step's <form> from outside it. Safe-area padding keeps it clear
+          of the iPhone home-indicator area; on mobile the modal already
+          covers the full viewport (see the outer h-[100dvh]), so the app's
+          fixed bottom nav sits behind it rather than overlapping it.
+        */}
+        <div
+          className="shrink-0 border-t border-line bg-white px-6 py-4"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
+          {step === 1 ? (
+            <div className="flex gap-2">
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-sm font-semibold py-2.5 px-3.5 rounded-xl border border-brick text-brick disabled:opacity-60 hover:bg-brick/5"
+                >
+                  {deleting ? "Deleting…" : "Delete"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-sm font-semibold py-2.5 px-4 rounded-xl border border-line text-ink hover:bg-paper"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="client-step1-form"
+                className="ml-auto text-sm font-semibold py-2.5 px-5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555]"
+              >
+                Continue
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -1438,14 +1506,15 @@ export default function ClientModal({
               </button>
               <button
                 type="submit"
+                form="client-step2-form"
                 disabled={saving}
                 className="flex-1 text-sm font-semibold py-2.5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555] disabled:opacity-60"
               >
                 {saving ? "Saving…" : isEditing ? "Save Changes" : "Create"}
               </button>
             </div>
-          </form>
-        )}
+          )}
+        </div>
       </div>
       <style jsx global>{`
         .client-input {
