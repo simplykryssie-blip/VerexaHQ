@@ -28,6 +28,8 @@ export type Client = {
   date_of_birth: string | null;
   ssn_last_four: string | null;
   account_name: string | null;
+  middle_name: string | null;
+  occupation: string | null;
 };
 
 export type Contact = {

@@ -147,24 +147,37 @@ export default function ClientModal({
   onClose,
   onSaved,
   onDeleted,
+  initialStep,
+  initialContactMode,
 }: {
   client?: Client;
   onClose: () => void;
   onSaved: () => void;
   onDeleted?: () => void;
+  // Lets callers (e.g. "Add Contact" / "Link existing contact" from the
+  // Client Profile's Contacts card) jump straight to Step 2 already in
+  // search mode, instead of re-implementing that flow a second time.
+  initialStep?: 1 | 2;
+  initialContactMode?: "create" | "link";
 }) {
   const { activeWorkspaceId } = useWorkspace();
   const isEditing = !!client;
   const workspaceId = client?.workspace_id ?? activeWorkspaceId;
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2>(initialStep ?? 1);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isEditingBusiness = client?.client_type === "business";
   const [form, setForm] = useState({
     client_type: client?.client_type === "business" ? "business" : "individual",
     business_name: client?.business_name ?? "",
+    // clients.email/phone is the business's OWN contact info for a
+    // business client — kept in dedicated fields, never shared with the
+    // linked contact person's personal_email/personal_phone below.
+    business_email: isEditingBusiness ? client?.email ?? "" : "",
+    business_phone: isEditingBusiness ? client?.phone ?? "" : "",
     address: client?.address ?? "",
     city: client?.city ?? "",
     state: client?.state ?? "",
@@ -174,8 +187,13 @@ export default function ClientModal({
     first_name: client?.first_name ?? "",
     middle_name: "",
     last_name: client?.last_name ?? "",
-    email: client?.email ?? "",
-    phone: client?.phone ?? "",
+    // For an individual, email/phone are the person's own — safe to
+    // prefill from the clients row immediately. For a business, this
+    // represents the linked contact PERSON, not the business itself, so it
+    // starts blank and is filled by the primary-contact preload effect
+    // below (or by picking/creating a contact in Step 2).
+    email: isEditingBusiness ? "" : client?.email ?? "",
+    phone: isEditingBusiness ? "" : client?.phone ?? "",
     occupation: "",
     portal_access: false,
   });
@@ -188,7 +206,7 @@ export default function ClientModal({
   const [originalContactId, setOriginalContactId] = useState<string | null>(null);
   const [originalContactLabel, setOriginalContactLabel] = useState<string>("");
   const [keepOldContactAsAdditional, setKeepOldContactAsAdditional] = useState(false);
-  const [contactMode, setContactMode] = useState<"create" | "link">("create");
+  const [contactMode, setContactMode] = useState<"create" | "link">(initialContactMode ?? "create");
   const [contactQuery, setContactQuery] = useState("");
   const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -201,7 +219,7 @@ export default function ClientModal({
   // down the page on mobile, past the app's bottom nav, effectively
   // stranding the user on Step 2 with no reachable way to finish. Selecting
   // a result now collapses search back down to a compact summary.
-  const [searchExpanded, setSearchExpanded] = useState(false);
+  const [searchExpanded, setSearchExpanded] = useState(initialContactMode === "link");
   const selectedContactRef = useRef<HTMLDivElement>(null);
 
   const [availableTags, setAvailableTags] = useState<ClientTag[]>([]);
@@ -595,6 +613,13 @@ export default function ClientModal({
     // transaction (deleting anything unchecked on edit). It does not
     // manage the legacy account_type/account_name display columns, so
     // those are intentionally left untouched by this form.
+    //
+    // For a business, clients.email/phone is the business's OWN contact
+    // info (form.business_email/business_phone from Step 1) — never the
+    // linked contact person's personal_email/personal_phone (form.email/
+    // form.phone), which only ever gets written to the contacts table
+    // below. For an individual there's no separate "business" identity,
+    // so the person's own email/phone doubles as both.
     const { data: saveResult, error: saveError } = await supabase.rpc("save_workspace_client", {
       p_workspace_id: workspaceId,
       p_client_id: client?.id ?? null,
@@ -602,8 +627,8 @@ export default function ClientModal({
       p_first_name: form.first_name,
       p_last_name: form.last_name,
       p_business_name: form.business_name,
-      p_email: form.email,
-      p_phone: form.phone,
+      p_email: isEntity ? form.business_email : form.email,
+      p_phone: isEntity ? form.business_phone : form.phone,
       p_address: form.address,
       p_city: form.city,
       p_state: form.state,
@@ -904,15 +929,49 @@ export default function ClientModal({
             </Section>
 
             {isEntity ? (
-              <Section label="Business name">
-                <input
-                  required
-                  placeholder="Greenleaf Consulting LLC"
-                  value={form.business_name}
-                  onChange={(e) => setForm({ ...form, business_name: e.target.value })}
-                  className="client-input w-full"
-                />
-              </Section>
+              <>
+                <Section label="Business name">
+                  <input
+                    required
+                    placeholder="Greenleaf Consulting LLC"
+                    value={form.business_name}
+                    onChange={(e) => setForm({ ...form, business_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                </Section>
+                <Section label="Business contact info">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      type="email"
+                      placeholder="Business email"
+                      value={form.business_email}
+                      onChange={(e) => setForm({ ...form, business_email: e.target.value })}
+                      className="client-input w-full"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Business phone"
+                      value={form.business_phone}
+                      onChange={(e) => {
+                        const input = e.target;
+                        const rawCursor = input.selectionStart ?? input.value.length;
+                        const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                        const formatted = formatPhone(input.value);
+                        const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                        setForm((f) => ({ ...f, business_phone: formatted }));
+                        requestAnimationFrame(() => {
+                          input.setSelectionRange(newCursor, newCursor);
+                        });
+                      }}
+                      className="client-input w-full"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted">
+                    The business's own contact info — separate from the contact person's personal email and phone on
+                    Step 2.
+                  </p>
+                </Section>
+              </>
             ) : (
               <Section label="Client's name">
                 <div className="grid gap-3 sm:grid-cols-3">

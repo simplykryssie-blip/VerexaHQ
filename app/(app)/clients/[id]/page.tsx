@@ -17,11 +17,33 @@ import {
   ShieldCheck,
   Star,
   Tag,
+  MoreHorizontal,
+  ClipboardList,
+  FileText,
+  MessageSquare,
+  Receipt,
+  StickyNote,
+  Info,
+  Users,
+  Link2,
+  Trash2,
+  Eye,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type { Client, Contact, Service, Task, Deadline, Document, DocumentFolder } from "@/lib/types";
+import type {
+  Client,
+  Contact,
+  Service,
+  Task,
+  Deadline,
+  Document,
+  DocumentFolder,
+  ClientTag,
+  Invoice,
+  InvoicePayment,
+} from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
-import { isOpenServiceStatus } from "@/lib/status";
+import { isOpenServiceStatus, isDocumentAwaitingClient } from "@/lib/status";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
@@ -33,18 +55,47 @@ import InvitePortalModal from "@/components/InvitePortalModal";
 import UploadDocumentModal from "@/components/UploadDocumentModal";
 import RequestDocumentModal from "@/components/RequestDocumentModal";
 import DocumentFolderModal from "@/components/DocumentFolderModal";
+import NewInvoiceModal from "@/components/NewInvoiceModal";
 
+type LinkedClientSummary = { id: string; client_type: string; status: string };
+type ContactWithLinks = Contact & {
+  account_contacts?: { account_id: string; is_primary: boolean; clients: LinkedClientSummary | null }[];
+};
 type LinkedContact = {
   id: string;
   contact_id: string;
   relationship_type: string | null;
   is_primary: boolean;
   portal_access: boolean;
-  contacts: Contact | null;
+  contacts: ContactWithLinks | null;
 };
+type TeamMember = { user_id: string; label: string };
+type MaskedIdentity = { vault_id: string; identity_type: string; masked_value: string; last_four: string | null };
+type CommMessage = {
+  id: string;
+  channel: string;
+  direction: string;
+  subject: string | null;
+  body: string | null;
+  message_status: string;
+  to_address: string | null;
+  from_address: string | null;
+  sent_at: string | null;
+  created_at: string;
+};
+type Note = { id: string; note_body: string; created_by: string | null; created_at: string };
 
-const TABS = ["overview", "tasks", "deadlines", "documents"] as const;
+const TABS = ["overview", "work", "documents", "communication", "billing", "notes", "details"] as const;
 type Tab = (typeof TABS)[number];
+const TAB_LABELS: Record<Tab, string> = {
+  overview: "Overview",
+  work: "Work",
+  documents: "Documents",
+  communication: "Communication",
+  billing: "Billing",
+  notes: "Notes",
+  details: "Details",
+};
 
 // A person linked via account_contacts is never a separate client account —
 // they're a contact person, so their label comes from the relationship to
@@ -53,6 +104,12 @@ type Tab = (typeof TABS)[number];
 function contactRoleLabel(parentClientType: string, isPrimary: boolean): string {
   if (parentClientType === "business") return isPrimary ? "Primary Business Contact" : "Business Contact";
   return isPrimary ? "Primary Contact" : "Contact";
+}
+
+function isAlsoIndividualClient(c: ContactWithLinks | null): LinkedClientSummary | null {
+  if (!c) return null;
+  const link = (c.account_contacts ?? []).find((ac) => ac.is_primary && ac.clients?.client_type === "individual");
+  return link?.clients ?? null;
 }
 
 function orderFoldersByTree(folders: DocumentFolder[]): { folder: DocumentFolder; depth: number }[] {
@@ -82,16 +139,27 @@ export default function ClientDetailPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
   const [contacts, setContacts] = useState<LinkedContact[]>([]);
-  const [viewingContact, setViewingContact] = useState<LinkedContact | null>(null);
+  const [viewingContact, setViewingContact] = useState<{ link: LinkedContact; edit: boolean } | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<DocumentFolder[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [tags, setTags] = useState<ClientTag[]>([]);
+  const [maskedIdentities, setMaskedIdentities] = useState<MaskedIdentity[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [payments, setPayments] = useState<InvoicePayment[]>([]);
+  const [messages, setMessages] = useState<CommMessage[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
 
   const [showClientModal, setShowClientModal] = useState(false);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [openContactMenuId, setOpenContactMenuId] = useState<string | null>(null);
+  const [invitingContact, setInvitingContact] = useState<ContactWithLinks | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -99,34 +167,72 @@ export default function ClientDetailPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  const [contactActionError, setContactActionError] = useState<string | null>(null);
+  const [newNote, setNewNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [clientRes, servicesRes, engagementsRes, contactsRes, tasksRes, deadlinesRes, documentsRes, foldersRes] = await Promise.all([
-      supabase.from("clients").select("*").eq("id", id).maybeSingle(),
+    const clientRes = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
+    if (clientRes.error) {
+      setError(clientRes.error.message);
+      setLoading(false);
+      return;
+    }
+    if (!clientRes.data) {
+      setClient(null);
+      setLoading(false);
+      return;
+    }
+    const c = clientRes.data as Client;
+    setClient(c);
+
+    const [
+      servicesRes,
+      engagementsRes,
+      contactsRes,
+      tasksRes,
+      deadlinesRes,
+      documentsRes,
+      foldersRes,
+      teamRes,
+      workspaceMembersRes,
+      tagAssignmentsRes,
+      workspaceTagsRes,
+      identityRes,
+      invoicesRes,
+      paymentsRes,
+      messagesRes,
+      notesRes,
+    ] = await Promise.all([
       supabase.from("services").select("*").eq("client_id", id),
       supabase.from("engagements").select("id, service_id").eq("account_id", id),
       supabase
         .from("account_contacts")
-        .select("id, contact_id, relationship_type, is_primary, portal_access, contacts(*)")
+        .select(
+          "id, contact_id, relationship_type, is_primary, portal_access, contacts(*, account_contacts(account_id, is_primary, clients(id, client_type, status)))"
+        )
         .eq("account_id", id)
         .order("is_primary", { ascending: false }),
       supabase.from("tasks").select("*").eq("client_id", id).order("due_date"),
       supabase.from("deadlines").select("*").eq("client_id", id).order("due_date"),
       supabase.from("documents").select("*").eq("client_id", id).order("created_at", { ascending: false }),
       supabase.from("document_folders").select("*").eq("client_id", id).order("sort_order"),
+      supabase.from("client_team_members").select("user_id").eq("client_id", id),
+      supabase.from("workspace_members").select("user_id, display_name, role").eq("workspace_id", c.workspace_id),
+      supabase.from("client_tag_assignments").select("tag_id").eq("client_id", id),
+      supabase.from("client_tags").select("*").eq("workspace_id", c.workspace_id).eq("is_active", true),
+      supabase.rpc("get_client_identity_vault_masked", { p_workspace_id: c.workspace_id, p_client_id: id }),
+      supabase.from("invoices").select("*").eq("client_id", id).order("issue_date", { ascending: false }),
+      supabase.from("invoice_payments").select("*").eq("client_id", id).order("created_at", { ascending: false }).limit(5),
+      supabase.from("communication_messages").select("*").eq("client_id", id).order("created_at", { ascending: false }).limit(15),
+      supabase.from("notes").select("*").eq("client_id", id).order("created_at", { ascending: false }),
     ]);
 
-    if (clientRes.error) {
-      setError(clientRes.error.message);
-      setLoading(false);
-      return;
-    }
-
-    setClient(clientRes.data as Client);
     setServices((servicesRes.data as Service[]) ?? []);
     const engMap = new Map<string, string>();
     (engagementsRes.data ?? []).forEach((e: any) => {
@@ -138,6 +244,25 @@ export default function ClientDetailPage() {
     setDeadlines((deadlinesRes.data as Deadline[]) ?? []);
     setDocuments((documentsRes.data as Document[]) ?? []);
     setFolders((foldersRes.data as DocumentFolder[]) ?? []);
+
+    const memberIds = new Set(((teamRes.data as any[]) ?? []).map((r) => r.user_id));
+    const wsMembers = (workspaceMembersRes.data as any[]) ?? [];
+    setTeam(
+      wsMembers
+        .filter((m) => memberIds.has(m.user_id))
+        .map((m) => ({ user_id: m.user_id, label: m.display_name || m.role || "Team member" }))
+    );
+
+    const tagIds = new Set(((tagAssignmentsRes.data as any[]) ?? []).map((r) => r.tag_id));
+    setTags(((workspaceTagsRes.data as ClientTag[]) ?? []).filter((t) => tagIds.has(t.id)));
+
+    setMaskedIdentities((identityRes.data as MaskedIdentity[]) ?? []);
+    setInvoices((invoicesRes.data as Invoice[]) ?? []);
+    setPayments((paymentsRes.data as InvoicePayment[]) ?? []);
+    setMessages((messagesRes.data as CommMessage[]) ?? []);
+    setNotes((notesRes.data as Note[]) ?? []);
+
+    setError(null);
     setLoading(false);
   }
 
@@ -155,30 +280,81 @@ export default function ClientDetailPage() {
       })
       .eq("id", task.id);
     if (!error) {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, task_status: nextStatus } : t))
-      );
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, task_status: nextStatus } : t)));
     }
   }
 
   async function downloadDocument(doc: Document) {
     if (!doc.storage_path) return;
-    const { data, error } = await supabase.storage
-      .from("verexahq-client-documents")
-      .createSignedUrl(doc.storage_path, 60);
+    const { data, error } = await supabase.storage.from("verexahq-client-documents").createSignedUrl(doc.storage_path, 60);
     if (!error && data) window.open(data.signedUrl, "_blank");
   }
 
   async function moveDocumentToFolder(doc: Document, folderId: string) {
-    const { error } = await supabase
-      .from("documents")
-      .update({ folder_id: folderId || null })
-      .eq("id", doc.id);
+    const { error } = await supabase.from("documents").update({ folder_id: folderId || null }).eq("id", doc.id);
     if (!error) {
-      setDocuments((prev) =>
-        prev.map((d) => (d.id === doc.id ? { ...d, folder_id: folderId || null } : d))
-      );
+      setDocuments((prev) => prev.map((d) => (d.id === doc.id ? { ...d, folder_id: folderId || null } : d)));
     }
+  }
+
+  async function addNote() {
+    if (!client || !newNote.trim()) return;
+    setSavingNote(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const { error } = await supabase.from("notes").insert({
+      workspace_id: client.workspace_id,
+      client_id: client.id,
+      note_body: newNote.trim(),
+      created_by: sessionData.session?.user.id ?? null,
+    });
+    setSavingNote(false);
+    if (!error) {
+      setNewNote("");
+      load();
+    }
+  }
+
+  // Retires whichever link currently holds is_primary for this account
+  // *before* promoting the target — account_contacts has partial unique
+  // indexes allowing at most one is_primary = true row per account_id, so
+  // promoting the new one first (before the old one is demoted) hits a
+  // 23505 unique violation. The former primary is demoted to "additional",
+  // never deleted, so no data is lost.
+  async function makePrimary(target: LinkedContact) {
+    if (!client) return;
+    setContactActionError(null);
+    const current = contacts.find((c) => c.is_primary && c.id !== target.id);
+    if (current) {
+      const { error: demoteError } = await supabase
+        .from("account_contacts")
+        .update({ is_primary: false, relationship_type: "additional" })
+        .eq("id", current.id);
+      if (demoteError) {
+        setContactActionError(demoteError.message);
+        return;
+      }
+    }
+    const { error: promoteError } = await supabase
+      .from("account_contacts")
+      .update({ is_primary: true, relationship_type: "primary" })
+      .eq("id", target.id);
+    if (promoteError) {
+      setContactActionError(promoteError.message);
+      return;
+    }
+    load();
+  }
+
+  async function removeContact(link: LinkedContact) {
+    const name = [link.contacts?.first_name, link.contacts?.last_name].filter(Boolean).join(" ") || "this contact";
+    if (!window.confirm(`Remove ${name} from this account? This only removes the relationship — the contact record itself is kept.`)) return;
+    setContactActionError(null);
+    const { error } = await supabase.from("account_contacts").delete().eq("id", link.id);
+    if (error) {
+      setContactActionError(error.message);
+      return;
+    }
+    load();
   }
 
   if (loading) {
@@ -193,276 +369,337 @@ export default function ClientDetailPage() {
     );
   }
 
+  const isBusiness = client.client_type === "business";
   const displayName = clientDisplayName(client);
   const meta = accountTypeMeta(client);
   const address = [client.address, [client.city, client.state, client.zip_code].filter(Boolean).join(", ")]
     .filter(Boolean)
     .join(", ");
+  const primaryLink = contacts.find((c) => c.is_primary);
+  const primaryContactName = primaryLink?.contacts
+    ? [primaryLink.contacts.first_name, primaryLink.contacts.last_name].filter(Boolean).join(" ")
+    : null;
+  const identityType = isBusiness ? "ein" : "ssn";
+  const maskedIdentity = maskedIdentities.find((m) => m.identity_type === identityType) ?? maskedIdentities[0];
+  const openDocs = documents.filter((d) => isDocumentAwaitingClient(d.document_status));
+  const openTasksAndDeadlines = [
+    ...tasks.filter((t) => t.task_status !== "Done").map((t) => ({ kind: "task" as const, id: t.id, title: t.task_title, due: t.due_date })),
+    ...deadlines.map((d) => ({ kind: "deadline" as const, id: d.id, title: d.deadline_title, due: d.due_date })),
+  ]
+    .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"))
+    .slice(0, 5);
+  const unpaidInvoices = invoices.filter((i) => i.total_amount > i.amount_paid);
+  const balance = unpaidInvoices.reduce((sum, i) => sum + (i.total_amount - i.amount_paid), 0);
 
   return (
-    <div className="space-y-6">
-      <button
-        onClick={() => router.push("/clients")}
-        className="flex items-center gap-1.5 text-xs text-muted hover:text-ink"
-      >
+    <div className="space-y-6 pb-8">
+      <button onClick={() => router.push("/clients")} className="flex items-center gap-1.5 text-xs text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Clients
       </button>
 
+      {/* Header */}
       <div className="app-card p-5">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-emerald-50 text-base font-bold text-[#108A64]">
-            {clientInitials(client)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-slab text-xl font-bold text-ink">{displayName}</h1>
-              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
-              <StatusPill status={client.status} />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-emerald-50 text-base font-bold text-[#108A64]">
+              {clientInitials(client)}
             </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-              {client.email && <span className="flex items-center gap-1"><Mail size={12} /> {client.email}</span>}
-              {client.phone && <span className="flex items-center gap-1"><Phone size={12} /> {client.phone}</span>}
-              {client.source && <span className="flex items-center gap-1"><Tag size={12} /> {client.source}</span>}
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-slab text-xl font-bold text-ink break-anywhere">{displayName}</h1>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${meta.badge}`}>{meta.label}</span>
+                <StatusPill status={client.status} />
+              </div>
+              {isBusiness && primaryContactName && (
+                <div className="mt-1 text-xs text-muted">
+                  Primary contact: <span className="font-semibold text-ink">{primaryContactName}</span>
+                </div>
+              )}
+              <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                {client.email && (
+                  <span className="flex items-center gap-1">
+                    <Mail size={12} /> {client.email}
+                  </span>
+                )}
+                {client.phone && (
+                  <span className="flex items-center gap-1">
+                    <Phone size={12} /> {client.phone}
+                  </span>
+                )}
+                {team.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Users size={12} /> {team.map((t) => t.label).join(", ")}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-xs font-semibold text-ink hover:bg-paper"
-            >
-              <UserPlus size={13} /> Invite to Portal
-            </button>
+
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setShowClientModal(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-[#108A64] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#0d7555]"
+            >
+              <Pencil size={13} /> Edit account
+            </button>
+            <button
+              onClick={() => setShowActivateModal(true)}
               className="flex items-center gap-1.5 rounded-xl border border-line px-3.5 py-2 text-xs font-semibold text-ink hover:bg-paper"
             >
-              <Pencil size={13} /> Edit
+              <Plus size={13} /> Add service
             </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowHeaderMenu((v) => !v)}
+                aria-label="More actions"
+                className="grid h-9 w-9 place-items-center rounded-xl border border-line text-muted hover:text-ink hover:bg-paper"
+              >
+                <MoreHorizontal size={16} />
+              </button>
+              {showHeaderMenu && (
+                <>
+                  <button aria-hidden className="fixed inset-0 z-40" onClick={() => setShowHeaderMenu(false)} tabIndex={-1} />
+                  <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-line bg-white py-1.5 shadow-xl">
+                    <MenuItem
+                      icon={ClipboardList}
+                      label="Add task"
+                      onClick={() => {
+                        setShowHeaderMenu(false);
+                        setShowTaskModal(true);
+                      }}
+                    />
+                    <MenuItem
+                      icon={FileText}
+                      label="Request documents"
+                      onClick={() => {
+                        setShowHeaderMenu(false);
+                        setShowRequestModal(true);
+                      }}
+                    />
+                    <MenuItem icon={MessageSquare} label="Send message" disabled disabledReason="Not yet connected" />
+                    <MenuItem
+                      icon={UserPlus}
+                      label="Invite to portal"
+                      onClick={() => {
+                        setShowHeaderMenu(false);
+                        setShowInviteModal(true);
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto border-b border-line">
+      {/* Tabs */}
+      <div className="flex gap-1 overflow-x-auto border-b border-line">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold capitalize ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold ${
               tab === t ? "border-[#108A64] text-[#108A64]" : "border-transparent text-muted"
             }`}
           >
-            {t}
+            {TAB_LABELS[t]}
           </button>
         ))}
       </div>
 
       {tab === "overview" && (
-        <div className="space-y-4">
-          <div className="app-card p-5">
-            <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-              <h2 className="font-bold text-ink">Services</h2>
-              <button
-                onClick={() => setShowActivateModal(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-              >
-                <Plus size={13} /> Add service
-              </button>
-            </div>
-            <div className="divide-y divide-line">
-              {services.length === 0 && <Empty text="No services yet. Add one to open its Service Workspace." />}
-              {services.map((s) => {
-                const engagementId = serviceEngagements.get(s.id);
-                const content = (
-                  <>
-                    <div>
-                      <div className="font-semibold text-ink text-sm">{s.service_type}</div>
-                      <div className="text-xs text-muted mt-0.5">
-                        {s.service_year || "No year set"}
-                        {!engagementId && " · Legacy service, no workspace"}
-                      </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="space-y-4 lg:col-span-2">
+            <Card
+              title="Active Services"
+              action={{ label: "View All", onClick: () => setTab("work") }}
+              headerAction={{ icon: Plus, label: "Add", onClick: () => setShowActivateModal(true) }}
+            >
+              {services.length === 0 ? (
+                <EmptyAction text="No services yet." actionLabel="Add Service" onAction={() => setShowActivateModal(true)} />
+              ) : (
+                <div className="divide-y divide-line">
+                  {services.slice(0, 4).map((s) => (
+                    <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card title="Upcoming Tasks & Deadlines" action={{ label: "View All", onClick: () => setTab("work") }}>
+              {openTasksAndDeadlines.length === 0 ? (
+                <Empty text="Nothing due right now." />
+              ) : (
+                <div className="divide-y divide-line">
+                  {openTasksAndDeadlines.map((item) => (
+                    <div key={`${item.kind}-${item.id}`} className="flex items-center justify-between py-2.5 text-sm">
+                      <span className="text-ink">{item.title}</span>
+                      <span className="text-xs text-muted tabular-nums font-mono">{item.due ?? "No due date"}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {isOpenServiceStatus(s.service_status) ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[#108A64]">Active</span>
-                      ) : (
-                        <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted">Closed</span>
-                      )}
-                      <StatusPill status={s.service_status} />
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card title="Open Document Requests" action={{ label: "View All", onClick: () => setTab("documents") }}>
+              {openDocs.length === 0 ? (
+                <Empty text="No open document requests." />
+              ) : (
+                <div className="divide-y divide-line">
+                  {openDocs.slice(0, 4).map((d) => (
+                    <div key={d.id} className="flex items-center justify-between py-2.5 text-sm">
+                      <span className="text-ink">{d.document_name}</span>
+                      <StatusPill status={d.document_status} />
                     </div>
-                  </>
-                );
-                return engagementId ? (
-                  <Link
-                    key={s.id}
-                    href={`/work/${engagementId}`}
-                    className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <button
-                    key={s.id}
-                    onClick={() => setEditingService(s)}
-                    className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
-                  >
-                    {content}
-                  </button>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card title="Recent Communication" action={{ label: "View All", onClick: () => setTab("communication") }}>
+              {messages.length === 0 ? (
+                <Empty text="No communication logged yet." />
+              ) : (
+                <div className="divide-y divide-line">
+                  {messages.slice(0, 3).map((m) => (
+                    <MessageRow key={m.id} m={m} />
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
 
-          <div className="app-card p-5">
-            <h2 className="font-bold text-ink">Contacts</h2>
-            <div className="mt-4 divide-y divide-line">
-              {contacts.length === 0 && <Empty text="No contacts linked yet." />}
-              {contacts.map((link) => {
-                const c = link.contacts;
-                if (!c) return null;
-                const fullName = [c.first_name, c.middle_name, c.last_name].filter(Boolean).join(" ");
-                return (
-                  <div key={link.id} className="flex flex-wrap items-center justify-between gap-2 py-3.5">
-                    <div className="min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => setViewingContact(link)}
-                        className="font-semibold text-sm text-[#108A64] hover:underline text-left"
-                      >
-                        {fullName || "Unnamed contact"}
-                      </button>
-                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-                        {c.personal_email && <span className="flex items-center gap-1"><Mail size={12} /> {c.personal_email}</span>}
-                        {c.personal_phone && <span className="flex items-center gap-1"><Phone size={12} /> {c.personal_phone}</span>}
-                        {c.occupation && <span>{c.occupation}</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-1 ${
-                          link.is_primary ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
-                        }`}
-                      >
-                        {link.is_primary && <Star size={11} />} {contactRoleLabel(client.client_type, link.is_primary)}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-1 ${
-                          link.portal_access ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
-                        }`}
-                      >
-                        <ShieldCheck size={11} /> {link.portal_access ? "Portal access" : "No portal access"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="app-card p-5">
-              <h2 className="font-bold text-ink">Contact</h2>
-              <div className="mt-4 space-y-3 text-sm">
-                <InfoRow icon={Mail} label="Email" value={client.email} />
-                <InfoRow icon={Phone} label="Phone" value={client.phone} />
+          <div className="space-y-4">
+            <Card title="Account Summary">
+              <div className="space-y-3 text-sm">
+                <InfoRow icon={isBusiness ? Info : Mail} label={isBusiness ? "Business email" : "Email"} value={client.email} />
+                <InfoRow icon={Phone} label={isBusiness ? "Business phone" : "Phone"} value={client.phone} />
                 <InfoRow icon={MapPin} label="Address" value={address} />
                 <InfoRow icon={Tag} label="Source" value={client.source} />
               </div>
-            </div>
-            <div className="app-card p-5">
-              <h2 className="font-bold text-ink">Tax profile</h2>
-              <div className="mt-4 space-y-3 text-sm">
-                <InfoRow icon={Cake} label="Date of birth" value={client.date_of_birth} />
-                <InfoRow
-                  icon={ShieldCheck}
-                  label="SSN"
-                  value={client.ssn_last_four ? `•••-••-${client.ssn_last_four}` : ""}
-                />
-              </div>
-            </div>
+              {(tags.length > 0 || team.length > 0) && (
+                <div className="mt-4 space-y-2.5 border-t border-line pt-3.5">
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((t) => (
+                        <span key={t.id} className="rounded-full bg-paper border border-line px-2 py-0.5 text-[10px] font-semibold text-ink">
+                          {t.tag_name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {team.length > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted">
+                      <Users size={12} /> {team.map((t) => t.label).join(", ")}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+
+            <ContactsCard
+              client={client}
+              contacts={contacts}
+              openContactMenuId={openContactMenuId}
+              setOpenContactMenuId={setOpenContactMenuId}
+              onAdd={() => setShowAddContactModal(true)}
+              onView={(link) => setViewingContact({ link, edit: false })}
+              onEdit={(link) => setViewingContact({ link, edit: true })}
+              onMakePrimary={makePrimary}
+              onRemove={removeContact}
+              onInvite={(c) => {
+                setInvitingContact(c);
+                setShowInviteModal(true);
+              }}
+              actionError={contactActionError}
+            />
+
+            <Card title="Notes & Alerts" action={{ label: "View All", onClick: () => setTab("notes") }}>
+              {notes.length === 0 ? (
+                <Empty text="No notes yet." />
+              ) : (
+                <div className="space-y-2.5">
+                  {notes.slice(0, 2).map((n) => (
+                    <div key={n.id} className="text-sm">
+                      <div className="text-ink break-anywhere">{n.note_body}</div>
+                      <div className="mt-0.5 text-[11px] text-muted">{new Date(n.created_at).toLocaleDateString()}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
         </div>
       )}
 
-      {tab === "tasks" && (
-        <div className="app-card p-5">
-          <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-            <h2 className="font-bold text-ink">Tasks</h2>
-            <button
-              onClick={() => setShowTaskModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-            >
-              <Plus size={13} /> Add
-            </button>
-          </div>
-          <div className="divide-y divide-line">
-            {tasks.length === 0 && <Empty text="No tasks yet." />}
-            {tasks.map((t) => (
-              <div key={t.id} className="flex items-center justify-between py-3.5">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={t.task_status === "Done"}
-                    onChange={() => toggleTask(t)}
-                    className="w-4 h-4 accent-[#108A64]"
-                  />
-                  <span
-                    className="text-sm font-semibold text-ink"
-                    style={{
-                      textDecoration: t.task_status === "Done" ? "line-through" : "none",
-                      opacity: t.task_status === "Done" ? 0.5 : 1,
-                    }}
-                  >
-                    {t.task_title}
-                  </span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs tabular-nums font-mono text-muted">
-                    {t.due_date ?? "No due date"}
-                  </span>
-                  <button
-                    onClick={() => setEditingTask(t)}
-                    className="text-muted hover:text-ink"
-                    aria-label="Edit task"
-                  >
-                    <Pencil size={13} />
+      {tab === "work" && (
+        <div className="space-y-4">
+          <Card title="Services" headerAction={{ icon: Plus, label: "Add service", onClick: () => setShowActivateModal(true) }}>
+            {services.length === 0 ? (
+              <EmptyAction text="No services yet. Add one to open its Service Workspace." actionLabel="Add Service" onAction={() => setShowActivateModal(true)} />
+            ) : (
+              <div className="divide-y divide-line">
+                {services.map((s) => (
+                  <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Tasks" headerAction={{ icon: Plus, label: "Add", onClick: () => setShowTaskModal(true) }}>
+            {tasks.length === 0 ? (
+              <Empty text="No tasks yet." />
+            ) : (
+              <div className="divide-y divide-line">
+                {tasks.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between py-3">
+                    <label className="flex min-w-0 items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={t.task_status === "Done"}
+                        onChange={() => toggleTask(t)}
+                        className="h-4 w-4 shrink-0 accent-[#108A64]"
+                      />
+                      <span
+                        className="truncate text-sm font-semibold text-ink"
+                        style={{ textDecoration: t.task_status === "Done" ? "line-through" : "none", opacity: t.task_status === "Done" ? 0.5 : 1 }}
+                      >
+                        {t.task_title}
+                      </span>
+                    </label>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-xs tabular-nums font-mono text-muted">{t.due_date ?? "No due date"}</span>
+                      <button onClick={() => setEditingTask(t)} className="text-muted hover:text-ink" aria-label="Edit task">
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Deadlines" headerAction={{ icon: Plus, label: "Add", onClick: () => setShowDeadlineModal(true) }}>
+            {deadlines.length === 0 ? (
+              <Empty text="No deadlines yet." />
+            ) : (
+              <div className="divide-y divide-line">
+                {deadlines.map((d) => (
+                  <button key={d.id} onClick={() => setEditingDeadline(d)} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-ink">{d.deadline_title}</div>
+                      <div className="mt-0.5 text-xs text-muted">{d.deadline_type}</div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-sm tabular-nums font-mono text-ink">{d.due_date}</span>
+                      <StatusPill status={d.deadline_status} />
+                    </div>
                   </button>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {tab === "deadlines" && (
-        <div className="app-card p-5">
-          <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
-            <h2 className="font-bold text-ink">Deadlines</h2>
-            <button
-              onClick={() => setShowDeadlineModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-            >
-              <Plus size={13} /> Add
-            </button>
-          </div>
-          <div className="divide-y divide-line">
-            {deadlines.length === 0 && <Empty text="No deadlines yet." />}
-            {deadlines.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setEditingDeadline(d)}
-                className="w-full flex items-center justify-between py-3.5 text-left hover:bg-paper transition-colors"
-              >
-                <div>
-                  <div className="font-semibold text-ink text-sm">{d.deadline_title}</div>
-                  <div className="text-xs text-muted mt-0.5">{d.deadline_type}</div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-sm tabular-nums font-mono text-ink">{d.due_date}</span>
-                  <StatusPill status={d.deadline_status} />
-                </div>
-              </button>
-            ))}
-          </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -470,23 +707,14 @@ export default function ClientDetailPage() {
         <div className="app-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3 mb-4">
             <h2 className="font-bold text-ink">Documents</h2>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowFolderModal(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-              >
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={() => setShowFolderModal(true)} className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper">
                 <Plus size={13} /> Folders
               </button>
-              <button
-                onClick={() => setShowRequestModal(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-              >
+              <button onClick={() => setShowRequestModal(true)} className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper">
                 <Plus size={13} /> Request
               </button>
-              <button
-                onClick={() => setShowUploadModal(true)}
-                className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
-              >
+              <button onClick={() => setShowUploadModal(true)} className="flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper">
                 <Upload size={13} /> Upload
               </button>
             </div>
@@ -498,27 +726,19 @@ export default function ClientDetailPage() {
             const orderedFolders = orderFoldersByTree(folders);
             return [...orderedFolders.map((o) => o.folder), null].map((folder, idx) => {
               const depth = folder ? orderedFolders[idx]?.depth ?? 0 : 0;
-              const folderDocs = documents.filter((d) =>
-                folder ? d.folder_id === folder.id : !d.folder_id
-              );
+              const folderDocs = documents.filter((d) => (folder ? d.folder_id === folder.id : !d.folder_id));
               if (folderDocs.length === 0) return null;
               return (
-                <div
-                  key={folder ? folder.id : "unfiled"}
-                  className="mb-4"
-                  style={{ marginLeft: folder ? depth * 20 : 0 }}
-                >
-                  <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">
-                    {folder ? folder.folder_name : "Unfiled"}
-                  </div>
+                <div key={folder ? folder.id : "unfiled"} className="mb-4" style={{ marginLeft: folder ? depth * 20 : 0 }}>
+                  <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">{folder ? folder.folder_name : "Unfiled"}</div>
                   <div className="divide-y divide-line rounded-xl border border-line">
                     {folderDocs.map((d) => (
-                      <div key={d.id} className="flex items-center justify-between px-4 py-3.5">
-                        <div>
-                          <div className="font-semibold text-ink text-sm">{d.document_name}</div>
-                          <div className="text-xs text-muted mt-0.5">{d.document_category}</div>
+                      <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-ink">{d.document_name}</div>
+                          <div className="mt-0.5 text-xs text-muted">{d.document_category}</div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex shrink-0 items-center gap-3">
                           {folders.length > 0 && (
                             <select
                               value={d.folder_id ?? ""}
@@ -550,97 +770,512 @@ export default function ClientDetailPage() {
         </div>
       )}
 
-      {showClientModal && (
-        <ClientModal
-          client={client}
-          onClose={() => setShowClientModal(false)}
-          onSaved={load}
-          onDeleted={() => router.push("/clients")}
-        />
+      {tab === "communication" && (
+        <Card
+          title="Communication"
+          headerAction={{ icon: MessageSquare, label: "Send message", onClick: undefined, disabled: true, disabledReason: "Not yet connected" }}
+        >
+          {messages.length === 0 ? (
+            <Empty text="No communication logged yet." />
+          ) : (
+            <div className="divide-y divide-line">
+              {messages.map((m) => (
+                <MessageRow key={m.id} m={m} expanded />
+              ))}
+            </div>
+          )}
+        </Card>
       )}
-      {viewingContact && viewingContact.contacts && (
+
+      {tab === "billing" && (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card title="Balance">
+              <div className="text-2xl font-bold tabular-nums text-ink">${balance.toFixed(2)}</div>
+              <div className="mt-1 text-xs text-muted">{unpaidInvoices.length} unpaid invoice{unpaidInvoices.length === 1 ? "" : "s"}</div>
+            </Card>
+            <Card title="Billing status">
+              <div className="text-sm text-ink">{balance > 0 ? "Outstanding balance" : "Account current"}</div>
+              <button
+                onClick={() => setShowInvoiceModal(true)}
+                className="mt-3 flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink hover:bg-paper"
+              >
+                <Plus size={13} /> Create Invoice
+              </button>
+            </Card>
+          </div>
+
+          <Card title="Unpaid Invoices">
+            {unpaidInvoices.length === 0 ? (
+              <Empty text="No unpaid invoices." />
+            ) : (
+              <div className="divide-y divide-line">
+                {unpaidInvoices.map((inv) => (
+                  <div key={inv.id} className="flex items-center justify-between py-2.5 text-sm">
+                    <span className="text-ink">{inv.invoice_number || "Invoice"}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="tabular-nums font-mono text-ink">${(inv.total_amount - inv.amount_paid).toFixed(2)}</span>
+                      <StatusPill status={inv.invoice_status} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Recent Payments">
+            {payments.length === 0 ? (
+              <Empty text="No payments recorded yet." />
+            ) : (
+              <div className="divide-y divide-line">
+                {payments.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between py-2.5 text-sm">
+                    <span className="text-ink">{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : "—"}</span>
+                    <span className="tabular-nums font-mono text-ink">${p.payment_amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {tab === "notes" && (
+        <Card title="Notes">
+          <div className="mb-4 flex gap-2">
+            <input
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Add an internal note…"
+              className="flex-1 rounded-xl border border-line px-3 py-2 text-sm outline-none focus:border-[#108A64]"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addNote();
+              }}
+            />
+            <button
+              onClick={addNote}
+              disabled={savingNote || !newNote.trim()}
+              className="rounded-xl bg-[#108A64] px-3.5 py-2 text-xs font-semibold text-white disabled:opacity-60"
+            >
+              {savingNote ? "Saving…" : "Add Note"}
+            </button>
+          </div>
+          {notes.length === 0 ? (
+            <Empty text="No notes yet." />
+          ) : (
+            <div className="divide-y divide-line">
+              {notes.map((n) => (
+                <div key={n.id} className="py-2.5 text-sm">
+                  <div className="text-ink break-anywhere">{n.note_body}</div>
+                  <div className="mt-0.5 text-[11px] text-muted">{new Date(n.created_at).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {tab === "details" && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card title={isBusiness ? "Business Details" : "Personal Details"}>
+            <div className="space-y-3 text-sm">
+              {isBusiness ? (
+                <>
+                  <InfoRow icon={Info} label="Legal / business name" value={client.business_name} />
+                  <InfoRow icon={Mail} label="Business email" value={client.email} />
+                  <InfoRow icon={Phone} label="Business phone" value={client.phone} />
+                </>
+              ) : (
+                <>
+                  <InfoRow icon={Info} label="First name" value={client.first_name} />
+                  <InfoRow icon={Info} label="Middle name" value={client.middle_name} />
+                  <InfoRow icon={Info} label="Last name" value={client.last_name} />
+                  <InfoRow icon={Mail} label="Personal email" value={client.email} />
+                  <InfoRow icon={Phone} label="Personal phone" value={client.phone} />
+                  <InfoRow icon={Info} label="Occupation" value={client.occupation} />
+                </>
+              )}
+              <InfoRow icon={MapPin} label="Address" value={address} />
+              <InfoRow icon={Tag} label="Source" value={client.source} />
+              <InfoRow icon={Info} label="Status" value={client.status} />
+            </div>
+            {(tags.length > 0 || team.length > 0) && (
+              <div className="mt-4 space-y-2.5 border-t border-line pt-3.5">
+                {tags.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">Tags</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tags.map((t) => (
+                        <span key={t.id} className="rounded-full bg-paper border border-line px-2 py-0.5 text-[10px] font-semibold text-ink">
+                          {t.tag_name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {team.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">Assigned team</div>
+                    <div className="text-sm text-ink">{team.map((t) => t.label).join(", ")}</div>
+                  </div>
+                )}
+                <div>
+                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">Portal status</div>
+                  <div className="text-sm text-ink">
+                    {contacts.filter((c) => c.portal_access).length} of {contacts.length || 0} linked contact
+                    {contacts.length === 1 ? "" : "s"} have portal access
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          <Card title={isBusiness ? "Business Tax / Identity" : "Tax / Identity"}>
+            {isBusiness ? (
+              maskedIdentity ? (
+                <div className="space-y-3 text-sm">
+                  <InfoRow icon={ShieldCheck} label="EIN" value={maskedIdentity.masked_value} />
+                  <button onClick={() => setShowClientModal(true)} className="text-xs font-semibold text-[#108A64] hover:underline">
+                    Reveal or replace in Edit account
+                  </button>
+                </div>
+              ) : (
+                <Empty text="Business identity details not entered." />
+              )
+            ) : (
+              <div className="space-y-3 text-sm">
+                <InfoRow icon={Cake} label="Date of birth" value={client.date_of_birth} />
+                <InfoRow icon={ShieldCheck} label="SSN" value={maskedIdentity?.masked_value || (client.ssn_last_four ? `•••-••-${client.ssn_last_four}` : null)} />
+                {maskedIdentity && (
+                  <button onClick={() => setShowClientModal(true)} className="text-xs font-semibold text-[#108A64] hover:underline">
+                    Reveal or replace in Edit account
+                  </button>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={load} onDeleted={() => router.push("/clients")} />}
+      {showAddContactModal && (
+        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={load} />
+      )}
+      {viewingContact && viewingContact.link.contacts && (
         <ContactDetailModal
-          contact={viewingContact.contacts}
-          isPrimary={viewingContact.is_primary}
-          relationshipType={viewingContact.relationship_type}
-          portalAccess={viewingContact.portal_access}
-          contactTypeLabel={contactRoleLabel(client.client_type, viewingContact.is_primary)}
+          contact={viewingContact.link.contacts}
+          linkId={viewingContact.link.id}
+          isPrimary={viewingContact.link.is_primary}
+          relationshipType={viewingContact.link.relationship_type}
+          portalAccess={viewingContact.link.portal_access}
+          contactTypeLabel={contactRoleLabel(client.client_type, viewingContact.link.is_primary)}
           accountName={displayName}
           onClose={() => setViewingContact(null)}
+          onSaved={() => {
+            setViewingContact(null);
+            load();
+          }}
         />
       )}
       {showInviteModal && (
         <InvitePortalModal
           workspaceId={client.workspace_id}
           clientId={client.id}
-          defaultEmail={client.email}
-          onClose={() => setShowInviteModal(false)}
+          defaultEmail={invitingContact?.personal_email ?? client.email}
+          onClose={() => {
+            setShowInviteModal(false);
+            setInvitingContact(null);
+          }}
         />
       )}
-      {showUploadModal && (
-        <UploadDocumentModal
-          clientId={client.id}
-          workspaceId={client.workspace_id}
-          onClose={() => setShowUploadModal(false)}
-          onSaved={load}
-        />
-      )}
-      {showRequestModal && (
-        <RequestDocumentModal
-          clientId={client.id}
-          onClose={() => setShowRequestModal(false)}
-          onSaved={load}
-        />
-      )}
-      {showFolderModal && (
-        <DocumentFolderModal
-          clientId={client.id}
-          workspaceId={client.workspace_id}
-          onClose={() => setShowFolderModal(false)}
-          onSaved={load}
-        />
-      )}
-      {showTaskModal && (
-        <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={load} />
-      )}
-      {editingTask && (
-        <NewTaskModal
-          clientId={client.id}
-          task={editingTask}
-          onClose={() => setEditingTask(null)}
-          onSaved={load}
-          onDeleted={load}
-        />
-      )}
-      {showDeadlineModal && (
-        <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={load} />
-      )}
+      {showUploadModal && <UploadDocumentModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowUploadModal(false)} onSaved={load} />}
+      {showRequestModal && <RequestDocumentModal clientId={client.id} onClose={() => setShowRequestModal(false)} onSaved={load} />}
+      {showFolderModal && <DocumentFolderModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowFolderModal(false)} onSaved={load} />}
+      {showTaskModal && <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={load} />}
+      {editingTask && <NewTaskModal clientId={client.id} task={editingTask} onClose={() => setEditingTask(null)} onSaved={load} onDeleted={load} />}
+      {showDeadlineModal && <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={load} />}
       {editingDeadline && (
-        <NewDeadlineModal
-          clientId={client.id}
-          deadline={editingDeadline}
-          onClose={() => setEditingDeadline(null)}
-          onSaved={load}
-          onDeleted={load}
-        />
+        <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={load} onDeleted={load} />
       )}
       {showActivateModal && (
-        <ActivateServiceModal
-          clientId={client.id}
-          workspaceId={client.workspace_id}
-          onClose={() => setShowActivateModal(false)}
-          onActivated={load}
-        />
+        <ActivateServiceModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowActivateModal(false)} onActivated={load} />
       )}
       {editingService && (
-        <NewServiceModal
-          clientId={client.id}
-          service={editingService}
-          onClose={() => setEditingService(null)}
-          onSaved={load}
-          onDeleted={load}
-        />
+        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={load} onDeleted={load} />
       )}
+      {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={load} />}
+    </div>
+  );
+}
+
+function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: string; onEdit: () => void }) {
+  const content = (
+    <>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-ink">{s.service_type}</div>
+        <div className="mt-0.5 text-xs text-muted">
+          {s.service_year || "No year set"}
+          {!engagementId && " · Legacy service, no workspace"}
+          {s.due_date && ` · Due ${s.due_date}`}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {isOpenServiceStatus(s.service_status) ? (
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[#108A64]">Active</span>
+        ) : (
+          <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted">Closed</span>
+        )}
+        <StatusPill status={s.service_status} />
+      </div>
+    </>
+  );
+  return engagementId ? (
+    <Link href={`/work/${engagementId}`} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
+      {content}
+    </Link>
+  ) : (
+    <button onClick={onEdit} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
+      {content}
+    </button>
+  );
+}
+
+function MessageRow({ m, expanded }: { m: CommMessage; expanded?: boolean }) {
+  return (
+    <div className="py-2.5 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold text-ink capitalize">
+          {m.channel} · {m.direction}
+        </span>
+        <span className="shrink-0 text-[11px] text-muted">{m.sent_at ? new Date(m.sent_at).toLocaleDateString() : new Date(m.created_at).toLocaleDateString()}</span>
+      </div>
+      {m.subject && <div className="mt-0.5 text-xs text-ink">{m.subject}</div>}
+      {expanded && m.body && <div className="mt-1 text-xs text-muted break-anywhere">{m.body}</div>}
+      <div className="mt-1 text-[11px] text-muted">{m.message_status}</div>
+    </div>
+  );
+}
+
+function ContactsCard({
+  client,
+  contacts,
+  openContactMenuId,
+  setOpenContactMenuId,
+  onAdd,
+  onView,
+  onEdit,
+  onMakePrimary,
+  onRemove,
+  onInvite,
+  actionError,
+}: {
+  client: Client;
+  contacts: LinkedContact[];
+  openContactMenuId: string | null;
+  setOpenContactMenuId: (id: string | null) => void;
+  onAdd: () => void;
+  onView: (link: LinkedContact) => void;
+  onEdit: (link: LinkedContact) => void;
+  onMakePrimary: (link: LinkedContact) => void;
+  onRemove: (link: LinkedContact) => void;
+  onInvite: (contact: ContactWithLinks) => void;
+  actionError: string | null;
+}) {
+  return (
+    <Card title="Contacts" headerAction={{ icon: Plus, label: "Add Contact", onClick: onAdd }}>
+      {actionError && <div className="mb-3 rounded-lg bg-brick/10 border border-brick/30 px-3 py-2 text-xs text-brick">{actionError}</div>}
+      {contacts.length === 0 ? (
+        <EmptyAction text="No contacts linked yet." actionLabel="Add Contact" onAction={onAdd} />
+      ) : (
+        <div className="divide-y divide-line">
+          {contacts.map((link) => {
+            const c = link.contacts;
+            if (!c) return null;
+            const fullName = [c.first_name, c.middle_name, c.last_name].filter(Boolean).join(" ");
+            const linkedIndividual = isAlsoIndividualClient(c);
+            return (
+              <div key={link.id} className="py-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <button type="button" onClick={() => onView(link)} className="text-left text-sm font-semibold text-[#108A64] hover:underline">
+                      {fullName || "Unnamed contact"}
+                    </button>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${
+                          link.is_primary ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
+                        }`}
+                      >
+                        {link.is_primary && <Star size={10} />} {contactRoleLabel(client.client_type, link.is_primary)}
+                      </span>
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${
+                          link.portal_access ? "bg-emerald-50 text-[#108A64]" : "bg-paper border border-line text-muted"
+                        }`}
+                      >
+                        <ShieldCheck size={10} /> {link.portal_access ? "Portal" : "No portal"}
+                      </span>
+                      {linkedIndividual && (
+                        <Link
+                          href={`/clients/${linkedIndividual.id}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-sky-50 text-sky-700 text-[10px] font-semibold px-2 py-0.5"
+                        >
+                          <Link2 size={10} /> Also an Individual Client
+                        </Link>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                      {c.personal_email && (
+                        <span className="flex items-center gap-1">
+                          <Mail size={11} /> {c.personal_email}
+                        </span>
+                      )}
+                      {c.personal_phone && (
+                        <span className="flex items-center gap-1">
+                          <Phone size={11} /> {c.personal_phone}
+                        </span>
+                      )}
+                      {c.occupation && <span>{c.occupation}</span>}
+                    </div>
+                  </div>
+                  <div className="relative shrink-0">
+                    <button
+                      onClick={() => setOpenContactMenuId(openContactMenuId === link.id ? null : link.id)}
+                      aria-label="Contact actions"
+                      className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:text-ink hover:bg-paper"
+                    >
+                      <MoreHorizontal size={15} />
+                    </button>
+                    {openContactMenuId === link.id && (
+                      <>
+                        <button aria-hidden className="fixed inset-0 z-40" onClick={() => setOpenContactMenuId(null)} tabIndex={-1} />
+                        <div className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-xl border border-line bg-white py-1.5 shadow-xl">
+                          <MenuItem
+                            icon={Eye}
+                            label="View contact"
+                            onClick={() => {
+                              setOpenContactMenuId(null);
+                              onView(link);
+                            }}
+                          />
+                          <MenuItem
+                            icon={Pencil}
+                            label="Edit contact"
+                            onClick={() => {
+                              setOpenContactMenuId(null);
+                              onEdit(link);
+                            }}
+                          />
+                          {!link.is_primary && (
+                            <MenuItem
+                              icon={Star}
+                              label="Make primary"
+                              onClick={() => {
+                                setOpenContactMenuId(null);
+                                onMakePrimary(link);
+                              }}
+                            />
+                          )}
+                          <MenuItem
+                            icon={UserPlus}
+                            label="Invite to portal"
+                            onClick={() => {
+                              setOpenContactMenuId(null);
+                              onInvite(c);
+                            }}
+                          />
+                          {!link.is_primary && (
+                            <MenuItem
+                              icon={Trash2}
+                              label="Remove from business"
+                              danger
+                              onClick={() => {
+                                setOpenContactMenuId(null);
+                                onRemove(link);
+                              }}
+                            />
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function MenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  danger,
+  disabled,
+  disabledReason,
+}: {
+  icon: any;
+  label: string;
+  onClick?: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={disabled ? disabledReason : undefined}
+      className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm ${
+        disabled ? "text-line cursor-not-allowed" : danger ? "text-brick hover:bg-brick/5" : "text-ink hover:bg-paper"
+      }`}
+    >
+      <Icon size={14} /> {label}
+      {disabled && disabledReason && <span className="ml-auto text-[10px] text-muted">{disabledReason}</span>}
+    </button>
+  );
+}
+
+function Card({
+  title,
+  action,
+  headerAction,
+  children,
+}: {
+  title: string;
+  action?: { label: string; onClick: () => void };
+  headerAction?: { icon: any; label: string; onClick?: () => void; disabled?: boolean; disabledReason?: string };
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="app-card p-5">
+      <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
+        <h2 className="font-bold text-ink">{title}</h2>
+        <div className="flex items-center gap-2">
+          {headerAction && (
+            <button
+              onClick={headerAction.disabled ? undefined : headerAction.onClick}
+              disabled={headerAction.disabled}
+              title={headerAction.disabled ? headerAction.disabledReason : undefined}
+              className={`flex items-center gap-1.5 rounded-xl border border-line px-3 py-1.5 text-xs font-semibold ${
+                headerAction.disabled ? "text-line cursor-not-allowed" : "text-ink hover:bg-paper"
+              }`}
+            >
+              <headerAction.icon size={13} /> {headerAction.label}
+            </button>
+          )}
+          {action && (
+            <button onClick={action.onClick} className="text-xs font-semibold text-[#108A64] hover:underline">
+              {action.label}
+            </button>
+          )}
+        </div>
+      </div>
+      {children}
     </div>
   );
 }
@@ -648,7 +1283,9 @@ export default function ClientDetailPage() {
 function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value?: string | null }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-0.5 text-muted"><Icon size={14} /></div>
+      <div className="mt-0.5 text-muted">
+        <Icon size={14} />
+      </div>
       <div className="min-w-0">
         <div className="text-[11px] uppercase tracking-wide text-muted font-semibold">{label}</div>
         <div className="text-sm text-ink break-anywhere">{value || "—"}</div>
@@ -658,5 +1295,16 @@ function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="rounded-xl border border-dashed border-line p-5 text-sm text-muted">{text}</div>;
+  return <div className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">{text}</div>;
+}
+
+function EmptyAction({ text, actionLabel, onAction }: { text: string; actionLabel: string; onAction: () => void }) {
+  return (
+    <div className="rounded-xl border border-dashed border-line p-4 text-center text-sm text-muted">
+      <div className="mb-2.5">{text}</div>
+      <button onClick={onAction} className="inline-flex items-center gap-1.5 rounded-xl bg-[#108A64] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0d7555]">
+        <Plus size={13} /> {actionLabel}
+      </button>
+    </div>
+  );
 }
