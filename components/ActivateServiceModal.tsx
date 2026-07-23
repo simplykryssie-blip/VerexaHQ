@@ -125,6 +125,17 @@ export default function ActivateServiceModal({
   const [members, setMembers] = useState<{ user_id: string; label: string }[]>([]);
   const [setupError, setSetupError] = useState<string | null>(null);
 
+  // Pre-flight duplicate check against the real `services` table — a
+  // frontend-only guard, not a substitute for a backend one (see the
+  // written report accompanying this change on the safest RPC/constraint
+  // design). Catches the two ways this actually happened in testing:
+  // reopening "Add Service" for a service_type/year that already exists,
+  // and re-clicking Activate before its disabled state visibly applied.
+  // Recurring services are intentionally not checked yet — no safe rule
+  // for those has been designed.
+  const [existingDuplicate, setExistingDuplicate] = useState<{ service_year: string | null } | null>(null);
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false);
+
   const [method, setMethod] = useState<Method>("apply");
   const [previewOpen, setPreviewOpen] = useState(false);
   // Loaded once for every visible template (not just the selected one), so
@@ -207,6 +218,24 @@ export default function ActivateServiceModal({
     if (!selectedTemplate) return;
     setIsRecurring(RECURRING_SERVICE_TYPES.has(selectedTemplate.service_type));
   }, [selectedTemplate?.id]);
+
+  useEffect(() => {
+    setConfirmDuplicate(false);
+    if (isRecurring || !selectedTemplate) {
+      setExistingDuplicate(null);
+      return;
+    }
+    let cancelled = false;
+    let q = supabase.from("services").select("id, service_year").eq("client_id", clientId).eq("service_type", selectedTemplate.service_type);
+    q = serviceYear ? q.eq("service_year", serviceYear) : q.is("service_year", null);
+    q.limit(1).then(({ data }) => {
+      if (cancelled) return;
+      setExistingDuplicate((data as { id: string; service_year: string | null }[] | null)?.[0] ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTemplate?.id, isRecurring, serviceYear, clientId]);
 
   useEffect(() => {
     if (templates.length === 0) {
@@ -314,6 +343,10 @@ export default function ActivateServiceModal({
         setSetupError("Choose a deadline type, or clear the deadline date.");
         return;
       }
+    }
+    if (existingDuplicate && !confirmDuplicate) {
+      setSetupError("Confirm you want to create an additional service for this year, or change the year above.");
+      return;
     }
     setSetupError(null);
     setStep(2);
@@ -647,6 +680,23 @@ export default function ActivateServiceModal({
                       The overall filing, statutory, client-promised, or internal completion deadline for this
                       service. This is not the due date for every task.
                     </p>
+                    {existingDuplicate && (
+                      <div className="space-y-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                        <p className="font-semibold">
+                          This client already has {humanizeServiceType(selectedTemplate?.service_type ?? "")}
+                          {serviceYear ? ` for ${serviceYear}` : ""}.
+                        </p>
+                        <label className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={confirmDuplicate}
+                            onChange={(e) => setConfirmDuplicate(e.target.checked)}
+                            className="mt-0.5 h-3.5 w-3.5 accent-amber-700"
+                          />
+                          I understand this creates an additional service for this year and want to proceed anyway.
+                        </label>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>

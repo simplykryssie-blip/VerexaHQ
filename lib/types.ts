@@ -215,6 +215,7 @@ export type Task = {
   workspace_id: string;
   client_id: string;
   service_id: string | null;
+  engagement_id: string | null;
   task_title: string;
   task_description: string;
   task_status: "To Do" | "In Progress" | "Done" | string;

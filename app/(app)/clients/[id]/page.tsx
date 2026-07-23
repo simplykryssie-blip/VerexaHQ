@@ -85,6 +85,7 @@ type CommMessage = {
   created_at: string;
 };
 type Note = { id: string; note_body: string; created_by: string | null; created_at: string };
+type EngagementSummary = { id: string; service_id: string | null; engagement_name: string; tax_year: number | null; status: string };
 
 const TABS = ["overview", "work", "documents", "communication", "billing", "notes", "details"] as const;
 type Tab = (typeof TABS)[number];
@@ -113,6 +114,101 @@ function isAlsoIndividualClient(c: ContactWithLinks | null): LinkedClientSummary
   return link?.clients ?? null;
 }
 
+function humanizeServiceType(code: string, labels: Map<string, string>): string {
+  const known = labels.get(code);
+  if (known) return known;
+  return code
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+type TaskGroup = {
+  key: string;
+  label: string;
+  subtitle: string | null;
+  statusLabel: string | null;
+  engagementId: string | null;
+  // True only for the engagement-fallback tier (service_id is gone but the
+  // engagement itself still exists) and the general bucket — a visible
+  // signal that a group's own service record no longer exists, most often
+  // because a duplicate service was manually deleted without its
+  // engagement/tasks being cleaned up alongside it (deleting a `services`
+  // row does not cascade to `engagements`/`tasks` — the FK just goes
+  // null). Never used to hide anything, only to label it honestly.
+  orphaned: boolean;
+  tasks: Task[];
+};
+
+// Groups by service_id first (the real, current source of truth), then
+// falls back to engagement_id for tasks whose service record is gone but
+// whose engagement still exists, then a single "General client tasks"
+// bucket for tasks with neither — never by task_title, which is why
+// same-named tasks from different services were indistinguishable before.
+function groupTasksByService(
+  tasks: Task[],
+  services: Service[],
+  engagements: EngagementSummary[],
+  serviceEngagements: Map<string, string>,
+  serviceTypeLabels: Map<string, string>
+): TaskGroup[] {
+  const servicesById = new Map(services.map((s) => [s.id, s]));
+  const engagementsById = new Map(engagements.map((e) => [e.id, e]));
+  const groups = new Map<string, TaskGroup>();
+
+  for (const t of tasks) {
+    let key: string;
+    let group: TaskGroup;
+
+    if (t.service_id && servicesById.has(t.service_id)) {
+      const s = servicesById.get(t.service_id)!;
+      key = `service:${s.id}`;
+      group = groups.get(key) ?? {
+        key,
+        label: humanizeServiceType(s.service_type, serviceTypeLabels),
+        subtitle: s.service_year || null,
+        statusLabel: s.service_status,
+        engagementId: serviceEngagements.get(s.id) ?? null,
+        orphaned: false,
+        tasks: [],
+      };
+    } else if (t.engagement_id && engagementsById.has(t.engagement_id)) {
+      const e = engagementsById.get(t.engagement_id)!;
+      key = `engagement:${e.id}`;
+      group = groups.get(key) ?? {
+        key,
+        label: e.engagement_name,
+        subtitle: e.tax_year ? String(e.tax_year) : null,
+        statusLabel: e.status,
+        engagementId: e.id,
+        orphaned: true,
+        tasks: [],
+      };
+    } else {
+      key = "general";
+      group = groups.get(key) ?? {
+        key,
+        label: "General client tasks",
+        subtitle: null,
+        statusLabel: null,
+        engagementId: null,
+        orphaned: false,
+        tasks: [],
+      };
+    }
+
+    if (!groups.has(key)) groups.set(key, group);
+    group.tasks.push(t);
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === "general") return 1;
+    if (b.key === "general") return -1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
 function orderFoldersByTree(folders: DocumentFolder[]): { folder: DocumentFolder; depth: number }[] {
   const byParent = new Map<string, DocumentFolder[]>();
   for (const f of folders) {
@@ -139,6 +235,12 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<Client | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
+  // Full engagement rows (not just the service_id -> id map above) so
+  // tasks whose own service_id has since gone null (the service record it
+  // pointed to was deleted, leaving the engagement orphaned via
+  // ON DELETE SET NULL) can still be grouped and labeled sensibly by
+  // their engagement instead of being dumped into "General client tasks".
+  const [engagementSummaries, setEngagementSummaries] = useState<EngagementSummary[]>([]);
   // Requested Services (client_service_interests) are separate from real,
   // activated Services — a service_type here never implies a `services` row
   // exists. "Activated" is derived by matching service_type against
@@ -237,7 +339,7 @@ export default function ClientDetailPage() {
       notesRes,
     ] = await Promise.all([
       supabase.from("services").select("*").eq("client_id", id),
-      supabase.from("engagements").select("id, service_id").eq("account_id", id),
+      supabase.from("engagements").select("id, service_id, engagement_name, tax_year, status").eq("account_id", id),
       supabase.from("client_service_interests").select("*").eq("client_id", id).order("created_at"),
       // Not filtered to is_active — a requested service saved under a code
       // that's since been deactivated should still resolve to its real
@@ -271,6 +373,7 @@ export default function ClientDetailPage() {
       if (e.service_id) engMap.set(e.service_id, e.id);
     });
     setServiceEngagements(engMap);
+    setEngagementSummaries((engagementsRes.data as EngagementSummary[]) ?? []);
     setServiceInterests((serviceInterestsRes.data as ClientServiceInterest[]) ?? []);
     setServiceTypeLabels(
       new Map(((serviceTypeOptionsRes.data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label]))
@@ -442,6 +545,12 @@ export default function ClientDetailPage() {
   const remainingRequestedServices = serviceInterests
     .filter((i) => !services.some((s) => s.service_type === i.service_type))
     .map((i) => ({ serviceType: i.service_type, label: serviceTypeLabels.get(i.service_type) || i.service_type }));
+  const taskGroups = groupTasksByService(tasks, services, engagementSummaries, serviceEngagements, serviceTypeLabels);
+  const taskLabelById = new Map<string, string>();
+  taskGroups.forEach((g) => {
+    const full = g.subtitle ? `${g.label} — ${g.subtitle}` : g.label;
+    g.tasks.forEach((t) => taskLabelById.set(t.id, full));
+  });
   const displayName = clientDisplayName(client);
   const meta = accountTypeMeta(client);
   const address = [client.address, [client.city, client.state, client.zip_code].filter(Boolean).join(", ")]
@@ -623,8 +732,15 @@ export default function ClientDetailPage() {
                       onClick={() => setTab("work")}
                       className="flex w-full items-center justify-between py-2.5 text-left text-sm hover:bg-paper transition-colors"
                     >
-                      <span className="text-ink">{item.title}</span>
-                      <span className="text-xs text-muted tabular-nums font-mono">{item.due ?? "No due date"}</span>
+                      <span className="min-w-0">
+                        <span className="text-ink">{item.title}</span>
+                        {item.kind === "task" && taskLabelById.get(item.id) && (
+                          <span className="ml-2 rounded-full bg-paper border border-line px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                            {taskLabelById.get(item.id)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted tabular-nums font-mono">{item.due ?? "No due date"}</span>
                     </button>
                   ))}
                 </div>
@@ -747,28 +863,56 @@ export default function ClientDetailPage() {
             {tasks.length === 0 ? (
               <Empty text="No tasks yet." />
             ) : (
-              <div className="divide-y divide-line">
-                {tasks.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between py-3">
-                    <label className="flex min-w-0 items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={t.task_status === "Done"}
-                        onChange={() => toggleTask(t)}
-                        className="h-4 w-4 shrink-0 accent-[#108A64]"
-                      />
-                      <span
-                        className="truncate text-sm font-semibold text-ink"
-                        style={{ textDecoration: t.task_status === "Done" ? "line-through" : "none", opacity: t.task_status === "Done" ? 0.5 : 1 }}
-                      >
-                        {t.task_title}
-                      </span>
-                    </label>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-xs tabular-nums font-mono text-muted">{t.due_date ?? "No due date"}</span>
-                      <button onClick={() => setEditingTask(t)} className="text-muted hover:text-ink" aria-label="Edit task">
-                        <Pencil size={13} />
-                      </button>
+              <div className="space-y-5">
+                {taskGroups.map((group) => (
+                  <div key={group.key}>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-semibold text-ink">
+                          {group.label}
+                          {group.subtitle && ` — ${group.subtitle}`}
+                        </span>
+                        {group.statusLabel && <StatusPill status={group.statusLabel} />}
+                        {group.orphaned && group.key !== "general" && (
+                          <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                            No linked service record
+                          </span>
+                        )}
+                        <span className="text-[11px] text-muted">
+                          {group.tasks.length} task{group.tasks.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      {group.engagementId && (
+                        <Link href={`/work/${group.engagementId}`} className="text-xs font-semibold text-[#108A64] hover:underline">
+                          Open Workspace
+                        </Link>
+                      )}
+                    </div>
+                    <div className="divide-y divide-line">
+                      {group.tasks.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between py-3">
+                          <label className="flex min-w-0 items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={t.task_status === "Done"}
+                              onChange={() => toggleTask(t)}
+                              className="h-4 w-4 shrink-0 accent-[#108A64]"
+                            />
+                            <span
+                              className="truncate text-sm font-semibold text-ink"
+                              style={{ textDecoration: t.task_status === "Done" ? "line-through" : "none", opacity: t.task_status === "Done" ? 0.5 : 1 }}
+                            >
+                              {t.task_title}
+                            </span>
+                          </label>
+                          <div className="flex shrink-0 items-center gap-3">
+                            <span className="text-xs tabular-nums font-mono text-muted">{t.due_date ?? "No due date"}</span>
+                            <button onClick={() => setEditingTask(t)} className="text-muted hover:text-ink" aria-label="Edit task">
+                              <Pencil size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
