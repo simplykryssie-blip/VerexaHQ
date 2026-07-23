@@ -58,7 +58,10 @@ export default function ClientsPage() {
 
   const filtered = clients.filter((c) => {
     const matchesQuery = clientDisplayName(c).toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    // "All" means all non-archived clients — archived records only ever
+    // show up under the explicit Archived filter, never under All or any
+    // other status tab.
+    const matchesStatus = statusFilter === "all" ? c.status !== "archived" : c.status === statusFilter;
     return matchesQuery && matchesStatus;
   });
 
