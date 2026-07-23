@@ -674,6 +674,46 @@ export default function ClientModal({
         }
       }
 
+      // account_contacts has two (redundant) partial unique indexes —
+      // account_contacts_one_primary_per_account and
+      // account_contacts_one_primary_idx — both enforcing at most one
+      // is_primary = true row per account_id at the database level. The
+      // primary contact was switched to a different existing person: the
+      // OLD primary link must be retired *before* the new one is promoted
+      // to primary, or the two is_primary = true rows briefly coexist and
+      // the second write hits a 23505 unique violation — reproduced live:
+      // "duplicate key value violates unique constraint
+      // account_contacts_one_primary_per_account". The old contact's own
+      // record (name/email/phone) is never touched here. Per the user's
+      // choice: either demote the old link to a non-primary "additional"
+      // relationship, or remove just the relationship row (never the
+      // contact itself).
+      if (isEditing && originalContactId && originalContactId !== activeContactId) {
+        if (keepOldContactAsAdditional) {
+          const { error: demoteError } = await supabase
+            .from("account_contacts")
+            .update({ is_primary: false, relationship_type: "additional" })
+            .eq("account_id", clientId)
+            .eq("contact_id", originalContactId);
+          if (demoteError) {
+            setSaving(false);
+            setError(`Client saved, but updating the previous contact's relationship failed: ${stepError("account_contacts_demote", demoteError)}`);
+            return;
+          }
+        } else {
+          const { error: removeError } = await supabase
+            .from("account_contacts")
+            .delete()
+            .eq("account_id", clientId)
+            .eq("contact_id", originalContactId);
+          if (removeError) {
+            setSaving(false);
+            setError(`Client saved, but removing the previous contact's relationship failed: ${stepError("account_contacts_remove", removeError)}`);
+            return;
+          }
+        }
+      }
+
       const { data: existingLink, error: linkLookupError } = await supabase
         .from("account_contacts")
         .select("id, is_primary")
@@ -708,38 +748,6 @@ export default function ClientModal({
           setSaving(false);
           setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
           return;
-        }
-      }
-
-      // The primary contact was switched to a different existing person —
-      // retire the old primary link so only one account_contacts row for
-      // this business ever has is_primary = true. The old contact's own
-      // record (name/email/phone) is never touched here. Per the user's
-      // choice: either demote it to a non-primary "additional" relationship,
-      // or remove just the relationship row (never the contact itself).
-      if (isEditing && originalContactId && originalContactId !== activeContactId) {
-        if (keepOldContactAsAdditional) {
-          const { error: demoteError } = await supabase
-            .from("account_contacts")
-            .update({ is_primary: false, relationship_type: "additional" })
-            .eq("account_id", clientId)
-            .eq("contact_id", originalContactId);
-          if (demoteError) {
-            setSaving(false);
-            setError(`Client saved, but updating the previous contact's relationship failed: ${stepError("account_contacts_demote", demoteError)}`);
-            return;
-          }
-        } else {
-          const { error: removeError } = await supabase
-            .from("account_contacts")
-            .delete()
-            .eq("account_id", clientId)
-            .eq("contact_id", originalContactId);
-          if (removeError) {
-            setSaving(false);
-            setError(`Client saved, but removing the previous contact's relationship failed: ${stepError("account_contacts_remove", removeError)}`);
-            return;
-          }
         }
       }
     }
