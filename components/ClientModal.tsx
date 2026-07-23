@@ -141,6 +141,21 @@ type ContactSearchResult = {
 };
 type MaskedIdentity = { vault_id: string; identity_type: string; masked_value: string; last_four: string | null };
 type SetupOption = { option_code: string; option_label: string };
+// The contact currently connected to a business in "Connect existing
+// contact" mode. Deliberately read-only display data, separate from any
+// editable form state — connect mode never writes to this person's own
+// contacts row, only to the account_contacts relationship, so their record
+// is never at risk of being overwritten by an unrelated edit.
+type ConnectedContact = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  personal_email: string | null;
+  personal_phone: string | null;
+  occupation: string | null;
+  portal_access: boolean;
+};
 
 export default function ClientModal({
   client,
@@ -197,12 +212,31 @@ export default function ClientModal({
     occupation: "",
     portal_access: false,
   });
+  // Business path: "Create new contact" and "Connect existing contact" are
+  // fully independent state, so switching between them can never lose or
+  // corrupt data. connectedContact is read-only display data for the
+  // person currently connected (never written to until Save); newContactForm
+  // is always-blank-initialized editable fields for a brand new person.
+  // Neither is touched by the other mode.
+  const [connectedContact, setConnectedContact] = useState<ConnectedContact | null>(null);
+  const [newContactForm, setNewContactForm] = useState({
+    first_name: "",
+    middle_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    occupation: "",
+    portal_access: false,
+  });
+  // Individual path only: the linked contact mirrors the client's own
+  // identity (see form.email/phone comment above), so it keeps using the
+  // shared `form` fields exactly as before.
   const [contactId, setContactId] = useState<string | null>(null);
   // The primary contact that was actually loaded from account_contacts when
-  // editing — distinct from contactId, which changes as soon as the user
-  // selects a different existing contact. Comparing the two is how we know
-  // whether the primary is being replaced (needs the old link retired) or
-  // just being re-saved (no old link to touch).
+  // editing — distinct from the contact the user has now selected/created.
+  // Comparing the two is how we know whether the primary is being replaced
+  // (needs the old link retired) or just being re-saved (no old link to
+  // touch).
   const [originalContactId, setOriginalContactId] = useState<string | null>(null);
   const [originalContactLabel, setOriginalContactLabel] = useState<string>("");
   const [keepOldContactAsAdditional, setKeepOldContactAsAdditional] = useState(false);
@@ -213,13 +247,6 @@ export default function ClientModal({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchedOnce, setSearchedOnce] = useState(false);
   const [includeArchivedContacts, setIncludeArchivedContacts] = useState(false);
-  // Whether the "Find a contact" search UI is shown. Search results used to
-  // stay rendered indefinitely once a contact was picked, which — combined
-  // with there being no sticky footer — pushed the Save/Update button far
-  // down the page on mobile, past the app's bottom nav, effectively
-  // stranding the user on Step 2 with no reachable way to finish. Selecting
-  // a result now collapses search back down to a compact summary.
-  const [searchExpanded, setSearchExpanded] = useState(initialContactMode === "link");
   const selectedContactRef = useRef<HTMLDivElement>(null);
 
   const [availableTags, setAvailableTags] = useState<ClientTag[]>([]);
@@ -334,24 +361,43 @@ export default function ClientModal({
         if (!data) return;
         const c = (data as any).contacts;
         const id = (data as any).contact_id as string;
-        setContactId(id);
         setOriginalContactId(id);
         if (c) {
           setOriginalContactLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
-          // Source email/phone from the contact's own row, not client.email/
-          // client.phone — those are the clients row's fields (the
-          // business's own contact info for a business client), which can
-          // drift from the linked person's actual personal_email/
-          // personal_phone. The contacts row is the source of truth for the
-          // linked person.
-          setForm((f) => ({
-            ...f,
-            middle_name: c.middle_name ?? "",
-            email: c.personal_email ?? f.email,
-            phone: c.personal_phone ?? f.phone,
-            occupation: c.occupation ?? "",
-            portal_access: c.portal_access ?? false,
-          }));
+        }
+        if (isEditingBusiness) {
+          // A business already has a primary contact — default to
+          // "Connect existing contact" and show that person, per spec. This
+          // never touches `form`, so the business's own identity fields
+          // stay untouched.
+          setContactMode("link");
+          if (c) {
+            setConnectedContact({
+              id,
+              first_name: c.first_name,
+              middle_name: c.middle_name,
+              last_name: c.last_name,
+              personal_email: c.personal_email,
+              personal_phone: c.personal_phone,
+              occupation: c.occupation,
+              portal_access: c.portal_access ?? false,
+            });
+          }
+        } else {
+          setContactId(id);
+          if (c) {
+            // Source email/phone from the contact's own row, not
+            // client.email/client.phone — the contacts row is the source
+            // of truth for the linked person.
+            setForm((f) => ({
+              ...f,
+              middle_name: c.middle_name ?? "",
+              email: c.personal_email ?? f.email,
+              phone: c.personal_phone ?? f.phone,
+              occupation: c.occupation ?? "",
+              portal_access: c.portal_access ?? false,
+            }));
+          }
         }
       });
     supabase
@@ -439,49 +485,40 @@ export default function ClientModal({
     setContactResults(visible.slice(0, 8));
   }
 
-  // Fully hydrates the form from the selected contact's own record — the
-  // previous version only copied first/last name and email, so
-  // phone/occupation/middle name/portal access were left holding whatever
-  // was already in the form (stale data from a previously-loaded contact,
-  // or blank). Saving with that partial hydration would have overwritten
-  // the *newly selected* person's real phone/occupation with that leftover
-  // data. Search results now collapse immediately on selection (previously
-  // left expanded, which on mobile pushed the Save button out of reach) —
-  // "Change selected contact" reopens the search without losing the pick.
+  // Business path: picking a search result only updates the read-only
+  // connectedContact summary — it never writes into `form` or the contacts
+  // table, so the previously-connected (or original) person's own record
+  // is left completely untouched until Save Changes is pressed.
+  // Individual path: unchanged from before — the linked contact mirrors
+  // the client's own identity, so it still hydrates `form` directly.
   function selectExistingContact(c: ContactSearchResult) {
-    setContactId(c.id);
-    setForm((f) => ({
-      ...f,
-      first_name: c.first_name,
-      middle_name: c.middle_name ?? "",
-      last_name: c.last_name,
-      email: c.personal_email ?? "",
-      phone: c.personal_phone ?? "",
-      occupation: c.occupation ?? "",
-      portal_access: c.portal_access ?? false,
-    }));
+    if (isEntity) {
+      setConnectedContact({
+        id: c.id,
+        first_name: c.first_name,
+        middle_name: c.middle_name,
+        last_name: c.last_name,
+        personal_email: c.personal_email,
+        personal_phone: c.personal_phone,
+        occupation: c.occupation,
+        portal_access: c.portal_access ?? false,
+      });
+    } else {
+      setContactId(c.id);
+      setForm((f) => ({
+        ...f,
+        first_name: c.first_name,
+        middle_name: c.middle_name ?? "",
+        last_name: c.last_name,
+        email: c.personal_email ?? "",
+        phone: c.personal_phone ?? "",
+        occupation: c.occupation ?? "",
+        portal_access: c.portal_access ?? false,
+      }));
+    }
     setContactResults([]);
     setContactQuery("");
     setSearchedOnce(false);
-    setSearchExpanded(false);
-    requestAnimationFrame(() => {
-      selectedContactRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-
-  function clearSelectedContact(backToCreate: boolean) {
-    setContactId(null);
-    if (backToCreate) {
-      setContactMode("create");
-      setSearchExpanded(false);
-      setForm((f) => ({ ...f, first_name: "", middle_name: "", last_name: "", email: "", phone: "", occupation: "", portal_access: false }));
-    } else {
-      setSearchExpanded(true);
-    }
-  }
-
-  function reopenContactSearch() {
-    setSearchExpanded(true);
   }
 
   function toggleTagId(id: string) {
@@ -649,8 +686,127 @@ export default function ClientModal({
       return;
     }
 
-    if (form.first_name || form.last_name) {
-      let activeContactId = contactId;
+    if (isEntity) {
+      // Business: "Create new contact" and "Connect existing contact" are
+      // fully independent. Connect mode NEVER writes to the contacts table
+      // — only the account_contacts relationship changes — so the
+      // connected person's own record is always preserved exactly as-is.
+      let activeContactId: string | null = null;
+      let activePortalAccess = false;
+
+      if (contactMode === "create") {
+        if (newContactForm.first_name || newContactForm.last_name) {
+          const { data: newContact, error: contactError } = await supabase
+            .from("contacts")
+            .insert({
+              workspace_id: workspaceId,
+              first_name: newContactForm.first_name,
+              middle_name: newContactForm.middle_name || null,
+              last_name: newContactForm.last_name,
+              personal_email: newContactForm.email || null,
+              personal_phone: newContactForm.phone || null,
+              occupation: newContactForm.occupation || null,
+              portal_access: newContactForm.portal_access,
+            })
+            .select("id")
+            .single();
+          if (contactError) {
+            setSaving(false);
+            setError(`Client saved, but creating the contact record failed: ${stepError("contact_create", contactError)}`);
+            return;
+          }
+          activeContactId = newContact.id;
+          activePortalAccess = newContactForm.portal_access;
+        }
+      } else if (connectedContact) {
+        activeContactId = connectedContact.id;
+        activePortalAccess = connectedContact.portal_access;
+      }
+
+      if (activeContactId) {
+        // account_contacts has two (redundant) partial unique indexes —
+        // account_contacts_one_primary_per_account and
+        // account_contacts_one_primary_idx — both enforcing at most one
+        // is_primary = true row per account_id at the database level. The
+        // primary contact is being replaced: the OLD primary link must be
+        // retired *before* the new one is promoted to primary, or the two
+        // is_primary = true rows briefly coexist and the second write hits
+        // a 23505 unique violation — reproduced live: "duplicate key value
+        // violates unique constraint account_contacts_one_primary_per_account".
+        // The old contact's own record (name/email/phone) is never touched
+        // here. Per the user's choice: either demote the old link to a
+        // non-primary "additional" relationship, or remove just the
+        // relationship row (never the contact itself).
+        if (isEditing && originalContactId && originalContactId !== activeContactId) {
+          if (keepOldContactAsAdditional) {
+            const { error: demoteError } = await supabase
+              .from("account_contacts")
+              .update({ is_primary: false, relationship_type: "additional" })
+              .eq("account_id", clientId)
+              .eq("contact_id", originalContactId);
+            if (demoteError) {
+              setSaving(false);
+              setError(`Client saved, but updating the previous contact's relationship failed: ${stepError("account_contacts_demote", demoteError)}`);
+              return;
+            }
+          } else {
+            const { error: removeError } = await supabase
+              .from("account_contacts")
+              .delete()
+              .eq("account_id", clientId)
+              .eq("contact_id", originalContactId);
+            if (removeError) {
+              setSaving(false);
+              setError(`Client saved, but removing the previous contact's relationship failed: ${stepError("account_contacts_remove", removeError)}`);
+              return;
+            }
+          }
+        }
+
+        const { data: existingLink, error: linkLookupError } = await supabase
+          .from("account_contacts")
+          .select("id, is_primary")
+          .eq("account_id", clientId)
+          .eq("contact_id", activeContactId)
+          .maybeSingle();
+        if (linkLookupError) {
+          setSaving(false);
+          setError(`Client saved, but checking the contact link failed: ${stepError("account_contacts_link", linkLookupError)}`);
+          return;
+        }
+        if (existingLink) {
+          const { error: linkUpdateError } = await supabase
+            .from("account_contacts")
+            .update({ is_primary: true, relationship_type: "primary", portal_access: activePortalAccess })
+            .eq("id", existingLink.id);
+          if (linkUpdateError) {
+            setSaving(false);
+            setError(`Client saved, but updating the contact link failed: ${stepError("account_contacts_link", linkUpdateError)}`);
+            return;
+          }
+        } else {
+          const { error: linkInsertError } = await supabase.from("account_contacts").insert({
+            workspace_id: workspaceId,
+            account_id: clientId,
+            contact_id: activeContactId,
+            relationship_type: "primary",
+            is_primary: true,
+            portal_access: activePortalAccess,
+          });
+          if (linkInsertError) {
+            setSaving(false);
+            setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
+            return;
+          }
+        }
+      }
+    } else if (form.first_name || form.last_name) {
+      // Individual: unchanged from before — the linked contact mirrors the
+      // client's own identity, so it still reads from the shared `form`.
+      // "Create new contact" mode always creates a fresh contacts row
+      // rather than silently reusing whatever was loaded, even if a
+      // contact was previously linked.
+      let activeContactId = contactMode === "link" ? contactId : null;
 
       if (!activeContactId) {
         const { data: newContact, error: contactError } = await supabase
@@ -675,11 +831,6 @@ export default function ClientModal({
         activeContactId = newContact.id;
         setContactId(newContact.id);
       } else {
-        // Whichever contact is currently selected — the original primary
-        // being re-saved, or a different existing contact just picked from
-        // search — the form was hydrated to match it exactly (see
-        // selectExistingContact), so writing it back here never overwrites
-        // a person with someone else's data.
         const { error: contactUpdateError } = await supabase
           .from("contacts")
           .update({
@@ -699,20 +850,6 @@ export default function ClientModal({
         }
       }
 
-      // account_contacts has two (redundant) partial unique indexes —
-      // account_contacts_one_primary_per_account and
-      // account_contacts_one_primary_idx — both enforcing at most one
-      // is_primary = true row per account_id at the database level. The
-      // primary contact was switched to a different existing person: the
-      // OLD primary link must be retired *before* the new one is promoted
-      // to primary, or the two is_primary = true rows briefly coexist and
-      // the second write hits a 23505 unique violation — reproduced live:
-      // "duplicate key value violates unique constraint
-      // account_contacts_one_primary_per_account". The old contact's own
-      // record (name/email/phone) is never touched here. Per the user's
-      // choice: either demote the old link to a non-primary "additional"
-      // relationship, or remove just the relationship row (never the
-      // contact itself).
       if (isEditing && originalContactId && originalContactId !== activeContactId) {
         if (keepOldContactAsAdditional) {
           const { error: demoteError } = await supabase
@@ -1086,50 +1223,43 @@ export default function ClientModal({
 
         {step === 2 && (
           <form id="client-step2-form" onSubmit={handleSubmit} className="space-y-5">
-            {!contactId && (
-              <div className="flex gap-2 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setContactMode("create")}
-                  className={`rounded-xl px-3 py-1.5 ${contactMode === "create" ? "bg-[#108A64] text-white" : "border border-line text-muted"}`}
-                >
-                  Create new contact
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setContactMode("link");
-                    setSearchExpanded(true);
-                  }}
-                  className={`rounded-xl px-3 py-1.5 ${contactMode === "link" ? "bg-[#108A64] text-white" : "border border-line text-muted"}`}
-                >
-                  Link existing contact
-                </button>
-              </div>
-            )}
+            <div className="inline-flex gap-1 rounded-xl bg-paper p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setContactMode("create")}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${contactMode === "create" ? "bg-[#108A64] text-white" : "text-muted hover:text-ink"}`}
+              >
+                Create new contact
+              </button>
+              <button
+                type="button"
+                onClick={() => setContactMode("link")}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${contactMode === "link" ? "bg-[#108A64] text-white" : "text-muted hover:text-ink"}`}
+              >
+                Connect existing contact
+              </button>
+            </div>
 
-            {contactId && (
+            {contactMode === "link" && isEntity && (
               <div ref={selectedContactRef} className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm space-y-2 scroll-mt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <span>
+                {connectedContact ? (
+                  <div>
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-0.5">
-                      Selected existing contact
+                      Connected contact
                     </span>
-                    <strong className="text-ink">{form.first_name} {form.last_name}</strong>
-                  </span>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-3">
-                    <button type="button" onClick={reopenContactSearch} className="text-xs font-semibold text-muted hover:text-ink">
-                      Change selected contact
-                    </button>
-                    <button type="button" onClick={() => clearSelectedContact(false)} className="text-xs font-semibold text-muted hover:text-ink">
-                      Clear
-                    </button>
-                    <button type="button" onClick={() => clearSelectedContact(true)} className="text-xs font-semibold text-muted hover:text-ink">
-                      Create new instead
-                    </button>
+                    <strong className="text-ink">
+                      {[connectedContact.first_name, connectedContact.middle_name, connectedContact.last_name].filter(Boolean).join(" ")}
+                    </strong>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                      {connectedContact.personal_email && <span>{connectedContact.personal_email}</span>}
+                      {connectedContact.personal_phone && <span>{connectedContact.personal_phone}</span>}
+                      {connectedContact.occupation && <span>{connectedContact.occupation}</span>}
+                    </div>
                   </div>
-                </div>
-                {isEditing && originalContactId && contactId !== originalContactId && (
+                ) : (
+                  <div className="text-xs text-muted">No contact connected yet — search below to connect one.</div>
+                )}
+                {isEditing && originalContactId && connectedContact?.id !== originalContactId && (
                   <label className="flex items-start gap-2 text-xs text-ink pt-2 border-t border-line">
                     <input
                       type="checkbox"
@@ -1144,7 +1274,29 @@ export default function ClientModal({
               </div>
             )}
 
-            {contactMode === "link" && searchExpanded && (
+            {contactMode === "link" && !isEntity && contactId && (
+              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-0.5">
+                  Connected contact
+                </span>
+                <strong className="text-ink">{form.first_name} {form.last_name}</strong>
+              </div>
+            )}
+
+            {contactMode === "create" && isEntity && isEditing && originalContactId && (
+              <label className="flex items-start gap-2 text-xs text-ink rounded-xl border border-line bg-paper px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={keepOldContactAsAdditional}
+                  onChange={(e) => setKeepOldContactAsAdditional(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 accent-[#108A64]"
+                />
+                Keep {originalContactLabel || "the previous contact"} linked as an additional (non-primary) contact
+                instead of removing them from this business
+              </label>
+            )}
+
+            {contactMode === "link" && (
               <Section label="Find a contact">
                 <p className="text-xs text-muted mb-2">
                   Searches contacts and people who are already Individual clients — by name, email, or phone.
@@ -1199,7 +1351,7 @@ export default function ClientModal({
                 {contactResults.length > 0 && (
                   <div className="mt-2 divide-y divide-line rounded-xl border border-line">
                     {contactResults.map((c) => {
-                      const isSelected = c.id === contactId;
+                      const isSelected = isEntity ? c.id === connectedContact?.id : c.id === contactId;
                       const isIndividualClient = c.linkedAccounts.some((a) => a.client_type === "individual");
                       const linkedClient = c.linkedAccounts.find((a) => a.client_type === "individual");
                       const businesses = c.linkedAccounts.filter((a) => a.client_type === "business");
@@ -1245,73 +1397,144 @@ export default function ClientModal({
               </Section>
             )}
 
-            {isEntity && !contactId && (
-              <Section label="Contact name">
+            {contactMode === "create" && isEntity && (
+              <Section label="New contact">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <input
                     required
                     placeholder="First name"
-                    value={form.first_name}
-                    onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+                    value={newContactForm.first_name}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, first_name: e.target.value })}
                     className="client-input w-full"
                   />
                   <input
                     placeholder="Middle name"
-                    value={form.middle_name}
-                    onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
+                    value={newContactForm.middle_name}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, middle_name: e.target.value })}
                     className="client-input w-full"
                   />
                   <input
                     required
                     placeholder="Last name"
-                    value={form.last_name}
-                    onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+                    value={newContactForm.last_name}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, last_name: e.target.value })}
                     className="client-input w-full"
                   />
                 </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input
+                    required
+                    type="email"
+                    placeholder="Email"
+                    value={newContactForm.email}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={newContactForm.phone}
+                    onChange={(e) => {
+                      const input = e.target;
+                      const rawCursor = input.selectionStart ?? input.value.length;
+                      const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                      const formatted = formatPhone(input.value);
+                      const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                      setNewContactForm((f) => ({ ...f, phone: formatted }));
+                      requestAnimationFrame(() => {
+                        input.setSelectionRange(newCursor, newCursor);
+                      });
+                    }}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Occupation"
+                    value={newContactForm.occupation}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, occupation: e.target.value })}
+                    className="client-input w-full sm:col-span-2"
+                  />
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={newContactForm.portal_access}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, portal_access: e.target.checked })}
+                    className="h-4 w-4 accent-[#108A64]"
+                  />
+                  Give this contact portal access
+                </label>
               </Section>
             )}
 
-            {!isEntity && !contactId && (
+            {contactMode === "create" && !isEntity && (
               <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm text-ink">
                 Contact: <strong>{form.first_name} {form.last_name}</strong>
               </div>
             )}
 
-            <Section label="Contact">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  required
-                  type="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="client-input w-full"
-                />
-                <input
-                  required
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  value={form.phone}
-                  onChange={(e) => {
-                    const input = e.target;
-                    const rawCursor = input.selectionStart ?? input.value.length;
-                    const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
-                    const formatted = formatPhone(input.value);
-                    const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
-                    setForm((f) => ({ ...f, phone: formatted }));
-                    requestAnimationFrame(() => {
-                      input.setSelectionRange(newCursor, newCursor);
-                    });
-                  }}
-                  className="client-input w-full"
-                />
-                <input
-                  placeholder="Occupation"
-                  value={form.occupation}
-                  onChange={(e) => setForm({ ...form, occupation: e.target.value })}
-                  className="client-input w-full"
-                />
+            {!isEntity && (
+              <Section label="Contact">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    required
+                    type="email"
+                    placeholder="Email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={form.phone}
+                    onChange={(e) => {
+                      const input = e.target;
+                      const rawCursor = input.selectionStart ?? input.value.length;
+                      const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                      const formatted = formatPhone(input.value);
+                      const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                      setForm((f) => ({ ...f, phone: formatted }));
+                      requestAnimationFrame(() => {
+                        input.setSelectionRange(newCursor, newCursor);
+                      });
+                    }}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Occupation"
+                    value={form.occupation}
+                    onChange={(e) => setForm({ ...form, occupation: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <select
+                    value={form.source}
+                    onChange={(e) => setForm({ ...form, source: e.target.value })}
+                    className="client-input w-full"
+                  >
+                    <option value="">Referral source…</option>
+                    {sourceOptions.map((o) => (
+                      <option key={o.option_code} value={o.option_code}>
+                        {o.option_label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={form.portal_access}
+                    onChange={(e) => setForm({ ...form, portal_access: e.target.checked })}
+                    className="h-4 w-4 accent-[#108A64]"
+                  />
+                  Give this contact portal access
+                </label>
+              </Section>
+            )}
+
+            {isEntity && (
+              <Section label="Referral source">
                 <select
                   value={form.source}
                   onChange={(e) => setForm({ ...form, source: e.target.value })}
@@ -1324,17 +1547,8 @@ export default function ClientModal({
                     </option>
                   ))}
                 </select>
-              </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={form.portal_access}
-                  onChange={(e) => setForm({ ...form, portal_access: e.target.checked })}
-                  className="h-4 w-4 accent-[#108A64]"
-                />
-                Give this contact portal access
-              </label>
-            </Section>
+              </Section>
+            )}
 
             {/* Tags lives here (Contact step, next to team members/portal access)
                rather than on Account info — team assignment stays on Step 1
