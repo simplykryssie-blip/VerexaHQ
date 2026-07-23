@@ -1701,7 +1701,11 @@ export default function ClientModal({
               </Section>
             )}
 
-            <Section label="Services (required)">
+            <Section label="Services needed">
+              <p className="text-xs text-muted mb-2">
+                Choose the services this client may need. You can activate and configure each service after the
+                client is created.
+              </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {serviceOptions.map((opt) => (
                   <label

@@ -59,6 +59,8 @@ const colorMap: Record<string, string> = {
   "delivered": "#0EA5A0",
   "client viewed": "#0EA5A0",
   "archived": "#64748B",
+  "not activated": "#64748B",
+  "activated": "#0EA5A0",
 };
 
 export default function StatusPill({ status }: { status: string }) {

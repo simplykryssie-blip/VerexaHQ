@@ -175,6 +175,24 @@ export type EngagementWorkspace = {
   current_stage_ready: boolean;
 };
 
+// A service the client said they may need, captured at client-creation/edit
+// time via save_workspace_client's p_service_types. This is a request/
+// interest only — it never implies a real, active service exists. Matching
+// service_type against `services` rows is how the UI derives whether an
+// interest has actually been activated (see clients/[id]/page.tsx); nothing
+// on this row itself reliably tracks that (service_status gets reset to
+// 'interested' by save_workspace_client on every client resave).
+export type ClientServiceInterest = {
+  id: string;
+  workspace_id: string;
+  client_id: string;
+  service_type: string;
+  service_status: "interested" | "quoted" | "active" | "completed" | "declined" | "archived" | string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ServiceTemplate = {
   id: string;
   workspace_id: string | null;

@@ -9,11 +9,19 @@ import type { ServiceTemplate } from "@/lib/types";
 export default function ActivateServiceModal({
   clientId,
   workspaceId,
+  initialServiceType,
+  requestedServiceLabel,
   onClose,
   onActivated,
 }: {
   clientId: string;
   workspaceId: string;
+  // Set when this modal was opened from a specific Requested Service row.
+  // If a service_templates row shares this service_type, it's preselected
+  // (never auto-submitted — the user still confirms). Either way, when
+  // requestedServiceLabel is set the modal shows which request triggered it.
+  initialServiceType?: string;
+  requestedServiceLabel?: string;
   onClose: () => void;
   onActivated: () => void;
 }) {
@@ -49,8 +57,14 @@ export default function ActivateServiceModal({
           return;
         }
         setTemplatesError(null);
-        setTemplates((data as ServiceTemplate[]) ?? []);
+        const list = (data as ServiceTemplate[]) ?? [];
+        setTemplates(list);
+        if (initialServiceType) {
+          const match = list.find((t) => t.service_type === initialServiceType);
+          if (match) setTemplateId(match.id);
+        }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
@@ -130,6 +144,11 @@ export default function ActivateServiceModal({
 
         {step === 1 && (
           <div className="space-y-2">
+            {requestedServiceLabel && (
+              <div className="rounded-lg border border-line bg-paper px-3 py-2 text-xs text-ink">
+                Activating for requested service: <strong>{requestedServiceLabel}</strong>
+              </div>
+            )}
             {templatesError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                 Couldn't load service templates: {templatesError}

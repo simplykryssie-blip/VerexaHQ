@@ -34,6 +34,7 @@ import type {
   Client,
   Contact,
   Service,
+  ClientServiceInterest,
   Task,
   Deadline,
   Document,
@@ -138,6 +139,14 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<Client | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
+  // Requested Services (client_service_interests) are separate from real,
+  // activated Services — a service_type here never implies a `services` row
+  // exists. "Activated" is derived by matching service_type against
+  // `services`, not from service_interests.service_status, since
+  // save_workspace_client resets that column to 'interested' on every
+  // client resave.
+  const [serviceInterests, setServiceInterests] = useState<ClientServiceInterest[]>([]);
+  const [serviceTypeLabels, setServiceTypeLabels] = useState<Map<string, string>>(new Map());
   const [contacts, setContacts] = useState<LinkedContact[]>([]);
   const [viewingContact, setViewingContact] = useState<{ link: LinkedContact; edit: boolean } | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -167,6 +176,14 @@ export default function ClientDetailPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
+  // Set when "Activate" is clicked on a specific Requested Service row, so
+  // the modal can preselect the matching template and show which request
+  // triggered it. null means either closed, or opened via the plain
+  // "Add service" action (showActivateModal) with no preselection.
+  const [activatingRequestedService, setActivatingRequestedService] = useState<{
+    serviceType: string;
+    label: string;
+  } | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
@@ -194,6 +211,8 @@ export default function ClientDetailPage() {
     const [
       servicesRes,
       engagementsRes,
+      serviceInterestsRes,
+      serviceTypeOptionsRes,
       contactsRes,
       tasksRes,
       deadlinesRes,
@@ -211,6 +230,11 @@ export default function ClientDetailPage() {
     ] = await Promise.all([
       supabase.from("services").select("*").eq("client_id", id),
       supabase.from("engagements").select("id, service_id").eq("account_id", id),
+      supabase.from("client_service_interests").select("*").eq("client_id", id).order("created_at"),
+      // Not filtered to is_active — a requested service saved under a code
+      // that's since been deactivated should still resolve to its real
+      // label instead of falling back to the raw code.
+      supabase.from("client_setup_options").select("option_code, option_label").eq("option_group", "client_service_type"),
       supabase
         .from("account_contacts")
         .select(
@@ -239,6 +263,10 @@ export default function ClientDetailPage() {
       if (e.service_id) engMap.set(e.service_id, e.id);
     });
     setServiceEngagements(engMap);
+    setServiceInterests((serviceInterestsRes.data as ClientServiceInterest[]) ?? []);
+    setServiceTypeLabels(
+      new Map(((serviceTypeOptionsRes.data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label]))
+    );
     setContacts((contactsRes.data as unknown as LinkedContact[]) ?? []);
     setTasks((tasksRes.data as Task[]) ?? []);
     setDeadlines((deadlinesRes.data as Deadline[]) ?? []);
@@ -511,6 +539,13 @@ export default function ClientDetailPage() {
       {tab === "overview" && (
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
+            <RequestedServicesCard
+              interests={serviceInterests}
+              serviceTypeLabels={serviceTypeLabels}
+              services={services}
+              onActivate={(interest, label) => setActivatingRequestedService({ serviceType: interest.service_type, label })}
+            />
+
             <Card
               title="Active Services"
               action={{ label: "View All", onClick: () => setTab("work") }}
@@ -635,6 +670,13 @@ export default function ClientDetailPage() {
 
       {tab === "work" && (
         <div className="space-y-4">
+          <RequestedServicesCard
+            interests={serviceInterests}
+            serviceTypeLabels={serviceTypeLabels}
+            services={services}
+            onActivate={(interest, label) => setActivatingRequestedService({ serviceType: interest.service_type, label })}
+          />
+
           <Card title="Services" headerAction={{ icon: Plus, label: "Add service", onClick: () => setShowActivateModal(true) }}>
             {services.length === 0 ? (
               <EmptyAction text="No services yet. Add one to open its Service Workspace." actionLabel="Add Service" onAction={() => setShowActivateModal(true)} />
@@ -997,14 +1039,77 @@ export default function ClientDetailPage() {
       {editingDeadline && (
         <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={load} onDeleted={load} />
       )}
-      {showActivateModal && (
-        <ActivateServiceModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowActivateModal(false)} onActivated={load} />
+      {(showActivateModal || activatingRequestedService) && (
+        <ActivateServiceModal
+          clientId={client.id}
+          workspaceId={client.workspace_id}
+          initialServiceType={activatingRequestedService?.serviceType}
+          requestedServiceLabel={activatingRequestedService?.label}
+          onClose={() => {
+            setShowActivateModal(false);
+            setActivatingRequestedService(null);
+          }}
+          onActivated={load}
+        />
       )}
       {editingService && (
         <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={load} onDeleted={load} />
       )}
       {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={load} />}
     </div>
+  );
+}
+
+// "Activated" is derived, never stored: a requested service_type counts as
+// activated the moment a real `services` row shares that service_type for
+// this client. client_service_interests.service_status is not used for
+// this — save_workspace_client resets it to 'interested' on every resave,
+// and apply_service_template_to_client never updates it, so it can't be
+// trusted to reflect real activation state.
+function RequestedServicesCard({
+  interests,
+  serviceTypeLabels,
+  services,
+  onActivate,
+}: {
+  interests: ClientServiceInterest[];
+  serviceTypeLabels: Map<string, string>;
+  services: Service[];
+  onActivate: (interest: ClientServiceInterest, label: string) => void;
+}) {
+  return (
+    <Card title="Requested Services">
+      {interests.length === 0 ? (
+        <Empty text="No requested services." />
+      ) : (
+        <div className="divide-y divide-line">
+          {interests.map((interest) => {
+            const label = serviceTypeLabels.get(interest.service_type) || interest.service_type;
+            const activated = services.some((s) => s.service_type === interest.service_type);
+            return (
+              <div key={interest.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                <span className="text-ink">{label}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {activated ? (
+                    <StatusPill status="Activated" />
+                  ) : (
+                    <>
+                      <StatusPill status="Not activated" />
+                      <button
+                        onClick={() => onActivate(interest, label)}
+                        className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-ink hover:bg-paper"
+                      >
+                        Activate
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 
