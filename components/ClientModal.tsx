@@ -1,27 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Check, ChevronRight, Eye, EyeOff, Plus, Search, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertCircle, Building2, Check, ChevronRight, Eye, EyeOff, Loader2, Plus, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 
-// clients.account_type still accepts individual | household | business |
-// estate | trust | nonprofit | other, but the create/edit form only offers
-// the two the practice actually uses day to day.
-const ACCOUNT_TYPES = [
+// save_workspace_client only accepts client_type = individual | business.
+const CLIENT_TYPES = [
   { value: "individual", label: "Individual" },
   { value: "business", label: "Business" },
 ];
-
-const ENTITY_TYPES = new Set(["business", "trust", "estate", "nonprofit", "other"]);
 
 function formatPhone(raw: string) {
   const digits = raw.replace(/\D/g, "").slice(0, 10);
   if (digits.length < 4) return digits;
   if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// formatPhone rebuilds the entire display string from scratch on every
+// keystroke. For a controlled input, React then sets that whole string back
+// as .value — which resets the cursor to the end unless something restores
+// it. Appending digits at the end is invisibly fine (that's where the
+// cursor already was), but editing a digit in the *middle* of an existing
+// number silently breaks: the first keystroke lands where you clicked, the
+// reformat snaps the cursor to the end, and every keystroke after that
+// lands in the wrong place — corrupting or discarding the intended edit
+// without any error. This is exactly the asymmetry reported: the email
+// field is a plain passthrough with no reformatting, so it never hits this;
+// phone is the only field in this form that reformats-on-every-keystroke.
+// Fix: figure out how many digits sit before the cursor in the raw input,
+// reformat, then place the cursor back after that same digit in the
+// reformatted string.
+function digitIndexToFormattedCursor(formatted: string, digitsBeforeCursor: number): number {
+  if (digitsBeforeCursor <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (/\d/.test(formatted[i])) {
+      seen++;
+      if (seen === digitsBeforeCursor) return i + 1;
+    }
+  }
+  return formatted.length;
 }
 
 function formatSSN(raw: string) {
@@ -37,11 +59,51 @@ function formatEIN(raw: string) {
   return `${digits.slice(0, 2)}-${digits.slice(2)}`;
 }
 
-function friendlyError(message: string) {
-  if (message.toLowerCase().includes("row-level security")) {
-    return "Your session may have expired or your access changed. Refresh the page, sign in again, and retry.";
+// next build always bakes NODE_ENV=production into a Vercel deployment —
+// preview and production builds are identical on that axis, so NODE_ENV
+// can't tell them apart. Only treat this as "real production" when we can
+// positively confirm it: either Vercel's own NEXT_PUBLIC_VERCEL_ENV says
+// so, or the browser is actually on the production hostname. Anything
+// else (preview, local dev, unset) defaults to showing full error detail,
+// since hiding detail on an environment we can't positively identify as
+// production would make preview failures undebuggable — which is exactly
+// what happened before this was tightened.
+const PRODUCTION_HOSTNAME = "verexa-hq-phi.vercel.app";
+function computeIsPreviewOrDev(): boolean {
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") return false;
+  if (typeof window !== "undefined" && window.location.hostname === PRODUCTION_HOSTNAME) return false;
+  return true;
+}
+const IS_PREVIEW_OR_DEV = computeIsPreviewOrDev();
+
+type SbError = { message: string; code?: string; details?: string | null; hint?: string | null };
+
+// Every follow-up write in the save flow reports its own failure through
+// this, tagged with a distinct step name, so a partial save always says
+// exactly which step broke instead of one generic message. It never
+// claims the session expired — that specific wording is only ever shown
+// right after getSession() itself confirms there is no session, never
+// guessed from an error string here.
+function stepError(step: string, err: SbError): string {
+  if (IS_PREVIEW_OR_DEV) {
+    const parts = [`[${step}] ${err.message}`];
+    if (err.code) parts.push(`code=${err.code}`);
+    if (err.details) parts.push(`details=${err.details}`);
+    if (err.hint) parts.push(`hint=${err.hint}`);
+    return parts.join(" — ");
   }
-  return message;
+  const lower = err.message.toLowerCase();
+  if (lower.includes("row-level security") || lower.includes("not allowed") || lower.includes("permission")) {
+    return "You don't have permission to complete this action. Contact a workspace admin if this seems wrong.";
+  }
+  // P0001 is the SQLSTATE Postgres assigns to a plain `raise exception` —
+  // every business-rule validation error this app's own RPCs raise uses
+  // that form, so its message is intentional and safe to show as-is. Any
+  // other code is an unexpected/internal database error (a genuine bug,
+  // not a validation message), which could name real tables or columns —
+  // that's kept out of production and only shown in preview/dev above.
+  if (err.code === "P0001") return err.message;
+  return "There was a problem saving. Please try again, and contact support if it keeps happening.";
 }
 
 const US_STATES = [
@@ -58,72 +120,134 @@ const US_STATES = [
   ["WA", "Washington"], ["WV", "West Virginia"], ["WI", "Wisconsin"], ["WY", "Wyoming"],
 ] as const;
 
-const SERVICE_OPTIONS = [
-  "Bookkeeping",
-  "Tax Preparation",
-  "Payroll",
-  "Financial Statements",
-  "Sales Tax",
-  "Advisory & Consulting",
-  "Audit & Assurance",
-];
-
-// clients.client_type only allows individual | business | family — this app's
-// other pages branch on client_type === "business" to decide whether to show
-// business_name, so every entity-style account_type maps to "business" here
-// and "household" maps to the legacy "family" value.
-function deriveClientType(accountType: string): "individual" | "business" | "family" {
-  if (accountType === "individual") return "individual";
-  if (accountType === "household") return "family";
-  return "business";
-}
-
-type ContactSearchResult = { id: string; first_name: string; last_name: string; personal_email: string | null };
+type LinkedAccountSummary = {
+  id: string;
+  client_type: string;
+  status: string;
+  label: string;
+};
+type ContactSearchResult = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  personal_email: string | null;
+  personal_phone: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  occupation: string | null;
+  portal_access: boolean;
+  linkedAccounts: LinkedAccountSummary[];
+};
 type MaskedIdentity = { vault_id: string; identity_type: string; masked_value: string; last_four: string | null };
+type SetupOption = { option_code: string; option_label: string };
+// The contact currently connected to a business in "Connect existing
+// contact" mode. Deliberately read-only display data, separate from any
+// editable form state — connect mode never writes to this person's own
+// contacts row, only to the account_contacts relationship, so their record
+// is never at risk of being overwritten by an unrelated edit.
+type ConnectedContact = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  personal_email: string | null;
+  personal_phone: string | null;
+  occupation: string | null;
+  portal_access: boolean;
+};
 
 export default function ClientModal({
   client,
   onClose,
   onSaved,
   onDeleted,
+  initialStep,
+  initialContactMode,
 }: {
   client?: Client;
   onClose: () => void;
   onSaved: () => void;
   onDeleted?: () => void;
+  // Lets callers (e.g. "Add Contact" / "Link existing contact" from the
+  // Client Profile's Contacts card) jump straight to Step 2 already in
+  // search mode, instead of re-implementing that flow a second time.
+  initialStep?: 1 | 2;
+  initialContactMode?: "create" | "link";
 }) {
   const { activeWorkspaceId } = useWorkspace();
   const isEditing = !!client;
   const workspaceId = client?.workspace_id ?? activeWorkspaceId;
 
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2>(initialStep ?? 1);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isEditingBusiness = client?.client_type === "business";
   const [form, setForm] = useState({
-    account_type: client?.account_type ?? "individual",
-    account_name: client?.account_name ?? "",
+    client_type: client?.client_type === "business" ? "business" : "individual",
     business_name: client?.business_name ?? "",
+    // clients.email/phone is the business's OWN contact info for a
+    // business client — kept in dedicated fields, never shared with the
+    // linked contact person's personal_email/personal_phone below.
+    business_email: isEditingBusiness ? client?.email ?? "" : "",
+    business_phone: isEditingBusiness ? client?.phone ?? "" : "",
     address: client?.address ?? "",
     city: client?.city ?? "",
     state: client?.state ?? "",
     zip_code: client?.zip_code ?? "",
     status: client?.status ?? "lead",
-    source: client?.source ?? "",
+    source: "",
     first_name: client?.first_name ?? "",
     middle_name: "",
     last_name: client?.last_name ?? "",
-    email: client?.email ?? "",
-    phone: client?.phone ?? "",
+    // For an individual, email/phone are the person's own — safe to
+    // prefill from the clients row immediately. For a business, this
+    // represents the linked contact PERSON, not the business itself, so it
+    // starts blank and is filled by the primary-contact preload effect
+    // below (or by picking/creating a contact in Step 2).
+    email: isEditingBusiness ? "" : client?.email ?? "",
+    phone: isEditingBusiness ? "" : client?.phone ?? "",
     occupation: "",
     portal_access: false,
   });
+  // Business path: "Create new contact" and "Connect existing contact" are
+  // fully independent state, so switching between them can never lose or
+  // corrupt data. connectedContact is read-only display data for the
+  // person currently connected (never written to until Save); newContactForm
+  // is always-blank-initialized editable fields for a brand new person.
+  // Neither is touched by the other mode.
+  const [connectedContact, setConnectedContact] = useState<ConnectedContact | null>(null);
+  const [newContactForm, setNewContactForm] = useState({
+    first_name: "",
+    middle_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    occupation: "",
+    portal_access: false,
+  });
+  // Individual path only: the linked contact mirrors the client's own
+  // identity (see form.email/phone comment above), so it keeps using the
+  // shared `form` fields exactly as before.
   const [contactId, setContactId] = useState<string | null>(null);
-  const [contactMode, setContactMode] = useState<"create" | "link">("create");
+  // The primary contact that was actually loaded from account_contacts when
+  // editing — distinct from the contact the user has now selected/created.
+  // Comparing the two is how we know whether the primary is being replaced
+  // (needs the old link retired) or just being re-saved (no old link to
+  // touch).
+  const [originalContactId, setOriginalContactId] = useState<string | null>(null);
+  const [originalContactLabel, setOriginalContactLabel] = useState<string>("");
+  const [keepOldContactAsAdditional, setKeepOldContactAsAdditional] = useState(false);
+  const [contactMode, setContactMode] = useState<"create" | "link">(initialContactMode ?? "create");
   const [contactQuery, setContactQuery] = useState("");
   const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchedOnce, setSearchedOnce] = useState(false);
+  const [includeArchivedContacts, setIncludeArchivedContacts] = useState(false);
+  const selectedContactRef = useRef<HTMLDivElement>(null);
 
   const [availableTags, setAvailableTags] = useState<ClientTag[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -132,9 +256,11 @@ export default function ClientModal({
   const [availableMembers, setAvailableMembers] = useState<{ user_id: string; label: string }[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
+  const [sourceOptions, setSourceOptions] = useState<SetupOption[]>([]);
+  const [serviceOptions, setServiceOptions] = useState<SetupOption[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
-  const isEntity = ENTITY_TYPES.has(form.account_type);
+  const isEntity = form.client_type === "business";
   const identityType = isEntity ? "ein" : "ssn";
   const identityLabel = isEntity ? "EIN" : "SSN";
 
@@ -146,6 +272,42 @@ export default function ClientModal({
   const [revealedValue, setRevealedValue] = useState<string | null>(null);
   const [identityBusy, setIdentityBusy] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
+
+  // Without this, the page behind the modal and the modal's own scroll
+  // region both scroll independently — on mobile especially, a touch-drag
+  // over the backdrop scrolls the page underneath while the modal is open.
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, []);
+
+  // client_setup_options is a global reference table (no workspace scope),
+  // so this loads once regardless of workspaceId.
+  useEffect(() => {
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_source")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data, error: err }) => {
+        if (err) return;
+        setSourceOptions((data as SetupOption[]) ?? []);
+      });
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_service_type")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data, error: err }) => {
+        if (err) return;
+        setServiceOptions((data as SetupOption[]) ?? []);
+      });
+  }, []);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -183,22 +345,59 @@ export default function ClientModal({
       .eq("client_id", client.id)
       .then(({ data }) => setSelectedMemberIds(((data as any[]) ?? []).map((r) => r.user_id)));
     supabase
+      .from("client_service_interests")
+      .select("service_type")
+      .eq("client_id", client.id)
+      .then(({ data }) => setSelectedServices(((data as any[]) ?? []).map((r) => r.service_type)));
+    supabase
       .from("account_contacts")
-      .select("contact_id, contacts(middle_name, occupation, portal_access)")
+      .select(
+        "contact_id, contacts(first_name, middle_name, last_name, personal_email, personal_phone, occupation, portal_access)"
+      )
       .eq("account_id", client.id)
       .eq("is_primary", true)
       .maybeSingle()
       .then(({ data }) => {
         if (!data) return;
         const c = (data as any).contacts;
-        setContactId((data as any).contact_id);
+        const id = (data as any).contact_id as string;
+        setOriginalContactId(id);
         if (c) {
-          setForm((f) => ({
-            ...f,
-            middle_name: c.middle_name ?? "",
-            occupation: c.occupation ?? "",
-            portal_access: c.portal_access ?? false,
-          }));
+          setOriginalContactLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
+        }
+        if (isEditingBusiness) {
+          // A business already has a primary contact — default to
+          // "Connect existing contact" and show that person, per spec. This
+          // never touches `form`, so the business's own identity fields
+          // stay untouched.
+          setContactMode("link");
+          if (c) {
+            setConnectedContact({
+              id,
+              first_name: c.first_name,
+              middle_name: c.middle_name,
+              last_name: c.last_name,
+              personal_email: c.personal_email,
+              personal_phone: c.personal_phone,
+              occupation: c.occupation,
+              portal_access: c.portal_access ?? false,
+            });
+          }
+        } else {
+          setContactId(id);
+          if (c) {
+            // Source email/phone from the contact's own row, not
+            // client.email/client.phone — the contacts row is the source
+            // of truth for the linked person.
+            setForm((f) => ({
+              ...f,
+              middle_name: c.middle_name ?? "",
+              email: c.personal_email ?? f.email,
+              phone: c.personal_phone ?? f.phone,
+              occupation: c.occupation ?? "",
+              portal_access: c.portal_access ?? false,
+            }));
+          }
         }
       });
     supabase
@@ -214,24 +413,112 @@ export default function ClientModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing, client?.id]);
 
+  // Root cause of "search returns no usable results": the previous query
+  // only matched a single term against first_name OR last_name. Typing a
+  // full name ("Krystal Beloney") never matched either column alone, so it
+  // always came back empty — confirmed live: the old first_name-or-last_name
+  // query returns zero rows for "Krystal Beloney" even though that contact
+  // exists, while splitting into per-word AND (each word must match *some*
+  // field) correctly finds them. It also silently discarded the query error
+  // (`const { data } = await supabase...`), so an RLS or syntax failure
+  // looked identical to "no matches" — that's fixed below too.
   async function searchContacts() {
-    if (!workspaceId || contactQuery.trim().length < 2) return;
+    if (!workspaceId) return;
+    const trimmed = contactQuery.trim();
+    if (trimmed.length < 2) return;
     setSearching(true);
-    const { data } = await supabase
+    setSearchError(null);
+    setSearchedOnce(false);
+
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    let q = supabase
       .from("contacts")
-      .select("id, first_name, last_name, personal_email")
-      .eq("workspace_id", workspaceId)
-      .or(`first_name.ilike.%${contactQuery}%,last_name.ilike.%${contactQuery}%`)
-      .limit(8);
-    setContactResults((data as ContactSearchResult[]) ?? []);
+      .select(
+        "id, first_name, middle_name, last_name, personal_email, personal_phone, business_email, business_phone, occupation, portal_access, account_contacts(account_id, is_primary, clients(id, client_type, business_name, first_name, last_name, account_name, status))"
+      )
+      .eq("workspace_id", workspaceId);
+    for (const token of tokens) {
+      const t = token.replace(/[,()]/g, "");
+      q = q.or(
+        `first_name.ilike.%${t}%,middle_name.ilike.%${t}%,last_name.ilike.%${t}%,personal_email.ilike.%${t}%,personal_phone.ilike.%${t}%,business_email.ilike.%${t}%,business_phone.ilike.%${t}%`
+      );
+    }
+    const { data, error: searchErr } = await q.limit(20);
+
     setSearching(false);
+    setSearchedOnce(true);
+    if (searchErr) {
+      setSearchError(stepError("contact_search", searchErr));
+      setContactResults([]);
+      return;
+    }
+
+    const rows: ContactSearchResult[] = ((data as any[]) ?? []).map((r) => ({
+      id: r.id,
+      first_name: r.first_name,
+      middle_name: r.middle_name,
+      last_name: r.last_name,
+      personal_email: r.personal_email,
+      personal_phone: r.personal_phone,
+      business_email: r.business_email,
+      business_phone: r.business_phone,
+      occupation: r.occupation,
+      portal_access: r.portal_access,
+      linkedAccounts: ((r.account_contacts as any[]) ?? [])
+        .map((ac) => ac.clients)
+        .filter(Boolean)
+        .map((cl: any) => ({
+          id: cl.id,
+          client_type: cl.client_type,
+          status: cl.status,
+          label:
+            cl.account_name ||
+            (cl.client_type === "business" ? cl.business_name : [cl.first_name, cl.last_name].filter(Boolean).join(" ")) ||
+            "Unnamed account",
+        })),
+    }));
+
+    const visible = includeArchivedContacts
+      ? rows
+      : rows.filter((r) => !r.linkedAccounts.some((a) => a.client_type === "individual" && a.status === "archived"));
+
+    setContactResults(visible.slice(0, 8));
   }
 
+  // Business path: picking a search result only updates the read-only
+  // connectedContact summary — it never writes into `form` or the contacts
+  // table, so the previously-connected (or original) person's own record
+  // is left completely untouched until Save Changes is pressed.
+  // Individual path: unchanged from before — the linked contact mirrors
+  // the client's own identity, so it still hydrates `form` directly.
   function selectExistingContact(c: ContactSearchResult) {
-    setContactId(c.id);
-    setForm((f) => ({ ...f, first_name: c.first_name, last_name: c.last_name, email: c.personal_email ?? "" }));
+    if (isEntity) {
+      setConnectedContact({
+        id: c.id,
+        first_name: c.first_name,
+        middle_name: c.middle_name,
+        last_name: c.last_name,
+        personal_email: c.personal_email,
+        personal_phone: c.personal_phone,
+        occupation: c.occupation,
+        portal_access: c.portal_access ?? false,
+      });
+    } else {
+      setContactId(c.id);
+      setForm((f) => ({
+        ...f,
+        first_name: c.first_name,
+        middle_name: c.middle_name ?? "",
+        last_name: c.last_name,
+        email: c.personal_email ?? "",
+        phone: c.personal_phone ?? "",
+        occupation: c.occupation ?? "",
+        portal_access: c.portal_access ?? false,
+      }));
+    }
     setContactResults([]);
     setContactQuery("");
+    setSearchedOnce(false);
   }
 
   function toggleTagId(id: string) {
@@ -247,15 +534,17 @@ export default function ClientModal({
       setTagInput("");
       return;
     }
-    const { data, error } = await supabase
+    const { data, error: tagCreateError } = await supabase
       .from("client_tags")
       .insert({ workspace_id: workspaceId, tag_name: name })
       .select("*")
       .single();
-    if (!error && data) {
-      setAvailableTags((prev) => [...prev, data as ClientTag]);
-      setSelectedTagIds((prev) => [...prev, (data as ClientTag).id]);
+    if (tagCreateError) {
+      setError(stepError("client_tags_insert", tagCreateError));
+      return;
     }
+    setAvailableTags((prev) => [...prev, data as ClientTag]);
+    setSelectedTagIds((prev) => [...prev, (data as ClientTag).id]);
     setTagInput("");
   }
 
@@ -263,10 +552,8 @@ export default function ClientModal({
     setSelectedMemberIds((prev) => (prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]));
   }
 
-  function toggleService(service: string) {
-    setSelectedServices((prev) =>
-      prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]
-    );
+  function toggleService(code: string) {
+    setSelectedServices((prev) => (prev.includes(code) ? prev.filter((s) => s !== code) : [...prev, code]));
   }
 
   function goToContacts(e: React.FormEvent) {
@@ -279,16 +566,6 @@ export default function ClientModal({
     if (selectedMemberIds.length === 0) {
       setError("Select at least one team member.");
       return;
-    }
-    if (isEntity) {
-      setForm((f) => ({ ...f, business_name: f.account_name }));
-    } else {
-      const parts = form.account_name.trim().split(/\s+/);
-      setForm((f) => ({
-        ...f,
-        first_name: parts[0] ?? "",
-        last_name: parts.slice(1).join(" "),
-      }));
     }
     setStep(2);
   }
@@ -343,7 +620,7 @@ export default function ClientModal({
     e.preventDefault();
     setError(null);
 
-    if (!isEditing && selectedServices.length === 0) {
+    if (selectedServices.length === 0) {
       setError("Select at least one service.");
       return;
     }
@@ -360,111 +637,182 @@ export default function ClientModal({
       setError("Your session has expired. Refresh the page and sign in again.");
       return;
     }
-    const userId = sessionData.session.user.id;
 
-    // Re-resolve the workspace directly from membership right before writing,
-    // rather than trusting the WorkspaceProvider context value, so this
-    // always matches exactly what the clients RLS policy itself checks.
-    let resolvedWorkspaceId = workspaceId;
-    if (!isEditing) {
-      const { data: memberRow, error: memberError } = await supabase
-        .from("workspace_members")
-        .select("workspace_id")
-        .eq("user_id", userId)
-        .eq("member_status", "Active")
-        .limit(1)
-        .maybeSingle();
-      if (memberError || !memberRow) {
-        setSaving(false);
-        setError("Could not confirm your workspace membership. Refresh the page and try again.");
-        return;
-      }
-      resolvedWorkspaceId = memberRow.workspace_id;
-    }
-    if (!resolvedWorkspaceId) {
+    if (!workspaceId) {
       setSaving(false);
       setError("Could not determine your workspace. Close this and try again.");
       return;
     }
 
-    const contactFullName = `${form.first_name} ${form.last_name}`.trim();
-    const resolvedAccountName = form.account_name.trim() || (isEntity ? form.business_name : contactFullName);
-
-    const clientPayload = {
-      client_type: deriveClientType(form.account_type),
-      account_type: form.account_type,
-      account_name: resolvedAccountName,
-      first_name: form.first_name,
-      last_name: form.last_name,
-      business_name: form.business_name,
-      email: form.email,
-      phone: form.phone,
-      status: form.status,
-      source: form.source,
-      address: form.address,
-      city: form.city,
-      state: form.state,
-      zip_code: form.zip_code,
-    };
-
-    let clientId = client?.id ?? "";
-
-    if (isEditing) {
-      const { error: updateError } = await supabase.from("clients").update(clientPayload).eq("id", client!.id);
-      if (updateError) {
-        setSaving(false);
-        setError(friendlyError(updateError.message));
-        return;
-      }
-    } else {
-      const { data: newClient, error: insertError } = await supabase
-        .from("clients")
-        .insert({ workspace_id: resolvedWorkspaceId, ...clientPayload, assigned_to: userId })
-        .select("id")
-        .single();
-      if (insertError) {
-        setSaving(false);
-        setError(friendlyError(insertError.message));
-        return;
-      }
-      clientId = newClient!.id;
+    // save_workspace_client is the approved write path for public.clients.
+    // It validates permission, status/source/service-type values, and
+    // upserts client_service_interests from p_service_types in one
+    // transaction (deleting anything unchecked on edit). It does not
+    // manage the legacy account_type/account_name display columns, so
+    // those are intentionally left untouched by this form.
+    //
+    // For a business, clients.email/phone is the business's OWN contact
+    // info (form.business_email/business_phone from Step 1) — never the
+    // linked contact person's personal_email/personal_phone (form.email/
+    // form.phone), which only ever gets written to the contacts table
+    // below. For an individual there's no separate "business" identity,
+    // so the person's own email/phone doubles as both.
+    const { data: saveResult, error: saveError } = await supabase.rpc("save_workspace_client", {
+      p_workspace_id: workspaceId,
+      p_client_id: client?.id ?? null,
+      p_client_type: form.client_type,
+      p_first_name: form.first_name,
+      p_last_name: form.last_name,
+      p_business_name: form.business_name,
+      p_email: isEntity ? form.business_email : form.email,
+      p_phone: isEntity ? form.business_phone : form.phone,
+      p_address: form.address,
+      p_city: form.city,
+      p_state: form.state,
+      p_zip_code: form.zip_code,
+      p_status: form.status,
+      p_source: form.source || null,
+      p_service_types: selectedServices,
+    });
+    if (saveError) {
+      setSaving(false);
+      setError(stepError("save_workspace_client", saveError));
+      return;
+    }
+    const clientId: string | undefined = (saveResult as any)?.client_id;
+    if (!clientId) {
+      setSaving(false);
+      setError("The client save did not return a client ID.");
+      return;
     }
 
-    if (form.first_name || form.last_name) {
-      if (contactId) {
-        await supabase
-          .from("contacts")
-          .update({
-            first_name: form.first_name,
-            middle_name: form.middle_name || null,
-            last_name: form.last_name,
-            personal_email: form.email || null,
-            personal_phone: form.phone || null,
-            occupation: form.occupation || null,
-            portal_access: form.portal_access,
-          })
-          .eq("id", contactId);
-        const { data: existingLink } = await supabase
+    if (isEntity) {
+      // Business: "Create new contact" and "Connect existing contact" are
+      // fully independent. Connect mode NEVER writes to the contacts table
+      // — only the account_contacts relationship changes — so the
+      // connected person's own record is always preserved exactly as-is.
+      let activeContactId: string | null = null;
+      let activePortalAccess = false;
+
+      if (contactMode === "create") {
+        if (newContactForm.first_name || newContactForm.last_name) {
+          const { data: newContact, error: contactError } = await supabase
+            .from("contacts")
+            .insert({
+              workspace_id: workspaceId,
+              first_name: newContactForm.first_name,
+              middle_name: newContactForm.middle_name || null,
+              last_name: newContactForm.last_name,
+              personal_email: newContactForm.email || null,
+              personal_phone: newContactForm.phone || null,
+              occupation: newContactForm.occupation || null,
+              portal_access: newContactForm.portal_access,
+            })
+            .select("id")
+            .single();
+          if (contactError) {
+            setSaving(false);
+            setError(`Client saved, but creating the contact record failed: ${stepError("contact_create", contactError)}`);
+            return;
+          }
+          activeContactId = newContact.id;
+          activePortalAccess = newContactForm.portal_access;
+        }
+      } else if (connectedContact) {
+        activeContactId = connectedContact.id;
+        activePortalAccess = connectedContact.portal_access;
+      }
+
+      if (activeContactId) {
+        // account_contacts has two (redundant) partial unique indexes —
+        // account_contacts_one_primary_per_account and
+        // account_contacts_one_primary_idx — both enforcing at most one
+        // is_primary = true row per account_id at the database level. The
+        // primary contact is being replaced: the OLD primary link must be
+        // retired *before* the new one is promoted to primary, or the two
+        // is_primary = true rows briefly coexist and the second write hits
+        // a 23505 unique violation — reproduced live: "duplicate key value
+        // violates unique constraint account_contacts_one_primary_per_account".
+        // The old contact's own record (name/email/phone) is never touched
+        // here. Per the user's choice: either demote the old link to a
+        // non-primary "additional" relationship, or remove just the
+        // relationship row (never the contact itself).
+        if (isEditing && originalContactId && originalContactId !== activeContactId) {
+          if (keepOldContactAsAdditional) {
+            const { error: demoteError } = await supabase
+              .from("account_contacts")
+              .update({ is_primary: false, relationship_type: "additional" })
+              .eq("account_id", clientId)
+              .eq("contact_id", originalContactId);
+            if (demoteError) {
+              setSaving(false);
+              setError(`Client saved, but updating the previous contact's relationship failed: ${stepError("account_contacts_demote", demoteError)}`);
+              return;
+            }
+          } else {
+            const { error: removeError } = await supabase
+              .from("account_contacts")
+              .delete()
+              .eq("account_id", clientId)
+              .eq("contact_id", originalContactId);
+            if (removeError) {
+              setSaving(false);
+              setError(`Client saved, but removing the previous contact's relationship failed: ${stepError("account_contacts_remove", removeError)}`);
+              return;
+            }
+          }
+        }
+
+        const { data: existingLink, error: linkLookupError } = await supabase
           .from("account_contacts")
-          .select("id")
+          .select("id, is_primary")
           .eq("account_id", clientId)
-          .eq("contact_id", contactId)
+          .eq("contact_id", activeContactId)
           .maybeSingle();
-        if (!existingLink) {
-          await supabase.from("account_contacts").insert({
-            workspace_id: resolvedWorkspaceId,
+        if (linkLookupError) {
+          setSaving(false);
+          setError(`Client saved, but checking the contact link failed: ${stepError("account_contacts_link", linkLookupError)}`);
+          return;
+        }
+        if (existingLink) {
+          const { error: linkUpdateError } = await supabase
+            .from("account_contacts")
+            .update({ is_primary: true, relationship_type: "primary", portal_access: activePortalAccess })
+            .eq("id", existingLink.id);
+          if (linkUpdateError) {
+            setSaving(false);
+            setError(`Client saved, but updating the contact link failed: ${stepError("account_contacts_link", linkUpdateError)}`);
+            return;
+          }
+        } else {
+          const { error: linkInsertError } = await supabase.from("account_contacts").insert({
+            workspace_id: workspaceId,
             account_id: clientId,
-            contact_id: contactId,
+            contact_id: activeContactId,
             relationship_type: "primary",
             is_primary: true,
-            portal_access: form.portal_access,
+            portal_access: activePortalAccess,
           });
+          if (linkInsertError) {
+            setSaving(false);
+            setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
+            return;
+          }
         }
-      } else {
+      }
+    } else if (form.first_name || form.last_name) {
+      // Individual: unchanged from before — the linked contact mirrors the
+      // client's own identity, so it still reads from the shared `form`.
+      // "Create new contact" mode always creates a fresh contacts row
+      // rather than silently reusing whatever was loaded, even if a
+      // contact was previously linked.
+      let activeContactId = contactMode === "link" ? contactId : null;
+
+      if (!activeContactId) {
         const { data: newContact, error: contactError } = await supabase
           .from("contacts")
           .insert({
-            workspace_id: resolvedWorkspaceId,
+            workspace_id: workspaceId,
             first_name: form.first_name,
             middle_name: form.middle_name || null,
             last_name: form.last_name,
@@ -475,59 +823,167 @@ export default function ClientModal({
           })
           .select("id")
           .single();
-        if (!contactError && newContact) {
-          await supabase.from("account_contacts").insert({
-            workspace_id: resolvedWorkspaceId,
-            account_id: clientId,
-            contact_id: newContact.id,
-            relationship_type: "primary",
-            is_primary: true,
+        if (contactError) {
+          setSaving(false);
+          setError(`Client saved, but creating the contact record failed: ${stepError("contact_create", contactError)}`);
+          return;
+        }
+        activeContactId = newContact.id;
+        setContactId(newContact.id);
+      } else {
+        const { error: contactUpdateError } = await supabase
+          .from("contacts")
+          .update({
+            first_name: form.first_name,
+            middle_name: form.middle_name || null,
+            last_name: form.last_name,
+            personal_email: form.email || null,
+            personal_phone: form.phone || null,
+            occupation: form.occupation || null,
             portal_access: form.portal_access,
-          });
+          })
+          .eq("id", activeContactId);
+        if (contactUpdateError) {
+          setSaving(false);
+          setError(`Client saved, but the contact record failed to update: ${stepError("contact_update", contactUpdateError)}`);
+          return;
+        }
+      }
+
+      if (isEditing && originalContactId && originalContactId !== activeContactId) {
+        if (keepOldContactAsAdditional) {
+          const { error: demoteError } = await supabase
+            .from("account_contacts")
+            .update({ is_primary: false, relationship_type: "additional" })
+            .eq("account_id", clientId)
+            .eq("contact_id", originalContactId);
+          if (demoteError) {
+            setSaving(false);
+            setError(`Client saved, but updating the previous contact's relationship failed: ${stepError("account_contacts_demote", demoteError)}`);
+            return;
+          }
+        } else {
+          const { error: removeError } = await supabase
+            .from("account_contacts")
+            .delete()
+            .eq("account_id", clientId)
+            .eq("contact_id", originalContactId);
+          if (removeError) {
+            setSaving(false);
+            setError(`Client saved, but removing the previous contact's relationship failed: ${stepError("account_contacts_remove", removeError)}`);
+            return;
+          }
+        }
+      }
+
+      const { data: existingLink, error: linkLookupError } = await supabase
+        .from("account_contacts")
+        .select("id, is_primary")
+        .eq("account_id", clientId)
+        .eq("contact_id", activeContactId)
+        .maybeSingle();
+      if (linkLookupError) {
+        setSaving(false);
+        setError(`Client saved, but checking the contact link failed: ${stepError("account_contacts_link", linkLookupError)}`);
+        return;
+      }
+      if (existingLink) {
+        const { error: linkUpdateError } = await supabase
+          .from("account_contacts")
+          .update({ is_primary: true, relationship_type: "primary", portal_access: form.portal_access })
+          .eq("id", existingLink.id);
+        if (linkUpdateError) {
+          setSaving(false);
+          setError(`Client saved, but updating the contact link failed: ${stepError("account_contacts_link", linkUpdateError)}`);
+          return;
+        }
+      } else {
+        const { error: linkInsertError } = await supabase.from("account_contacts").insert({
+          workspace_id: workspaceId,
+          account_id: clientId,
+          contact_id: activeContactId,
+          relationship_type: "primary",
+          is_primary: true,
+          portal_access: form.portal_access,
+        });
+        if (linkInsertError) {
+          setSaving(false);
+          setError(`Client saved, but linking the contact failed: ${stepError("account_contacts_link", linkInsertError)}`);
+          return;
         }
       }
     }
 
-    await supabase.from("client_tag_assignments").delete().eq("client_id", clientId);
+    const { error: tagDeleteError } = await supabase.from("client_tag_assignments").delete().eq("client_id", clientId);
+    if (tagDeleteError) {
+      setSaving(false);
+      setError(`Client saved, but clearing old tags failed: ${stepError("client_tag_assignments_delete", tagDeleteError)}`);
+      return;
+    }
     if (selectedTagIds.length > 0) {
-      await supabase
+      const { error: tagInsertError } = await supabase
         .from("client_tag_assignments")
-        .insert(selectedTagIds.map((tag_id) => ({ workspace_id: resolvedWorkspaceId, client_id: clientId, tag_id })));
+        .insert(selectedTagIds.map((tag_id) => ({ workspace_id: workspaceId, client_id: clientId, tag_id })));
+      if (tagInsertError) {
+        setSaving(false);
+        setError(`Client saved, but saving tags failed: ${stepError("client_tag_assignments_insert", tagInsertError)}`);
+        return;
+      }
     }
 
-    await supabase.from("client_team_members").delete().eq("client_id", clientId);
+    const { error: memberDeleteError } = await supabase.from("client_team_members").delete().eq("client_id", clientId);
+    if (memberDeleteError) {
+      setSaving(false);
+      setError(`Client saved, but clearing team assignment failed: ${stepError("client_team_members_delete", memberDeleteError)}`);
+      return;
+    }
     if (selectedMemberIds.length > 0) {
-      await supabase
+      const { error: memberInsertError } = await supabase
         .from("client_team_members")
-        .insert(selectedMemberIds.map((user_id) => ({ workspace_id: resolvedWorkspaceId, client_id: clientId, user_id })));
+        .insert(selectedMemberIds.map((user_id) => ({ workspace_id: workspaceId, client_id: clientId, user_id })));
+      if (memberInsertError) {
+        setSaving(false);
+        setError(`Client saved, but saving team assignment failed: ${stepError("client_team_members_insert", memberInsertError)}`);
+        return;
+      }
     }
 
     if (newIdentityValue.trim()) {
+      // The full value is only ever sent to save_identity_vault_value,
+      // which encrypts it server-side. If this fails, stop immediately —
+      // do not fall through to saving the last-four digits below.
       const { error: idError } = await supabase.rpc("save_identity_vault_value", {
-        p_workspace_id: resolvedWorkspaceId,
+        p_workspace_id: workspaceId,
         p_client_id: clientId,
         p_related_contact_id: null,
         p_identity_type: identityType,
         p_plain_value: newIdentityValue,
         p_reason: "Saved via client form",
       });
-      if (!idError && identityType === "ssn") {
-        const digits = newIdentityValue.replace(/\D/g, "");
-        await supabase.from("clients").update({ ssn_last_four: digits.slice(-4) }).eq("id", clientId);
+      if (idError) {
+        setSaving(false);
+        setError(`Client saved, but the ${identityLabel} could not be stored securely: ${stepError("save_identity_vault_value", idError)}`);
+        return;
       }
-    }
-
-    if (!isEditing && selectedServices.length > 0) {
-      const currentYear = new Date().getFullYear().toString();
-      await supabase.from("services").insert(
-        selectedServices.map((service_type) => ({
-          workspace_id: resolvedWorkspaceId,
-          client_id: clientId,
-          service_type,
-          service_status: "New",
-          service_year: currentYear,
-        }))
-      );
+      if (identityType === "ssn") {
+        const digits = newIdentityValue.replace(/\D/g, "");
+        // save_client_profile_details overwrites date_of_birth on every
+        // call rather than leaving it untouched — pass the client's
+        // existing value straight through so this can't silently null it.
+        const { error: profileError } = await supabase.rpc("save_client_profile_details", {
+          p_workspace_id: workspaceId,
+          p_client_id: clientId,
+          p_date_of_birth: client?.date_of_birth ?? null,
+          p_ssn_last_four: digits.slice(-4),
+        });
+        if (profileError) {
+          setSaving(false);
+          setError(
+            `Client and SSN saved securely, but the last-four display value failed to save: ${stepError("save_client_profile_details", profileError)}`
+          );
+          return;
+        }
+      }
     }
 
     setSaving(false);
@@ -548,7 +1004,7 @@ export default function ClientModal({
     const { error: deleteError } = await supabase.from("clients").delete().eq("id", client.id);
     setDeleting(false);
     if (deleteError) {
-      setError(deleteError.message);
+      setError(stepError("clients_delete", deleteError));
       return;
     }
     onDeleted?.();
@@ -556,9 +1012,18 @@ export default function ClientModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4 py-8">
-      <div className="bg-white rounded-2xl border border-line shadow-lg w-full max-w-2xl max-h-full overflow-y-auto p-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/40 lg:items-center lg:p-4">
+      {/*
+        One controlled scroll region: header + step indicator are shrink-0
+        (always visible), the middle form area is the only scrolling child,
+        and the footer is a separate shrink-0 sibling below it — so it can
+        never be scrolled past, only reached by shrinking the middle region.
+        Full-height on mobile (matching the app shell's own `lg:hidden`
+        bottom-nav breakpoint) so the modal fully covers the viewport and
+        the fixed bottom nav sits behind it instead of overlapping it.
+      */}
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden border border-line bg-white shadow-lg lg:h-auto lg:max-h-[90vh] lg:w-full lg:max-w-2xl lg:rounded-2xl">
+        <div className="flex shrink-0 items-center justify-between px-6 pt-6 pb-4">
           <h3 className="font-slab text-lg font-bold text-ink">
             {isEditing ? "Edit Client" : "New Client"}
           </h3>
@@ -572,7 +1037,7 @@ export default function ClientModal({
           </button>
         </div>
 
-        <div className="flex items-center gap-3 border-b border-line pb-4 mb-5">
+        <div className="flex shrink-0 items-center gap-3 border-b border-line px-6 pb-4">
           <StepBadge active={step === 1} done={step > 1}>1</StepBadge>
           <span className={`text-sm font-semibold ${step === 1 ? "text-ink" : "text-muted"}`}>Account info</span>
           <ChevronRight size={14} className="text-line" />
@@ -580,17 +1045,18 @@ export default function ClientModal({
           <span className={`text-sm font-semibold ${step === 2 ? "text-ink" : "text-muted"}`}>Contact</span>
         </div>
 
+        <div className="flex-1 overflow-y-auto px-6 py-5">
         {step === 1 && (
-          <form onSubmit={goToContacts} className="space-y-5">
+          <form id="client-step1-form" onSubmit={goToContacts} className="space-y-5">
             <Section label="Client type">
               <div className="flex flex-wrap gap-x-5 gap-y-2.5">
-                {ACCOUNT_TYPES.map((t) => (
+                {CLIENT_TYPES.map((t) => (
                   <label key={t.value} className="flex items-center gap-2 text-sm text-ink cursor-pointer">
                     <input
                       type="radio"
-                      name="account_type"
-                      checked={form.account_type === t.value}
-                      onChange={() => setForm({ ...form, account_type: t.value })}
+                      name="client_type"
+                      checked={form.client_type === t.value}
+                      onChange={() => setForm({ ...form, client_type: t.value })}
                       className="h-4 w-4 accent-[#108A64]"
                     />
                     {t.label}
@@ -599,15 +1065,76 @@ export default function ClientModal({
               </div>
             </Section>
 
-            <Section label={isEntity ? "Business name" : "Client's name"}>
-              <input
-                required
-                placeholder={isEntity ? "Greenleaf Consulting LLC" : "John Doe"}
-                value={form.account_name}
-                onChange={(e) => setForm({ ...form, account_name: e.target.value })}
-                className="client-input w-full"
-              />
-            </Section>
+            {isEntity ? (
+              <>
+                <Section label="Business name">
+                  <input
+                    required
+                    placeholder="Greenleaf Consulting LLC"
+                    value={form.business_name}
+                    onChange={(e) => setForm({ ...form, business_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                </Section>
+                <Section label="Business contact info">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      type="email"
+                      placeholder="Business email"
+                      value={form.business_email}
+                      onChange={(e) => setForm({ ...form, business_email: e.target.value })}
+                      className="client-input w-full"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Business phone"
+                      value={form.business_phone}
+                      onChange={(e) => {
+                        const input = e.target;
+                        const rawCursor = input.selectionStart ?? input.value.length;
+                        const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                        const formatted = formatPhone(input.value);
+                        const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                        setForm((f) => ({ ...f, business_phone: formatted }));
+                        requestAnimationFrame(() => {
+                          input.setSelectionRange(newCursor, newCursor);
+                        });
+                      }}
+                      className="client-input w-full"
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted">
+                    The business's own contact info — separate from the contact person's personal email and phone on
+                    Step 2.
+                  </p>
+                </Section>
+              </>
+            ) : (
+              <Section label="Client's name">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    required
+                    placeholder="First name"
+                    value={form.first_name}
+                    onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Middle name (optional)"
+                    value={form.middle_name}
+                    onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    placeholder="Last name"
+                    value={form.last_name}
+                    onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                </div>
+              </Section>
+            )}
 
             <Section label="Address">
               <div className="grid gap-3 sm:grid-cols-2">
@@ -650,6 +1177,382 @@ export default function ClientModal({
               </div>
             </Section>
 
+            <Section label="Team members (required)">
+              <div className="flex flex-wrap gap-2 mb-2">
+                {selectedMemberIds.map((id) => {
+                  const member = availableMembers.find((m) => m.user_id === id);
+                  if (!member) return null;
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-paper-dim bg-paper border border-line text-xs font-semibold text-ink px-2.5 py-1"
+                    >
+                      {member.label}
+                      <button type="button" onClick={() => toggleMember(id)} aria-label={`Remove ${member.label}`}>
+                        <X size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) toggleMember(e.target.value);
+                }}
+                className="client-input w-full"
+              >
+                <option value="">Add a team member…</option>
+                {availableMembers
+                  .filter((m) => !selectedMemberIds.includes(m.user_id))
+                  .map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.label}
+                    </option>
+                  ))}
+              </select>
+            </Section>
+
+            {error && (
+              <div className="text-xs text-brick bg-brick/10 border border-brick/30 rounded-xl px-3 py-2.5">
+                {error}
+              </div>
+            )}
+          </form>
+        )}
+
+        {step === 2 && (
+          <form id="client-step2-form" onSubmit={handleSubmit} className="space-y-5">
+            <div className="inline-flex gap-1 rounded-xl bg-paper p-1 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setContactMode("create")}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${contactMode === "create" ? "bg-[#108A64] text-white" : "text-muted hover:text-ink"}`}
+              >
+                Create new contact
+              </button>
+              <button
+                type="button"
+                onClick={() => setContactMode("link")}
+                className={`rounded-lg px-3 py-1.5 transition-colors ${contactMode === "link" ? "bg-[#108A64] text-white" : "text-muted hover:text-ink"}`}
+              >
+                Connect existing contact
+              </button>
+            </div>
+
+            {contactMode === "link" && isEntity && (
+              <div ref={selectedContactRef} className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm space-y-2 scroll-mt-4">
+                {connectedContact ? (
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-0.5">
+                      Connected contact
+                    </span>
+                    <strong className="text-ink">
+                      {[connectedContact.first_name, connectedContact.middle_name, connectedContact.last_name].filter(Boolean).join(" ")}
+                    </strong>
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                      {connectedContact.personal_email && <span>{connectedContact.personal_email}</span>}
+                      {connectedContact.personal_phone && <span>{connectedContact.personal_phone}</span>}
+                      {connectedContact.occupation && <span>{connectedContact.occupation}</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted">No contact connected yet — search below to connect one.</div>
+                )}
+                {isEditing && originalContactId && connectedContact?.id !== originalContactId && (
+                  <label className="flex items-start gap-2 text-xs text-ink pt-2 border-t border-line">
+                    <input
+                      type="checkbox"
+                      checked={keepOldContactAsAdditional}
+                      onChange={(e) => setKeepOldContactAsAdditional(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 accent-[#108A64]"
+                    />
+                    Keep {originalContactLabel || "the previous contact"} linked as an additional (non-primary) contact
+                    instead of removing them from this business
+                  </label>
+                )}
+              </div>
+            )}
+
+            {contactMode === "link" && !isEntity && contactId && (
+              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-0.5">
+                  Connected contact
+                </span>
+                <strong className="text-ink">{form.first_name} {form.last_name}</strong>
+              </div>
+            )}
+
+            {contactMode === "create" && isEntity && isEditing && originalContactId && (
+              <label className="flex items-start gap-2 text-xs text-ink rounded-xl border border-line bg-paper px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={keepOldContactAsAdditional}
+                  onChange={(e) => setKeepOldContactAsAdditional(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 accent-[#108A64]"
+                />
+                Keep {originalContactLabel || "the previous contact"} linked as an additional (non-primary) contact
+                instead of removing them from this business
+              </label>
+            )}
+
+            {contactMode === "link" && (
+              <Section label="Find a contact">
+                <p className="text-xs text-muted mb-2">
+                  Searches contacts and people who are already Individual clients — by name, email, or phone.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Search by name, email, or phone…"
+                    value={contactQuery}
+                    onChange={(e) => setContactQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        searchContacts();
+                      }
+                    }}
+                    className="client-input flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={searchContacts}
+                    disabled={searching}
+                    className="flex items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-semibold text-ink hover:bg-paper disabled:opacity-60"
+                  >
+                    {searching ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                    {searching ? "Searching…" : "Search"}
+                  </button>
+                </div>
+
+                <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    checked={includeArchivedContacts}
+                    onChange={(e) => {
+                      setIncludeArchivedContacts(e.target.checked);
+                      if (contactQuery.trim().length >= 2) searchContacts();
+                    }}
+                    className="h-3.5 w-3.5 accent-[#108A64]"
+                  />
+                  Include archived
+                </label>
+
+                {searchError && (
+                  <div className="mt-2 flex items-center gap-1.5 text-xs text-brick">
+                    <AlertCircle size={13} /> {searchError}
+                  </div>
+                )}
+
+                {!searching && searchedOnce && !searchError && contactResults.length === 0 && (
+                  <div className="mt-2 text-xs text-muted">No matching contacts found.</div>
+                )}
+
+                {contactResults.length > 0 && (
+                  <div className="mt-2 divide-y divide-line rounded-xl border border-line">
+                    {contactResults.map((c) => {
+                      const isSelected = isEntity ? c.id === connectedContact?.id : c.id === contactId;
+                      const isIndividualClient = c.linkedAccounts.some((a) => a.client_type === "individual");
+                      const linkedClient = c.linkedAccounts.find((a) => a.client_type === "individual");
+                      const businesses = c.linkedAccounts.filter((a) => a.client_type === "business");
+                      return (
+                        <button
+                          type="button"
+                          key={c.id}
+                          onClick={() => selectExistingContact(c)}
+                          className={`w-full text-left px-3 py-2.5 text-sm hover:bg-paper ${isSelected ? "bg-emerald-50" : ""}`}
+                        >
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-semibold text-ink">
+                              {[c.first_name, c.middle_name, c.last_name].filter(Boolean).join(" ")}
+                            </span>
+                            {isSelected && <Check size={13} className="text-[#108A64]" />}
+                            {isIndividualClient && (
+                              <span className="rounded-full bg-sky-50 text-sky-700 text-[10px] font-semibold px-2 py-0.5">
+                                Individual Client{linkedClient?.status ? ` · ${linkedClient.status}` : ""}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted">
+                            {(c.personal_email || c.business_email) && <span>{c.personal_email || c.business_email}</span>}
+                            {(c.personal_phone || c.business_phone) && <span>{c.personal_phone || c.business_phone}</span>}
+                          </div>
+                          {businesses.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {businesses.map((b) => (
+                                <span
+                                  key={b.id}
+                                  className="inline-flex items-center gap-1 rounded-full bg-paper border border-line text-[10px] font-semibold text-muted px-2 py-0.5"
+                                >
+                                  <Building2 size={10} /> {b.label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </Section>
+            )}
+
+            {contactMode === "create" && isEntity && (
+              <Section label="New contact">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <input
+                    required
+                    placeholder="First name"
+                    value={newContactForm.first_name}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, first_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Middle name"
+                    value={newContactForm.middle_name}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, middle_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    placeholder="Last name"
+                    value={newContactForm.last_name}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, last_name: e.target.value })}
+                    className="client-input w-full"
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input
+                    required
+                    type="email"
+                    placeholder="Email"
+                    value={newContactForm.email}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={newContactForm.phone}
+                    onChange={(e) => {
+                      const input = e.target;
+                      const rawCursor = input.selectionStart ?? input.value.length;
+                      const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                      const formatted = formatPhone(input.value);
+                      const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                      setNewContactForm((f) => ({ ...f, phone: formatted }));
+                      requestAnimationFrame(() => {
+                        input.setSelectionRange(newCursor, newCursor);
+                      });
+                    }}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Occupation"
+                    value={newContactForm.occupation}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, occupation: e.target.value })}
+                    className="client-input w-full sm:col-span-2"
+                  />
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={newContactForm.portal_access}
+                    onChange={(e) => setNewContactForm({ ...newContactForm, portal_access: e.target.checked })}
+                    className="h-4 w-4 accent-[#108A64]"
+                  />
+                  Give this contact portal access
+                </label>
+              </Section>
+            )}
+
+            {contactMode === "create" && !isEntity && (
+              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm text-ink">
+                Contact: <strong>{form.first_name} {form.last_name}</strong>
+              </div>
+            )}
+
+            {!isEntity && (
+              <Section label="Contact">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    required
+                    type="email"
+                    placeholder="Email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <input
+                    required
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={form.phone}
+                    onChange={(e) => {
+                      const input = e.target;
+                      const rawCursor = input.selectionStart ?? input.value.length;
+                      const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                      const formatted = formatPhone(input.value);
+                      const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                      setForm((f) => ({ ...f, phone: formatted }));
+                      requestAnimationFrame(() => {
+                        input.setSelectionRange(newCursor, newCursor);
+                      });
+                    }}
+                    className="client-input w-full"
+                  />
+                  <input
+                    placeholder="Occupation"
+                    value={form.occupation}
+                    onChange={(e) => setForm({ ...form, occupation: e.target.value })}
+                    className="client-input w-full"
+                  />
+                  <select
+                    value={form.source}
+                    onChange={(e) => setForm({ ...form, source: e.target.value })}
+                    className="client-input w-full"
+                  >
+                    <option value="">Referral source…</option>
+                    {sourceOptions.map((o) => (
+                      <option key={o.option_code} value={o.option_code}>
+                        {o.option_label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={form.portal_access}
+                    onChange={(e) => setForm({ ...form, portal_access: e.target.checked })}
+                    className="h-4 w-4 accent-[#108A64]"
+                  />
+                  Give this contact portal access
+                </label>
+              </Section>
+            )}
+
+            {isEntity && (
+              <Section label="Referral source">
+                <select
+                  value={form.source}
+                  onChange={(e) => setForm({ ...form, source: e.target.value })}
+                  className="client-input w-full"
+                >
+                  <option value="">Referral source…</option>
+                  {sourceOptions.map((o) => (
+                    <option key={o.option_code} value={o.option_code}>
+                      {o.option_label}
+                    </option>
+                  ))}
+                </select>
+              </Section>
+            )}
+
+            {/* Tags lives here (Contact step, next to team members/portal access)
+               rather than on Account info — team assignment stays on Step 1
+               since it gates moving to this step. */}
             <Section label="Tags">
               <div className="flex flex-wrap gap-2 mb-2">
                 {selectedTagIds.map((id) => {
@@ -695,227 +1598,6 @@ export default function ClientModal({
                   Add
                 </button>
               </div>
-            </Section>
-
-            <Section label="Team members (required)">
-              <div className="flex flex-wrap gap-2 mb-2">
-                {selectedMemberIds.map((id) => {
-                  const member = availableMembers.find((m) => m.user_id === id);
-                  if (!member) return null;
-                  return (
-                    <span
-                      key={id}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-paper-dim bg-paper border border-line text-xs font-semibold text-ink px-2.5 py-1"
-                    >
-                      {member.label}
-                      <button type="button" onClick={() => toggleMember(id)} aria-label={`Remove ${member.label}`}>
-                        <X size={12} />
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) toggleMember(e.target.value);
-                }}
-                className="client-input w-full"
-              >
-                <option value="">Add a team member…</option>
-                {availableMembers
-                  .filter((m) => !selectedMemberIds.includes(m.user_id))
-                  .map((m) => (
-                    <option key={m.user_id} value={m.user_id}>
-                      {m.label}
-                    </option>
-                  ))}
-              </select>
-            </Section>
-
-            {error && (
-              <div className="text-xs text-brick bg-brick/10 border border-brick/30 rounded-xl px-3 py-2.5">
-                {error}
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-1">
-              {isEditing && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-sm font-semibold py-2.5 px-3.5 rounded-xl border border-brick text-brick disabled:opacity-60 hover:bg-brick/5"
-                >
-                  {deleting ? "Deleting…" : "Delete"}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={onClose}
-                className="text-sm font-semibold py-2.5 px-4 rounded-xl border border-line text-ink hover:bg-paper"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="text-sm font-semibold py-2.5 px-5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555]"
-              >
-                Continue
-              </button>
-            </div>
-          </form>
-        )}
-
-        {step === 2 && (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {!contactId && (
-              <div className="flex gap-2 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setContactMode("create")}
-                  className={`rounded-xl px-3 py-1.5 ${contactMode === "create" ? "bg-[#108A64] text-white" : "border border-line text-muted"}`}
-                >
-                  Create new contact
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setContactMode("link")}
-                  className={`rounded-xl px-3 py-1.5 ${contactMode === "link" ? "bg-[#108A64] text-white" : "border border-line text-muted"}`}
-                >
-                  Link existing contact
-                </button>
-              </div>
-            )}
-
-            {contactMode === "link" && !contactId && (
-              <Section label="Find a contact">
-                <div className="flex gap-2">
-                  <input
-                    placeholder="Search by name…"
-                    value={contactQuery}
-                    onChange={(e) => setContactQuery(e.target.value)}
-                    className="client-input flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={searchContacts}
-                    className="flex items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-semibold text-ink hover:bg-paper"
-                  >
-                    <Search size={14} /> {searching ? "…" : "Search"}
-                  </button>
-                </div>
-                {contactResults.length > 0 && (
-                  <div className="mt-2 divide-y divide-line rounded-xl border border-line">
-                    {contactResults.map((c) => (
-                      <button
-                        type="button"
-                        key={c.id}
-                        onClick={() => selectExistingContact(c)}
-                        className="w-full text-left px-3 py-2.5 text-sm hover:bg-paper"
-                      >
-                        <div className="font-semibold text-ink">
-                          {c.first_name} {c.last_name}
-                        </div>
-                        {c.personal_email && <div className="text-xs text-muted">{c.personal_email}</div>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </Section>
-            )}
-
-            {contactId && (
-              <div className="flex items-center justify-between rounded-xl border border-line bg-paper px-3 py-2.5 text-sm">
-                <span>
-                  Linked to <strong className="text-ink">{form.first_name} {form.last_name}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setContactId(null);
-                    setContactMode("create");
-                  }}
-                  className="text-xs font-semibold text-muted hover:text-ink"
-                >
-                  Change
-                </button>
-              </div>
-            )}
-
-            {isEntity && !contactId && (
-              <Section label="Contact name">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <input
-                    required
-                    placeholder="First name"
-                    value={form.first_name}
-                    onChange={(e) => setForm({ ...form, first_name: e.target.value })}
-                    className="client-input w-full"
-                  />
-                  <input
-                    placeholder="Middle name"
-                    value={form.middle_name}
-                    onChange={(e) => setForm({ ...form, middle_name: e.target.value })}
-                    className="client-input w-full"
-                  />
-                  <input
-                    required
-                    placeholder="Last name"
-                    value={form.last_name}
-                    onChange={(e) => setForm({ ...form, last_name: e.target.value })}
-                    className="client-input w-full"
-                  />
-                </div>
-              </Section>
-            )}
-
-            {!isEntity && !contactId && (
-              <div className="rounded-xl border border-line bg-paper px-3 py-2.5 text-sm text-ink">
-                Contact: <strong>{form.first_name} {form.last_name}</strong>
-              </div>
-            )}
-
-            <Section label="Contact">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <input
-                  required
-                  type="email"
-                  placeholder="Email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="client-input w-full"
-                />
-                <input
-                  required
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
-                  className="client-input w-full"
-                />
-                <input
-                  placeholder="Occupation"
-                  value={form.occupation}
-                  onChange={(e) => setForm({ ...form, occupation: e.target.value })}
-                  className="client-input w-full"
-                />
-                <input
-                  placeholder="Referral source (e.g. Referral, Website, Google)"
-                  value={form.source}
-                  onChange={(e) => setForm({ ...form, source: e.target.value })}
-                  className="client-input w-full"
-                />
-              </div>
-              <label className="mt-3 flex items-center gap-2 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  checked={form.portal_access}
-                  onChange={(e) => setForm({ ...form, portal_access: e.target.checked })}
-                  className="h-4 w-4 accent-[#108A64]"
-                />
-                Give this contact portal access
-              </label>
             </Section>
 
             <Section label={`${identityLabel} (required)`}>
@@ -1019,34 +1701,76 @@ export default function ClientModal({
               </Section>
             )}
 
-            {!isEditing && (
-              <Section label="Services (required)">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {SERVICE_OPTIONS.map((service) => (
-                    <label
-                      key={service}
-                      className="flex items-center gap-2 text-sm text-ink border border-line rounded-xl px-3 py-2.5 cursor-pointer hover:bg-paper"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedServices.includes(service)}
-                        onChange={() => toggleService(service)}
-                        className="w-4 h-4 accent-[#108A64]"
-                      />
-                      {service}
-                    </label>
-                  ))}
-                </div>
-              </Section>
-            )}
+            <Section label="Services (required)">
+              <div className="grid gap-2 sm:grid-cols-2">
+                {serviceOptions.map((opt) => (
+                  <label
+                    key={opt.option_code}
+                    className="flex items-center gap-2 text-sm text-ink border border-line rounded-xl px-3 py-2.5 cursor-pointer hover:bg-paper"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedServices.includes(opt.option_code)}
+                      onChange={() => toggleService(opt.option_code)}
+                      className="w-4 h-4 accent-[#108A64]"
+                    />
+                    {opt.option_label}
+                  </label>
+                ))}
+              </div>
+            </Section>
 
             {error && (
               <div className="text-xs text-brick bg-brick/10 border border-brick/30 rounded-xl px-3 py-2.5">
                 {error}
               </div>
             )}
+          </form>
+        )}
+        </div>
 
-            <div className="flex gap-2 pt-1">
+        {/*
+          Footer lives outside the scrolling body as a plain (non-sticky)
+          flex sibling, so it's always visible without any scroll-position
+          math — the buttons use the HTML `form` attribute to submit the
+          step's <form> from outside it. Safe-area padding keeps it clear
+          of the iPhone home-indicator area; on mobile the modal already
+          covers the full viewport (see the outer h-[100dvh]), so the app's
+          fixed bottom nav sits behind it rather than overlapping it.
+        */}
+        <div
+          className="shrink-0 border-t border-line bg-white px-6 py-4"
+          style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+        >
+          {step === 1 ? (
+            <div className="flex gap-2">
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-sm font-semibold py-2.5 px-3.5 rounded-xl border border-brick text-brick disabled:opacity-60 hover:bg-brick/5"
+                >
+                  {deleting ? "Deleting…" : "Delete"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-sm font-semibold py-2.5 px-4 rounded-xl border border-line text-ink hover:bg-paper"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="client-step1-form"
+                className="ml-auto text-sm font-semibold py-2.5 px-5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555]"
+              >
+                Continue
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -1063,14 +1787,15 @@ export default function ClientModal({
               </button>
               <button
                 type="submit"
+                form="client-step2-form"
                 disabled={saving}
                 className="flex-1 text-sm font-semibold py-2.5 rounded-xl bg-[#108A64] text-white hover:bg-[#0d7555] disabled:opacity-60"
               >
                 {saving ? "Saving…" : isEditing ? "Save Changes" : "Create"}
               </button>
             </div>
-          </form>
-        )}
+          )}
+        </div>
       </div>
       <style jsx global>{`
         .client-input {

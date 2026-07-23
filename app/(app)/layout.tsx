@@ -1,29 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
-  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
-  Calculator,
   CheckSquare,
   ChevronDown,
   CircleDollarSign,
   FileBarChart,
   FileText,
   FolderOpen,
+  HelpCircle,
   LayoutGrid,
   LogOut,
   Menu,
   MessageSquare,
   PanelLeftClose,
+  Plus,
   Settings,
   Shield,
+  User,
   Users,
-  Wallet,
   X,
 } from "lucide-react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -34,60 +34,173 @@ import {
   useWorkspace,
 } from "@/components/WorkspaceProvider";
 
-const GROUPS = [
-  {
-    label: "Overview",
-    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutGrid }],
-  },
-  {
-    label: "Clients",
-    items: [
-      { href: "/clients", label: "Clients", icon: Users },
-      { href: "/messages", label: "Messages", icon: MessageSquare },
-    ],
-  },
-  {
-    label: "Work",
-    items: [
-      { href: "/services", label: "Services", icon: BriefcaseBusiness },
-      { href: "/pipeline", label: "Workflows", icon: BookOpen },
-      { href: "/tasks", label: "Tasks", icon: CheckSquare },
-      { href: "/deadlines", label: "Deadlines", icon: CalendarDays },
-      { href: "/calendar", label: "Calendar", icon: CalendarDays },
-    ],
-  },
-  {
-    label: "Practice",
-    items: [
-      { href: "/tax", label: "Tax Prep", icon: FileText },
-      { href: "/bookkeeping", label: "Bookkeeping", icon: Calculator },
-      { href: "/payroll", label: "Payroll", icon: Wallet },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { href: "/documents", label: "Documents", icon: FolderOpen },
-      { href: "/forms", label: "Forms & Templates", icon: FileText },
-      { href: "/billing", label: "Billing", icon: CircleDollarSign },
-      { href: "/reports", label: "Reports", icon: FileBarChart },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { href: "/notifications", label: "Notifications", icon: Bell },
-      { href: "/settings", label: "Settings", icon: Settings },
-    ],
-  },
+// Primary navigation, per the approved product spec. Every entry routes to
+// a real page — none of these are placeholders.
+const PRD_NAV = [
+  { href: "/dashboard", label: "Home", icon: LayoutGrid },
+  { href: "/clients", label: "Clients", icon: Users },
+  { href: "/work", label: "Work", icon: BriefcaseBusiness },
+  { href: "/documents", label: "Documents", icon: FolderOpen },
+  { href: "/messages", label: "Communication", icon: MessageSquare },
+  { href: "/billing", label: "Billing", icon: CircleDollarSign },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/reports", label: "Reports", icon: FileBarChart },
+  { href: "/forms", label: "Templates", icon: FileText },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 const MOBILE = [
-  { href: "/dashboard", label: "Home", icon: LayoutGrid },
-  { href: "/clients", label: "Clients", icon: Users },
-  { href: "/tasks", label: "Tasks", icon: CheckSquare },
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  PRD_NAV[0],
+  PRD_NAV[1],
+  PRD_NAV[2],
+  PRD_NAV[3],
 ];
+
+type QuickCreateItem = {
+  label: string;
+  href?: string;
+  available: boolean;
+  note?: string;
+};
+
+const QUICK_CREATE: QuickCreateItem[] = [
+  { label: "Client / lead", href: "/clients?new=1", available: true },
+  {
+    label: "Service workspace",
+    href: "/clients",
+    available: true,
+    note: "Pick a client, then Add Service",
+  },
+  { label: "Task", href: "/tasks?new=1", available: true },
+  { label: "Document request", href: "/documents?new=1", available: true },
+  { label: "Invoice", href: "/billing?new=1", available: true },
+  {
+    label: "Appointment",
+    available: false,
+    note: "Coming with the Calendar build",
+  },
+  { label: "Secure message", href: "/messages", available: true },
+  {
+    label: "Internal note",
+    available: false,
+    note: "Add notes from a Service Workspace's Notes tab",
+  },
+];
+
+function QuickCreateMenu() {
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Quick create"
+        className="flex h-10 items-center gap-1.5 rounded-xl bg-[#108A64] px-3 text-sm font-semibold text-white hover:bg-[#0d6f51]"
+      >
+        <Plus size={16} />
+        <span className="hidden sm:inline">Create</span>
+      </button>
+      {open && (
+        <>
+          <button
+            aria-label="Close"
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-white py-1.5 shadow-xl">
+            {QUICK_CREATE.map((item) => (
+              <button
+                key={item.label}
+                disabled={!item.available}
+                onClick={() => {
+                  if (!item.href) return;
+                  setOpen(false);
+                  router.push(item.href);
+                }}
+                className={`flex w-full flex-col items-start px-3.5 py-2.5 text-left text-sm ${
+                  item.available
+                    ? "text-ink hover:bg-paper"
+                    : "cursor-not-allowed text-muted/60"
+                }`}
+              >
+                <span className="font-semibold">{item.label}</span>
+                {item.note && (
+                  <span className="mt-0.5 text-[11px] text-muted">
+                    {item.note}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function UserMenu({
+  email,
+  role,
+  onSignOut,
+}: {
+  email: string;
+  role: string;
+  onSignOut: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-label="User menu"
+        className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-muted hover:text-ink"
+      >
+        <User size={17} />
+      </button>
+      {open && (
+        <>
+          <button
+            aria-label="Close"
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+          />
+          <div className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-line bg-white py-1.5 shadow-xl">
+            <div className="border-b border-line px-3.5 py-2.5">
+              <div className="truncate text-sm font-semibold text-ink">
+                {email || "Signed in"}
+              </div>
+              {role && (
+                <div className="mt-0.5 text-xs capitalize text-muted">
+                  {role}
+                </div>
+              )}
+            </div>
+            <Link
+              href="/settings"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-ink hover:bg-paper"
+            >
+              <Settings size={15} /> Settings
+            </Link>
+            <Link
+              href="/help"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-3.5 py-2.5 text-sm text-ink hover:bg-paper"
+            >
+              <HelpCircle size={15} /> Help
+            </Link>
+            <button
+              onClick={onSignOut}
+              className="flex w-full items-center gap-2 px-3.5 py-2.5 text-sm text-ink hover:bg-paper"
+            >
+              <LogOut size={15} /> Sign out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function Nav({
   close,
@@ -128,34 +241,27 @@ function Nav({
         </div>
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {GROUPS.map((group) => (
-          <div key={group.label} className="mb-4">
-            <div className="mb-1 px-3 text-[10px] font-bold uppercase tracking-[.14em] text-white/40">
-              {group.label}
-            </div>
-            {group.items.map((item) => {
-              const Icon = item.icon;
-              const active =
-                pathname === item.href || pathname?.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  onClick={close}
-                  key={item.href}
-                  href={item.href}
-                  className={`mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active ? "bg-white/12 text-white" : "text-white/72 hover:bg-white/7 hover:text-white"}`}
-                >
-                  <Icon size={17} className={active ? "text-[#36D39A]" : ""} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+        {PRD_NAV.map((item) => {
+          const Icon = item.icon;
+          const active =
+            pathname === item.href || pathname?.startsWith(`${item.href}/`);
+          return (
+            <Link
+              onClick={close}
+              key={item.href}
+              href={item.href}
+              className={`mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${active ? "bg-white/12 text-white" : "text-white/72 hover:bg-white/7 hover:text-white"}`}
+            >
+              <Icon size={17} className={active ? "text-[#36D39A]" : ""} />
+              {item.label}
+            </Link>
+          );
+        })}
         {isAdmin && (
           <Link
             href="/admin"
             onClick={close}
-            className="flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-sm text-white/70 hover:bg-white/10"
+            className="mt-3 flex items-center gap-3 rounded-xl border border-white/10 px-3 py-2.5 text-sm text-white/70 hover:bg-white/10"
           >
             <Shield size={17} />
             Platform Admin
@@ -181,11 +287,13 @@ function Nav({
 function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
   const [ready, setReady] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [more, setMore] = useState(false);
   const [email, setEmail] = useState("");
   const [admin, setAdmin] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   useEffect(() => {
     if (!isSupabaseConfigured) {
       router.replace("/setup");
@@ -206,27 +314,46 @@ function Shell({ children }: { children: React.ReactNode }) {
     });
     return () => sub.subscription.unsubscribe();
   }, [router]);
+
   useEffect(() => {
     setMenu(false);
-    setMore(false);
   }, [pathname]);
-  const title = useMemo(
+
+  const loadUnread = useCallback(async () => {
+    if (!activeWorkspaceId) return;
+    const { count } = await supabase
+      .from("v_my_notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", activeWorkspaceId)
+      .is("read_at", null);
+    setUnreadCount(count ?? 0);
+  }, [activeWorkspaceId]);
+
+  useEffect(() => {
+    void loadUnread();
+  }, [loadUnread, pathname]);
+
+  const activeItem = useMemo(
     () =>
-      GROUPS.flatMap((g) => g.items).find(
+      PRD_NAV.find(
         (i) => pathname === i.href || pathname?.startsWith(`${i.href}/`),
-      )?.label ?? (pathname === "/admin" ? "Platform Admin" : "VerexaHQ"),
+      ),
     [pathname],
   );
+  const title = activeItem?.label ?? (pathname === "/admin" ? "Platform Admin" : "VerexaHQ");
+
   async function signOut() {
     await supabase.auth.signOut();
     router.replace("/login");
   }
+
   if (!ready)
     return (
       <div className="min-h-screen grid place-items-center bg-paper text-sm text-muted">
         Loading your workspace…
       </div>
     );
+
   return (
     <div className="min-h-screen bg-paper lg:flex">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[252px] lg:block">
@@ -264,21 +391,36 @@ function Shell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={20} />
           </button>
-          <div className="hidden min-w-[140px] text-base font-bold text-ink sm:block">
+          <div className="hidden min-w-[100px] text-base font-bold text-ink sm:block">
             {title}
           </div>
           <GlobalSearch />
           <div className="ml-auto flex items-center gap-2">
+            <QuickCreateMenu />
             <Link
               aria-label="Notifications"
               href="/notifications"
               className="relative grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-muted hover:text-ink"
             >
               <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-4.5 min-w-4.5 place-items-center rounded-full bg-[#B3261E] px-1 text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
             </Link>
-            <div className="hidden max-w-[180px] truncate text-xs text-muted xl:block">
-              {email}
-            </div>
+            <Link
+              aria-label="Help"
+              href="/help"
+              className="hidden h-10 w-10 place-items-center rounded-xl border border-line bg-white text-muted hover:text-ink sm:grid"
+            >
+              <HelpCircle size={18} />
+            </Link>
+            <UserMenu
+              email={email}
+              role={activeWorkspace?.role ?? ""}
+              onSignOut={signOut}
+            />
           </div>
         </header>
         <main className="min-w-0 px-3 py-5 pb-24 sm:px-5 lg:px-8 lg:py-8 lg:pb-8">

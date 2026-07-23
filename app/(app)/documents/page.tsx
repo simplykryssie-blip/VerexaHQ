@@ -59,6 +59,14 @@ export default function DocumentsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowRequest(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   async function handleDownload(doc: Document) {
     if (!doc.storage_path) return;
     const { data, error } = await supabase.storage

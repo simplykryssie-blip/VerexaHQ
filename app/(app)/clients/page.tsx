@@ -39,6 +39,14 @@ export default function ClientsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowNewModal(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   const stats = useMemo(
     () => ({
       total: clients.length,
@@ -50,7 +58,10 @@ export default function ClientsPage() {
 
   const filtered = clients.filter((c) => {
     const matchesQuery = clientDisplayName(c).toLowerCase().includes(query.toLowerCase());
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+    // "All" means all non-archived clients — archived records only ever
+    // show up under the explicit Archived filter, never under All or any
+    // other status tab.
+    const matchesStatus = statusFilter === "all" ? c.status !== "archived" : c.status === statusFilter;
     return matchesQuery && matchesStatus;
   });
 
@@ -122,7 +133,7 @@ export default function ClientsPage() {
         {!loading && filtered.length > 0 && (
           <div className="divide-y divide-line">
             {filtered.map((c) => {
-              const meta = accountTypeMeta(c.account_type);
+              const meta = accountTypeMeta(c);
               return (
                 <div
                   key={c.id}

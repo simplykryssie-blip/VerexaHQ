@@ -56,6 +56,14 @@ export default function BillingPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowModal(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
+
   const visible = rows.filter((r) => statusFilter === "all" || r.invoice_status === statusFilter);
 
   const totals = useMemo(() => {
