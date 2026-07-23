@@ -398,6 +398,12 @@ export default function ClientDetailPage() {
   }
 
   const isBusiness = client.client_type === "business";
+  // Same "activated" derivation as RequestedServicesCard, computed once
+  // here so the still-open ActivateServiceModal can offer the next
+  // requested service without staff having to close and reopen it.
+  const remainingRequestedServices = serviceInterests
+    .filter((i) => !services.some((s) => s.service_type === i.service_type))
+    .map((i) => ({ serviceType: i.service_type, label: serviceTypeLabels.get(i.service_type) || i.service_type }));
   const displayName = clientDisplayName(client);
   const meta = accountTypeMeta(client);
   const address = [client.address, [client.city, client.state, client.zip_code].filter(Boolean).join(", ")]
@@ -1050,6 +1056,7 @@ export default function ClientDetailPage() {
           workspaceId={client.workspace_id}
           initialServiceType={activatingRequestedService?.serviceType}
           requestedServiceLabel={activatingRequestedService?.label}
+          remainingRequestedServices={remainingRequestedServices}
           onClose={() => {
             setShowActivateModal(false);
             setActivatingRequestedService(null);
