@@ -20,6 +20,32 @@ function formatPhone(raw: string) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+// formatPhone rebuilds the entire display string from scratch on every
+// keystroke. For a controlled input, React then sets that whole string back
+// as .value — which resets the cursor to the end unless something restores
+// it. Appending digits at the end is invisibly fine (that's where the
+// cursor already was), but editing a digit in the *middle* of an existing
+// number silently breaks: the first keystroke lands where you clicked, the
+// reformat snaps the cursor to the end, and every keystroke after that
+// lands in the wrong place — corrupting or discarding the intended edit
+// without any error. This is exactly the asymmetry reported: the email
+// field is a plain passthrough with no reformatting, so it never hits this;
+// phone is the only field in this form that reformats-on-every-keystroke.
+// Fix: figure out how many digits sit before the cursor in the raw input,
+// reformat, then place the cursor back after that same digit in the
+// reformatted string.
+function digitIndexToFormattedCursor(formatted: string, digitsBeforeCursor: number): number {
+  if (digitsBeforeCursor <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < formatted.length; i++) {
+    if (/\d/.test(formatted[i])) {
+      seen++;
+      if (seen === digitsBeforeCursor) return i + 1;
+    }
+  }
+  return formatted.length;
+}
+
 function formatSSN(raw: string) {
   const digits = raw.replace(/\D/g, "").slice(0, 9);
   if (digits.length < 4) return digits;
@@ -261,7 +287,9 @@ export default function ClientModal({
       .then(({ data }) => setSelectedServices(((data as any[]) ?? []).map((r) => r.service_type)));
     supabase
       .from("account_contacts")
-      .select("contact_id, contacts(first_name, middle_name, last_name, occupation, portal_access)")
+      .select(
+        "contact_id, contacts(first_name, middle_name, last_name, personal_email, personal_phone, occupation, portal_access)"
+      )
       .eq("account_id", client.id)
       .eq("is_primary", true)
       .maybeSingle()
@@ -273,9 +301,17 @@ export default function ClientModal({
         setOriginalContactId(id);
         if (c) {
           setOriginalContactLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
+          // Source email/phone from the contact's own row, not client.email/
+          // client.phone — those are the clients row's fields (the
+          // business's own contact info for a business client), which can
+          // drift from the linked person's actual personal_email/
+          // personal_phone. The contacts row is the source of truth for the
+          // linked person.
           setForm((f) => ({
             ...f,
             middle_name: c.middle_name ?? "",
+            email: c.personal_email ?? f.email,
+            phone: c.personal_phone ?? f.phone,
             occupation: c.occupation ?? "",
             portal_access: c.portal_access ?? false,
           }));
@@ -1166,7 +1202,17 @@ export default function ClientModal({
                   type="tel"
                   placeholder="(555) 123-4567"
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
+                  onChange={(e) => {
+                    const input = e.target;
+                    const rawCursor = input.selectionStart ?? input.value.length;
+                    const digitsBeforeCursor = input.value.slice(0, rawCursor).replace(/\D/g, "").length;
+                    const formatted = formatPhone(input.value);
+                    const newCursor = digitIndexToFormattedCursor(formatted, digitsBeforeCursor);
+                    setForm((f) => ({ ...f, phone: formatted }));
+                    requestAnimationFrame(() => {
+                      input.setSelectionRange(newCursor, newCursor);
+                    });
+                  }}
                   className="client-input w-full"
                 />
                 <input
