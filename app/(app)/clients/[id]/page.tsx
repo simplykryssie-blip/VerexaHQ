@@ -733,6 +733,15 @@ export default function ClientDetailPage() {
                       className="flex w-full items-center justify-between py-2.5 text-left text-sm hover:bg-paper transition-colors"
                     >
                       <span className="min-w-0">
+                        <span
+                          className={`mr-2 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            item.kind === "deadline"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-blue-200 bg-blue-50 text-blue-700"
+                          }`}
+                        >
+                          {item.kind === "deadline" ? "Deadline" : "Task"}
+                        </span>
                         <span className="text-ink">{item.title}</span>
                         {item.kind === "task" && taskLabelById.get(item.id) && (
                           <span className="ml-2 rounded-full bg-paper border border-line px-1.5 py-0.5 text-[10px] font-semibold text-muted">
