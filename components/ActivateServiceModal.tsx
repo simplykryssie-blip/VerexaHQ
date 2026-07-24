@@ -26,6 +26,36 @@ const DEADLINE_TYPE_OPTIONS = [
 // are just sensible common choices for a free-text column.
 const BILLING_FREQUENCY_OPTIONS = ["Monthly", "Quarterly", "Semi-Annually", "Annually"];
 
+// Every RAISE EXCEPTION message in apply_service_template_to_client() and
+// the RPCs this modal calls is hand-written in plain English specifically
+// for staff to read (e.g. "You do not have permission to apply service
+// templates.", "This service has retained records that must be
+// preserved..."). Anything else reaching here is a raw Postgres error —
+// a constraint violation, a missing column, etc. — and staff should never
+// see that verbatim (found live: a documents_storage_bucket_check
+// violation surfaced as literal SQL to the activation screen). This is a
+// blacklist of the telltale shapes raw database errors take, not a
+// whitelist of expected messages, so a new hand-written RPC message
+// still passes through unless it happens to use one of these words.
+const RAW_DB_ERROR_PATTERNS = [
+  /violates .* constraint/i,
+  /constraint "/i,
+  /relation "/i,
+  /column .* does not exist/i,
+  /duplicate key/i,
+  /null value in column/i,
+  /permission denied for/i,
+  /invalid input syntax/i,
+];
+
+function friendlyActivationError(message: string): string {
+  if (RAW_DB_ERROR_PATTERNS.some((pattern) => pattern.test(message))) {
+    console.error("Service activation failed with a raw database error:", message);
+    return "We couldn't create this service workflow. No records were saved. Please try again or contact support.";
+  }
+  return message;
+}
+
 type TemplateTaskItem = {
   id: string;
   service_template_id: string;
@@ -384,7 +414,7 @@ export default function ActivateServiceModal({
       p_is_recurring: isRecurring,
     });
     if (rpcError) {
-      setError(rpcError.message);
+      setError(friendlyActivationError(rpcError.message));
       setSaving(false);
       return;
     }
@@ -462,7 +492,7 @@ export default function ActivateServiceModal({
       .select("id")
       .single();
     if (insertError) {
-      setError(insertError.message);
+      setError(friendlyActivationError(insertError.message));
       setSaving(false);
       return;
     }
