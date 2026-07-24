@@ -34,6 +34,7 @@ import type {
   Client,
   Contact,
   Service,
+  ClientServiceInterest,
   Task,
   Deadline,
   Document,
@@ -84,6 +85,7 @@ type CommMessage = {
   created_at: string;
 };
 type Note = { id: string; note_body: string; created_by: string | null; created_at: string };
+type EngagementSummary = { id: string; service_id: string | null; engagement_name: string; tax_year: number | null; status: string };
 
 const TABS = ["overview", "work", "documents", "communication", "billing", "notes", "details"] as const;
 type Tab = (typeof TABS)[number];
@@ -112,6 +114,101 @@ function isAlsoIndividualClient(c: ContactWithLinks | null): LinkedClientSummary
   return link?.clients ?? null;
 }
 
+function humanizeServiceType(code: string, labels: Map<string, string>): string {
+  const known = labels.get(code);
+  if (known) return known;
+  return code
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+type TaskGroup = {
+  key: string;
+  label: string;
+  subtitle: string | null;
+  statusLabel: string | null;
+  engagementId: string | null;
+  // True only for the engagement-fallback tier (service_id is gone but the
+  // engagement itself still exists) and the general bucket — a visible
+  // signal that a group's own service record no longer exists, most often
+  // because a duplicate service was manually deleted without its
+  // engagement/tasks being cleaned up alongside it (deleting a `services`
+  // row does not cascade to `engagements`/`tasks` — the FK just goes
+  // null). Never used to hide anything, only to label it honestly.
+  orphaned: boolean;
+  tasks: Task[];
+};
+
+// Groups by service_id first (the real, current source of truth), then
+// falls back to engagement_id for tasks whose service record is gone but
+// whose engagement still exists, then a single "General client tasks"
+// bucket for tasks with neither — never by task_title, which is why
+// same-named tasks from different services were indistinguishable before.
+function groupTasksByService(
+  tasks: Task[],
+  services: Service[],
+  engagements: EngagementSummary[],
+  serviceEngagements: Map<string, string>,
+  serviceTypeLabels: Map<string, string>
+): TaskGroup[] {
+  const servicesById = new Map(services.map((s) => [s.id, s]));
+  const engagementsById = new Map(engagements.map((e) => [e.id, e]));
+  const groups = new Map<string, TaskGroup>();
+
+  for (const t of tasks) {
+    let key: string;
+    let group: TaskGroup;
+
+    if (t.service_id && servicesById.has(t.service_id)) {
+      const s = servicesById.get(t.service_id)!;
+      key = `service:${s.id}`;
+      group = groups.get(key) ?? {
+        key,
+        label: humanizeServiceType(s.service_type, serviceTypeLabels),
+        subtitle: s.service_year || null,
+        statusLabel: s.service_status,
+        engagementId: serviceEngagements.get(s.id) ?? null,
+        orphaned: false,
+        tasks: [],
+      };
+    } else if (t.engagement_id && engagementsById.has(t.engagement_id)) {
+      const e = engagementsById.get(t.engagement_id)!;
+      key = `engagement:${e.id}`;
+      group = groups.get(key) ?? {
+        key,
+        label: e.engagement_name,
+        subtitle: e.tax_year ? String(e.tax_year) : null,
+        statusLabel: e.status,
+        engagementId: e.id,
+        orphaned: true,
+        tasks: [],
+      };
+    } else {
+      key = "general";
+      group = groups.get(key) ?? {
+        key,
+        label: "General client tasks",
+        subtitle: null,
+        statusLabel: null,
+        engagementId: null,
+        orphaned: false,
+        tasks: [],
+      };
+    }
+
+    if (!groups.has(key)) groups.set(key, group);
+    group.tasks.push(t);
+  }
+
+  return Array.from(groups.values()).sort((a, b) => {
+    if (a.key === "general") return 1;
+    if (b.key === "general") return -1;
+    return a.label.localeCompare(b.label);
+  });
+}
+
 function orderFoldersByTree(folders: DocumentFolder[]): { folder: DocumentFolder; depth: number }[] {
   const byParent = new Map<string, DocumentFolder[]>();
   for (const f of folders) {
@@ -138,6 +235,20 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<Client | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
+  // Full engagement rows (not just the service_id -> id map above) so
+  // tasks whose own service_id has since gone null (the service record it
+  // pointed to was deleted, leaving the engagement orphaned via
+  // ON DELETE SET NULL) can still be grouped and labeled sensibly by
+  // their engagement instead of being dumped into "General client tasks".
+  const [engagementSummaries, setEngagementSummaries] = useState<EngagementSummary[]>([]);
+  // Requested Services (client_service_interests) are separate from real,
+  // activated Services — a service_type here never implies a `services` row
+  // exists. "Activated" is derived by matching service_type against
+  // `services`, not from service_interests.service_status, since
+  // save_workspace_client resets that column to 'interested' on every
+  // client resave.
+  const [serviceInterests, setServiceInterests] = useState<ClientServiceInterest[]>([]);
+  const [serviceTypeLabels, setServiceTypeLabels] = useState<Map<string, string>>(new Map());
   const [contacts, setContacts] = useState<LinkedContact[]>([]);
   const [viewingContact, setViewingContact] = useState<{ link: LinkedContact; edit: boolean } | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -167,7 +278,16 @@ export default function ClientDetailPage() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [showActivateModal, setShowActivateModal] = useState(false);
+  // Set when "Activate" is clicked on a specific Requested Service row, so
+  // the modal can preselect the matching template and show which request
+  // triggered it. null means either closed, or opened via the plain
+  // "Add service" action (showActivateModal) with no preselection.
+  const [activatingRequestedService, setActivatingRequestedService] = useState<{
+    serviceType: string;
+    label: string;
+  } | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -175,17 +295,24 @@ export default function ClientDetailPage() {
   const [newNote, setNewNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
-  async function load() {
-    setLoading(true);
+  // The actual fetch — shared by both entry points below. Never toggles
+  // `loading` itself: `loading` gates the page's *only* render branch
+  // (see `if (loading) return ...` further down), which unmounts this
+  // entire tree, including any modal that's still open above it (e.g.
+  // ActivateServiceModal, which deliberately stays open across an
+  // activation). Toggling it mid-flow caused the tree — and whatever
+  // modal was open — to unmount and then remount from scratch once the
+  // fetch finished, wiping out the modal's own state and any props like
+  // `initialServiceType`, which is what silently reset activation back to
+  // its first step after every successful save.
+  async function fetchClientData() {
     const clientRes = await supabase.from("clients").select("*").eq("id", id).maybeSingle();
     if (clientRes.error) {
       setError(clientRes.error.message);
-      setLoading(false);
       return;
     }
     if (!clientRes.data) {
       setClient(null);
-      setLoading(false);
       return;
     }
     const c = clientRes.data as Client;
@@ -194,6 +321,8 @@ export default function ClientDetailPage() {
     const [
       servicesRes,
       engagementsRes,
+      serviceInterestsRes,
+      serviceTypeOptionsRes,
       contactsRes,
       tasksRes,
       deadlinesRes,
@@ -210,7 +339,12 @@ export default function ClientDetailPage() {
       notesRes,
     ] = await Promise.all([
       supabase.from("services").select("*").eq("client_id", id),
-      supabase.from("engagements").select("id, service_id").eq("account_id", id),
+      supabase.from("engagements").select("id, service_id, engagement_name, tax_year, status").eq("account_id", id),
+      supabase.from("client_service_interests").select("*").eq("client_id", id).order("created_at"),
+      // Not filtered to is_active — a requested service saved under a code
+      // that's since been deactivated should still resolve to its real
+      // label instead of falling back to the raw code.
+      supabase.from("client_setup_options").select("option_code, option_label").eq("option_group", "client_service_type"),
       supabase
         .from("account_contacts")
         .select(
@@ -239,6 +373,11 @@ export default function ClientDetailPage() {
       if (e.service_id) engMap.set(e.service_id, e.id);
     });
     setServiceEngagements(engMap);
+    setEngagementSummaries((engagementsRes.data as EngagementSummary[]) ?? []);
+    setServiceInterests((serviceInterestsRes.data as ClientServiceInterest[]) ?? []);
+    setServiceTypeLabels(
+      new Map(((serviceTypeOptionsRes.data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label]))
+    );
     setContacts((contactsRes.data as unknown as LinkedContact[]) ?? []);
     setTasks((tasksRes.data as Task[]) ?? []);
     setDeadlines((deadlinesRes.data as Deadline[]) ?? []);
@@ -263,12 +402,42 @@ export default function ClientDetailPage() {
     setNotes((notesRes.data as Note[]) ?? []);
 
     setError(null);
+  }
+
+  // Initial page load only — this is the one place a full-page "Loading
+  // client…" state is appropriate, since there's nothing meaningful to
+  // show yet anyway.
+  async function load() {
+    setLoading(true);
+    await fetchClientData();
     setLoading(false);
+  }
+
+  // Used by every in-place save/activate/delete callback below instead of
+  // `load()`, so refreshing data while a modal is open can never unmount
+  // (and silently reset) that modal.
+  async function refresh() {
+    await fetchClientData();
   }
 
   useEffect(() => {
     if (id) load();
   }, [id]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Refreshes this page's data (never the loading-toggling `load()`, so
+  // the still-open ActivateServiceModal doesn't get unmounted mid-flow —
+  // see fetchClientData's comment) and surfaces a lightweight success
+  // message, then the modal closes itself right after calling this.
+  async function handleServiceActivated(serviceName: string) {
+    await refresh();
+    setToast(`${serviceName} activated successfully.`);
+  }
 
   async function toggleTask(task: Task) {
     const nextStatus = task.task_status === "Done" ? "To Do" : "Done";
@@ -370,6 +539,18 @@ export default function ClientDetailPage() {
   }
 
   const isBusiness = client.client_type === "business";
+  // Same "activated" derivation as RequestedServicesCard, computed once
+  // here so the still-open ActivateServiceModal can offer the next
+  // requested service without staff having to close and reopen it.
+  const remainingRequestedServices = serviceInterests
+    .filter((i) => !services.some((s) => s.service_type === i.service_type))
+    .map((i) => ({ serviceType: i.service_type, label: serviceTypeLabels.get(i.service_type) || i.service_type }));
+  const taskGroups = groupTasksByService(tasks, services, engagementSummaries, serviceEngagements, serviceTypeLabels);
+  const taskLabelById = new Map<string, string>();
+  taskGroups.forEach((g) => {
+    const full = g.subtitle ? `${g.label} — ${g.subtitle}` : g.label;
+    g.tasks.forEach((t) => taskLabelById.set(t.id, full));
+  });
   const displayName = clientDisplayName(client);
   const meta = accountTypeMeta(client);
   const address = [client.address, [client.city, client.state, client.zip_code].filter(Boolean).join(", ")]
@@ -393,6 +574,11 @@ export default function ClientDetailPage() {
 
   return (
     <div className="space-y-6 pb-8">
+      {toast && (
+        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-[#108A64] shadow-lg">
+          {toast}
+        </div>
+      )}
       <button onClick={() => router.push("/clients")} className="flex items-center gap-1.5 text-xs text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Clients
       </button>
@@ -511,6 +697,13 @@ export default function ClientDetailPage() {
       {tab === "overview" && (
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2">
+            <RequestedServicesCard
+              interests={serviceInterests}
+              serviceTypeLabels={serviceTypeLabels}
+              services={services}
+              onActivate={(interest, label) => setActivatingRequestedService({ serviceType: interest.service_type, label })}
+            />
+
             <Card
               title="Active Services"
               action={{ label: "View All", onClick: () => setTab("work") }}
@@ -533,10 +726,31 @@ export default function ClientDetailPage() {
               ) : (
                 <div className="divide-y divide-line">
                   {openTasksAndDeadlines.map((item) => (
-                    <div key={`${item.kind}-${item.id}`} className="flex items-center justify-between py-2.5 text-sm">
-                      <span className="text-ink">{item.title}</span>
-                      <span className="text-xs text-muted tabular-nums font-mono">{item.due ?? "No due date"}</span>
-                    </div>
+                    <button
+                      type="button"
+                      key={`${item.kind}-${item.id}`}
+                      onClick={() => setTab("work")}
+                      className="flex w-full items-center justify-between py-2.5 text-left text-sm hover:bg-paper transition-colors"
+                    >
+                      <span className="min-w-0">
+                        <span
+                          className={`mr-2 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            item.kind === "deadline"
+                              ? "border-amber-200 bg-amber-50 text-amber-700"
+                              : "border-blue-200 bg-blue-50 text-blue-700"
+                          }`}
+                        >
+                          {item.kind === "deadline" ? "Deadline" : "Task"}
+                        </span>
+                        <span className="text-ink">{item.title}</span>
+                        {item.kind === "task" && taskLabelById.get(item.id) && (
+                          <span className="ml-2 rounded-full bg-paper border border-line px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                            {taskLabelById.get(item.id)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted tabular-nums font-mono">{item.due ?? "No due date"}</span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -635,6 +849,13 @@ export default function ClientDetailPage() {
 
       {tab === "work" && (
         <div className="space-y-4">
+          <RequestedServicesCard
+            interests={serviceInterests}
+            serviceTypeLabels={serviceTypeLabels}
+            services={services}
+            onActivate={(interest, label) => setActivatingRequestedService({ serviceType: interest.service_type, label })}
+          />
+
           <Card title="Services" headerAction={{ icon: Plus, label: "Add service", onClick: () => setShowActivateModal(true) }}>
             {services.length === 0 ? (
               <EmptyAction text="No services yet. Add one to open its Service Workspace." actionLabel="Add Service" onAction={() => setShowActivateModal(true)} />
@@ -651,28 +872,56 @@ export default function ClientDetailPage() {
             {tasks.length === 0 ? (
               <Empty text="No tasks yet." />
             ) : (
-              <div className="divide-y divide-line">
-                {tasks.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between py-3">
-                    <label className="flex min-w-0 items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={t.task_status === "Done"}
-                        onChange={() => toggleTask(t)}
-                        className="h-4 w-4 shrink-0 accent-[#108A64]"
-                      />
-                      <span
-                        className="truncate text-sm font-semibold text-ink"
-                        style={{ textDecoration: t.task_status === "Done" ? "line-through" : "none", opacity: t.task_status === "Done" ? 0.5 : 1 }}
-                      >
-                        {t.task_title}
-                      </span>
-                    </label>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-xs tabular-nums font-mono text-muted">{t.due_date ?? "No due date"}</span>
-                      <button onClick={() => setEditingTask(t)} className="text-muted hover:text-ink" aria-label="Edit task">
-                        <Pencil size={13} />
-                      </button>
+              <div className="space-y-5">
+                {taskGroups.map((group) => (
+                  <div key={group.key}>
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-semibold text-ink">
+                          {group.label}
+                          {group.subtitle && ` — ${group.subtitle}`}
+                        </span>
+                        {group.statusLabel && <StatusPill status={group.statusLabel} />}
+                        {group.orphaned && group.key !== "general" && (
+                          <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                            No linked service record
+                          </span>
+                        )}
+                        <span className="text-[11px] text-muted">
+                          {group.tasks.length} task{group.tasks.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      {group.engagementId && (
+                        <Link href={`/work/${group.engagementId}`} className="text-xs font-semibold text-[#108A64] hover:underline">
+                          Open Workspace
+                        </Link>
+                      )}
+                    </div>
+                    <div className="divide-y divide-line">
+                      {group.tasks.map((t) => (
+                        <div key={t.id} className="flex items-center justify-between py-3">
+                          <label className="flex min-w-0 items-center gap-3 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={t.task_status === "Done"}
+                              onChange={() => toggleTask(t)}
+                              className="h-4 w-4 shrink-0 accent-[#108A64]"
+                            />
+                            <span
+                              className="truncate text-sm font-semibold text-ink"
+                              style={{ textDecoration: t.task_status === "Done" ? "line-through" : "none", opacity: t.task_status === "Done" ? 0.5 : 1 }}
+                            >
+                              {t.task_title}
+                            </span>
+                          </label>
+                          <div className="flex shrink-0 items-center gap-3">
+                            <span className="text-xs tabular-nums font-mono text-muted">{t.due_date ?? "No due date"}</span>
+                            <button onClick={() => setEditingTask(t)} className="text-muted hover:text-ink" aria-label="Edit task">
+                              <Pencil size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -957,9 +1206,9 @@ export default function ClientDetailPage() {
         </div>
       )}
 
-      {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={load} onDeleted={() => router.push("/clients")} />}
+      {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={refresh} onDeleted={() => router.push("/clients")} />}
       {showAddContactModal && (
-        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={load} />
+        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={refresh} />
       )}
       {viewingContact && viewingContact.link.contacts && (
         <ContactDetailModal
@@ -988,36 +1237,106 @@ export default function ClientDetailPage() {
           }}
         />
       )}
-      {showUploadModal && <UploadDocumentModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowUploadModal(false)} onSaved={load} />}
-      {showRequestModal && <RequestDocumentModal clientId={client.id} onClose={() => setShowRequestModal(false)} onSaved={load} />}
-      {showFolderModal && <DocumentFolderModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowFolderModal(false)} onSaved={load} />}
-      {showTaskModal && <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={load} />}
-      {editingTask && <NewTaskModal clientId={client.id} task={editingTask} onClose={() => setEditingTask(null)} onSaved={load} onDeleted={load} />}
-      {showDeadlineModal && <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={load} />}
+      {showUploadModal && <UploadDocumentModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowUploadModal(false)} onSaved={refresh} />}
+      {showRequestModal && <RequestDocumentModal clientId={client.id} onClose={() => setShowRequestModal(false)} onSaved={refresh} />}
+      {showFolderModal && <DocumentFolderModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowFolderModal(false)} onSaved={refresh} />}
+      {showTaskModal && <NewTaskModal clientId={client.id} onClose={() => setShowTaskModal(false)} onSaved={refresh} />}
+      {editingTask && <NewTaskModal clientId={client.id} task={editingTask} onClose={() => setEditingTask(null)} onSaved={refresh} onDeleted={refresh} />}
+      {showDeadlineModal && <NewDeadlineModal clientId={client.id} onClose={() => setShowDeadlineModal(false)} onSaved={refresh} />}
       {editingDeadline && (
-        <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={load} onDeleted={load} />
+        <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={refresh} onDeleted={refresh} />
       )}
-      {showActivateModal && (
-        <ActivateServiceModal clientId={client.id} workspaceId={client.workspace_id} onClose={() => setShowActivateModal(false)} onActivated={load} />
+      {(showActivateModal || activatingRequestedService) && (
+        <ActivateServiceModal
+          clientId={client.id}
+          workspaceId={client.workspace_id}
+          initialServiceType={activatingRequestedService?.serviceType}
+          requestedServiceLabel={activatingRequestedService?.label}
+          remainingRequestedServices={remainingRequestedServices}
+          onClose={() => {
+            setShowActivateModal(false);
+            setActivatingRequestedService(null);
+          }}
+          onActivated={handleServiceActivated}
+        />
       )}
       {editingService && (
-        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={load} onDeleted={load} />
+        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={refresh} onDeleted={refresh} />
       )}
-      {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={load} />}
+      {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={refresh} />}
     </div>
   );
 }
 
+// "Activated" is derived, never stored: a requested service_type counts as
+// activated the moment a real `services` row shares that service_type for
+// this client. client_service_interests.service_status is not used for
+// this — save_workspace_client resets it to 'interested' on every resave,
+// and apply_service_template_to_client never updates it, so it can't be
+// trusted to reflect real activation state.
+function RequestedServicesCard({
+  interests,
+  serviceTypeLabels,
+  services,
+  onActivate,
+}: {
+  interests: ClientServiceInterest[];
+  serviceTypeLabels: Map<string, string>;
+  services: Service[];
+  onActivate: (interest: ClientServiceInterest, label: string) => void;
+}) {
+  return (
+    <Card title="Requested Services">
+      {interests.length === 0 ? (
+        <Empty text="No requested services." />
+      ) : (
+        <div className="divide-y divide-line">
+          {interests.map((interest) => {
+            const label = serviceTypeLabels.get(interest.service_type) || interest.service_type;
+            const activated = services.some((s) => s.service_type === interest.service_type);
+            return (
+              <div key={interest.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                <span className="text-ink">{label}</span>
+                <div className="flex shrink-0 items-center gap-2">
+                  {activated ? (
+                    <StatusPill status="Activated" />
+                  ) : (
+                    <>
+                      <StatusPill status="Not activated" />
+                      <button
+                        onClick={() => onActivate(interest, label)}
+                        className="rounded-lg border border-line px-2.5 py-1 text-xs font-semibold text-ink hover:bg-paper"
+                      >
+                        Activate
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: string; onEdit: () => void }) {
-  const content = (
+  // service_year is a real column, but plenty of rows (legacy, or activated
+  // before this fix) never had it set — fall back to start/due date instead
+  // of a bare "No year set", and only say that when there's truly no date
+  // data of any kind to show.
+  const dateBits: string[] = [];
+  if (s.service_year) dateBits.push(s.service_year);
+  if (s.start_date) dateBits.push(`Start ${s.start_date}`);
+  if (s.due_date) dateBits.push(`Due ${s.due_date}`);
+  const subtitle = dateBits.length > 0 ? dateBits.join(" · ") : "No dates set";
+
+  const mainContent = (
     <>
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-ink">{s.service_type}</div>
-        <div className="mt-0.5 text-xs text-muted">
-          {s.service_year || "No year set"}
-          {!engagementId && " · Legacy service, no workspace"}
-          {s.due_date && ` · Due ${s.due_date}`}
-        </div>
+        <div className="mt-0.5 text-xs text-muted">{subtitle}</div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {isOpenServiceStatus(s.service_status) ? (
@@ -1025,18 +1344,41 @@ function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: st
         ) : (
           <span className="rounded-full bg-paper px-2 py-0.5 text-[10px] font-semibold text-muted">Closed</span>
         )}
+        {/* No fabricated "Add Workflow" action here — no existing RPC
+            attaches an engagement to an already-created service, so this
+            only ever states the truthful current state. */}
+        {!engagementId && (
+          <span className="rounded-full bg-paper border border-line px-2 py-0.5 text-[10px] font-semibold text-muted">Workflow not added</span>
+        )}
         <StatusPill status={s.service_status} />
       </div>
     </>
   );
-  return engagementId ? (
-    <Link href={`/work/${engagementId}`} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
-      {content}
-    </Link>
-  ) : (
-    <button onClick={onEdit} className="flex w-full items-center justify-between py-3 text-left hover:bg-paper transition-colors">
-      {content}
-    </button>
+  // The Edit button is always rendered (never hover-only) so it's reachable
+  // on mobile — it used to only exist when a service had no engagement,
+  // meaning newly-activated services (which always get one) had no way to
+  // edit their dates/status/owner at all from this card.
+  return (
+    <div className="flex w-full items-center gap-1 py-3">
+      {engagementId ? (
+        <Link
+          href={`/work/${engagementId}`}
+          className="-mx-1 flex min-w-0 flex-1 items-center justify-between rounded-lg px-1 text-left transition-colors hover:bg-paper"
+        >
+          {mainContent}
+        </Link>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center justify-between">{mainContent}</div>
+      )}
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${s.service_type}`}
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-paper hover:text-ink"
+      >
+        <Pencil size={14} />
+      </button>
+    </div>
   );
 }
 
