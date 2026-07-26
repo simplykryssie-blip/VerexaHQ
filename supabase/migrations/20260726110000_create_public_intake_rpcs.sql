@@ -104,8 +104,19 @@ begin
   select * into r from public.intakes where id = p_intake_id;
   if not found then return; end if;
 
-  create temp table if not exists _intake_doc_rules (item_key text, item_title text, item_reason text, is_required boolean, is_blocking boolean, sort_order int) on commit drop;
-  delete from _intake_doc_rules;
+  -- Scratch table, rebuilt fresh on every call (ON COMMIT DROP means it
+  -- never survives past this transaction anyway) -- dropped and recreated
+  -- rather than DELETEd so this never needs a WHERE clause: this project's
+  -- authenticator role preloads the `safeupdate` library, which rejects
+  -- any DELETE/UPDATE without one, and a bare `delete from
+  -- _intake_doc_rules;` was exactly that (caught live: it broke every
+  -- public intake start, since this function runs inside
+  -- start_public_intake). DROP TABLE isn't a DELETE, so it isn't subject
+  -- to that check at all, and it carries no cross-intake/cross-workspace
+  -- data since this table has no intake_id column -- it's pure per-call
+  -- scratch space, never persisted or shared.
+  drop table if exists _intake_doc_rules;
+  create temp table _intake_doc_rules (item_key text, item_title text, item_reason text, is_required boolean, is_blocking boolean, sort_order int) on commit drop;
 
   insert into _intake_doc_rules values ('photo_id', 'Government-issued photo ID', 'Confirms your identity for the return.', true, true, 1);
   insert into _intake_doc_rules values ('other_documents', 'Other documents', 'Anything else you think we should see.', false, false, 99);

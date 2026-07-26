@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/serverAuth";
 import { isRateLimited, requestIp } from "@/lib/intakeRateLimit";
+import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
 
 // Public, unauthenticated endpoint, gated entirely by the intake return
 // token (re-validated via resume_public_intake on every call -- a token
@@ -111,7 +112,11 @@ export async function POST(req: NextRequest) {
   );
   if (recordError) {
     await service.storage.from("verexahq-client-documents").remove([storagePath]);
-    return NextResponse.json({ ok: false, error: recordError.message }, { status: 400 });
+    console.error("[public-intake] record_intake_document_upload", recordError.code, recordError.message);
+    return NextResponse.json(
+      { ok: false, error: publicIntakeErrorMessage(recordError, "We couldn't save that upload. Please try again.") },
+      { status: 400 },
+    );
   }
 
   return NextResponse.json({ ok: true, documentId });

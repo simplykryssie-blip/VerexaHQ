@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { LogoMark } from "@/components/Logo";
 import { supabaseIntake, isIntakeSupabaseConfigured } from "@/lib/supabaseIntake";
+import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
+import { reportIntakeError } from "@/lib/reportIntakeError";
 
 const CURRENT_TAX_YEAR = new Date().getFullYear() - 1;
+const GENERIC_START_ERROR = "We couldn't start your intake right now. Please try again.";
 
 export default function IntakeStartPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -19,9 +22,14 @@ export default function IntakeStartPage() {
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Belt-and-suspenders against a double click racing ahead of the
+  // `disabled={submitting}` re-render: this ref is checked synchronously,
+  // before React has necessarily committed the state update.
+  const submittingRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError(null);
 
     if (!firstName.trim() || !lastName.trim()) {
@@ -33,30 +41,45 @@ export default function IntakeStartPage() {
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
-    const { data, error: rpcError } = await supabaseIntake.rpc("start_public_intake", {
-      p_workspace_id: workspaceId,
-      p_tax_year: taxYear,
-      p_return_type: "individual",
-      p_is_returning: isReturning === "yes",
-      p_first_name: firstName.trim(),
-      p_last_name: lastName.trim(),
-      p_email: email.trim() || null,
-      p_phone: phone.trim() || null,
-    });
-    setSubmitting(false);
+    try {
+      const { data, error: rpcError } = await supabaseIntake.rpc("start_public_intake", {
+        p_workspace_id: workspaceId,
+        p_tax_year: taxYear,
+        p_return_type: "individual",
+        p_is_returning: isReturning === "yes",
+        p_first_name: firstName.trim(),
+        p_last_name: lastName.trim(),
+        p_email: email.trim() || null,
+        p_phone: phone.trim() || null,
+      });
 
-    if (rpcError || !data) {
-      setError(rpcError?.message || "We couldn't start your intake. Please try again.");
-      return;
+      if (rpcError || !data) {
+        if (rpcError) reportIntakeError("start_public_intake", rpcError);
+        setError(rpcError ? publicIntakeErrorMessage(rpcError, GENERIC_START_ERROR) : GENERIC_START_ERROR);
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      const token = row?.raw_token as string | undefined;
+      if (!token) {
+        setError(GENERIC_START_ERROR);
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+      // Leave submitting=true / the ref locked through navigation -- the
+      // button should stay disabled until this screen unmounts, not flip
+      // back to clickable while the redirect is in flight.
+      router.replace(`/intake/r/${token}`);
+    } catch (err) {
+      reportIntakeError("start_public_intake", err);
+      setError(GENERIC_START_ERROR);
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-    const row = Array.isArray(data) ? data[0] : data;
-    const token = row?.raw_token as string | undefined;
-    if (!token) {
-      setError("We couldn't start your intake. Please try again.");
-      return;
-    }
-    router.replace(`/intake/r/${token}`);
   }
 
   if (!isIntakeSupabaseConfigured) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/serverAuth";
 import { isEmailConfigured, isSmsConfigured } from "@/lib/providerStatus";
 import { isRateLimited, requestIp } from "@/lib/intakeRateLimit";
+import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
 
 // Public, unauthenticated endpoint. The only thing that stands in for auth
 // here is the intake return-link token, re-validated on every call by
@@ -63,7 +64,11 @@ export async function POST(req: NextRequest) {
     { p_intake_id: intakeId, p_channel: channel, p_destination: destination },
   );
   if (genError) {
-    return NextResponse.json({ ok: false, error: genError.message }, { status: 400 });
+    console.error("[public-intake] generate_intake_verification_code", genError.code, genError.message);
+    return NextResponse.json(
+      { ok: false, error: publicIntakeErrorMessage(genError, "We couldn't send a code right now. Please try again.") },
+      { status: 400 },
+    );
   }
   const row = Array.isArray(codeRows) ? codeRows[0] : codeRows;
   const rawCode = row?.raw_code as string | undefined;

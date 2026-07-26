@@ -9,6 +9,8 @@ import {
   type IntakeRow,
   type IntakeDocumentRequest,
 } from "@/lib/supabaseIntake";
+import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
+import { reportIntakeError } from "@/lib/reportIntakeError";
 
 const SECTIONS = [
   "Identity & Entry",
@@ -143,6 +145,7 @@ export default function IntakeWizardPage() {
       const { data, error } = await supabaseIntake.rpc("resume_public_intake", { p_token: token });
       if (cancelled) return;
       if (error || !data) {
+        if (error) reportIntakeError("resume_public_intake", error);
         setLoadError("This link is invalid or has expired. Please contact our office for a new one.");
         setLoading(false);
         return;
@@ -170,6 +173,7 @@ export default function IntakeWizardPage() {
         p_patch: buildPatch(currentForm),
       });
       if (error || !data) {
+        if (error) reportIntakeError("save_intake_progress", error);
         setSaveStatus("error");
         return;
       }
@@ -649,6 +653,7 @@ function SectionReview({
   const [recordAck, setRecordAck] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const verified = intake.contact_email_verified || intake.contact_phone_verified;
 
@@ -682,7 +687,8 @@ function SectionReview({
     });
     setVerifying(false);
     if (error || !data) {
-      setNotice(error?.message || "That code didn't work.");
+      if (error) reportIntakeError("verify_intake_code", error);
+      setNotice(publicIntakeErrorMessage(error, "That code didn't work. Please try again."));
       return;
     }
     const row = Array.isArray(data) ? data[0] : data;
@@ -692,31 +698,45 @@ function SectionReview({
   }
 
   async function handleSubmit() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);
-    let ip: string | null = null;
     try {
-      const r = await fetch("/api/intake/client-info");
-      ip = (await r.json())?.ip ?? null;
-    } catch {
-      ip = null;
+      let ip: string | null = null;
+      try {
+        const r = await fetch("/api/intake/client-info");
+        ip = (await r.json())?.ip ?? null;
+      } catch {
+        ip = null;
+      }
+      const { data, error } = await supabaseIntake.rpc("submit_intake", {
+        p_token: token,
+        p_typed_name: typedName.trim(),
+        p_accuracy_ack: accuracyAck,
+        p_communication_consent: commConsent,
+        p_marketing_consent: marketingConsent,
+        p_electronic_record_ack: recordAck,
+        p_ip_address: ip,
+        p_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      });
+      if (error || !data) {
+        if (error) reportIntakeError("submit_intake", error);
+        setSubmitError(publicIntakeErrorMessage(error, "We couldn't submit your intake. Please try again."));
+        submittingRef.current = false;
+        setSubmitting(false);
+        return;
+      }
+      // Leave submitting=true / the ref locked -- onSubmitted() swaps this
+      // whole screen for the confirmation view, so the button never needs
+      // to become clickable again.
+      onSubmitted();
+    } catch (err) {
+      reportIntakeError("submit_intake", err);
+      setSubmitError("We couldn't submit your intake. Please try again.");
+      submittingRef.current = false;
+      setSubmitting(false);
     }
-    const { data, error } = await supabaseIntake.rpc("submit_intake", {
-      p_token: token,
-      p_typed_name: typedName.trim(),
-      p_accuracy_ack: accuracyAck,
-      p_communication_consent: commConsent,
-      p_marketing_consent: marketingConsent,
-      p_electronic_record_ack: recordAck,
-      p_ip_address: ip,
-      p_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
-    });
-    setSubmitting(false);
-    if (error || !data) {
-      setSubmitError(error?.message || "We couldn't submit your intake. Please try again.");
-      return;
-    }
-    onSubmitted();
   }
 
   return (
