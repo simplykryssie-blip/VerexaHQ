@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight, CheckCircle2, FileText, ClipboardList, FileCheck2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { ServiceTemplate, PipelineStage } from "@/lib/types";
+import { friendlyDbError } from "@/lib/friendlyError";
 
 // Heuristic default only — service_templates has no is_recurring/frequency
 // column of its own, so this just pre-selects a sensible starting choice on
@@ -25,6 +26,12 @@ const DEADLINE_TYPE_OPTIONS = [
 // services.billing_frequency is real but has no CHECK constraint — these
 // are just sensible common choices for a free-text column.
 const BILLING_FREQUENCY_OPTIONS = ["Monthly", "Quarterly", "Semi-Annually", "Annually"];
+
+// Sanitization (preview-vs-production, RLS detection, P0001 passthrough)
+// now lives in lib/friendlyError.ts, shared with ClientModal and
+// NewServiceModal — confirmed live that a documents_storage_bucket_check
+// violation used to surface as literal SQL on this exact screen.
+const ACTIVATION_FALLBACK = "We couldn't create this service workflow. No records were saved. Please try again or contact support.";
 
 type TemplateTaskItem = {
   id: string;
@@ -384,7 +391,7 @@ export default function ActivateServiceModal({
       p_is_recurring: isRecurring,
     });
     if (rpcError) {
-      setError(rpcError.message);
+      setError(friendlyDbError(rpcError, "apply_service_template_to_client", ACTIVATION_FALLBACK));
       setSaving(false);
       return;
     }
@@ -462,7 +469,7 @@ export default function ActivateServiceModal({
       .select("id")
       .single();
     if (insertError) {
-      setError(insertError.message);
+      setError(friendlyDbError(insertError, "services_insert_create_only", ACTIVATION_FALLBACK));
       setSaving(false);
       return;
     }

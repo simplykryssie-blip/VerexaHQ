@@ -5,6 +5,7 @@ import { BriefcaseBusiness, Plus, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import NewServiceModal from "@/components/NewServiceModal";
+import { humanizeServiceType } from "@/lib/serviceLabels";
 import type { Service } from "@/lib/types";
 type Row = Service & {
   clients: {
@@ -17,6 +18,7 @@ type Row = Service & {
 export default function ServicesPage() {
   const { activeWorkspaceId } = useWorkspace();
   const [rows, setRows] = useState<Row[]>([]);
+  const [serviceTypeLabels, setServiceTypeLabels] = useState<Map<string, string>>(new Map());
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,14 +38,25 @@ export default function ServicesPage() {
   useEffect(() => {
     void load();
   }, [load]);
+  // Not filtered to is_active — a service saved under a code that's since
+  // been deactivated should still resolve to its real label.
+  useEffect(() => {
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_service_type")
+      .then(({ data }) =>
+        setServiceTypeLabels(new Map(((data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label])))
+      );
+  }, []);
   const filtered = useMemo(
     () =>
       rows.filter((r) =>
-        `${r.service_type} ${r.service_status} ${r.clients?.business_name ?? ""} ${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`
+        `${r.service_type} ${humanizeServiceType(r.service_type, serviceTypeLabels)} ${r.service_status} ${r.clients?.business_name ?? ""} ${r.clients?.first_name ?? ""} ${r.clients?.last_name ?? ""}`
           .toLowerCase()
           .includes(q.toLowerCase()),
       ),
-    [rows, q],
+    [rows, q, serviceTypeLabels],
   );
   return (
     <div>
@@ -107,7 +120,7 @@ export default function ServicesPage() {
                         "Client"}
                     </Link>
                   </td>
-                  <td>{r.service_type?.replaceAll("_", " ")}</td>
+                  <td>{humanizeServiceType(r.service_type, serviceTypeLabels)}</td>
                   <td>
                     <span className="rounded-full bg-paper px-2.5 py-1 text-xs">
                       {r.service_status}

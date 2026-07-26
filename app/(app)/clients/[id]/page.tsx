@@ -235,6 +235,15 @@ export default function ClientDetailPage() {
   const [client, setClient] = useState<Client | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [serviceEngagements, setServiceEngagements] = useState<Map<string, string>>(new Map());
+  // A service's real workflow position — its pipeline stage — is a
+  // different, more meaningful fact than service_status (a generic New/In
+  // Progress/Completed/Canceled bucket that every template-activated
+  // service starts at "New" regardless of which stage it's actually in).
+  // Confirmed live: ServiceRow previously showed only service_status,
+  // which never changes when staff move a service through its pipeline —
+  // this loads the real stage_name so the Active Services list matches
+  // what the Work/Service Workspace pages show.
+  const [serviceStageLabels, setServiceStageLabels] = useState<Map<string, string>>(new Map());
   // Full engagement rows (not just the service_id -> id map above) so
   // tasks whose own service_id has since gone null (the service record it
   // pointed to was deleted, leaving the engagement orphaned via
@@ -367,7 +376,15 @@ export default function ClientDetailPage() {
       supabase.from("notes").select("*").eq("client_id", id).order("created_at", { ascending: false }),
     ]);
 
-    setServices((servicesRes.data as Service[]) ?? []);
+    const loadedServices = (servicesRes.data as Service[]) ?? [];
+    setServices(loadedServices);
+    const stageIds = Array.from(new Set(loadedServices.map((s) => s.pipeline_stage_id).filter((v): v is string => !!v)));
+    if (stageIds.length > 0) {
+      const { data: stageRows } = await supabase.from("pipeline_stages").select("id, stage_name").in("id", stageIds);
+      setServiceStageLabels(new Map(((stageRows as { id: string; stage_name: string }[]) ?? []).map((s) => [s.id, s.stage_name])));
+    } else {
+      setServiceStageLabels(new Map());
+    }
     const engMap = new Map<string, string>();
     (engagementsRes.data ?? []).forEach((e: any) => {
       if (e.service_id) engMap.set(e.service_id, e.id);
@@ -714,7 +731,14 @@ export default function ClientDetailPage() {
               ) : (
                 <div className="divide-y divide-line">
                   {services.slice(0, 4).map((s) => (
-                    <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                    <ServiceRow
+                      key={s.id}
+                      s={s}
+                      engagementId={serviceEngagements.get(s.id)}
+                      serviceTypeLabels={serviceTypeLabels}
+                      stageLabel={s.pipeline_stage_id ? serviceStageLabels.get(s.pipeline_stage_id) : undefined}
+                      onEdit={() => setEditingService(s)}
+                    />
                   ))}
                 </div>
               )}
@@ -862,7 +886,14 @@ export default function ClientDetailPage() {
             ) : (
               <div className="divide-y divide-line">
                 {services.map((s) => (
-                  <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                  <ServiceRow
+                    key={s.id}
+                    s={s}
+                    engagementId={serviceEngagements.get(s.id)}
+                    serviceTypeLabels={serviceTypeLabels}
+                    stageLabel={s.pipeline_stage_id ? serviceStageLabels.get(s.pipeline_stage_id) : undefined}
+                    onEdit={() => setEditingService(s)}
+                  />
                 ))}
               </div>
             )}
@@ -1321,7 +1352,19 @@ function RequestedServicesCard({
   );
 }
 
-function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: string; onEdit: () => void }) {
+function ServiceRow({
+  s,
+  engagementId,
+  serviceTypeLabels,
+  stageLabel,
+  onEdit,
+}: {
+  s: Service;
+  engagementId?: string;
+  serviceTypeLabels: Map<string, string>;
+  stageLabel?: string;
+  onEdit: () => void;
+}) {
   // service_year is a real column, but plenty of rows (legacy, or activated
   // before this fix) never had it set — fall back to start/due date instead
   // of a bare "No year set", and only say that when there's truly no date
@@ -1331,14 +1374,25 @@ function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: st
   if (s.start_date) dateBits.push(`Start ${s.start_date}`);
   if (s.due_date) dateBits.push(`Due ${s.due_date}`);
   const subtitle = dateBits.length > 0 ? dateBits.join(" · ") : "No dates set";
+  const label = humanizeServiceType(s.service_type, serviceTypeLabels);
 
   const mainContent = (
     <>
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-ink">{s.service_type}</div>
+        <div className="truncate text-sm font-semibold text-ink">{label}</div>
         <div className="mt-0.5 text-xs text-muted">{subtitle}</div>
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        {/* This is the service's real pipeline stage (e.g. "Consultation
+            Needed"), not service_status — every template-activated service
+            starts service_status at a flat "New" regardless of which stage
+            it's actually in, so showing that instead of the real stage was
+            a standing mismatch with the Work/Service Workspace pages. */}
+        {stageLabel && (
+          <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+            {stageLabel}
+          </span>
+        )}
         {isOpenServiceStatus(s.service_status) ? (
           <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-[#108A64]">Active</span>
         ) : (
@@ -1373,7 +1427,7 @@ function ServiceRow({ s, engagementId, onEdit }: { s: Service; engagementId?: st
       <button
         type="button"
         onClick={onEdit}
-        aria-label={`Edit ${s.service_type}`}
+        aria-label={`Edit ${label}`}
         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted hover:bg-paper hover:text-ink"
       >
         <Pencil size={14} />
