@@ -10,6 +10,7 @@ import {
   CheckSquare,
   ChevronDown,
   CircleDollarSign,
+  ClipboardList,
   FileBarChart,
   FileText,
   FolderOpen,
@@ -39,6 +40,7 @@ import {
 const PRD_NAV = [
   { href: "/dashboard", label: "Home", icon: LayoutGrid },
   { href: "/clients", label: "Clients", icon: Users },
+  { href: "/intake-review", label: "Intake Review", icon: ClipboardList },
   { href: "/work", label: "Work", icon: BriefcaseBusiness },
   { href: "/documents", label: "Documents", icon: FolderOpen },
   { href: "/messages", label: "Communication", icon: MessageSquare },
@@ -52,8 +54,8 @@ const PRD_NAV = [
 const MOBILE = [
   PRD_NAV[0],
   PRD_NAV[1],
-  PRD_NAV[2],
   PRD_NAV[3],
+  PRD_NAV[4],
 ];
 
 type QuickCreateItem = {
