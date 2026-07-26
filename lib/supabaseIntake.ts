@@ -57,4 +57,5 @@ export type IntakeDocumentRequest = {
   is_blocking: boolean;
   status: string;
   sort_order: number;
+  client_note: string | null;
 };

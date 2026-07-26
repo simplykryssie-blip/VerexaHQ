@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/serverAuth";
 import { isEmailConfigured, isSmsConfigured } from "@/lib/providerStatus";
 import { isRateLimited, requestIp } from "@/lib/intakeRateLimit";
 import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
+import { PRODUCTION_HOSTNAME } from "@/lib/friendlyError";
 
 // Public, unauthenticated endpoint. The only thing that stands in for auth
 // here is the intake return-link token, re-validated on every call by
@@ -13,9 +14,23 @@ import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
 // the only place in the system that ever sees a raw verification code, and
 // only for the instant it takes to hand it to Resend/Twilio. It is never
 // echoed back to the browser in production.
-function isProduction() {
-  if (process.env.VERCEL_ENV) return process.env.VERCEL_ENV === "production";
-  return process.env.NODE_ENV === "production";
+//
+// Preview testing mode: a raw code is only ever included in the response
+// when providers aren't configured AND this deployment isn't production --
+// checked here, server-side, from the request's own Host header and
+// server-only env vars. Never trust a client-supplied flag for this.
+// `req.headers.get("host")` matching the real production hostname is an
+// absolute block that no env var can override, since NODE_ENV alone can't
+// tell a Vercel Preview deployment apart from Production (`next build`
+// bakes NODE_ENV=production into both -- see lib/friendlyError.ts).
+function isPreviewVerificationAllowed(req: NextRequest): boolean {
+  const host = (req.headers.get("host") || "").toLowerCase();
+  if (host === PRODUCTION_HOSTNAME) return false;
+
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (process.env.PUBLIC_INTAKE_PREVIEW_VERIFICATION === "true") return true;
+  if (vercelEnv) return vercelEnv !== "production";
+  return process.env.NODE_ENV !== "production";
 }
 
 export async function POST(req: NextRequest) {
@@ -77,17 +92,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Could not generate a code." }, { status: 500 });
   }
 
-  const devPreview = !isProduction() ? { devCode: rawCode } : {};
+  const previewAllowed = isPreviewVerificationAllowed(req);
 
   if (channel === "email") {
     if (!isEmailConfigured()) {
+      if (previewAllowed) {
+        console.log("[public-intake] preview verification: email not configured, issuing preview test code", { intakeId });
+        return NextResponse.json(
+          {
+            ok: false,
+            sent: false,
+            reason: "Preview testing mode: verification messages are not being delivered.",
+            devCode: rawCode,
+          },
+          { status: 503 },
+        );
+      }
       return NextResponse.json(
         {
           ok: false,
           sent: false,
           reason:
             "Email delivery is not configured for this workspace yet. Please contact our office to verify your intake, or ask staff to configure email delivery.",
-          ...devPreview,
         },
         { status: 503 },
       );
@@ -109,13 +135,24 @@ export async function POST(req: NextRequest) {
     }
   } else {
     if (!isSmsConfigured()) {
+      if (previewAllowed) {
+        console.log("[public-intake] preview verification: sms not configured, issuing preview test code", { intakeId });
+        return NextResponse.json(
+          {
+            ok: false,
+            sent: false,
+            reason: "Preview testing mode: verification messages are not being delivered.",
+            devCode: rawCode,
+          },
+          { status: 503 },
+        );
+      }
       return NextResponse.json(
         {
           ok: false,
           sent: false,
           reason:
             "Text-message delivery is not configured for this workspace yet. Please contact our office to verify your intake, or ask staff to configure SMS delivery.",
-          ...devPreview,
         },
         { status: 503 },
       );
@@ -136,5 +173,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, sent: true, expiresAt, ...devPreview });
+  return NextResponse.json({ ok: true, sent: true, expiresAt });
 }

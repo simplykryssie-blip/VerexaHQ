@@ -103,7 +103,7 @@ export default function IntakeStartPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white border border-line rounded-sm p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-muted mb-1">First name</label>
               <input

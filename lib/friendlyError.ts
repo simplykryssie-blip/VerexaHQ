@@ -20,7 +20,7 @@ export type SbError = { message: string; code?: string; details?: string | null;
 // else (preview, local dev, unset) defaults to showing full error detail,
 // since hiding detail on an environment we can't positively identify as
 // production would make preview failures undebuggable.
-const PRODUCTION_HOSTNAME = "verexa-hq-phi.vercel.app";
+export const PRODUCTION_HOSTNAME = "verexa-hq-phi.vercel.app";
 function computeIsPreviewOrDev(): boolean {
   if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") return false;
   if (typeof window !== "undefined" && window.location.hostname === PRODUCTION_HOSTNAME) return false;
