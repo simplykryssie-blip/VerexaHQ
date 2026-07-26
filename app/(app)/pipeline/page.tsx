@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { Pipeline, PipelineStage, Service, Client } from "@/lib/types";
 import NewPipelineModal from "@/components/NewPipelineModal";
 import NewServiceModal from "@/components/NewServiceModal";
+import { humanizeServiceType } from "@/lib/serviceLabels";
 
 type ServiceWithClient = Service & { clientName: string };
 
@@ -14,6 +15,7 @@ export default function PipelinePage() {
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [services, setServices] = useState<ServiceWithClient[]>([]);
+  const [serviceTypeLabels, setServiceTypeLabels] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPipelineModal, setShowPipelineModal] = useState(false);
@@ -39,6 +41,16 @@ export default function PipelinePage() {
 
   useEffect(() => {
     loadPipelines();
+  }, []);
+
+  useEffect(() => {
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_service_type")
+      .then(({ data }) =>
+        setServiceTypeLabels(new Map(((data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label])))
+      );
   }, []);
 
   async function loadBoard() {
@@ -255,7 +267,7 @@ export default function PipelinePage() {
                       </button>
                     </div>
                     <div className="text-xs text-muted mt-0.5">
-                      {svc.service_type} · {svc.service_year}
+                      {humanizeServiceType(svc.service_type, serviceTypeLabels)} · {svc.service_year}
                     </div>
                     <div className="flex justify-between mt-2">
                       <button

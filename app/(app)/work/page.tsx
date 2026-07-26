@@ -9,6 +9,7 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import StatusPill from "@/components/StatusPill";
 import type { Deadline, EngagementWorkspace, Service, Task } from "@/lib/types";
 import { isOpenTaskStatus, nextEngagementAction } from "@/lib/status";
+import { humanizeServiceType } from "@/lib/serviceLabels";
 
 const VIEWS = [
   { key: "mine", label: "My Work" },
@@ -56,9 +57,20 @@ export default function WorkPage() {
   const [docsForReview, setDocsForReview] = useState<any[]>([]);
   const [organizersForReview, setOrganizersForReview] = useState<any[]>([]);
   const [dueItems, setDueItems] = useState<DueItem[]>([]);
+  const [serviceTypeLabels, setServiceTypeLabels] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+  }, []);
+
+  useEffect(() => {
+    supabase
+      .from("client_setup_options")
+      .select("option_code, option_label")
+      .eq("option_group", "client_service_type")
+      .then(({ data }) =>
+        setServiceTypeLabels(new Map(((data as { option_code: string; option_label: string }[]) ?? []).map((o) => [o.option_code, o.option_label])))
+      );
   }, []);
 
   useEffect(() => {
@@ -322,7 +334,7 @@ export default function WorkPage() {
                   <div>
                     <div className="font-semibold text-ink text-sm">{s._clientName}</div>
                     <div className="text-xs text-muted mt-0.5">
-                      {s.service_type} · {s.billing_frequency || "No billing frequency set"}
+                      {humanizeServiceType(s.service_type, serviceTypeLabels)} · {s.billing_frequency || "No billing frequency set"}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Search, ChevronRight, Pencil, Users, UserCheck, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
@@ -12,6 +13,7 @@ import ClientModal from "@/components/ClientModal";
 const STATUS_FILTERS = ["all", "lead", "active", "inactive", "archived"];
 
 export default function ClientsPage() {
+  const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -173,7 +175,17 @@ export default function ClientsPage() {
       </div>
 
       {showNewModal && (
-        <ClientModal onClose={() => setShowNewModal(false)} onSaved={load} />
+        <ClientModal
+          onClose={() => setShowNewModal(false)}
+          // A brand-new client is created with nothing on it yet — staff
+          // should land straight on the profile to start adding services,
+          // contacts, etc., not back on the list where they'd have to
+          // search for the record they just made.
+          onSaved={(newClientId) => {
+            setShowNewModal(false);
+            router.push(`/clients/${newClientId}`);
+          }}
+        />
       )}
       {editingClient && (
         <ClientModal

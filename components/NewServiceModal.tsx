@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Pipeline, PipelineStage, Service } from "@/lib/types";
+import { friendlyDbError } from "@/lib/friendlyError";
 
 export default function NewServiceModal({
   clientId,
@@ -34,6 +35,7 @@ export default function NewServiceModal({
   const [stageId, setStageId] = useState(service?.pipeline_stage_id ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [canceling, setCanceling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Real counts for the delete confirmation — deleting a service used to
@@ -178,7 +180,7 @@ export default function NewServiceModal({
         .eq("id", service!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyDbError(error, "services_update"));
         return;
       }
       onSaved();
@@ -213,7 +215,34 @@ export default function NewServiceModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyDbError(error, "services_insert"));
+      return;
+    }
+    onSaved();
+    onClose();
+  }
+
+  // Sets service_status to the existing, already-supported 'Canceled'
+  // value (services_service_status_check already allows it) — a simple,
+  // always-safe update, unlike hard delete which can be blocked by
+  // retained records or immutable audit history. isOpenServiceStatus
+  // already excludes 'canceled'/'cancelled' from active-work counts and
+  // the "Active" badge, so this alone moves the service out of active
+  // views without touching any of its tasks, documents, or history.
+  async function cancelService() {
+    if (!service) return;
+    if (!window.confirm("Cancel this service? It will be marked Canceled and removed from active-work views. Its history, tasks, and documents are kept.")) {
+      return;
+    }
+    setCanceling(true);
+    setDeleteError(null);
+    const { error: cancelUpdateError } = await supabase
+      .from("services")
+      .update({ service_status: "Canceled" })
+      .eq("id", service.id);
+    setCanceling(false);
+    if (cancelUpdateError) {
+      setDeleteError(friendlyDbError(cancelUpdateError, "services_cancel"));
       return;
     }
     onSaved();
@@ -237,23 +266,32 @@ export default function NewServiceModal({
     const { error: rpcError } = await supabase.rpc("delete_service_with_workflow", { p_service_id: service.id });
     setDeleting(false);
     if (rpcError) {
-      setDeleteError(rpcError.message);
+      setDeleteError(friendlyDbError(rpcError, "delete_service_with_workflow", "We couldn't delete this service. Please try again or contact support."));
       return;
     }
     onDeleted?.();
     onClose();
   }
 
+  // Hard delete is only offered when there's realistically nothing to
+  // lose: no engagement at all, or an engagement with zero tasks,
+  // deadlines, document requests, or form assignments. Once any of that
+  // exists, delete_service_with_workflow's own retention check (and, for
+  // audited history, an immutable-audit-log constraint underneath it)
+  // will refuse anyway — hiding the option here instead of letting staff
+  // hit that error is what "limited to safe test records" means in
+  // practice, and Cancel Service is always available as the real action.
+  const hasWorkflowContent =
+    !!engagementId && !!workflowCounts && workflowCounts.tasks + workflowCounts.deadlines + workflowCounts.documents + workflowCounts.forms > 0;
+  const canHardDelete = !engagementId || (!!workflowCounts && !hasWorkflowContent);
+
   if (confirmingDelete) {
     return (
       <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4 py-8">
         <div className="bg-white rounded-sm border border-line w-full max-w-md max-h-full overflow-y-auto p-6">
-          <h3 className="font-slab text-lg font-bold text-ink mb-4">Delete this service?</h3>
+          <h3 className="font-slab text-lg font-bold text-ink mb-4">Remove this service</h3>
           {engagementId ? (
             <div className="space-y-3 text-sm text-ink">
-              <p className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900">
-                Deleting this service will also delete its Service Workspace and related workflow items.
-              </p>
               {workflowCounts ? (
                 <ul className="space-y-1 text-xs text-muted">
                   <li>{workflowCounts.tasks} task{workflowCounts.tasks === 1 ? "" : "s"}</li>
@@ -262,13 +300,20 @@ export default function NewServiceModal({
                   <li>{workflowCounts.forms} form assignment{workflowCounts.forms === 1 ? "" : "s"}</li>
                 </ul>
               ) : (
-                <p className="text-xs text-muted">Loading what will be removed…</p>
+                <p className="text-xs text-muted">Loading what's attached to this service…</p>
               )}
-              <p className="text-xs text-muted">
-                This can't be undone. If this service has invoices, signed documents, filed tax returns, or other
-                records that must be preserved, deletion will be blocked — cancel it instead (set its status to
-                Canceled) in that case.
-              </p>
+              {hasWorkflowContent ? (
+                <p className="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900">
+                  This service has workflow items attached, so deleting it isn't available. Cancel it instead — its
+                  history, tasks, and documents are kept, and it's removed from active-work views.
+                </p>
+              ) : (
+                <p className="text-xs text-muted">
+                  This service has no workflow items yet, so deleting it is available and can't be undone. If it
+                  turns out to have invoices, signed documents, or other retained records, deletion will still be
+                  blocked — cancel it instead in that case.
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-ink">This service has no workflow attached. Deleting it can't be undone.</p>
@@ -276,21 +321,31 @@ export default function NewServiceModal({
           {deleteError && (
             <div className="mt-3 text-xs text-brick bg-brick/10 border border-brick/30 rounded-sm px-3 py-2">{deleteError}</div>
           )}
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col gap-2 pt-4">
+            <button
+              type="button"
+              onClick={cancelService}
+              disabled={canceling}
+              className="text-sm font-semibold py-2 rounded-sm bg-ink text-white disabled:opacity-60"
+            >
+              {canceling ? "Canceling…" : "Cancel Service"}
+            </button>
+            {canHardDelete && (
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="text-sm font-semibold py-2 rounded-sm border border-brick text-brick disabled:opacity-60"
+              >
+                {deleting ? "Deleting…" : "Delete service and workflow"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setConfirmingDelete(false)}
-              className="flex-1 text-sm font-semibold py-2 rounded-sm border border-line text-ink"
+              className="text-sm font-semibold py-2 rounded-sm border border-line text-ink"
             >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={confirmDelete}
-              disabled={deleting}
-              className="flex-1 text-sm font-semibold py-2 rounded-sm bg-brick text-white disabled:opacity-60"
-            >
-              {deleting ? "Deleting…" : "Delete service and workflow"}
+              Go back
             </button>
           </div>
         </div>
@@ -415,10 +470,10 @@ export default function NewServiceModal({
               <button
                 type="button"
                 onClick={requestDelete}
-                disabled={deleting}
+                disabled={deleting || canceling}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
-                {deleting ? "Deleting…" : "Delete"}
+                Cancel or Delete…
               </button>
             )}
             <button
