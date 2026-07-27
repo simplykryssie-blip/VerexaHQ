@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, SubHeading, TextField, Select, YesNo, Checkbox } from "./fields";
+import { Card, SubHeading, TextField, Select, YesNo, Checkbox, DisclaimerNote } from "./fields";
 import { StatesMultiSelect } from "./StatesMultiSelect";
 import { SpouseSection } from "./SpouseSection";
 import { DependentsSection } from "./DependentsSection";
@@ -25,14 +25,30 @@ const FILING_STATUSES: [string, string][] = [
 export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; setAnswer: (path: string[], value: unknown) => void }) {
   const filingStatus = getStr(answers, ["filing_status_expected"]);
   const marriage = (answers.marriage as AnyRecord) || {};
-  const marriedDuringYear = getBool(marriage, ["married_during_year"]);
-  const separatedNotDivorced = getBool(marriage, ["separated_not_divorced"]);
   const showSpouse =
     filingStatus === "married_filing_jointly" ||
     filingStatus === "married_filing_separately" ||
-    filingStatus === "qualifying_surviving_spouse" ||
-    marriedDuringYear ||
-    separatedNotDivorced;
+    filingStatus === "qualifying_surviving_spouse";
+
+  // expected_filing_status is the sole authoritative trigger for which
+  // marital questions render below -- there is no longer a standalone
+  // "married during the year" / "separated but not divorced" toggle that
+  // applies across every status. Switching status clears the marriage
+  // namespace so an answer collected under one status (e.g. MFS's "date
+  // living apart began") never lingers as an active, hidden value once the
+  // client picks a different status -- it is never read by flags/document
+  // rules for the new status, and it is gone from the draft entirely
+  // rather than merely hidden. Previously submitted versions are
+  // unaffected: intake_versions snapshots the answers at submission time
+  // and this only prunes the live, unsubmitted draft.
+  function handleFilingStatusChange(next: string) {
+    setAnswer(["filing_status_expected"], next);
+    setAnswer(["marriage"], {});
+    setAnswer(
+      ["has_spouse"],
+      next === "married_filing_jointly" || next === "married_filing_separately" || next === "qualifying_surviving_spouse"
+    );
+  }
 
   const taxpayer = (answers.taxpayer_detail as AnyRecord) || {};
   const priorFiling = (answers.prior_filing as AnyRecord) || {};
@@ -131,25 +147,149 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
 
       <SubHeading title="Filing status" />
       <Card>
-        <Select label="Expected filing status" value={filingStatus} onChange={(v) => setAnswer(["filing_status_expected"], v)} options={FILING_STATUSES} />
-        <div className="mt-2 divide-y divide-line">
-          <YesNo label="Married at any point during the tax year" value={marriedDuringYear} onChange={(v) => setAnswer(["marriage", "married_during_year"], v)} />
-          <YesNo label="Separated but not legally divorced" value={separatedNotDivorced} onChange={(v) => setAnswer(["marriage", "separated_not_divorced"], v)} />
-        </div>
-        {(marriedDuringYear || separatedNotDivorced || filingStatus.startsWith("married")) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-            <TextField label="Date married" type="date" value={getStr(marriage, ["date_married"])} onChange={(v) => setAnswer(["marriage", "date_married"], v)} />
-            <TextField label="Date separated" type="date" value={getStr(marriage, ["date_separated"])} onChange={(v) => setAnswer(["marriage", "date_separated"], v)} />
-            <TextField label="Date divorced" type="date" value={getStr(marriage, ["date_divorced"])} onChange={(v) => setAnswer(["marriage", "date_divorced"], v)} />
+        <Select label="Expected filing status" value={filingStatus} onChange={handleFilingStatusChange} options={FILING_STATUSES} />
+
+        {filingStatus === "married_filing_jointly" && (
+          <div className="mt-2 divide-y divide-line">
+            <YesNo
+              label="Is this your first year filing jointly with this spouse?"
+              value={getBool(marriage, ["first_year_filing_jointly"])}
+              onChange={(v) => setAnswer(["marriage", "first_year_filing_jointly"], v)}
+            />
+            {getBool(marriage, ["first_year_filing_jointly"]) && (
+              <div className="py-2">
+                <TextField label="Date married" type="date" value={getStr(marriage, ["date_married"])} onChange={(v) => setAnswer(["marriage", "date_married"], v)} />
+              </div>
+            )}
+            <YesNo
+              label="Did either spouse use a different legal name?"
+              value={getBool(marriage, ["name_changed_either"])}
+              onChange={(v) => setAnswer(["marriage", "name_changed_either"], v)}
+            />
+            <YesNo
+              label="Did either spouse live in a different state during the year?"
+              value={getBool(marriage, ["lived_different_states"])}
+              onChange={(v) => setAnswer(["marriage", "lived_different_states"], v)}
+            />
           </div>
         )}
-        {(separatedNotDivorced || filingStatus === "married_filing_separately") && (
+
+        {filingStatus === "married_filing_separately" && (
+          <>
+            <div className="mt-2 divide-y divide-line">
+              <YesNo
+                label="Were you legally married on December 31?"
+                value={getBool(marriage, ["married_on_dec31"])}
+                onChange={(v) => setAnswer(["marriage", "married_on_dec31"], v)}
+              />
+              <YesNo
+                label="Were you legally separated under a final decree on December 31?"
+                value={getBool(marriage, ["has_decree"])}
+                onChange={(v) => setAnswer(["marriage", "has_decree"], v)}
+              />
+              <YesNo
+                label="Did you live with your spouse at any time during the year?"
+                value={getBool(marriage, ["spouse_lived_in_home"])}
+                onChange={(v) => setAnswer(["marriage", "spouse_lived_in_home"], v)}
+              />
+              <YesNo
+                label="Did your spouse live in the home during the final six months of the year?"
+                value={getBool(marriage, ["spouse_lived_last_six_months"])}
+                onChange={(v) => setAnswer(["marriage", "spouse_lived_last_six_months"], v)}
+              />
+            </div>
+            <div className="mt-2">
+              <TextField label="Date living apart began" type="date" value={getStr(marriage, ["date_separated"])} onChange={(v) => setAnswer(["marriage", "date_separated"], v)} />
+            </div>
+            <div className="mt-2 divide-y divide-line">
+              <YesNo
+                label="Did your spouse itemize deductions?"
+                value={getBool(marriage, ["spouse_itemizes"])}
+                onChange={(v) => setAnswer(["marriage", "spouse_itemizes"], v)}
+              />
+              <YesNo
+                label="Do you live in a community-property state?"
+                value={getBool(marriage, ["community_property"])}
+                onChange={(v) => setAnswer(["marriage", "community_property"], v)}
+              />
+              <YesNo
+                label="Do you have access to your spouse's income information?"
+                value={getBool(marriage, ["access_to_spouse_income"])}
+                onChange={(v) => setAnswer(["marriage", "access_to_spouse_income"], v)}
+              />
+            </div>
+            <div className="mt-2">
+              <DisclaimerNote>
+                Married Filing Separately often results in reduced credits and a higher combined
+                tax than filing jointly. Your preparer will confirm which option is best once both
+                returns are reviewed.
+              </DisclaimerNote>
+            </div>
+          </>
+        )}
+
+        {filingStatus === "head_of_household" && (
           <div className="mt-2 divide-y divide-line">
-            <YesNo label="Have a divorce decree or separation agreement" value={getBool(marriage, ["has_decree"])} onChange={(v) => setAnswer(["marriage", "has_decree"], v)} />
-            <YesNo label="Spouse lived in the home" value={getBool(marriage, ["spouse_lived_in_home"])} onChange={(v) => setAnswer(["marriage", "spouse_lived_in_home"], v)} />
-            <YesNo label="Either spouse has remarried" value={getBool(marriage, ["either_remarried"])} onChange={(v) => setAnswer(["marriage", "either_remarried"], v)} />
-            <YesNo label="Spouse itemizes deductions" value={getBool(marriage, ["spouse_itemizes"])} onChange={(v) => setAnswer(["marriage", "spouse_itemizes"], v)} />
-            <YesNo label="You live in a community-property state" value={getBool(marriage, ["community_property"])} onChange={(v) => setAnswer(["marriage", "community_property"], v)} />
+            <YesNo
+              label="If married, were you considered unmarried at year-end (living apart from your spouse for the last 6 months of the year)?"
+              value={getBool(marriage, ["hoh_considered_unmarried"])}
+              onChange={(v) => setAnswer(["marriage", "hoh_considered_unmarried"], v)}
+            />
+            <YesNo
+              label="Did you pay more than half the cost of keeping up your home for the year?"
+              value={getBool(marriage, ["hoh_paid_more_than_half_costs"])}
+              onChange={(v) => setAnswer(["marriage", "hoh_paid_more_than_half_costs"], v)}
+            />
+          </div>
+        )}
+
+        {filingStatus === "single" && (
+          <div className="mt-2 divide-y divide-line">
+            <YesNo
+              label="Were you divorced or legally separated under a final decree by December 31?"
+              value={getBool(marriage, ["divorced_or_separated_by_dec31"])}
+              onChange={(v) => setAnswer(["marriage", "divorced_or_separated_by_dec31"], v)}
+            />
+            {getBool(marriage, ["divorced_or_separated_by_dec31"]) && (
+              <div className="py-2">
+                <TextField
+                  label="Date of divorce or legal separation"
+                  type="date"
+                  value={getStr(marriage, ["date_divorced"])}
+                  onChange={(v) => setAnswer(["marriage", "date_divorced"], v)}
+                />
+              </div>
+            )}
+            <YesNo
+              label="Did you become widowed during the year?"
+              value={getBool(marriage, ["widowed_this_year"])}
+              onChange={(v) => setAnswer(["marriage", "widowed_this_year"], v)}
+            />
+            {getBool(marriage, ["widowed_this_year"]) && (
+              <div className="py-2">
+                <TextField
+                  label="Date of spouse's death"
+                  type="date"
+                  value={getStr(marriage, ["date_of_widowhood"])}
+                  onChange={(v) => setAnswer(["marriage", "date_of_widowhood"], v)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {filingStatus === "qualifying_surviving_spouse" && (
+          <div className="mt-2 divide-y divide-line">
+            <YesNo
+              label="Do you have a qualifying child who lived with you the entire year?"
+              value={getBool(marriage, ["qss_qualifying_child"])}
+              onChange={(v) => setAnswer(["marriage", "qss_qualifying_child"], v)}
+            />
+            <YesNo
+              label="Did you pay more than half the cost of keeping up the home?"
+              value={getBool(marriage, ["qss_paid_more_than_half_costs"])}
+              onChange={(v) => setAnswer(["marriage", "qss_paid_more_than_half_costs"], v)}
+            />
           </div>
         )}
       </Card>
