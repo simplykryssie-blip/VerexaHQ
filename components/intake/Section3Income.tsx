@@ -150,6 +150,13 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
               </div>
             ))}
           </div>
+          <div className="mt-3 pt-3 border-t border-line">
+            <YesNo
+              label="Bookkeeping needs cleanup before this return can be prepared"
+              value={getBool(answers, ["bookkeeping_cleanup_needed"])}
+              onChange={(v) => setAnswer(["bookkeeping_cleanup_needed"], v)}
+            />
+          </div>
         </Card>
       )}
 

@@ -34,3 +34,15 @@ export const ALL_STATE_OPTIONS: StateOption[] = [...US_STATES, DC_OPTION, ...US_
 export function stateLabel(code: string): string {
   return ALL_STATE_OPTIONS.find((s) => s.code === code)?.label || code;
 }
+
+// States where a local/school-district-level tax question is commonly
+// relevant (Ohio and Pennsylvania in particular have per-school-district
+// income tax; the others have significant city/county-level income or
+// occupational taxes). This is a starting heuristic to decide when to
+// show the school-district question at all -- not a claim of complete or
+// authoritative jurisdiction coverage, since no real school-district
+// lookup dataset is wired in yet. Staff can always ask if this misses a
+// jurisdiction.
+export const STATES_WITH_LOCAL_TAX_RELEVANCE = new Set([
+  "OH", "PA", "IN", "MD", "MI", "KY", "AL", "NY", "MO",
+]);

@@ -1,7 +1,8 @@
 "use client";
 
 import { Card, SubHeading, Checkbox, TextArea } from "./fields";
-import { getBool, getStr, type AnyRecord } from "@/lib/intakeAnswers";
+import { getBool, getStr, getArray, type AnyRecord } from "@/lib/intakeAnswers";
+import { stateLabel } from "@/lib/intakeStates";
 
 const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
   {
@@ -18,7 +19,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     key: "residence",
     title: "Residence",
     items: [
-      ["moved", "Moved"], ["multiple_states", "Lived in multiple states"], ["worked_remotely", "Worked remotely"],
+      ["moved", "Moved"], ["worked_remotely", "Worked remotely"],
       ["lived_abroad", "Lived abroad"], ["foreign_address", "Have a foreign address"], ["disaster_relocation", "Disaster-area relocation"],
     ],
   },
@@ -37,7 +38,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     items: [
       ["started_business", "Started a business"], ["closed_business", "Closed a business"], ["bought_business", "Bought a business"],
       ["sold_business", "Sold a business"], ["new_partner", "New business partner"], ["ownership_change", "Ownership change"],
-      ["bookkeeping_cleanup", "Bookkeeping cleanup needed"], ["payroll_issues", "Payroll issues"], ["contractor_reporting_issues", "Contractor reporting issues"],
+      ["payroll_issues", "Payroll issues"], ["contractor_reporting_issues", "Contractor reporting issues"],
     ],
   },
   {
@@ -54,8 +55,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     key: "tax_compliance",
     title: "Tax compliance",
     items: [
-      ["irs_notice", "IRS notice"], ["state_notice", "State notice"], ["audit", "Audit"], ["identity_theft", "Identity theft"],
-      ["ip_pin", "Have an IP PIN"], ["unfiled_returns", "Unfiled returns"], ["installment_agreement", "Installment agreement"],
+      ["audit", "Audit"], ["installment_agreement", "Installment agreement"],
       ["offer_in_compromise", "Offer in compromise"], ["levy_or_lien", "Levy or lien"], ["prior_rejected_return", "Prior return was rejected"],
       ["bankruptcy", "Bankruptcy"],
     ],
@@ -81,16 +81,58 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
   },
 ];
 
+// De-duplication note: IP PIN, identity theft, prior-year return, and
+// states-lived-in are all asked exactly once, in Section 2 (Household &
+// Filing Basics) -- this section shows them read-only where relevant
+// instead of asking again. IRS/state notices and unfiled years live here
+// (Tax Compliance) as the single authoritative location and are wired
+// directly to the same top-level answer keys the checklist/complexity
+// logic reads (has_irs_state_notice, has_unfiled_years) -- not a separate,
+// disconnected key.
 export function Section5LifeChanges({ answers, setAnswer }: { answers: AnyRecord; setAnswer: (path: string[], value: unknown) => void }) {
   const lifeChanges = (answers.life_changes as AnyRecord) || {};
+  const taxpayer = (answers.taxpayer_detail as AnyRecord) || {};
+  const states = getArray<string>(answers, ["states_lived_worked"]);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">Select anything that applied to you this year -- this helps us know what to ask about.</p>
+
       {GROUPS.map((group) => {
         const groupAnswers = (lifeChanges[group.key] as AnyRecord) || {};
         return (
           <Card key={group.key}>
             <SubHeading title={group.title} />
+
+            {group.key === "residence" && states.length > 0 && (
+              <p className="text-xs text-muted mb-2 bg-paperDim border border-line rounded-sm px-2.5 py-1.5">
+                States lived/worked in this year (from Household & Filing Basics): {states.map(stateLabel).join(", ")}
+                {states.length > 1 && " — already noted as a multistate return."}
+              </p>
+            )}
+
+            {group.key === "tax_compliance" && (
+              <>
+                <p className="text-xs text-muted mb-2 bg-paperDim border border-line rounded-sm px-2.5 py-1.5">
+                  IP PIN and identity theft are answered in the About You section (Household & Filing
+                  Basics): IP PIN — {getBool(taxpayer, ["ip_pin"]) ? "Yes" : "No"}, Identity theft —{" "}
+                  {getBool(taxpayer, ["identity_theft"]) ? "Yes" : "No"}.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-1.5">
+                  <Checkbox
+                    label="IRS or state notice"
+                    checked={getBool(answers, ["has_irs_state_notice"])}
+                    onChange={(v) => setAnswer(["has_irs_state_notice"], v)}
+                  />
+                  <Checkbox
+                    label="Unfiled prior-year returns"
+                    checked={getBool(answers, ["has_unfiled_years"])}
+                    onChange={(v) => setAnswer(["has_unfiled_years"], v)}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
               {group.items.map(([key, label]) => (
                 <Checkbox

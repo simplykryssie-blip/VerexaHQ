@@ -4,7 +4,9 @@ import { Card, SubHeading, TextField, Select, YesNo, Checkbox } from "./fields";
 import { StatesMultiSelect } from "./StatesMultiSelect";
 import { SpouseSection } from "./SpouseSection";
 import { DependentsSection } from "./DependentsSection";
+import { TemporaryAbsences } from "./TemporaryAbsences";
 import { getBool, getStr, getArray, type AnyRecord } from "@/lib/intakeAnswers";
+import { STATES_WITH_LOCAL_TAX_RELEVANCE } from "@/lib/intakeStates";
 
 const FILING_STATUSES: [string, string][] = [
   ["", "Select…"],
@@ -16,6 +18,10 @@ const FILING_STATUSES: [string, string][] = [
   ["unsure", "Unsure — let's discuss"],
 ];
 
+// This section is the single authoritative place for: prior-year return
+// availability, IP PIN / identity theft (taxpayer-level), and states
+// lived/worked in. Life Changes (Section 5) references these via a
+// read-only summary instead of asking again -- see Section5LifeChanges.
 export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; setAnswer: (path: string[], value: unknown) => void }) {
   const filingStatus = getStr(answers, ["filing_status_expected"]);
   const marriage = (answers.marriage as AnyRecord) || {};
@@ -33,6 +39,10 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
   const priorFiling = (answers.prior_filing as AnyRecord) || {};
   const spouse = (answers.spouse as AnyRecord) || {};
   const dependents = getArray<AnyRecord>(answers, ["dependents"]);
+  const states = getArray<string>(answers, ["states_lived_worked"]);
+
+  const schoolDistrictRelevant = states.some((s) => STATES_WITH_LOCAL_TAX_RELEVANCE.has(s));
+  const schoolDistrictStatus = getStr(taxpayer, ["school_district_status"]);
 
   return (
     <div className="space-y-4">
@@ -45,9 +55,34 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
           <TextField label="Mailing address (if different)" value={getStr(taxpayer, ["mailing_address"])} onChange={(v) => setAnswer(["taxpayer_detail", "mailing_address"], v)} />
           <TextField label="Prior-year address (if moved)" value={getStr(taxpayer, ["prior_address"])} onChange={(v) => setAnswer(["taxpayer_detail", "prior_address"], v)} />
           <TextField label="County / parish" value={getStr(taxpayer, ["county"])} onChange={(v) => setAnswer(["taxpayer_detail", "county"], v)} />
-          <TextField label="School district (if relevant)" value={getStr(taxpayer, ["school_district"])} onChange={(v) => setAnswer(["taxpayer_detail", "school_district"], v)} />
           <TextField label="Residency dates (if partial-year)" value={getStr(taxpayer, ["residency_dates"])} onChange={(v) => setAnswer(["taxpayer_detail", "residency_dates"], v)} />
         </div>
+
+        {(schoolDistrictRelevant || schoolDistrictStatus) && (
+          <div className="mt-3 pt-3 border-t border-line">
+            <Select
+              label="School district or local tax district, if applicable"
+              value={schoolDistrictStatus}
+              onChange={(v) => setAnswer(["taxpayer_detail", "school_district_status"], v)}
+              options={[
+                ["", "Select…"],
+                ["known", "I know it — enter below"],
+                ["not_sure", "Not sure"],
+                ["not_applicable", "Not applicable"],
+              ]}
+            />
+            {schoolDistrictStatus === "known" && (
+              <div className="mt-2">
+                <TextField
+                  label="District name"
+                  value={getStr(taxpayer, ["school_district"])}
+                  onChange={(v) => setAnswer(["taxpayer_detail", "school_district"], v)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-2 divide-y divide-line">
           <YesNo label="U.S. citizen or resident" value={getBool(taxpayer, ["citizen_or_resident"])} onChange={(v) => setAnswer(["taxpayer_detail", "citizen_or_resident"], v)} />
           <YesNo label="Legally blind" value={getBool(taxpayer, ["blind"])} onChange={(v) => setAnswer(["taxpayer_detail", "blind"], v)} />
@@ -90,7 +125,6 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
 
       {showSpouse && <SpouseSection spouse={spouse} onChange={(key, value) => setAnswer(["spouse", key], value)} />}
 
-      <SubHeading title="Dependents" />
       <DependentsSection dependents={dependents} onChange={(next) => setAnswer(["dependents"], next)} />
 
       <SubHeading title="Household" />
@@ -101,10 +135,12 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
         </div>
         <div className="mt-2 divide-y divide-line">
           <YesNo label="You rent or have a mortgage" value={getBool(household, ["rent_or_mortgage"])} onChange={(v) => setAnswer(["household_detail", "rent_or_mortgage"], v)} />
-          <YesNo label="Any temporary absences from the home this year" value={getBool(household, ["temporary_absences"])} onChange={(v) => setAnswer(["household_detail", "temporary_absences"], v)} />
           <YesNo label="Shared custody arrangement in the home" value={getBool(household, ["shared_custody"])} onChange={(v) => setAnswer(["household_detail", "shared_custody"], v)} />
           <YesNo label="Any foster placements this year" value={getBool(household, ["foster_placements"])} onChange={(v) => setAnswer(["household_detail", "foster_placements"], v)} />
           <YesNo label="Other adults living in the household" value={getBool(household, ["other_adults"])} onChange={(v) => setAnswer(["household_detail", "other_adults"], v)} />
+        </div>
+        <div className="mt-3 pt-3 border-t border-line">
+          <TemporaryAbsences answers={answers} setAnswer={setAnswer} />
         </div>
       </Card>
 
@@ -115,22 +151,20 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
           <TextField label="Prior preparer (if any)" value={getStr(priorFiling, ["prior_preparer"])} onChange={(v) => setAnswer(["prior_filing", "prior_preparer"], v)} />
         </div>
         <div className="mt-2 divide-y divide-line">
-          <YesNo label="Prior-year return available" value={getBool(priorFiling, ["prior_return_available"])} onChange={(v) => setAnswer(["prior_filing", "prior_return_available"], v)} />
+          <YesNo label="I have a copy of my prior-year tax return" value={getBool(answers, ["has_prior_year_return"])} onChange={(v) => setAnswer(["has_prior_year_return"], v)} />
           <YesNo label="Any carryovers from a prior year" value={getBool(priorFiling, ["carryovers"])} onChange={(v) => setAnswer(["prior_filing", "carryovers"], v)} />
-          <YesNo label="Made estimated tax payments" value={getBool(priorFiling, ["estimated_payments"])} onChange={(v) => setAnswer(["prior_filing", "estimated_payments"], v)} />
           <YesNo label="Filed an extension" value={getBool(priorFiling, ["extension_filed"])} onChange={(v) => setAnswer(["prior_filing", "extension_filed"], v)} />
-          <YesNo label="Have unfiled prior-year returns" value={getBool(answers, ["has_unfiled_years"])} onChange={(v) => setAnswer(["has_unfiled_years"], v)} />
           <YesNo label="Have an amended return in progress" value={getBool(priorFiling, ["amended_returns"])} onChange={(v) => setAnswer(["prior_filing", "amended_returns"], v)} />
-          <YesNo label="Have received IRS or state correspondence" value={getBool(answers, ["has_irs_state_notice"])} onChange={(v) => setAnswer(["has_irs_state_notice"], v)} />
         </div>
+        <p className="text-xs text-muted mt-2">
+          IRS/state notices, unfiled years, and estimated tax payments are covered in the Life
+          Changes and Adjustments sections.
+        </p>
       </Card>
 
       <SubHeading title="States" />
       <Card>
-        <StatesMultiSelect
-          value={getArray<string>(answers, ["states_lived_worked"])}
-          onChange={(codes) => setAnswer(["states_lived_worked"], codes)}
-        />
+        <StatesMultiSelect value={states} onChange={(codes) => setAnswer(["states_lived_worked"], codes)} />
       </Card>
 
       <Checkbox
