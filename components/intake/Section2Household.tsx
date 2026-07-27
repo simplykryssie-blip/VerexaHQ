@@ -484,7 +484,7 @@ export function Section2Household({
         </div>
         <div className="mt-2">
           <Select
-            label={`Was an extension filed for the ${taxYear} tax year covered by this intake?`}
+            label="Was an extension filed for the tax year covered by this intake?"
             value={extensionFiled}
             onChange={(v) => setAnswer(["prior_filing", "extension_filed"], v)}
             options={[

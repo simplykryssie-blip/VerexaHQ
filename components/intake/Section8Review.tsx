@@ -178,6 +178,7 @@ export function Section8Review({
     <div className="space-y-4">
       <SubHeading title="Review your answers" />
       <Card>
+        <SummaryRow label="Tax year" value={String(intake.tax_year)} section={1} onJump={onJump} />
         <SummaryRow label="Filing status" value={getStr(answers, ["filing_status_expected"])} section={2} onJump={onJump} />
         <SummaryRow label="Spouse" value={getBool(answers, ["has_spouse"]) ? getStr((answers.spouse as AnyRecord) || {}, ["first_name"]) || "Added" : "Not applicable"} section={2} onJump={onJump} />
         <SummaryRow label="Dependents" value={String(dependentsCount)} section={2} onJump={onJump} />
