@@ -10,8 +10,9 @@ import {
   type IntakeDocumentRequest,
 } from "@/lib/supabaseIntake";
 import { reportIntakeError } from "@/lib/reportIntakeError";
-import { setDeep, type AnyRecord } from "@/lib/intakeAnswers";
+import { setDeep, getStr, type AnyRecord } from "@/lib/intakeAnswers";
 import { SectionProgress } from "@/components/intake/SectionProgress";
+import { Select } from "@/components/intake/fields";
 import { Section2Household } from "@/components/intake/Section2Household";
 import { Section3Income } from "@/components/intake/Section3Income";
 import { Section4Adjustments } from "@/components/intake/Section4Adjustments";
@@ -174,7 +175,7 @@ export default function IntakeWizardPage() {
       <SectionProgress sections={SECTIONS} current={section} onJump={goTo} />
 
       <div className="bg-white border border-line rounded-sm p-3.5 sm:p-6 mt-4 min-w-0">
-        {section === 1 && <SectionIdentity intake={intake} />}
+        {section === 1 && <SectionIdentity intake={intake} answers={answers} setAnswer={setAnswer} />}
         {section === 2 && <Section2Household answers={answers} setAnswer={setAnswer} />}
         {section === 3 && <Section3Income answers={answers} setAnswer={setAnswer} />}
         {section === 4 && <Section4Adjustments answers={answers} setAnswer={setAnswer} />}
@@ -235,7 +236,16 @@ function SaveIndicator({ status }: { status: "idle" | "saving" | "saved" | "erro
   return <div className="text-xs text-green">Saved</div>;
 }
 
-function SectionIdentity({ intake }: { intake: IntakeRow }) {
+function SectionIdentity({
+  intake,
+  answers,
+  setAnswer,
+}: {
+  intake: IntakeRow;
+  answers: AnyRecord;
+  setAnswer: (path: string[], value: unknown) => void;
+}) {
+  const readiness = (answers.readiness as AnyRecord) || {};
   return (
     <div className="space-y-3">
       <h2 className="font-slab text-lg font-bold text-ink">Identity & Entry</h2>
@@ -251,6 +261,20 @@ function SectionIdentity({ intake }: { intake: IntakeRow }) {
         <Field label="Tax year">{intake.tax_year}</Field>
         <Field label="Email">{intake.contact_email || "—"}</Field>
         <Field label="Phone">{intake.contact_phone || "—"}</Field>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-line">
+        <Select
+          label="Best contact method"
+          value={getStr(readiness, ["best_contact_method"])}
+          onChange={(v) => setAnswer(["readiness", "best_contact_method"], v)}
+          options={[["", "Select…"], ["email", "Email"], ["phone", "Phone"], ["text", "Text"], ["portal", "Portal message"]]}
+        />
+        <Select
+          label="Best contact time"
+          value={getStr(readiness, ["best_contact_time"])}
+          onChange={(v) => setAnswer(["readiness", "best_contact_time"], v)}
+          options={[["", "Select…"], ["morning", "Morning"], ["afternoon", "Afternoon"], ["evening", "Evening"], ["anytime", "Anytime"]]}
+        />
       </div>
     </div>
   );

@@ -35,7 +35,6 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
     separatedNotDivorced;
 
   const taxpayer = (answers.taxpayer_detail as AnyRecord) || {};
-  const household = (answers.household_detail as AnyRecord) || {};
   const priorFiling = (answers.prior_filing as AnyRecord) || {};
   const spouse = (answers.spouse as AnyRecord) || {};
   const dependents = getArray<AnyRecord>(answers, ["dependents"]);
@@ -49,28 +48,60 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
       <SubHeading title="About you" />
       <Card>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <TextField label="Prior legal name (if changed)" value={getStr(taxpayer, ["prior_name"])} onChange={(v) => setAnswer(["taxpayer_detail", "prior_name"], v)} />
           <TextField label="Occupation" value={getStr(taxpayer, ["occupation"])} onChange={(v) => setAnswer(["taxpayer_detail", "occupation"], v)} />
           <TextField label="Current address" value={getStr(taxpayer, ["current_address"])} onChange={(v) => setAnswer(["taxpayer_detail", "current_address"], v)} />
-          <TextField label="Mailing address (if different)" value={getStr(taxpayer, ["mailing_address"])} onChange={(v) => setAnswer(["taxpayer_detail", "mailing_address"], v)} />
           <TextField label="Prior-year address (if moved)" value={getStr(taxpayer, ["prior_address"])} onChange={(v) => setAnswer(["taxpayer_detail", "prior_address"], v)} />
-          <TextField label="County / parish" value={getStr(taxpayer, ["county"])} onChange={(v) => setAnswer(["taxpayer_detail", "county"], v)} />
-          <TextField label="Residency dates (if partial-year)" value={getStr(taxpayer, ["residency_dates"])} onChange={(v) => setAnswer(["taxpayer_detail", "residency_dates"], v)} />
+        </div>
+
+        <div className="mt-2 divide-y divide-line">
+          <YesNo
+            label="Has your legal name changed since your last tax return?"
+            value={getBool(taxpayer, ["name_changed"])}
+            onChange={(v) => setAnswer(["taxpayer_detail", "name_changed"], v)}
+          />
+          {getBool(taxpayer, ["name_changed"]) && (
+            <div className="py-2">
+              <TextField label="Prior legal name" value={getStr(taxpayer, ["prior_name"])} onChange={(v) => setAnswer(["taxpayer_detail", "prior_name"], v)} />
+            </div>
+          )}
+          <YesNo
+            label="Do you have a mailing address different from your home address?"
+            value={getBool(taxpayer, ["mailing_address_different"])}
+            onChange={(v) => setAnswer(["taxpayer_detail", "mailing_address_different"], v)}
+          />
+          {getBool(taxpayer, ["mailing_address_different"]) && (
+            <div className="py-2">
+              <TextField label="Mailing address" value={getStr(taxpayer, ["mailing_address"])} onChange={(v) => setAnswer(["taxpayer_detail", "mailing_address"], v)} />
+            </div>
+          )}
+          <YesNo
+            label="Were you a full-year resident of your state this year?"
+            value={getBool(taxpayer, ["full_year_resident"])}
+            onChange={(v) => setAnswer(["taxpayer_detail", "full_year_resident"], v)}
+          />
+          {getBool(taxpayer, ["full_year_resident"]) === false && (
+            <div className="py-2">
+              <TextField label="Residency dates (partial-year)" value={getStr(taxpayer, ["residency_dates"])} onChange={(v) => setAnswer(["taxpayer_detail", "residency_dates"], v)} />
+            </div>
+          )}
         </div>
 
         {(schoolDistrictRelevant || schoolDistrictStatus) && (
           <div className="mt-3 pt-3 border-t border-line">
-            <Select
-              label="School district or local tax district, if applicable"
-              value={schoolDistrictStatus}
-              onChange={(v) => setAnswer(["taxpayer_detail", "school_district_status"], v)}
-              options={[
-                ["", "Select…"],
-                ["known", "I know it — enter below"],
-                ["not_sure", "Not sure"],
-                ["not_applicable", "Not applicable"],
-              ]}
-            />
+            <TextField label="County / parish" value={getStr(taxpayer, ["county"])} onChange={(v) => setAnswer(["taxpayer_detail", "county"], v)} />
+            <div className="mt-2">
+              <Select
+                label="School district or local tax district, if applicable"
+                value={schoolDistrictStatus}
+                onChange={(v) => setAnswer(["taxpayer_detail", "school_district_status"], v)}
+                options={[
+                  ["", "Select…"],
+                  ["known", "I know it — enter below"],
+                  ["not_sure", "Not sure"],
+                  ["not_applicable", "Not applicable"],
+                ]}
+              />
+            </div>
             {schoolDistrictStatus === "known" && (
               <div className="mt-2">
                 <TextField
@@ -129,19 +160,7 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
 
       <SubHeading title="Household" />
       <Card>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <TextField label="Who lived in the home with you" value={getStr(household, ["who_lived"])} onChange={(v) => setAnswer(["household_detail", "who_lived"], v)} />
-          <TextField label="Who paid most household expenses" value={getStr(household, ["who_paid_expenses"])} onChange={(v) => setAnswer(["household_detail", "who_paid_expenses"], v)} />
-        </div>
-        <div className="mt-2 divide-y divide-line">
-          <YesNo label="You rent or have a mortgage" value={getBool(household, ["rent_or_mortgage"])} onChange={(v) => setAnswer(["household_detail", "rent_or_mortgage"], v)} />
-          <YesNo label="Shared custody arrangement in the home" value={getBool(household, ["shared_custody"])} onChange={(v) => setAnswer(["household_detail", "shared_custody"], v)} />
-          <YesNo label="Any foster placements this year" value={getBool(household, ["foster_placements"])} onChange={(v) => setAnswer(["household_detail", "foster_placements"], v)} />
-          <YesNo label="Other adults living in the household" value={getBool(household, ["other_adults"])} onChange={(v) => setAnswer(["household_detail", "other_adults"], v)} />
-        </div>
-        <div className="mt-3 pt-3 border-t border-line">
-          <TemporaryAbsences answers={answers} setAnswer={setAnswer} />
-        </div>
+        <TemporaryAbsences answers={answers} setAnswer={setAnswer} />
       </Card>
 
       <SubHeading title="Prior filing" />
@@ -152,13 +171,11 @@ export function Section2Household({ answers, setAnswer }: { answers: AnyRecord; 
         </div>
         <div className="mt-2 divide-y divide-line">
           <YesNo label="I have a copy of my prior-year tax return" value={getBool(answers, ["has_prior_year_return"])} onChange={(v) => setAnswer(["has_prior_year_return"], v)} />
-          <YesNo label="Any carryovers from a prior year" value={getBool(priorFiling, ["carryovers"])} onChange={(v) => setAnswer(["prior_filing", "carryovers"], v)} />
           <YesNo label="Filed an extension" value={getBool(priorFiling, ["extension_filed"])} onChange={(v) => setAnswer(["prior_filing", "extension_filed"], v)} />
-          <YesNo label="Have an amended return in progress" value={getBool(priorFiling, ["amended_returns"])} onChange={(v) => setAnswer(["prior_filing", "amended_returns"], v)} />
         </div>
         <p className="text-xs text-muted mt-2">
-          IRS/state notices, unfiled years, and estimated tax payments are covered in the Life
-          Changes and Adjustments sections.
+          IRS/state notices, unfiled years, carryovers, and amended returns are covered in the
+          Life Changes and Adjustments sections, and in the amended-return checkbox below.
         </p>
       </Card>
 

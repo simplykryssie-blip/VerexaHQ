@@ -7,7 +7,6 @@ import type { AnyRecord } from "@/lib/intakeAnswers";
 import {
   DEPENDENT_RELATIONSHIPS,
   CUSTODY_ARRANGEMENTS,
-  CUSTODY_NEEDS_FOLLOWUP,
   optionLabel,
 } from "@/lib/intakeDependentOptions";
 
@@ -33,7 +32,6 @@ function emptyDependent(): Dependent {
     lived_more_nights_with_taxpayer: false,
     other_parent_provided_8332: false,
     taxpayer_will_release_claim: false,
-    another_person_expected_to_claim: false,
     form_8332: false,
     ip_pin: false,
     born_or_died_during_year: false,
@@ -90,7 +88,11 @@ export function DependentsSection({ dependents, onChange }: { dependents: Depend
       <div className="space-y-3">
         {dependents.map((dep, i) => {
           const isEditing = editingIndex === i;
-          const showFollowup = CUSTODY_NEEDS_FOLLOWUP.has(String(dep.custody || ""));
+          // Custody follow-ups (living-nights, Form 8332, release of claim)
+          // only matter when someone else might also claim this dependent --
+          // asking them unconditionally implies an eligibility question the
+          // client can't answer. See intakeQuestionMap.ts.
+          const showFollowup = dep.others_may_claim === true;
 
           if (!isEditing) {
             return (
@@ -136,6 +138,10 @@ export function DependentsSection({ dependents, onChange }: { dependents: Depend
                 )}
               </div>
 
+              <div className="mt-1 divide-y divide-line">
+                <YesNo label="Someone else may also be able to claim them" value={!!dep.others_may_claim} onChange={(v) => update(i, "others_may_claim", v)} />
+              </div>
+
               {showFollowup && (
                 <div className="mt-1 divide-y divide-line">
                   <YesNo
@@ -153,11 +159,6 @@ export function DependentsSection({ dependents, onChange }: { dependents: Depend
                     value={!!dep.taxpayer_will_release_claim}
                     onChange={(v) => update(i, "taxpayer_will_release_claim", v)}
                   />
-                  <YesNo
-                    label="Is another person expected to claim this dependent?"
-                    value={!!dep.another_person_expected_to_claim}
-                    onChange={(v) => update(i, "another_person_expected_to_claim", v)}
-                  />
                 </div>
               )}
 
@@ -167,7 +168,6 @@ export function DependentsSection({ dependents, onChange }: { dependents: Depend
                 <YesNo label="Had income of their own" value={!!dep.income} onChange={(v) => update(i, "income", v)} />
                 <YesNo label="You provided childcare costs for them" value={!!dep.childcare} onChange={(v) => update(i, "childcare", v)} />
                 <YesNo label="You paid education expenses for them" value={!!dep.education} onChange={(v) => update(i, "education", v)} />
-                <YesNo label="Someone else may also be able to claim them" value={!!dep.others_may_claim} onChange={(v) => update(i, "others_may_claim", v)} />
                 <YesNo label="You have a signed Form 8332 for them" value={!!dep.form_8332} onChange={(v) => update(i, "form_8332", v)} />
                 <YesNo label="They have an IRS Identity Protection PIN" value={!!dep.ip_pin} onChange={(v) => update(i, "ip_pin", v)} />
                 <YesNo label="They were born or passed away during the year" value={!!dep.born_or_died_during_year} onChange={(v) => update(i, "born_or_died_during_year", v)} />

@@ -9,7 +9,6 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     key: "family",
     title: "Family",
     items: [
-      ["marriage", "Marriage"], ["divorce", "Divorce"], ["separation", "Separation"],
       ["birth", "Birth of a child"], ["adoption", "Adoption"], ["death", "Death in the family"],
       ["dependent_changes", "Dependent changes"], ["custody_changes", "Custody changes"],
       ["child_aging_out", "Child aging out of dependency"], ["student_status_changes", "Student status changes"],
@@ -28,7 +27,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     title: "Employment",
     items: [
       ["new_job", "New job"], ["job_loss", "Job loss"], ["retirement", "Retirement"], ["disability", "Disability"],
-      ["military_service", "Military service"], ["clergy", "Clergy"], ["stock_compensation", "Stock compensation"],
+      ["stock_compensation", "Stock compensation"],
       ["severance", "Severance"], ["employer_benefits", "Employer-provided benefits changed"],
     ],
   },
@@ -36,7 +35,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     key: "business",
     title: "Business",
     items: [
-      ["started_business", "Started a business"], ["closed_business", "Closed a business"], ["bought_business", "Bought a business"],
+      ["bought_business", "Bought a business"],
       ["sold_business", "Sold a business"], ["new_partner", "New business partner"], ["ownership_change", "Ownership change"],
       ["payroll_issues", "Payroll issues"], ["contractor_reporting_issues", "Contractor reporting issues"],
     ],
@@ -64,7 +63,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     key: "foreign",
     title: "Foreign",
     items: [
-      ["foreign_income", "Foreign income"], ["foreign_bank_accounts", "Foreign bank accounts"], ["foreign_assets", "Foreign assets"],
+      ["foreign_bank_accounts", "Foreign bank accounts"], ["foreign_assets", "Foreign assets"],
       ["foreign_trust", "Foreign trust"], ["foreign_business_ownership", "Foreign business ownership"],
       ["foreign_gifts", "Foreign gifts received"], ["foreign_inheritance", "Foreign inheritance"], ["crypto_held_abroad", "Cryptocurrency held abroad"],
     ],
@@ -73,9 +72,7 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
     key: "other",
     title: "Other",
     items: [
-      ["legal_settlement", "Legal settlement"], ["gambling_activity", "Significant gambling activity"],
-      ["marketplace_insurance_changes", "Marketplace insurance changes"], ["disaster_loss", "Disaster loss"],
-      ["casualty_loss", "Casualty loss"], ["large_gift", "Gave or received a large gift"], ["inheritance", "Inheritance"],
+      ["large_gift", "Gave or received a large gift"], ["inheritance", "Inheritance"],
       ["trust_estate_distribution", "Trust or estate distribution"],
     ],
   },
@@ -92,7 +89,13 @@ const GROUPS: { key: string; title: string; items: [string, string][] }[] = [
 export function Section5LifeChanges({ answers, setAnswer }: { answers: AnyRecord; setAnswer: (path: string[], value: unknown) => void }) {
   const lifeChanges = (answers.life_changes as AnyRecord) || {};
   const taxpayer = (answers.taxpayer_detail as AnyRecord) || {};
+  const marriage = (answers.marriage as AnyRecord) || {};
   const states = getArray<string>(answers, ["states_lived_worked"]);
+
+  const marriageSummary: string[] = [];
+  if (getBool(marriage, ["married_during_year"])) marriageSummary.push("married during the year");
+  if (getBool(marriage, ["separated_not_divorced"])) marriageSummary.push("separated but not divorced");
+  if (getStr(marriage, ["date_divorced"])) marriageSummary.push(`divorced ${getStr(marriage, ["date_divorced"])}`);
 
   return (
     <div className="space-y-4">
@@ -103,6 +106,12 @@ export function Section5LifeChanges({ answers, setAnswer }: { answers: AnyRecord
         return (
           <Card key={group.key}>
             <SubHeading title={group.title} />
+
+            {group.key === "family" && marriageSummary.length > 0 && (
+              <p className="text-xs text-muted mb-2 bg-paperDim border border-line rounded-sm px-2.5 py-1.5">
+                Marriage status this year (from Household & Filing Basics): {marriageSummary.join(", ")}.
+              </p>
+            )}
 
             {group.key === "residence" && states.length > 0 && (
               <p className="text-xs text-muted mb-2 bg-paperDim border border-line rounded-sm px-2.5 py-1.5">

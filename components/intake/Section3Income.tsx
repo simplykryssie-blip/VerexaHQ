@@ -21,16 +21,16 @@ const INCOME_SOURCES = [
 
 function emptyBusiness(): AnyRecord {
   return {
-    name: "", ein: "", address: "", activity: "", start_date: "", closure_date: "",
-    accounting_method: "", mileage: false, home_office: false, inventory: false,
+    name: "", ein: "", address: "", activity: "", is_new: false, still_operating: true,
+    start_date: "", closure_date: "", mileage: false, home_office: false, inventory: false,
     employees: false, contractors: false, payment_processor_forms: false,
-    prior_depreciation: false, bookkeeping_status: "", estimated_payments: false,
+    prior_depreciation: false, estimated_payments: false,
   };
 }
 function emptyRental(): AnyRecord {
   return {
     address: "", ownership_pct: 100, rental_dates: "", personal_use_days: 0,
-    property_manager: false, short_term: false, sale_or_conversion: false, prior_depreciation: false,
+    short_term: false, sale_or_conversion: false, prior_depreciation: false,
   };
 }
 
@@ -97,7 +97,6 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
           <SubHeading title="W-2 wages" />
           <NumberField label="Number of employers" value={Number(w2.employer_count || 0)} onChange={(v) => setAnswer(["w2_detail", "employer_count"], v)} />
           <div className="mt-2 divide-y divide-line">
-            <YesNo label="Worked in more than one state" value={getBool(w2, ["multi_state"])} onChange={(v) => setAnswer(["w2_detail", "multi_state"], v)} />
             <YesNo label="Have unreimbursed employee expenses" value={getBool(w2, ["unreimbursed_expenses"])} onChange={(v) => setAnswer(["w2_detail", "unreimbursed_expenses"], v)} />
             <YesNo label="Clergy income" value={getBool(w2, ["clergy"])} onChange={(v) => setAnswer(["w2_detail", "clergy"], v)} />
             <YesNo label="Military income" value={getBool(w2, ["military"])} onChange={(v) => setAnswer(["w2_detail", "military"], v)} />
@@ -130,14 +129,22 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
                   <TextField label="EIN (if applicable)" value={String(b.ein || "")} onChange={(v) => updateBusiness(i, "ein", v)} />
                   <TextField label="Business address" value={String(b.address || "")} onChange={(v) => updateBusiness(i, "address", v)} />
                   <TextField label="Business activity" value={String(b.activity || "")} onChange={(v) => updateBusiness(i, "activity", v)} />
-                  <TextField label="Start date (if new)" type="date" value={String(b.start_date || "")} onChange={(v) => updateBusiness(i, "start_date", v)} />
-                  <TextField label="Closure date (if closed)" type="date" value={String(b.closure_date || "")} onChange={(v) => updateBusiness(i, "closure_date", v)} />
-                  <TextField label="Accounting method" value={String(b.accounting_method || "")} onChange={(v) => updateBusiness(i, "accounting_method", v)} placeholder="Cash, accrual…" />
-                  <TextField label="Bookkeeping status" value={String(b.bookkeeping_status || "")} onChange={(v) => updateBusiness(i, "bookkeeping_status", v)} placeholder="Up to date, needs cleanup…" />
                 </div>
                 <div className="mt-1 divide-y divide-line">
-                  <YesNo label="Have income records" value={!!b.income_records} onChange={(v) => updateBusiness(i, "income_records", v)} />
-                  <YesNo label="Have expense records" value={!!b.expense_records} onChange={(v) => updateBusiness(i, "expense_records", v)} />
+                  <YesNo label="This business is new this year" value={!!b.is_new} onChange={(v) => updateBusiness(i, "is_new", v)} />
+                  {!!b.is_new && (
+                    <div className="py-2">
+                      <TextField label="Start date" type="date" value={String(b.start_date || "")} onChange={(v) => updateBusiness(i, "start_date", v)} />
+                    </div>
+                  )}
+                  <YesNo label="This business is still operating" value={b.still_operating !== false} onChange={(v) => updateBusiness(i, "still_operating", v)} />
+                  {b.still_operating === false && (
+                    <div className="py-2">
+                      <TextField label="Closure date" type="date" value={String(b.closure_date || "")} onChange={(v) => updateBusiness(i, "closure_date", v)} />
+                    </div>
+                  )}
+                </div>
+                <div className="mt-1 divide-y divide-line">
                   <YesNo label="Track business mileage" value={!!b.mileage} onChange={(v) => updateBusiness(i, "mileage", v)} />
                   <YesNo label="Claim a home office" value={!!b.home_office} onChange={(v) => updateBusiness(i, "home_office", v)} />
                   <YesNo label="Carry inventory" value={!!b.inventory} onChange={(v) => updateBusiness(i, "inventory", v)} />
@@ -168,7 +175,6 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
             <TextField label="Ownership percentage" value={getStr(bizOwnership, ["ownership_pct"])} onChange={(v) => setAnswer(["business_ownership", "ownership_pct"], v)} />
           </div>
           <div className="mt-2 divide-y divide-line">
-            <YesNo label="Expecting a K-1" value={getBool(bizOwnership, ["k1_expected"])} onChange={(v) => setAnswer(["business_ownership", "k1_expected"], v)} />
             <YesNo label="Have basis information available" value={getBool(bizOwnership, ["basis_info"])} onChange={(v) => setAnswer(["business_ownership", "basis_info"], v)} />
             <YesNo label="Made capital contributions this year" value={getBool(bizOwnership, ["capital_contributions"])} onChange={(v) => setAnswer(["business_ownership", "capital_contributions"], v)} />
             <YesNo label="Received distributions" value={getBool(bizOwnership, ["distributions"])} onChange={(v) => setAnswer(["business_ownership", "distributions"], v)} />
@@ -203,10 +209,7 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
                   <NumberField label="Personal-use days" value={Number(p.personal_use_days || 0)} onChange={(v) => updateRental(i, "personal_use_days", v)} />
                 </div>
                 <div className="mt-1 divide-y divide-line">
-                  <YesNo label="Have income records" value={!!p.income} onChange={(v) => updateRental(i, "income", v)} />
-                  <YesNo label="Have expense records" value={!!p.expenses} onChange={(v) => updateRental(i, "expenses", v)} />
                   <YesNo label="Made improvements this year" value={!!p.improvements} onChange={(v) => updateRental(i, "improvements", v)} />
-                  <YesNo label="Uses a property manager" value={!!p.property_manager} onChange={(v) => updateRental(i, "property_manager", v)} />
                   <YesNo label="Short-term rental (Airbnb, VRBO, etc.)" value={!!p.short_term} onChange={(v) => updateRental(i, "short_term", v)} />
                   <YesNo label="Sold or converted to personal use this year" value={!!p.sale_or_conversion} onChange={(v) => updateRental(i, "sale_or_conversion", v)} />
                   <YesNo label="Has prior-year depreciation to continue" value={!!p.prior_depreciation} onChange={(v) => updateRental(i, "prior_depreciation", v)} />
@@ -222,7 +225,6 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
           <SubHeading title="Investments" />
           <div className="divide-y divide-line">
             <YesNo label="Have one or more brokerage accounts" value={getBool(investments, ["brokerage_accounts"])} onChange={(v) => setAnswer(["investments_detail", "brokerage_accounts"], v)} />
-            <YesNo label="Sold stock this year" value={getBool(investments, ["stock_sales"])} onChange={(v) => setAnswer(["investments_detail", "stock_sales"], v)} />
             <YesNo label="Have cost-basis records" value={getBool(investments, ["cost_basis"])} onChange={(v) => setAnswer(["investments_detail", "cost_basis"], v)} />
             <YesNo label="Received employee stock (RSUs, options, ESPP)" value={getBool(investments, ["employee_stock"])} onChange={(v) => setAnswer(["investments_detail", "employee_stock"], v)} />
             <YesNo label="Had worthless securities" value={getBool(investments, ["worthless_securities"])} onChange={(v) => setAnswer(["investments_detail", "worthless_securities"], v)} />
@@ -234,19 +236,7 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
       {has("crypto") && (
         <Card>
           <SubHeading title="Cryptocurrency / digital assets" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {["bought", "sold", "exchanged", "mined", "staked", "received_as_payment", "airdrops", "nfts"].map((k) => (
-              <Checkbox
-                key={k}
-                label={k.replace(/_/g, " ")}
-                checked={getBool(crypto, [k])}
-                onChange={(v) => setAnswer(["crypto_detail", k], v)}
-              />
-            ))}
-          </div>
-          <div className="mt-2">
-            <YesNo label="Exchange/wallet reports available" value={getBool(crypto, ["reports_available"])} onChange={(v) => setAnswer(["crypto_detail", "reports_available"], v)} />
-          </div>
+          <YesNo label="Exchange/wallet reports available" value={getBool(crypto, ["reports_available"])} onChange={(v) => setAnswer(["crypto_detail", "reports_available"], v)} />
         </Card>
       )}
 
@@ -254,7 +244,7 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
         <Card>
           <SubHeading title="Retirement income" />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-            {["pension", "ira", "k401", "early_withdrawal", "rollover", "roth_conversion", "rmd", "disability_retirement"].map((k) => (
+            {["early_withdrawal", "rollover", "roth_conversion", "rmd"].map((k) => (
               <Checkbox key={k} label={k.replace(/_/g, " ")} checked={getBool(retirement, [k])} onChange={(v) => setAnswer(["retirement_detail", k], v)} />
             ))}
           </div>
@@ -275,10 +265,7 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
       {has("unemployment") && (
         <Card>
           <SubHeading title="Unemployment" />
-          <TextField label="State" value={getStr(unemployment, ["state"])} onChange={(v) => setAnswer(["unemployment_detail", "state"], v)} />
-          <div className="mt-2">
-            <YesNo label="Had tax withheld from benefits" value={getBool(unemployment, ["withholding"])} onChange={(v) => setAnswer(["unemployment_detail", "withholding"], v)} />
-          </div>
+          <YesNo label="Had tax withheld from benefits" value={getBool(unemployment, ["withholding"])} onChange={(v) => setAnswer(["unemployment_detail", "withholding"], v)} />
         </Card>
       )}
 
@@ -288,7 +275,6 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
           <div className="divide-y divide-line">
             <YesNo label="From one or more banks" value={getBool(intDiv, ["banks"])} onChange={(v) => setAnswer(["interest_dividends_detail", "banks"], v)} />
             <YesNo label="From a brokerage account" value={getBool(intDiv, ["brokerage"])} onChange={(v) => setAnswer(["interest_dividends_detail", "brokerage"], v)} />
-            <YesNo label="From a foreign account" value={getBool(intDiv, ["foreign_accounts"])} onChange={(v) => setAnswer(["interest_dividends_detail", "foreign_accounts"], v)} />
             <YesNo label="Includes tax-exempt interest" value={getBool(intDiv, ["tax_exempt"])} onChange={(v) => setAnswer(["interest_dividends_detail", "tax_exempt"], v)} />
             <YesNo label="Includes nominee interest" value={getBool(intDiv, ["nominee"])} onChange={(v) => setAnswer(["interest_dividends_detail", "nominee"], v)} />
           </div>

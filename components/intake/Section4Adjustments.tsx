@@ -38,8 +38,7 @@ const GROUPS: { title: string; items: [string, string][] }[] = [
     title: "Home & property",
     items: [
       ["mortgage_interest", "Mortgage interest"],
-      ["property_taxes", "Property taxes"],
-      ["real_estate_taxes", "Other real-estate taxes"],
+      ["property_taxes", "Property or real-estate taxes"],
       ["energy_efficient_home", "Energy-efficient home improvements"],
       ["clean_energy_credits", "Residential clean-energy credits (solar, etc.)"],
       ["ev_credits", "Electric vehicle credit"],
