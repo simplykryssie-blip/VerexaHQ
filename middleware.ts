@@ -15,9 +15,21 @@ function isPublicIntakePath(pathname: string): boolean {
   return PUBLIC_INTAKE_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
+// Temporary diagnostic header (non-sensitive: the short commit SHA Vercel
+// injects at build time) so it's possible to independently confirm which
+// deployment actually served a given response -- e.g. via curl -I or
+// browser devtools -- rather than trusting the Vercel dashboard's
+// "Ready" status alone. Safe to remove once the deployment-routing
+// investigation for PR #7 is closed out.
+const BUILD_SHA = (process.env.VERCEL_GIT_COMMIT_SHA || "unknown").slice(0, 7);
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (isPublicIntakePath(pathname)) return NextResponse.next();
+  if (isPublicIntakePath(pathname)) {
+    const res = NextResponse.next();
+    res.headers.set("X-Verexa-Build", BUILD_SHA);
+    return res;
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)?.trim();
