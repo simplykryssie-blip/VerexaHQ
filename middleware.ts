@@ -28,6 +28,12 @@ export function middleware(request: NextRequest) {
   if (isPublicIntakePath(pathname)) {
     const res = NextResponse.next();
     res.headers.set("X-Verexa-Build", BUILD_SHA);
+    // Public intake pages are entirely client-rendered from a token/answers
+    // that change on every visit -- there is no correct reason for the HTML
+    // shell to ever be cached by a CDN, proxy, or browser. Explicit no-store
+    // rules that out as a source of "the deployed code is right but the
+    // visitor still sees an old version" reports.
+    res.headers.set("Cache-Control", "no-store, must-revalidate");
     return res;
   }
 
