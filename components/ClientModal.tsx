@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
+import { friendlyDbError, type SbError } from "@/lib/friendlyError";
 
 // save_workspace_client only accepts client_type = individual | business.
 const CLIENT_TYPES = [
@@ -59,51 +60,17 @@ function formatEIN(raw: string) {
   return `${digits.slice(0, 2)}-${digits.slice(2)}`;
 }
 
-// next build always bakes NODE_ENV=production into a Vercel deployment —
-// preview and production builds are identical on that axis, so NODE_ENV
-// can't tell them apart. Only treat this as "real production" when we can
-// positively confirm it: either Vercel's own NEXT_PUBLIC_VERCEL_ENV says
-// so, or the browser is actually on the production hostname. Anything
-// else (preview, local dev, unset) defaults to showing full error detail,
-// since hiding detail on an environment we can't positively identify as
-// production would make preview failures undebuggable — which is exactly
-// what happened before this was tightened.
-const PRODUCTION_HOSTNAME = "verexa-hq-phi.vercel.app";
-function computeIsPreviewOrDev(): boolean {
-  if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") return false;
-  if (typeof window !== "undefined" && window.location.hostname === PRODUCTION_HOSTNAME) return false;
-  return true;
-}
-const IS_PREVIEW_OR_DEV = computeIsPreviewOrDev();
-
-type SbError = { message: string; code?: string; details?: string | null; hint?: string | null };
-
 // Every follow-up write in the save flow reports its own failure through
 // this, tagged with a distinct step name, so a partial save always says
 // exactly which step broke instead of one generic message. It never
 // claims the session expired — that specific wording is only ever shown
 // right after getSession() itself confirms there is no session, never
-// guessed from an error string here.
+// guessed from an error string here. Shared sanitization logic (preview
+// vs. production, RLS detection, P0001 passthrough) now lives in
+// lib/friendlyError.ts so NewServiceModal and ActivateServiceModal reuse
+// the exact same rules instead of each having their own ad hoc filter.
 function stepError(step: string, err: SbError): string {
-  if (IS_PREVIEW_OR_DEV) {
-    const parts = [`[${step}] ${err.message}`];
-    if (err.code) parts.push(`code=${err.code}`);
-    if (err.details) parts.push(`details=${err.details}`);
-    if (err.hint) parts.push(`hint=${err.hint}`);
-    return parts.join(" — ");
-  }
-  const lower = err.message.toLowerCase();
-  if (lower.includes("row-level security") || lower.includes("not allowed") || lower.includes("permission")) {
-    return "You don't have permission to complete this action. Contact a workspace admin if this seems wrong.";
-  }
-  // P0001 is the SQLSTATE Postgres assigns to a plain `raise exception` —
-  // every business-rule validation error this app's own RPCs raise uses
-  // that form, so its message is intentional and safe to show as-is. Any
-  // other code is an unexpected/internal database error (a genuine bug,
-  // not a validation message), which could name real tables or columns —
-  // that's kept out of production and only shown in preview/dev above.
-  if (err.code === "P0001") return err.message;
-  return "There was a problem saving. Please try again, and contact support if it keeps happening.";
+  return friendlyDbError(err, step, "There was a problem saving. Please try again, and contact support if it keeps happening.");
 }
 
 const US_STATES = [
@@ -167,7 +134,10 @@ export default function ClientModal({
 }: {
   client?: Client;
   onClose: () => void;
-  onSaved: () => void;
+  // Always receives the saved client's id — callers creating a brand-new
+  // client (no `client` prop passed in) use this to navigate straight to
+  // the new profile instead of leaving staff to find it in the list.
+  onSaved: (clientId: string) => void;
   onDeleted?: () => void;
   // Lets callers (e.g. "Add Contact" / "Link existing contact" from the
   // Client Profile's Contacts card) jump straight to Step 2 already in
@@ -987,7 +957,7 @@ export default function ClientModal({
     }
 
     setSaving(false);
-    onSaved();
+    onSaved(clientId);
     onClose();
   }
 
