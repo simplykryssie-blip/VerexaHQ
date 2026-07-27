@@ -27,7 +27,6 @@ const GROUPS: { title: string; items: [string, string][] }[] = [
   {
     title: "Family & medical",
     items: [
-      ["dependent_care", "Childcare / dependent-care expenses"],
       ["adoption_expenses", "Adoption expenses"],
       ["medical_dental", "Medical and dental expenses"],
       ["health_premiums", "Health insurance premiums paid out of pocket"],

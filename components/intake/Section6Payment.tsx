@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, SubHeading, Select, TextArea, YesNo, Checkbox } from "./fields";
+import { Card, SubHeading, Select, TextArea, YesNo, Checkbox, DisclaimerNote } from "./fields";
 import { getBool, getStr, getArray, type AnyRecord } from "@/lib/intakeAnswers";
 
 const ASSISTANCE_TYPES: [string, string][] = [
@@ -17,55 +17,80 @@ const ASSISTANCE_TYPES: [string, string][] = [
 // Portal-assistance answers only ever create a staff-visible
 // client-assistance flag (see review_flags in recompute_intake_flags) --
 // they're deliberately never read by any complexity, pricing, or
-// acceptance logic.
+// acceptance logic. Nothing on this screen commits the client to a
+// binding payment plan or bank-product agreement -- that only happens
+// later, after a quote, with full terms disclosed at that time.
 export function Section6Payment({ answers, setAnswer }: { answers: AnyRecord; setAnswer: (path: string[], value: unknown) => void }) {
   const readiness = (answers.readiness as AnyRecord) || {};
   const portalHelp = getStr(readiness, ["portal_help"]);
   const needsAssistance = portalHelp === "yes_may_need_help" || portalHelp === "someone_will_assist" || portalHelp === "other_accommodation";
   const assistanceTypes = getArray<string>(readiness, ["assistance_types"]);
+  const paymentPreference = getStr(answers, ["payment_preference"]);
+  const preferredNextStep = getStr(readiness, ["preferred_next_step"]);
 
   function toggleAssistance(key: string) {
     const has = assistanceTypes.includes(key);
     setAnswer(["readiness", "assistance_types"], has ? assistanceTypes.filter((k) => k !== key) : [...assistanceTypes, key]);
   }
 
+  function handleNextStepChange(next: string) {
+    setAnswer(["readiness", "preferred_next_step"], next);
+    setAnswer(["readiness", "consultation_requested"], next === "consultation_first");
+  }
+
   return (
     <div className="space-y-4">
+      <SubHeading title="Service Preferences and Payment Options" />
+      <p className="text-sm text-muted">These answers help the firm prepare the appropriate quote and service package. No payment is due from this screen.</p>
+
       <Card>
-        <SubHeading title="Payment preference" />
         <Select
-          label="How would you prefer to pay for our services?"
-          value={getStr(answers, ["payment_preference"])}
+          label="Preferred next step"
+          value={preferredNextStep}
+          onChange={handleNextStepChange}
+          options={[
+            ["", "Select…"],
+            ["send_quote", "Send me a quote if enough information is available"],
+            ["consultation_first", "I would like a consultation first"],
+            ["unsure", "I am unsure"],
+          ]}
+        />
+      </Card>
+
+      <Card>
+        <Select
+          label="Preferred payment option"
+          value={paymentPreference}
           onChange={(v) => setAnswer(["payment_preference"], v)}
           options={[
             ["", "Select…"],
-            ["upfront", "Pay upfront"],
-            ["refund", "Deduct from my refund"],
-            ["unsure", "Not sure yet"],
-            ["discuss", "I'd like to discuss this with staff"],
+            ["upfront", "Pay preparation fees directly"],
+            ["refund", "Ask whether fees may be paid from my refund"],
+            ["discuss", "Discuss payment options"],
+            ["unsure", "Unsure"],
           ]}
         />
-        {getStr(answers, ["payment_preference"]) !== "" && (
-          <>
-            <div className="mt-3">
-              <Select
-                label="Preferred payment timing"
-                value={getStr(readiness, ["preferred_timing"])}
-                onChange={(v) => setAnswer(["readiness", "preferred_timing"], v)}
-                options={[
-                  ["", "Select…"],
-                  ["as_soon_as_possible", "As soon as possible"],
-                  ["at_filing", "At filing"],
-                  ["installments", "In installments"],
-                ]}
+        {paymentPreference === "refund" && (
+          <div className="mt-2 space-y-2">
+            <DisclaimerNote>
+              Paying preparation fees from your refund may involve additional bank or processing fees and is
+              subject to eligibility and approval. If your refund is delayed, reduced, offset, or insufficient, you
+              remain responsible for any unpaid preparation fees. Full terms and fees will be provided before you
+              authorize this payment method.
+            </DisclaimerNote>
+            <div className="divide-y divide-line">
+              <YesNo
+                label="Is another person responsible for the preparation fee?"
+                value={getBool(readiness, ["another_person_responsible_for_fee"])}
+                onChange={(v) => setAnswer(["readiness", "another_person_responsible_for_fee"], v)}
+              />
+              <YesNo
+                label="Would you like to discuss this option before receiving the quote?"
+                value={getBool(readiness, ["discuss_before_quote"])}
+                onChange={(v) => setAnswer(["readiness", "discuss_before_quote"], v)}
               />
             </div>
-            <div className="mt-2 divide-y divide-line">
-              <YesNo label="Able to make a deposit if needed" value={getBool(readiness, ["deposit_ability"])} onChange={(v) => setAnswer(["readiness", "deposit_ability"], v)} />
-              <YesNo label="Payment will come from a third party" value={getBool(readiness, ["third_party_payer"])} onChange={(v) => setAnswer(["readiness", "third_party_payer"], v)} />
-              <YesNo label="Spouse or co-client will share payment" value={getBool(readiness, ["spouse_co_payer"])} onChange={(v) => setAnswer(["readiness", "spouse_co_payer"], v)} />
-            </div>
-          </>
+          </div>
         )}
       </Card>
 
@@ -73,7 +98,6 @@ export function Section6Payment({ answers, setAnswer }: { answers: AnyRecord; se
         <SubHeading title="Engagement readiness" />
         <div className="divide-y divide-line">
           <YesNo label="Interested in expedited service" value={getBool(readiness, ["expedited_interest"])} onChange={(v) => setAnswer(["readiness", "expedited_interest"], v)} />
-          <YesNo label="Would like a consultation before we proceed" value={getBool(readiness, ["consultation_requested"])} onChange={(v) => setAnswer(["readiness", "consultation_requested"], v)} />
         </div>
 
         <div className="mt-3 pt-3 border-t border-line">
@@ -103,7 +127,7 @@ export function Section6Payment({ answers, setAnswer }: { answers: AnyRecord; se
 
         <div className="mt-3 pt-3 border-t border-line">
           <TextArea
-            label="Any deadline or travel concerns we should know about?"
+            label="Any important deadline or travel date we should know about?"
             value={getStr(readiness, ["deadline_concerns"])}
             onChange={(v) => setAnswer(["readiness", "deadline_concerns"], v)}
           />

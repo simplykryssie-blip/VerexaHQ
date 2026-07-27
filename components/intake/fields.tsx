@@ -106,6 +106,43 @@ export function Select({
   );
 }
 
+// Like NumberField, but the field can be genuinely empty (not 0) --
+// starts blank, and clearing it returns to blank rather than snapping
+// back to 0. Use this whenever "no answer yet" must be distinguishable
+// from "the client entered zero."
+export function BlankableNumberField({
+  label,
+  value,
+  onChange,
+  min = 0,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (v: number | null) => void;
+  min?: number;
+}) {
+  return (
+    <div className="min-w-0">
+      <label className="block text-xs font-semibold text-muted mb-1 break-words">{label}</label>
+      <input
+        type="number"
+        min={min}
+        value={value === null ? "" : value}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw.trim() === "") {
+            onChange(null);
+            return;
+          }
+          const n = Number(raw);
+          onChange(Number.isNaN(n) ? null : Math.max(min, n));
+        }}
+        className="w-full min-w-0 border border-line rounded-sm px-3 py-2 text-sm"
+      />
+    </div>
+  );
+}
+
 export function Checkbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <label className="flex items-start gap-2 text-sm text-ink cursor-pointer py-1 min-w-0">

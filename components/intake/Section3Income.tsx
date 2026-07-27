@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { Card, SubHeading, TextField, NumberField, YesNo, Checkbox } from "./fields";
+import { Card, SubHeading, TextField, NumberField, BlankableNumberField, YesNo, Checkbox, Select } from "./fields";
 import { getBool, getStr, getArray, type AnyRecord } from "@/lib/intakeAnswers";
 
 const INCOME_SOURCES = [
@@ -95,7 +95,15 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
       {has("w2") && (
         <Card>
           <SubHeading title="W-2 wages" />
-          <NumberField label="Number of employers" value={Number(w2.employer_count || 0)} onChange={(v) => setAnswer(["w2_detail", "employer_count"], v)} />
+          <BlankableNumberField
+            label="How many employers issued you a W-2 for this tax year?"
+            min={1}
+            value={typeof w2.employer_count === "number" ? (w2.employer_count as number) : null}
+            onChange={(v) => setAnswer(["w2_detail", "employer_count"], v)}
+          />
+          {typeof w2.employer_count === "number" && w2.employer_count > 0 && (
+            <p className="text-xs text-muted mt-1">You indicated that you received W-2s from {w2.employer_count} employer{w2.employer_count === 1 ? "" : "s"}.</p>
+          )}
           <div className="mt-2 divide-y divide-line">
             <YesNo label="Have unreimbursed employee expenses" value={getBool(w2, ["unreimbursed_expenses"])} onChange={(v) => setAnswer(["w2_detail", "unreimbursed_expenses"], v)} />
             <YesNo label="Clergy income" value={getBool(w2, ["clergy"])} onChange={(v) => setAnswer(["w2_detail", "clergy"], v)} />
@@ -174,8 +182,26 @@ export function Section3Income({ answers, setAnswer }: { answers: AnyRecord; set
             <TextField label="Entity type" value={getStr(bizOwnership, ["entity_type"])} onChange={(v) => setAnswer(["business_ownership", "entity_type"], v)} placeholder="Partnership, S-corp, trust…" />
             <TextField label="Ownership percentage" value={getStr(bizOwnership, ["ownership_pct"])} onChange={(v) => setAnswer(["business_ownership", "ownership_pct"], v)} />
           </div>
+          <div className="mt-2">
+            <Select
+              label="Do you have records showing your investment and activity in this partnership, S corporation, trust, or estate?"
+              value={getStr(bizOwnership, ["basis_records"])}
+              onChange={(v) => setAnswer(["business_ownership", "basis_records"], v)}
+              options={[
+                ["", "Select…"],
+                ["yes", "Yes"],
+                ["some", "Some records"],
+                ["no", "No"],
+                ["unsure", "Unsure"],
+              ]}
+            />
+            <p className="text-xs text-muted mt-1">
+              Examples: prior-year K-1, contributions, distributions, loans to or from the entity, a prior basis
+              worksheet, or purchase/ownership documents. Your preparer will determine whether a basis calculation
+              is required.
+            </p>
+          </div>
           <div className="mt-2 divide-y divide-line">
-            <YesNo label="Have basis information available" value={getBool(bizOwnership, ["basis_info"])} onChange={(v) => setAnswer(["business_ownership", "basis_info"], v)} />
             <YesNo label="Made capital contributions this year" value={getBool(bizOwnership, ["capital_contributions"])} onChange={(v) => setAnswer(["business_ownership", "capital_contributions"], v)} />
             <YesNo label="Received distributions" value={getBool(bizOwnership, ["distributions"])} onChange={(v) => setAnswer(["business_ownership", "distributions"], v)} />
             <YesNo label="Have loans to/from the business" value={getBool(bizOwnership, ["loans"])} onChange={(v) => setAnswer(["business_ownership", "loans"], v)} />

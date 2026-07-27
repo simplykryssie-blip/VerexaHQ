@@ -64,7 +64,20 @@ export function Section8Review({
 
   const missingRequired: string[] = [];
   if (!getStr(answers, ["filing_status_expected"])) missingRequired.push("Filing status (Section 2)");
+  if (!getStr((answers.taxpayer_detail as AnyRecord) || {}, ["dob"])) missingRequired.push("Date of birth (Section 2)");
+  if (getBool(answers, ["has_spouse"]) && !getStr((answers.spouse as AnyRecord) || {}, ["dob"])) missingRequired.push("Spouse date of birth (Section 2)");
+  {
+    const missingDependentDob = getArray<AnyRecord>(answers, ["dependents"]).some((d) => !getStr(d, ["dob"]));
+    if (missingDependentDob) missingRequired.push("Dependent date of birth (Section 2)");
+  }
   if (getArray(answers, ["income_sources"]).length === 0) missingRequired.push("At least one income source (Section 3)");
+  {
+    const w2Detail = (answers.w2_detail as AnyRecord) || {};
+    const employerCount = w2Detail.employer_count;
+    if (getArray<string>(answers, ["income_sources"]).includes("w2") && (typeof employerCount !== "number" || employerCount < 1)) {
+      missingRequired.push("Number of W-2 employers (Section 3)");
+    }
+  }
   if (!getStr(answers, ["payment_preference"])) missingRequired.push("Payment preference (Section 6)");
 
   const blockingMissing = docs.filter((d) => d.is_blocking && d.status === "requested");

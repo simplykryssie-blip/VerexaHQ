@@ -176,7 +176,7 @@ export default function IntakeWizardPage() {
 
       <div className="bg-white border border-line rounded-sm p-3.5 sm:p-6 mt-4 min-w-0">
         {section === 1 && <SectionIdentity intake={intake} answers={answers} setAnswer={setAnswer} />}
-        {section === 2 && <Section2Household answers={answers} setAnswer={setAnswer} />}
+        {section === 2 && <Section2Household answers={answers} setAnswer={setAnswer} token={token} taxYear={intake.tax_year} />}
         {section === 3 && <Section3Income answers={answers} setAnswer={setAnswer} />}
         {section === 4 && <Section4Adjustments answers={answers} setAnswer={setAnswer} />}
         {section === 5 && <Section5LifeChanges answers={answers} setAnswer={setAnswer} />}
