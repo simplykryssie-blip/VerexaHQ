@@ -182,6 +182,7 @@ export default function NewDeadlineModal({
               <option>Due Soon</option>
               <option>Past Due</option>
               <option>Completed</option>
+              <option>Canceled</option>
             </select>
           )}
           <textarea

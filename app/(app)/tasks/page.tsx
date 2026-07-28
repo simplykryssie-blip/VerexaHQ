@@ -7,6 +7,8 @@ import type { Task, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import { friendlyError } from "@/lib/friendlyError";
+import { isOpenTaskStatus } from "@/lib/status";
+import { useToast } from "@/components/Toast";
 
 type TaskWithClient = Task & { clientName: string };
 
@@ -17,6 +19,7 @@ export default function TasksPage() {
   const [showDone, setShowDone] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskWithClient | null>(null);
+  const { showError } = useToast();
 
   async function load() {
     setLoading(true);
@@ -66,22 +69,24 @@ export default function TasksPage() {
   }, []);
 
   async function toggleTask(task: TaskWithClient) {
-    const nextStatus = task.task_status === "Done" ? "To Do" : "Done";
+    const nextStatus = task.task_status === "Completed" ? "To Do" : "Completed";
     const { error } = await supabase
       .from("tasks")
       .update({
         task_status: nextStatus,
-        completed_at: nextStatus === "Done" ? new Date().toISOString() : null,
+        completed_at: nextStatus === "Completed" ? new Date().toISOString() : null,
       })
       .eq("id", task.id);
     if (!error) {
       setTasks((prev) =>
         prev.map((t) => (t.id === task.id ? { ...t, task_status: nextStatus } : t))
       );
+    } else {
+      showError(friendlyError(error, "Couldn't update that task. Please try again."));
     }
   }
 
-  const visible = tasks.filter((t) => showDone || t.task_status !== "Done");
+  const visible = tasks.filter((t) => showDone || isOpenTaskStatus(t.task_status));
 
   return (
     <div>
@@ -139,7 +144,7 @@ export default function TasksPage() {
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
-                checked={t.task_status === "Done"}
+                checked={t.task_status === "Completed"}
                 onChange={() => toggleTask(t)}
                 className="w-4 h-4 accent-[#0D1B2A]"
               />
@@ -147,8 +152,8 @@ export default function TasksPage() {
                 <div
                   className="text-sm font-semibold text-ink"
                   style={{
-                    textDecoration: t.task_status === "Done" ? "line-through" : "none",
-                    opacity: t.task_status === "Done" ? 0.5 : 1,
+                    textDecoration: t.task_status === "Completed" ? "line-through" : "none",
+                    opacity: t.task_status === "Completed" ? 0.5 : 1,
                   }}
                 >
                   {t.task_title}
