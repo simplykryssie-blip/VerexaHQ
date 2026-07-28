@@ -20,8 +20,16 @@ import { Section5LifeChanges } from "@/components/intake/Section5LifeChanges";
 import { Section6Payment } from "@/components/intake/Section6Payment";
 import { Section7Documents, type UploadedDoc } from "@/components/intake/Section7Documents";
 import { Section8Review } from "@/components/intake/Section8Review";
+import { BizSection1Identity } from "@/components/intake/business/BizSection1Identity";
+import { BizSection2Owners } from "@/components/intake/business/BizSection2Owners";
+import { BizSection3Operations } from "@/components/intake/business/BizSection3Operations";
+import { BizSection4Financials } from "@/components/intake/business/BizSection4Financials";
+import { BizSection5Payroll } from "@/components/intake/business/BizSection5Payroll";
+import { BizSection6Assets } from "@/components/intake/business/BizSection6Assets";
+import { BizSection7Compliance } from "@/components/intake/business/BizSection7Compliance";
+import { BizSection8Review } from "@/components/intake/business/BizSection8Review";
 
-const SECTIONS = [
+const INDIVIDUAL_SECTIONS = [
   "Identity & Entry",
   "Household & Filing Basics",
   "Income Sources",
@@ -30,6 +38,17 @@ const SECTIONS = [
   "Payment Preference & Readiness",
   "Documents",
   "Review & Submit",
+] as const;
+
+const BUSINESS_SECTIONS = [
+  "Business Identity & Classification",
+  "Owners & Shareholders",
+  "Operations & Locations",
+  "Financial Records",
+  "Payroll & Contractors",
+  "Assets & Loans",
+  "Changes & Compliance",
+  "Documents & Review",
 ] as const;
 
 const NOT_EDITABLE_STATUSES = new Set([
@@ -162,12 +181,15 @@ export default function IntakeWizardPage() {
     );
   }
 
+  const isBusiness = intake.intake_type === "business_entity";
+  const SECTIONS = isBusiness ? BUSINESS_SECTIONS : INDIVIDUAL_SECTIONS;
+
   return (
     <div className="max-w-2xl mx-auto px-3 sm:px-4 py-6 sm:py-8 overflow-x-hidden">
       <div className="flex items-center gap-3 mb-4">
         <LogoMark size={28} />
         <div className="min-w-0">
-          <div className="font-slab text-lg font-bold text-ink">Tax Intake</div>
+          <div className="font-slab text-lg font-bold text-ink">{isBusiness ? "Business Tax Intake" : "Tax Intake"}</div>
           <SaveIndicator status={saveStatus} />
         </div>
       </div>
@@ -175,26 +197,61 @@ export default function IntakeWizardPage() {
       <SectionProgress sections={SECTIONS} current={section} onJump={goTo} />
 
       <div className="bg-white border border-line rounded-sm p-3.5 sm:p-6 mt-4 min-w-0">
-        {section === 1 && <SectionIdentity intake={intake} answers={answers} setAnswer={setAnswer} />}
-        {section === 2 && <Section2Household answers={answers} setAnswer={setAnswer} token={token} taxYear={intake.tax_year} />}
-        {section === 3 && <Section3Income answers={answers} setAnswer={setAnswer} />}
-        {section === 4 && <Section4Adjustments answers={answers} setAnswer={setAnswer} />}
-        {section === 5 && <Section5LifeChanges answers={answers} setAnswer={setAnswer} />}
-        {section === 6 && <Section6Payment answers={answers} setAnswer={setAnswer} />}
-        {section === 7 && (
-          <Section7Documents token={token} docs={docs} uploaded={uploaded} onRefresh={() => loadDocs(token)} />
-        )}
-        {section === 8 && (
-          <Section8Review
-            token={token}
-            intake={intake}
-            answers={answers}
-            docs={docs}
-            onTokenRotated={(t) => setToken(t)}
-            onIntakeUpdated={(i) => setIntake(i)}
-            onSubmitted={() => setSubmitted(true)}
-            onJump={goTo}
-          />
+        {isBusiness ? (
+          <>
+            {section === 1 && <BizSection1Identity token={token} intake={intake} answers={answers} setAnswer={setAnswer} />}
+            {section === 2 && (
+              <BizSection2Owners token={token} answers={answers} setAnswer={setAnswer} entityClassification={intake.entity_classification} />
+            )}
+            {section === 3 && <BizSection3Operations answers={answers} setAnswer={setAnswer} />}
+            {section === 4 && <BizSection4Financials answers={answers} setAnswer={setAnswer} />}
+            {section === 5 && (
+              <BizSection5Payroll answers={answers} setAnswer={setAnswer} entityClassification={intake.entity_classification} />
+            )}
+            {section === 6 && (
+              <BizSection6Assets answers={answers} setAnswer={setAnswer} entityClassification={intake.entity_classification} />
+            )}
+            {section === 7 && <BizSection7Compliance answers={answers} setAnswer={setAnswer} />}
+            {section === 8 && (
+              <div className="space-y-6">
+                <Section7Documents token={token} docs={docs} uploaded={uploaded} onRefresh={() => loadDocs(token)} />
+                <BizSection8Review
+                  token={token}
+                  intake={intake}
+                  answers={answers}
+                  docs={docs}
+                  onTokenRotated={(t) => setToken(t)}
+                  onIntakeUpdated={(i) => setIntake(i)}
+                  onSubmitted={() => setSubmitted(true)}
+                  onJump={goTo}
+                />
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            {section === 1 && <SectionIdentity intake={intake} answers={answers} setAnswer={setAnswer} />}
+            {section === 2 && <Section2Household answers={answers} setAnswer={setAnswer} token={token} taxYear={intake.tax_year} />}
+            {section === 3 && <Section3Income answers={answers} setAnswer={setAnswer} />}
+            {section === 4 && <Section4Adjustments answers={answers} setAnswer={setAnswer} />}
+            {section === 5 && <Section5LifeChanges answers={answers} setAnswer={setAnswer} />}
+            {section === 6 && <Section6Payment answers={answers} setAnswer={setAnswer} />}
+            {section === 7 && (
+              <Section7Documents token={token} docs={docs} uploaded={uploaded} onRefresh={() => loadDocs(token)} />
+            )}
+            {section === 8 && (
+              <Section8Review
+                token={token}
+                intake={intake}
+                answers={answers}
+                docs={docs}
+                onTokenRotated={(t) => setToken(t)}
+                onIntakeUpdated={(i) => setIntake(i)}
+                onSubmitted={() => setSubmitted(true)}
+                onJump={goTo}
+              />
+            )}
+          </>
         )}
 
         <div className="flex flex-wrap gap-3 justify-between items-center mt-6 pt-4 border-t border-line">

@@ -8,6 +8,9 @@ import { supabase } from "@/lib/supabase";
 type IntakeListRow = {
   id: string;
   status: string;
+  intake_type: string;
+  entity_classification: string | null;
+  legal_business_name: string | null;
   contact_first_name: string | null;
   contact_last_name: string | null;
   tax_year: number;
@@ -51,7 +54,7 @@ export default function IntakeReviewQueuePage() {
       const { data } = await supabase
         .from("intakes")
         .select(
-          "id,status,contact_first_name,contact_last_name,tax_year,is_returning_client,contact_email_verified,contact_phone_verified,has_possible_matches,complexity_classification,consultation_recommended,assigned_to,submitted_at,created_at",
+          "id,status,intake_type,entity_classification,legal_business_name,contact_first_name,contact_last_name,tax_year,is_returning_client,contact_email_verified,contact_phone_verified,has_possible_matches,complexity_classification,consultation_recommended,assigned_to,submitted_at,created_at",
         )
         .order("submitted_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
@@ -102,6 +105,7 @@ export default function IntakeReviewQueuePage() {
             <thead className="bg-paperDim text-xs text-muted uppercase tracking-wide">
               <tr>
                 <th className="text-left px-4 py-2">Name</th>
+                <th className="text-left px-4 py-2">Type</th>
                 <th className="text-left px-4 py-2">Status</th>
                 <th className="text-left px-4 py-2">Tax year</th>
                 <th className="text-left px-4 py-2">New/Returning</th>
@@ -119,7 +123,18 @@ export default function IntakeReviewQueuePage() {
                   className="border-t border-line cursor-pointer hover:bg-paperDim"
                 >
                   <td className="px-4 py-2.5 font-medium text-ink">
-                    {r.contact_first_name} {r.contact_last_name}
+                    {r.intake_type === "business_entity"
+                      ? r.legal_business_name || `${r.contact_first_name} ${r.contact_last_name}`
+                      : `${r.contact_first_name} ${r.contact_last_name}`}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {r.intake_type === "business_entity" ? (
+                      <span className="text-xs font-semibold text-blue">
+                        Business{r.entity_classification ? ` · ${r.entity_classification.replace(/_/g, " ")}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">Individual</span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">{STATUS_LABELS[r.status] || r.status}</td>
                   <td className="px-4 py-2.5">{r.tax_year}</td>
