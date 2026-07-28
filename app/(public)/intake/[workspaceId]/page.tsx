@@ -26,21 +26,45 @@ type EntityClassification =
 // Routes to the Individual Tax Intake instead of this one.
 const INDIVIDUAL_ROUTED = new Set<EntityClassification>(["sole_prop", "smllc_individual"]);
 
-const ENTITY_OPTIONS: [EntityClassification, string, string][] = [
-  ["sole_prop", "Sole proprietorship", "No separate business entity was formed; reported on your individual return"],
-  ["smllc_individual", "Single-member LLC reported on the owner's individual return", "The default tax treatment for a one-owner LLC that hasn't made a corporate election"],
-  ["smllc_s_corp", "Single-member LLC taxed as an S corporation", ""],
-  ["smllc_c_corp", "Single-member LLC taxed as a C corporation", ""],
-  ["mmllc_partnership", "Multi-member LLC taxed as a partnership", "The default tax treatment for an LLC with more than one owner"],
-  ["mmllc_s_corp", "Multi-member LLC taxed as an S corporation", ""],
-  ["mmllc_c_corp", "Multi-member LLC taxed as a C corporation", ""],
-  ["s_corp", "S Corporation", "Files Form 1120-S"],
-  ["c_corp", "C Corporation", "Files Form 1120"],
-  ["partnership", "Partnership", "Files Form 1065"],
-  ["unsure", "I'm not sure how the business is taxed", "We'll flag this for our team to confirm with you"],
+// Full classification list -- only ever shown compactly, in the "I already
+// know the classification" expert dropdown. The guided interview below
+// derives the same values without ever displaying all 11 as cards.
+const ENTITY_OPTIONS: [EntityClassification, string][] = [
+  ["sole_prop", "Sole proprietorship"],
+  ["smllc_individual", "Single-member LLC reported on the owner's individual return"],
+  ["smllc_s_corp", "Single-member LLC taxed as an S corporation"],
+  ["smllc_c_corp", "Single-member LLC taxed as a C corporation"],
+  ["mmllc_partnership", "Multi-member LLC taxed as a partnership"],
+  ["mmllc_s_corp", "Multi-member LLC taxed as an S corporation"],
+  ["mmllc_c_corp", "Multi-member LLC taxed as a C corporation"],
+  ["s_corp", "S Corporation"],
+  ["c_corp", "C Corporation"],
+  ["partnership", "Partnership"],
+  ["unsure", "I'm not sure how the business is taxed"],
 ];
 
-type Step = "choose" | "individual" | "business_classify" | "business_sole_prop_notice" | "business_contact";
+type OwnerCount = "one" | "multiple" | "unsure" | "";
+type EntityFormed = "llc" | "corporation" | "partnership" | "none" | "unsure" | "";
+type CorpElection = "s_corp" | "c_corp" | "none" | "unsure" | "";
+
+// The only two-dimensional branch in the derived-routing table (owner
+// count x corporate election) -- pulled out as a pure function so it can
+// be tested in isolation from the UI.
+function deriveLlcClassification(ownerCount: "one" | "multiple", corpElection: "s_corp" | "c_corp" | "none"): EntityClassification {
+  if (corpElection === "s_corp") return ownerCount === "one" ? "smllc_s_corp" : "mmllc_s_corp";
+  if (corpElection === "c_corp") return ownerCount === "one" ? "smllc_c_corp" : "mmllc_c_corp";
+  return ownerCount === "one" ? "smllc_individual" : "mmllc_partnership";
+}
+
+type Step =
+  | "choose"
+  | "individual"
+  | "business_classify_q1"
+  | "business_classify_q2"
+  | "business_classify_q3"
+  | "business_classify_expert"
+  | "business_sole_prop_notice"
+  | "business_contact";
 
 export default function IntakeStartPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -55,12 +79,32 @@ export default function IntakeStartPage() {
   const [phone, setPhone] = useState("");
   const [legalBusinessName, setLegalBusinessName] = useState("");
   const [entityClassification, setEntityClassification] = useState<EntityClassification | "">("");
+  const [ownerCount, setOwnerCount] = useState<OwnerCount>("");
+  const [entityFormed, setEntityFormed] = useState<EntityFormed>("");
+  const [expertSelection, setExpertSelection] = useState<EntityClassification | "">("");
+  const [usedExpert, setUsedExpert] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Belt-and-suspenders against a double click racing ahead of the
   // `disabled={submitting}` re-render: this ref is checked synchronously,
   // before React has necessarily committed the state update.
   const submittingRef = useRef(false);
+
+  // Applies a derived (or expert-picked) classification and routes to the
+  // correct next step: sole-prop/disregarded-LLC to the individual-intake
+  // notice, everything else (including "unsure") to the business contact
+  // form.
+  function applyClassification(value: EntityClassification) {
+    setEntityClassification(value);
+    setStep(INDIVIDUAL_ROUTED.has(value) ? "business_sole_prop_notice" : "business_contact");
+  }
+
+  function classifyBackStep(): Step {
+    if (usedExpert) return "business_classify_expert";
+    if (entityFormed === "llc" || entityFormed === "corporation") return "business_classify_q3";
+    if (ownerCount) return "business_classify_q2";
+    return "business_classify_q1";
+  }
 
   async function handleIndividualSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -213,7 +257,7 @@ export default function IntakeStartPage() {
             </button>
             <button
               type="button"
-              onClick={() => setStep("business_classify")}
+              onClick={() => setStep("business_classify_q1")}
               className="w-full text-left border border-line rounded-sm px-4 py-3 hover:border-ink transition-colors"
             >
               <div className="text-sm font-semibold text-ink">Business/Entity Tax Preparation</div>
@@ -307,29 +351,171 @@ export default function IntakeStartPage() {
           </form>
         )}
 
-        {step === "business_classify" && (
+        {step === "business_classify_q1" && (
           <div className="bg-white border border-line rounded-sm p-6 space-y-3">
             <BackLink onClick={() => setStep("choose")} />
+            <div className="text-sm font-semibold text-ink mb-1">How many owners does the business have?</div>
+            <div className="space-y-2">
+              <ClassifyOption
+                label="One owner"
+                onClick={() => {
+                  setOwnerCount("one");
+                  setStep("business_classify_q2");
+                }}
+              />
+              <ClassifyOption
+                label="More than one owner"
+                onClick={() => {
+                  setOwnerCount("multiple");
+                  setStep("business_classify_q2");
+                }}
+              />
+              <ClassifyOption
+                label="Unsure"
+                onClick={() => {
+                  setOwnerCount("unsure");
+                  applyClassification("unsure");
+                }}
+              />
+            </div>
+            <ExpertPathLink
+              onClick={() => {
+                setUsedExpert(true);
+                setStep("business_classify_expert");
+              }}
+            />
+          </div>
+        )}
+
+        {step === "business_classify_q2" && (
+          <div className="bg-white border border-line rounded-sm p-6 space-y-3">
+            <BackLink onClick={() => setStep("business_classify_q1")} />
+            <div className="text-sm font-semibold text-ink mb-1">
+              Was an LLC, corporation, or partnership legally formed?
+            </div>
+            <div className="space-y-2">
+              <ClassifyOption
+                label="LLC"
+                onClick={() => {
+                  setEntityFormed("llc");
+                  setStep("business_classify_q3");
+                }}
+              />
+              <ClassifyOption
+                label="Corporation"
+                onClick={() => {
+                  setEntityFormed("corporation");
+                  setStep("business_classify_q3");
+                }}
+              />
+              <ClassifyOption
+                label="Partnership"
+                onClick={() => {
+                  setEntityFormed("partnership");
+                  applyClassification("partnership");
+                }}
+              />
+              <ClassifyOption
+                label="No separate business entity was formed"
+                onClick={() => {
+                  setEntityFormed("none");
+                  // Only defined for one owner in the derived-routing spec;
+                  // multiple owners with no formal entity are still taxed
+                  // as a partnership by default (Treas. Reg. 301.7701-3),
+                  // so that's routed to the Business Intake rather than
+                  // treated as a sole proprietorship.
+                  applyClassification(ownerCount === "one" ? "sole_prop" : "partnership");
+                }}
+              />
+              <ClassifyOption
+                label="Unsure"
+                onClick={() => {
+                  setEntityFormed("unsure");
+                  applyClassification("unsure");
+                }}
+              />
+            </div>
+            <ExpertPathLink
+              onClick={() => {
+                setUsedExpert(true);
+                setStep("business_classify_expert");
+              }}
+            />
+          </div>
+        )}
+
+        {step === "business_classify_q3" && (
+          <div className="bg-white border border-line rounded-sm p-6 space-y-3">
+            <BackLink onClick={() => setStep("business_classify_q2")} />
+            <div className="text-sm font-semibold text-ink mb-1">
+              {entityFormed === "corporation"
+                ? "Has the corporation elected S corporation tax treatment?"
+                : "Has the business elected to be taxed as an S corporation or C corporation?"}
+            </div>
+            <div className="space-y-2">
+              {entityFormed === "corporation" ? (
+                <>
+                  <ClassifyOption label="Yes" onClick={() => applyClassification("s_corp")} />
+                  <ClassifyOption label="No" onClick={() => applyClassification("c_corp")} />
+                  <ClassifyOption label="Unsure" onClick={() => applyClassification("unsure")} />
+                </>
+              ) : (
+                <>
+                  <ClassifyOption
+                    label="S corporation"
+                    onClick={() => applyClassification(deriveLlcClassification(ownerCount === "multiple" ? "multiple" : "one", "s_corp"))}
+                  />
+                  <ClassifyOption
+                    label="C corporation"
+                    onClick={() => applyClassification(deriveLlcClassification(ownerCount === "multiple" ? "multiple" : "one", "c_corp"))}
+                  />
+                  <ClassifyOption
+                    label="No corporate election"
+                    onClick={() => applyClassification(deriveLlcClassification(ownerCount === "multiple" ? "multiple" : "one", "none"))}
+                  />
+                  <ClassifyOption label="Unsure" onClick={() => applyClassification("unsure")} />
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === "business_classify_expert" && (
+          <div className="bg-white border border-line rounded-sm p-6 space-y-3">
+            <BackLink onClick={() => setStep("business_classify_q1")} />
             <div className="text-sm font-semibold text-ink mb-1">
               How is the business currently taxed for federal purposes?
             </div>
-            <div className="space-y-2">
-              {ENTITY_OPTIONS.map(([value, label, hint]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => {
-                    setEntityClassification(value);
-                    if (INDIVIDUAL_ROUTED.has(value)) setStep("business_sole_prop_notice");
-                    else setStep("business_contact");
-                  }}
-                  className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors"
-                >
-                  <div className="text-sm font-semibold text-ink">{label}</div>
-                  {hint && <div className="text-xs text-muted mt-0.5">{hint}</div>}
-                </button>
+            <select
+              value={expertSelection}
+              onChange={(e) => setExpertSelection(e.target.value as EntityClassification)}
+              className="w-full border border-line rounded-sm px-3 py-2 text-sm bg-white"
+            >
+              <option value="">Select…</option>
+              {ENTITY_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
-            </div>
+            </select>
+            <button
+              type="button"
+              disabled={!expertSelection}
+              onClick={() => expertSelection && applyClassification(expertSelection)}
+              className="w-full bg-ink text-white text-sm font-semibold py-2.5 rounded-sm disabled:opacity-50"
+            >
+              Continue
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsedExpert(false);
+                setStep("business_classify_q1");
+              }}
+              className="w-full text-xs font-semibold text-muted underline"
+            >
+              Use the guided questions instead
+            </button>
           </div>
         )}
 
@@ -354,7 +540,7 @@ export default function IntakeStartPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setStep("business_classify")}
+                onClick={() => setStep(classifyBackStep())}
                 className="w-full border border-line text-ink text-sm font-semibold py-2.5 rounded-sm"
               >
                 Return to entity selection
@@ -365,7 +551,7 @@ export default function IntakeStartPage() {
 
         {step === "business_contact" && (
           <form onSubmit={handleBusinessSubmit} className="bg-white border border-line rounded-sm p-6 space-y-4">
-            <BackLink onClick={() => setStep("business_classify")} />
+            <BackLink onClick={() => setStep(classifyBackStep())} />
 
             {entityClassification === "unsure" && (
               <div className="text-xs text-muted bg-paperDim border border-line rounded-sm px-3 py-2">
@@ -443,6 +629,26 @@ export default function IntakeStartPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function ClassifyOption({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors text-sm font-semibold text-ink"
+    >
+      {label}
+    </button>
+  );
+}
+
+function ExpertPathLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="text-xs font-semibold text-blue underline">
+      I already know the federal tax classification
+    </button>
   );
 }
 
