@@ -331,7 +331,10 @@ export type TaxOrganizerSection = {
   section_title: string;
   section_description: string | null;
   sort_order: number;
+  estimated_minutes: number | null;
 };
+
+export type OrganizerFormatType = "ssn" | "ein" | "phone" | "zip" | "currency" | "percentage";
 
 export type TaxOrganizerQuestion = {
   id: string;
@@ -344,6 +347,11 @@ export type TaxOrganizerQuestion = {
   mapped_field: string | null;
   conditional_logic: Record<string, unknown> | null;
   sort_order: number;
+  explanation: string | null;
+  example_text: string | null;
+  placeholder: string | null;
+  not_sure_text: string | null;
+  format_type: OrganizerFormatType | null;
 };
 
 export type TaxOrganizerAssignment = {
