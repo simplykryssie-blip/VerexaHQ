@@ -141,9 +141,17 @@ export default function IntakeReviewDetailPage() {
 
       <div>
         <h1 className="font-slab text-xl font-bold text-ink">
-          {intake.contact_first_name} {intake.contact_last_name}
+          {intake.intake_type === "business_entity"
+            ? intake.legal_business_name || `${intake.contact_first_name} ${intake.contact_last_name}`
+            : `${intake.contact_first_name} ${intake.contact_last_name}`}
         </h1>
         <p className="text-sm text-muted">
+          {intake.intake_type === "business_entity" && (
+            <>
+              {String(intake.entity_classification || "").replace(/_/g, " ")} · Contact: {intake.contact_first_name}{" "}
+              {intake.contact_last_name} ·{" "}
+            </>
+          )}
           Tax year {intake.tax_year} · {intake.is_returning_client ? "Returning client" : "New"} ·{" "}
           Status: <span className="font-semibold text-ink">{intake.status}</span>
         </p>
@@ -168,8 +176,37 @@ export default function IntakeReviewDetailPage() {
         </div>
       </div>
 
+      {intake.intake_type === "business_entity" && (
+        <div className="bg-white border border-line rounded-sm p-4 space-y-2 text-sm">
+          <div className="font-semibold text-ink mb-1">Business summary</div>
+          <div>Return type: {intake.answers?.return_type_detail || "—"}</div>
+          <div>Bookkeeping: {intake.answers?.bookkeeping?.status || "—"}</div>
+          <div>
+            States of operation: {Array.isArray(intake.states_lived_worked) ? intake.states_lived_worked.join(", ") || "—" : "—"}
+          </div>
+          <div>
+            Ownership total: {intake.ownership_percentage_total != null ? `${intake.ownership_percentage_total}%` : "—"}
+          </div>
+          <div className="mt-2">
+            <div className="text-xs font-semibold text-muted mb-1">Owners</div>
+            {(intake.answers?.owners || []).length === 0 ? (
+              <div className="text-xs text-muted">No owners recorded.</div>
+            ) : (
+              <div className="space-y-1">
+                {(intake.answers.owners as any[]).map((o, i) => (
+                  <div key={o.local_id || i} className="text-xs border-t border-line pt-1 first:border-t-0">
+                    {o.full_name || `Owner ${i + 1}`} — {o.role || "role not set"} —{" "}
+                    {typeof o.ownership_pct === "number" ? `${o.ownership_pct}%` : "% unknown"}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border border-line rounded-sm p-4">
-        <div className="font-semibold text-ink text-sm mb-2">Answers</div>
+        <div className="font-semibold text-ink text-sm mb-2">Answers (raw)</div>
         <pre className="text-xs text-muted whitespace-pre-wrap">{JSON.stringify(intake.answers, null, 2)}</pre>
       </div>
 
