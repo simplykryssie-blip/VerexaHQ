@@ -76,11 +76,11 @@ export default function DashboardPage() {
     const [clients, tasks, invoices, docs, deadlines, taskList, recentDocs] =
       await Promise.all([
         supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).is("archived_at", null),
-        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).neq("task_status", "Done"),
-        supabase.from("invoices").select("total_amount,amount_paid").eq("workspace_id", activeWorkspaceId).not("invoice_status", "in", '("Paid","Void","Cancelled")'),
-        supabase.from("documents").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).in("document_status", ["Requested", "Pending", "Missing"]),
+        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).not("task_status", "in", '("Completed","Canceled")'),
+        supabase.from("invoices").select("total_amount,amount_paid").eq("workspace_id", activeWorkspaceId).not("invoice_status", "in", '("paid","void")'),
+        supabase.from("documents").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).in("document_status", ["Needed", "Requested"]),
         supabase.from("deadlines").select("id,deadline_title,due_date,deadline_status").eq("workspace_id", activeWorkspaceId).gte("due_date", today).neq("deadline_status", "Completed").order("due_date", { ascending: true }).limit(6),
-        supabase.from("tasks").select("id,task_title,due_date,priority,task_status").eq("workspace_id", activeWorkspaceId).neq("task_status", "Done").order("due_date", { ascending: true, nullsFirst: false }).limit(6),
+        supabase.from("tasks").select("id,task_title,due_date,priority,task_status").eq("workspace_id", activeWorkspaceId).not("task_status", "in", '("Completed","Canceled")').order("due_date", { ascending: true, nullsFirst: false }).limit(6),
         supabase.from("documents").select("id,document_name,document_status,created_at").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }).limit(5),
       ]);
 
