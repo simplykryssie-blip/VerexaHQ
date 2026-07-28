@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, CheckCircle2, FileText, ClipboardList, Fi
 import { supabase } from "@/lib/supabase";
 import DateField from "@/components/DateField";
 import type { ServiceTemplate, PipelineStage } from "@/lib/types";
+import { friendlyError } from "@/lib/friendlyError";
 
 // Heuristic default only — service_templates has no is_recurring/frequency
 // column of its own, so this just pre-selects a sensible starting choice on
@@ -168,7 +169,7 @@ export default function ActivateServiceModal({
       .order("template_name")
       .then(({ data, error: queryError }) => {
         if (queryError) {
-          setTemplatesError(queryError.message);
+          setTemplatesError(friendlyError(queryError, "Couldn't load service templates. Please try again."));
           setTemplates([]);
           return;
         }
@@ -385,7 +386,7 @@ export default function ActivateServiceModal({
       p_is_recurring: isRecurring,
     });
     if (rpcError) {
-      setError(rpcError.message);
+      setError(friendlyError(rpcError, "Something went wrong activating this service. Please try again."));
       setSaving(false);
       return;
     }
@@ -463,7 +464,7 @@ export default function ActivateServiceModal({
       .select("id")
       .single();
     if (insertError) {
-      setError(insertError.message);
+      setError(friendlyError(insertError, "Something went wrong activating this service. Please try again."));
       setSaving(false);
       return;
     }

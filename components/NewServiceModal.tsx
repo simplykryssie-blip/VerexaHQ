@@ -5,6 +5,18 @@ import { supabase } from "@/lib/supabase";
 import type { Client, Pipeline, PipelineStage, Service } from "@/lib/types";
 
 import { friendlyError } from "@/lib/friendlyError";
+const SERVICE_STATUSES = [
+  "New",
+  "Pending Documents",
+  "Ready to Start",
+  "In Progress",
+  "Waiting on Client",
+  "Review",
+  "Completed",
+  "On Hold",
+  "Canceled",
+];
+
 export default function NewServiceModal({
   clientId,
   service,
@@ -238,7 +250,7 @@ export default function NewServiceModal({
     const { error: rpcError } = await supabase.rpc("delete_service_with_workflow", { p_service_id: service.id });
     setDeleting(false);
     if (rpcError) {
-      setDeleteError(rpcError.message);
+      setDeleteError(friendlyError(rpcError, "Something went wrong deleting this service. Please try again."));
       return;
     }
     onDeleted?.();
@@ -330,12 +342,17 @@ export default function NewServiceModal({
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
           {isEditing && (
-            <input
-              placeholder="Status (e.g. New, In Progress, Filed)"
+            <select
               value={serviceStatus}
               onChange={(e) => setServiceStatus(e.target.value)}
               className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-            />
+            >
+              {SERVICE_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           )}
           <input
             placeholder="Service year"

@@ -624,9 +624,9 @@ export default function ServiceWorkspacePage() {
               onBlur={(e) => saveSettings({ status: e.target.value })}
               className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
             >
-              {["active", "completed", "cancelled"].map((s) => (
+              {["draft", "active", "waiting_on_client", "on_hold", "completed", "cancelled", "archived"].map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {s.replaceAll("_", " ")}
                 </option>
               ))}
             </select>
@@ -634,11 +634,11 @@ export default function ServiceWorkspacePage() {
           <div>
             <label className="text-xs font-semibold text-muted">Priority</label>
             <select
-              defaultValue={row.priority ?? "Normal"}
+              defaultValue={row.priority ?? "normal"}
               onBlur={(e) => saveSettings({ priority: e.target.value })}
               className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
             >
-              {["Low", "Normal", "High", "Urgent"].map((s) => (
+              {["low", "normal", "high", "urgent"].map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
