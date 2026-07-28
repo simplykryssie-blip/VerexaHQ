@@ -20,6 +20,7 @@ import PaymentPlanModal from "@/components/PaymentPlanModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useToast } from "@/components/Toast";
 import { sendEmail, getProviderStatus } from "@/lib/notify";
+import { friendlyError } from "@/lib/friendlyError";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -198,24 +199,32 @@ export default function InvoiceDetailPage() {
     if (error) return;
 
     if (nextStatus === "paid") {
-      await supabase.from("invoice_payments").insert({
+      const { error: paymentError } = await supabase.from("invoice_payments").insert({
         workspace_id: invoice.workspace_id,
         invoice_id: invoice.id,
         client_id: invoice.client_id,
         payment_amount: schedule.amount,
-        payment_status: "completed",
+        payment_status: "succeeded",
         payment_method: "Payment Plan Installment",
         paid_at: new Date().toISOString(),
         source_type: "manual_tracking",
       });
+      if (paymentError) {
+        setError(friendlyError(paymentError, "Something went wrong. Please try again."));
+        return;
+      }
       const newAmountPaid = invoice.amount_paid + Number(schedule.amount);
-      await supabase
+      const { error: invoiceError } = await supabase
         .from("invoices")
         .update({
           amount_paid: newAmountPaid,
-          invoice_status: newAmountPaid >= invoice.total_amount ? "paid" : "partially_paid",
+          invoice_status: newAmountPaid >= invoice.total_amount ? "paid" : "partial",
         })
         .eq("id", invoice.id);
+      if (invoiceError) {
+        setError(friendlyError(invoiceError, "Something went wrong. Please try again."));
+        return;
+      }
     }
     load();
   }

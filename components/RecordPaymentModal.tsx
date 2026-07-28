@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Invoice } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import { friendlyError } from "@/lib/friendlyError";
 
 const METHODS = ["Check", "ACH", "Cash", "Credit Card (manual)", "Other"];
 
@@ -35,7 +36,7 @@ export default function RecordPaymentModal({
       invoice_id: invoice.id,
       client_id: invoice.client_id,
       payment_amount: paymentAmount,
-      payment_status: "completed",
+      payment_status: "succeeded",
       payment_method: method,
       paid_at: new Date().toISOString(),
       notes,
@@ -43,7 +44,7 @@ export default function RecordPaymentModal({
     });
 
     if (paymentError) {
-      setError(paymentError.message);
+      setError(friendlyError(paymentError, "Something went wrong. Please try again."));
       setSaving(false);
       return;
     }
@@ -53,7 +54,7 @@ export default function RecordPaymentModal({
       newAmountPaid >= invoice.total_amount
         ? "paid"
         : newAmountPaid > 0
-        ? "partially_paid"
+        ? "partial"
         : invoice.invoice_status;
 
     const { error: invoiceError } = await supabase
@@ -67,7 +68,7 @@ export default function RecordPaymentModal({
 
     setSaving(false);
     if (invoiceError) {
-      setError(invoiceError.message);
+      setError(friendlyError(invoiceError, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
