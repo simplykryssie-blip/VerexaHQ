@@ -17,6 +17,15 @@ type PossibleMatch = {
 };
 type HistoryRow = { id: string; from_status: string | null; to_status: string; reason: string | null; occurred_at: string };
 type ClientSearchRow = { id: string; first_name: string; last_name: string; email: string | null; phone: string | null };
+type ReasonableInquiry = {
+  id: string;
+  category: string;
+  trigger_reason: string;
+  client_question: string | null;
+  client_response: string | null;
+  status: "open" | "answered" | "resolved" | "dismissed";
+  staff_note: string | null;
+};
 
 export default function IntakeReviewDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -26,6 +35,7 @@ export default function IntakeReviewDetailPage() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [matches, setMatches] = useState<PossibleMatch[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
+  const [inquiries, setInquiries] = useState<ReasonableInquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -36,7 +46,7 @@ export default function IntakeReviewDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: i }, { data: dr }, { data: d }, { data: pm }, { data: h }] = await Promise.all([
+    const [{ data: i }, { data: dr }, { data: d }, { data: pm }, { data: h }, { data: ri }] = await Promise.all([
       supabase.from("intakes").select("*").eq("id", id).maybeSingle(),
       supabase.from("intake_document_requests").select("*").eq("intake_id", id).order("sort_order"),
       supabase.from("intake_documents").select("*").eq("intake_id", id),
@@ -46,14 +56,28 @@ export default function IntakeReviewDetailPage() {
         .eq("intake_id", id)
         .eq("reviewed", false),
       supabase.from("intake_status_history").select("*").eq("intake_id", id).order("occurred_at"),
+      supabase.from("intake_reasonable_inquiries").select("*").eq("intake_id", id).order("created_at"),
     ]);
     setIntake(i || null);
     setDocRequests((dr as DocRequest[]) || []);
     setDocs((d as Doc[]) || []);
     setMatches(((pm as unknown) as PossibleMatch[]) || []);
     setHistory((h as HistoryRow[]) || []);
+    setInquiries((ri as ReasonableInquiry[]) || []);
     setLoading(false);
   }, [id]);
+
+  async function resolveInquiry(inquiryId: string) {
+    setBusy(true);
+    setNotice(null);
+    const { error } = await supabase.rpc("staff_resolve_intake_inquiry", { p_inquiry_id: inquiryId, p_note: null });
+    setBusy(false);
+    if (error) {
+      setNotice(error.message);
+      return;
+    }
+    await load();
+  }
 
   useEffect(() => {
     load();
@@ -179,7 +203,17 @@ export default function IntakeReviewDetailPage() {
       {intake.intake_type === "business_entity" && (
         <div className="bg-white border border-line rounded-sm p-4 space-y-2 text-sm">
           <div className="font-semibold text-ink mb-1">Business summary</div>
-          <div>Return type: {intake.answers?.return_type_detail || "—"}</div>
+          <div>
+            Return type:{" "}
+            {[
+              intake.answers?.return_status?.is_initial === "yes" && "Initial",
+              intake.answers?.return_status?.is_final === "yes" && "Final",
+              intake.answers?.return_status?.needs_amendment === "yes" && "Amended",
+              intake.answers?.return_status?.is_short_period === "yes" && "Short period",
+            ]
+              .filter(Boolean)
+              .join(", ") || "Original"}
+          </div>
           <div>Bookkeeping: {intake.answers?.bookkeeping?.status || "—"}</div>
           <div>
             States of operation: {Array.isArray(intake.states_lived_worked) ? intake.states_lived_worked.join(", ") || "—" : "—"}
@@ -285,6 +319,45 @@ export default function IntakeReviewDetailPage() {
           <Link href={`/clients/${intake.matched_client_id}`} className="text-blue underline">
             View client profile
           </Link>
+        </div>
+      )}
+
+      {inquiries.length > 0 && (
+        <div className="bg-white border border-line rounded-sm p-4">
+          <div className="font-semibold text-ink text-sm mb-2">Reasonable-inquiry follow-ups</div>
+          <div className="space-y-2">
+            {inquiries.map((q) => (
+              <div key={q.id} className="border-t border-line pt-2 first:border-t-0 first:pt-0 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-ink">{q.category.replace(/_/g, " ")}</span>
+                  <span
+                    className={
+                      q.status === "resolved"
+                        ? "text-xs text-green"
+                        : q.status === "answered"
+                          ? "text-xs text-blue"
+                          : "text-xs text-amber"
+                    }
+                  >
+                    {q.status}
+                  </span>
+                </div>
+                <p className="text-xs text-muted mt-0.5">{q.trigger_reason}</p>
+                {q.client_question && <p className="text-xs text-ink mt-1">Asked client: {q.client_question}</p>}
+                {q.client_response && <p className="text-xs text-green mt-1">Client response: {q.client_response}</p>}
+                {q.status !== "resolved" && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => resolveInquiry(q.id)}
+                    className="text-xs font-semibold text-blue underline mt-1"
+                  >
+                    Mark resolved
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

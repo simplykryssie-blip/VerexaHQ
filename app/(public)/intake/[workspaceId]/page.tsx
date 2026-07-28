@@ -11,35 +11,36 @@ const CURRENT_TAX_YEAR = new Date().getFullYear() - 1;
 const GENERIC_START_ERROR = "We couldn't start your intake right now. Please try again.";
 
 type EntityClassification =
-  | "c_corp"
-  | "s_corp"
-  | "partnership"
-  | "mmllc_partnership"
-  | "llc_s_corp"
-  | "llc_c_corp"
-  | "smllc"
   | "sole_prop"
+  | "smllc_individual"
+  | "smllc_s_corp"
+  | "smllc_c_corp"
+  | "mmllc_partnership"
+  | "mmllc_s_corp"
+  | "mmllc_c_corp"
+  | "s_corp"
+  | "c_corp"
+  | "partnership"
   | "unsure";
 
+// Routes to the Individual Tax Intake instead of this one.
+const INDIVIDUAL_ROUTED = new Set<EntityClassification>(["sole_prop", "smllc_individual"]);
+
 const ENTITY_OPTIONS: [EntityClassification, string, string][] = [
-  ["c_corp", "C Corporation", "Files Form 1120"],
-  ["s_corp", "S Corporation", "Files Form 1120-S"],
-  ["partnership", "Partnership", "Files Form 1065"],
+  ["sole_prop", "Sole proprietorship", "No separate business entity was formed; reported on your individual return"],
+  ["smllc_individual", "Single-member LLC reported on the owner's individual return", "The default tax treatment for a one-owner LLC that hasn't made a corporate election"],
+  ["smllc_s_corp", "Single-member LLC taxed as an S corporation", ""],
+  ["smllc_c_corp", "Single-member LLC taxed as a C corporation", ""],
   ["mmllc_partnership", "Multi-member LLC taxed as a partnership", "The default tax treatment for an LLC with more than one owner"],
-  ["llc_s_corp", "LLC that elected to be taxed as an S corporation", ""],
-  ["llc_c_corp", "LLC that elected to be taxed as a C corporation", ""],
-  ["smllc", "Single-member LLC (one owner)", "We'll ask one quick follow-up question"],
-  ["sole_prop", "Sole proprietorship (no separate entity was formed)", ""],
+  ["mmllc_s_corp", "Multi-member LLC taxed as an S corporation", ""],
+  ["mmllc_c_corp", "Multi-member LLC taxed as a C corporation", ""],
+  ["s_corp", "S Corporation", "Files Form 1120-S"],
+  ["c_corp", "C Corporation", "Files Form 1120"],
+  ["partnership", "Partnership", "Files Form 1065"],
   ["unsure", "I'm not sure how the business is taxed", "We'll flag this for our team to confirm with you"],
 ];
 
-type Step =
-  | "choose"
-  | "individual"
-  | "business_classify"
-  | "business_smllc_followup"
-  | "business_sole_prop_notice"
-  | "business_contact";
+type Step = "choose" | "individual" | "business_classify" | "business_sole_prop_notice" | "business_contact";
 
 export default function IntakeStartPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
@@ -133,7 +134,7 @@ export default function IntakeStartPage() {
       setError("Please provide an email address or mobile number so we can reach you.");
       return;
     }
-    if (!entityClassification || entityClassification === "sole_prop" || entityClassification === "smllc") {
+    if (!entityClassification || INDIVIDUAL_ROUTED.has(entityClassification)) {
       setError("Please select how the business is taxed.");
       return;
     }
@@ -319,8 +320,7 @@ export default function IntakeStartPage() {
                   type="button"
                   onClick={() => {
                     setEntityClassification(value);
-                    if (value === "sole_prop") setStep("business_sole_prop_notice");
-                    else if (value === "smllc") setStep("business_smllc_followup");
+                    if (INDIVIDUAL_ROUTED.has(value)) setStep("business_sole_prop_notice");
                     else setStep("business_contact");
                   }}
                   className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors"
@@ -329,58 +329,6 @@ export default function IntakeStartPage() {
                   {hint && <div className="text-xs text-muted mt-0.5">{hint}</div>}
                 </button>
               ))}
-            </div>
-          </div>
-        )}
-
-        {step === "business_smllc_followup" && (
-          <div className="bg-white border border-line rounded-sm p-6 space-y-3">
-            <BackLink onClick={() => setStep("business_classify")} />
-            <div className="text-sm font-semibold text-ink mb-1">
-              Has this LLC elected to be taxed as an S corporation or C corporation?
-            </div>
-            <p className="text-xs text-muted">
-              This is a formal election filed with the IRS (Form 2553 or Form 8832). If you&apos;re
-              not sure, that&apos;s okay — choose &quot;I&apos;m not sure&quot; below.
-            </p>
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEntityClassification("llc_s_corp");
-                  setStep("business_contact");
-                }}
-                className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors text-sm font-semibold text-ink"
-              >
-                Yes — taxed as an S corporation
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEntityClassification("llc_c_corp");
-                  setStep("business_contact");
-                }}
-                className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors text-sm font-semibold text-ink"
-              >
-                Yes — taxed as a C corporation
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep("business_sole_prop_notice")}
-                className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors text-sm font-semibold text-ink"
-              >
-                No election was made
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setEntityClassification("unsure");
-                  setStep("business_contact");
-                }}
-                className="w-full text-left border border-line rounded-sm px-3 py-2.5 hover:border-ink transition-colors text-sm font-semibold text-ink"
-              >
-                I&apos;m not sure
-              </button>
             </div>
           </div>
         )}

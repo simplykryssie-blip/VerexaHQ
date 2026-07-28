@@ -1,7 +1,9 @@
 "use client";
 
-import { Card, SectionHeading, SubHeading, YesNo, TextField, BlankableNumberField, DisclaimerNote } from "../fields";
+import { Card, SectionHeading, SubHeading, YesNo, YesNoUnsure, TextField, BlankableNumberField, DisclaimerNote } from "../fields";
 import { getBool, getStr, type AnyRecord } from "@/lib/intakeAnswers";
+
+const S_CORP_TAXED = new Set(["s_corp", "smllc_s_corp", "mmllc_s_corp"]);
 
 export function BizSection5Payroll({
   answers,
@@ -14,7 +16,7 @@ export function BizSection5Payroll({
 }) {
   const payroll = (answers.payroll as AnyRecord) || {};
   const contractors = (answers.contractors as AnyRecord) || {};
-  const isSCorp = entityClassification === "s_corp" || entityClassification === "llc_s_corp";
+  const isSCorp = S_CORP_TAXED.has(entityClassification || "");
 
   return (
     <div className="space-y-4">
@@ -39,6 +41,11 @@ export function BizSection5Payroll({
               label="Payroll provider (if any)"
               value={getStr(payroll, ["provider_name"])}
               onChange={(v) => setAnswer(["payroll", "provider_name"], v)}
+            />
+            <YesNo
+              label="Do you have any payroll reports available (even partial)?"
+              value={getBool(payroll, ["reports_available"])}
+              onChange={(v) => setAnswer(["payroll", "reports_available"], v)}
             />
             <YesNo
               label="Are all payroll tax returns (941/940 and state) filed and up to date?"
@@ -78,6 +85,11 @@ export function BizSection5Payroll({
               label="Do you have a completed Form W-9 on file for each contractor?"
               value={getBool(contractors, ["w9_collected"])}
               onChange={(v) => setAnswer(["contractors", "w9_collected"], v)}
+            />
+            <YesNoUnsure
+              label="Have 1099 forms been filed for these contractors?"
+              value={getStr(contractors, ["forms_1099_filed"]) as "yes" | "no" | "unsure" | ""}
+              onChange={(v) => setAnswer(["contractors", "forms_1099_filed"], v)}
             />
             <YesNo
               label="Are there any contractor payments you're not sure were reported on a 1099?"

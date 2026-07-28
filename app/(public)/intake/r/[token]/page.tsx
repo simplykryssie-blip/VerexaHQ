@@ -200,13 +200,17 @@ export default function IntakeWizardPage() {
         {isBusiness ? (
           <>
             {section === 1 && <BizSection1Identity token={token} intake={intake} answers={answers} setAnswer={setAnswer} />}
-            {section === 2 && <BizSection2Owners token={token} answers={answers} setAnswer={setAnswer} />}
+            {section === 2 && (
+              <BizSection2Owners token={token} answers={answers} setAnswer={setAnswer} entityClassification={intake.entity_classification} />
+            )}
             {section === 3 && <BizSection3Operations answers={answers} setAnswer={setAnswer} />}
             {section === 4 && <BizSection4Financials answers={answers} setAnswer={setAnswer} />}
             {section === 5 && (
               <BizSection5Payroll answers={answers} setAnswer={setAnswer} entityClassification={intake.entity_classification} />
             )}
-            {section === 6 && <BizSection6Assets answers={answers} setAnswer={setAnswer} />}
+            {section === 6 && (
+              <BizSection6Assets answers={answers} setAnswer={setAnswer} entityClassification={intake.entity_classification} />
+            )}
             {section === 7 && <BizSection7Compliance answers={answers} setAnswer={setAnswer} />}
             {section === 8 && (
               <div className="space-y-6">

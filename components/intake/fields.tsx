@@ -183,6 +183,69 @@ export function YesNo({ label, value, onChange }: { label: string; value: boolea
   );
 }
 
+// Three-way Yes/No/Unsure control. Used throughout the business intake
+// wherever a client genuinely may not know the answer -- forcing a binary
+// Yes/No in those cases produces false signals downstream (a guessed "No"
+// looks identical to a confident "No" to every flag/document rule that
+// reads it).
+export function YesNoUnsure({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: "yes" | "no" | "unsure" | "";
+  onChange: (v: "yes" | "no" | "unsure") => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1 min-w-0">
+      <span className="text-sm text-ink break-words min-w-0">{label}</span>
+      <div className="flex shrink-0 border border-line rounded-sm overflow-hidden text-xs font-semibold">
+        {(["yes", "no", "unsure"] as const).map((v, i) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className={i > 0 ? "px-2.5 py-1.5 border-l border-line" : "px-2.5 py-1.5"}
+            style={{ backgroundColor: value === v ? "#172622" : "white", color: value === v ? "white" : "#60716B" }}
+          >
+            {v === "yes" ? "Yes" : v === "no" ? "No" : "Unsure"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Native date input with clean blank/clear semantics -- unlike a number
+// field, an empty date input's value is already "" (never a sentinel like
+// 0 or 1900), so clearing it and re-entering it round-trips correctly by
+// construction. Never defaults to today's date.
+export function DateField({
+  label,
+  value,
+  onChange,
+  max,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  max?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <label className="block text-xs font-semibold text-muted mb-1 break-words">{label}</label>
+      <input
+        type="date"
+        value={value}
+        max={max}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full min-w-0 border border-line rounded-sm px-3 py-2 text-sm"
+      />
+    </div>
+  );
+}
+
 export function DisclaimerNote({ children }: { children: React.ReactNode }) {
   return <p className="text-xs text-muted bg-paperDim border border-line rounded-sm px-3 py-2">{children}</p>;
 }

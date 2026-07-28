@@ -1,9 +1,12 @@
 "use client";
 
-import { Card, SectionHeading, TextField, Select, YesNo, BlankableNumberField, DisclaimerNote } from "../fields";
+import { Card, SectionHeading, TextField, Select, YesNo, BlankableNumberField, DateField, DisclaimerNote } from "../fields";
 import { SecureIdentityField } from "../SecureIdentityField";
 import { getArray, getStr, type AnyRecord } from "@/lib/intakeAnswers";
 import { OWNER_ROLE_OPTIONS, BASIS_RECORDS_OPTIONS } from "@/lib/businessIntakeOptions";
+
+const S_CORP_TAXED = new Set(["s_corp", "smllc_s_corp", "mmllc_s_corp"]);
+const PARTNERSHIP_TAXED = new Set(["partnership", "mmllc_partnership"]);
 
 function newLocalId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -20,6 +23,12 @@ function emptyOwner(): AnyRecord {
     received_compensation: false,
     received_distributions: false,
     had_loans: false,
+    is_foreign: false,
+    received_guaranteed_payments: false,
+    shareholder_health_insurance: false,
+    ownership_changed_during_year: false,
+    ownership_pct_beginning: null,
+    ownership_change_effective_date: "",
   };
 }
 
@@ -27,11 +36,15 @@ export function BizSection2Owners({
   token,
   answers,
   setAnswer,
+  entityClassification,
 }: {
   token: string;
   answers: AnyRecord;
   setAnswer: (path: string[], value: unknown) => void;
+  entityClassification: string | null;
 }) {
+  const isSCorpTaxed = S_CORP_TAXED.has(entityClassification || "");
+  const isPartnershipTaxed = PARTNERSHIP_TAXED.has(entityClassification || "");
   const owners = getArray<AnyRecord>(answers, ["owners"]);
   const ownershipStructure = (answers.ownership_structure as AnyRecord) || {};
 
@@ -128,7 +141,46 @@ export function BizSection2Owners({
                 value={!!owner.had_loans}
                 onChange={(v) => updateOwner(i, { had_loans: v })}
               />
+              <YesNo
+                label="Is this owner a foreign person (not a U.S. citizen or resident)?"
+                value={!!owner.is_foreign}
+                onChange={(v) => updateOwner(i, { is_foreign: v })}
+              />
+              {isPartnershipTaxed && (
+                <YesNo
+                  label="Did this owner receive guaranteed payments from the business?"
+                  value={!!owner.received_guaranteed_payments}
+                  onChange={(v) => updateOwner(i, { received_guaranteed_payments: v })}
+                />
+              )}
+              {isSCorpTaxed && (
+                <YesNo
+                  label="Did the business pay for this owner's health insurance?"
+                  value={!!owner.shareholder_health_insurance}
+                  onChange={(v) => updateOwner(i, { shareholder_health_insurance: v })}
+                />
+              )}
+              <YesNo
+                label="Did this owner's ownership percentage change during the year?"
+                value={!!owner.ownership_changed_during_year}
+                onChange={(v) => updateOwner(i, { ownership_changed_during_year: v })}
+              />
             </div>
+
+            {!!owner.ownership_changed_during_year && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-line">
+                <BlankableNumberField
+                  label="Ownership percentage at the start of the year"
+                  value={(owner.ownership_pct_beginning as number) ?? null}
+                  onChange={(v) => updateOwner(i, { ownership_pct_beginning: v })}
+                />
+                <DateField
+                  label="Date the change took effect"
+                  value={getStr(owner, ["ownership_change_effective_date"])}
+                  onChange={(v) => updateOwner(i, { ownership_change_effective_date: v })}
+                />
+              </div>
+            )}
           </Card>
         ))}
       </div>

@@ -12,17 +12,23 @@ function emptyLoan(): AnyRecord {
   return { local_id: newLocalId(), lender_name: "", purpose: "" };
 }
 
+const TRUE_C_CORP = new Set(["c_corp"]);
+
 export function BizSection6Assets({
   answers,
   setAnswer,
+  entityClassification,
 }: {
   answers: AnyRecord;
   setAnswer: (path: string[], value: unknown) => void;
+  entityClassification: string | null;
 }) {
   const assets = (answers.assets as AnyRecord) || {};
   const vehicles = (answers.vehicles as AnyRecord) || {};
   const equity = (answers.equity as AnyRecord) || {};
+  const cCorp = (answers.c_corp as AnyRecord) || {};
   const loans = getArray<AnyRecord>(answers, ["loans"]);
+  const isTrueCCorp = TRUE_C_CORP.has(entityClassification || "");
 
   function addLoan() {
     setAnswer(["loans"], [...loans, emptyLoan()]);
@@ -64,6 +70,13 @@ export function BizSection6Assets({
           value={getBool(vehicles, ["personal_used_for_business"])}
           onChange={(v) => setAnswer(["vehicles", "personal_used_for_business"], v)}
         />
+        {getBool(vehicles, ["personal_used_for_business"]) && (
+          <YesNo
+            label="Do you track business mileage for that vehicle?"
+            value={getBool(vehicles, ["mileage_records_available"])}
+            onChange={(v) => setAnswer(["vehicles", "mileage_records_available"], v)}
+          />
+        )}
       </Card>
 
       <Card>
@@ -99,6 +112,17 @@ export function BizSection6Assets({
         />
         <DisclaimerNote>If you're not sure, our team can help you determine this — leave it as No for now.</DisclaimerNote>
       </Card>
+
+      {isTrueCCorp && (
+        <Card>
+          <SubHeading title="Dividends" />
+          <YesNo
+            label="Did the business pay any dividends to shareholders this year?"
+            value={getBool(cCorp, ["dividends_paid"])}
+            onChange={(v) => setAnswer(["c_corp", "dividends_paid"], v)}
+          />
+        </Card>
+      )}
     </div>
   );
 }

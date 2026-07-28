@@ -13,6 +13,7 @@ export function BizSection7Compliance({
   const businessStatus = (answers.business_status as AnyRecord) || {};
   const relatedParty = ((answers.changes_compliance as AnyRecord)?.related_party as AnyRecord) || {};
   const taxCompliance = ((answers.changes_compliance as AnyRecord)?.tax_compliance as AnyRecord) || {};
+  const specialTransactions = ((answers.changes_compliance as AnyRecord)?.special_transactions as AnyRecord) || {};
 
   return (
     <div className="space-y-4">
@@ -40,13 +41,18 @@ export function BizSection7Compliance({
           value={getBool(businessStatus, ["ownership_changed"])}
           onChange={(v) => setAnswer(["business_status", "ownership_changed"], v)}
         />
+        <YesNo
+          label="Did the business formally dissolve this year?"
+          value={getBool(businessStatus, ["dissolved"])}
+          onChange={(v) => setAnswer(["business_status", "dissolved"], v)}
+        />
       </Card>
 
       <Card>
         <SubHeading title="Related-party transactions" />
         <p className="text-xs text-muted mb-1">
-          Beyond any owner loans you already told us about, has the business bought, sold, or
-          leased anything with:
+          Beyond any owner loans you already told us about, did the business pay rent, fees,
+          wages, or loan payments to, or otherwise buy, sell, or lease something with:
         </p>
         <YesNo
           label="An owner personally?"
@@ -81,6 +87,30 @@ export function BizSection7Compliance({
           label="Is the business on a payment plan (installment agreement) with the IRS or a state?"
           value={getBool(taxCompliance, ["installment_agreement"])}
           onChange={(v) => setAnswer(["changes_compliance", "tax_compliance", "installment_agreement"], v)}
+        />
+      </Card>
+
+      <Card>
+        <SubHeading title="Special situations" />
+        <YesNo
+          label="Was the business involved in a lawsuit settlement this year?"
+          value={getBool(specialTransactions, ["lawsuit_settlement"])}
+          onChange={(v) => setAnswer(["changes_compliance", "special_transactions", "lawsuit_settlement"], v)}
+        />
+        <YesNo
+          label="Did the business file for bankruptcy this year?"
+          value={getBool(specialTransactions, ["bankruptcy"])}
+          onChange={(v) => setAnswer(["changes_compliance", "special_transactions", "bankruptcy"], v)}
+        />
+        <YesNo
+          label="Did the business have a casualty or disaster loss this year?"
+          value={getBool(specialTransactions, ["disaster_loss"])}
+          onChange={(v) => setAnswer(["changes_compliance", "special_transactions", "disaster_loss"], v)}
+        />
+        <YesNo
+          label="Was the business affected by fraud, theft, or embezzlement this year?"
+          value={getBool(specialTransactions, ["fraud_theft_embezzlement"])}
+          onChange={(v) => setAnswer(["changes_compliance", "special_transactions", "fraud_theft_embezzlement"], v)}
         />
       </Card>
     </div>

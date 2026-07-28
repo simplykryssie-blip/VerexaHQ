@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, SubHeading, TextField, Checkbox } from "../fields";
 import { supabaseIntake, type IntakeRow, type IntakeDocumentRequest } from "@/lib/supabaseIntake";
 import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
@@ -20,6 +20,76 @@ function SummaryRow({ label, value, section, onJump }: { label: string; value: s
         Edit
       </button>
     </div>
+  );
+}
+
+type OpenInquiry = { id: string; category: string; client_question: string; status: "open" | "answered"; client_response: string | null };
+
+function FollowUpQuestions({ token }: { token: string }) {
+  const [inquiries, setInquiries] = useState<OpenInquiry[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabaseIntake.rpc("public_intake_open_inquiries", { p_token: token });
+      if (error) reportIntakeError("public_intake_open_inquiries", error);
+      setInquiries((data as OpenInquiry[]) || []);
+      setLoaded(true);
+    })();
+  }, [token]);
+
+  async function respond(id: string) {
+    const text = (drafts[id] || "").trim();
+    if (!text) return;
+    setSavingId(id);
+    const { error } = await supabaseIntake.rpc("public_respond_intake_inquiry", { p_token: token, p_inquiry_id: id, p_response: text });
+    setSavingId(null);
+    if (error) {
+      reportIntakeError("public_respond_intake_inquiry", error);
+      return;
+    }
+    setInquiries((prev) => prev.map((q) => (q.id === id ? { ...q, status: "answered", client_response: text } : q)));
+  }
+
+  if (!loaded || inquiries.length === 0) return null;
+
+  return (
+    <Card>
+      <SubHeading title="A few follow-up questions" />
+      <p className="text-xs text-muted mb-2">
+        Reviewing your answers raised these questions. Answering them now can help us avoid
+        contacting you again later, but it&apos;s not required to submit.
+      </p>
+      <div className="space-y-3">
+        {inquiries.map((q) => (
+          <div key={q.id} className="border border-line rounded-sm p-3">
+            <div className="text-sm text-ink mb-2">{q.client_question}</div>
+            {q.status === "answered" ? (
+              <p className="text-xs text-green">Thanks — you told us: &quot;{q.client_response}&quot;</p>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  value={drafts[q.id] || ""}
+                  onChange={(e) => setDrafts((prev) => ({ ...prev, [q.id]: e.target.value }))}
+                  placeholder="Your answer"
+                  className="flex-1 border border-line rounded-sm px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={savingId === q.id || !(drafts[q.id] || "").trim()}
+                  onClick={() => respond(q.id)}
+                  className="text-sm font-semibold bg-ink text-white px-3 py-2 rounded-sm disabled:opacity-50 shrink-0"
+                >
+                  {savingId === q.id ? "Saving…" : "Send"}
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -64,9 +134,16 @@ export function BizSection8Review({
   const verified = intake.contact_email_verified || intake.contact_phone_verified;
 
   const owners = getArray<AnyRecord>(answers, ["owners"]);
+  const returnStatus = (answers.return_status as AnyRecord) || {};
+  const principalAddress = ((answers.address as AnyRecord)?.principal as AnyRecord) || {};
   const missingRequired: string[] = [];
   if (owners.length === 0) missingRequired.push("At least one owner (Section 2)");
-  if (!getStr(answers, ["return_type_detail"])) missingRequired.push("What kind of return this is (Section 1)");
+  if (!getStr(returnStatus, ["already_filed"])) missingRequired.push("Whether a return has already been filed (Section 1)");
+  if (!getStr(returnStatus, ["is_initial"])) missingRequired.push("Whether this is the first return (Section 1)");
+  if (!getStr(returnStatus, ["is_final"])) missingRequired.push("Whether this is the final return (Section 1)");
+  if (!getStr(returnStatus, ["is_short_period"])) missingRequired.push("Whether this return covers fewer than 12 months (Section 1)");
+  if (!getStr(principalAddress, ["street"]) || !getStr(principalAddress, ["city"]) || !getStr(principalAddress, ["state"]))
+    missingRequired.push("Principal business address (Section 1)");
   if (!getStr((answers.bookkeeping as AnyRecord) || {}, ["status"])) missingRequired.push("Bookkeeping status (Section 4)");
 
   const blockingMissing = docs.filter((d) => d.is_blocking && d.status === "requested");
@@ -160,13 +237,15 @@ export function BizSection8Review({
   }
 
   const states = getArray<string>(answers, ["states_lived_worked"]).map(stateLabel).join(", ");
-  const returnTypeLabels: Record<string, string> = {
-    ongoing: "Ongoing return",
-    initial: "Initial return",
-    final: "Final return",
-    amended: "Amended return",
-    short_period: "Short-period return",
-  };
+  const returnTypeSummary =
+    [
+      getStr(returnStatus, ["is_initial"]) === "yes" && "Initial return",
+      getStr(returnStatus, ["is_final"]) === "yes" && "Final return",
+      getStr(returnStatus, ["needs_amendment"]) === "yes" && "Amended return",
+      getStr(returnStatus, ["is_short_period"]) === "yes" && "Short-period return",
+    ]
+      .filter(Boolean)
+      .join(", ") || "Original return";
 
   return (
     <div className="space-y-4">
@@ -180,12 +259,7 @@ export function BizSection8Review({
           section={1}
           onJump={onJump}
         />
-        <SummaryRow
-          label="Return type"
-          value={returnTypeLabels[getStr(answers, ["return_type_detail"])] || ""}
-          section={1}
-          onJump={onJump}
-        />
+        <SummaryRow label="Return type" value={returnTypeSummary} section={1} onJump={onJump} />
         <SummaryRow label="Owners added" value={String(owners.length)} section={2} onJump={onJump} />
         <SummaryRow label="States of operation" value={states} section={3} onJump={onJump} />
         <SummaryRow
@@ -215,6 +289,8 @@ export function BizSection8Review({
           </ul>
         </Card>
       )}
+
+      <FollowUpQuestions token={token} />
 
       <Card>
         <SubHeading title="Documents" />
