@@ -7,6 +7,7 @@ import { LogOut } from "lucide-react";
 import { supabasePortal } from "@/lib/supabasePortal";
 import { PortalProvider, usePortal } from "@/components/portal/PortalContext";
 import { LogoMark } from "@/components/Logo";
+import { ToastProvider } from "@/components/Toast";
 
 const PUBLIC_PATHS_PREFIXES = ["/portal/login", "/portal/accept"];
 
@@ -136,8 +137,10 @@ function PortalShell({ children }: { children: React.ReactNode }) {
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <PortalProvider>
-      <PortalShell>{children}</PortalShell>
-    </PortalProvider>
+    <ToastProvider>
+      <PortalProvider>
+        <PortalShell>{children}</PortalShell>
+      </PortalProvider>
+    </ToastProvider>
   );
 }

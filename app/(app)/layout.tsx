@@ -29,6 +29,7 @@ import {
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { ToastProvider } from "@/components/Toast";
 import {
   WorkspaceProvider,
   useWorkspace,
@@ -457,8 +458,10 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <WorkspaceProvider>
-      <Shell>{children}</Shell>
-    </WorkspaceProvider>
+    <ToastProvider>
+      <WorkspaceProvider>
+        <Shell>{children}</Shell>
+      </WorkspaceProvider>
+    </ToastProvider>
   );
 }

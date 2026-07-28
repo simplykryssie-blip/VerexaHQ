@@ -9,6 +9,7 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import StatusPill from "@/components/StatusPill";
 import type { Deadline, EngagementWorkspace, Service, Task } from "@/lib/types";
 import { isOpenTaskStatus, nextEngagementAction } from "@/lib/status";
+import { friendlyError } from "@/lib/friendlyError";
 
 const VIEWS = [
   { key: "mine", label: "My Work" },
@@ -40,6 +41,41 @@ type DueItem = {
   href: string;
 };
 
+type ClientNameRow = {
+  id: string;
+  account_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+type TeamMemberRow = { user_id: string; display_name: string | null };
+
+type EngagementLinkRow = { id: string; service_id: string; status: string };
+
+type DueEngagementRow = {
+  engagement_id: string;
+  engagement_name: string;
+  due_date: string;
+  account_name: string | null;
+};
+
+type ReviewDocument = {
+  id: string;
+  client_id: string;
+  document_name: string;
+  client_name: string;
+  document_status: string;
+};
+
+type ReviewOrganizer = {
+  id: string;
+  client_id: string;
+  client_name: string;
+  tax_year: number | null;
+  return_type: string | null;
+  assignment_status: string;
+};
+
 export default function WorkPage() {
   const { activeWorkspaceId } = useWorkspace();
   const router = useRouter();
@@ -52,9 +88,9 @@ export default function WorkPage() {
   const [myTasks, setMyTasks] = useState<QueueTask[]>([]);
   const [teamTasks, setTeamTasks] = useState<QueueTask[]>([]);
   const [workspaces, setWorkspaces] = useState<EngagementWorkspace[]>([]);
-  const [recurring, setRecurring] = useState<(Service & { engagement_id: string | null; engagement_status: string | null })[]>([]);
-  const [docsForReview, setDocsForReview] = useState<any[]>([]);
-  const [organizersForReview, setOrganizersForReview] = useState<any[]>([]);
+  const [recurring, setRecurring] = useState<(Service & { engagement_id: string | null; engagement_status: string | null; _clientName: string })[]>([]);
+  const [docsForReview, setDocsForReview] = useState<ReviewDocument[]>([]);
+  const [organizersForReview, setOrganizersForReview] = useState<ReviewOrganizer[]>([]);
   const [dueItems, setDueItems] = useState<DueItem[]>([]);
 
   useEffect(() => {
@@ -69,12 +105,12 @@ export default function WorkPage() {
       .eq("workspace_id", activeWorkspaceId)
       .then(({ data }) => {
         const map = new Map<string, string>();
-        (data ?? []).forEach((m: any) => map.set(m.user_id, m.display_name || "Team member"));
+        ((data as TeamMemberRow[]) ?? []).forEach((m) => map.set(m.user_id, m.display_name || "Team member"));
         setMemberNames(map);
       });
   }, [activeWorkspaceId]);
 
-  const clientNameFor = useCallback((row: any) => {
+  const clientNameFor = useCallback((row: ClientNameRow) => {
     return (
       row.account_name ||
       [row.first_name, row.last_name].filter(Boolean).join(" ") ||
@@ -104,7 +140,7 @@ export default function WorkPage() {
             .from("clients")
             .select("id, account_name, first_name, last_name")
             .in("id", clientIds);
-          (clients ?? []).forEach((c: any) => names.set(c.id, clientNameFor(c)));
+          ((clients as ClientNameRow[]) ?? []).forEach((c) => names.set(c.id, clientNameFor(c)));
         }
         setMyTasks(
           rows.map((r) => ({ ...r, client_name: names.get(r.client_id) ?? "—" }) as QueueTask),
@@ -138,7 +174,7 @@ export default function WorkPage() {
             .from("engagements")
             .select("id, service_id, status")
             .in("service_id", serviceIds);
-          (engs ?? []).forEach((e: any) => engByService.set(e.service_id, { id: e.id, status: e.status }));
+          ((engs as EngagementLinkRow[]) ?? []).forEach((e) => engByService.set(e.service_id, { id: e.id, status: e.status }));
         }
         const clientIds = Array.from(new Set(svcList.map((s) => s.client_id)));
         let names = new Map<string, string>();
@@ -147,7 +183,7 @@ export default function WorkPage() {
             .from("clients")
             .select("id, account_name, first_name, last_name")
             .in("id", clientIds);
-          (clients ?? []).forEach((c: any) => names.set(c.id, clientNameFor(c)));
+          ((clients as ClientNameRow[]) ?? []).forEach((c) => names.set(c.id, clientNameFor(c)));
         }
         setRecurring(
           svcList.map((s) => ({
@@ -155,15 +191,15 @@ export default function WorkPage() {
             engagement_id: engByService.get(s.id)?.id ?? null,
             engagement_status: engByService.get(s.id)?.status ?? null,
             _clientName: names.get(s.client_id) ?? "—",
-          }) as any),
+          })),
         );
       } else if (view === "review") {
         const { data, error } = await supabase.rpc("get_firm_work_queue", {
           p_workspace_id: activeWorkspaceId,
         });
         if (error) throw error;
-        setDocsForReview((data?.documents_for_review as any[]) ?? []);
-        setOrganizersForReview((data?.organizers_for_review as any[]) ?? []);
+        setDocsForReview((data?.documents_for_review as ReviewDocument[]) ?? []);
+        setOrganizersForReview((data?.organizers_for_review as ReviewOrganizer[]) ?? []);
       } else if (view === "due") {
         const [tasksRes, deadlinesRes, engagementsRes] = await Promise.all([
           supabase
@@ -183,23 +219,23 @@ export default function WorkPage() {
             .not("due_date", "is", null),
         ]);
         const items: DueItem[] = [
-          ...(((tasksRes.data as Task[]) ?? []) as any[])
+          ...((tasksRes.data as Task[]) ?? [])
             .filter((t) => isOpenTaskStatus(t.task_status))
             .map((t) => ({
               id: `task-${t.id}`,
               kind: "Task" as const,
               title: t.task_title,
-              due_date: t.due_date,
+              due_date: t.due_date as string,
               href: `/clients/${t.client_id}`,
             })),
-          ...(((deadlinesRes.data as Deadline[]) ?? []) as any[]).map((d) => ({
+          ...((deadlinesRes.data as Deadline[]) ?? []).map((d) => ({
             id: `deadline-${d.id}`,
             kind: "Deadline" as const,
             title: d.deadline_title,
-            due_date: d.due_date,
+            due_date: d.due_date as string,
             href: `/clients/${d.client_id}`,
           })),
-          ...(((engagementsRes.data as any[]) ?? [])).map((e) => ({
+          ...(((engagementsRes.data as DueEngagementRow[]) ?? [])).map((e) => ({
             id: `eng-${e.engagement_id}`,
             kind: "Service Workspace" as const,
             title: `${e.account_name ?? "Client"} — ${e.engagement_name}`,
@@ -209,8 +245,8 @@ export default function WorkPage() {
         ].sort((a, b) => (a.due_date < b.due_date ? -1 : 1));
         setDueItems(items);
       }
-    } catch (e: any) {
-      setError(e.message ?? "Failed to load work.");
+    } catch (e) {
+      setError(friendlyError(e as { message: string; code?: string } | null, "We couldn't load your work queue. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -231,12 +267,26 @@ export default function WorkPage() {
             Everything your firm has open, across every Service Workspace.
           </p>
         </div>
-        <button
-          onClick={() => void load()}
-          className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-ink hover:bg-paper"
-        >
-          <RefreshCw size={13} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/pipeline"
+            className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-ink hover:bg-paper"
+          >
+            Pipeline view
+          </Link>
+          <Link
+            href="/services"
+            className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-ink hover:bg-paper"
+          >
+            All services
+          </Link>
+          <button
+            onClick={() => void load()}
+            className="flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-ink hover:bg-paper"
+          >
+            <RefreshCw size={13} /> Refresh
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 overflow-x-auto border-b border-line">
@@ -317,7 +367,7 @@ export default function WorkPage() {
           {view === "recurring" && (
             <div className="app-card divide-y divide-line">
               {recurring.length === 0 && <Empty text="No recurring services yet." />}
-              {recurring.map((s: any) => (
+              {recurring.map((s) => (
                 <div key={s.id} className="flex items-center justify-between px-5 py-4">
                   <div>
                     <div className="font-semibold text-ink text-sm">{s._clientName}</div>

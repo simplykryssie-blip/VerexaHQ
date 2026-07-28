@@ -12,9 +12,12 @@ import {
   Plus,
   Upload,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/components/WorkspaceProvider";
+import { friendlyError } from "@/lib/friendlyError";
+import type { Invoice } from "@/lib/types";
 
 type DeadlineRow = {
   id: string;
@@ -83,13 +86,13 @@ export default function DashboardPage() {
 
     const firstError = [clients, tasks, invoices, docs, deadlines, taskList, recentDocs].find((result) => result.error)?.error;
     if (firstError) {
-      setError(firstError.message);
+      setError(friendlyError(firstError, "We couldn't load your dashboard right now. Please try again."));
       setLoading(false);
       return;
     }
 
-    const outstanding = (invoices.data ?? []).reduce(
-      (sum, invoice: any) => sum + Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0), 0),
+    const outstanding = ((invoices.data ?? []) as Pick<Invoice, "total_amount" | "amount_paid">[]).reduce(
+      (sum, invoice) => sum + Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0), 0),
       0,
     );
 
@@ -134,10 +137,10 @@ export default function DashboardPage() {
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Users} label="Active clients" value={loading ? "—" : data.clients.toLocaleString()} helper="Across this workspace" />
-        <Metric icon={CheckSquare} label="Open tasks" value={loading ? "—" : data.openTasks.toLocaleString()} helper="Work still in motion" />
-        <Metric icon={FileClock} label="Documents needed" value={loading ? "—" : data.awaitingDocuments.toLocaleString()} helper="Requested or missing" />
-        <Metric icon={CircleDollarSign} label="Outstanding" value={loading ? "—" : money(data.outstanding)} helper="Unpaid invoice balance" />
+        <Metric icon={Users} label="Active clients" value={data.clients.toLocaleString()} helper="Across this workspace" loading={loading} />
+        <Metric icon={CheckSquare} label="Open tasks" value={data.openTasks.toLocaleString()} helper="Work still in motion" loading={loading} />
+        <Metric icon={FileClock} label="Documents needed" value={data.awaitingDocuments.toLocaleString()} helper="Requested or missing" loading={loading} />
+        <Metric icon={CircleDollarSign} label="Outstanding" value={money(data.outstanding)} helper="Unpaid invoice balance" loading={loading} />
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
@@ -187,11 +190,36 @@ export default function DashboardPage() {
   );
 }
 
-function Metric({ icon: Icon, label, value, helper }: { icon: any; label: string; value: string; helper: string }) {
-  return <div className="app-card p-5"><div className="flex items-center justify-between"><div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-[#108A64]"><Icon size={19} /></div></div><div className="mt-5 text-3xl font-bold tabular-nums text-ink">{value}</div><div className="mt-1 text-sm font-semibold text-ink">{label}</div><div className="mt-1 text-xs text-muted">{helper}</div></div>;
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  helper,
+  loading,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  helper: string;
+  loading: boolean;
+}) {
+  return (
+    <div className="app-card p-5">
+      <div className="flex items-center justify-between">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-[#108A64]"><Icon size={19} /></div>
+      </div>
+      {loading ? (
+        <div className="mt-5 h-8 w-20 animate-pulse rounded-md bg-paperDim" aria-hidden="true" />
+      ) : (
+        <div className="mt-5 text-3xl font-bold tabular-nums text-ink">{value}</div>
+      )}
+      <div className="mt-1 text-sm font-semibold text-ink">{label}</div>
+      <div className="mt-1 text-xs text-muted">{helper}</div>
+    </div>
+  );
 }
 
-function QuickLink({ href, icon: Icon, label }: { href: string; icon: any; label: string }) {
+function QuickLink({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
   return <Link href={href} className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-white/15"><Icon size={16} />{label}</Link>;
 }
 

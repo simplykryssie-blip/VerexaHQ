@@ -45,6 +45,9 @@ import type {
 } from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import { isOpenServiceStatus, isDocumentAwaitingClient } from "@/lib/status";
+import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
@@ -287,11 +290,13 @@ export default function ClientDetailPage() {
     label: string;
   } | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const { showSuccess } = useToast();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [contactActionError, setContactActionError] = useState<string | null>(null);
+  const [removeContactTarget, setRemoveContactTarget] = useState<LinkedContact | null>(null);
+  const [removingContact, setRemovingContact] = useState(false);
   const [newNote, setNewNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
@@ -424,19 +429,13 @@ export default function ClientDetailPage() {
     if (id) load();
   }, [id]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   // Refreshes this page's data (never the loading-toggling `load()`, so
   // the still-open ActivateServiceModal doesn't get unmounted mid-flow —
   // see fetchClientData's comment) and surfaces a lightweight success
   // message, then the modal closes itself right after calling this.
   async function handleServiceActivated(serviceName: string) {
     await refresh();
-    setToast(`${serviceName} activated successfully.`);
+    showSuccess(`${serviceName} activated successfully.`);
   }
 
   async function toggleTask(task: Task) {
@@ -499,7 +498,7 @@ export default function ClientDetailPage() {
         .update({ is_primary: false, relationship_type: "additional" })
         .eq("id", current.id);
       if (demoteError) {
-        setContactActionError(demoteError.message);
+        setContactActionError(friendlyError(demoteError, "Something went wrong. Please try again."));
         return;
       }
     }
@@ -508,21 +507,28 @@ export default function ClientDetailPage() {
       .update({ is_primary: true, relationship_type: "primary" })
       .eq("id", target.id);
     if (promoteError) {
-      setContactActionError(promoteError.message);
+      setContactActionError(friendlyError(promoteError, "Something went wrong. Please try again."));
       return;
     }
     load();
   }
 
-  async function removeContact(link: LinkedContact) {
-    const name = [link.contacts?.first_name, link.contacts?.last_name].filter(Boolean).join(" ") || "this contact";
-    if (!window.confirm(`Remove ${name} from this account? This only removes the relationship — the contact record itself is kept.`)) return;
+  function removeContact(link: LinkedContact) {
+    setRemoveContactTarget(link);
+  }
+
+  async function confirmRemoveContact() {
+    if (!removeContactTarget) return;
     setContactActionError(null);
-    const { error } = await supabase.from("account_contacts").delete().eq("id", link.id);
+    setRemovingContact(true);
+    const { error } = await supabase.from("account_contacts").delete().eq("id", removeContactTarget.id);
+    setRemovingContact(false);
+    setRemoveContactTarget(null);
     if (error) {
-      setContactActionError(error.message);
+      setContactActionError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
+    showSuccess("Contact removed from this account.");
     load();
   }
 
@@ -574,11 +580,6 @@ export default function ClientDetailPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      {toast && (
-        <div className="fixed left-1/2 top-4 z-[60] -translate-x-1/2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-[#108A64] shadow-lg">
-          {toast}
-        </div>
-      )}
       <button onClick={() => router.push("/clients")} className="flex items-center gap-1.5 text-xs text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Clients
       </button>
@@ -1264,6 +1265,15 @@ export default function ClientDetailPage() {
         <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={refresh} onDeleted={refresh} />
       )}
       {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={refresh} />}
+      <ConfirmDialog
+        open={!!removeContactTarget}
+        title={`Remove ${[removeContactTarget?.contacts?.first_name, removeContactTarget?.contacts?.last_name].filter(Boolean).join(" ") || "this contact"} from this account?`}
+        description="This only removes the relationship — the contact record itself is kept."
+        confirmLabel="Remove"
+        busy={removingContact}
+        onConfirm={confirmRemoveContact}
+        onCancel={() => setRemoveContactTarget(null)}
+      />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { Task, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
+import { friendlyError } from "@/lib/friendlyError";
 
 type TaskWithClient = Task & { clientName: string };
 
@@ -25,7 +26,7 @@ export default function TasksPage() {
       .order("due_date", { ascending: true });
 
     if (taskError) {
-      setError(taskError.message);
+      setError(friendlyError(taskError, "We couldn't load your tasks right now. Please try again."));
       setLoading(false);
       return;
     }
