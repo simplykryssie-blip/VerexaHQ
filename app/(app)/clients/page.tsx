@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, ChevronRight, Pencil, Users, UserCheck, UserPlus } from "lucide-react";
+import { Plus, Search, ChevronRight, Pencil, Users, UserCheck, UserPlus, type LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
@@ -188,7 +188,7 @@ export default function ClientsPage() {
   );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function Metric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="app-card p-5">
       <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-[#108A64]">

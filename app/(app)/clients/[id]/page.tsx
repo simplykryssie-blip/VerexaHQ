@@ -44,7 +44,7 @@ import type {
   InvoicePayment,
 } from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
-import { isOpenServiceStatus, isDocumentAwaitingClient } from "@/lib/status";
+import { isOpenServiceStatus, isDocumentAwaitingClient, isOpenTaskStatus } from "@/lib/status";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -290,7 +290,7 @@ export default function ClientDetailPage() {
     label: string;
   } | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const { showSuccess } = useToast();
+  const { showSuccess, showError } = useToast();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -439,16 +439,18 @@ export default function ClientDetailPage() {
   }
 
   async function toggleTask(task: Task) {
-    const nextStatus = task.task_status === "Done" ? "To Do" : "Done";
+    const nextStatus = task.task_status === "Completed" ? "To Do" : "Completed";
     const { error } = await supabase
       .from("tasks")
       .update({
         task_status: nextStatus,
-        completed_at: nextStatus === "Done" ? new Date().toISOString() : null,
+        completed_at: nextStatus === "Completed" ? new Date().toISOString() : null,
       })
       .eq("id", task.id);
     if (!error) {
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, task_status: nextStatus } : t)));
+    } else {
+      showError(friendlyError(error, "Couldn't update that task. Please try again."));
     }
   }
 
@@ -570,7 +572,7 @@ export default function ClientDetailPage() {
   const maskedIdentity = maskedIdentities.find((m) => m.identity_type === identityType) ?? maskedIdentities[0];
   const openDocs = documents.filter((d) => isDocumentAwaitingClient(d.document_status));
   const openTasksAndDeadlines = [
-    ...tasks.filter((t) => t.task_status !== "Done").map((t) => ({ kind: "task" as const, id: t.id, title: t.task_title, due: t.due_date })),
+    ...tasks.filter((t) => isOpenTaskStatus(t.task_status)).map((t) => ({ kind: "task" as const, id: t.id, title: t.task_title, due: t.due_date })),
     ...deadlines.map((d) => ({ kind: "deadline" as const, id: d.id, title: d.deadline_title, due: d.due_date })),
   ]
     .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"))
@@ -904,13 +906,13 @@ export default function ClientDetailPage() {
                           <label className="flex min-w-0 items-center gap-3 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={t.task_status === "Done"}
+                              checked={t.task_status === "Completed"}
                               onChange={() => toggleTask(t)}
                               className="h-4 w-4 shrink-0 accent-[#108A64]"
                             />
                             <span
                               className="truncate text-sm font-semibold text-ink"
-                              style={{ textDecoration: t.task_status === "Done" ? "line-through" : "none", opacity: t.task_status === "Done" ? 0.5 : 1 }}
+                              style={{ textDecoration: t.task_status === "Completed" ? "line-through" : "none", opacity: t.task_status === "Completed" ? 0.5 : 1 }}
                             >
                               {t.task_title}
                             </span>
