@@ -61,13 +61,15 @@ The connective-tissue picture is **not uniform across the three**, and is better
 
 ---
 
-## 3. `form_templates` has no field/question editor (unchanged, confirmed still accurate)
+## 3. `form_templates` has no field/question editor, and no assignment UI either (expanded during beta-readiness pass)
 
 **What I found:** `app/(app)/forms/page.tsx` can create a `form_templates` row (via the `create_form_template` RPC, confirmed to exist on production with a matching signature) but there is no UI, table, or RPC for adding fields/questions to a template afterward.
 
-**Why I didn't touch it:** building a full template field editor is a new feature (new schema for sections/questions, a builder UI, save/preview logic), not a polish fix.
+**Newly confirmed this pass:** it's worse than "no editor" — there's no way to *assign* a form to a client from the UI at all. Four RPCs exist on production specifically for this (`assign_form_to_client`, `submit_assigned_form`, `mark_assigned_form_reviewed`, `request_form_changes`, all confirmed live with real signatures) but have **zero call sites anywhere in the frontend codebase**. The "Assigned forms" section on `/forms` is read-only — it displays existing `client_form_assignments` rows (if any exist from some other path) but has no button or flow to create one. Combined with the missing field/question editor, a template created today has no fields and can never be assigned to a client — the feature is scaffolded (real tables, real RPCs, a real list page) but not wired end-to-end.
 
-**What I need from the backend side:** if `form_templates` is meant to support its own question/field schema, that schema needs to be designed and migrated on the backend before a frontend editor can be built against it.
+**Why I didn't touch it:** building a full template field editor and an assignment flow is new feature work (new schema for sections/questions on `form_templates`, a builder UI, an "Assign to client" modal, wiring 4 existing-but-unused RPCs), not a polish fix. I did fix what was safely fixable in `/forms` this pass: removed 2 `any` types, removed a dead-code fallback referencing a nonexistent `is_platform_template` column (the real column is `is_system_template` — this was a genuine bug, since the "Verexa" platform-template badge could never render), and removed another dead-code fallback referencing a nonexistent `status` column on `client_form_assignments`.
+
+**What I need from the backend/product side:** if `form_templates` is meant to support its own question/field schema, that schema needs to be designed and migrated first. Once it exists, wiring the "Assign to client" flow is comparatively straightforward — the RPCs are already there and verified.
 
 ---
 
