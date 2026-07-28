@@ -17,6 +17,8 @@ import StatusPill from "@/components/StatusPill";
 import InvoiceLineItemModal from "@/components/InvoiceLineItemModal";
 import RecordPaymentModal from "@/components/RecordPaymentModal";
 import PaymentPlanModal from "@/components/PaymentPlanModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 import { sendEmail, getProviderStatus } from "@/lib/notify";
 
 export default function InvoiceDetailPage() {
@@ -39,6 +41,9 @@ export default function InvoiceDetailPage() {
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [stripeConfigured, setStripeConfigured] = useState(false);
   const [creatingPaymentLink, setCreatingPaymentLink] = useState(false);
+  const [deleteItemTarget, setDeleteItemTarget] = useState<InvoiceLineItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
+  const { showSuccess } = useToast();
 
   useEffect(() => {
     getProviderStatus().then((s) => {
@@ -108,10 +113,16 @@ export default function InvoiceDetailPage() {
     if (id) load();
   }, [id]);
 
-  async function handleDeleteItem(item: InvoiceLineItem) {
-    if (!window.confirm("Remove this line item?")) return;
-    const { error } = await supabase.from("invoice_line_items").delete().eq("id", item.id);
-    if (!error) load();
+  async function confirmDeleteItem() {
+    if (!deleteItemTarget) return;
+    setDeletingItem(true);
+    const { error } = await supabase.from("invoice_line_items").delete().eq("id", deleteItemTarget.id);
+    setDeletingItem(false);
+    setDeleteItemTarget(null);
+    if (!error) {
+      showSuccess("Line item removed.");
+      load();
+    }
   }
 
   async function markSent() {
@@ -389,7 +400,7 @@ export default function InvoiceDetailPage() {
                   ${Number(it.line_total).toLocaleString()}
                 </span>
                 <button
-                  onClick={() => handleDeleteItem(it)}
+                  onClick={() => setDeleteItemTarget(it)}
                   className="text-muted hover:text-brick"
                 >
                   <Trash2 size={14} />
@@ -456,6 +467,15 @@ export default function InvoiceDetailPage() {
           onSaved={load}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteItemTarget}
+        title={`Remove "${deleteItemTarget?.item_name ?? ""}"?`}
+        description="This can't be undone."
+        confirmLabel="Remove"
+        busy={deletingItem}
+        onConfirm={confirmDeleteItem}
+        onCancel={() => setDeleteItemTarget(null)}
+      />
     </div>
   );
 }

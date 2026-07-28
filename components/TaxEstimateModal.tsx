@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { TaxEstimate } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 import { friendlyError } from "@/lib/friendlyError";
 export default function TaxEstimateModal({
@@ -34,6 +35,7 @@ export default function TaxEstimateModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,10 +97,10 @@ export default function TaxEstimateModal({
 
   async function handleDelete() {
     if (!estimate) return;
-    if (!window.confirm(`Delete the ${estimate.quarter} estimate? This can't be undone.`)) return;
     setDeleting(true);
     const { error } = await supabase.from("tax_estimates").delete().eq("id", estimate.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
       setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
@@ -165,7 +167,7 @@ export default function TaxEstimateModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -189,6 +191,15 @@ export default function TaxEstimateModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={estimate ? `Delete the ${estimate.quarter} estimate?` : "Delete this estimate?"}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

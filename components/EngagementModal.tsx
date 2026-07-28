@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, BookkeepingEngagement } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 import { friendlyError } from "@/lib/friendlyError";
 const STATUSES = ["active", "paused", "cleanup", "offboarding", "closed"];
@@ -32,6 +33,7 @@ export default function EngagementModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (isEditing) return;
@@ -111,18 +113,13 @@ export default function EngagementModal({
 
   async function handleDelete() {
     if (!engagement) return;
-    if (
-      !window.confirm(
-        "Delete this bookkeeping engagement? Accounts, periods, and transactions under it will remain but become orphaned — clean those up first for a tidy delete."
-      )
-    )
-      return;
     setDeleting(true);
     const { error } = await supabase
       .from("bookkeeping_engagements")
       .delete()
       .eq("id", engagement.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
       setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
@@ -220,7 +217,7 @@ export default function EngagementModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -244,6 +241,15 @@ export default function EngagementModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this bookkeeping engagement?"
+        description="Accounts, periods, and transactions under it will remain but become orphaned — clean those up first for a tidy delete."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

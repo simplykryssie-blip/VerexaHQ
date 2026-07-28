@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollFiling } from "@/lib/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 import { friendlyError } from "@/lib/friendlyError";
 const FILING_TYPES = ["941", "940", "W-2", "W-3", "State Withholding", "State Unemployment", "1099-NEC"];
@@ -32,6 +33,7 @@ export default function PayrollFilingModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,10 +81,10 @@ export default function PayrollFilingModal({
 
   async function handleDelete() {
     if (!filing) return;
-    if (!window.confirm("Delete this filing?")) return;
     setDeleting(true);
     const { error } = await supabase.from("payroll_filings").delete().eq("id", filing.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
       setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
@@ -149,7 +151,7 @@ export default function PayrollFilingModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -173,6 +175,14 @@ export default function PayrollFilingModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this filing?"
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }
