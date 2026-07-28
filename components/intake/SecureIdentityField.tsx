@@ -14,10 +14,10 @@ import { supabaseIntake } from "@/lib/supabaseIntake";
 import { publicIntakeErrorMessage } from "@/lib/publicIntakeError";
 import { reportIntakeError } from "@/lib/reportIntakeError";
 
-type PersonType = "taxpayer" | "spouse" | "dependent" | "childcare_provider";
+type PersonType = "taxpayer" | "spouse" | "dependent" | "childcare_provider" | "business" | "owner";
 type TaxIdType = "ssn" | "itin" | "atin" | "ein";
 type IdentityStatus = "" | "provided" | "will_provide_later" | "need_help";
-type FieldKind = "tax_id" | "ip_pin" | "provider_tax_id";
+type FieldKind = "tax_id" | "ip_pin" | "provider_tax_id" | "business_ein" | "owner_tax_id";
 
 type IdentityStatusRow = {
   person_type: PersonType;
@@ -51,7 +51,7 @@ export function SecureIdentityField({
   required?: boolean;
 }) {
   const [loading, setLoading] = useState(true);
-  const [taxIdType, setTaxIdType] = useState<TaxIdType>(kind === "provider_tax_id" ? "ssn" : "ssn");
+  const [taxIdType, setTaxIdType] = useState<TaxIdType>(kind === "business_ein" ? "ein" : "ssn");
   const [status, setStatus] = useState<IdentityStatus>("");
   const [maskedValue, setMaskedValue] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -60,7 +60,7 @@ export function SecureIdentityField({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const identityType = kind === "ip_pin" ? "ip_pin" : taxIdType;
+  const identityType = kind === "ip_pin" ? "ip_pin" : kind === "business_ein" ? "ein" : taxIdType;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,9 +77,11 @@ export function SecureIdentityField({
         (r.person_ref ?? null) === personRef &&
         (kind === "ip_pin"
           ? r.identity_type === "ip_pin"
-          : kind === "provider_tax_id"
-            ? r.identity_type === "ssn" || r.identity_type === "ein"
-            : r.identity_type === "ssn" || r.identity_type === "itin" || r.identity_type === "atin")
+          : kind === "business_ein"
+            ? r.identity_type === "ein"
+            : kind === "provider_tax_id" || kind === "owner_tax_id"
+              ? r.identity_type === "ssn" || r.identity_type === "ein" || r.identity_type === "itin"
+              : r.identity_type === "ssn" || r.identity_type === "itin" || r.identity_type === "atin")
     );
     if (match) {
       if (match.identity_type !== "ip_pin") setTaxIdType(match.identity_type as TaxIdType);
@@ -119,9 +121,11 @@ export function SecureIdentityField({
     setEditing(false);
   }
 
-  const idLabel = kind === "ip_pin" ? "IP PIN" : taxIdType.toUpperCase();
+  const idLabel = kind === "ip_pin" ? "IP PIN" : kind === "business_ein" ? "EIN" : taxIdType.toUpperCase();
   const taxIdChoices: TaxIdType[] =
-    kind === "provider_tax_id" ? ["ssn", "ein"] : ["ssn", "itin", ...(personType === "dependent" ? (["atin"] as TaxIdType[]) : [])];
+    kind === "provider_tax_id" || kind === "owner_tax_id"
+      ? ["ssn", "itin", "ein"]
+      : ["ssn", "itin", ...(personType === "dependent" ? (["atin"] as TaxIdType[]) : [])];
 
   return (
     <div className="border border-line rounded-sm p-3 bg-paperDim">
@@ -141,7 +145,7 @@ export function SecureIdentityField({
         </div>
       ) : (
         <div className="space-y-2">
-          {kind !== "ip_pin" && (
+          {kind !== "ip_pin" && kind !== "business_ein" && (
             <div className="flex gap-3 text-xs">
               {taxIdChoices.map((t) => (
                 <label key={t} className="flex items-center gap-1">

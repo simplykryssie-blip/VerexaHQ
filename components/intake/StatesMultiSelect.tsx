@@ -10,7 +10,15 @@ import { ALL_STATE_OPTIONS, stateLabel } from "@/lib/intakeStates";
 // exclusive -- picking one clears the other, since "none, just my home
 // state" isn't meaningful alongside an actual state selection here (the
 // taxpayer's home state, if relevant, is asked about separately).
-export function StatesMultiSelect({ value, onChange }: { value: string[]; onChange: (codes: string[]) => void }) {
+export function StatesMultiSelect({
+  value,
+  onChange,
+  label = "State(s) you lived or worked in this year",
+}: {
+  value: string[];
+  onChange: (codes: string[]) => void;
+  label?: string;
+}) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -36,7 +44,7 @@ export function StatesMultiSelect({ value, onChange }: { value: string[]; onChan
 
   return (
     <div className="min-w-0">
-      <label className="block text-xs font-semibold text-muted mb-1">State(s) you lived or worked in this year</label>
+      <label className="block text-xs font-semibold text-muted mb-1">{label}</label>
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {value.map((code) => (

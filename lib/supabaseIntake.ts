@@ -30,6 +30,10 @@ export type IntakeRow = {
   service_type: string;
   tax_year: number;
   return_type: string;
+  intake_type: string;
+  entity_classification: string | null;
+  legal_business_name: string | null;
+  ownership_percentage_total: number | null;
   is_returning_client: boolean;
   status: string;
   current_section: number;

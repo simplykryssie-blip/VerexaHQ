@@ -368,7 +368,9 @@ begin
   end if;
 
   -- Changes/compliance section (only counts what isn't already captured above)
-  if coalesce((a #>> '{changes_compliance,major_transactions,asset_sale}')::boolean, false) then v_flags := array_append(v_flags, 'asset_sale'); end if;
+  -- Reuses assets.disposed_assets (Section 6) rather than a second,
+  -- duplicate "did you sell any assets" question in this section.
+  if coalesce((a #>> '{assets,disposed_assets}')::boolean, false) then v_flags := array_append(v_flags, 'asset_sale'); end if;
   if coalesce((a #>> '{changes_compliance,related_party,with_owners}')::boolean, false)
      or coalesce((a #>> '{changes_compliance,related_party,with_relatives}')::boolean, false)
      or coalesce((a #>> '{changes_compliance,related_party,with_commonly_owned}')::boolean, false)
