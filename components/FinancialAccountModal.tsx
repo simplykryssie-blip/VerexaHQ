@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { BookkeepingFinancialAccount } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 const ACCOUNT_TYPES = ["checking", "savings", "credit_card", "loan", "cash", "other"];
 
 export default function FinancialAccountModal({
@@ -54,7 +55,7 @@ export default function FinancialAccountModal({
         .eq("id", account!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -70,7 +71,7 @@ export default function FinancialAccountModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -87,7 +88,7 @@ export default function FinancialAccountModal({
       .eq("id", account.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

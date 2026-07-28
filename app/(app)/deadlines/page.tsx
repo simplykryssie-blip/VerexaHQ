@@ -7,6 +7,7 @@ import type { Deadline, Client } from "@/lib/types";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
 import { sendEmail, sendSms, getProviderStatus } from "@/lib/notify";
 
+import { friendlyError } from "@/lib/friendlyError";
 type ClientContact = { name: string; email: string; phone: string };
 type DeadlineWithClient = Deadline & { clientName: string; clientEmail: string; clientPhone: string };
 
@@ -42,7 +43,7 @@ export default function DeadlinesPage() {
       .order("due_date", { ascending: true });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

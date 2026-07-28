@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollRun } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function PayrollRunModal({
   payrollClientId,
   clientId,
@@ -42,7 +43,7 @@ export default function PayrollRunModal({
       const { error } = await supabase.from("payroll_runs").update(payload).eq("id", run!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -59,7 +60,7 @@ export default function PayrollRunModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -73,7 +74,7 @@ export default function PayrollRunModal({
     const { error } = await supabase.from("payroll_runs").delete().eq("id", run.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

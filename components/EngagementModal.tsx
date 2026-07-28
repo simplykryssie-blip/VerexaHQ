@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client, BookkeepingEngagement } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 const STATUSES = ["active", "paused", "cleanup", "offboarding", "closed"];
 const FREQUENCIES = ["weekly", "monthly", "quarterly"];
 
@@ -72,7 +73,7 @@ export default function EngagementModal({
         .eq("id", engagement!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -101,7 +102,7 @@ export default function EngagementModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -123,7 +124,7 @@ export default function EngagementModal({
       .eq("id", engagement.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client, TaxReturn } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 const RETURN_TYPES = ["1040", "1120", "1120-S", "1065", "990", "1041", "706", "709"];
 const STATUSES = [
   "not_started",
@@ -94,7 +95,7 @@ export default function TaxReturnModal({
         .eq("id", taxReturn!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -154,7 +155,7 @@ export default function TaxReturnModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -173,7 +174,7 @@ export default function TaxReturnModal({
     const { error } = await supabase.from("tax_returns").delete().eq("id", taxReturn.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

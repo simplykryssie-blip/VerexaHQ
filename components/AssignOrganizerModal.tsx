@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import DateField from "@/components/DateField";
 import type { Client, TaxOrganizerTemplate } from "@/lib/types";
 import { organizerPrefillValue } from "@/lib/organizerPrefill";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function AssignOrganizerModal({
   clientId,
   onClose,
@@ -161,7 +163,7 @@ export default function AssignOrganizerModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
 
@@ -233,12 +235,7 @@ export default function AssignOrganizerModal({
             The return type is selected automatically when it is already known for this client. For a new business client, choose the entity return type once and VerexaHQ will reuse it next year.
           </p>
 
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-          />
+          <DateField value={dueDate} onChange={setDueDate} />
           <p className="text-xs text-muted">Due date the client should submit by (optional).</p>
 
           {error && (

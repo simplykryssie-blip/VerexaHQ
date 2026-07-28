@@ -9,6 +9,7 @@ import RequestDocumentModal from "@/components/RequestDocumentModal";
 import UploadDocumentModal from "@/components/UploadDocumentModal";
 import ApplyDocumentTemplateModal from "@/components/ApplyDocumentTemplateModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type DocumentRow = Document & { clientName: string };
 
 export default function DocumentsPage() {
@@ -28,7 +29,7 @@ export default function DocumentsPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }
@@ -82,7 +83,7 @@ export default function DocumentsPage() {
   async function handleAccept(doc: Document) {
     const { error } = await supabase.rpc("accept_client_document", { p_document_id: doc.id });
     if (!error) load();
-    else setError(error.message);
+    else setError(friendlyError(error, "Something went wrong. Please try again."));
   }
 
   async function handleReject(doc: Document) {
@@ -93,7 +94,7 @@ export default function DocumentsPage() {
       p_rejection_reason: reason,
     });
     if (!error) load();
-    else setError(error.message);
+    else setError(friendlyError(error, "Something went wrong. Please try again."));
   }
 
   async function toggleVisibility(doc: Document) {
@@ -111,7 +112,7 @@ export default function DocumentsPage() {
     }
     const { error } = await supabase.from("documents").delete().eq("id", doc.id);
     if (!error) load();
-    else setError(error.message);
+    else setError(friendlyError(error, "Something went wrong. Please try again."));
   }
 
   const visible = docs.filter((d) => statusFilter === "all" || d.document_status === statusFilter);

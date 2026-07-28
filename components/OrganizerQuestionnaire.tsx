@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import CurrencyInput from "@/components/CurrencyInput";
+import DateField from "@/components/DateField";
 import { ORGANIZER_FORMAT_CONFIG } from "@/lib/organizerFormat";
 import { isQuestionAnswered, isQuestionVisible } from "@/lib/organizerVisibility";
 import type { TaxOrganizerAnswer, TaxOrganizerQuestion, TaxOrganizerSection } from "@/lib/types";
@@ -214,34 +215,10 @@ function FormattedQuestion({
 }
 
 function DateQuestion({ value, onSave }: { value: string; onSave: (value: string) => void }) {
-  const [draft, setDraft] = useState(value);
-
-  useEffect(() => setDraft(value), [value]);
-
   return (
     <div className="max-w-xs">
-      {!draft && <p className="text-xs text-muted mb-1">Select a date — this field is blank until you choose one.</p>}
-      <input
-        type="date"
-        value={draft}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          onSave(e.target.value);
-        }}
-        className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-      />
-      {draft && (
-        <button
-          type="button"
-          onClick={() => {
-            setDraft("");
-            onSave("");
-          }}
-          className="text-[11px] font-semibold text-muted underline mt-1"
-        >
-          Clear date
-        </button>
-      )}
+      {!value && <p className="text-xs text-muted mb-1">Select a date — this field is blank until you choose one.</p>}
+      <DateField value={value} onChange={onSave} />
     </div>
   );
 }

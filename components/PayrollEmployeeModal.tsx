@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { PayrollEmployee } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function PayrollEmployeeModal({
   payrollClientId,
   clientId,
@@ -56,7 +57,7 @@ export default function PayrollEmployeeModal({
         .eq("id", employee!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -73,7 +74,7 @@ export default function PayrollEmployeeModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -87,7 +88,7 @@ export default function PayrollEmployeeModal({
     const { error } = await supabase.from("payroll_employees").delete().eq("id", employee.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 import { sendEmail, getProviderStatus } from "@/lib/notify";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function RequestDocumentModal({
   clientId,
   onClose,
@@ -61,7 +62,7 @@ export default function RequestDocumentModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
 

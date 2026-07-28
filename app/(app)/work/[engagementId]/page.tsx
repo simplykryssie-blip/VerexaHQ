@@ -17,6 +17,7 @@ import StatusPill from "@/components/StatusPill";
 import type { EngagementWorkspace, PipelineStage, Task } from "@/lib/types";
 import { isOpenTaskStatus, statusLabel } from "@/lib/status";
 
+import { friendlyError } from "@/lib/friendlyError";
 const TABS = [
   "overview",
   "workflow",
@@ -194,7 +195,7 @@ export default function ServiceWorkspacePage() {
       p_priority: "Normal",
     });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     // save_task has no engagement_id parameter yet — link the created task
@@ -217,7 +218,7 @@ export default function ServiceWorkspacePage() {
       created_by: userData.user?.id,
     });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     setNoteDraft("");
@@ -255,7 +256,7 @@ export default function ServiceWorkspacePage() {
       .eq("id", engagementId)
       .eq("workspace_id", activeWorkspaceId);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     void load();

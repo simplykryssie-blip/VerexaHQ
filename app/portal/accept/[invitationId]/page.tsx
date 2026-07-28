@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { supabasePortal } from "@/lib/supabasePortal";
 import { LogoMark } from "@/components/Logo";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function AcceptInvitationPage() {
   const { invitationId } = useParams<{ invitationId: string }>();
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function AcceptInvitationPage() {
       p_invitation_id: invitationId,
     });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setMode("error");
       return;
     }
@@ -53,7 +54,7 @@ export default function AcceptInvitationPage() {
       const { error, data } = await supabasePortal.auth.signUp({ email, password });
       setSubmitting(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       if (!data.session) {
@@ -69,7 +70,7 @@ export default function AcceptInvitationPage() {
     const { error } = await supabasePortal.auth.signInWithPassword({ email, password });
     setSubmitting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     activate();

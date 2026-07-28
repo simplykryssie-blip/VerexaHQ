@@ -4,6 +4,7 @@ import { useState } from "react";
 import Papa from "papaparse";
 import { supabase } from "@/lib/supabase";
 
+import { friendlyError } from "@/lib/friendlyError";
 const FIELD_OPTIONS = [
   { key: "transaction_date", label: "Transaction Date", required: true },
   { key: "amount", label: "Amount", required: true },
@@ -71,7 +72,7 @@ export default function BankImportModal({
         setMapping(autoMap);
         setStep("map");
       },
-      error: (err: Error) => setError(err.message),
+      error: (err: Error) => setError(friendlyError(err, "Something went wrong. Please try again.")),
     });
   }
 

@@ -8,6 +8,7 @@ import type { BookkeepingEngagement, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import EngagementModal from "@/components/EngagementModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type EngagementRow = BookkeepingEngagement & { clientName: string };
 
 export default function BookkeepingPage() {
@@ -24,7 +25,7 @@ export default function BookkeepingPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

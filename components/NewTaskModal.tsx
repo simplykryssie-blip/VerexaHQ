@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Task } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function NewTaskModal({
   clientId,
   task,
@@ -64,7 +65,7 @@ export default function NewTaskModal({
         .eq("id", task!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -99,7 +100,7 @@ export default function NewTaskModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -113,7 +114,7 @@ export default function NewTaskModal({
     const { error } = await supabase.from("tasks").delete().eq("id", task.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

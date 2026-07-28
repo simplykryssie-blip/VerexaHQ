@@ -6,6 +6,7 @@ import { supabasePortal } from "@/lib/supabasePortal";
 import { usePortal } from "@/components/portal/PortalContext";
 import type { PortalConversation, PortalMessage } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function PortalMessagesPage() {
   const { access } = usePortal();
   const [conversations, setConversations] = useState<PortalConversation[]>([]);
@@ -67,7 +68,7 @@ export default function PortalMessagesPage() {
 
     setSending(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     setDraft("");

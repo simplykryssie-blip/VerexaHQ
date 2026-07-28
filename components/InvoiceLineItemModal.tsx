@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { InvoiceLineItem } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function InvoiceLineItemModal({
   invoiceId,
   workspaceId,
@@ -49,7 +50,7 @@ export default function InvoiceLineItemModal({
         .eq("id", item!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -65,7 +66,7 @@ export default function InvoiceLineItemModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -79,7 +80,7 @@ export default function InvoiceLineItemModal({
     const { error } = await supabase.from("invoice_line_items").delete().eq("id", item.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
