@@ -14,7 +14,10 @@ import type {
 } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import OrganizerQuestionnaire from "@/components/OrganizerQuestionnaire";
+import OrganizerProgress from "@/components/OrganizerProgress";
 import { organizerPrefillValue } from "@/lib/organizerPrefill";
+import { isQuestionAnswered, isQuestionVisible } from "@/lib/organizerVisibility";
+import { friendlyOrganizerError } from "@/lib/organizerError";
 
 const STATUS_STEPS = ["draft", "sent", "submitted", "reviewed", "accepted"];
 
@@ -42,7 +45,7 @@ export default function OrganizerFillPage() {
       .maybeSingle();
 
     if (assignmentError || !assignmentData) {
-      setError(assignmentError?.message ?? "Organizer assignment not found.");
+      setError(friendlyOrganizerError(assignmentError, "We couldn't load this organizer assignment. Please try again."));
       setLoading(false);
       return;
     }
@@ -200,6 +203,12 @@ export default function OrganizerFillPage() {
   const currentStepIndex = STATUS_STEPS.indexOf(assignment.assignment_status);
   const nextStatus = STATUS_STEPS[currentStepIndex + 1];
 
+  const visibleQuestions = questions.filter((q) => isQuestionVisible(q, questions, answers));
+  const remainingSections = sections.filter((s) => {
+    const sectionQuestions = visibleQuestions.filter((q) => q.section_id === s.id);
+    return sectionQuestions.length > 0 && sectionQuestions.some((q) => !isQuestionAnswered(answers.get(q.id)?.answer_value));
+  }).length;
+
   return (
     <div>
       <button
@@ -231,6 +240,13 @@ export default function OrganizerFillPage() {
           {assignment.due_date ? `Due ${assignment.due_date}` : "No due date set"}
         </span>
       </div>
+
+      <OrganizerProgress
+        answeredCount={visibleQuestions.filter((q) => isQuestionAnswered(answers.get(q.id)?.answer_value)).length}
+        totalCount={visibleQuestions.length}
+        remainingSections={remainingSections}
+        dueDate={assignment.due_date}
+      />
 
       <OrganizerQuestionnaire
         sections={sections}
