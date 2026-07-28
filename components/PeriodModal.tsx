@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import DateField from "@/components/DateField";
 import type { BookkeepingPeriod } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -57,7 +59,7 @@ export default function PeriodModal({
         .eq("id", period!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -74,7 +76,7 @@ export default function PeriodModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -88,7 +90,7 @@ export default function PeriodModal({
     const { error } = await supabase.from("bookkeeping_periods").delete().eq("id", period.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -121,13 +123,7 @@ export default function PeriodModal({
               className="w-1/3 border border-line rounded-sm px-3 py-2 text-sm"
             />
           </div>
-          <input
-            type="date"
-            placeholder="Due date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-          />
+          <DateField value={dueDate} onChange={setDueDate} />
           <p className="text-xs text-muted">
             Due date is when reports should go to the client (optional).
           </p>

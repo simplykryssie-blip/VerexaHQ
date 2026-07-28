@@ -143,7 +143,7 @@ export default function PayrollRunDetailPage() {
           </button>
         )}
         <p className="text-xs text-muted">
-          No payroll provider is connected — marking a run "Processed" here just
+          No payroll provider is connected — marking a run &quot;Processed&quot; here just
           tracks status; it doesn&apos;t move money or file taxes.
         </p>
       </div>

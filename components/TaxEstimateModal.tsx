@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { TaxEstimate } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function TaxEstimateModal({
   clientId,
   taxYear,
@@ -55,7 +56,7 @@ export default function TaxEstimateModal({
         .eq("id", estimate!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -85,7 +86,7 @@ export default function TaxEstimateModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -99,7 +100,7 @@ export default function TaxEstimateModal({
     const { error } = await supabase.from("tax_estimates").delete().eq("id", estimate.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

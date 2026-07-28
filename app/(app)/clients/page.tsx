@@ -9,6 +9,7 @@ import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/client
 import StatusPill from "@/components/StatusPill";
 import ClientModal from "@/components/ClientModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 const STATUS_FILTERS = ["all", "lead", "active", "inactive", "archived"];
 
 export default function ClientsPage() {
@@ -27,7 +28,7 @@ export default function ClientsPage() {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
     } else {
       setClients((data as Client[]) ?? []);
       setError(null);

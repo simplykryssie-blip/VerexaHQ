@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client, RecurringInvoice } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 const FREQUENCIES = ["weekly", "monthly", "quarterly", "annually"];
 
 export default function RecurringInvoiceModal({
@@ -75,7 +76,7 @@ export default function RecurringInvoiceModal({
         .eq("id", recurringInvoice!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -103,7 +104,7 @@ export default function RecurringInvoiceModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -120,7 +121,7 @@ export default function RecurringInvoiceModal({
       .eq("id", recurringInvoice.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -204,7 +205,7 @@ export default function RecurringInvoiceModal({
           />
           <p className="text-xs text-muted">
             No payment processor is connected, so nothing auto-charges. Use
-            "Generate Invoice Now" on this schedule when it&apos;s time to bill,
+            &quot;Generate Invoice Now&quot; on this schedule when it&apos;s time to bill,
             and it&apos;ll create a real invoice with this amount.
           </p>
 

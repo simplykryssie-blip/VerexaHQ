@@ -204,7 +204,12 @@ export default function BrandCenter() {
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <Field label="Legal business name"><input className="brand-input" value={profile.legal_name} onChange={(e) => update("legal_name", e.target.value)} /></Field>
-          <Field label="DBA / display name"><input className="brand-input" value={profile.dba_name} onChange={(e) => update("dba_name", e.target.value)} /></Field>
+          <Field
+            label="Does your firm use another business name (DBA)?"
+            hint={'Example: ABC Holdings LLC does business as "ABC Tax & Accounting."  Leave blank if you only use your legal business name.'}
+          >
+            <input className="brand-input" value={profile.dba_name} onChange={(e) => update("dba_name", e.target.value)} />
+          </Field>
           <Field label="Office logo">
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line p-4 text-sm font-semibold text-[#108A64] hover:bg-emerald-50">
               <Upload size={17} /> {uploading ? "Uploading…" : "Upload logo"}
@@ -258,8 +263,14 @@ export default function BrandCenter() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block"><span className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted">{label}</span>{children}</label>;
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-muted">{label}</span>
+      {hint && <span className="mb-2 block text-xs font-normal normal-case tracking-normal text-muted">{hint}</span>}
+      {children}
+    </label>
+  );
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {

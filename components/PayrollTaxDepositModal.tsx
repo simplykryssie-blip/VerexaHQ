@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { PayrollTaxDeposit } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 const TAX_TYPES = ["941 Deposit", "State Withholding", "SUTA", "FUTA", "Local"];
 const STATUSES = ["scheduled", "paid", "late", "waived"];
 
@@ -56,7 +57,7 @@ export default function PayrollTaxDepositModal({
         .eq("id", deposit!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -72,7 +73,7 @@ export default function PayrollTaxDepositModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -86,7 +87,7 @@ export default function PayrollTaxDepositModal({
     const { error } = await supabase.from("payroll_tax_deposits").delete().eq("id", deposit.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

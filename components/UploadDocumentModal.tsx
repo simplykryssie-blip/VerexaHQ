@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function UploadDocumentModal({
   clientId,
   workspaceId,
@@ -99,7 +100,7 @@ export default function UploadDocumentModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();

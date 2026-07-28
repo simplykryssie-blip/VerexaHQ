@@ -7,6 +7,7 @@ import type { Pipeline, PipelineStage, Service, Client } from "@/lib/types";
 import NewPipelineModal from "@/components/NewPipelineModal";
 import NewServiceModal from "@/components/NewServiceModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type ServiceWithClient = Service & { clientName: string };
 
 export default function PipelinePage() {
@@ -27,7 +28,7 @@ export default function PipelinePage() {
       .eq("is_active", true)
       .order("created_at");
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

@@ -8,6 +8,7 @@ import type { TaxReturn, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import TaxReturnModal from "@/components/TaxReturnModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type ReturnWithClient = TaxReturn & { clientName: string };
 
 export default function TaxPrepPage() {
@@ -25,7 +26,7 @@ export default function TaxPrepPage() {
       .order("tax_year", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

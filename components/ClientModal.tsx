@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
+import { maskZip } from "@/lib/organizerFormat";
 
 // save_workspace_client only accepts client_type = individual | business.
 const CLIENT_TYPES = [
@@ -1067,7 +1068,7 @@ export default function ClientModal({
 
             {isEntity ? (
               <>
-                <Section label="Business name">
+                <Section label="Business name (required)">
                   <input
                     required
                     placeholder="Greenleaf Consulting LLC"
@@ -1104,7 +1105,7 @@ export default function ClientModal({
                     />
                   </div>
                   <p className="mt-1.5 text-xs text-muted">
-                    The business's own contact info — separate from the contact person's personal email and phone on
+                    The business&apos;s own contact info — separate from the contact person&apos;s personal email and phone on
                     Step 2.
                   </p>
                 </Section>
@@ -1136,7 +1137,7 @@ export default function ClientModal({
               </Section>
             )}
 
-            <Section label="Address">
+            <Section label="Address (required)">
               <div className="grid gap-3 sm:grid-cols-2">
                 <input
                   required
@@ -1168,9 +1169,10 @@ export default function ClientModal({
                   </select>
                   <input
                     required
+                    inputMode="numeric"
                     placeholder="ZIP code"
                     value={form.zip_code}
-                    onChange={(e) => setForm({ ...form, zip_code: e.target.value })}
+                    onChange={(e) => setForm({ ...form, zip_code: maskZip(e.target.value) })}
                     className="client-input w-1/2"
                   />
                 </div>
@@ -1600,7 +1602,10 @@ export default function ClientModal({
               </div>
             </Section>
 
-            <Section label={`${identityLabel} (required)`}>
+            <Section label={`${isEntity ? "Business Tax ID (EIN)" : "Social Security Number (SSN)"} (required)`}>
+              <p className="text-xs text-muted mb-2">
+                We use this number to prepare this client&apos;s federal and state tax returns. Example: {isEntity ? "12-3456789" : "123-45-6789"}.
+              </p>
               {isEditing && identityStage === "masked" && maskedIdentity && (
                 <div className="flex items-center justify-between rounded-xl border border-line px-3 py-2.5 text-sm">
                   <span className="font-mono text-ink">{maskedIdentity.masked_value}</span>
@@ -1677,6 +1682,7 @@ export default function ClientModal({
               {identityStage === "input" && (
                 <input
                   placeholder={isEntity ? "12-3456789" : "123-45-6789"}
+                  inputMode="numeric"
                   value={newIdentityValue}
                   onChange={(e) =>
                     setNewIdentityValue(isEntity ? formatEIN(e.target.value) : formatSSN(e.target.value))

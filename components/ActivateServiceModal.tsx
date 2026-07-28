@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, ChevronLeft, ChevronRight, CheckCircle2, FileText, ClipboardList, FileCheck2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import DateField from "@/components/DateField";
 import type { ServiceTemplate, PipelineStage } from "@/lib/types";
 
 // Heuristic default only — service_templates has no is_recurring/frequency
@@ -560,7 +561,7 @@ export default function ActivateServiceModal({
 
             {templatesError && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                Couldn't load service templates: {templatesError}
+                Couldn&apos;t load service templates: {templatesError}
               </div>
             )}
             {!templatesError && templates.length === 0 && (
@@ -658,7 +659,7 @@ export default function ActivateServiceModal({
                   <>
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Deadline date (optional)">
-                        <input type="date" value={deadlineDate} onChange={(e) => setDeadlineDate(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
+                        <DateField value={deadlineDate} onChange={setDeadlineDate} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm" />
                       </Field>
                       <Field label={deadlineDate ? "Deadline type (required)" : "Deadline type"}>
                         <select
@@ -715,9 +716,9 @@ export default function ActivateServiceModal({
                       </select>
                     </Field>
                     <p className="text-xs text-muted">
-                      Recurring services don't need one overall deadline — this is ongoing work. Generating each
-                      period's own due dates automatically is a separate, later build; for now this only records
-                      the service's start date and frequency.
+                      Recurring services don&apos;t need one overall deadline — this is ongoing work. Generating each
+                      period&apos;s own due dates automatically is a separate, later build; for now this only records
+                      the service&apos;s start date and frequency.
                     </p>
                   </>
                 )}
@@ -861,7 +862,7 @@ export default function ActivateServiceModal({
                     )}
                   </div>
                 )}
-                <p className="text-xs text-muted">Per-item include/exclude isn't available yet — that needs a new, separately approved RPC.</p>
+                <p className="text-xs text-muted">Per-item include/exclude isn&apos;t available yet — that needs a new, separately approved RPC.</p>
               </div>
             )}
 
@@ -870,9 +871,9 @@ export default function ActivateServiceModal({
                 <p className="font-semibold">A Service Workspace will not be created.</p>
                 <p>
                   No existing approved backend path creates an engagement/Service Workspace without also creating a
-                  template's full task/document/form set — only apply_service_template_to_client creates an
-                  engagement, and it can't skip those. This creates a bare service record only, the same as the
-                  manual "New Service" form. A new RPC would be needed to support "service + empty workspace"
+                  template&apos;s full task/document/form set — only apply_service_template_to_client creates an
+                  engagement, and it can&apos;t skip those. This creates a bare service record only, the same as the
+                  manual &quot;New Service&quot; form. A new RPC would be needed to support &quot;service + empty workspace&quot;
                   safely — treat this as an advanced option.
                 </p>
               </div>
@@ -896,8 +897,8 @@ export default function ActivateServiceModal({
             <div>
               <div className="text-sm font-semibold text-ink">{pipelineNameFor(selectedTemplate?.default_pipeline_id) ?? "Pipeline"}</div>
               <p className="mt-1 text-xs text-muted">
-                Real, workspace-configured stages for this workflow's pipeline. Choosing one here only sets where
-                the new engagement starts — it doesn't run any automation.
+                Real, workspace-configured stages for this workflow&apos;s pipeline. Choosing one here only sets where
+                the new engagement starts — it doesn&apos;t run any automation.
               </p>
             </div>
             <div className="space-y-2">

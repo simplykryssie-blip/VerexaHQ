@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { DocumentFolderTemplate, DocumentFolder } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function DocumentFolderModal({
   clientId,
   workspaceId,
@@ -60,7 +61,7 @@ export default function DocumentFolderModal({
       });
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -80,7 +81,7 @@ export default function DocumentFolderModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();

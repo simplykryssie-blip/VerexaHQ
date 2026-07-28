@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { BookkeepingTransaction, BookkeepingTransactionCategory } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function TransactionModal({
   clientId,
   workspaceId,
@@ -87,7 +88,7 @@ export default function TransactionModal({
         .eq("id", transaction!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -106,7 +107,7 @@ export default function TransactionModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -123,7 +124,7 @@ export default function TransactionModal({
       .eq("id", transaction.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

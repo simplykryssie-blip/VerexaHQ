@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, PayrollClient } from "@/lib/types";
+import { maskEin } from "@/lib/organizerFormat";
 
+import { friendlyError } from "@/lib/friendlyError";
 const FREQUENCIES = ["weekly", "biweekly", "semimonthly", "monthly"];
 const STATUSES = ["setup", "active", "on_hold", "offboarding", "closed"];
 
@@ -73,7 +75,7 @@ export default function PayrollClientModal({
         .eq("id", payrollClient!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -101,7 +103,7 @@ export default function PayrollClientModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -120,7 +122,7 @@ export default function PayrollClientModal({
     const { error } = await supabase.from("payroll_clients").delete().eq("id", payrollClient.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -157,9 +159,10 @@ export default function PayrollClientModal({
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
           <input
-            placeholder="FEIN"
+            placeholder="Federal Employer ID Number (EIN), e.g. 12-3456789"
+            inputMode="numeric"
             value={fein}
-            onChange={(e) => setFein(e.target.value)}
+            onChange={(e) => setFein(maskEin(e.target.value))}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Document, BookkeepingReportDelivery } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 const REPORT_TYPES = [
   "profit_and_loss",
   "balance_sheet",
@@ -70,7 +71,7 @@ export default function ReportDeliveryModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();

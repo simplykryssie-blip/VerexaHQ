@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollFiling } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 const FILING_TYPES = ["941", "940", "W-2", "W-3", "State Withholding", "State Unemployment", "1099-NEC"];
 const STATUSES = ["upcoming", "in_progress", "filed", "accepted", "rejected"];
 
@@ -53,7 +54,7 @@ export default function PayrollFilingModal({
         .eq("id", filing!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -69,7 +70,7 @@ export default function PayrollFilingModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -83,7 +84,7 @@ export default function PayrollFilingModal({
     const { error } = await supabase.from("payroll_filings").delete().eq("id", filing.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

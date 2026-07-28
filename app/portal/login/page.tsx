@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabasePortal } from "@/lib/supabasePortal";
 import { LogoMark } from "@/components/Logo";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function PortalLoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup">("login");
@@ -24,7 +25,7 @@ export default function PortalLoginPage() {
       const { error } = await supabasePortal.auth.signInWithPassword({ email, password });
       setLoading(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       router.push("/portal");
@@ -34,7 +35,7 @@ export default function PortalLoginPage() {
     const { error, data } = await supabasePortal.auth.signUp({ email, password });
     setLoading(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     if (!data.session) {

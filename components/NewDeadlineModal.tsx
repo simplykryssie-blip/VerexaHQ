@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Deadline } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function NewDeadlineModal({
   clientId,
   deadline,
@@ -70,7 +71,7 @@ export default function NewDeadlineModal({
         .eq("id", deadline!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -105,7 +106,7 @@ export default function NewDeadlineModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -119,7 +120,7 @@ export default function NewDeadlineModal({
     const { error } = await supabase.from("deadlines").delete().eq("id", deadline.id);
     setDeleting(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();

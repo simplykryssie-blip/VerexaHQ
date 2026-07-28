@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import type { RecurringInvoice, Client } from "@/lib/types";
 import RecurringInvoiceModal from "@/components/RecurringInvoiceModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type Row = RecurringInvoice & { clientName: string };
 
 function addInterval(dateStr: string, frequency: string): string {
@@ -43,7 +44,7 @@ export default function RecurringInvoicesPage() {
       .order("next_invoice_date", { ascending: true });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }
