@@ -2,9 +2,16 @@
 import { useEffect, useState } from "react";
 import { Shield } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+
+type ReadinessRow = {
+  category: string | null;
+  completed_items: number | null;
+  total_items: number | null;
+};
+
 export default function AdminPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<ReadinessRow[]>([]);
   useEffect(() => {
     (async () => {
       const { data: ok } = await supabase.rpc("is_platform_admin");
@@ -13,7 +20,7 @@ export default function AdminPage() {
         const { data: rows } = await supabase.rpc(
           "admin_launch_readiness_dashboard",
         );
-        setData(Array.isArray(rows) ? rows : []);
+        setData(Array.isArray(rows) ? (rows as ReadinessRow[]) : []);
       }
     })();
   }, []);
@@ -35,7 +42,7 @@ export default function AdminPage() {
         Internal launch status. This page is hidden from firm users.
       </p>
       <div className="mt-6 space-y-3">
-        {data.map((r: any, i) => (
+        {data.map((r, i) => (
           <div
             key={r.category ?? i}
             className="rounded-2xl border border-line bg-white p-4"
@@ -52,7 +59,7 @@ export default function AdminPage() {
               <div
                 className="brand-gradient h-2 rounded-full"
                 style={{
-                  width: `${r.total_items ? Math.round((r.completed_items / r.total_items) * 100) : 0}%`,
+                  width: `${r.total_items ? Math.round(((r.completed_items ?? 0) / r.total_items) * 100) : 0}%`,
                 }}
               />
             </div>
