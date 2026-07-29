@@ -6,6 +6,7 @@ import { supabasePortal } from "@/lib/supabasePortal";
 import { usePortal } from "@/components/portal/PortalContext";
 import type { Document, DocumentFolder } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
+import { friendlyError } from "@/lib/friendlyError";
 
 const NEEDS_UPLOAD_STATUSES = ["Needed", "Requested", "Rejected"];
 
@@ -62,7 +63,7 @@ export default function PortalDocumentsPage() {
       .upload(path, file);
 
     if (uploadError) {
-      setError(uploadError.message);
+      setError(friendlyError(uploadError, "Something went wrong uploading that file. Please try again."));
       setUploadingId(null);
       return;
     }
@@ -77,7 +78,7 @@ export default function PortalDocumentsPage() {
 
     setUploadingId(null);
     if (submitError) {
-      setError(submitError.message);
+      setError(friendlyError(submitError, "Something went wrong uploading that file. Please try again."));
       return;
     }
     load();
