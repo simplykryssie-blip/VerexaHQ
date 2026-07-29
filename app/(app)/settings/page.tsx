@@ -6,11 +6,47 @@ import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import BrandCenter from "@/components/BrandCenter";
 type Providers = { email: boolean; sms: boolean; stripe: boolean };
+
+type WorkspaceSetupState = {
+  business_name: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  business_website: string | null;
+  business_type: string | null;
+  primary_service_type: string | null;
+  owner_full_name: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+};
+
+type TeamMemberRow = {
+  id: string;
+  role: string;
+  member_status: string;
+  display_name: string | null;
+  job_title: string | null;
+  user_id: string;
+};
+
+type SubscriptionSummary = {
+  plan_name: string | null;
+  subscription_status: string | null;
+  trial_ends_at: string | null;
+  monthly_price: number | null;
+};
+
+type GridRow = [string, string | number | null | undefined];
+
 export default function SettingsPage() {
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
-  const [setup, setSetup] = useState<any>(null);
-  const [team, setTeam] = useState<any[]>([]);
-  const [sub, setSub] = useState<any>(null);
+  const [setup, setSetup] = useState<WorkspaceSetupState | null>(null);
+  const [team, setTeam] = useState<TeamMemberRow[]>([]);
+  const [sub, setSub] = useState<SubscriptionSummary | null>(null);
   const [providers, setProviders] = useState<Providers>({
     email: false,
     sms: false,
@@ -33,9 +69,9 @@ export default function SettingsPage() {
         .eq("workspace_id", activeWorkspaceId)
         .maybeSingle(),
     ]);
-    setSetup(s.data);
-    setTeam(t.data ?? []);
-    setSub(b.data);
+    setSetup(s.data as WorkspaceSetupState | null);
+    setTeam((t.data as TeamMemberRow[]) ?? []);
+    setSub(b.data as SubscriptionSummary | null);
     try {
       const r = await authenticatedFetch("/api/provider-status");
       if (r.ok) setProviders(await r.json());
@@ -73,6 +109,15 @@ export default function SettingsPage() {
                 ["Website", setup?.business_website],
                 ["Business type", setup?.business_type],
                 ["Primary service", setup?.primary_service_type],
+                [
+                  "Address",
+                  [setup?.address_line1, setup?.address_line2, setup?.city, setup?.state, setup?.postal_code]
+                    .filter(Boolean)
+                    .join(", ") || null,
+                ],
+                ["Owner", setup?.owner_full_name],
+                ["Owner email", setup?.owner_email],
+                ["Owner phone", setup?.owner_phone],
               ]}
             />
           </Panel>
@@ -167,7 +212,7 @@ function Panel({
     </section>
   );
 }
-function Grid({ rows }: { rows: any[][] }) {
+function Grid({ rows }: { rows: GridRow[] }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {rows.map(([a, b]) => (
