@@ -42,12 +42,20 @@ export default function AdminPage() {
       <p className="mt-1 text-sm text-muted">
         Internal launch status. This page is hidden from firm users.
       </p>
-      <Link
-        href="/admin/system-health"
-        className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#108A64]"
-      >
-        View system health detail <ArrowRight size={14} />
-      </Link>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+        <Link
+          href="/admin/system-health"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#108A64]"
+        >
+          View system health detail <ArrowRight size={14} />
+        </Link>
+        <Link
+          href="/admin/platform"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#108A64]"
+        >
+          Platform Management (Early Access) <ArrowRight size={14} />
+        </Link>
+      </div>
       <div className="mt-6 space-y-3">
         {data.map((r, i) => (
           <div
