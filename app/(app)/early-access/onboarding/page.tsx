@@ -186,9 +186,20 @@ export default function EarlyAccessOnboardingPage() {
           <div>
             <h2 className="text-lg font-bold text-ink">What to expect during the beta</h2>
             <p className="mt-2 text-sm text-muted">
-              This is early software. You may find rough edges — use the Report a Bug action any time you
-              hit one, and share ideas through Feature Requests. The team reviews both regularly.
+              Use the Report a Bug action any time you hit a problem, and share ideas through Feature
+              Requests. Please review the known limitations below before continuing to the agreement.
             </p>
+            {settings && settings.known_limitations.length > 0 ? (
+              <ul className="mt-4 list-disc space-y-1.5 rounded-xl bg-paper p-4 pl-8 text-sm text-ink">
+                {settings.known_limitations.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-4 rounded-xl bg-paper p-4 text-sm text-muted">
+                No known limitations have been published for this campaign yet.
+              </p>
+            )}
             <button onClick={() => completeAndAdvance(stepName)} className="mt-4 flex items-center gap-1.5 rounded-xl bg-[#108A64] px-4 py-2 text-sm font-semibold text-white">
               Continue <ArrowRight size={14} />
             </button>

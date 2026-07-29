@@ -22,6 +22,7 @@ export default function WorkspaceSurveysPage() {
   const [active, setActive] = useState<EarlyAccessSurvey | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [betaStartDate, setBetaStartDate] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
     if (!campaign || !activeWorkspaceId) return;
@@ -29,6 +30,18 @@ export default function WorkspaceSurveysPage() {
     setError(null);
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user.id;
+
+    // Beta start date = when this workspace first accepted the campaign
+    // agreement -- the real gate into the program, not a fabricated date.
+    const { data: earliestAgreement } = await supabase
+      .from("early_access_agreements")
+      .select("accepted_at")
+      .eq("campaign_id", campaign.id)
+      .eq("workspace_id", activeWorkspaceId)
+      .order("accepted_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    setBetaStartDate(earliestAgreement ? new Date(earliestAgreement.accepted_at) : null);
 
     const { data, error: surveysError } = await supabase
       .from("early_access_surveys")
@@ -171,7 +184,22 @@ export default function WorkspaceSurveysPage() {
   }
   if (error) return <div className="rounded-xl border border-brick/30 bg-brick/10 px-4 py-3 text-sm text-brick">{error}</div>;
 
-  const pending = surveys.filter((s) => !answeredIds.has(s.id));
+  const daysSinceStart = betaStartDate
+    ? Math.floor((Date.now() - betaStartDate.getTime()) / (24 * 60 * 60 * 1000))
+    : null;
+  function dueDate(triggerDay: number) {
+    if (!betaStartDate) return null;
+    return new Date(betaStartDate.getTime() + triggerDay * 24 * 60 * 60 * 1000);
+  }
+  function isDue(s: EarlyAccessSurvey) {
+    if (s.trigger_day === null) return true;
+    if (daysSinceStart === null) return false;
+    return daysSinceStart >= s.trigger_day;
+  }
+
+  const unanswered = surveys.filter((s) => !answeredIds.has(s.id));
+  const pending = unanswered.filter(isDue);
+  const upcoming = unanswered.filter((s) => !isDue(s));
   const completed = surveys.filter((s) => answeredIds.has(s.id));
 
   return (
@@ -179,7 +207,7 @@ export default function WorkspaceSurveysPage() {
       <h1 className="text-2xl font-bold text-ink">Surveys</h1>
       <p className="mt-1 text-sm text-muted">Quick feedback that helps us improve VerexaHQ.</p>
 
-      {pending.length === 0 && completed.length === 0 ? (
+      {pending.length === 0 && upcoming.length === 0 && completed.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-line bg-white p-10 text-center text-sm text-muted">No surveys are open right now.</div>
       ) : (
         <div className="mt-5 space-y-3">
@@ -194,6 +222,20 @@ export default function WorkspaceSurveysPage() {
               </button>
             </div>
           ))}
+          {upcoming.map((s) => {
+            const due = s.trigger_day !== null ? dueDate(s.trigger_day) : null;
+            return (
+              <div key={s.id} className="flex items-center justify-between rounded-2xl border border-line bg-white p-4 opacity-70">
+                <div>
+                  <div className="font-semibold text-ink">{s.name}</div>
+                  {s.description && <p className="mt-1 text-sm text-muted">{s.description}</p>}
+                </div>
+                <span className="text-xs font-semibold text-muted">
+                  {due ? `Opens ${due.toLocaleDateString()}` : "Not yet available"}
+                </span>
+              </div>
+            );
+          })}
           {completed.map((s) => (
             <div key={s.id} className="flex items-center justify-between rounded-2xl border border-line bg-white p-4 opacity-70">
               <div className="font-semibold text-ink">{s.name}</div>
