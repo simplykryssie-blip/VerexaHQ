@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/components/Toast";
 import { logAdminActivity } from "@/lib/earlyAccess/logActivity";
+import { useEarlyAccessDirectory } from "@/lib/earlyAccess/admin/useEarlyAccessDirectory";
 import type {
   BugSeverity,
   BugStatus,
@@ -26,10 +27,6 @@ const STATUSES: BugStatus[] = [
   "cannot_reproduce",
 ];
 const SEVERITIES: BugSeverity[] = ["critical", "high", "medium", "low"];
-
-function shortId(id: string) {
-  return id.slice(0, 8);
-}
 
 function SeverityBadge({ severity }: { severity: BugSeverity }) {
   const style: Record<BugSeverity, string> = {
@@ -63,6 +60,7 @@ function StatusBadge({ status }: { status: BugStatus }) {
 function BugsPageInner() {
   const searchParams = useSearchParams();
   const { showSuccess, showError } = useToast();
+  const directory = useEarlyAccessDirectory();
   const [campaign, setCampaign] = useState<EarlyAccessCampaign | null>(null);
   const [bugs, setBugs] = useState<EarlyAccessBugReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +73,8 @@ function BugsPageInner() {
   const [resolutionDraft, setResolutionDraft] = useState("");
   const [fixedVersionDraft, setFixedVersionDraft] = useState("");
   const [statusBusy, setStatusBusy] = useState(false);
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [screenshotBusy, setScreenshotBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,6 +178,46 @@ function BugsPageInner() {
     );
   }
 
+  async function assignBug(userId: string) {
+    if (!selected || !campaign) return;
+    setAssignBusy(true);
+    const nextAssignee = userId || null;
+    const { error: updateError } = await supabase
+      .from("early_access_bug_reports")
+      .update({ assigned_to: nextAssignee })
+      .eq("id", selected.id);
+    setAssignBusy(false);
+    if (updateError) {
+      showError(friendlyError(updateError, "Couldn't update the assignee."));
+      return;
+    }
+    showSuccess(nextAssignee ? "Bug assigned." : "Assignment cleared.");
+    void logAdminActivity({
+      campaignId: campaign.id,
+      workspaceId: selected.workspace_id,
+      action: "bug_assigned",
+      entityType: "early_access_bug_report",
+      entityId: selected.id,
+      details: { from: selected.assigned_to, to: nextAssignee },
+    });
+    setBugs((prev) => prev.map((b) => (b.id === selected.id ? { ...b, assigned_to: nextAssignee } : b)));
+    setSelected((prev) => (prev ? { ...prev, assigned_to: nextAssignee } : prev));
+  }
+
+  async function viewScreenshot() {
+    if (!selected?.screenshot_path) return;
+    setScreenshotBusy(true);
+    const { data, error: signError } = await supabase.storage
+      .from("early-access-bug-screenshots")
+      .createSignedUrl(selected.screenshot_path, 60);
+    setScreenshotBusy(false);
+    if (signError || !data) {
+      showError(friendlyError(signError, "Couldn't open that screenshot."));
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+
   async function postComment() {
     if (!selected || !newComment.trim()) return;
     const { data: sessionData } = await supabase.auth.getSession();
@@ -250,7 +290,7 @@ function BugsPageInner() {
                 <tr key={b.id} onClick={() => openDetail(b)} className="cursor-pointer border-b border-line last:border-0 hover:bg-paper">
                   <td className="px-4 py-3 font-semibold text-ink">{b.title}</td>
                   <td className="px-4 py-3 text-muted">{b.module ?? "—"}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted">{shortId(b.workspace_id)}</td>
+                  <td className="px-4 py-3 text-xs text-muted">{directory.workspaceName(b.workspace_id)}</td>
                   <td className="px-4 py-3">
                     <SeverityBadge severity={b.severity} />
                   </td>
@@ -305,11 +345,11 @@ function BugsPageInner() {
               </div>
               <div>
                 <div className="font-bold uppercase tracking-wide text-muted">Workspace</div>
-                <div className="mt-0.5 font-mono text-ink">{shortId(selected.workspace_id)}</div>
+                <div className="mt-0.5 text-ink">{directory.workspaceName(selected.workspace_id)}</div>
               </div>
               <div>
                 <div className="font-bold uppercase tracking-wide text-muted">Reported by</div>
-                <div className="mt-0.5 font-mono text-ink">{shortId(selected.reported_by)}</div>
+                <div className="mt-0.5 text-ink">{directory.userName(selected.reported_by)}</div>
               </div>
               <div className="col-span-2 truncate">
                 <div className="font-bold uppercase tracking-wide text-muted">Page URL</div>
@@ -319,6 +359,35 @@ function BugsPageInner() {
                 <div className="font-bold uppercase tracking-wide text-muted">Browser</div>
                 <div className="mt-0.5 text-ink">{selected.browser_info ?? "—"}</div>
               </div>
+              {selected.screenshot_path && (
+                <div className="col-span-2">
+                  <div className="font-bold uppercase tracking-wide text-muted">Screenshot</div>
+                  <button
+                    onClick={viewScreenshot}
+                    disabled={screenshotBusy}
+                    className="mt-0.5 font-semibold text-[#108A64] underline disabled:opacity-50"
+                  >
+                    {screenshotBusy ? "Opening…" : "View screenshot"}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 space-y-1.5">
+              <label className="text-xs font-bold uppercase tracking-wide text-muted">Assigned to</label>
+              <select
+                value={selected.assigned_to ?? ""}
+                onChange={(e) => assignBug(e.target.value)}
+                disabled={assignBusy}
+                className="w-full rounded-xl border border-line px-3 py-2 text-sm disabled:opacity-50"
+              >
+                <option value="">Unassigned</option>
+                {directory.users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="mt-5 grid grid-cols-3 gap-1.5">

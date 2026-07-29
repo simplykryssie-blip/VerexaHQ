@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SendInvitationModal from "@/components/earlyAccess/SendInvitationModal";
 import { logAdminActivity } from "@/lib/earlyAccess/logActivity";
+import { useEarlyAccessDirectory } from "@/lib/earlyAccess/admin/useEarlyAccessDirectory";
 import type { EarlyAccessCampaign, EarlyAccessInvitation, InvitationStatus } from "@/lib/earlyAccess/types";
 
 function displayStatus(inv: EarlyAccessInvitation): InvitationStatus | "expired" {
@@ -34,6 +35,7 @@ function StatusBadge({ status }: { status: InvitationStatus | "expired" }) {
 function InvitationsPageInner() {
   const searchParams = useSearchParams();
   const { showSuccess, showError } = useToast();
+  const directory = useEarlyAccessDirectory();
   const [campaign, setCampaign] = useState<EarlyAccessCampaign | null>(null);
   const [invitations, setInvitations] = useState<EarlyAccessInvitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +209,7 @@ function InvitationsPageInner() {
             <thead>
               <tr className="border-b border-line text-left text-xs font-bold uppercase tracking-wide text-muted">
                 <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Workspace</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Sent</th>
                 <th className="px-4 py-3">Opened</th>
@@ -222,6 +225,9 @@ function InvitationsPageInner() {
                 return (
                   <tr key={inv.id} className="border-b border-line last:border-0">
                     <td className="px-4 py-3 font-semibold text-ink">{inv.email}</td>
+                    <td className="px-4 py-3 text-xs text-muted">
+                      {inv.workspace_id ? directory.workspaceName(inv.workspace_id) : "—"}
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={status} />
                     </td>

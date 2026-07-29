@@ -5,14 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/components/Toast";
 import { logAdminActivity } from "@/lib/earlyAccess/logActivity";
+import { useEarlyAccessDirectory } from "@/lib/earlyAccess/admin/useEarlyAccessDirectory";
 import type { EarlyAccessAgreement, EarlyAccessCampaign } from "@/lib/earlyAccess/types";
-
-function shortId(id: string) {
-  return id.slice(0, 8);
-}
 
 export default function AgreementsPage() {
   const { showSuccess, showError } = useToast();
+  const directory = useEarlyAccessDirectory();
   const [campaign, setCampaign] = useState<EarlyAccessCampaign | null>(null);
   const [agreements, setAgreements] = useState<EarlyAccessAgreement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -132,9 +130,7 @@ export default function AgreementsPage() {
       <section className="rounded-2xl border border-line bg-white p-5">
         <h2 className="font-bold text-ink">Acceptance records</h2>
         <p className="mt-1 text-sm text-muted">
-          {agreements.length} acceptance{agreements.length === 1 ? "" : "s"} recorded. Workspace and
-          user names aren&apos;t resolvable from this admin view yet — see the completion report for
-          the exact backend change needed.
+          {agreements.length} acceptance{agreements.length === 1 ? "" : "s"} recorded.
         </p>
         {agreements.length === 0 ? (
           <div className="mt-4 rounded-xl border border-line bg-paper p-6 text-center text-sm text-muted">
@@ -156,8 +152,8 @@ export default function AgreementsPage() {
               <tbody>
                 {agreements.map((a) => (
                   <tr key={a.id} className="border-b border-line last:border-0">
-                    <td className="py-2 pr-4 font-mono text-xs text-ink">{shortId(a.workspace_id)}</td>
-                    <td className="py-2 pr-4 font-mono text-xs text-ink">{shortId(a.user_id)}</td>
+                    <td className="py-2 pr-4 text-xs text-ink">{directory.workspaceName(a.workspace_id)}</td>
+                    <td className="py-2 pr-4 text-xs text-ink">{directory.userName(a.user_id)}</td>
                     <td className="py-2 pr-4 text-muted">{a.agreement_version}</td>
                     <td className="py-2 pr-4 text-muted">{new Date(a.accepted_at).toLocaleString()}</td>
                     <td className="py-2 pr-4 text-muted">{a.ip_address ?? "—"}</td>

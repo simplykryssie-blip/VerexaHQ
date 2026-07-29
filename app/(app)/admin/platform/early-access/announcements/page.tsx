@@ -6,6 +6,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { logAdminActivity } from "@/lib/earlyAccess/logActivity";
+import { useEarlyAccessDirectory } from "@/lib/earlyAccess/admin/useEarlyAccessDirectory";
 import type {
   AnnouncementStatus,
   AnnouncementType,
@@ -45,7 +46,7 @@ type Draft = {
   scheduled_for: string;
   expires_at: string;
   targetMode: "all" | "selected";
-  targetIdsText: string;
+  targetIds: string[];
 };
 
 const EMPTY_DRAFT: Draft = {
@@ -56,11 +57,12 @@ const EMPTY_DRAFT: Draft = {
   scheduled_for: "",
   expires_at: "",
   targetMode: "all",
-  targetIdsText: "",
+  targetIds: [],
 };
 
 export default function AnnouncementsPage() {
   const { showSuccess, showError } = useToast();
+  const directory = useEarlyAccessDirectory();
   const [campaign, setCampaign] = useState<EarlyAccessCampaign | null>(null);
   const [announcements, setAnnouncements] = useState<EarlyAccessAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,7 @@ export default function AnnouncementsPage() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
   const [archiveTarget, setArchiveTarget] = useState<EarlyAccessAnnouncement | null>(null);
+  const [workspaceSearch, setWorkspaceSearch] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,6 +108,7 @@ export default function AnnouncementsPage() {
 
   function openNew() {
     setDraft(EMPTY_DRAFT);
+    setWorkspaceSearch("");
     setShowEditor(true);
   }
 
@@ -118,8 +122,9 @@ export default function AnnouncementsPage() {
       scheduled_for: a.scheduled_for ? a.scheduled_for.slice(0, 16) : "",
       expires_at: a.expires_at ? a.expires_at.slice(0, 16) : "",
       targetMode: a.target_workspace_ids && a.target_workspace_ids.length > 0 ? "selected" : "all",
-      targetIdsText: (a.target_workspace_ids ?? []).join(", "),
+      targetIds: a.target_workspace_ids ?? [],
     });
+    setWorkspaceSearch("");
     setShowEditor(true);
   }
 
@@ -130,13 +135,7 @@ export default function AnnouncementsPage() {
       return;
     }
     setSaving(true);
-    const targetIds =
-      draft.targetMode === "selected"
-        ? draft.targetIdsText
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : null;
+    const targetIds = draft.targetMode === "selected" ? draft.targetIds : null;
 
     const { data: sessionData } = await supabase.auth.getSession();
     const payload = {
@@ -347,15 +346,65 @@ export default function AnnouncementsPage() {
                 {draft.targetMode === "selected" && (
                   <div className="mt-2">
                     <input
-                      placeholder="Paste workspace IDs, comma-separated"
-                      value={draft.targetIdsText}
-                      onChange={(e) => setDraft((d) => ({ ...d, targetIdsText: e.target.value }))}
-                      className="w-full rounded-sm border border-line px-3 py-2 text-xs font-mono"
+                      placeholder="Search workspaces…"
+                      value={workspaceSearch}
+                      onChange={(e) => setWorkspaceSearch(e.target.value)}
+                      className="w-full rounded-sm border border-line px-3 py-2 text-sm"
                     />
-                    <p className="mt-1 text-xs text-muted">
-                      There&apos;s no workspace directory in this admin area yet, so paste full workspace
-                      IDs manually (visible in the Agreements/Bugs lists, though currently shortened there).
-                    </p>
+                    {draft.targetIds.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {draft.targetIds.map((id) => (
+                          <span
+                            key={id}
+                            className="flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-[#108A64]"
+                          >
+                            {directory.workspaceName(id)}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setDraft((d) => ({ ...d, targetIds: d.targetIds.filter((t) => t !== id) }))
+                              }
+                              className="text-[#108A64] hover:text-brick"
+                            >
+                              <X size={11} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-1.5 max-h-40 overflow-y-auto rounded-sm border border-line">
+                      {directory.loading ? (
+                        <p className="px-3 py-2 text-xs text-muted">Loading workspaces…</p>
+                      ) : (
+                        directory.workspaces
+                          .filter((w) => w.name.toLowerCase().includes(workspaceSearch.trim().toLowerCase()))
+                          .map((w) => {
+                            const isSelected = draft.targetIds.includes(w.id);
+                            return (
+                              <button
+                                type="button"
+                                key={w.id}
+                                onClick={() =>
+                                  setDraft((d) => ({
+                                    ...d,
+                                    targetIds: isSelected
+                                      ? d.targetIds.filter((t) => t !== w.id)
+                                      : [...d.targetIds, w.id],
+                                  }))
+                                }
+                                className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs hover:bg-paper ${isSelected ? "bg-emerald-50/60 font-semibold text-[#108A64]" : "text-ink"}`}
+                              >
+                                {w.name}
+                                {isSelected && <span>Selected</span>}
+                              </button>
+                            );
+                          })
+                      )}
+                      {!directory.loading &&
+                        directory.workspaces.filter((w) => w.name.toLowerCase().includes(workspaceSearch.trim().toLowerCase())).length === 0 && (
+                          <p className="px-3 py-2 text-xs text-muted">No workspaces match.</p>
+                        )}
+                    </div>
                   </div>
                 )}
               </div>

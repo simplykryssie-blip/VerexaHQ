@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/friendlyError";
+import { useEarlyAccessDirectory } from "@/lib/earlyAccess/admin/useEarlyAccessDirectory";
 import type { EarlyAccessActivityLog, EarlyAccessCampaign } from "@/lib/earlyAccess/types";
 
 function shortId(id: string | null) {
@@ -11,6 +12,7 @@ function shortId(id: string | null) {
 const PAGE_SIZE = 50;
 
 export default function ActivityLogPage() {
+  const directory = useEarlyAccessDirectory();
   const [campaign, setCampaign] = useState<EarlyAccessCampaign | null>(null);
   const [logs, setLogs] = useState<EarlyAccessActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,8 +100,8 @@ export default function ActivityLogPage() {
                     {l.entity_type}
                     {l.entity_id && <span className="ml-1 font-mono text-xs">{shortId(l.entity_id)}</span>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted">{shortId(l.actor_user_id)}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted">{shortId(l.workspace_id)}</td>
+                  <td className="px-4 py-3 text-xs text-muted">{directory.userName(l.actor_user_id)}</td>
+                  <td className="px-4 py-3 text-xs text-muted">{directory.workspaceName(l.workspace_id)}</td>
                   <td className="max-w-[260px] truncate px-4 py-3 text-xs text-muted" title={JSON.stringify(l.details)}>
                     {Object.keys(l.details ?? {}).length > 0 ? JSON.stringify(l.details) : "—"}
                   </td>

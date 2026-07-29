@@ -5,14 +5,11 @@ import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/friendlyError";
 import { useToast } from "@/components/Toast";
 import { logAdminActivity } from "@/lib/earlyAccess/logActivity";
+import { useEarlyAccessDirectory } from "@/lib/earlyAccess/admin/useEarlyAccessDirectory";
 import type { EarlyAccessCampaign, EarlyAccessFeatureRequest, FeaturePriority, FeatureRequestStatus } from "@/lib/earlyAccess/types";
 
 const STATUSES: FeatureRequestStatus[] = ["under_review", "planned", "in_progress", "completed", "declined", "duplicate"];
 const PRIORITIES: FeaturePriority[] = ["critical", "high", "medium", "low"];
-
-function shortId(id: string) {
-  return id.slice(0, 8);
-}
 
 function StatusBadge({ status }: { status: FeatureRequestStatus }) {
   const style: Record<FeatureRequestStatus, string> = {
@@ -28,6 +25,7 @@ function StatusBadge({ status }: { status: FeatureRequestStatus }) {
 
 export default function AdminFeaturesPage() {
   const { showSuccess, showError } = useToast();
+  const directory = useEarlyAccessDirectory();
   const [campaign, setCampaign] = useState<EarlyAccessCampaign | null>(null);
   const [requests, setRequests] = useState<EarlyAccessFeatureRequest[]>([]);
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>({});
@@ -231,7 +229,7 @@ export default function AdminFeaturesPage() {
               </div>
               <div>
                 <div className="font-bold uppercase tracking-wide text-muted">Workspace</div>
-                <div className="mt-0.5 font-mono text-ink">{shortId(selected.workspace_id)}</div>
+                <div className="mt-0.5 text-ink">{directory.workspaceName(selected.workspace_id)}</div>
               </div>
             </div>
 

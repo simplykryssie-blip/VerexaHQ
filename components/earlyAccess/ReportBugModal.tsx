@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/friendlyError";
 import type { BugSeverity } from "@/lib/earlyAccess/types";
 
 const SEVERITIES: BugSeverity[] = ["low", "medium", "high", "critical"];
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_BYTES = 10 * 1024 * 1024;
 
 // Diagnostic metadata is limited to what's safe to capture automatically:
 // URL, module (route), app version, browser UA, viewport, timestamp.
@@ -25,19 +27,46 @@ export default function ReportBugModal({
   onClose: () => void;
 }) {
   const pathname = usePathname();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [expected, setExpected] = useState("");
   const [actual, setActual] = useState("");
   const [severity, setSeverity] = useState<BugSeverity>("medium");
+  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [screenshotWarning, setScreenshotWarning] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setFileError(null);
+    if (!file) {
+      setScreenshot(null);
+      return;
+    }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setFileError("Screenshots must be a PNG, JPEG, or WebP image.");
+      setScreenshot(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setFileError("Screenshots must be 10 MB or smaller.");
+      setScreenshot(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setScreenshot(file);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+    setScreenshotWarning(null);
 
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData.session?.user.id;
@@ -47,30 +76,55 @@ export default function ReportBugModal({
       return;
     }
 
-    const { error: insertError } = await supabase.from("early_access_bug_reports").insert({
-      campaign_id: campaignId,
-      workspace_id: workspaceId,
-      reported_by: userId,
-      title,
-      description,
-      expected_behavior: expected || null,
-      actual_behavior: actual || null,
-      module: pathname,
-      page_url: typeof window !== "undefined" ? window.location.href : null,
-      browser_info: typeof navigator !== "undefined" ? navigator.userAgent : null,
-      app_version: appVersion,
-      severity,
-      diagnostic_metadata: {
-        viewport: typeof window !== "undefined" ? `${window.innerWidth}x${window.innerHeight}` : null,
-        reported_at: new Date().toISOString(),
-      },
-    });
+    // Insert the report first -- the screenshot's storage path is
+    // {workspace_id}/{bug_report_id}/{filename}, so a real bug_report_id
+    // has to exist before anything can be uploaded.
+    const { data: inserted, error: insertError } = await supabase
+      .from("early_access_bug_reports")
+      .insert({
+        campaign_id: campaignId,
+        workspace_id: workspaceId,
+        reported_by: userId,
+        title,
+        description,
+        expected_behavior: expected || null,
+        actual_behavior: actual || null,
+        module: pathname,
+        page_url: typeof window !== "undefined" ? window.location.href : null,
+        browser_info: typeof navigator !== "undefined" ? navigator.userAgent : null,
+        app_version: appVersion,
+        severity,
+        diagnostic_metadata: {
+          viewport: typeof window !== "undefined" ? `${window.innerWidth}x${window.innerHeight}` : null,
+          reported_at: new Date().toISOString(),
+        },
+      })
+      .select("id")
+      .single();
 
-    setSubmitting(false);
-    if (insertError) {
+    if (insertError || !inserted) {
+      setSubmitting(false);
       setError(friendlyError(insertError, "Couldn't submit that bug report. Please try again."));
       return;
     }
+
+    if (screenshot) {
+      const ext = screenshot.type === "image/png" ? "png" : screenshot.type === "image/webp" ? "webp" : "jpg";
+      const path = `${workspaceId}/${inserted.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("early-access-bug-screenshots")
+        .upload(path, screenshot, { contentType: screenshot.type });
+
+      if (uploadError) {
+        setScreenshotWarning(
+          friendlyError(uploadError, "Your bug report was submitted, but the screenshot didn't upload."),
+        );
+      } else {
+        await supabase.from("early_access_bug_reports").update({ screenshot_path: path }).eq("id", inserted.id);
+      }
+    }
+
+    setSubmitting(false);
     setDone(true);
   }
 
@@ -89,6 +143,11 @@ export default function ReportBugModal({
             <div className="rounded-sm border border-green/30 bg-green/10 px-3 py-2 text-sm text-green">
               Thanks — your report was submitted and the team can see it.
             </div>
+            {screenshotWarning && (
+              <div className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                {screenshotWarning}
+              </div>
+            )}
             <button
               onClick={onClose}
               className="w-full rounded-sm bg-ink py-2 text-sm font-semibold text-white"
@@ -142,6 +201,29 @@ export default function ReportBugModal({
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="text-xs text-muted">Screenshot (optional, PNG/JPEG/WebP, up to 10 MB)</label>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="mt-1 flex w-full items-center gap-2 rounded-sm border border-dashed border-line px-3 py-2 text-sm text-muted hover:border-ink hover:text-ink"
+              >
+                <Paperclip size={14} />
+                {screenshot ? screenshot.name : "Attach a screenshot"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ALLOWED_TYPES.join(",")}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              {fileError && <p className="mt-1 text-xs text-brick">{fileError}</p>}
+              <p className="mt-1 text-xs text-brick">
+                Never attach a screenshot that shows SSNs, bank details, passwords, access tokens,
+                tax identity data, or a full client document.
+              </p>
             </div>
             <p className="text-xs text-muted">
               We automatically include this page&apos;s URL and your browser info to help
