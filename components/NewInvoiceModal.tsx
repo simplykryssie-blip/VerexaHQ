@@ -5,6 +5,8 @@ import { Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import { getProviderStatus } from "@/lib/notify";
+import { friendlyError } from "@/lib/friendlyError";
 
 type DraftLineItem = { item_name: string; quantity: string; unit_price: string };
 
@@ -27,6 +29,7 @@ export default function NewInvoiceModal({
   ]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stripeConfigured, setStripeConfigured] = useState(false);
 
   useEffect(() => {
     if (clientId) return;
@@ -36,6 +39,10 @@ export default function NewInvoiceModal({
       .order("first_name")
       .then(({ data }) => setClients((data as Client[]) ?? []));
   }, [clientId]);
+
+  useEffect(() => {
+    getProviderStatus().then((s) => setStripeConfigured(s.stripe));
+  }, []);
 
   function clientLabel(c: Client) {
     return c.client_type === "business" && c.business_name
@@ -99,7 +106,7 @@ export default function NewInvoiceModal({
       .single();
 
     if (invoiceError || !invoice) {
-      setError(invoiceError?.message ?? "Failed to create invoice.");
+      setError(friendlyError(invoiceError, "Failed to create invoice."));
       setSaving(false);
       return;
     }
@@ -119,7 +126,7 @@ export default function NewInvoiceModal({
     if (rows.length > 0) {
       const { error: itemsError } = await supabase.from("invoice_line_items").insert(rows);
       if (itemsError) {
-        setError(itemsError.message);
+        setError(friendlyError(itemsError, "Failed to save invoice line items."));
         setSaving(false);
         return;
       }
@@ -229,9 +236,9 @@ export default function NewInvoiceModal({
           </div>
 
           <p className="text-xs text-muted">
-            No payment processor is connected, so this invoice is tracked
-            manually — no payment link goes out automatically. You can still
-            send it however you like and record payments as they come in.
+            {stripeConfigured
+              ? "Once created, open this invoice to generate a Stripe payment link you can send to the client."
+              : "No payment processor is connected, so this invoice is tracked manually — no payment link goes out automatically. You can still send it however you like and record payments as they come in."}
           </p>
 
           {error && (
