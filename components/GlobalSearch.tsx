@@ -110,17 +110,17 @@ export function GlobalSearch() {
     };
   }, [query, activeWorkspaceId]);
   return (
-    <div className="relative w-full max-w-xl">
+    <div className="relative w-full min-w-0 max-w-xl">
       <Search
         className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
         size={17}
       />
       <input
-        aria-label="Global search"
+        aria-label="Search clients, work, tasks, documents"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-xl border border-line bg-paper py-2.5 pl-9 pr-9 text-sm outline-none focus:border-teal focus:bg-white"
-        placeholder="Search clients, work, tasks, documents…"
+        className="w-full min-w-0 truncate rounded-xl border border-line bg-paper py-2.5 pl-9 pr-9 text-sm outline-none focus:border-teal focus:bg-white"
+        placeholder="Search…"
       />
       {query && (
         <button

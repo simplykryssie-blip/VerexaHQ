@@ -424,8 +424,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="hidden min-w-[100px] text-base font-bold text-ink sm:block">
             {title}
           </div>
-          <GlobalSearch />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <GlobalSearch />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {inEarlyAccess && (
               <button
                 onClick={() => setShowReportBug(true)}
@@ -461,7 +463,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="min-w-0 px-3 py-5 pb-24 sm:px-5 lg:px-8 lg:py-8 lg:pb-8">
+        <main className="min-w-0 px-3 py-5 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:px-5 lg:px-8 lg:py-8 lg:pb-8">
           {children}
         </main>
       </div>

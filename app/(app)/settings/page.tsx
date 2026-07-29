@@ -5,33 +5,9 @@ import { supabase } from "@/lib/supabase";
 import { authenticatedFetch } from "@/lib/authenticatedFetch";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import BrandCenter from "@/components/BrandCenter";
+import FirmProfilePanel from "@/components/FirmProfilePanel";
+import TeamManagementPanel from "@/components/TeamManagementPanel";
 type Providers = { email: boolean; sms: boolean; stripe: boolean };
-
-type WorkspaceSetupState = {
-  business_name: string | null;
-  business_email: string | null;
-  business_phone: string | null;
-  business_website: string | null;
-  business_type: string | null;
-  primary_service_type: string | null;
-  owner_full_name: string | null;
-  owner_email: string | null;
-  owner_phone: string | null;
-  address_line1: string | null;
-  address_line2: string | null;
-  city: string | null;
-  state: string | null;
-  postal_code: string | null;
-};
-
-type TeamMemberRow = {
-  id: string;
-  role: string;
-  member_status: string;
-  display_name: string | null;
-  job_title: string | null;
-  user_id: string;
-};
 
 type SubscriptionSummary = {
   plan_name: string | null;
@@ -42,10 +18,16 @@ type SubscriptionSummary = {
 
 type GridRow = [string, string | number | null | undefined];
 
+const SETTINGS_TABS = [
+  { key: "profile", label: "Profile" },
+  { key: "branding", label: "Branding" },
+  { key: "team", label: "Team" },
+  { key: "integrations", label: "Integrations" },
+  { key: "subscription", label: "Subscription" },
+];
+
 export default function SettingsPage() {
-  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
-  const [setup, setSetup] = useState<WorkspaceSetupState | null>(null);
-  const [team, setTeam] = useState<TeamMemberRow[]>([]);
+  const { activeWorkspaceId } = useWorkspace();
   const [sub, setSub] = useState<SubscriptionSummary | null>(null);
   const [providers, setProviders] = useState<Providers>({
     email: false,
@@ -55,23 +37,12 @@ export default function SettingsPage() {
   const [tab, setTab] = useState("profile");
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
-    const [s, t, b] = await Promise.all([
-      supabase.rpc("get_workspace_setup_state", {
-        p_workspace_id: activeWorkspaceId,
-      }),
-      supabase
-        .from("workspace_members")
-        .select("id,role,member_status,display_name,job_title,user_id")
-        .eq("workspace_id", activeWorkspaceId),
-      supabase
-        .from("v_workspace_subscription_summary")
-        .select("*")
-        .eq("workspace_id", activeWorkspaceId)
-        .maybeSingle(),
-    ]);
-    setSetup(s.data as WorkspaceSetupState | null);
-    setTeam((t.data as TeamMemberRow[]) ?? []);
-    setSub(b.data as SubscriptionSummary | null);
+    const { data } = await supabase
+      .from("v_workspace_subscription_summary")
+      .select("*")
+      .eq("workspace_id", activeWorkspaceId)
+      .maybeSingle();
+    setSub(data as SubscriptionSummary | null);
     try {
       const r = await authenticatedFetch("/api/provider-status");
       if (r.ok) setProviders(await r.json());
@@ -80,75 +51,30 @@ export default function SettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
-  const tabs = ["profile", "branding", "team", "integrations", "subscription"];
   return (
     <div>
       <h1 className="text-2xl font-bold text-ink">Settings</h1>
       <p className="mt-1 text-sm text-muted">
         Manage your firm, branding, team, providers, and plan.
       </p>
-      <div className="mt-6 flex gap-2 overflow-x-auto border-b border-line">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold capitalize ${tab === t ? "border-[#108A64] text-[#108A64]" : "border-transparent text-muted"}`}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="relative mt-6 border-b border-line">
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-px sm:mx-0 sm:px-0">
+          {SETTINGS_TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`shrink-0 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-semibold ${tab === t.key ? "border-[#108A64] text-[#108A64]" : "border-transparent text-muted"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+          <span className="shrink-0 basis-2 sm:hidden" aria-hidden />
+        </div>
       </div>
-      <div className="mt-5">
-        {tab === "profile" && (
-          <Panel title="Firm profile">
-            <Grid
-              rows={[
-                ["Business", setup?.business_name || activeWorkspace?.name],
-                ["Email", setup?.business_email],
-                ["Phone", setup?.business_phone],
-                ["Website", setup?.business_website],
-                ["Business type", setup?.business_type],
-                ["Primary service", setup?.primary_service_type],
-                [
-                  "Address",
-                  [setup?.address_line1, setup?.address_line2, setup?.city, setup?.state, setup?.postal_code]
-                    .filter(Boolean)
-                    .join(", ") || null,
-                ],
-                ["Owner", setup?.owner_full_name],
-                ["Owner email", setup?.owner_email],
-                ["Owner phone", setup?.owner_phone],
-              ]}
-            />
-          </Panel>
-        )}
+      <div className="mt-5 pb-8">
+        {tab === "profile" && <FirmProfilePanel />}
         {tab === "branding" && <BrandCenter />}
-        {tab === "team" && (
-          <Panel title="Team members">
-            {team.length === 0 ? (
-              <p className="text-sm text-muted">No team members found.</p>
-            ) : (
-              team.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center justify-between border-b border-line py-3 last:border-0"
-                >
-                  <div>
-                    <div className="font-semibold text-ink">
-                      {m.display_name || "Team member"}
-                    </div>
-                    <div className="text-xs text-muted">
-                      {m.job_title || m.member_status}
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-paper px-3 py-1 text-xs font-semibold">
-                    {m.role}
-                  </span>
-                </div>
-              ))
-            )}
-          </Panel>
-        )}
+        {tab === "team" && <TeamManagementPanel />}
         {tab === "integrations" && (
           <div className="grid gap-4 lg:grid-cols-3">
             <Provider
@@ -169,25 +95,21 @@ export default function SettingsPage() {
           </div>
         )}
         {tab === "subscription" && (
-          <Panel title="Founding Beta">
+          <Panel title={sub?.plan_name || "Subscription"}>
             <Grid
               rows={[
-                ["Plan", sub?.plan_name || "Founding Beta"],
-                ["Status", sub?.subscription_status || "Trial"],
+                ["Plan", sub?.plan_name],
+                ["Status", sub?.subscription_status],
                 [
-                  "Trial ends",
-                  sub?.trial_ends_at
-                    ? new Date(sub.trial_ends_at).toLocaleDateString()
-                    : "—",
-                ],
-                [
-                  "Continuation",
-                  sub?.monthly_price
-                    ? `$${sub.monthly_price}/month`
-                    : "$97/month",
+                  "Continuation price",
+                  sub?.monthly_price != null ? `$${sub.monthly_price}/month` : null,
                 ],
               ]}
             />
+            <div className="mt-3 rounded-xl bg-paper p-4">
+              <div className="text-xs font-bold uppercase tracking-wide text-muted">Trial ends</div>
+              <div className="mt-1 font-semibold text-ink">{trialEndsDisplay(sub)}</div>
+            </div>
             <p className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">
               No card is required during the 30-day beta. Paid continuation is
               optional.
@@ -225,6 +147,16 @@ function Grid({ rows }: { rows: GridRow[] }) {
       ))}
     </div>
   );
+}
+function trialEndsDisplay(sub: SubscriptionSummary | null) {
+  if (!sub || sub.subscription_status !== "Trial") return "Not applicable";
+  if (!sub.trial_ends_at) return "Trial end date is unavailable — contact support so this can be corrected.";
+  const end = new Date(sub.trial_ends_at);
+  const exact = end.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const daysRemaining = Math.ceil((end.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  if (daysRemaining < 0) return `${exact} (trial has ended)`;
+  if (daysRemaining === 0) return `${exact} (ends today)`;
+  return `${exact} (${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining)`;
 }
 function Provider({
   name,
