@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Shield } from "lucide-react";
+import Link from "next/link";
+import { Shield, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type ReadinessRow = {
@@ -41,6 +42,12 @@ export default function AdminPage() {
       <p className="mt-1 text-sm text-muted">
         Internal launch status. This page is hidden from firm users.
       </p>
+      <Link
+        href="/admin/system-health"
+        className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#108A64]"
+      >
+        View system health detail <ArrowRight size={14} />
+      </Link>
       <div className="mt-6 space-y-3">
         {data.map((r, i) => (
           <div
