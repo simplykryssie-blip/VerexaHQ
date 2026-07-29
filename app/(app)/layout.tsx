@@ -37,6 +37,7 @@ import {
   useWorkspace,
 } from "@/components/WorkspaceProvider";
 import { useEarlyAccessMembership } from "@/lib/earlyAccess/useEarlyAccessMembership";
+import { useUnreadAnnouncementCount } from "@/lib/earlyAccess/useUnreadAnnouncementCount";
 import ReportBugModal from "@/components/earlyAccess/ReportBugModal";
 
 // Primary navigation, per the approved product spec. Every entry routes to
@@ -219,7 +220,8 @@ function Nav({
   const pathname = usePathname();
   const { workspaces, activeWorkspaceId, switchWorkspace, activeWorkspace } =
     useWorkspace();
-  const { inProgram: inEarlyAccess } = useEarlyAccessMembership(activeWorkspaceId);
+  const { inProgram: inEarlyAccess, campaign: earlyAccessCampaign } = useEarlyAccessMembership(activeWorkspaceId);
+  const unreadAnnouncements = useUnreadAnnouncementCount(activeWorkspaceId, earlyAccessCampaign?.id ?? null);
   return (
     <div className="flex h-full flex-col bg-[#132922] text-white">
       <div className="border-b border-white/10 px-5 py-5">
@@ -275,6 +277,11 @@ function Nav({
           >
             <Rocket size={17} className={pathname?.startsWith("/early-access") ? "text-[#36D39A]" : ""} />
             Early Access
+            {unreadAnnouncements > 0 && (
+              <span className="ml-auto grid h-4.5 min-w-4.5 place-items-center rounded-full bg-[#36D39A] px-1 text-[10px] font-bold text-[#0D1B14]">
+                {unreadAnnouncements > 9 ? "9+" : unreadAnnouncements}
+              </span>
+            )}
           </Link>
         )}
         {isAdmin && (
