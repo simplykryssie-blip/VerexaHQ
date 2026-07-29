@@ -29,10 +29,11 @@ export async function POST(req: NextRequest) {
       if (!existing) {
         const { data: invoice } = await supabase.from("invoices").select("*").eq("id", invoiceId).maybeSingle();
         if (invoice) {
-          const { error: paymentError } = await supabase.from("invoice_payments").insert({ workspace_id: invoice.workspace_id, invoice_id: invoiceId, client_id: invoice.client_id, payment_amount: amountPaid, payment_status: "completed", payment_method: "Stripe", paid_at: new Date().toISOString(), source_type: "stripe", external_transaction_id: event.id });
+          const { error: paymentError } = await supabase.from("invoice_payments").insert({ workspace_id: invoice.workspace_id, invoice_id: invoiceId, client_id: invoice.client_id, payment_amount: amountPaid, payment_status: "succeeded", payment_method: "Stripe", paid_at: new Date().toISOString(), source_type: "provider_webhook", external_transaction_id: event.id });
           if (paymentError) return NextResponse.json({ ok: false, error: "Unable to record payment." }, { status: 500 });
           const newAmountPaid = Number(invoice.amount_paid) + amountPaid;
-          await supabase.from("invoices").update({ amount_paid: newAmountPaid, invoice_status: newAmountPaid >= Number(invoice.total_amount) ? "paid" : "partially_paid", paid_at: newAmountPaid >= Number(invoice.total_amount) ? new Date().toISOString() : null, external_provider_status: "paid", external_last_synced_at: new Date().toISOString() }).eq("id", invoiceId);
+          const { error: invoiceError } = await supabase.from("invoices").update({ amount_paid: newAmountPaid, invoice_status: newAmountPaid >= Number(invoice.total_amount) ? "paid" : "partial", paid_at: newAmountPaid >= Number(invoice.total_amount) ? new Date().toISOString() : null, external_provider_status: "paid", external_last_synced_at: new Date().toISOString() }).eq("id", invoiceId);
+          if (invoiceError) return NextResponse.json({ ok: false, error: "Unable to update invoice." }, { status: 500 });
         }
       }
     }

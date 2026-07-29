@@ -7,6 +7,7 @@ import type { Client, ClientTag } from "@/lib/types";
 import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { maskZip } from "@/lib/organizerFormat";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 // save_workspace_client only accepts client_type = individual | business.
 const CLIENT_TYPES = [
@@ -158,6 +159,37 @@ type ConnectedContact = {
   portal_access: boolean;
 };
 
+type WorkspaceMemberRow = { user_id: string; display_name: string | null; role: string | null };
+type TagAssignmentRow = { tag_id: string };
+type TeamMemberIdRow = { user_id: string };
+type ServiceInterestRow = { service_type: string };
+type PrimaryContactRow = { contact_id: string; contacts: Omit<ConnectedContact, "id"> | null };
+type ContactSearchRow = {
+  id: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
+  personal_email: string | null;
+  personal_phone: string | null;
+  business_email: string | null;
+  business_phone: string | null;
+  occupation: string | null;
+  portal_access: boolean;
+  account_contacts: {
+    account_id: string;
+    is_primary: boolean;
+    clients: {
+      id: string;
+      client_type: string;
+      business_name: string | null;
+      first_name: string | null;
+      last_name: string | null;
+      account_name: string | null;
+      status: string;
+    } | null;
+  }[];
+};
+
 export default function ClientModal({
   client,
   onClose,
@@ -183,6 +215,7 @@ export default function ClientModal({
   const [step, setStep] = useState<1 | 2>(initialStep ?? 1);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isEditingBusiness = client?.client_type === "business";
@@ -325,7 +358,7 @@ export default function ClientModal({
       .eq("workspace_id", workspaceId)
       .then(({ data }) =>
         setAvailableMembers(
-          ((data as any[]) ?? []).map((m) => ({
+          ((data as WorkspaceMemberRow[]) ?? []).map((m) => ({
             user_id: m.user_id,
             label: m.display_name || m.role || "Team member",
           }))
@@ -339,17 +372,17 @@ export default function ClientModal({
       .from("client_tag_assignments")
       .select("tag_id")
       .eq("client_id", client.id)
-      .then(({ data }) => setSelectedTagIds(((data as any[]) ?? []).map((r) => r.tag_id)));
+      .then(({ data }) => setSelectedTagIds(((data as TagAssignmentRow[]) ?? []).map((r) => r.tag_id)));
     supabase
       .from("client_team_members")
       .select("user_id")
       .eq("client_id", client.id)
-      .then(({ data }) => setSelectedMemberIds(((data as any[]) ?? []).map((r) => r.user_id)));
+      .then(({ data }) => setSelectedMemberIds(((data as TeamMemberIdRow[]) ?? []).map((r) => r.user_id)));
     supabase
       .from("client_service_interests")
       .select("service_type")
       .eq("client_id", client.id)
-      .then(({ data }) => setSelectedServices(((data as any[]) ?? []).map((r) => r.service_type)));
+      .then(({ data }) => setSelectedServices(((data as ServiceInterestRow[]) ?? []).map((r) => r.service_type)));
     supabase
       .from("account_contacts")
       .select(
@@ -360,8 +393,15 @@ export default function ClientModal({
       .maybeSingle()
       .then(({ data }) => {
         if (!data) return;
-        const c = (data as any).contacts;
-        const id = (data as any).contact_id as string;
+        // Supabase's client infers embedded to-one relations as arrays when
+        // no generated Database types are available; PostgREST actually
+        // returns a single object here since account_contacts.contact_id
+        // is a unique-per-row foreign key. Going through `unknown` is the
+        // correct way to say "I know the real cardinality," same as the
+        // pattern used for embedded joins elsewhere in this file.
+        const row = data as unknown as PrimaryContactRow;
+        const c = row.contacts;
+        const id = row.contact_id;
         setOriginalContactId(id);
         if (c) {
           setOriginalContactLabel([c.first_name, c.last_name].filter(Boolean).join(" "));
@@ -454,7 +494,7 @@ export default function ClientModal({
       return;
     }
 
-    const rows: ContactSearchResult[] = ((data as any[]) ?? []).map((r) => ({
+    const rows: ContactSearchResult[] = ((data as unknown as ContactSearchRow[]) ?? []).map((r) => ({
       id: r.id,
       first_name: r.first_name,
       middle_name: r.middle_name,
@@ -465,10 +505,10 @@ export default function ClientModal({
       business_phone: r.business_phone,
       occupation: r.occupation,
       portal_access: r.portal_access,
-      linkedAccounts: ((r.account_contacts as any[]) ?? [])
+      linkedAccounts: (r.account_contacts ?? [])
         .map((ac) => ac.clients)
-        .filter(Boolean)
-        .map((cl: any) => ({
+        .filter((cl): cl is NonNullable<typeof cl> => Boolean(cl))
+        .map((cl) => ({
           id: cl.id,
           client_type: cl.client_type,
           status: cl.status,
@@ -609,7 +649,7 @@ export default function ClientModal({
       setIdentityError(revealError.message);
       return;
     }
-    setRevealedValue((data as any).value);
+    setRevealedValue((data as { value: string }).value);
     setIdentityReason("");
     setTimeout(() => {
       setRevealedValue(null);
@@ -680,7 +720,7 @@ export default function ClientModal({
       setError(stepError("save_workspace_client", saveError));
       return;
     }
-    const clientId: string | undefined = (saveResult as any)?.client_id;
+    const clientId: string | undefined = (saveResult as { client_id: string } | null)?.client_id;
     if (!clientId) {
       setSaving(false);
       setError("The client save did not return a client ID.");
@@ -994,16 +1034,10 @@ export default function ClientModal({
 
   async function handleDelete() {
     if (!client) return;
-    const name = clientDisplayName(client);
-    if (
-      !window.confirm(
-        `Delete ${name}? This removes the client record but not their services, tasks, or deadlines — remove those first if you want a clean delete.`
-      )
-    )
-      return;
     setDeleting(true);
     const { error: deleteError } = await supabase.from("clients").delete().eq("id", client.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (deleteError) {
       setError(stepError("clients_delete", deleteError));
       return;
@@ -1757,7 +1791,7 @@ export default function ClientModal({
               {isEditing && (
                 <button
                   type="button"
-                  onClick={handleDelete}
+                  onClick={() => setConfirmingDelete(true)}
                   disabled={deleting}
                   className="text-sm font-semibold py-2.5 px-3.5 rounded-xl border border-brick text-brick disabled:opacity-60 hover:bg-brick/5"
                 >
@@ -1824,6 +1858,15 @@ export default function ClientModal({
           background: #f5faf8;
         }
       `}</style>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={client ? `Delete ${clientDisplayName(client)}?` : "Delete this client?"}
+        description="This removes the client record but not their services, tasks, or deadlines — remove those first if you want a clean delete."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

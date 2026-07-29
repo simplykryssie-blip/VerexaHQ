@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollRun } from "@/lib/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 import { friendlyError } from "@/lib/friendlyError";
 export default function PayrollRunModal({
@@ -27,6 +28,7 @@ export default function PayrollRunModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,10 +71,10 @@ export default function PayrollRunModal({
 
   async function handleDelete() {
     if (!run) return;
-    if (!window.confirm("Delete this payroll run? All line items go with it.")) return;
     setDeleting(true);
     const { error } = await supabase.from("payroll_runs").delete().eq("id", run.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
       setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
@@ -120,7 +122,7 @@ export default function PayrollRunModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -144,6 +146,15 @@ export default function PayrollRunModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this payroll run?"
+        description="All line items go with it."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

@@ -113,6 +113,10 @@ export type Service = {
   assigned_to: string | null;
   pipeline_id: string | null;
   pipeline_stage_id: string | null;
+  service_name: string | null;
+  billing_frequency: string | null;
+  is_recurring: boolean;
+  workflow_managed_by: string;
   created_at: string;
   updated_at: string;
 };

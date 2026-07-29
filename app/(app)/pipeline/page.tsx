@@ -119,6 +119,8 @@ export default function PipelinePage() {
       setServices((prev) =>
         prev.map((s) => (s.id === service.id ? { ...s, pipeline_stage_id: stageId } : s))
       );
+    } else {
+      setError(friendlyError(error, "Couldn't move that card. Please try again."));
     }
   }
 

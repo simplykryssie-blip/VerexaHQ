@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/components/WorkspaceProvider";
+import { friendlyError } from "@/lib/friendlyError";
 type Event = {
   id: string;
   title: string;
@@ -11,12 +12,17 @@ type Event = {
   kind: string;
   client_id: string | null;
 };
+type DeadlineRow = { id: string; deadline_title: string; due_date: string; client_id: string | null };
+type CalendarEventRow = { id: string; event_title: string; start_at: string; client_id: string | null; event_category: string | null };
 export default function CalendarPage() {
   const { activeWorkspaceId } = useWorkspace();
   const [cursor, setCursor] = useState(() => new Date());
   const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
+    setLoading(true);
     const start = new Date(
       cursor.getFullYear(),
       cursor.getMonth(),
@@ -38,18 +44,26 @@ export default function CalendarPage() {
         .from("workspace_calendar_events")
         .select("id,event_title,start_at,client_id,event_category")
         .eq("workspace_id", activeWorkspaceId)
+        .neq("event_status", "canceled")
         .gte("start_at", start)
         .lt("start_at", end),
     ]);
+    const firstError = d.error ?? c.error;
+    if (firstError) {
+      setError(friendlyError(firstError, "We couldn't load your calendar right now. Please try again."));
+      setLoading(false);
+      return;
+    }
+    setError(null);
     setEvents([
-      ...(d.data ?? []).map((r: any) => ({
+      ...((d.data as DeadlineRow[]) ?? []).map((r) => ({
         id: r.id,
         title: r.deadline_title,
         date: r.due_date,
         kind: "Deadline",
         client_id: r.client_id,
       })),
-      ...(c.data ?? []).map((r: any) => ({
+      ...((c.data as CalendarEventRow[]) ?? []).map((r) => ({
         id: r.id,
         title: r.event_title,
         date: r.start_at,
@@ -57,6 +71,7 @@ export default function CalendarPage() {
         client_id: r.client_id,
       })),
     ]);
+    setLoading(false);
   }, [activeWorkspaceId, cursor]);
   useEffect(() => {
     void load();
@@ -111,6 +126,12 @@ export default function CalendarPage() {
       <h2 className="mb-3 text-lg font-bold text-ink">
         {cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
       </h2>
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+      )}
+      {loading && (
+        <div className="mb-4 text-sm text-muted">Loading calendar…</div>
+      )}
       <div className="overflow-x-auto">
         <div className="min-w-[760px] overflow-hidden rounded-2xl border border-line bg-white">
           <div className="grid grid-cols-7 bg-paper">

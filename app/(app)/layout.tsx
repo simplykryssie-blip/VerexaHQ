@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Bell,
   BriefcaseBusiness,
+  Bug,
   CalendarDays,
   CheckSquare,
   ChevronDown,
@@ -20,6 +21,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   Plus,
+  Rocket,
   Settings,
   Shield,
   User,
@@ -29,10 +31,14 @@ import {
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Logo } from "@/components/Logo";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { ToastProvider } from "@/components/Toast";
 import {
   WorkspaceProvider,
   useWorkspace,
 } from "@/components/WorkspaceProvider";
+import { useEarlyAccessMembership } from "@/lib/earlyAccess/useEarlyAccessMembership";
+import { useUnreadAnnouncementCount } from "@/lib/earlyAccess/useUnreadAnnouncementCount";
+import ReportBugModal from "@/components/earlyAccess/ReportBugModal";
 
 // Primary navigation, per the approved product spec. Every entry routes to
 // a real page — none of these are placeholders.
@@ -214,6 +220,8 @@ function Nav({
   const pathname = usePathname();
   const { workspaces, activeWorkspaceId, switchWorkspace, activeWorkspace } =
     useWorkspace();
+  const { inProgram: inEarlyAccess, campaign: earlyAccessCampaign } = useEarlyAccessMembership(activeWorkspaceId);
+  const unreadAnnouncements = useUnreadAnnouncementCount(activeWorkspaceId, earlyAccessCampaign?.id ?? null);
   return (
     <div className="flex h-full flex-col bg-[#132922] text-white">
       <div className="border-b border-white/10 px-5 py-5">
@@ -257,6 +265,25 @@ function Nav({
             </Link>
           );
         })}
+        {inEarlyAccess && (
+          <Link
+            href="/early-access"
+            onClick={close}
+            className={`mt-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+              pathname === "/early-access" || pathname?.startsWith("/early-access/")
+                ? "bg-white/12 text-white"
+                : "text-white/72 hover:bg-white/7 hover:text-white"
+            }`}
+          >
+            <Rocket size={17} className={pathname?.startsWith("/early-access") ? "text-[#36D39A]" : ""} />
+            Early Access
+            {unreadAnnouncements > 0 && (
+              <span className="ml-auto grid h-4.5 min-w-4.5 place-items-center rounded-full bg-[#36D39A] px-1 text-[10px] font-bold text-[#0D1B14]">
+                {unreadAnnouncements > 9 ? "9+" : unreadAnnouncements}
+              </span>
+            )}
+          </Link>
+        )}
         {isAdmin && (
           <Link
             href="/admin"
@@ -288,11 +315,14 @@ function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
+  const { inProgram: inEarlyAccess, campaign: earlyAccessCampaign } =
+    useEarlyAccessMembership(activeWorkspaceId);
   const [ready, setReady] = useState(false);
   const [menu, setMenu] = useState(false);
   const [email, setEmail] = useState("");
   const [admin, setAdmin] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showReportBug, setShowReportBug] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -396,6 +426,14 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <GlobalSearch />
           <div className="ml-auto flex items-center gap-2">
+            {inEarlyAccess && (
+              <button
+                onClick={() => setShowReportBug(true)}
+                className="hidden items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-muted hover:text-ink sm:flex"
+              >
+                <Bug size={15} /> Report a bug
+              </button>
+            )}
             <QuickCreateMenu />
             <Link
               aria-label="Notifications"
@@ -451,14 +489,24 @@ function Shell({ children }: { children: React.ReactNode }) {
           More
         </button>
       </nav>
+      {showReportBug && activeWorkspaceId && (
+        <ReportBugModal
+          workspaceId={activeWorkspaceId}
+          campaignId={earlyAccessCampaign?.id ?? null}
+          appVersion={earlyAccessCampaign?.version_label ?? null}
+          onClose={() => setShowReportBug(false)}
+        />
+      )}
     </div>
   );
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <WorkspaceProvider>
-      <Shell>{children}</Shell>
-    </WorkspaceProvider>
+    <ToastProvider>
+      <WorkspaceProvider>
+        <Shell>{children}</Shell>
+      </WorkspaceProvider>
+    </ToastProvider>
   );
 }
