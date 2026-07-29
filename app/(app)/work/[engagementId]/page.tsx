@@ -262,7 +262,7 @@ export default function ServiceWorkspacePage() {
       thread_id: activeThread,
       client_id: row.account_id,
       sender_user_id: userData.user?.id,
-      sender_type: "Firm",
+      sender_type: "firm",
       message_body: draft.trim(),
       is_internal_note: false,
     });
@@ -273,7 +273,9 @@ export default function ServiceWorkspacePage() {
         .select("*")
         .eq("thread_id", activeThread)
         .order("created_at", { ascending: true });
-      setThreadMessages(data ?? []);
+      setThreadMessages((data as SecureMessageRow[]) ?? []);
+    } else {
+      setError(friendlyError(error, "Couldn't send that message. Please try again."));
     }
   }
 
