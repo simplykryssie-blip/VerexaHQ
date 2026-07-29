@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, ChevronRight, Pencil, Users, UserCheck, UserPlus } from "lucide-react";
+import { Plus, Search, ChevronRight, Pencil, Users, UserCheck, UserPlus, type LucideIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import StatusPill from "@/components/StatusPill";
 import ClientModal from "@/components/ClientModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 const STATUS_FILTERS = ["all", "lead", "active", "inactive", "archived"];
 
 export default function ClientsPage() {
@@ -27,7 +28,7 @@ export default function ClientsPage() {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
     } else {
       setClients((data as Client[]) ?? []);
       setError(null);
@@ -187,7 +188,7 @@ export default function ClientsPage() {
   );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function Metric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="app-card p-5">
       <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-[#108A64]">

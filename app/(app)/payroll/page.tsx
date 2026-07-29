@@ -8,6 +8,7 @@ import type { PayrollClient, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import PayrollClientModal from "@/components/PayrollClientModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type Row = PayrollClient & { clientName: string };
 
 export default function PayrollPage() {
@@ -24,7 +25,7 @@ export default function PayrollPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

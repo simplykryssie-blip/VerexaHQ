@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import DateField from "@/components/DateField";
 import type { BookkeepingPeriod } from "@/lib/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -32,6 +35,7 @@ export default function PeriodModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,7 +61,7 @@ export default function PeriodModal({
         .eq("id", period!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -74,7 +78,7 @@ export default function PeriodModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -83,12 +87,12 @@ export default function PeriodModal({
 
   async function handleDelete() {
     if (!period) return;
-    if (!window.confirm("Delete this period? Transactions linked to it will remain but lose their period link.")) return;
     setDeleting(true);
     const { error } = await supabase.from("bookkeeping_periods").delete().eq("id", period.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -121,13 +125,7 @@ export default function PeriodModal({
               className="w-1/3 border border-line rounded-sm px-3 py-2 text-sm"
             />
           </div>
-          <input
-            type="date"
-            placeholder="Due date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-          />
+          <DateField value={dueDate} onChange={setDueDate} />
           <p className="text-xs text-muted">
             Due date is when reports should go to the client (optional).
           </p>
@@ -142,7 +140,7 @@ export default function PeriodModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -166,6 +164,15 @@ export default function PeriodModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this period?"
+        description="Transactions linked to it will remain but lose their period link."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

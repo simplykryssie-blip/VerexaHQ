@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import CurrencyInput from "@/components/CurrencyInput";
 
+import { friendlyError } from "@/lib/friendlyError";
 const ADJUSTMENT_TYPES = ["Bank Fee", "Interest Earned", "NSF Fee", "Correction", "Other"];
 
 export default function AdjustmentModal({
@@ -50,7 +51,7 @@ export default function AdjustmentModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();

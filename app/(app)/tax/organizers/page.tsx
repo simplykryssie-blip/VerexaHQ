@@ -8,6 +8,7 @@ import type { TaxOrganizerAssignment, TaxOrganizerTemplate, Client } from "@/lib
 import StatusPill from "@/components/StatusPill";
 import AssignOrganizerModal from "@/components/AssignOrganizerModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type AssignmentRow = TaxOrganizerAssignment & { clientName: string; templateName: string };
 
 export default function OrganizersPage() {
@@ -24,7 +25,7 @@ export default function OrganizersPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

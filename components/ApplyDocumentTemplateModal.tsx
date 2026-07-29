@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import DateField from "@/components/DateField";
 import type { Client, DocumentRequestTemplate } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function ApplyDocumentTemplateModal({
   clientId,
   onClose,
@@ -79,7 +81,7 @@ export default function ApplyDocumentTemplateModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     const created = (data as { created_count: number }).created_count;
@@ -137,12 +139,7 @@ export default function ApplyDocumentTemplateModal({
               ))}
             </select>
 
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-            />
+            <DateField value={dueDate} onChange={setDueDate} />
             <p className="text-xs text-muted">
               Optional due date for all items created from this template.
             </p>

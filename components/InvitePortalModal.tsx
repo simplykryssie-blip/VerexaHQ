@@ -5,6 +5,7 @@ import { Copy, Check, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { sendEmail, getProviderStatus } from "@/lib/notify";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function InvitePortalModal({
   workspaceId,
   clientId,
@@ -42,7 +43,7 @@ export default function InvitePortalModal({
 
     if (error) {
       setSending(false);
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
 

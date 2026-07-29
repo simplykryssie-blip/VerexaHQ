@@ -4,7 +4,9 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { BookkeepingFinancialAccount } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 const ACCOUNT_TYPES = ["checking", "savings", "credit_card", "loan", "cash", "other"];
 
 export default function FinancialAccountModal({
@@ -33,6 +35,7 @@ export default function FinancialAccountModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,7 +57,7 @@ export default function FinancialAccountModal({
         .eq("id", account!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -70,7 +73,7 @@ export default function FinancialAccountModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -79,15 +82,15 @@ export default function FinancialAccountModal({
 
   async function handleDelete() {
     if (!account) return;
-    if (!window.confirm(`Delete account "${account.account_name}"? This can't be undone.`)) return;
     setDeleting(true);
     const { error } = await supabase
       .from("bookkeeping_financial_accounts")
       .delete()
       .eq("id", account.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -148,7 +151,7 @@ export default function FinancialAccountModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -172,6 +175,15 @@ export default function FinancialAccountModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={account ? `Delete account "${account.account_name}"?` : "Delete this account?"}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

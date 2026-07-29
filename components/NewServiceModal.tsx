@@ -4,6 +4,19 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Pipeline, PipelineStage, Service } from "@/lib/types";
 
+import { friendlyError } from "@/lib/friendlyError";
+const SERVICE_STATUSES = [
+  "New",
+  "Pending Documents",
+  "Ready to Start",
+  "In Progress",
+  "Waiting on Client",
+  "Review",
+  "Completed",
+  "On Hold",
+  "Canceled",
+];
+
 export default function NewServiceModal({
   clientId,
   service,
@@ -178,7 +191,7 @@ export default function NewServiceModal({
         .eq("id", service!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -213,7 +226,7 @@ export default function NewServiceModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -237,7 +250,7 @@ export default function NewServiceModal({
     const { error: rpcError } = await supabase.rpc("delete_service_with_workflow", { p_service_id: service.id });
     setDeleting(false);
     if (rpcError) {
-      setDeleteError(rpcError.message);
+      setDeleteError(friendlyError(rpcError, "Something went wrong deleting this service. Please try again."));
       return;
     }
     onDeleted?.();
@@ -265,13 +278,13 @@ export default function NewServiceModal({
                 <p className="text-xs text-muted">Loading what will be removed…</p>
               )}
               <p className="text-xs text-muted">
-                This can't be undone. If this service has invoices, signed documents, filed tax returns, or other
+                This can&apos;t be undone. If this service has invoices, signed documents, filed tax returns, or other
                 records that must be preserved, deletion will be blocked — cancel it instead (set its status to
                 Canceled) in that case.
               </p>
             </div>
           ) : (
-            <p className="text-sm text-ink">This service has no workflow attached. Deleting it can't be undone.</p>
+            <p className="text-sm text-ink">This service has no workflow attached. Deleting it can&apos;t be undone.</p>
           )}
           {deleteError && (
             <div className="mt-3 text-xs text-brick bg-brick/10 border border-brick/30 rounded-sm px-3 py-2">{deleteError}</div>
@@ -329,12 +342,17 @@ export default function NewServiceModal({
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
           {isEditing && (
-            <input
-              placeholder="Status (e.g. New, In Progress, Filed)"
+            <select
               value={serviceStatus}
               onChange={(e) => setServiceStatus(e.target.value)}
               className="w-full border border-line rounded-sm px-3 py-2 text-sm"
-            />
+            >
+              {SERVICE_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
           )}
           <input
             placeholder="Service year"

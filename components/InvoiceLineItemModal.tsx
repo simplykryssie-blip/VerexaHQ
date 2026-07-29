@@ -4,7 +4,9 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { InvoiceLineItem } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function InvoiceLineItemModal({
   invoiceId,
   workspaceId,
@@ -27,6 +29,7 @@ export default function InvoiceLineItemModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -49,7 +52,7 @@ export default function InvoiceLineItemModal({
         .eq("id", item!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -65,7 +68,7 @@ export default function InvoiceLineItemModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -74,12 +77,12 @@ export default function InvoiceLineItemModal({
 
   async function handleDelete() {
     if (!item) return;
-    if (!window.confirm("Remove this line item?")) return;
     setDeleting(true);
     const { error } = await supabase.from("invoice_line_items").delete().eq("id", item.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -127,7 +130,7 @@ export default function InvoiceLineItemModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -151,6 +154,14 @@ export default function InvoiceLineItemModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Remove this line item?"
+        confirmLabel="Remove"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

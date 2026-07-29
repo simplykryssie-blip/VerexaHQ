@@ -4,7 +4,9 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollEmployee } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function PayrollEmployeeModal({
   payrollClientId,
   clientId,
@@ -32,6 +34,7 @@ export default function PayrollEmployeeModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +59,7 @@ export default function PayrollEmployeeModal({
         .eq("id", employee!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -73,7 +76,7 @@ export default function PayrollEmployeeModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -82,12 +85,12 @@ export default function PayrollEmployeeModal({
 
   async function handleDelete() {
     if (!employee) return;
-    if (!window.confirm(`Remove ${employee.first_name} ${employee.last_name}?`)) return;
     setDeleting(true);
     const { error } = await supabase.from("payroll_employees").delete().eq("id", employee.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -182,7 +185,7 @@ export default function PayrollEmployeeModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -206,6 +209,14 @@ export default function PayrollEmployeeModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={employee ? `Remove ${employee.first_name} ${employee.last_name}?` : "Remove this employee?"}
+        confirmLabel="Remove"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

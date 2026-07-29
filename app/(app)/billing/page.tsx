@@ -8,6 +8,7 @@ import type { Invoice, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import NewInvoiceModal from "@/components/NewInvoiceModal";
 
+import { friendlyError } from "@/lib/friendlyError";
 type Row = Invoice & { clientName: string };
 
 export default function BillingPage() {
@@ -25,7 +26,7 @@ export default function BillingPage() {
       .order("issue_date", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }

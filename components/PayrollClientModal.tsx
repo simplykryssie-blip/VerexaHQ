@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, PayrollClient } from "@/lib/types";
+import { maskEin } from "@/lib/organizerFormat";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 const FREQUENCIES = ["weekly", "biweekly", "semimonthly", "monthly"];
 const STATUSES = ["setup", "active", "on_hold", "offboarding", "closed"];
 
@@ -31,6 +34,7 @@ export default function PayrollClientModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (isEditing) return;
@@ -73,7 +77,7 @@ export default function PayrollClientModal({
         .eq("id", payrollClient!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -101,7 +105,7 @@ export default function PayrollClientModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -110,17 +114,12 @@ export default function PayrollClientModal({
 
   async function handleDelete() {
     if (!payrollClient) return;
-    if (
-      !window.confirm(
-        "Delete this payroll engagement? Employees, runs, filings, and deposits under it will remain but become orphaned."
-      )
-    )
-      return;
     setDeleting(true);
     const { error } = await supabase.from("payroll_clients").delete().eq("id", payrollClient.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -157,9 +156,10 @@ export default function PayrollClientModal({
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
           <input
-            placeholder="FEIN"
+            placeholder="Federal Employer ID Number (EIN), e.g. 12-3456789"
+            inputMode="numeric"
             value={fein}
-            onChange={(e) => setFein(e.target.value)}
+            onChange={(e) => setFein(maskEin(e.target.value))}
             className="w-full border border-line rounded-sm px-3 py-2 text-sm"
           />
 
@@ -225,7 +225,7 @@ export default function PayrollClientModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -249,6 +249,15 @@ export default function PayrollClientModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this payroll engagement?"
+        description="Employees, runs, filings, and deposits under it will remain but become orphaned."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

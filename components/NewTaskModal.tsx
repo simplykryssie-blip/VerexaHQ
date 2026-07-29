@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Task } from "@/lib/types";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function NewTaskModal({
   clientId,
   task,
@@ -27,6 +30,8 @@ export default function NewTaskModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const { showSuccess } = useToast();
 
   useEffect(() => {
     if (clientId) return;
@@ -64,7 +69,7 @@ export default function NewTaskModal({
         .eq("id", task!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -99,7 +104,7 @@ export default function NewTaskModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -108,14 +113,15 @@ export default function NewTaskModal({
 
   async function handleDelete() {
     if (!task) return;
-    if (!window.confirm(`Delete task "${task.task_title}"? This can't be undone.`)) return;
     setDeleting(true);
     const { error } = await supabase.from("tasks").delete().eq("id", task.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
+    showSuccess("Task deleted.");
     onDeleted?.();
     onClose();
   }
@@ -185,7 +191,7 @@ export default function NewTaskModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -209,6 +215,15 @@ export default function NewTaskModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`Delete task "${task?.task_title ?? ""}"?`}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

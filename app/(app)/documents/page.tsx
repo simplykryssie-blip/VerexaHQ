@@ -8,10 +8,14 @@ import StatusPill from "@/components/StatusPill";
 import RequestDocumentModal from "@/components/RequestDocumentModal";
 import UploadDocumentModal from "@/components/UploadDocumentModal";
 import ApplyDocumentTemplateModal from "@/components/ApplyDocumentTemplateModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 
+import { friendlyError } from "@/lib/friendlyError";
 type DocumentRow = Document & { clientName: string };
 
 export default function DocumentsPage() {
+  const { showSuccess, showError } = useToast();
   const [docs, setDocs] = useState<DocumentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +23,8 @@ export default function DocumentsPage() {
   const [showUpload, setShowUpload] = useState(false);
   const [showTemplate, setShowTemplate] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -28,7 +34,7 @@ export default function DocumentsPage() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }
@@ -73,7 +79,7 @@ export default function DocumentsPage() {
       .from("verexahq-client-documents")
       .createSignedUrl(doc.storage_path, 60);
     if (error || !data) {
-      setError(error?.message ?? "Could not generate download link.");
+      setError(friendlyError(error, "Could not generate a download link. Please try again."));
       return;
     }
     window.open(data.signedUrl, "_blank");
@@ -82,7 +88,7 @@ export default function DocumentsPage() {
   async function handleAccept(doc: Document) {
     const { error } = await supabase.rpc("accept_client_document", { p_document_id: doc.id });
     if (!error) load();
-    else setError(error.message);
+    else setError(friendlyError(error, "Something went wrong. Please try again."));
   }
 
   async function handleReject(doc: Document) {
@@ -93,7 +99,7 @@ export default function DocumentsPage() {
       p_rejection_reason: reason,
     });
     if (!error) load();
-    else setError(error.message);
+    else setError(friendlyError(error, "Something went wrong. Please try again."));
   }
 
   async function toggleVisibility(doc: Document) {
@@ -104,14 +110,21 @@ export default function DocumentsPage() {
     if (!error) load();
   }
 
-  async function handleDelete(doc: Document) {
-    if (!window.confirm(`Delete "${doc.document_name}"? This can't be undone.`)) return;
-    if (doc.storage_path) {
-      await supabase.storage.from("verexahq-client-documents").remove([doc.storage_path]);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    if (deleteTarget.storage_path) {
+      await supabase.storage.from("verexahq-client-documents").remove([deleteTarget.storage_path]);
     }
-    const { error } = await supabase.from("documents").delete().eq("id", doc.id);
-    if (!error) load();
-    else setError(error.message);
+    const { error } = await supabase.from("documents").delete().eq("id", deleteTarget.id);
+    setDeleting(false);
+    setDeleteTarget(null);
+    if (!error) {
+      showSuccess("Document deleted.");
+      load();
+    } else {
+      showError(friendlyError(error, "Something went wrong. Please try again."));
+    }
   }
 
   const visible = docs.filter((d) => statusFilter === "all" || d.document_status === statusFilter);
@@ -221,7 +234,7 @@ export default function DocumentsPage() {
                   </button>
                 </>
               )}
-              <button onClick={() => handleDelete(d)} className="text-muted hover:text-brick">
+              <button onClick={() => setDeleteTarget(d)} className="text-muted hover:text-brick">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -236,6 +249,15 @@ export default function DocumentsPage() {
       {showTemplate && (
         <ApplyDocumentTemplateModal onClose={() => setShowTemplate(false)} onSaved={load} />
       )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title={`Delete "${deleteTarget?.document_name ?? ""}"?`}
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

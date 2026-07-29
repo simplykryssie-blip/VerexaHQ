@@ -13,6 +13,9 @@ import type {
 } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import OrganizerQuestionnaire from "@/components/OrganizerQuestionnaire";
+import OrganizerProgress from "@/components/OrganizerProgress";
+import { isQuestionAnswered, isQuestionVisible } from "@/lib/organizerVisibility";
+import { friendlyOrganizerError } from "@/lib/organizerError";
 
 export default function PortalOrganizerPage() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -37,7 +40,7 @@ export default function PortalOrganizerPage() {
       .maybeSingle();
 
     if (assignmentError || !assignmentData) {
-      setError(assignmentError?.message ?? "Organizer not found.");
+      setError(friendlyOrganizerError(assignmentError, "We couldn't find this organizer. Please check the link or contact your preparer."));
       setLoading(false);
       return;
     }
@@ -124,7 +127,7 @@ export default function PortalOrganizerPage() {
       return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
     });
     if (missing.length > 0) {
-      setError(`Complete ${missing.length} required question${missing.length === 1 ? "" : "s"} before submitting.`);
+      setError(`Please answer ${missing.length} more required question${missing.length === 1 ? "" : "s"} before submitting.`);
       return;
     }
     setSubmitting(true);
@@ -134,7 +137,7 @@ export default function PortalOrganizerPage() {
       .eq("id", assignment.id);
     setSubmitting(false);
     if (submitError) {
-      setError(submitError.message);
+      setError(friendlyOrganizerError(submitError, "We couldn't submit your organizer right now. Please try again in a moment."));
       return;
     }
     setAssignment({ ...assignment, assignment_status: "submitted", submitted_at: new Date().toISOString() });
@@ -151,7 +154,12 @@ export default function PortalOrganizerPage() {
     );
   }
 
-  const answeredCount = questions.filter((q) => answers.has(q.id)).length;
+  const visibleQuestions = questions.filter((q) => isQuestionVisible(q, questions, answers));
+  const answeredCount = visibleQuestions.filter((q) => isQuestionAnswered(answers.get(q.id)?.answer_value)).length;
+  const remainingSections = sections.filter((s) => {
+    const sectionQuestions = visibleQuestions.filter((q) => q.section_id === s.id);
+    return sectionQuestions.length > 0 && sectionQuestions.some((q) => !isQuestionAnswered(answers.get(q.id)?.answer_value));
+  }).length;
 
   return (
     <div>
@@ -162,14 +170,21 @@ export default function PortalOrganizerPage() {
         <ArrowLeft size={13} /> Back to Home
       </button>
 
-      <div className="flex items-center gap-3 mb-2">
+      <div className="flex items-center gap-3 mb-1">
         <h1 className="font-slab text-2xl font-bold text-ink">{template?.template_name}</h1>
         <StatusPill status={assignment.assignment_status} />
       </div>
-      <div className="text-sm text-muted mb-8">
-        {answeredCount} of {questions.length} questions answered
-        {assignment.due_date ? ` · Due ${assignment.due_date}` : ""}
-      </div>
+      <p className="text-sm text-muted mb-4">
+        We&apos;ll ask a few questions so we can prepare your return correctly. Answer what you
+        know now — you can always come back and finish later.
+      </p>
+
+      <OrganizerProgress
+        answeredCount={answeredCount}
+        totalCount={visibleQuestions.length}
+        remainingSections={remainingSections}
+        dueDate={assignment.due_date}
+      />
 
       {error && (
         <div className="mb-6 text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">

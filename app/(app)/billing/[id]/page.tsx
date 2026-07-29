@@ -17,7 +17,10 @@ import StatusPill from "@/components/StatusPill";
 import InvoiceLineItemModal from "@/components/InvoiceLineItemModal";
 import RecordPaymentModal from "@/components/RecordPaymentModal";
 import PaymentPlanModal from "@/components/PaymentPlanModal";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/Toast";
 import { sendEmail, getProviderStatus } from "@/lib/notify";
+import { friendlyError } from "@/lib/friendlyError";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +42,9 @@ export default function InvoiceDetailPage() {
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [stripeConfigured, setStripeConfigured] = useState(false);
   const [creatingPaymentLink, setCreatingPaymentLink] = useState(false);
+  const [deleteItemTarget, setDeleteItemTarget] = useState<InvoiceLineItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
+  const { showSuccess } = useToast();
 
   useEffect(() => {
     getProviderStatus().then((s) => {
@@ -108,10 +114,16 @@ export default function InvoiceDetailPage() {
     if (id) load();
   }, [id]);
 
-  async function handleDeleteItem(item: InvoiceLineItem) {
-    if (!window.confirm("Remove this line item?")) return;
-    const { error } = await supabase.from("invoice_line_items").delete().eq("id", item.id);
-    if (!error) load();
+  async function confirmDeleteItem() {
+    if (!deleteItemTarget) return;
+    setDeletingItem(true);
+    const { error } = await supabase.from("invoice_line_items").delete().eq("id", deleteItemTarget.id);
+    setDeletingItem(false);
+    setDeleteItemTarget(null);
+    if (!error) {
+      showSuccess("Line item removed.");
+      load();
+    }
   }
 
   async function markSent() {
@@ -187,24 +199,32 @@ export default function InvoiceDetailPage() {
     if (error) return;
 
     if (nextStatus === "paid") {
-      await supabase.from("invoice_payments").insert({
+      const { error: paymentError } = await supabase.from("invoice_payments").insert({
         workspace_id: invoice.workspace_id,
         invoice_id: invoice.id,
         client_id: invoice.client_id,
         payment_amount: schedule.amount,
-        payment_status: "completed",
+        payment_status: "succeeded",
         payment_method: "Payment Plan Installment",
         paid_at: new Date().toISOString(),
         source_type: "manual_tracking",
       });
+      if (paymentError) {
+        setError(friendlyError(paymentError, "Something went wrong. Please try again."));
+        return;
+      }
       const newAmountPaid = invoice.amount_paid + Number(schedule.amount);
-      await supabase
+      const { error: invoiceError } = await supabase
         .from("invoices")
         .update({
           amount_paid: newAmountPaid,
-          invoice_status: newAmountPaid >= invoice.total_amount ? "paid" : "partially_paid",
+          invoice_status: newAmountPaid >= invoice.total_amount ? "paid" : "partial",
         })
         .eq("id", invoice.id);
+      if (invoiceError) {
+        setError(friendlyError(invoiceError, "Something went wrong. Please try again."));
+        return;
+      }
     }
     load();
   }
@@ -389,7 +409,7 @@ export default function InvoiceDetailPage() {
                   ${Number(it.line_total).toLocaleString()}
                 </span>
                 <button
-                  onClick={() => handleDeleteItem(it)}
+                  onClick={() => setDeleteItemTarget(it)}
                   className="text-muted hover:text-brick"
                 >
                   <Trash2 size={14} />
@@ -456,6 +476,15 @@ export default function InvoiceDetailPage() {
           onSaved={load}
         />
       )}
+      <ConfirmDialog
+        open={!!deleteItemTarget}
+        title={`Remove "${deleteItemTarget?.item_name ?? ""}"?`}
+        description="This can't be undone."
+        confirmLabel="Remove"
+        busy={deletingItem}
+        onConfirm={confirmDeleteItem}
+        onCancel={() => setDeleteItemTarget(null)}
+      />
     </div>
   );
 }

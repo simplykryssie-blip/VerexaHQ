@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/friendlyError";
+import { useToast } from "@/components/Toast";
 
 export type WorkspaceInfo = {
   id: string;
@@ -33,11 +35,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     null,
   );
   const [loading, setLoading] = useState(true);
+  const { showError } = useToast();
 
   const refresh = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase.rpc("list_my_active_workspaces");
-    if (!error) {
+    if (error) {
+      showError(friendlyError(error, "Couldn't load your workspaces. Please refresh the page."));
+    } else {
       const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => {
         const role = String(row.role ?? "Staff");
         return {
@@ -65,7 +70,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       );
     }
     setLoading(false);
-  }, []);
+  }, [showError]);
 
   useEffect(() => {
     void refresh();

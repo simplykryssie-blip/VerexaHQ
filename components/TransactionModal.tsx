@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { BookkeepingTransaction, BookkeepingTransactionCategory } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 export default function TransactionModal({
   clientId,
   workspaceId,
@@ -38,6 +40,7 @@ export default function TransactionModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function loadCategories() {
     const { data } = await supabase
@@ -87,7 +90,7 @@ export default function TransactionModal({
         .eq("id", transaction!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -106,7 +109,7 @@ export default function TransactionModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -115,15 +118,15 @@ export default function TransactionModal({
 
   async function handleDelete() {
     if (!transaction) return;
-    if (!window.confirm("Delete this transaction? This can't be undone.")) return;
     setDeleting(true);
     const { error } = await supabase
       .from("bookkeeping_transactions")
       .delete()
       .eq("id", transaction.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -203,7 +206,7 @@ export default function TransactionModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -227,6 +230,15 @@ export default function TransactionModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this transaction?"
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

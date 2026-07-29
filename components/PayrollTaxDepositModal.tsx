@@ -4,7 +4,9 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PayrollTaxDeposit } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 const TAX_TYPES = ["941 Deposit", "State Withholding", "SUTA", "FUTA", "Local"];
 const STATUSES = ["scheduled", "paid", "late", "waived"];
 
@@ -33,6 +35,7 @@ export default function PayrollTaxDepositModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -56,7 +59,7 @@ export default function PayrollTaxDepositModal({
         .eq("id", deposit!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -72,7 +75,7 @@ export default function PayrollTaxDepositModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -81,12 +84,12 @@ export default function PayrollTaxDepositModal({
 
   async function handleDelete() {
     if (!deposit) return;
-    if (!window.confirm("Delete this tax deposit?")) return;
     setDeleting(true);
     const { error } = await supabase.from("payroll_tax_deposits").delete().eq("id", deposit.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -164,7 +167,7 @@ export default function PayrollTaxDepositModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -188,6 +191,15 @@ export default function PayrollTaxDepositModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this tax deposit?"
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

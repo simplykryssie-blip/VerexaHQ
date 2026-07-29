@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { PortalConversation, PortalMessage, Client } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 
+import { friendlyError } from "@/lib/friendlyError";
 type ConversationRow = PortalConversation & { clientName: string };
 
 export default function StaffMessagesPage() {
@@ -27,7 +28,7 @@ export default function StaffMessagesPage() {
       .order("last_message_at", { ascending: false });
 
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       setLoading(false);
       return;
     }
@@ -93,7 +94,7 @@ export default function StaffMessagesPage() {
 
     setSending(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     setDraft("");

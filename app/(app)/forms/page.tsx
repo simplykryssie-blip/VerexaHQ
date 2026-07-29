@@ -1,12 +1,28 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Copy, FileText, Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/components/WorkspaceProvider";
+import { friendlyError } from "@/lib/friendlyError";
+
+type FormTemplateRow = {
+  id: string;
+  template_name: string;
+  is_active: boolean;
+  is_system_template: boolean;
+};
+
+type AssignedFormRow = {
+  id: string;
+  assignment_status: string;
+  clients: { first_name: string; last_name: string; business_name: string | null } | null;
+  form_templates: { template_name: string } | null;
+};
+
 export default function FormsPage() {
   const { activeWorkspaceId } = useWorkspace();
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [assigned, setAssigned] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<FormTemplateRow[]>([]);
+  const [assigned, setAssigned] = useState<AssignedFormRow[]>([]);
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +42,8 @@ export default function FormsPage() {
         .eq("workspace_id", activeWorkspaceId)
         .order("created_at", { ascending: false }),
     ]);
-    setTemplates(t.data ?? []);
-    setAssigned(a.data ?? []);
+    setTemplates((t.data as FormTemplateRow[]) ?? []);
+    setAssigned((a.data as unknown as AssignedFormRow[]) ?? []);
   }, [activeWorkspaceId]);
   useEffect(() => {
     void load();
@@ -42,9 +58,7 @@ export default function FormsPage() {
       p_description: null,
     });
     if (e) {
-      setError(
-        "This template could not be created. Check your role and try again.",
-      );
+      setError(friendlyError(e, "This template could not be created. Check your role and try again."));
       return;
     }
     setName("");
@@ -94,10 +108,10 @@ export default function FormsPage() {
                     {t.template_name}
                   </div>
                   <div className="text-xs text-muted">
-                    {t.template_status || t.status || "Template"}
+                    {t.is_active ? "Active" : "Inactive"}
                   </div>
                 </div>
-                {t.is_platform_template && (
+                {t.is_system_template && (
                   <span className="rounded-full bg-paper px-2 py-1 text-xs text-muted">
                     Verexa
                   </span>
@@ -124,7 +138,7 @@ export default function FormsPage() {
                 <div className="mt-1 text-sm text-muted">
                   {a.clients?.business_name ||
                     `${a.clients?.first_name ?? ""} ${a.clients?.last_name ?? ""}`.trim()}{" "}
-                  · {a.assignment_status || a.status}
+                  · {a.assignment_status}
                 </div>
               </div>
             ))

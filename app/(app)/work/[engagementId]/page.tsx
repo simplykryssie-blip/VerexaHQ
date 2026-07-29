@@ -17,6 +17,7 @@ import StatusPill from "@/components/StatusPill";
 import type { EngagementWorkspace, PipelineStage, Task } from "@/lib/types";
 import { isOpenTaskStatus, statusLabel } from "@/lib/status";
 
+import { friendlyError } from "@/lib/friendlyError";
 const TABS = [
   "overview",
   "workflow",
@@ -29,6 +30,33 @@ const TABS = [
   "settings",
 ] as const;
 type Tab = (typeof TABS)[number];
+
+type WorkspaceMemberRow = { user_id: string; display_name: string | null };
+type RequirementRow = { id: string; title: string; is_satisfied: boolean; is_required: boolean };
+type ClientRequestRow = { id: string; title: string; request_type: string; request_status: string };
+type FormAssignmentRow = {
+  id: string;
+  due_date: string | null;
+  assignment_status: string;
+  form_templates: { template_name: string } | null;
+};
+type EngagementDocumentRow = {
+  id: string;
+  document_name: string;
+  document_category: string | null;
+  document_status: string;
+};
+type MessageThreadRow = { id: string; subject: string | null };
+type SecureMessageRow = { id: string; message_body: string };
+type EngagementInvoiceRow = {
+  id: string;
+  invoice_number: string | null;
+  total_amount: number | null;
+  due_date: string | null;
+  invoice_status: string;
+};
+type EngagementNoteRow = { id: string; note_body: string; created_at: string };
+type StatutoryDeadlineRow = { due_date: string | null };
 
 export default function ServiceWorkspacePage() {
   const { engagementId } = useParams<{ engagementId: string }>();
@@ -43,18 +71,18 @@ export default function ServiceWorkspacePage() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [requirements, setRequirements] = useState<any[]>([]);
-  const [requests, setRequests] = useState<any[]>([]);
-  const [forms, setForms] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [threads, setThreads] = useState<any[]>([]);
+  const [requirements, setRequirements] = useState<RequirementRow[]>([]);
+  const [requests, setRequests] = useState<ClientRequestRow[]>([]);
+  const [forms, setForms] = useState<FormAssignmentRow[]>([]);
+  const [documents, setDocuments] = useState<EngagementDocumentRow[]>([]);
+  const [threads, setThreads] = useState<MessageThreadRow[]>([]);
   const [activeThread, setActiveThread] = useState<string | null>(null);
-  const [threadMessages, setThreadMessages] = useState<any[]>([]);
+  const [threadMessages, setThreadMessages] = useState<SecureMessageRow[]>([]);
   const [draft, setDraft] = useState("");
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [notes, setNotes] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<EngagementInvoiceRow[]>([]);
+  const [notes, setNotes] = useState<EngagementNoteRow[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
-  const [statutoryDeadline, setStatutoryDeadline] = useState<any | null>(null);
+  const [statutoryDeadline, setStatutoryDeadline] = useState<StatutoryDeadlineRow | null>(null);
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId || !engagementId) return;
@@ -103,17 +131,19 @@ export default function ServiceWorkspacePage() {
       ]);
 
     const memberMap = new Map<string, string>();
-    (membersRes.data ?? []).forEach((m: any) => memberMap.set(m.user_id, m.display_name || "Team member"));
+    ((membersRes.data as WorkspaceMemberRow[]) ?? []).forEach((m) =>
+      memberMap.set(m.user_id, m.display_name || "Team member")
+    );
     setMembers(memberMap);
     setTasks((tasksRes.data as Task[]) ?? []);
-    setRequirements(requirementsRes.data ?? []);
-    setRequests(requestsRes.data ?? []);
-    setForms(formsRes.data ?? []);
-    setDocuments(documentsRes.data ?? []);
-    setThreads(threadsRes.data ?? []);
-    setInvoices(invoicesRes.data ?? []);
-    setNotes(notesRes.data ?? []);
-    setStatutoryDeadline((deadlineRes.data ?? [])[0] ?? null);
+    setRequirements((requirementsRes.data as RequirementRow[]) ?? []);
+    setRequests((requestsRes.data as ClientRequestRow[]) ?? []);
+    setForms((formsRes.data as unknown as FormAssignmentRow[]) ?? []);
+    setDocuments((documentsRes.data as EngagementDocumentRow[]) ?? []);
+    setThreads((threadsRes.data as MessageThreadRow[]) ?? []);
+    setInvoices((invoicesRes.data as EngagementInvoiceRow[]) ?? []);
+    setNotes((notesRes.data as EngagementNoteRow[]) ?? []);
+    setStatutoryDeadline(((deadlineRes.data as StatutoryDeadlineRow[]) ?? [])[0] ?? null);
 
     if (engRow.pipeline_id) {
       const { data: stageData } = await supabase
@@ -143,7 +173,7 @@ export default function ServiceWorkspacePage() {
       .select("*")
       .eq("thread_id", activeThread)
       .order("created_at", { ascending: true })
-      .then(({ data }) => setThreadMessages(data ?? []));
+      .then(({ data }) => setThreadMessages((data as SecureMessageRow[]) ?? []));
   }, [activeThread]);
 
   const memberLabel = (id: string | null) => (id ? members.get(id) ?? "Unassigned" : "Unassigned");
@@ -194,12 +224,12 @@ export default function ServiceWorkspacePage() {
       p_priority: "Normal",
     });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     // save_task has no engagement_id parameter yet — link the created task
     // to this Service Workspace directly, same table + policy the RPC uses.
-    const taskId = (data as any)?.task_id;
+    const taskId = (data as { task_id: string } | null)?.task_id;
     if (taskId) {
       await supabase.from("tasks").update({ engagement_id: engagementId }).eq("id", taskId);
     }
@@ -217,7 +247,7 @@ export default function ServiceWorkspacePage() {
       created_by: userData.user?.id,
     });
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     setNoteDraft("");
@@ -232,7 +262,7 @@ export default function ServiceWorkspacePage() {
       thread_id: activeThread,
       client_id: row.account_id,
       sender_user_id: userData.user?.id,
-      sender_type: "Firm",
+      sender_type: "firm",
       message_body: draft.trim(),
       is_internal_note: false,
     });
@@ -243,7 +273,9 @@ export default function ServiceWorkspacePage() {
         .select("*")
         .eq("thread_id", activeThread)
         .order("created_at", { ascending: true });
-      setThreadMessages(data ?? []);
+      setThreadMessages((data as SecureMessageRow[]) ?? []);
+    } else {
+      setError(friendlyError(error, "Couldn't send that message. Please try again."));
     }
   }
 
@@ -255,7 +287,7 @@ export default function ServiceWorkspacePage() {
       .eq("id", engagementId)
       .eq("workspace_id", activeWorkspaceId);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     void load();
@@ -594,9 +626,9 @@ export default function ServiceWorkspacePage() {
               onBlur={(e) => saveSettings({ status: e.target.value })}
               className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
             >
-              {["active", "completed", "cancelled"].map((s) => (
+              {["draft", "active", "waiting_on_client", "on_hold", "completed", "cancelled", "archived"].map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {s.replaceAll("_", " ")}
                 </option>
               ))}
             </select>
@@ -604,11 +636,11 @@ export default function ServiceWorkspacePage() {
           <div>
             <label className="text-xs font-semibold text-muted">Priority</label>
             <select
-              defaultValue={row.priority ?? "Normal"}
+              defaultValue={row.priority ?? "normal"}
               onBlur={(e) => saveSettings({ priority: e.target.value })}
               className="mt-1 w-full rounded-xl border border-line px-3 py-2 text-sm"
             >
-              {["Low", "Normal", "High", "Urgent"].map((s) => (
+              {["low", "normal", "high", "urgent"].map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>

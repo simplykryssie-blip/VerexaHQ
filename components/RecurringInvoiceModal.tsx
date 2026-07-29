@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, RecurringInvoice } from "@/lib/types";
 import CurrencyInput from "@/components/CurrencyInput";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
+import { friendlyError } from "@/lib/friendlyError";
 const FREQUENCIES = ["weekly", "monthly", "quarterly", "annually"];
 
 export default function RecurringInvoiceModal({
@@ -34,6 +36,7 @@ export default function RecurringInvoiceModal({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (clientId) return;
@@ -75,7 +78,7 @@ export default function RecurringInvoiceModal({
         .eq("id", recurringInvoice!.id);
       setSaving(false);
       if (error) {
-        setError(error.message);
+        setError(friendlyError(error, "Something went wrong. Please try again."));
         return;
       }
       onSaved();
@@ -103,7 +106,7 @@ export default function RecurringInvoiceModal({
 
     setSaving(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onSaved();
@@ -112,15 +115,15 @@ export default function RecurringInvoiceModal({
 
   async function handleDelete() {
     if (!recurringInvoice) return;
-    if (!window.confirm("Delete this recurring invoice schedule?")) return;
     setDeleting(true);
     const { error } = await supabase
       .from("recurring_invoices")
       .delete()
       .eq("id", recurringInvoice.id);
     setDeleting(false);
+    setConfirmingDelete(false);
     if (error) {
-      setError(error.message);
+      setError(friendlyError(error, "Something went wrong. Please try again."));
       return;
     }
     onDeleted?.();
@@ -204,7 +207,7 @@ export default function RecurringInvoiceModal({
           />
           <p className="text-xs text-muted">
             No payment processor is connected, so nothing auto-charges. Use
-            "Generate Invoice Now" on this schedule when it&apos;s time to bill,
+            &quot;Generate Invoice Now&quot; on this schedule when it&apos;s time to bill,
             and it&apos;ll create a real invoice with this amount.
           </p>
 
@@ -218,7 +221,7 @@ export default function RecurringInvoiceModal({
             {isEditing && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmingDelete(true)}
                 disabled={deleting}
                 className="text-sm font-semibold py-2 px-3 rounded-sm border border-brick text-brick disabled:opacity-60"
               >
@@ -242,6 +245,15 @@ export default function RecurringInvoiceModal({
           </div>
         </form>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this recurring invoice schedule?"
+        description="This can't be undone."
+        confirmLabel="Delete"
+        busy={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </div>
   );
 }

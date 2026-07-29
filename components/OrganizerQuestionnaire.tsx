@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import CurrencyInput from "@/components/CurrencyInput";
+import DateField from "@/components/DateField";
+import { ORGANIZER_FORMAT_CONFIG } from "@/lib/organizerFormat";
+import { isQuestionAnswered, isQuestionVisible } from "@/lib/organizerVisibility";
 import type { TaxOrganizerAnswer, TaxOrganizerQuestion, TaxOrganizerSection } from "@/lib/types";
 
 type Props = {
@@ -12,21 +15,9 @@ type Props = {
   onSave: (question: TaxOrganizerQuestion, value: unknown) => void;
 };
 
-function isAnswered(value: unknown) {
-  if (Array.isArray(value)) return value.length > 0;
-  return value !== undefined && value !== null && value !== "";
-}
-
 export default function OrganizerQuestionnaire({ sections, questions, answers, savingQuestionId, onSave }: Props) {
   function isVisible(question: TaxOrganizerQuestion) {
-    const rule = question.conditional_logic as { mapped_field?: string; equals?: unknown; not_equals?: unknown } | null;
-    if (!rule?.mapped_field) return true;
-    const source = questions.find((candidate) => candidate.mapped_field === rule.mapped_field);
-    if (!source) return true;
-    const sourceValue = answers.get(source.id)?.answer_value;
-    if (Object.prototype.hasOwnProperty.call(rule, "equals")) return sourceValue === rule.equals;
-    if (Object.prototype.hasOwnProperty.call(rule, "not_equals")) return sourceValue !== rule.not_equals;
-    return Boolean(sourceValue);
+    return isQuestionVisible(question, questions, answers);
   }
 
   function renderQuestion(q: TaxOrganizerQuestion) {
@@ -82,17 +73,26 @@ export default function OrganizerQuestionnaire({ sections, questions, answers, s
     }
 
     if (q.question_type === "textarea") {
-      return <textarea defaultValue={String(value ?? "")} rows={3} onBlur={(e) => onSave(q, e.target.value)} className={inputClass} />;
+      return <textarea defaultValue={String(value ?? "")} rows={3} placeholder={q.placeholder ?? undefined} onBlur={(e) => onSave(q, e.target.value)} className={inputClass} />;
     }
 
     if (q.question_type === "file") {
       return <div className="text-xs text-muted border border-dashed border-line rounded-sm px-3 py-3">Upload the requested document from the Documents area, then note the filename here.</div>;
     }
 
+    if (q.question_type === "date") {
+      return <DateQuestion value={String(value ?? "")} onSave={(nextValue) => onSave(q, nextValue)} />;
+    }
+
+    if (q.format_type) {
+      return <FormattedQuestion formatType={q.format_type} value={String(value ?? "")} placeholder={q.placeholder} onSave={(nextValue) => onSave(q, nextValue)} />;
+    }
+
     return (
       <input
-        type={q.question_type === "date" ? "date" : q.question_type === "number" ? "number" : "text"}
+        type={q.question_type === "number" ? "number" : "text"}
         defaultValue={String(value ?? "")}
+        placeholder={q.placeholder ?? undefined}
         onBlur={(e) => onSave(q, e.target.value)}
         className={inputClass}
       />
@@ -104,31 +104,59 @@ export default function OrganizerQuestionnaire({ sections, questions, answers, s
       {sections.map((section) => {
         const sectionQuestions = questions.filter((q) => q.section_id === section.id && isVisible(q));
         if (sectionQuestions.length === 0) return null;
-        const complete = sectionQuestions.filter((q) => isAnswered(answers.get(q.id)?.answer_value)).length;
+        const complete = sectionQuestions.filter((q) => isQuestionAnswered(answers.get(q.id)?.answer_value)).length;
         return (
           <section key={section.id}>
-            <div className="border-b border-line pb-3 mb-4 flex items-end justify-between gap-4">
-              <div>
-                <h2 className="font-slab text-lg font-bold text-ink">{section.section_title}</h2>
-                {section.section_description && <p className="text-xs text-muted mt-1">{section.section_description}</p>}
+            <div className="border-b border-line pb-3 mb-4">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <h2 className="font-slab text-lg font-bold text-ink">{section.section_title}</h2>
+                  {section.section_description && <p className="text-xs text-muted mt-1">{section.section_description}</p>}
+                </div>
+                <span className="text-xs text-muted whitespace-nowrap">{complete} of {sectionQuestions.length} complete</span>
               </div>
-              <span className="text-xs text-muted whitespace-nowrap">{complete} of {sectionQuestions.length} complete</span>
+              {section.estimated_minutes != null && (
+                <div className="text-[11px] text-muted mt-1.5">
+                  Estimated time: {section.estimated_minutes} minute{section.estimated_minutes === 1 ? "" : "s"}
+                </div>
+              )}
             </div>
             <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
               {sectionQuestions.map((q) => (
-                <div key={q.id} className="px-5 py-4">
-                  <div className="text-sm font-semibold text-ink mb-2">
-                    {q.question_text}{q.is_required && <span className="text-brick"> *</span>}
-                  </div>
-                  {q.help_text && <div className="text-xs text-muted mb-2">{q.help_text}</div>}
+                <QuestionRow key={q.id} question={q} saving={savingQuestionId === q.id}>
                   {renderQuestion(q)}
-                  {savingQuestionId === q.id && <div className="text-[11px] text-muted mt-1">Saving…</div>}
-                </div>
+                </QuestionRow>
               ))}
             </div>
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function QuestionRow({ question: q, saving, children }: { question: TaxOrganizerQuestion; saving: boolean; children: React.ReactNode }) {
+  const [showNotSure, setShowNotSure] = useState(false);
+  return (
+    <div className="px-5 py-4">
+      <div className="text-sm font-semibold text-ink mb-1">
+        {q.question_text}{q.is_required && <span className="text-brick"> *</span>}
+      </div>
+      {q.explanation && <p className="text-xs text-muted mb-1.5">{q.explanation}</p>}
+      {q.help_text && <p className="text-xs text-muted mb-1.5">{q.help_text}</p>}
+      {q.example_text && <p className="text-xs text-muted italic mb-2">Example: {q.example_text}</p>}
+      {children}
+      <div className="flex items-center gap-3 mt-1.5">
+        {saving && <div className="text-[11px] text-muted">Saving…</div>}
+        {q.not_sure_text && (
+          <button type="button" onClick={() => setShowNotSure((v) => !v)} className="text-[11px] font-semibold text-blue underline">
+            Not Sure?
+          </button>
+        )}
+      </div>
+      {showNotSure && q.not_sure_text && (
+        <div className="text-xs text-ink bg-paperDim border border-line rounded-sm px-3 py-2 mt-1.5">{q.not_sure_text}</div>
+      )}
     </div>
   );
 }
@@ -145,5 +173,52 @@ function CurrencyQuestion({ value, onSave }: { value: string; onSave: (value: st
       onBlur={() => onSave(draft)}
       className="max-w-xs"
     />
+  );
+}
+
+function FormattedQuestion({
+  formatType,
+  value,
+  placeholder,
+  onSave,
+}: {
+  formatType: NonNullable<TaxOrganizerQuestion["format_type"]>;
+  value: string;
+  placeholder: string | null;
+  onSave: (value: string) => void;
+}) {
+  const config = ORGANIZER_FORMAT_CONFIG[formatType];
+  const [draft, setDraft] = useState(value);
+  const [touched, setTouched] = useState(false);
+
+  useEffect(() => setDraft(value), [value]);
+
+  const showError = touched && draft.length > 0 && !config.isComplete(draft);
+
+  return (
+    <div className="max-w-xs">
+      <input
+        type="text"
+        inputMode={config.inputMode}
+        value={draft}
+        placeholder={placeholder ?? config.placeholder}
+        onChange={(e) => setDraft(config.mask(e.target.value))}
+        onBlur={() => {
+          setTouched(true);
+          onSave(draft);
+        }}
+        className="w-full border border-line rounded-sm px-3 py-2 text-sm"
+      />
+      {showError && <p className="text-xs text-brick mt-1">{config.errorMessage}</p>}
+    </div>
+  );
+}
+
+function DateQuestion({ value, onSave }: { value: string; onSave: (value: string) => void }) {
+  return (
+    <div className="max-w-xs">
+      {!value && <p className="text-xs text-muted mb-1">Select a date — this field is blank until you choose one.</p>}
+      <DateField value={value} onChange={onSave} />
+    </div>
   );
 }
