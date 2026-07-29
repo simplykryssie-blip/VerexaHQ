@@ -11,6 +11,8 @@ const TABS = [
   { href: "/admin/platform/early-access/features", label: "Features" },
   { href: "/admin/platform/early-access/announcements", label: "Announcements" },
   { href: "/admin/platform/early-access/surveys", label: "Surveys" },
+  { href: "/admin/platform/early-access/templates", label: "Templates" },
+  { href: "/admin/platform/early-access/resources", label: "Resources" },
   { href: "/admin/platform/early-access/activity", label: "Activity" },
   { href: "/admin/platform/early-access/settings", label: "Settings" },
 ];

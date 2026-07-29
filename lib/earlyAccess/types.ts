@@ -263,6 +263,33 @@ export type EarlyAccessActivityLog = {
   created_at: string;
 };
 
+export type ApplicationQuestionType =
+  | "text"
+  | "email"
+  | "tel"
+  | "url"
+  | "number"
+  | "textarea"
+  | "boolean"
+  | "multiselect";
+
+export type ApplicationQuestion = {
+  key: string;
+  type: ApplicationQuestionType;
+  label: string;
+  required: boolean;
+  options?: string[];
+};
+
+export type SupportProcess = {
+  instructions: string[];
+  support_email: string;
+  primary_channel: string;
+  critical_definition: string;
+  critical_response_target: string;
+  standard_response_target: string;
+};
+
 export type EarlyAccessSettings = {
   id: string;
   campaign_id: string;
@@ -274,9 +301,42 @@ export type EarlyAccessSettings = {
   onboarding_steps: string[];
   support_email: string | null;
   feedback_email: string | null;
-  application_questions: unknown[];
-  support_process: Record<string, unknown>;
-  known_limitations: unknown[];
+  application_questions: ApplicationQuestion[];
+  support_process: SupportProcess | Record<string, never>;
+  known_limitations: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type MessageTemplateChannel = "email" | "sms" | "in_app";
+export type MessageTemplateStatus = "draft" | "active" | "archived";
+
+export type EarlyAccessMessageTemplate = {
+  id: string;
+  campaign_id: string;
+  template_key: string;
+  channel: MessageTemplateChannel;
+  subject: string | null;
+  body: string;
+  status: MessageTemplateStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ResourceType = "guide" | "policy" | "faq" | "checklist" | "known_issues" | "support";
+export type ResourceStatus = "draft" | "published" | "archived";
+
+export type EarlyAccessResource = {
+  id: string;
+  campaign_id: string;
+  resource_key: string;
+  title: string;
+  content: string;
+  resource_type: ResourceType;
+  status: ResourceStatus;
+  sort_order: number;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 };

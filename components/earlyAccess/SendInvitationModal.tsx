@@ -7,6 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { sendEmail, getProviderStatus } from "@/lib/notify";
 import { friendlyError } from "@/lib/friendlyError";
 import { logAdminActivity } from "@/lib/earlyAccess/logActivity";
+import { mergeTemplate } from "@/lib/earlyAccess/mergeTemplate";
+import type { EarlyAccessMessageTemplate } from "@/lib/earlyAccess/types";
 
 export default function SendInvitationModal({
   campaignId,
@@ -32,10 +34,20 @@ export default function SendInvitationModal({
   const [emailConfigured, setEmailConfigured] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [emailSendError, setEmailSendError] = useState<string | null>(null);
+  const [template, setTemplate] = useState<EarlyAccessMessageTemplate | null>(null);
 
   useEffect(() => {
     getProviderStatus().then((s) => setEmailConfigured(s.email));
-  }, []);
+    supabase
+      .from("early_access_message_templates")
+      .select("*")
+      .eq("campaign_id", campaignId)
+      .eq("template_key", "beta_invitation")
+      .eq("channel", "email")
+      .eq("status", "active")
+      .maybeSingle()
+      .then(({ data }) => setTemplate(data as EarlyAccessMessageTemplate | null));
+  }, [campaignId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +60,7 @@ export default function SendInvitationModal({
       body: JSON.stringify({ campaignId, applicationId: applicationId ?? null, email, expiresInDays }),
     });
     const result = (await res.json().catch(() => null)) as
-      | { ok: true; invitation: { id: string }; token: string }
+      | { ok: true; invitation: { id: string; expires_at: string }; token: string }
       | { ok: false; error: string }
       | null;
 
@@ -69,14 +81,28 @@ export default function SendInvitationModal({
     });
 
     if (emailConfigured) {
-      const sendResult = await sendEmail(
-        email,
-        `You're invited to the ${campaignName}`,
-        `<p>Hi,</p>
-         <p>You've been invited to join the ${campaignName}. Click the link below to accept:</p>
-         <p><a href="${link}">${link}</a></p>
-         <p>This invitation expires in ${expiresInDays} days.</p>`,
-      );
+      let ownerName = "";
+      if (applicationId) {
+        const { data: application } = await supabase
+          .from("early_access_applications")
+          .select("owner_name")
+          .eq("id", applicationId)
+          .maybeSingle();
+        ownerName = application?.owner_name ?? "";
+      }
+      const mergeVars = {
+        owner_name: ownerName || "there",
+        invitation_url: link,
+        expires_at: new Date(result.invitation.expires_at).toLocaleDateString(),
+      };
+      const subject = template
+        ? mergeTemplate(template.subject ?? `You're invited to the ${campaignName}`, mergeVars)
+        : `You're invited to the ${campaignName}`;
+      const body = template
+        ? mergeTemplate(template.body, mergeVars).replace(/\n/g, "<br/>")
+        : `<p>You've been invited to join the ${campaignName}. Click the link below to accept:</p><p><a href="${link}">${link}</a></p>`;
+
+      const sendResult = await sendEmail(email, subject, body);
       if (sendResult.sent) {
         setEmailSent(true);
         await supabase
@@ -132,6 +158,12 @@ export default function SendInvitationModal({
                 ? "This creates a real invitation and emails the link automatically."
                 : "This creates a real invitation. No email provider is connected yet, so you'll need to share the link yourself once it's generated."}
             </p>
+            {emailConfigured && !template && (
+              <p className="text-xs text-amber-700">
+                No active &quot;beta_invitation&quot; email template found — a generic message will be sent instead.
+                Manage templates on the Templates tab.
+              </p>
+            )}
             {error && (
               <div className="rounded-sm border border-brick/30 bg-brick/10 px-3 py-2 text-xs text-brick">
                 {error}
