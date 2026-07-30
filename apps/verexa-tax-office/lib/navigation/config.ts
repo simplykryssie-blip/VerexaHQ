@@ -27,6 +27,7 @@ import {
   LayoutTemplate,
   Wallet,
   ScrollText,
+  Handshake,
 } from "lucide-react";
 import type { Capability } from "@/lib/permissions/capabilities";
 
@@ -101,6 +102,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: "Integrations", href: "/settings/integrations", icon: Plug, requires: "manage_integrations" },
       { label: "Templates", href: "/templates", icon: LayoutTemplate, requires: "manage_templates" },
       { label: "Subscription", href: "/settings/subscription", icon: Wallet, requires: "manage_workspace" },
+      { label: "Workspace Relationships", href: "/relationships", icon: Handshake, requires: "manage_workspace" },
       { label: "Audit Logs", href: "/audit-logs", icon: ScrollText, requires: "manage_workspace" },
     ],
   },
