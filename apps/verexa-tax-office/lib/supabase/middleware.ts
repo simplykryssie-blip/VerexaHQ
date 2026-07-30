@@ -36,9 +36,16 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/reset-password") ||
     pathname.startsWith("/auth");
   const isPortalRoute = pathname.startsWith("/portal");
-  const isPublicRoute = pathname === "/" || pathname.startsWith("/api");
+  const isPortalAuthRoute =
+    pathname.startsWith("/portal/sign-in") ||
+    pathname.startsWith("/portal/forgot-password") ||
+    pathname.startsWith("/portal/reset-password");
+  // Magic-link signing never requires a portal login — the single-use token
+  // itself is the credential, matching the redeem_signature_token RPC.
+  const isPortalPublicRoute = pathname.startsWith("/portal/sign/");
+  const isPublicRoute = pathname === "/" || pathname.startsWith("/api") || isPortalPublicRoute;
 
-  if (!user && !isAuthRoute && !isPublicRoute) {
+  if (!user && !isAuthRoute && !isPortalAuthRoute && !isPublicRoute) {
     const redirectTo = isPortalRoute ? "/portal/sign-in" : "/sign-in";
     const url = request.nextUrl.clone();
     url.pathname = redirectTo;

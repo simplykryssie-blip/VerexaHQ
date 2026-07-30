@@ -30,3 +30,9 @@ export async function signOutAction() {
   cookieStore.delete(SELECTED_WORKSPACE_COOKIE);
   redirect("/sign-in");
 }
+
+export async function portalSignOutAction() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/portal/sign-in");
+}

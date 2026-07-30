@@ -44,7 +44,7 @@ export default async function IntakePage({ searchParams }: { searchParams: Promi
           <h1 className="text-2xl font-semibold tracking-tight">Intake Organizers</h1>
           <p className="text-sm text-muted-foreground mt-1">Assign, track, and review client intake organizers.</p>
         </div>
-        <AssignOrganizerDialog templates={templates} clients={clientOptions} />
+        <AssignOrganizerDialog workspaceId={workspaceId} templates={templates} clients={clientOptions} />
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">

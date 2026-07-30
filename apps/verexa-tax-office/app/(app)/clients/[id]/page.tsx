@@ -11,6 +11,7 @@ import { ClientContactsTab } from "@/features/clients/client-contacts-tab";
 import { ClientNotesTab } from "@/features/clients/client-notes-tab";
 import { ClientActivityTab } from "@/features/clients/client-activity-tab";
 import { ClientCommunicationPreferences } from "@/features/clients/communication-preferences";
+import { PortalInviteButton } from "@/features/clients/portal-invite-button";
 import { AssignOrganizerDialog } from "@/features/intake/assign-organizer-dialog";
 import { getOrganizerTemplates, getIntakeSubmissionsForWorkspace } from "@/features/intake/queries";
 import { getDocuments, getDocumentCategories } from "@/features/documents/queries";
@@ -78,6 +79,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <span className="text-xs text-muted-foreground capitalize">Portal: {client.portal_status.replace("_", " ")}</span>
           </div>
         </div>
+        <PortalInviteButton clientId={client.id} portalStatus={client.portal_status} hasEmail={!!client.email} />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -176,7 +178,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <TabsContent value="intake">
           <div className="space-y-3">
             <div className="flex items-center justify-end">
-              <AssignOrganizerDialog templates={organizerTemplates} fixedClientId={client.id} />
+              <AssignOrganizerDialog workspaceId={client.workspace_id} templates={organizerTemplates} fixedClientId={client.id} />
             </div>
             {intakeSubmissions.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No intake organizers assigned to this client yet.</p>

@@ -16,12 +16,14 @@ import { friendlyDbError } from "@/lib/errors";
 import { toast } from "@/components/ui/toaster";
 
 export function AssignOrganizerDialog({
+  workspaceId,
   templates,
   clients,
   fixedClientId,
   trigger,
 }: {
-  templates: { id: string; name: string; is_system_template: boolean }[];
+  workspaceId: string;
+  templates: { id: string; name: string; is_system_template: boolean; latest_published_version_id: string | null }[];
   clients?: PickerOption[];
   fixedClientId?: string;
   trigger?: React.ReactNode;
@@ -42,25 +44,46 @@ export function AssignOrganizerDialog({
       setError("Choose a client and an organizer template.");
       return;
     }
+    const template = templates.find((t) => t.id === templateId);
+    if (!template?.latest_published_version_id) {
+      setError("That template has no published version to assign.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     const supabase = createClient();
-    const { data, error: rpcError } = await supabase.rpc("assign_form_to_client", {
-      p_client_id: clientId,
-      p_template_id: templateId,
-      p_service_id: undefined,
-      p_due_date: dueDate || undefined,
-      p_client_message: clientMessage || undefined,
-      p_internal_notes: internalNotes || undefined,
-    });
-    setSubmitting(false);
-    if (rpcError || !data) {
-      setError(friendlyDbError(rpcError?.message));
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const { data: submission, error: insertError } = await supabase
+      .from("intake_submissions")
+      .insert({
+        workspace_id: workspaceId,
+        client_id: clientId,
+        template_id: templateId,
+        template_version_id: template.latest_published_version_id,
+        due_date: dueDate || null,
+        assigned_by: user?.id ?? null,
+        metadata: { client_message: clientMessage || null, internal_notes: internalNotes || null },
+      })
+      .select("id")
+      .single();
+    if (insertError || !submission) {
+      setSubmitting(false);
+      setError(friendlyDbError(insertError?.message));
       return;
     }
+    await supabase.from("notifications").insert({
+      workspace_id: workspaceId,
+      client_id: clientId,
+      type: "form_assigned",
+      title: "New organizer assigned",
+      message: `${template.name} has been assigned to you.`,
+    });
+    setSubmitting(false);
     toast.success("Organizer assigned to client");
     setOpen(false);
-    router.push(`/intake/${data}`);
+    router.push(`/intake/${submission.id}`);
     router.refresh();
   }
 
