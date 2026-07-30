@@ -9,6 +9,17 @@ import { CLIENT_STATUS_LABELS, CLIENT_TYPE_LABELS } from "@/lib/validation/clien
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { ClientContactsTab } from "@/features/clients/client-contacts-tab";
 import { ClientNotesTab } from "@/features/clients/client-notes-tab";
+import { ClientActivityTab } from "@/features/clients/client-activity-tab";
+import { AssignOrganizerDialog } from "@/features/intake/assign-organizer-dialog";
+import { getOrganizerTemplates, getIntakeSubmissionsForWorkspace } from "@/features/intake/queries";
+import { getDocuments, getDocumentCategories } from "@/features/documents/queries";
+import { DocumentsTable } from "@/features/documents/documents-table";
+import { UploadDocumentDialog } from "@/features/documents/upload-dialog";
+import { getTasks } from "@/features/tasks/queries";
+import { TaskListView } from "@/features/tasks/task-views";
+import { TaskFormDialog } from "@/features/tasks/task-form-dialog";
+import { intakeStatusLabel } from "@/lib/validation/intake";
+import type { PickerOption } from "@/features/engagements/client-picker";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -26,6 +37,24 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   ]);
 
   if (!client) notFound();
+
+  const [intakeSubmissions, organizerTemplates, documents, documentCategories, tasks, { data: staffMembers }] = await Promise.all([
+    getIntakeSubmissionsForWorkspace(client.workspace_id, { clientId: id }),
+    getOrganizerTemplates(client.workspace_id),
+    getDocuments(client.workspace_id, { clientId: id }),
+    getDocumentCategories(),
+    getTasks(client.workspace_id, { clientId: id }),
+    supabase
+      .from("workspace_members")
+      .select("user_id, profile:user_profiles(display_name, first_name, last_name)")
+      .eq("workspace_id", client.workspace_id)
+      .eq("status", "active"),
+  ]);
+
+  const staffOptions: PickerOption[] = (staffMembers ?? []).map((s) => {
+    const profile = s.profile as { display_name?: string | null; first_name?: string | null; last_name?: string | null } | null;
+    return { id: s.user_id, label: profile?.display_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "Team member" };
+  });
 
   const displayName = client.company || `${client.first_name} ${client.last_name}`.trim();
   const openBalance = (engagements ?? []).reduce((sum, e) => sum + Number(e.balance_due ?? 0), 0);
@@ -63,7 +92,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="engagements">Tax Engagements</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
-          <TabsTrigger value="more">More</TabsTrigger>
+          <TabsTrigger value="intake">Intake</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -138,13 +170,54 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <ClientNotesTab clientId={client.id} notes={client.notes} />
         </TabsContent>
 
-        <TabsContent value="more">
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              Household, Intake, Documents, Tasks, Messages, Appointments, Billing, Signatures, and Activity
-              tabs land with their respective modules later in this build.
-            </CardContent>
-          </Card>
+        <TabsContent value="intake">
+          <div className="space-y-3">
+            <div className="flex items-center justify-end">
+              <AssignOrganizerDialog templates={organizerTemplates} fixedClientId={client.id} />
+            </div>
+            {intakeSubmissions.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">No intake organizers assigned to this client yet.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+                {intakeSubmissions.map((s) => {
+                  const template = s.template as { name?: string } | null;
+                  return (
+                    <li key={s.id} className="p-3 flex items-center justify-between gap-3 text-sm">
+                      <Link href={`/intake/${s.id}`} className="font-medium hover:underline">
+                        {template?.name ?? "Intake organizer"}
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{intakeStatusLabel(s.status)}</Badge>
+                        <span className="text-xs text-muted-foreground">{Math.round(Number(s.progress_percent ?? 0))}%</span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <div className="space-y-3">
+            <div className="flex items-center justify-end">
+              <UploadDocumentDialog workspaceId={client.workspace_id} clientId={client.id} categories={documentCategories} />
+            </div>
+            <DocumentsTable documents={documents} showClient={false} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="tasks">
+          <div className="space-y-3">
+            <div className="flex items-center justify-end">
+              <TaskFormDialog workspaceId={client.workspace_id} staff={staffOptions} clientId={client.id} />
+            </div>
+            <TaskListView tasks={tasks} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="activity">
+          <ClientActivityTab clientId={client.id} />
         </TabsContent>
       </Tabs>
     </div>
