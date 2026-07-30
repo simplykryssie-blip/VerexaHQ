@@ -4,6 +4,8 @@ import { getUserMemberships, getSelectedWorkspaceId } from "@/lib/auth/workspace
 import { WorkspaceProvider, type WorkspaceContextValue } from "@/components/providers/workspace-provider";
 import { Sidebar } from "@/components/app-shell/sidebar";
 import { Header } from "@/components/app-shell/header";
+import { getUnreadNotificationCount } from "@/features/notifications/queries";
+import { getTotalUnreadCount } from "@/features/messages/queries";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -30,6 +32,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const fullName = profile?.display_name || [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || null;
 
+  const [unreadNotifications, unreadMessages] = await Promise.all([
+    getUnreadNotificationCount(active.workspace.id),
+    getTotalUnreadCount(active.workspace.id),
+  ]);
+
   const contextValue: WorkspaceContextValue = {
     workspace: active.workspace,
     role: active.role,
@@ -42,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex h-screen overflow-hidden bg-secondary/30">
         <Sidebar />
         <div className="flex flex-1 flex-col min-w-0">
-          <Header />
+          <Header unreadNotifications={unreadNotifications} unreadMessages={unreadMessages} />
           <main className="flex-1 overflow-y-auto">
             <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
           </main>

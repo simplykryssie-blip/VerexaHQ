@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from "@/lib/formatters";
 import { ClientContactsTab } from "@/features/clients/client-contacts-tab";
 import { ClientNotesTab } from "@/features/clients/client-notes-tab";
 import { ClientActivityTab } from "@/features/clients/client-activity-tab";
+import { ClientCommunicationPreferences } from "@/features/clients/communication-preferences";
 import { AssignOrganizerDialog } from "@/features/intake/assign-organizer-dialog";
 import { getOrganizerTemplates, getIntakeSubmissionsForWorkspace } from "@/features/intake/queries";
 import { getDocuments, getDocumentCategories } from "@/features/documents/queries";
@@ -38,7 +39,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   if (!client) notFound();
 
-  const [intakeSubmissions, organizerTemplates, documents, documentCategories, tasks, { data: staffMembers }] = await Promise.all([
+  const [intakeSubmissions, organizerTemplates, documents, documentCategories, tasks, { data: staffMembers }, { data: communicationPreferences }] = await Promise.all([
     getIntakeSubmissionsForWorkspace(client.workspace_id, { clientId: id }),
     getOrganizerTemplates(client.workspace_id),
     getDocuments(client.workspace_id, { clientId: id }),
@@ -49,6 +50,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       .select("user_id, profile:user_profiles(display_name, first_name, last_name)")
       .eq("workspace_id", client.workspace_id)
       .eq("status", "active"),
+    supabase.from("client_communication_preferences").select("*").eq("client_id", id).maybeSingle(),
   ]);
 
   const staffOptions: PickerOption[] = (staffMembers ?? []).map((s) => {
@@ -116,8 +118,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </Card>
         </TabsContent>
 
-        <TabsContent value="contacts">
+        <TabsContent value="contacts" className="space-y-4">
           <ClientContactsTab clientId={client.id} workspaceId={client.workspace_id} contacts={contacts ?? []} />
+          <ClientCommunicationPreferences workspaceId={client.workspace_id} clientId={client.id} preferences={communicationPreferences} />
         </TabsContent>
 
         <TabsContent value="services">

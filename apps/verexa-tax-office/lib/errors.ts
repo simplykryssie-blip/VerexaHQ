@@ -20,6 +20,7 @@ export function friendlyAuthError(message: string | undefined | null): string {
 
 export function friendlyDbError(message: string | undefined | null): string {
   const m = (message || "").toLowerCase();
+  if (m.includes("appointment overlaps")) return "That time overlaps another appointment for this staff member. Choose a different time.";
   if (m.includes("duplicate key") || m.includes("already exists"))
     return "A record with that information already exists.";
   if (m.includes("row-level security") || m.includes("permission denied"))
