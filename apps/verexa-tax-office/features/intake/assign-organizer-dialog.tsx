@@ -55,22 +55,26 @@ export function AssignOrganizerDialog({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const { data: submission, error: insertError } = await supabase
-      .from("intake_submissions")
-      .insert({
-        workspace_id: workspaceId,
-        client_id: clientId,
-        template_id: templateId,
-        template_version_id: template.latest_published_version_id,
-        due_date: dueDate || null,
-        assigned_by: user?.id ?? null,
-        metadata: { client_message: clientMessage || null, internal_notes: internalNotes || null },
-      })
-      .select("id")
-      .single();
-    if (insertError || !submission) {
+    // Generate the id client-side and skip .select() on the insert:
+    // intake_submissions' SELECT policy resolves only through a
+    // self-referential can_access_intake_submission(id) function, which
+    // can't see a row inserted by the same statement, so
+    // INSERT ... RETURNING reliably fails RLS even for an authorized staff
+    // caller. Knowing the id up front sidesteps it.
+    const submissionId = crypto.randomUUID();
+    const { error: insertError } = await supabase.from("intake_submissions").insert({
+      id: submissionId,
+      workspace_id: workspaceId,
+      client_id: clientId,
+      template_id: templateId,
+      template_version_id: template.latest_published_version_id,
+      due_date: dueDate || null,
+      assigned_by: user?.id ?? null,
+      metadata: { client_message: clientMessage || null, internal_notes: internalNotes || null },
+    });
+    if (insertError) {
       setSubmitting(false);
-      setError(friendlyDbError(insertError?.message));
+      setError(friendlyDbError(insertError.message));
       return;
     }
     await supabase.from("notifications").insert({
@@ -83,7 +87,7 @@ export function AssignOrganizerDialog({
     setSubmitting(false);
     toast.success("Organizer assigned to client");
     setOpen(false);
-    router.push(`/intake/${submission.id}`);
+    router.push(`/intake/${submissionId}`);
     router.refresh();
   }
 

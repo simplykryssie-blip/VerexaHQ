@@ -188,28 +188,32 @@ function AttachmentPickerDialog({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const { data: doc, error } = await supabase
-      .from("documents")
-      .insert({
-        workspace_id: workspaceId,
-        client_id: clientId,
-        bucket_id: "tax-client-documents",
-        storage_path: path,
-        original_filename: file.name,
-        display_name: file.name,
-        mime_type: file.type,
-        file_size_bytes: file.size,
-        source: "staff_upload",
-        uploaded_by_user_id: user?.id ?? null,
-      })
-      .select("id, display_name")
-      .single();
+    // Generate the id client-side and skip .select() on the insert:
+    // documents' SELECT policy resolves only through a self-referential
+    // can_access_document(id) function, which can't see a row inserted by
+    // the same statement, so INSERT ... RETURNING reliably fails RLS even
+    // for an authorized staff caller. We already know both id and
+    // display_name, so no round trip is needed either way.
+    const documentId = crypto.randomUUID();
+    const { error } = await supabase.from("documents").insert({
+      id: documentId,
+      workspace_id: workspaceId,
+      client_id: clientId,
+      bucket_id: "tax-client-documents",
+      storage_path: path,
+      original_filename: file.name,
+      display_name: file.name,
+      mime_type: file.type,
+      file_size_bytes: file.size,
+      source: "staff_upload",
+      uploaded_by_user_id: user?.id ?? null,
+    });
     setUploading(false);
-    if (error || !doc) {
-      toast.error(friendlyDbError(error?.message));
+    if (error) {
+      toast.error(friendlyDbError(error.message));
       return;
     }
-    onPick(doc);
+    onPick({ id: documentId, display_name: file.name });
     setOpen(false);
   }
 

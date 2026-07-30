@@ -34,21 +34,25 @@ export function PortalNewConversationDialog({ workspaceId, clientId }: { workspa
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { data: conversation, error: convError } = await supabase
+    // Generate the id client-side and skip .select() on the insert:
+    // conversations' SELECT policy resolves only through a self-referential
+    // can_access_conversation(id) function, which can't see a row inserted
+    // by the same statement, so INSERT ... RETURNING reliably fails RLS
+    // even for an authorized caller. Knowing the id up front sidesteps it.
+    const conversationId = crypto.randomUUID();
+    const { error: convError } = await supabase
       .from("conversations")
-      .insert({ workspace_id: workspaceId, client_id: clientId, subject: subject || null, created_by: user?.id ?? null })
-      .select("id")
-      .single();
+      .insert({ id: conversationId, workspace_id: workspaceId, client_id: clientId, subject: subject || null, created_by: user?.id ?? null });
 
-    if (convError || !conversation) {
-      setError(friendlyDbError(convError?.message));
+    if (convError) {
+      setError(friendlyDbError(convError.message));
       setSubmitting(false);
       return;
     }
 
     const { error: msgError } = await supabase.from("messages").insert({
       workspace_id: workspaceId,
-      conversation_id: conversation.id,
+      conversation_id: conversationId,
       sender_user_id: user!.id,
       sender_type: "client",
       body: body.trim(),
@@ -62,7 +66,7 @@ export function PortalNewConversationDialog({ workspaceId, clientId }: { workspa
     }
     toast.success("Message sent");
     setOpen(false);
-    router.push(`/portal/messages/${conversation.id}`);
+    router.push(`/portal/messages/${conversationId}`);
   }
 
   return (

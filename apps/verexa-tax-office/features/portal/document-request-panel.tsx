@@ -133,36 +133,39 @@ function ItemCard({
       return;
     }
 
-    const { data: doc, error: insertError } = await supabase
-      .from("documents")
-      .insert({
-        workspace_id: workspaceId,
-        client_id: clientId,
-        category_id: item.category_id,
-        request_item_id: item.id,
-        bucket_id: "tax-client-documents",
-        storage_path: path,
-        original_filename: file.name,
-        display_name: item.custom_label || item.document_label || file.name,
-        file_extension: ext ?? null,
-        mime_type: file.type,
-        file_size_bytes: file.size,
-        status: "uploaded",
-        visibility: "client_and_staff",
-        source: "client_upload",
-        uploaded_by_user_id: user?.id ?? null,
-        tax_year: item.tax_year,
-      })
-      .select("id")
-      .single();
+    // Generate the id client-side and skip .select() on the insert:
+    // documents' SELECT policy resolves only through a self-referential
+    // can_access_document(id) function, which can't see a row inserted by
+    // the same statement, so INSERT ... RETURNING reliably fails RLS even
+    // for an authorized portal caller. Knowing the id up front sidesteps it.
+    const documentId = crypto.randomUUID();
+    const { error: insertError } = await supabase.from("documents").insert({
+      id: documentId,
+      workspace_id: workspaceId,
+      client_id: clientId,
+      category_id: item.category_id,
+      request_item_id: item.id,
+      bucket_id: "tax-client-documents",
+      storage_path: path,
+      original_filename: file.name,
+      display_name: item.custom_label || item.document_label || file.name,
+      file_extension: ext ?? null,
+      mime_type: file.type,
+      file_size_bytes: file.size,
+      status: "uploaded",
+      visibility: "client_and_staff",
+      source: "client_upload",
+      uploaded_by_user_id: user?.id ?? null,
+      tax_year: item.tax_year,
+    });
 
-    if (insertError || !doc) {
-      setError(friendlyDbError(insertError?.message));
+    if (insertError) {
+      setError(friendlyDbError(insertError.message));
       setUploading(false);
       return;
     }
 
-    await supabase.from("document_access_logs").insert({ workspace_id: workspaceId, document_id: doc.id, actor_user_id: user?.id ?? null, action: "upload" });
+    await supabase.from("document_access_logs").insert({ workspace_id: workspaceId, document_id: documentId, actor_user_id: user?.id ?? null, action: "upload" });
 
     setUploading(false);
     toast.success("File uploaded");
