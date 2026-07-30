@@ -4,10 +4,20 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EngagementStatusSelect } from "@/features/engagements/status-select";
 import { engagementStatusLabel } from "@/lib/validation/engagements";
 import { formatCurrency, formatDate, formatDateTime, titleCase } from "@/lib/formatters";
+import { getDocuments, getDocumentCategories } from "@/features/documents/queries";
+import { DocumentsTable } from "@/features/documents/documents-table";
+import { UploadDocumentDialog } from "@/features/documents/upload-dialog";
+import { getSignatureRequests } from "@/features/signatures/queries";
+import { signatureRequestStatusLabel } from "@/lib/validation/signatures";
+import { getInvoices } from "@/features/billing/queries";
+import { invoiceStatusLabel } from "@/lib/validation/billing";
+import { ReturnReleasePanel } from "@/features/engagements/return-release-panel";
+import { EfilePanel } from "@/features/engagements/efile-panel";
 
 export default async function EngagementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,6 +40,15 @@ export default async function EngagementDetailPage({ params }: { params: Promise
   if (!engagement) notFound();
   const client = engagement.client as { id: string; first_name?: string; last_name?: string; company?: string } | null;
   const household = engagement.household as { id: string; household_name?: string } | null;
+
+  const [documents, documentCategories, signatureRequests, invoices, { data: releaseControls }, { data: efileEvents }] = await Promise.all([
+    getDocuments(engagement.workspace_id, { engagementId: id }),
+    getDocumentCategories(),
+    getSignatureRequests(engagement.workspace_id, { engagementId: id }),
+    getInvoices(engagement.workspace_id, { engagementId: id }),
+    supabase.from("return_release_controls").select("*").eq("engagement_id", id).maybeSingle(),
+    supabase.from("efile_events").select("*").eq("engagement_id", id).order("occurred_at", { ascending: true }),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -64,7 +83,11 @@ export default async function EngagementDetailPage({ params }: { params: Promise
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="more">More</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="signatures">Signatures</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="release">Release</TabsTrigger>
+          <TabsTrigger value="efile">E-file</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -125,13 +148,72 @@ export default async function EngagementDetailPage({ params }: { params: Promise
           </Card>
         </TabsContent>
 
-        <TabsContent value="more">
-          <Card>
-            <CardContent className="p-6 text-sm text-muted-foreground">
-              Organizer, Documents, Document Requests, Preparation, Review, Tasks, Messages, Billing,
-              Signatures, and E-file History tabs land with their respective modules later in this build.
-            </CardContent>
-          </Card>
+        <TabsContent value="documents">
+          <div className="space-y-3">
+            <div className="flex items-center justify-end">
+              <UploadDocumentDialog workspaceId={engagement.workspace_id} clientId={engagement.client_id} engagementId={engagement.id} categories={documentCategories} />
+            </div>
+            <DocumentsTable documents={documents} showClient={false} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="signatures">
+          <div className="space-y-3">
+            <div className="flex items-center justify-end">
+              <Button asChild variant="brand" size="sm">
+                <Link href="/signatures/new">New signature request</Link>
+              </Button>
+            </div>
+            {signatureRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">No signature requests for this engagement yet.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+                {signatureRequests.map((r) => (
+                  <li key={r.id} className="p-3 flex items-center justify-between text-sm">
+                    <Link href={`/signatures/${r.id}`} className="font-medium hover:underline">
+                      {r.title}
+                    </Link>
+                    <Badge variant="secondary">{signatureRequestStatusLabel(r.status)}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="billing">
+          <div className="space-y-3">
+            <div className="flex items-center justify-end">
+              <Button asChild variant="brand" size="sm">
+                <Link href="/invoices/new">New invoice</Link>
+              </Button>
+            </div>
+            {invoices.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">No invoices for this engagement yet.</p>
+            ) : (
+              <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+                {invoices.map((inv) => (
+                  <li key={inv.id} className="p-3 flex items-center justify-between text-sm">
+                    <Link href={`/invoices/${inv.id}`} className="font-medium hover:underline">
+                      {inv.invoice_number}
+                    </Link>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{formatCurrency(inv.balance_due)} due</span>
+                      <Badge variant="secondary">{invoiceStatusLabel(inv.status)}</Badge>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="release">
+          <ReturnReleasePanel engagementId={engagement.id} initialControls={releaseControls} />
+        </TabsContent>
+
+        <TabsContent value="efile">
+          <EfilePanel workspaceId={engagement.workspace_id} engagementId={engagement.id} events={efileEvents ?? []} />
         </TabsContent>
       </Tabs>
     </div>
