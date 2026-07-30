@@ -274,19 +274,14 @@ export default function BrandCenter() {
             <Field label="Watermark"><input className="brand-input" value={profile.watermark_text} onChange={(e) => update("watermark_text", e.target.value)} placeholder="DRAFT or CONFIDENTIAL" /></Field>
           </div>
 
-          <div className="mt-5 rounded-xl border border-line p-4">
-            {canRemoveBranding ? (
+          {canRemoveBranding && (
+            <div className="mt-5 rounded-xl border border-line p-4">
               <label className="flex items-center gap-3 text-sm font-semibold text-ink">
                 <input type="checkbox" checked={profile.show_powered_by} onChange={(e) => update("show_powered_by", e.target.checked)} />
                 Show &ldquo;Powered by VerexaHQ&rdquo;
               </label>
-            ) : (
-              <p className="text-sm text-muted">
-                <span className="font-semibold text-ink">&ldquo;Powered by VerexaHQ&rdquo; is required on your current plan.</span>{" "}
-                It can only be hidden on the highest available paid plan.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
         </section>
 
         <aside className="rounded-2xl border border-line bg-[#edf6f2] p-4">
