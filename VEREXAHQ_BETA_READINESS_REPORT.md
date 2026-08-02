@@ -116,3 +116,40 @@ Engagement messaging (`secure_messages`) now works correctly after the `sender_t
 ## Go / No-Go Recommendation
 
 **Conditional Go.** The core staff-facing workflow (create client → assign service → generate workflow → manage tasks/documents → invoice → record payment → message client → complete engagement) is solid, tested end-to-end via code trace, and free of the bugs found. The client-portal invoice/payment gap is the one item worth a decision before beta: if clients are expected to self-serve their invoices inside the portal, that's a blocker; if staff-initiated payment links are an acceptable interim experience for a beta cohort, this can ship now with that gap called out to users/support as a known limitation.
+
+---
+
+## 2026-08-02 verification pass
+
+**Scope of this pass:** re-verify current HEAD (`9510023`, "Beta feedback Phase 1") is still healthy, and run a fresh security-advisor sweep against confirmed production (`euxfopzgdmlmgcmmjvic`) that earlier passes had no tooling access to run. This pass had live Supabase MCP access (`list_projects`, `get_advisors`, `execute_sql`), which prior sessions explicitly noted they lacked — used it to check things code-reading alone can't surface: every `anon`/`authenticated`-executable function on production, not just the ones the frontend happens to call.
+
+### Build health — reconfirmed clean
+
+- `npm ci`, `npm run typecheck` (0 errors), `npm run lint` (0 errors, same 14 pre-existing `react-hooks/exhaustive-deps`/`no-img-element` warnings as the July 29 baseline, no new warnings), `npm run build` (clean, all 68 routes compile — up from 41 at the last audit, driven by the "Complete VerexaHQ Early Access platform" and "Beta feedback Phase 1" commits landing since).
+- No code changes were needed this pass — nothing broken was found in application code.
+
+### New finding: a real, live "Public Intake" system with client SSN/EIN data, invisible to every prior audit and to the CRM itself
+
+Running `get_advisors(type: security)` against production surfaced 21 database functions callable by an unauthenticated (`anon`) caller. Most are expected (portal-invite acceptance, the beta-access-code check `app/signup/page.tsx` already uses correctly). Fourteen were not: a complete public tax-intake flow (`intakes`, `intake_return_tokens`, `intake_identity_vault`, `marketing_leads`, and 8 related tables) with **34 real intakes, 34 real marketing leads, and 10 real encrypted SSN/EIN/ITIN records already in production** — and **zero call sites anywhere in this repository's frontend**. Every prior audit's schema inventory was built by grepping this repo's `.from(...)`/`.rpc(...)` calls, so a live, data-bearing system with no frontend reference to it was invisible by construction, not overlooked.
+
+Traced every one of the 14 functions line by line (not just grant-checked): token handling, encryption, and OTP verification all follow the same sound pattern already verified for `client_identity_vault` in earlier passes (hashed tokens, server-side-only encryption key, masked/fingerprinted storage, `service_role`-only table grants, workspace-scoped RLS on the staff-visible tables). Full writeup, the one real gap found (`start_public_intake`/`start_public_business_intake` verify a workspace exists but not that the caller has any relationship to it, and no app-layer rate-limiting is visible from here), and the operational gap (four `staff_*` RPCs exist to bring this data into the CRM — `staff_convert_intake_to_prospective_client` and three others — but have no frontend call sites, so staff have no page to see their own 34 real prospects) are in `FRONTEND_BACKEND_GAPS.md` §4. Nothing was changed — this needs a product decision (is this intake flow paired with this CRM or a separate marketing site; should a Leads/Intake view be built against the existing `staff_*` RPCs) before any code or grant changes are safe to make.
+
+**This is now the single highest-priority item for a genuine beta-readiness decision**, ahead of the client-portal billing gap already logged in July: it's real client PII, already in production, that the product's own staff users cannot currently see.
+
+### Previously logged blockers — reconfirmed still open, no regression
+
+- No `/portal/billing` route exists yet (`app/portal/` still only has `documents`, `login`, `messages`, `organizer`, `todos`, `accept`) — the client-portal invoice/payment gap from the July 29 pass is unchanged.
+- `communication_messages` is still read-only in exactly one place (`app/(app)/clients/[id]/page.tsx`) and still has 0 writers — unchanged from July 29.
+
+### Newer surface area, spot-checked only (not a full line-by-line pass)
+
+The "Complete VerexaHQ Early Access platform" and "Beta feedback Phase 1" commits added real surface area since the last full audit: a 22-route Early Access program-management module (`/early-access/*` for beta participants, `/admin/platform/early-access/*` for platform admins managing applications, agreements, announcements, bug reports, features, invitations, resources, settings, surveys, templates), plus `FirmProfilePanel`, `TeamManagementPanel`, and Templates CRUD in `app/(app)/forms/page.tsx`. Spot-checked for the obvious placeholder pattern (a page with no Supabase call backing it) — none found; every page checked reads/writes real tables via `supabase.from(...)`/`.rpc(...)` or the corresponding `/api/early-access/*` route. This was **not** given the same line-by-line, module-by-module treatment the 12 core CRM modules got in the July 29 pass (role-by-role permission testing, status-literal cross-checks against CHECK constraints, etc.) — treat it as "not known to be broken," not as "verified clean," until it gets that pass.
+
+### Updated Go / No-Go Recommendation
+
+**Conditional Go**, same overall shape as July 29, with the condition list reordered. The core staff-facing CRM workflow remains solid and untouched by this pass. Before calling this beta-ready:
+
+1. **Decide what to do about the Public Intake system** (`FRONTEND_BACKEND_GAPS.md` §4) — at minimum, confirm what currently calls it and whether that caller has its own abuse protection, given the 34 real records already sitting in it that this CRM's staff cannot see.
+2. Client-portal invoice/payment page (carried over from July 29, still open).
+3. A dedicated line-by-line pass over the Early Access module and the other newer additions, using the same rigor as the July 29 module-by-module audit.
+4. A genuine accessibility/UX-polish sweep (still open from July 29).
