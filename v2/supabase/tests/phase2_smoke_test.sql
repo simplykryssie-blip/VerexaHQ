@@ -141,17 +141,19 @@ begin
   assert (select ein_last4 from public.firm_tax_profile where workspace_id = v_ws) = '6789', 'ein_last4 was not derived correctly';
   reset role;
 
-  -- 7. case sharing rejects without an active ERO connection -----------
+  -- 7. engagement sharing rejects without an active ERO connection -----
+  -- (share_case_with_ero was renamed to share_engagement_with_ero in the
+  -- Revision Sprint terminology pass; this test call was updated to match.)
   perform set_config('request.jwt.claims', json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
   set local role authenticated;
   begin
-    perform public.share_case_with_ero(gen_random_uuid(), v_ws, v_other_ws, '{"documents":true}'::jsonb);
-    raise exception 'share_case_with_ero should have been rejected without an active connection';
+    perform public.share_engagement_with_ero(gen_random_uuid(), v_ws, v_other_ws, '{"documents":true}'::jsonb);
+    raise exception 'share_engagement_with_ero should have been rejected without an active connection';
   exception when others then
     v_rejected := true;
   end;
   reset role;
-  assert v_rejected, 'share_case_with_ero did not reject a share with no active firm connection';
+  assert v_rejected, 'share_engagement_with_ero did not reject a share with no active firm connection';
 
   raise notice 'Phase 2 smoke tests passed';
 end $$;

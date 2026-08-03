@@ -116,6 +116,58 @@ no data was lost. `supabase/migrations/0035`-`0043`,
   share-accept flow; narrowed to require a matching pending
   `config_object_shares` row instead of removing the guard.
 
+## Progressive Disclosure -- Verexa UX Standard #001 (backend, complete)
+
+Backend support for "only show what exists, let users add more when
+needed" across the Client Profile, plus a generic auto-save mechanism --
+no rebuild, no duplicated structures, no schema redesign.
+`supabase/migrations/0044`-`0047`,
+`supabase/tests/progressive_disclosure_smoke_test.sql`.
+
+- **Client satellite tables**: `clients` (built in the prior revision)
+  stores exactly one embedded primary email/phone/address -- there was
+  never a repeating structure for a second contact, a seasonal address, or
+  an extra phone. `client_contacts`, `client_addresses`, `client_phones`,
+  and `client_emails` hold only records ADDITIONAL to that primary, so the
+  UI can render "one primary by default, + Add Another" honestly without
+  touching `clients`' existing columns or migrating any data. A partial
+  unique index (`where is_primary`) enforces at most one primary row per
+  client on each of the four tables.
+- **Relationships, not a second "Related Businesses" table**:
+  `client_relationships` covers Spouse/Dependent/Parent/Child/Business/
+  Trust/Estate/Partner/Owner/Officer/Other, optionally pointing at another
+  `clients` row (`related_client_id`) or a bare name (`related_name`) when
+  the related party isn't itself a client -- a check constraint requires
+  one or the other. The UI's "Related Businesses" section is this same
+  table filtered to business-ish relationship types; per the explicit "no
+  duplicate structures" requirement, it does not get its own table.
+- **Portal roster & notes**: `client_portal_users` tracks invite/active/
+  revoked status for "one Primary Portal User, + Invite Additional" (real
+  portal authentication is a later phase -- this is roster tracking only).
+  `client_notes` is free-form, author-or-admin-editable; "recent notes
+  only" is a query-side `ORDER BY created_at desc LIMIT`, not a schema
+  constraint.
+- **Documents**: `client_documents` + a new private `client-documents`
+  storage bucket (unlike Phase 0's public `branding` bucket, client
+  documents must never be reachable by an unauthenticated URL). Lean by
+  design -- no folders/categories/versioning; that's Phase 4. Gated by the
+  existing `documents.view`/`documents.upload`/`documents.delete`
+  permission keys from Phase 0, both on the table and on the storage
+  objects (folder-prefix-by-workspace_id, same pattern as `branding`).
+- **Draft auto-save**: one generic `draft_saves` table instead of nine
+  bespoke ones, covering Client/Engagement/Workflow/Blueprint/Organizer/
+  Document Request/Engagement Letter/Automation/Settings editing. Keyed by
+  `(workspace_id, user_id, draft_type, entity_id)`; `entity_id` is null
+  while editing something not yet created, and Postgres's distinct-NULLs
+  behavior lets two concurrent "new X" drafts coexist without colliding.
+  RLS is owner-only (`user_id = auth.uid()`) -- no RPCs needed, the client
+  upserts and reads directly.
+- **No table needed for**: Engagements/Tasks/Timeline/Dashboard/Reports
+  progressive disclosure -- those are pure "query only what exists, render
+  nothing for an empty result set" UI behavior against tables (or, for
+  Engagements, a future table) that already return exactly the real rows;
+  no schema changes were required or made for them.
+
 ## Applying migrations
 
 Migrations were applied directly to the v2 project via the Supabase MCP

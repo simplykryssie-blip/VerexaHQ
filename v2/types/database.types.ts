@@ -608,6 +608,448 @@ export type Database = {
           },
         ]
       }
+      client_addresses: {
+        Row: {
+          address_type: string
+          city: string | null
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          is_primary: boolean
+          state: string | null
+          street: string | null
+          updated_at: string
+          workspace_id: string
+          zip: string | null
+        }
+        Insert: {
+          address_type?: string
+          city?: string | null
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          state?: string | null
+          street?: string | null
+          updated_at?: string
+          workspace_id: string
+          zip?: string | null
+        }
+        Update: {
+          address_type?: string
+          city?: string | null
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          state?: string | null
+          street?: string | null
+          updated_at?: string
+          workspace_id?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_addresses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_addresses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_contacts: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          email: string | null
+          first_name: string | null
+          id: string
+          is_primary: boolean
+          last_name: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_primary?: boolean
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          title?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_primary?: boolean
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          title?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_contacts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_documents: {
+        Row: {
+          client_id: string
+          created_at: string
+          file_name: string
+          file_size_bytes: number | null
+          id: string
+          mime_type: string | null
+          storage_path: string
+          uploaded_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          file_name: string
+          file_size_bytes?: number | null
+          id?: string
+          mime_type?: string | null
+          storage_path: string
+          uploaded_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          file_name?: string
+          file_size_bytes?: number | null
+          id?: string
+          mime_type?: string | null
+          storage_path?: string
+          uploaded_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_documents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_emails: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          email: string
+          email_type: string
+          id: string
+          is_primary: boolean
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          email: string
+          email_type?: string
+          id?: string
+          is_primary?: boolean
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          email?: string
+          email_type?: string
+          id?: string
+          is_primary?: boolean
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_emails_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_emails_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_notes: {
+        Row: {
+          author_id: string | null
+          body: string
+          client_id: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          client_id: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_notes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_notes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_phones: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          is_primary: boolean
+          phone_number: string
+          phone_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          phone_number: string
+          phone_type?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_primary?: boolean
+          phone_number?: string
+          phone_type?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_phones_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_phones_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_portal_users: {
+        Row: {
+          accepted_at: string | null
+          client_id: string
+          display_order: number
+          id: string
+          invited_at: string
+          invited_by: string | null
+          invited_email: string
+          invited_name: string | null
+          is_primary: boolean
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          client_id: string
+          display_order?: number
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          invited_email: string
+          invited_name?: string | null
+          is_primary?: boolean
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          client_id?: string
+          display_order?: number
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          invited_email?: string
+          invited_name?: string | null
+          is_primary?: boolean
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_portal_users_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_relationships: {
+        Row: {
+          client_id: string
+          created_at: string
+          display_order: number
+          id: string
+          notes: string | null
+          related_client_id: string | null
+          related_name: string | null
+          relationship_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          notes?: string | null
+          related_client_id?: string | null
+          related_name?: string | null
+          relationship_type: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          notes?: string | null
+          related_client_id?: string | null
+          related_name?: string | null
+          relationship_type?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_relationships_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_relationships_related_client_id_fkey"
+            columns: ["related_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_relationships_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_object_shares: {
         Row: {
           accepted_object_id: string | null
@@ -715,6 +1157,47 @@ export type Database = {
           },
           {
             foreignKeyName: "consent_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      draft_saves: {
+        Row: {
+          created_at: string
+          draft_type: string
+          entity_id: string | null
+          id: string
+          payload: Json
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          draft_type: string
+          entity_id?: string | null
+          id?: string
+          payload: Json
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          draft_type?: string
+          entity_id?: string | null
+          id?: string
+          payload?: Json
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "draft_saves_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

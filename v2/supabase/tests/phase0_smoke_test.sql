@@ -25,8 +25,10 @@ declare
   v_rejected boolean := false;
 begin
   -- 1. Seed data sanity ------------------------------------------------
+  -- 5 original Phase 0 roles + 5 added in the Revision Sprint (Reviewer,
+  -- Compliance Officer, Manager, Administrative Staff, Receptionist).
   select count(*) into v_role_count from public.roles where workspace_id is null;
-  assert v_role_count = 5, format('expected 5 system roles, got %s', v_role_count);
+  assert v_role_count = 10, format('expected 10 system roles, got %s', v_role_count);
 
   select count(*) into v_permission_count from public.permissions;
   assert v_permission_count >= 30, format('expected >=30 permissions, got %s', v_permission_count);
