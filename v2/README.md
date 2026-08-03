@@ -17,7 +17,41 @@ v2/
     tests/         -- SQL smoke tests, safe to run directly (self-rollback)
   types/
     database.types.ts -- generated via the Supabase MCP `generate_typescript_types` tool
+  web/
+    -- Next.js 14 app router frontend (see "Frontend" section below)
 ```
+
+## Frontend (`v2/web`)
+
+A standalone Next.js 14 app, wired to this project's Supabase instance
+(`daxpavvsotvsyqqntddc`) via `@supabase/ssr`. `lib/database.types.ts` is a
+synced copy of `v2/types/database.types.ts` -- re-copy after schema changes
+rather than hand-editing it in place.
+
+- Auth: email/password via Supabase Auth, `middleware.ts` redirects
+  unauthenticated requests to `/login`; `/onboarding` calls `create_workspace()`
+  for a user with no workspace yet.
+- Nav: Dashboard, Clients, Engagements, Calendar, Reports, Settings (Firm
+  Profile / Brand Center / Users & Staff / Roles & Permissions / Security /
+  Integrations / Notifications / Workspace Preferences / Audit Logs). Every
+  item either renders live data or an explicit "under development" shell --
+  nothing 404s or renders blank.
+- Reports and Settings > Integrations are intentionally shells: no reporting
+  engine or integrations backend exists yet.
+- `npm run dev` / `npm run build` / `npm run typecheck` from `v2/web`.
+
+**Known environment limitation**: this app was built and validated
+(`tsc`, `next lint`, `next build`) inside a sandboxed session whose outbound
+network egress does not allow `*.supabase.co` -- confirmed via the proxy's
+own diagnostic endpoint, which returned a policy 403 and explicitly said not
+to route around it. That means neither this sandbox's server-side rendering
+nor a browser running inside it can reach the live database, so full
+click-through validation against real data (and hosting a working preview
+from this same sandbox) could not be completed here. The code itself has no
+dependency on this sandbox -- once run somewhere with normal internet access
+(e.g. Vercel, or any environment without this egress restriction), the
+Supabase calls are unremarkable client/server-side fetches with no special
+requirements.
 
 ## Phase 0 -- Platform Foundation (complete)
 

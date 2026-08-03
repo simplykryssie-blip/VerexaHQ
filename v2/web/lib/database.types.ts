@@ -1,3 +1,4 @@
+// Synced from v2/types/database.types.ts -- regenerate/copy after schema changes, do not hand-edit here.
 export type Json =
   | string
   | number
