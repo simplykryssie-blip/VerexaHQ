@@ -345,6 +345,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          estimated_setup_minutes: number | null
           id: string
           name: string
           slug: string
@@ -358,6 +359,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          estimated_setup_minutes?: number | null
           id?: string
           name: string
           slug: string
@@ -371,6 +373,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          estimated_setup_minutes?: number | null
           id?: string
           name?: string
           slug?: string
@@ -476,11 +479,254 @@ export type Database = {
           },
         ]
       }
-      case_shares: {
+      clients: {
         Row: {
-          case_id: string
+          address_line1: string | null
+          address_line2: string | null
+          business_name: string | null
+          city: string | null
+          client_type: string
+          country: string
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          date_of_birth: string | null
+          ein_encrypted: string | null
+          ein_hash: string | null
+          ein_last4: string | null
+          first_name: string | null
+          has_portal_access: boolean
+          id: string
+          itin_encrypted: string | null
+          itin_hash: string | null
+          itin_last4: string | null
+          last_name: string | null
+          lifecycle_status: string
+          merged_into_client_id: string | null
+          normalized_email: string | null
+          normalized_phone: string | null
+          notes: string | null
+          postal_code: string | null
+          primary_email: string | null
+          primary_phone: string | null
+          ssn_encrypted: string | null
+          ssn_hash: string | null
+          ssn_last4: string | null
+          state: string | null
+          tags: string[]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          business_name?: string | null
+          city?: string | null
+          client_type?: string
+          country?: string
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          date_of_birth?: string | null
+          ein_encrypted?: string | null
+          ein_hash?: string | null
+          ein_last4?: string | null
+          first_name?: string | null
+          has_portal_access?: boolean
+          id?: string
+          itin_encrypted?: string | null
+          itin_hash?: string | null
+          itin_last4?: string | null
+          last_name?: string | null
+          lifecycle_status?: string
+          merged_into_client_id?: string | null
+          normalized_email?: string | null
+          normalized_phone?: string | null
+          notes?: string | null
+          postal_code?: string | null
+          primary_email?: string | null
+          primary_phone?: string | null
+          ssn_encrypted?: string | null
+          ssn_hash?: string | null
+          ssn_last4?: string | null
+          state?: string | null
+          tags?: string[]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          business_name?: string | null
+          city?: string | null
+          client_type?: string
+          country?: string
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          date_of_birth?: string | null
+          ein_encrypted?: string | null
+          ein_hash?: string | null
+          ein_last4?: string | null
+          first_name?: string | null
+          has_portal_access?: boolean
+          id?: string
+          itin_encrypted?: string | null
+          itin_hash?: string | null
+          itin_last4?: string | null
+          last_name?: string | null
+          lifecycle_status?: string
+          merged_into_client_id?: string | null
+          normalized_email?: string | null
+          normalized_phone?: string | null
+          notes?: string | null
+          postal_code?: string | null
+          primary_email?: string | null
+          primary_phone?: string | null
+          ssn_encrypted?: string | null
+          ssn_hash?: string | null
+          ssn_last4?: string | null
+          state?: string | null
+          tags?: string[]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clients_merged_into_client_id_fkey"
+            columns: ["merged_into_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      config_object_shares: {
+        Row: {
+          accepted_object_id: string | null
+          created_at: string
+          id: string
+          object_id: string
+          object_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shared_by: string | null
+          shared_by_workspace_id: string
+          shared_with_workspace_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_object_id?: string | null
+          created_at?: string
+          id?: string
+          object_id: string
+          object_type: string
+          responded_at?: string | null
+          responded_by?: string | null
+          shared_by?: string | null
+          shared_by_workspace_id: string
+          shared_with_workspace_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_object_id?: string | null
+          created_at?: string
+          id?: string
+          object_id?: string
+          object_type?: string
+          responded_at?: string | null
+          responded_by?: string | null
+          shared_by?: string | null
+          shared_by_workspace_id?: string
+          shared_with_workspace_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "config_object_shares_shared_by_workspace_id_fkey"
+            columns: ["shared_by_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "config_object_shares_shared_with_workspace_id_fkey"
+            columns: ["shared_with_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consent_records: {
+        Row: {
+          accepted_at: string
+          client_id: string | null
+          consent_type: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string | null
+          version: string
+          workspace_id: string | null
+        }
+        Insert: {
+          accepted_at?: string
+          client_id?: string | null
+          consent_type: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          version: string
+          workspace_id?: string | null
+        }
+        Update: {
+          accepted_at?: string
+          client_id?: string | null
+          consent_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+          version?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consent_records_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_shares: {
+        Row: {
           created_at: string
           decision_notes: string | null
+          engagement_id: string
           expires_at: string | null
           id: string
           reviewed_at: string | null
@@ -493,9 +739,9 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          case_id: string
           created_at?: string
           decision_notes?: string | null
+          engagement_id: string
           expires_at?: string | null
           id?: string
           reviewed_at?: string | null
@@ -508,9 +754,9 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          case_id?: string
           created_at?: string
           decision_notes?: string | null
+          engagement_id?: string
           expires_at?: string | null
           id?: string
           reviewed_at?: string | null
@@ -534,6 +780,174 @@ export type Database = {
             foreignKeyName: "case_shares_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      login_history: {
+        Row: {
+          created_at: string
+          failure_reason: string | null
+          id: string
+          ip_address: string | null
+          success: boolean
+          user_agent: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          success: boolean
+          user_agent?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: string | null
+          success?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "login_history_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trusted_devices: {
+        Row: {
+          device_fingerprint: string
+          device_name: string | null
+          expires_at: string | null
+          id: string
+          last_seen_at: string
+          trusted_at: string
+          user_id: string
+        }
+        Insert: {
+          device_fingerprint: string
+          device_name?: string | null
+          expires_at?: string | null
+          id?: string
+          last_seen_at?: string
+          trusted_at?: string
+          user_id: string
+        }
+        Update: {
+          device_fingerprint?: string
+          device_name?: string | null
+          expires_at?: string | null
+          id?: string
+          last_seen_at?: string
+          trusted_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      workspace_retention_policies: {
+        Row: {
+          archived_clients_retention_days: number | null
+          archived_engagements_retention_days: number | null
+          audit_logs_retention_days: number | null
+          documents_retention_days: number | null
+          messages_retention_days: number | null
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          archived_clients_retention_days?: number | null
+          archived_engagements_retention_days?: number | null
+          audit_logs_retention_days?: number | null
+          documents_retention_days?: number | null
+          messages_retention_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          archived_clients_retention_days?: number | null
+          archived_engagements_retention_days?: number | null
+          audit_logs_retention_days?: number | null
+          documents_retention_days?: number | null
+          messages_retention_days?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_retention_policies_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_security_policies: {
+        Row: {
+          lockout_duration_minutes: number
+          max_failed_login_attempts: number
+          mfa_required: boolean
+          mfa_required_for_roles: string[]
+          password_expiry_days: number | null
+          password_min_length: number
+          password_require_number: boolean
+          password_require_symbol: boolean
+          password_require_uppercase: boolean
+          session_timeout_minutes: number
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          lockout_duration_minutes?: number
+          max_failed_login_attempts?: number
+          mfa_required?: boolean
+          mfa_required_for_roles?: string[]
+          password_expiry_days?: number | null
+          password_min_length?: number
+          password_require_number?: boolean
+          password_require_symbol?: boolean
+          password_require_uppercase?: boolean
+          session_timeout_minutes?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          lockout_duration_minutes?: number
+          max_failed_login_attempts?: number
+          mfa_required?: boolean
+          mfa_required_for_roles?: string[]
+          password_expiry_days?: number | null
+          password_min_length?: number
+          password_require_number?: boolean
+          password_require_symbol?: boolean
+          password_require_uppercase?: boolean
+          session_timeout_minutes?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_security_policies_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -1997,11 +2411,15 @@ export type Database = {
           created_at: string
           default_workspace_id: string | null
           display_name: string | null
+          failed_login_count: number
           first_name: string | null
           id: string
           is_platform_admin: boolean
           last_name: string | null
           last_seen_at: string | null
+          locked_until: string | null
+          mfa_enabled: boolean
+          mfa_enrolled_at: string | null
           phone: string | null
           updated_at: string
         }
@@ -2010,11 +2428,15 @@ export type Database = {
           created_at?: string
           default_workspace_id?: string | null
           display_name?: string | null
+          failed_login_count?: number
           first_name?: string | null
           id: string
           is_platform_admin?: boolean
           last_name?: string | null
           last_seen_at?: string | null
+          locked_until?: string | null
+          mfa_enabled?: boolean
+          mfa_enrolled_at?: string | null
           phone?: string | null
           updated_at?: string
         }
@@ -2023,11 +2445,15 @@ export type Database = {
           created_at?: string
           default_workspace_id?: string | null
           display_name?: string | null
+          failed_login_count?: number
           first_name?: string | null
           id?: string
           is_platform_admin?: boolean
           last_name?: string | null
           last_seen_at?: string | null
+          locked_until?: string | null
+          mfa_enabled?: boolean
+          mfa_enrolled_at?: string | null
           phone?: string | null
           updated_at?: string
         }
@@ -2193,9 +2619,117 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      compliance_consent_status_view: {
+        Row: {
+          accepted_at: string | null
+          client_id: string | null
+          consent_type: string | null
+          id: string | null
+          user_id: string | null
+          version: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_failed_logins_view: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          failure_reason: string | null
+          id: string | null
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_mfa_status_view: {
+        Row: {
+          display_name: string | null
+          mfa_enabled: boolean | null
+          mfa_enrolled_at: string | null
+          role_name: string | null
+          user_id: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_pending_reviews_view: {
+        Row: {
+          created_at: string | null
+          engagement_id: string | null
+          expires_at: string | null
+          id: string | null
+          shared_by: string | null
+          shared_items: Json | null
+          shared_with_workspace_id: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_permission_changes_view: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_security_events_view: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          metadata: Json | null
+          severity: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_sensitive_data_reveals_view: {
+        Row: {
+          action: string | null
+          actor_id: string | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      compliance_shared_engagements_view: {
+        Row: {
+          created_at: string | null
+          decision_notes: string | null
+          engagement_id: string | null
+          expires_at: string | null
+          id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shared_by: string | null
+          shared_with_workspace_id: string | null
+          status: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      accept_config_object_share: {
+        Args: { p_share_id: string }
+        Returns: string
+      }
       accept_workspace_invitation: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -2213,6 +2747,10 @@ export type Database = {
         Args: { p_blueprint_id: string; p_workspace_id: string }
         Returns: string
       }
+      archive_config_object_share: {
+        Args: { p_share_id: string }
+        Returns: undefined
+      }
       compare_config_object_versions: {
         Args: {
           p_id: string
@@ -2222,11 +2760,42 @@ export type Database = {
         }
         Returns: Json
       }
+      compliance_inactive_users: {
+        Args: { p_inactive_since?: string; p_workspace_id: string }
+        Returns: {
+          display_name: string | null
+          last_seen_at: string | null
+          role_name: string | null
+          user_id: string
+          workspace_id: string
+        }[]
+      }
+      create_client: {
+        Args: {
+          p_business_name?: string
+          p_client_type: string
+          p_date_of_birth?: string
+          p_ein?: string
+          p_first_name?: string
+          p_itin?: string
+          p_last_name?: string
+          p_primary_email?: string
+          p_primary_phone?: string
+          p_ssn?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       create_workspace: {
         Args: { p_name: string; p_timezone?: string; p_workspace_type?: string }
         Returns: string
       }
       current_workspace_ids: { Args: never; Returns: string[] }
+      decline_config_object_share: {
+        Args: { p_share_id: string }
+        Returns: undefined
+      }
+      decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_firm_secret: { Args: { p_ciphertext: string }; Returns: string }
       duplicate_config_object: {
         Args: {
@@ -2237,8 +2806,66 @@ export type Database = {
         }
         Returns: string
       }
+      encrypt_client_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_firm_secret: { Args: { p_plaintext: string }; Returns: string }
-      expire_stale_case_shares: { Args: never; Returns: number }
+      expire_stale_engagement_shares: { Args: never; Returns: number }
+      has_config_object_share_access: {
+        Args: { p_id: string; p_table: string }
+        Returns: boolean
+      }
+      is_account_locked: { Args: { p_user_id: string }; Returns: boolean }
+      merge_clients: {
+        Args: { p_duplicate_client_id: string; p_primary_client_id: string }
+        Returns: undefined
+      }
+      record_consent: {
+        Args: {
+          p_client_id?: string
+          p_consent_type: string
+          p_ip_address?: string
+          p_user_agent?: string
+          p_version: string
+          p_workspace_id?: string
+        }
+        Returns: string
+      }
+      record_login_attempt: {
+        Args: {
+          p_failure_reason?: string
+          p_ip_address?: string
+          p_success: boolean
+          p_user_agent?: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
+      reveal_client_itin: { Args: { p_client_id: string }; Returns: string }
+      reveal_client_ssn: { Args: { p_client_id: string }; Returns: string }
+      share_config_object: {
+        Args: { p_id: string; p_shared_with_workspace_id: string; p_table: string }
+        Returns: string
+      }
+      share_engagement_with_ero: {
+        Args: {
+          p_engagement_id: string
+          p_expires_in_days?: number
+          p_shared_items?: Json
+          p_shared_with_workspace_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      set_workspace_capabilities: {
+        Args: {
+          p_is_ero: boolean
+          p_is_ptin_preparer: boolean
+          p_is_service_bureau: boolean
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       get_config_object_versions: {
         Args: { p_id: string; p_table: string }
         Returns: {
@@ -2286,11 +2913,11 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
-      respond_to_case_share: {
+      respond_to_engagement_share: {
         Args: {
           p_approve: boolean
-          p_case_share_id: string
           p_decision_notes?: string
+          p_engagement_share_id: string
         }
         Returns: undefined
       }
@@ -2332,16 +2959,6 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: undefined
-      }
-      share_case_with_ero: {
-        Args: {
-          p_case_id: string
-          p_expires_in_days?: number
-          p_shared_items?: Json
-          p_shared_with_workspace_id: string
-          p_workspace_id: string
-        }
-        Returns: string
       }
     }
     Enums: {
