@@ -509,6 +509,7 @@ export type Database = {
           postal_code: string | null
           primary_email: string | null
           primary_phone: string | null
+          search_vector: unknown | null
           ssn_encrypted: string | null
           ssn_hash: string | null
           ssn_last4: string | null
@@ -731,48 +732,54 @@ export type Database = {
           },
         ]
       }
-      client_documents: {
+      attachments: {
         Row: {
-          client_id: string
+          category: string | null
           created_at: string
+          entity_id: string
+          entity_type: string
           file_name: string
           file_size_bytes: number | null
           id: string
           mime_type: string | null
+          search_vector: unknown | null
           storage_path: string
+          tags: string[] | null
           uploaded_by: string | null
+          version: number | null
           workspace_id: string
         }
         Insert: {
-          client_id: string
+          category?: string | null
           created_at?: string
+          entity_id: string
+          entity_type?: string
           file_name: string
           file_size_bytes?: number | null
           id?: string
           mime_type?: string | null
           storage_path: string
+          tags?: string[] | null
           uploaded_by?: string | null
+          version?: number | null
           workspace_id: string
         }
         Update: {
-          client_id?: string
+          category?: string | null
           created_at?: string
+          entity_id?: string
+          entity_type?: string
           file_name?: string
           file_size_bytes?: number | null
           id?: string
           mime_type?: string | null
           storage_path?: string
+          tags?: string[] | null
           uploaded_by?: string | null
+          version?: number | null
           workspace_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "client_documents_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "client_documents_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -833,45 +840,57 @@ export type Database = {
           },
         ]
       }
-      client_notes: {
+      notes: {
         Row: {
+          attachments: Json | null
           author_id: string | null
           body: string
-          client_id: string
           created_at: string
+          entity_id: string
+          entity_type: string
           id: string
+          is_internal: boolean
           is_pinned: boolean
+          is_private: boolean
+          mentions: Json | null
+          rich_content: Json | null
+          search_vector: unknown | null
           updated_at: string
           workspace_id: string
         }
         Insert: {
+          attachments?: Json | null
           author_id?: string | null
           body: string
-          client_id: string
           created_at?: string
+          entity_id: string
+          entity_type?: string
           id?: string
+          is_internal?: boolean
           is_pinned?: boolean
+          is_private?: boolean
+          mentions?: Json | null
+          rich_content?: Json | null
           updated_at?: string
           workspace_id: string
         }
         Update: {
+          attachments?: Json | null
           author_id?: string | null
           body?: string
-          client_id?: string
           created_at?: string
+          entity_id?: string
+          entity_type?: string
           id?: string
+          is_internal?: boolean
           is_pinned?: boolean
+          is_private?: boolean
+          mentions?: Json | null
+          rich_content?: Json | null
           updated_at?: string
           workspace_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "client_notes_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "client_notes_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -1043,6 +1062,689 @@ export type Database = {
           },
           {
             foreignKeyName: "client_relationships_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_execution_logs: {
+        Row: {
+          automation_id: string
+          engagement_id: string | null
+          error_message: string | null
+          execution_data: Json | null
+          executed_at: string | null
+          id: string
+          status: string
+          workflow_run_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          automation_id: string
+          engagement_id?: string | null
+          error_message?: string | null
+          execution_data?: Json | null
+          executed_at?: string | null
+          id?: string
+          status: string
+          workflow_run_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          automation_id?: string
+          engagement_id?: string | null
+          error_message?: string | null
+          execution_data?: Json | null
+          executed_at?: string | null
+          id?: string
+          status?: string
+          workflow_run_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_execution_logs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      due_date_rules: {
+        Row: {
+          base_date_type: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          name: string
+          offset_days: number | null
+          rule_type: string
+          workspace_id: string
+        }
+        Insert: {
+          base_date_type?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          name: string
+          offset_days?: number | null
+          rule_type: string
+          workspace_id: string
+        }
+        Update: {
+          base_date_type?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          name?: string
+          offset_days?: number | null
+          rule_type?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "due_date_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_types: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          module: string
+          name: string
+          slug: string
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          module?: string
+          name: string
+          slug: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          module?: string
+          name?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_types_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagements: {
+        Row: {
+          archived_date: string | null
+          assigned_staff_id: string | null
+          blueprint_id: string | null
+          client_id: string
+          compliance_officer_id: string | null
+          completed_date: string | null
+          created_at: string | null
+          current_stage: string | null
+          due_date: string | null
+          engagement_number: string | null
+          engagement_type_id: string | null
+          id: string
+          internal_reference: string | null
+          open_date: string | null
+          owner_workspace_id: string | null
+          priority: Database["public"]["Enums"]["engagement_priority"] | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
+          reviewer_id: string | null
+          search_vector: unknown | null
+          service_id: string | null
+          shared_status: string | null
+          status: string
+          updated_at: string
+          workflow_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          archived_date?: string | null
+          assigned_staff_id?: string | null
+          blueprint_id?: string | null
+          client_id: string
+          compliance_officer_id?: string | null
+          completed_date?: string | null
+          created_at?: string | null
+          current_stage?: string | null
+          due_date?: string | null
+          engagement_number?: string | null
+          engagement_type_id?: string | null
+          id?: string
+          internal_reference?: string | null
+          open_date?: string | null
+          owner_workspace_id?: string | null
+          priority?: Database["public"]["Enums"]["engagement_priority"] | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
+          reviewer_id?: string | null
+          service_id?: string | null
+          shared_status?: string | null
+          status?: string
+          updated_at?: string
+          workflow_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          archived_date?: string | null
+          assigned_staff_id?: string | null
+          blueprint_id?: string | null
+          client_id?: string
+          compliance_officer_id?: string | null
+          completed_date?: string | null
+          created_at?: string | null
+          current_stage?: string | null
+          due_date?: string | null
+          engagement_number?: string | null
+          engagement_type_id?: string | null
+          id?: string
+          internal_reference?: string | null
+          open_date?: string | null
+          owner_workspace_id?: string | null
+          priority?: Database["public"]["Enums"]["engagement_priority"] | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
+          reviewer_id?: string | null
+          service_id?: string | null
+          shared_status?: string | null
+          status?: string
+          updated_at?: string
+          workflow_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_blueprint_id_fkey"
+            columns: ["blueprint_id"]
+            isOneToOne: false
+            referencedRelation: "blueprints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_assigned_staff_id_fkey"
+            columns: ["assigned_staff_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_compliance_officer_id_fkey"
+            columns: ["compliance_officer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_owner_workspace_id_fkey"
+            columns: ["owner_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_engagement_type_id_fkey"
+            columns: ["engagement_type_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_status_history: {
+        Row: {
+          audit_reference: string | null
+          changed_at: string | null
+          changed_by: string | null
+          engagement_id: string
+          id: string
+          new_status: string
+          old_status: string | null
+          reason: string | null
+        }
+        Insert: {
+          audit_reference?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          engagement_id: string
+          id?: string
+          new_status: string
+          old_status?: string | null
+          reason?: string | null
+        }
+        Update: {
+          audit_reference?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          engagement_id?: string
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_status_history_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_status_history_audit_reference_fkey"
+            columns: ["audit_reference"]
+            isOneToOne: false
+            referencedRelation: "audit_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_assignment_history: {
+        Row: {
+          assignment_role: string
+          changed_at: string
+          changed_by: string | null
+          engagement_id: string
+          id: string
+          new_user_id: string | null
+          previous_user_id: string | null
+          reason: string | null
+        }
+        Insert: {
+          assignment_role: string
+          changed_at?: string
+          changed_by?: string | null
+          engagement_id: string
+          id?: string
+          new_user_id?: string | null
+          previous_user_id?: string | null
+          reason?: string | null
+        }
+        Update: {
+          assignment_role?: string
+          changed_at?: string
+          changed_by?: string | null
+          engagement_id?: string
+          id?: string
+          new_user_id?: string | null
+          previous_user_id?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_assignment_history_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      engagement_review_actions: {
+        Row: {
+          action: string
+          actor_id: string | null
+          comment: string | null
+          created_at: string
+          engagement_share_id: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          comment?: string | null
+          created_at?: string
+          engagement_share_id: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          comment?: string | null
+          created_at?: string
+          engagement_share_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_review_actions_engagement_share_id_fkey"
+            columns: ["engagement_share_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_shares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          current_stage_id: string | null
+          engagement_id: string
+          id: string
+          paused_at: string | null
+          process_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_run_status"] | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          engagement_id: string
+          id?: string
+          paused_at?: string | null
+          process_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"] | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          engagement_id?: string
+          id?: string
+          paused_at?: string | null
+          process_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"] | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_current_stage"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_stages: {
+        Row: {
+          actual_duration: unknown | null
+          assigned_staff_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          display_order: number
+          due_date: string | null
+          estimated_duration: unknown | null
+          id: string
+          notes: string | null
+          process_stage_id: string
+          reviewer_id: string | null
+          sla_status: string | null
+          stage_name: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at: string | null
+          workflow_run_id: string
+          workspace_id: string
+        }
+        Insert: {
+          actual_duration?: unknown | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order: number
+          due_date?: string | null
+          estimated_duration?: unknown | null
+          id?: string
+          notes?: string | null
+          process_stage_id: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workflow_run_id: string
+          workspace_id: string
+        }
+        Update: {
+          actual_duration?: unknown | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order?: number
+          due_date?: string | null
+          estimated_duration?: unknown | null
+          id?: string
+          notes?: string | null
+          process_stage_id?: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workflow_run_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_stages_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_process_stage_id_fkey"
+            columns: ["process_stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_assigned_staff_id_fkey"
+            columns: ["assigned_staff_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          assigned_staff_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          engagement_id: string
+          id: string
+          priority: string | null
+          status: string
+          title: string
+          updated_at: string | null
+          workflow_stage_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          engagement_id: string
+          id?: string
+          priority?: string | null
+          status?: string
+          title: string
+          updated_at?: string | null
+          workflow_stage_id: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          engagement_id?: string
+          id?: string
+          priority?: string | null
+          status?: string
+          title?: string
+          updated_at?: string | null
+          workflow_stage_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_workflow_stage_id_fkey"
+            columns: ["workflow_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_assigned_staff_id_fkey"
+            columns: ["assigned_staff_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3207,6 +3909,45 @@ export type Database = {
         }
         Relationships: []
       }
+      v_engagement_progress: {
+        Row: {
+          document_progress_pct: number | null
+          engagement_id: string | null
+          engagement_number: string | null
+          overall_progress_pct: number | null
+          task_progress_pct: number | null
+          workflow_status: Database["public"]["Enums"]["workflow_run_status"] | null
+        }
+        Relationships: []
+      }
+      v_reviewer_queue: {
+        Row: {
+          client_id: string | null
+          due_date: string | null
+          engagement_number: string | null
+          reviewer_id: string | null
+          stage_name: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"] | null
+          workflow_stage_id: string | null
+          workspace_id: string | null
+        }
+        Relationships: []
+      }
+      v_workflow_sla_status: {
+        Row: {
+          due_date: string | null
+          expected_duration: unknown | null
+          sla_category: string | null
+          stage_name: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"] | null
+          time_elapsed: unknown | null
+          workflow_run_id: string | null
+          workflow_stage_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_config_object_share: {
@@ -3229,6 +3970,38 @@ export type Database = {
       apply_blueprint: {
         Args: { p_blueprint_id: string; p_workspace_id: string }
         Returns: string
+      }
+      check_stage_readiness: {
+        Args: { p_workflow_stage_id: string }
+        Returns: { is_ready: boolean; missing_requirements: string[] }[]
+      }
+      create_notification: {
+        Args: {
+          p_channels?: string[]
+          p_event_type: string
+          p_payload?: Json
+          p_priority?: string
+          p_recipient_user_id: string
+          p_template_key: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      review_comment: {
+        Args: { p_comment: string; p_engagement_share_id: string }
+        Returns: undefined
+      }
+      review_request_corrections: {
+        Args: { p_comment: string; p_engagement_share_id: string }
+        Returns: undefined
+      }
+      start_engagement_workflow: {
+        Args: { p_engagement_id: string; p_process_id: string }
+        Returns: string
+      }
+      withdraw_engagement_share: {
+        Args: { p_engagement_share_id: string }
+        Returns: undefined
       }
       archive_config_object_share: {
         Args: { p_share_id: string }
@@ -3445,7 +4218,10 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      engagement_priority: "Low" | "Medium" | "High" | "Urgent"
+      review_status: "Pending" | "In Review" | "Approved" | "Rejected" | "Corrections Requested"
+      workflow_run_status: "Pending" | "Active" | "Paused" | "Cancelled" | "Completed"
+      workflow_stage_status: "Pending" | "In Progress" | "Waiting" | "Completed" | "Skipped"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3572,6 +4348,11 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      engagement_priority: ["Low", "Medium", "High", "Urgent"],
+      review_status: ["Pending", "In Review", "Approved", "Rejected", "Corrections Requested"],
+      workflow_run_status: ["Pending", "Active", "Paused", "Cancelled", "Completed"],
+      workflow_stage_status: ["Pending", "In Progress", "Waiting", "Completed", "Skipped"],
+    },
   },
 } as const

@@ -144,16 +144,14 @@ no rebuild, no duplicated structures, no schema redesign.
 - **Portal roster & notes**: `client_portal_users` tracks invite/active/
   revoked status for "one Primary Portal User, + Invite Additional" (real
   portal authentication is a later phase -- this is roster tracking only).
-  `client_notes` is free-form, author-or-admin-editable; "recent notes
-  only" is a query-side `ORDER BY created_at desc LIMIT`, not a schema
-  constraint.
-- **Documents**: `client_documents` + a new private `client-documents`
-  storage bucket (unlike Phase 0's public `branding` bucket, client
-  documents must never be reachable by an unauthenticated URL). Lean by
-  design -- no folders/categories/versioning; that's Phase 4. Gated by the
-  existing `documents.view`/`documents.upload`/`documents.delete`
-  permission keys from Phase 0, both on the table and on the storage
-  objects (folder-prefix-by-workspace_id, same pattern as `branding`).
+  Notes originally lived in a per-client `client_notes` table here; Epic 3A
+  below superseded it with a universal `notes` engine, so see that section
+  for the current shape.
+- **Documents**: originally a per-client `client_documents` table + a
+  private `client-documents` storage bucket (unlike Phase 0's public
+  `branding` bucket, client documents must never be reachable by an
+  unauthenticated URL). Epic 3A below turned this into the universal
+  `attachments` engine; the storage bucket keeps its original name.
 - **Draft auto-save**: one generic `draft_saves` table instead of nine
   bespoke ones, covering Client/Engagement/Workflow/Blueprint/Organizer/
   Document Request/Engagement Letter/Automation/Settings editing. Keyed by
@@ -167,6 +165,92 @@ no rebuild, no duplicated structures, no schema redesign.
   nothing for an empty result set" UI behavior against tables (or, for
   Engagements, a future table) that already return exactly the real rows;
   no schema changes were required or made for them.
+
+## Epic 3A -- Engagement Foundation (complete)
+
+`supabase/migrations/0048`-`0058`, `supabase/tests/epic_3a_smoke_test.sql`.
+The Engagement becomes Verexa's primary work object -- every Client may
+have unlimited Engagements, and every future module (Bookkeeping, Payroll,
+Business Formation, Advisory) plugs into the same architecture.
+
+- **Drift reconciliation**: before this epic's own build started, a
+  process outside this git repo had already applied a partial Engagement
+  Foundation directly to the live Supabase project -- `engagements`,
+  `engagement_status_history`, `workflow_runs`, `workflow_stages`, `tasks`,
+  `due_date_rules`, `automation_execution_logs`, 4 enum types, and several
+  functions/views, none of it tracked in any migration file. Two real bugs
+  were caught and fixed rather than shipped: **`public.tasks` had Row Level
+  Security disabled entirely** (anon/authenticated could read and write
+  every row via the API), and `generate_engagement_number()` counted
+  engagements across *all* workspaces combined with no concurrency guard
+  (a cross-tenant numbering bug plus a race condition). `0048`-`0049`
+  capture the drifted objects idempotently for git parity, fix both bugs,
+  add real RLS to every table that had none, and fix 3 views that were
+  running as `SECURITY DEFINER` (an ERROR-level finding). A "Simulation
+  Workspace" test row from the same drift was left in place per
+  "preserve existing data," flagged in `0048`'s header for a human call on
+  whether to remove it.
+- **Engagement core**: `engagements` gained `service_id`, `engagement_type_id`,
+  a top-level `status` (the spec's 12-state lifecycle -- distinct from the
+  narrower `review_status` enum the drift had already added), and
+  `updated_at`. `engagement_number` is now `ENG-YYYY-NNNNNN`, generated
+  per-workspace-per-year with an advisory-lock guard against concurrent
+  inserts. `engagement_types` is a lookup (workspace_id NULL = Verexa
+  system type, same pattern as `roles`/`services`) seeded with the six tax
+  types; a `module` column lets future modules register their own types
+  without touching this table's shape.
+- **Assignment Engine**: new Engagements default `assigned_staff_id` to the
+  workspace owner; every change to `assigned_staff_id`/`reviewer_id`/
+  `compliance_officer_id` is captured in `engagement_assignment_history`.
+- **Status Engine**: a trigger auto-snapshots every `engagements.status`
+  change into `engagement_status_history` (old/new/changed_by/timestamp)
+  and auto-stamps `completed_date`/`archived_date` on the two terminal
+  transitions -- status is never silently overwritten.
+- **Universal Timeline**: no new table -- `activity_log` (Phase 0) already
+  had exactly the right shape. Wired to fire on engagement creation, status
+  changes, task completion, attachment uploads, automation execution, and
+  blueprint application.
+- **Universal Notes & Attachments**: `client_notes` and `client_documents`
+  (Progressive Disclosure sprint) were already mid-transformation by the
+  same external drift into polymorphic engines when this epic started --
+  `entity_type`/`entity_id` columns existed, but the rename had left the
+  original single-target foreign key in place, so neither could actually
+  attach to anything but a Client yet. Finished rather than reverted:
+  dropped the wrong FK, added a real `entity_type` check constraint
+  (Client/Engagement/Task/Document/Invoice/Blueprint/Workflow, plus
+  Message for attachments), and renamed the tables to `notes` and
+  `attachments`. `notes` supports pinned/private/internal/rich content/
+  mentions; `attachments` supports category/tags/version.
+- **Review Engine**: `respond_to_engagement_share()` (Revision Sprint)
+  covered Approve/Reject; this epic added Request Corrections/Comment/
+  Withdraw and `engagement_review_actions` so full review history is
+  stored, not just the current decision.
+- **Notification Foundation**: `notification_queue` (Phase 0) already had
+  `channels`/`event_type`/`priority` -- a `create_notification()` helper
+  wraps it (its own INSERT policy is workspace-admin-only, since any user's
+  action can now raise a notification for someone else) and is wired into
+  engagement assignment and status-change events. Caught and fixed a
+  channel-vocabulary mismatch the same drift had left behind: the legacy
+  `channel` column only accepted lowercase `email/sms/portal/push` with no
+  `In-App` option at all, while the newer `channels` array defaulted to
+  `In-App` -- standardized both on the capitalized convention already used
+  elsewhere in this drifted cluster (`engagement_priority`'s
+  Low/Medium/High/Urgent, etc.), which in turn required a one-line fix to
+  Phase 0's `invite_workspace_user()` (still hardcoded the old lowercase
+  value).
+- **Global Search prep**: generated `tsvector` + GIN index on `clients`,
+  `engagements`, `attachments`, and `notes` -- indexes only, no search
+  UI/RPC yet.
+- **Client/Engagement Workspace, remaining work before Epic 3B**: no new
+  schema needed for the Client/Engagement Workspace tab structures
+  themselves -- every tab (Contacts, Relationships, Documents, Timeline,
+  Notes, Tasks, Review, etc.) is already backed by an existing table or
+  view from this epic or earlier ones. Not built: the actual Workflow
+  Execution Engine (Epic 3B, explicitly out of scope here), billing/
+  invoicing (referenced by `attachments`' `invoice` entity type and the
+  Notification spec's "Waiting On Payment" status, but no `invoices` table
+  exists yet), and any frontend at all -- this remains a pure backend
+  project.
 
 ## Applying migrations
 

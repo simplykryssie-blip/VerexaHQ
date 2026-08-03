@@ -1,12 +1,17 @@
 -- Progressive Disclosure (Verexa UX Standard #001) smoke tests.
 --
 -- Verifies: client satellite tables (contacts/addresses/phones/emails/
--- relationships/portal users/notes) enforce one-primary-per-client where
+-- relationships/portal users) enforce one-primary-per-client where
 -- applicable, clients.edit/portal.manage permission gating, the
 -- client_relationships "related_client_id or related_name" check,
--- client_documents permission gating (upload vs. delete), and draft_saves
--- RLS (owner-only visibility) + the distinct-NULL entity_id behavior for
+-- attachments permission gating (upload vs. delete), and draft_saves RLS
+-- (owner-only visibility) + the distinct-NULL entity_id behavior for
 -- in-progress "new X" drafts. Wrapped in BEGIN/ROLLBACK.
+--
+-- Note: client_notes and client_documents (as originally built here) were
+-- superseded during Epic 3A by the universal `notes` and `attachments`
+-- engines (entity_type/entity_id polymorphic) -- this test was updated to
+-- match; see supabase/migrations/0049 and 0052 for the rename/fix history.
 
 begin;
 
@@ -55,11 +60,11 @@ begin
   insert into public.client_portal_users (client_id, workspace_id, invited_email, is_primary, invited_by)
   values (v_client_id, v_ws, 'portal+pdtest@example.com', true, v_owner);
 
-  insert into public.client_notes (client_id, workspace_id, author_id, body)
-  values (v_client_id, v_ws, v_owner, 'First note');
+  insert into public.notes (workspace_id, entity_type, entity_id, author_id, body)
+  values (v_ws, 'client', v_client_id, v_owner, 'First note');
 
-  insert into public.client_documents (client_id, workspace_id, file_name, storage_path, uploaded_by)
-  values (v_client_id, v_ws, '2025-w2.pdf', v_ws || '/' || v_client_id || '/2025-w2.pdf', v_owner);
+  insert into public.attachments (entity_type, entity_id, workspace_id, file_name, storage_path, uploaded_by)
+  values ('client', v_client_id, v_ws, '2025-w2.pdf', v_ws || '/client/' || v_client_id || '/2025-w2.pdf', v_owner);
 
   -- 2. One-primary-per-client is enforced by the partial unique index
   begin
@@ -98,8 +103,8 @@ begin
 
   assert exists (select 1 from public.client_contacts where id = v_contact_id), 'staff (workspace member) could not read client_contacts';
 
-  insert into public.client_documents (client_id, workspace_id, file_name, storage_path, uploaded_by)
-  values (v_client_id, v_ws, 'staff-uploaded.pdf', v_ws || '/' || v_client_id || '/staff-uploaded.pdf', v_staff);
+  insert into public.attachments (entity_type, entity_id, workspace_id, file_name, storage_path, uploaded_by)
+  values ('client', v_client_id, v_ws, 'staff-uploaded.pdf', v_ws || '/client/' || v_client_id || '/staff-uploaded.pdf', v_staff);
 
   v_rejected := false;
   begin
@@ -113,14 +118,14 @@ begin
 
   v_rejected := false;
   begin
-    delete from public.client_documents where client_id = v_client_id and file_name = '2025-w2.pdf';
+    delete from public.attachments where entity_type = 'client' and entity_id = v_client_id and file_name = '2025-w2.pdf';
     if not found then
       raise exception 'no_data_found';
     end if;
   exception when others then
     v_rejected := true;
   end;
-  assert v_rejected, 'staff was able to delete a client_documents row without documents.delete';
+  assert v_rejected, 'staff was able to delete an attachments row without documents.delete';
   reset role;
 
   -- 5. draft_saves: owner-only visibility, distinct NULLs allow two
