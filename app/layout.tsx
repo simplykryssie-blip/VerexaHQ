@@ -4,8 +4,8 @@ import "./globals.css";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "Verexa Tax Office",
-  description: "Verexa Tax Office practice management",
+  title: "VerexaHQ",
+  description: "VerexaHQ business operating platform -- Tax Office module",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

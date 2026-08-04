@@ -10,8 +10,11 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface">
       <div className="border-b border-border px-5 py-5">
-        <p className="text-sm font-semibold text-ink">Verexa Tax Office</p>
+        <p className="text-sm font-semibold text-ink">VerexaHQ</p>
         <p className="mt-0.5 truncate text-xs text-muted">{workspaceName}</p>
+        <span className="mt-2 inline-flex items-center rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+          Tax Office module
+        </span>
       </div>
 
       <nav className="flex-1 space-y-1 px-3 py-4">
