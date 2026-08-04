@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/Toast";
 
 export function PaymentLinkButton({ invoiceId }: { invoiceId: string }) {
+  const toast = useToast();
   const [state, setState] = useState<"idle" | "loading" | "ready" | "unconfigured" | "error">("idle");
   const [url, setUrl] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -19,6 +21,7 @@ export function PaymentLinkButton({ invoiceId }: { invoiceId: string }) {
     if (!res.ok) {
       setState("error");
       setMessage(data.error ?? "Could not create a payment link.");
+      toast.show(data.error ?? "Could not create a payment link.", "error");
       return;
     }
     if (!data.configured) {
@@ -34,7 +37,10 @@ export function PaymentLinkButton({ invoiceId }: { invoiceId: string }) {
     return (
       <button
         type="button"
-        onClick={() => navigator.clipboard.writeText(url)}
+        onClick={() => {
+          navigator.clipboard.writeText(url);
+          toast.show("Payment link copied to clipboard", "success");
+        }}
         className="text-xs font-medium text-accent hover:underline"
       >
         Copy payment link

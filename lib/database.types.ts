@@ -2273,6 +2273,7 @@ export type Database = {
           display_order: number
           grid_position: Json
           id: string
+          is_visible: boolean
           title: string | null
           updated_at: string
           widget_type: string
@@ -2284,6 +2285,7 @@ export type Database = {
           display_order?: number
           grid_position?: Json
           id?: string
+          is_visible?: boolean
           title?: string | null
           updated_at?: string
           widget_type: string
@@ -2295,6 +2297,7 @@ export type Database = {
           display_order?: number
           grid_position?: Json
           id?: string
+          is_visible?: boolean
           title?: string | null
           updated_at?: string
           widget_type?: string
@@ -5134,6 +5137,7 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_default_dashboard: { Args: { p_workspace_id: string }; Returns: string }
       encrypt_client_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_firm_secret: { Args: { p_plaintext: string }; Returns: string }
       expire_stale_engagement_shares: { Args: never; Returns: number }

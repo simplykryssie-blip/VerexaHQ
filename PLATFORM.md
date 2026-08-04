@@ -82,6 +82,99 @@ one database call, not client-orchestrated multi-step provisioning, so
 there's nothing on the frontend that can leave a half-created workspace
 behind.
 
+## Executive Experience
+
+The Dashboard exists to answer exactly three questions: *Am I making
+money? Is anything urgent? What should I work on next?* Everything else —
+trends, breakdowns, historical comparisons — belongs in Reports, not the
+Dashboard. If a future change makes the Dashboard show a chart or a
+multi-column breakdown, that's a sign the Dashboard rule has been broken;
+move it to a report and link to it instead.
+
+### Dashboard philosophy
+
+`/dashboard` (`DashboardShell.tsx`) renders a role-scoped set of widgets in
+admin-configured order. It computes six KPIs (Revenue This Month, Open
+Engagements, Tasks Due Today, Outstanding Invoices, Missing Documents,
+Open Client Messages), a rule-based Today's Priorities list, a Review
+Queue, Quick Actions, a compact Calendar, and Recent Activity — all from
+`lib/dashboard/data.ts`, one consolidated `Promise.all` per load, live
+Supabase data only. Every KPI widget that has a corresponding report links
+to it via "View report →"; KPIs with no report yet (Tasks Due Today, Open
+Client Messages) simply don't render a link rather than pointing at
+nothing.
+
+### Today's Priorities: rule-based, not AI
+
+`lib/dashboard/priorities.ts` scores overdue tasks, review-queue items
+flagged `Overdue`/`Exceeded` by the existing `v_workflow_sla_status` view,
+overdue invoices, and tasks due today, by a fixed weight table (more
+overdue = higher weight within a category; categories are pre-ranked).
+Every ranking is explainable from its inputs — there's no model involved.
+If this is ever replaced by an AI-generated summary, the replacement should
+still return `PriorityItem[]` so `PrioritiesWidget` doesn't need to change.
+
+### Widget Engine
+
+Reuses `dashboards`/`dashboard_widgets` — tables that existed from an
+earlier phase but were empty and read by nothing. `dashboard_widgets.widget_type`
+has a CHECK constraint that already encoded a widget taxonomy
+(`revenue`, `collections`, `missing_documents`, `messages`, `todays_work`,
+`review_queue`, plus reserved-for-later values `returns_due`,
+`signatures_pending`, `staff_workload`, `client_health`, `compliance`) —
+extended (not replaced) with `quick_actions`, `calendar`, and
+`recent_activity` to cover the sections the Dashboard needed. `lib/dashboard/widgets.ts`
+maps that same vocabulary to components.
+
+`ensure_default_dashboard(workspace_id)` idempotently seeds one
+`is_default` dashboard per workspace with the 10 implemented widget types,
+called on every dashboard load (cheap no-op once seeded — no migration or
+trigger needed on `create_workspace`). Widgets support:
+- **Hide/show** — `dashboard_widgets.is_visible`.
+- **Reorder** — `display_order`, changed via up/down buttons (no drag-and-drop
+  library added for this).
+- **Role/module/workspace-type visibility** — `dashboard_widgets.config`
+  (jsonb) is reserved for this; nothing populates it yet because no widget
+  currently needs per-role variation beyond the admin-only customize gate.
+
+One real constraint to know: `dashboard_widgets`'s RLS ties INSERT/UPDATE/DELETE
+to `is_workspace_admin`, not the viewing user. So today "widgets must
+support hide/show/reorder" means an admin configures the layout for the
+whole workspace, not that each person has their own personal layout — the
+`role_slug` column on `dashboards` was clearly designed for role-specific
+variants, but only one `role_slug = null` ("everyone") dashboard is seeded
+today.
+
+### Reports philosophy
+
+Reports are the analytics center; the Dashboard is the decision center.
+The engine (`components/reports/`) is generic and reusable —
+`ReportLayout`, `FilterBar` (URL-param-driven date range + search, so
+`/reports/financial?filter=outstanding` from a dashboard widget link is
+just a report opening pre-filtered — no separate "deep link" mechanism
+needed), `SortableTable` (client-side sort over server-fetched rows),
+`ExportButtons` (CSV via `papaparse`, "Excel" as the same CSV since Excel
+opens it natively — no `.xlsx` writer added, labeled honestly as CSV — and
+"PDF" via the browser's own print dialog with a `print:hidden` layout
+class hiding filter chrome, not a generated PDF file), and
+`SimpleBarChart` (a dependency-free inline SVG bar chart — no charting
+library added for the one chart the engine needed so far). Saved filters
+are per-browser (`localStorage`, `lib/reports/savedFilters.ts`) rather than
+a new workspace-shared table, since nothing else in the schema models
+"saved views" to reuse and no report yet needs presets shared across a
+team.
+
+`lib/reportCategories.ts` now lists all 8 requested categories (Revenue,
+Clients, Engagements, Billing, Documents, Staff, Compliance, Growth).
+**Two are fully wired** end-to-end (permission-gated via `has_permission`,
+live data, sortable/searchable/exportable): `/reports/financial` (revenue
+by month + invoice/collections table) and `/reports/documents` (missing
+documents by engagement, the same estimate methodology as the Client
+Workspace's Documents tab, applied workspace-wide). The other 6 stay
+honest `ComingSoon` shells — the sprint asked for the engine, not every
+report, and building six more real reports without real per-category data
+questions answered first would mean guessing at what each should show.
+
 ## Email / SMS Infrastructure
 
 Two provider-agnostic send paths, both gated by `lib/providerStatus.ts`
@@ -225,6 +318,38 @@ before anything is considered done:
   flows as they were built; there is no regression suite guarding against
   breaking them later.
 
+## UX Standards
+
+- **Toasts** — `components/Toast.tsx`, a `ToastProvider`/`useToast()`
+  context mounted once in `(app)/layout.tsx`, `aria-live="polite"` region,
+  auto-dismiss after 5s plus a manual close button. Wired into the
+  dashboard's widget hide/reorder controls and the Stripe payment-link
+  button so far — not every mutation in the app calls it yet.
+- **Loading states** — Next.js `loading.tsx` route segments (not client-side
+  spinners) for `/dashboard`, `/reports/financial`, `/reports/documents`,
+  rendering `components/Skeleton.tsx`'s pulsing placeholders while the
+  server component's data fetch is in flight. Other routes still show
+  Next.js's default blank-until-ready behavior.
+- **Empty/error states** — `components/EmptyState.tsx` (existing, reused
+  everywhere new this pass) for empty results; report permission checks
+  render it with an explicit "you don't have permission" message rather
+  than an empty table.
+
+## Accessibility Standards
+
+Applied to everything built this pass, not retrofitted across the whole
+app: every widget is a `<section aria-labelledby>`; icon-only buttons
+(hide/show/reorder, toast dismiss, export) all carry `aria-label`; the
+sortable table has a `<caption className="sr-only">` announcing row count
+and real `<th scope="col">` headers; the bar chart has `role="img"` with a
+generated text description instead of being purely visual; a "Skip to main
+content" link (`sr-only focus:not-sr-only`) was added to the app shell
+targeting `<main id="main-content">`; report/print output hides filter
+chrome via Tailwind's `print:` variant rather than a separate print
+stylesheet. This was not run as a full contrast/screen-reader audit across
+every existing page — it's the standard applied going forward, not a
+retroactive guarantee.
+
 ## Workspace Provisioning gaps
 
 `create_workspace` (see above) covers Workspace, Owner Membership, Roles
@@ -233,13 +358,13 @@ Brand Profile, and enabling every `is_core` feature flag. Services,
 engagement types, and document-request templates are all
 workspace-`null` global templates every workspace already sees without
 needing a copy. A trigger (`audit_workspaces`) logs the creation to
-`activity_log` automatically. Two items on the sprint's checklist have no
-backing at all, not just an unwired one: there's no `notification_preferences`
-table anywhere in the schema (only `notification_queue`, which is a log,
-not a settings surface), and the `dashboards`/`dashboard_widgets` tables
-exist but are empty and read by nothing — `/dashboard` computes everything
-live instead of from stored config. Building either is real feature work,
-not something this audit-and-fix pass should invent unasked.
+`activity_log` automatically. `dashboards`/`dashboard_widgets` were empty
+and unwired as of the previous pass; they're now the live Dashboard/Widget
+Engine (see Executive Experience above). One item on the sprint's checklist
+still has no backing at all: there's no `notification_preferences` table
+anywhere in the schema (only `notification_queue`, which is a log, not a
+settings surface). Building it is real feature work, not something an
+audit-and-fix pass should invent unasked.
 
 ## Known gaps going into beta
 
@@ -256,3 +381,17 @@ not something this audit-and-fix pass should invent unasked.
 - Payment Plans (recurring billing) and automated payment-receipt emails.
 - The engagement-level "Send Message" modal logs but doesn't dispatch
   email/SMS yet (the client-level one does, as of this pass).
+- Per-user dashboard personalization — today's hide/show/reorder is
+  workspace-wide and admin-managed (see Widget Engine), not per person.
+- 6 of 8 report categories are still `ComingSoon` shells (Clients,
+  Engagements, Billing, Staff, Compliance, Growth) — the engine exists,
+  those specific reports don't yet.
+- No true drag-and-drop widget reordering (up/down buttons only) and no
+  `.xlsx` export (CSV, which Excel opens natively) — both deliberate
+  scope calls to avoid adding a new dependency for one feature.
+- Toasts, skeletons, and the accessibility fixes above are applied to what
+  was built this pass and a couple of existing components they touch —
+  not swept across every pre-existing page.
+- Manual QA this pass was a code-level route/link/permission audit, not a
+  live click-through in a browser (no browser tool available in this
+  session).
