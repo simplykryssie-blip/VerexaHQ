@@ -1,40 +1,9 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
-import { EmptyState } from "@/components/EmptyState";
+import { EngagementWorkspace } from "./EngagementWorkspace";
 
-export const dynamic = 'force-dynamic';
-import { StatusSelect } from "./StatusSelect";
-import { TaskRow } from "./TaskRow";
-import { AddEngagementNoteForm } from "./AddEngagementNoteForm";
-
-const STATUS_OPTIONS = [
-  "New",
-  "Waiting On Client",
-  "Waiting On Staff",
-  "In Progress",
-  "Waiting On Review",
-  "Corrections Requested",
-  "Approved",
-  "Waiting On Signature",
-  "Waiting On Payment",
-  "Ready To Release",
-  "Completed",
-  "Archived",
-];
-
-function clientLabel(c: {
-  client_type: string;
-  first_name: string | null;
-  last_name: string | null;
-  business_name: string | null;
-} | null) {
-  if (!c) return "--";
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
-}
+export const dynamic = "force-dynamic";
 
 export default async function EngagementDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
@@ -44,180 +13,176 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
   const { data: engagement } = await supabase
     .from("engagements")
     .select(
-      "id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, client_id, clients(id, first_name, last_name, business_name, client_type), assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(display_name)"
+      `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage,
+      client_id, service_id,
+      clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id),
+      engagement_types(name),
+      assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
+      reviewer:user_profiles!engagements_reviewer_id_fkey(id, display_name),
+      compliance_officer:user_profiles!engagements_compliance_officer_id_fkey(id, display_name)`
     )
     .eq("id", params.id)
     .single();
 
   if (!engagement) notFound();
 
-  const [{ data: workflowRuns }, { data: activity }, { data: notes }, { data: documents }] =
-    await Promise.all([
-      supabase.from("workflow_runs").select("id").eq("engagement_id", engagement.id),
-      supabase
-        .from("activity_log")
-        .select("id, description, created_at")
-        .eq("entity_type", "engagement")
-        .eq("entity_id", engagement.id)
-        .order("created_at", { ascending: false })
-        .limit(20),
-      supabase
-        .from("notes")
-        .select("id, body, created_at")
-        .eq("entity_type", "engagement")
-        .eq("entity_id", engagement.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("attachments")
-        .select("id, file_name, created_at")
-        .eq("entity_type", "engagement")
-        .eq("entity_id", engagement.id)
-        .order("created_at", { ascending: false }),
-    ]);
+  const [
+    { data: workflowRuns },
+    { data: tasks },
+    { data: documents },
+    { data: notes },
+    { data: messageThreads },
+    { data: shares },
+    { data: assignmentHistory },
+    { data: statusHistory },
+    { data: quotes },
+    { data: invoices },
+    { data: activity },
+    { data: progressRows },
+    { data: staffMembers },
+  ] = await Promise.all([
+    supabase.from("workflow_runs").select("id, status, started_at, completed_at").eq("engagement_id", engagement.id),
+    supabase
+      .from("tasks")
+      .select(
+        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id,
+        assigned_staff:user_profiles!tasks_assigned_staff_id_fkey(id, display_name)`
+      )
+      .eq("engagement_id", engagement.id)
+      .order("due_date", { ascending: true, nullsFirst: false }),
+    supabase
+      .from("attachments")
+      .select("id, file_name, category, version, mime_type, file_size_bytes, created_at")
+      .eq("entity_type", "engagement")
+      .eq("entity_id", engagement.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("notes")
+      .select("id, body, is_pinned, is_internal, is_private, created_at")
+      .eq("entity_type", "engagement")
+      .eq("entity_id", engagement.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("message_threads")
+      .select("*")
+      .eq("entity_type", "engagement")
+      .eq("entity_id", engagement.id)
+      .order("last_message_at", { ascending: false, nullsFirst: false }),
+    supabase.from("engagement_shares").select("*, shared_with:workspaces!case_shares_shared_with_workspace_id_fkey(name)").eq("engagement_id", engagement.id),
+    supabase
+      .from("engagement_assignment_history")
+      .select(
+        `id, assignment_role, changed_at, reason,
+        previous_user:user_profiles!engagement_assignment_history_previous_user_id_fkey(id, display_name),
+        new_user:user_profiles!engagement_assignment_history_new_user_id_fkey(id, display_name)`
+      )
+      .eq("engagement_id", engagement.id)
+      .order("changed_at", { ascending: false }),
+    supabase
+      .from("engagement_status_history")
+      .select("id, old_status, new_status, changed_at, reason")
+      .eq("engagement_id", engagement.id)
+      .order("changed_at", { ascending: false }),
+    supabase.from("quotes").select("*").eq("engagement_id", engagement.id).order("created_at", { ascending: false }),
+    supabase.from("invoices").select("*").eq("engagement_id", engagement.id).order("created_at", { ascending: false }),
+    supabase
+      .from("activity_log")
+      .select("id, description, activity_type, created_at")
+      .eq("entity_type", "engagement")
+      .eq("entity_id", engagement.id)
+      .order("created_at", { ascending: false })
+      .limit(50),
+    supabase.from("v_engagement_progress").select("*").eq("engagement_id", engagement.id).maybeSingle(),
+    supabase
+      .from("workspace_users")
+      .select("user_id, user_profiles(id, display_name)")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "active"),
+  ]);
 
   const workflowRunIds = (workflowRuns ?? []).map((r) => r.id);
-  let tasks: { id: string; title: string; status: string; due_date: string | null }[] = [];
-  if (workflowRunIds.length > 0) {
-    const { data: stageRows } = await supabase
-      .from("workflow_stages")
-      .select("id")
-      .in("workflow_run_id", workflowRunIds);
-    const stageIds = (stageRows ?? []).map((s) => s.id);
-    if (stageIds.length > 0) {
-      const { data: taskRows } = await supabase
-        .from("tasks")
-        .select("id, title, status, due_date")
-        .in("workflow_stage_id", stageIds)
-        .order("created_at");
-      tasks = taskRows ?? [];
-    }
-  }
+  const [{ data: stages }, { data: slaRows }] = await Promise.all([
+    workflowRunIds.length > 0
+      ? supabase
+          .from("workflow_stages")
+          .select(
+            `id, stage_name, status, due_date, started_at, completed_at, display_order,
+            reviewer:user_profiles!workflow_stages_reviewer_id_fkey(id, display_name)`
+          )
+          .in("workflow_run_id", workflowRunIds)
+          .order("display_order")
+      : Promise.resolve({ data: [] as any[] }),
+    workflowRunIds.length > 0
+      ? supabase.from("v_workflow_sla_status").select("*").in("workflow_run_id", workflowRunIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
 
-  const client = engagement.clients as unknown as {
-    id: string;
-    first_name: string | null;
-    last_name: string | null;
-    business_name: string | null;
-    client_type: string;
-  } | null;
-  const assignedStaff = engagement.assigned_staff as unknown as { display_name: string | null } | null;
+  const slaByStage = new Map((slaRows ?? []).map((s: any) => [s.workflow_stage_id, s.sla_category as string]));
+  const stagesWithSla = (stages ?? []).map((s: any) => ({ ...s, sla_category: slaByStage.get(s.id) ?? null }));
+
+  const taskIds = (tasks ?? []).map((t) => t.id);
+  const { data: dependencies } =
+    taskIds.length > 0
+      ? await supabase
+          .from("task_dependencies")
+          .select("id, task_id, depends_on_task_id")
+          .in("task_id", taskIds)
+      : { data: [] as { id: string; task_id: string; depends_on_task_id: string }[] };
+
+  const taskTitleById = new Map((tasks ?? []).map((t) => [t.id, t.title]));
+  const tasksWithDeps = (tasks ?? []).map((t) => ({
+    ...t,
+    dependencies: (dependencies ?? [])
+      .filter((d) => d.task_id === t.id)
+      .map((d) => ({ id: d.id, depends_on_task_id: d.depends_on_task_id, depends_on_title: taskTitleById.get(d.depends_on_task_id) ?? "Task" })),
+  }));
+
+  const threadIds = (messageThreads ?? []).map((t) => t.id);
+  const { data: messages } =
+    threadIds.length > 0
+      ? await supabase.from("messages").select("*").in("thread_id", threadIds).order("created_at", { ascending: true })
+      : { data: [] as any[] };
+
+  const shareIds = (shares ?? []).map((s: any) => s.id);
+  const { data: reviewActions } =
+    shareIds.length > 0
+      ? await supabase
+          .from("engagement_review_actions")
+          .select("id, engagement_share_id, action, comment, created_at, actor_id")
+          .in("engagement_share_id", shareIds)
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
+
+  const invoiceIds = (invoices ?? []).map((i) => i.id);
+  const { data: payments } =
+    invoiceIds.length > 0
+      ? await supabase.from("payments").select("*").in("invoice_id", invoiceIds).order("payment_date", { ascending: false })
+      : { data: [] as any[] };
+
+  const staffOptions = (staffMembers ?? [])
+    .map((m: any) => m.user_profiles)
+    .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p));
 
   return (
-    <>
-      <PageHeader
-        title={engagement.engagement_number ?? "Engagement"}
-        description={
-          client ? (
-            <span>
-              Client:{" "}
-              <Link href={`/clients/${client.id}`} className="text-accent hover:underline">
-                {clientLabel(client)}
-              </Link>
-            </span>
-          ) : undefined
-        }
-      />
-
-      <div className="flex-1 space-y-6 px-8 py-6">
-        <Section title="Overview">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
-            <div>
-              <p className="text-xs uppercase tracking-wide text-muted">Status</p>
-              <div className="mt-1">
-                <StatusSelect engagementId={engagement.id} currentStatus={engagement.status} options={STATUS_OPTIONS} />
-              </div>
-            </div>
-            <Field label="Priority" value={engagement.priority} />
-            <Field label="Assigned to" value={assignedStaff?.display_name ?? "Unassigned"} />
-            <Field label="Open date" value={engagement.open_date ? new Date(engagement.open_date).toLocaleDateString() : null} />
-            <Field label="Due date" value={engagement.due_date ? new Date(engagement.due_date).toLocaleDateString() : null} />
-            <Field
-              label="Completed date"
-              value={engagement.completed_date ? new Date(engagement.completed_date).toLocaleDateString() : null}
-            />
-          </div>
-        </Section>
-
-        <Section title="Tasks">
-          {tasks.length === 0 ? (
-            <EmptyState message="No tasks yet -- tasks appear once a workflow is started for this engagement." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {tasks.map((t) => (
-                <TaskRow key={t.id} task={t} />
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section title="Documents">
-          {!documents || documents.length === 0 ? (
-            <EmptyState message="No documents uploaded yet." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {documents.map((d) => (
-                <li key={d.id} className="py-2 text-sm text-slate">
-                  {d.file_name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section title="Timeline">
-          {!activity || activity.length === 0 ? (
-            <EmptyState message="No activity recorded yet." />
-          ) : (
-            <ul className="space-y-2">
-              {activity.map((a) => (
-                <li key={a.id} className="flex items-center justify-between text-sm">
-                  <span className="text-slate">{a.description}</span>
-                  <span className="text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section
-          title="Notes"
-          action={<AddEngagementNoteForm engagementId={engagement.id} workspaceId={workspace.id} />}
-        >
-          {!notes || notes.length === 0 ? (
-            <EmptyState message="No notes yet." />
-          ) : (
-            <ul className="space-y-3">
-              {notes.map((n) => (
-                <li key={n.id} className="rounded-lg bg-surfaceMuted p-3 text-sm text-slate">
-                  <p>{n.body}</p>
-                  <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-      </div>
-    </>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-0.5 text-slate">{value ?? "--"}</p>
-    </div>
-  );
-}
-
-function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {action}
-      </div>
-      <div className="px-5 py-3">{children}</div>
-    </div>
+    <EngagementWorkspace
+      workspace={workspace}
+      engagement={engagement as never}
+      stages={stagesWithSla as never}
+      tasks={tasksWithDeps as never}
+      documents={documents ?? []}
+      notes={notes ?? []}
+      messageThreads={messageThreads ?? []}
+      messages={(messages ?? []) as never}
+      shares={(shares ?? []) as never}
+      reviewActions={(reviewActions ?? []) as never}
+      assignmentHistory={(assignmentHistory ?? []) as never}
+      statusHistory={statusHistory ?? []}
+      quotes={quotes ?? []}
+      invoices={invoices ?? []}
+      payments={(payments ?? []) as never}
+      timeline={activity ?? []}
+      progress={(progressRows ?? null) as never}
+      staffOptions={staffOptions as never}
+    />
   );
 }

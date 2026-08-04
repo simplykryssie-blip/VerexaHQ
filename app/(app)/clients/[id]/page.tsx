@@ -122,32 +122,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string }[] = [];
   if (engagementIds.length > 0) {
-    const { data: workflowRuns } = await supabase
-      .from("workflow_runs")
-      .select("id, engagement_id")
-      .in("engagement_id", engagementIds);
-    const runIds = (workflowRuns ?? []).map((r) => r.id);
-    if (runIds.length > 0) {
-      const { data: stageRows } = await supabase.from("workflow_stages").select("id, workflow_run_id").in("workflow_run_id", runIds);
-      const stageIds = (stageRows ?? []).map((s) => s.id);
-      if (stageIds.length > 0) {
-        const { data: taskRows } = await supabase
-          .from("tasks")
-          .select("id, title, status, due_date, workflow_stage_id")
-          .in("workflow_stage_id", stageIds)
-          .neq("status", "completed")
-          .order("due_date");
-        const stageToRun = new Map((stageRows ?? []).map((s) => [s.id, s.workflow_run_id]));
-        const runToEngagement = new Map((workflowRuns ?? []).map((r) => [r.id, r.engagement_id]));
-        tasks = (taskRows ?? []).map((t) => ({
-          id: t.id,
-          title: t.title,
-          status: t.status,
-          due_date: t.due_date,
-          engagement_id: runToEngagement.get(stageToRun.get(t.workflow_stage_id) ?? "") ?? "",
-        }));
-      }
-    }
+    const { data: taskRows } = await supabase
+      .from("tasks")
+      .select("id, title, status, due_date, engagement_id")
+      .in("engagement_id", engagementIds)
+      .neq("status", "completed")
+      .order("due_date");
+    tasks = taskRows ?? [];
   }
 
   // Best-effort "missing documents" estimate: requested items come from each
