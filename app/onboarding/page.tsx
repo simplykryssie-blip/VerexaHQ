@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,22 +20,51 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const meta = user?.user_metadata as
+        | { first_name?: string; last_name?: string; company_name?: string }
+        | undefined;
+      if (meta?.company_name) setName(meta.company_name);
+    });
+  }, [supabase]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.rpc("create_workspace", {
+    const { data, error } = await supabase.rpc("create_workspace", {
       p_name: name,
       p_workspace_type: workspaceType,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const meta = user?.user_metadata as
+      | { first_name?: string; last_name?: string }
+      | undefined;
+
+    if (user && (meta?.first_name || meta?.last_name)) {
+      const displayName = [meta?.first_name, meta?.last_name].filter(Boolean).join(" ");
+      await supabase
+        .from("user_profiles")
+        .update({
+          first_name: meta?.first_name ?? null,
+          last_name: meta?.last_name ?? null,
+          display_name: displayName || null,
+        })
+        .eq("id", user.id);
+    }
+
+    setLoading(false);
 
     router.push("/dashboard");
     router.refresh();
