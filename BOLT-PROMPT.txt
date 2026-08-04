@@ -1,7 +1,0 @@
-Use the uploaded project as the complete VerexaHQ application. It is a Next.js project; do not convert it to Vite, merge it into the older Vite structure, replace it with a mockup, or remove the existing Supabase integration.
-
-First install dependencies and preserve every existing page, component, API route, and environment-variable name. Add the environment variables through Bolt Secrets/Environment settings using .env.local.example as the checklist. Never paste secret values into source files and never expose server credentials through NEXT_PUBLIC_ variables.
-
-Confirm the project runs as Next.js, then run npm run typecheck and npm run build. Fix only real build/runtime problems. Do not invent database tables, RPC names, or migrations, and do not weaken Supabase RLS. Preserve the VerexaHQ blue-to-green gradient, V logo, 30-day beta signup, workspace isolation, private document storage, client portal, tax, bookkeeping, payroll, billing, workflows, forms, calendar, reports, and settings modules.
-
-After the build passes, show me the environment variables that are still missing by name only. Do not show, print, or request secret values in chat. Do not redesign or start over.
