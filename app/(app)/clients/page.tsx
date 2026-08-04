@@ -22,26 +22,34 @@ export default async function ClientsPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status")
-    .eq("workspace_id", workspace.id)
-    .is("merged_into_client_id", null)
-    .order("created_at", { ascending: false });
+  const [{ data: clients }, { data: engagementTypes }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status")
+      .eq("workspace_id", workspace.id)
+      .is("merged_into_client_id", null)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("engagement_types")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("status", "published")
+      .order("display_order"),
+  ]);
 
   return (
     <>
       <PageHeader
         title="Clients"
         description="Every client in your workspace."
-        actions={<NewClientButton workspaceId={workspace.id} />}
+        actions={<NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} />}
       />
       <div className="flex-1 px-8 py-6">
         {!clients || clients.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface">
             <EmptyState
               message="No clients yet. Add your first client to get started."
-              action={<NewClientButton workspaceId={workspace.id} />}
+              action={<NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} />}
             />
           </div>
         ) : (
