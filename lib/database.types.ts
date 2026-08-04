@@ -4211,6 +4211,7 @@ export type Database = {
           amount_paid: number
           notes: string | null
           sent_at: string | null
+          stripe_checkout_url: string | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -4232,6 +4233,7 @@ export type Database = {
           amount_paid?: number
           notes?: string | null
           sent_at?: string | null
+          stripe_checkout_url?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -4253,6 +4255,7 @@ export type Database = {
           amount_paid?: number
           notes?: string | null
           sent_at?: string | null
+          stripe_checkout_url?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -4361,6 +4364,8 @@ export type Database = {
           payment_date: string
           reference: string | null
           notes: string | null
+          stripe_payment_intent_id: string | null
+          stripe_checkout_session_id: string | null
           recorded_by: string | null
           created_at: string
           updated_at: string
@@ -4377,6 +4382,8 @@ export type Database = {
           payment_date?: string
           reference?: string | null
           notes?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_checkout_session_id?: string | null
           recorded_by?: string | null
           created_at?: string
           updated_at?: string
@@ -4393,6 +4400,8 @@ export type Database = {
           payment_date?: string
           reference?: string | null
           notes?: string | null
+          stripe_payment_intent_id?: string | null
+          stripe_checkout_session_id?: string | null
           recorded_by?: string | null
           created_at?: string
           updated_at?: string

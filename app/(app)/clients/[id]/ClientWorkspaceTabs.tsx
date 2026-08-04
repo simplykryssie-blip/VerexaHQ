@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
+import { TaxIdReveal } from "./TaxIdReveal";
+import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import {
   AddContactForm,
   AddAddressForm,
@@ -56,7 +58,18 @@ export function OverviewTab({
   requestedDocumentCount,
   documentsCount,
 }: {
-  client: { primary_email: string | null; primary_phone: string | null; address_line1: string | null; city: string | null; state: string | null };
+  client: {
+    id: string;
+    client_type: string;
+    primary_email: string | null;
+    primary_phone: string | null;
+    address_line1: string | null;
+    city: string | null;
+    state: string | null;
+    ssn_last4: string | null;
+    ein_last4: string | null;
+    itin_last4: string | null;
+  };
   engagements: EngagementRow[];
   tasks: TaskRow[];
   timeline: ActivityRow[];
@@ -84,6 +97,14 @@ export function OverviewTab({
           <Field label="Primary email" value={client.primary_email} />
           <Field label="Primary phone" value={client.primary_phone} />
           <Field label="Address" value={[client.address_line1, client.city, client.state].filter(Boolean).join(", ") || null} />
+          {client.client_type === "individual" ? (
+            <>
+              <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
+              <TaxIdReveal clientId={client.id} kind="itin" last4={client.itin_last4} />
+            </>
+          ) : (
+            <TaxIdReveal clientId={client.id} kind="ein" last4={client.ein_last4} />
+          )}
         </dl>
       </Section>
 
@@ -478,9 +499,14 @@ export function BillingTab({
             {invoices.map((i) => (
               <li key={i.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
-                <span className="capitalize text-muted">
-                  {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="capitalize text-muted">
+                    {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                  </span>
+                  {i.status !== "paid" && i.status !== "void" && i.status !== "draft" && (
+                    <PaymentLinkButton invoiceId={i.id} />
+                  )}
+                </div>
               </li>
             ))}
           </ul>

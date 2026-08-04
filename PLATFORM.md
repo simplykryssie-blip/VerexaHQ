@@ -107,10 +107,22 @@ purely env-var presence checks) so an unconfigured environment degrades to
   `reply_to_email`, `billing_email`, `notification_email` for firms to
   override display name/reply-to on outgoing mail. Not yet wired into the
   send path — the columns exist, the read side doesn't yet.
+- **Wired to real UI** — the Client Workspace's "Send Message" action has
+  had a channel picker (portal/email/SMS/internal) since Epic 4, but
+  selecting email or SMS only ever wrote a row to `messages` — it never
+  actually called Resend or Twilio. That's fixed: choosing email/SMS there
+  now also fires `/api/email/send` / `/api/sms/send` to the client's
+  `primary_email`/`primary_phone`. The equivalent modal on the Engagement
+  Workspace still only logs the message — not yet updated to match.
 
-None of this has live credentials in this environment. It's real,
-callable, production-shaped code; it has not been exercised against an
-actual Resend or Twilio account.
+None of the Resend/Twilio code has live credentials in this environment.
+It's real, callable, production-shaped code; it has not been exercised
+against an actual Resend or Twilio account. **Nothing in the app triggers
+Appointment Reminders, Workflow Notifications, or Billing Reminders
+automatically** — there is no scheduler/cron in this stack, so those three
+of the four SMS/email use cases the sprint asked to verify have no trigger
+point at all yet, automated or manual. Only the client-notification path
+above is actually reachable from the UI.
 
 ## Billing
 
@@ -121,10 +133,46 @@ Quote/invoice numbering is advisory-lock-protected per-workspace-per-year.
 Triggers cascade a payment into the invoice's paid status and a
 `client_ledger` entry automatically. Frontend: the Billing tab on both the
 Client Workspace and Engagement Workspace, plus Quick Actions to create a
-quote or invoice. There is no Stripe integration wired up — no webhook
-route, no Checkout session creation, no `STRIPE_SECRET_KEY` in this
-environment. Payments today are recorded manually (status/amount typed in),
-not captured through a payment processor.
+quote or invoice.
+
+**Stripe** (`lib/stripe/client.ts`, fetch-based, no SDK, gated by the same
+`isStripeConfigured()` pattern as email/SMS):
+- `POST /api/stripe/checkout-session` creates a Checkout Session for an
+  invoice's remaining balance and stores the URL on `invoices.stripe_checkout_url`;
+  a "Get payment link" button (`components/PaymentLinkButton.tsx`) on any
+  unpaid invoice in both workspaces calls it.
+- `POST /api/stripe/webhook` verifies the signature itself (HMAC-SHA256 per
+  Stripe's documented scheme, implemented directly — no SDK) and, on
+  `checkout.session.completed`, inserts a `payments` row. That alone is
+  enough to update the invoice status and post the `client_ledger` entry,
+  because it reuses the existing `apply_payment_to_invoice` trigger rather
+  than duplicating that logic.
+- `POST /api/stripe/refund` calls Stripe's refund API, then reverses the
+  invoice's `amount_paid`/status and posts a matching `client_ledger` debit
+  — there's no existing trigger for refunds (only for payments), so this
+  path does that bookkeeping itself, mirroring the sign convention the
+  payment trigger already established.
+- Payment Plans and automatic payment-receipt emails are not built — the
+  schema (`recurring_billing`) and email infrastructure both exist, but
+  nothing generates a recurring schedule or sends a receipt yet.
+
+No `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` in this environment — none
+of this has been exercised against a real Stripe account.
+
+## Sensitive Data Masking
+
+More complete than it might look from the frontend: `clients` stores
+`ssn_encrypted`/`ein_encrypted`/`itin_encrypted` (bytea, via
+`encrypt_client_secret`), a `*_last4` column for masked display, and a
+`*_hash` column used only for duplicate-client detection (`create_client`
+matches on SSN/EIN hash before creating a new record). Revealing a value
+goes through `reveal_client_ssn`/`reveal_client_ein`/`reveal_client_itin`,
+each of which checks a dedicated permission (e.g. `identity.ssn_reveal`)
+and writes a `warning`-severity `audit_log` row on every reveal. The
+`clients.create` form now collects these optional fields, and the Client
+Workspace Overview tab shows them masked with a permission-gated Reveal
+button (`TaxIdReveal.tsx`) — before this pass the backend existed but
+nothing in the UI could capture or view them.
 
 ## Security
 
@@ -138,11 +186,15 @@ not captured through a payment processor.
   callable over PostgREST have `EXECUTE` revoked from `public`/`anon`/`authenticated`
   as they're added; `get_invitation_preview` is the one deliberate exception
   and is documented as such above.
-- **Not implemented**: SSN/EIN field-level masking or encryption. Client
-  PII fields exist in the schema as plain columns today — this is a real
-  gap before handling real taxpayer data in beta, not just a nice-to-have.
+- SSN/EIN/ITIN are encrypted at rest with permission-gated, audit-logged
+  reveal — see "Sensitive Data Masking" above. (This was previously
+  documented here as unimplemented; that was wrong — the backend existed,
+  it just had no frontend surface. It does now.)
 - Service-role keys and Stripe/Resend/Twilio secrets are server-only env
-  vars, never exposed under `NEXT_PUBLIC_*`.
+  vars, never exposed under `NEXT_PUBLIC_*`. The one exception,
+  `app/api/stripe/webhook/route.ts`, deliberately uses the service-role key
+  server-side because Stripe's webhook call has no user session to
+  authenticate with — it substitutes signature verification instead.
 
 ## Deployment
 
@@ -151,10 +203,11 @@ scaffold were previously consolidated/removed from this same repo — see the
 note at the top of this file). Single Supabase project
 (`daxpavvsotvsyqqntddc`); `.env.local.example` was pointing at a different
 project ID until this pass and has been corrected. Vercel builds are
-triggered by pushes to this branch through Vercel's own git integration —
-this session has no Vercel API/dashboard access, so it cannot trigger a
-deploy on demand or report a deployment URL; check the Vercel dashboard
-after a push lands.
+triggered by pushes to this branch through Vercel's own git integration. A
+Vercel MCP connector is attached to this session and shows as connected,
+but no callable Vercel tools are actually exposed here — a deploy cannot be
+triggered on demand or a deployment URL fetched from this session; check
+the Vercel dashboard after a push lands.
 
 ## Testing
 
@@ -172,13 +225,34 @@ before anything is considered done:
   flows as they were built; there is no regression suite guarding against
   breaking them later.
 
+## Workspace Provisioning gaps
+
+`create_workspace` (see above) covers Workspace, Owner Membership, Roles
+(shared system roles, not per-workspace copies), Permissions (same),
+Brand Profile, and enabling every `is_core` feature flag. Services,
+engagement types, and document-request templates are all
+workspace-`null` global templates every workspace already sees without
+needing a copy. A trigger (`audit_workspaces`) logs the creation to
+`activity_log` automatically. Two items on the sprint's checklist have no
+backing at all, not just an unwired one: there's no `notification_preferences`
+table anywhere in the schema (only `notification_queue`, which is a log,
+not a settings surface), and the `dashboards`/`dashboard_widgets` tables
+exist but are empty and read by nothing — `/dashboard` computes everything
+live instead of from stored config. Building either is real feature work,
+not something this audit-and-fix pass should invent unasked.
+
 ## Known gaps going into beta
 
-- Stripe, Resend domain verification, GoDaddy DNS (SPF/DKIM/DMARC), and a
-  live Twilio account — all require credentials/dashboard access this
-  session doesn't have.
-- SSN/EIN masking.
+- Resend domain verification, GoDaddy DNS (SPF/DKIM/DMARC), a live Stripe
+  account, and a live Twilio account — all require credentials/dashboard
+  access this session doesn't have. The integration code for all three
+  exists and degrades gracefully without them.
 - Client Portal — not started, explicitly deferred.
 - Frontend permission-gating (hiding actions a role can't perform) beyond
   RLS enforcement itself.
 - Automated test coverage.
+- No per-workspace `notification_preferences`; no scheduler for
+  appointment/workflow/billing reminders (see Email/SMS Infrastructure).
+- Payment Plans (recurring billing) and automated payment-receipt emails.
+- The engagement-level "Send Message" modal logs but doesn't dispatch
+  email/SMS yet (the client-level one does, as of this pass).

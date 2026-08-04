@@ -49,6 +49,9 @@ type ClientRow = {
   tags: string[];
   has_portal_access: boolean;
   created_at: string;
+  ssn_last4: string | null;
+  ein_last4: string | null;
+  itin_last4: string | null;
   relationship_manager: ClientHeaderInfo["relationship_manager"];
   default_reviewer: ClientHeaderInfo["default_reviewer"];
   default_compliance_officer: ClientHeaderInfo["default_compliance_officer"];
@@ -161,7 +164,13 @@ export function ClientWorkspace({
       />
 
       <div className="border-b border-border bg-surface px-8 py-3">
-        <QuickActions clientId={client.id} workspaceId={workspace.id} documentRequestTemplates={documentRequestTemplates} />
+        <QuickActions
+          clientId={client.id}
+          workspaceId={workspace.id}
+          documentRequestTemplates={documentRequestTemplates}
+          primaryEmail={client.primary_email}
+          primaryPhone={client.primary_phone}
+        />
       </div>
 
       <div className="flex flex-1 overflow-hidden">

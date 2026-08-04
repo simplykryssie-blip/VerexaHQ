@@ -7,7 +7,13 @@ import { Plus, MessageSquare, Upload, FileText, Receipt, StickyNote, ClipboardLi
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 
-type Props = { clientId: string; workspaceId: string; documentRequestTemplates: { id: string; name: string }[] };
+type Props = {
+  clientId: string;
+  workspaceId: string;
+  documentRequestTemplates: { id: string; name: string }[];
+  primaryEmail: string | null;
+  primaryPhone: string | null;
+};
 
 function ActionButton({
   icon: Icon,
@@ -45,7 +51,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-export function QuickActions({ clientId, workspaceId, documentRequestTemplates }: Props) {
+export function QuickActions({ clientId, workspaceId, documentRequestTemplates, primaryEmail, primaryPhone }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [modal, setModal] = useState<
@@ -157,6 +163,21 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates }
                 is_internal: isInternal,
               });
               if (error) return error.message;
+
+              if (v.channel === "email" && primaryEmail) {
+                await fetch("/api/email/send", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ to: primaryEmail, subject: "New message", html: `<p>${v.body}</p>` }),
+                });
+              } else if (v.channel === "sms" && primaryPhone) {
+                await fetch("/api/sms/send", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ to: primaryPhone, body: v.body }),
+                });
+              }
+
               setModal(null);
               router.refresh();
             }}

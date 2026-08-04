@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
+import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { StatusSelect } from "./StatusSelect";
 import { TaskRow } from "./TaskRow";
 import { AddEngagementNoteForm } from "./AddEngagementNoteForm";
@@ -413,9 +414,14 @@ export function BillingTab({ quotes, invoices, payments }: { quotes: QuoteRow[];
             {invoices.map((i) => (
               <li key={i.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
-                <span className="capitalize text-muted">
-                  {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="capitalize text-muted">
+                    {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                  </span>
+                  {i.status !== "paid" && i.status !== "void" && i.status !== "draft" && (
+                    <PaymentLinkButton invoiceId={i.id} />
+                  )}
+                </div>
               </li>
             ))}
           </ul>

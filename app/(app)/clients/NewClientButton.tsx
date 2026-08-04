@@ -26,6 +26,9 @@ export function NewClientButton({
   const [contactFirstName, setContactFirstName] = useState("");
   const [contactLastName, setContactLastName] = useState("");
   const [engagementTypeId, setEngagementTypeId] = useState("");
+  const [ssn, setSsn] = useState("");
+  const [itin, setItin] = useState("");
+  const [ein, setEin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -59,9 +62,9 @@ export function NewClientButton({
       p_date_of_birth: undefined,
       p_primary_email: email || undefined,
       p_primary_phone: phone || undefined,
-      p_ssn: undefined,
-      p_ein: undefined,
-      p_itin: undefined,
+      p_ssn: clientType === "individual" ? ssn || undefined : undefined,
+      p_ein: clientType === "business" ? ein || undefined : undefined,
+      p_itin: clientType === "individual" ? itin || undefined : undefined,
     });
 
     if (error) {
@@ -165,6 +168,31 @@ export function NewClientButton({
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               )}
+
+              {clientType === "individual" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    placeholder="SSN (optional)"
+                    value={ssn}
+                    onChange={(e) => setSsn(e.target.value)}
+                    className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                  <input
+                    placeholder="ITIN (optional)"
+                    value={itin}
+                    onChange={(e) => setItin(e.target.value)}
+                    className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                </div>
+              ) : (
+                <input
+                  placeholder="EIN (optional)"
+                  value={ein}
+                  onChange={(e) => setEin(e.target.value)}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              )}
+              <p className="text-xs text-muted">Stored encrypted. Only staff with reveal permission can view the full number later.</p>
 
               <input
                 type="email"

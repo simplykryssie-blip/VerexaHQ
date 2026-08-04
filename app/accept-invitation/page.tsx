@@ -41,6 +41,7 @@ export default function AcceptInvitationPage() {
       setPreview(data[0]);
     });
     supabase.auth.getUser().then(({ data }) => setCurrentUserEmail(data.user?.email ?? null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function acceptNow() {

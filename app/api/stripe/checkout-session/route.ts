@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createCheckoutSession } from "@/lib/stripe/client";
+
+export async function POST(request: Request) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const { invoiceId } = (await request.json()) as { invoiceId?: string };
+  if (!invoiceId) {
+    return NextResponse.json({ error: "invoiceId is required" }, { status: 400 });
+  }
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("id, workspace_id, invoice_number, total_amount, amount_paid")
+    .eq("id", invoiceId)
+    .single();
+  if (invoiceError || !invoice) {
+    return NextResponse.json({ error: invoiceError?.message ?? "Invoice not found" }, { status: 404 });
+  }
+
+  const balanceDue = invoice.total_amount - invoice.amount_paid;
+  if (balanceDue <= 0) {
+    return NextResponse.json({ error: "This invoice has no remaining balance." }, { status: 400 });
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const result = await createCheckoutSession({
+    amount: balanceDue,
+    description: `Invoice ${invoice.invoice_number ?? invoice.id}`,
+    successUrl: `${appUrl}/clients?paid=1`,
+    cancelUrl: `${appUrl}/clients?paid=0`,
+    metadata: { invoice_id: invoice.id, workspace_id: invoice.workspace_id },
+  });
+
+  if (!result.ok) {
+    return NextResponse.json({ configured: false, reason: result.reason }, { status: 200 });
+  }
+
+  await supabase.from("invoices").update({ stripe_checkout_url: result.data.url }).eq("id", invoiceId);
+
+  return NextResponse.json({ configured: true, url: result.data.url });
+}
