@@ -28,3 +28,30 @@ export async function sendSmsViaTwilio({ to, body }: { to: string; body: string 
   const data = (await res.json()) as { sid?: string };
   return { sent: true, id: data.sid };
 }
+
+/**
+ * Verifies a Twilio webhook signature per Twilio's documented scheme:
+ * HMAC-SHA1 over the full request URL + sorted POST param key/value pairs
+ * concatenated, base64-encoded, using the auth token as the key -- no
+ * Twilio SDK needed, same hand-rolled approach as verifyStripeSignature.
+ */
+export async function verifyTwilioSignature(
+  url: string,
+  params: Record<string, string>,
+  signatureHeader: string,
+  authToken: string
+): Promise<boolean> {
+  const crypto = await import("crypto");
+  const data =
+    url +
+    Object.keys(params)
+      .sort()
+      .map((key) => key + params[key])
+      .join("");
+
+  const expected = crypto.createHmac("sha1", authToken).update(data).digest("base64");
+  const expectedBuf = Buffer.from(expected);
+  const signatureBuf = Buffer.from(signatureHeader);
+  if (expectedBuf.length !== signatureBuf.length) return false;
+  return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+}

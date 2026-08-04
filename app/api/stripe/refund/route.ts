@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createRefund } from "@/lib/stripe/client";
+import { recordProviderCheck } from "@/lib/providerHealth";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -34,8 +35,12 @@ export async function POST(request: Request) {
   const refundAmount = amount ?? payment.amount;
   const result = await createRefund({ paymentIntentId: payment.stripe_payment_intent_id, amount: refundAmount });
   if (!result.ok) {
+    if (result.reason !== "Stripe is not configured for this environment.") {
+      await recordProviderCheck("stripe", false, result.reason);
+    }
     return NextResponse.json({ configured: false, reason: result.reason }, { status: 200 });
   }
+  await recordProviderCheck("stripe", true);
 
   await supabase.from("payments").update({ status: "refunded" }).eq("id", paymentId);
 

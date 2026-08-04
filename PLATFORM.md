@@ -309,12 +309,142 @@ purely env-var presence checks) so an unconfigured environment degrades to
 
 None of the Resend/Twilio code has live credentials in this environment.
 It's real, callable, production-shaped code; it has not been exercised
-against an actual Resend or Twilio account. **Nothing in the app triggers
-Appointment Reminders, Workflow Notifications, or Billing Reminders
-automatically** — there is no scheduler/cron in this stack, so those three
-of the four SMS/email use cases the sprint asked to verify have no trigger
-point at all yet, automated or manual. Only the client-notification path
-above is actually reachable from the UI.
+against an actual Resend or Twilio account. As of the Backend Completion
+sprint below there **is** a scheduler (`/api/cron/dispatch-notifications`
++ `vercel.json`), but nothing yet enqueues Appointment Reminder, Workflow
+Notification, or Billing Reminder jobs into `notification_queue` — the
+dispatcher has something to drain now, the triggers that would populate it
+for those three use cases still don't exist. Only the client-notification
+send path above is reachable from the UI today.
+
+## Backend Completion Sprint (Epic 6)
+
+A backend-only pass to close every remaining gap between the schema and
+the mission's Epic 6/Tax Office/Client Portal/Reporting requirements,
+with no new frontend. Full inventory, gap analysis, and what got built are
+in the sprint's own certification report (delivered in chat); this section
+covers the durable architecture decisions.
+
+### Notification Dispatcher
+
+`notification_queue` existed but nothing drained it. `/api/cron/dispatch-notifications`
+(Vercel Cron, every 5 minutes per `vercel.json`, gated by a `CRON_SECRET`
+bearer check) now does: for `channel = 'Email'`/`'SMS'` jobs, looks up the
+matching `email_templates`/`sms_templates` row by `template_key` (workspace
+row first, global fallback), renders it through the new
+`lib/templates/render.ts` `{{merge.field}}` substitution (the piece that
+was missing — `merge_fields` columns existed, nothing read them), sends via
+the existing Resend/Twilio helpers, and logs to `email_log`/`sms_log`.
+`In-App`/`Portal`/`Push` channels have no external provider, so reaching
+dispatch is itself success — the row is the delivery surface until a
+notifications inbox reads it directly. Retry/dead-letter reuses the
+existing `status`/`attempts` columns (`max_attempts` added) rather than a
+separate queue: on failure, `scheduled_at` is bumped by
+`attempts * 5 minutes` and the row stays `pending`; once `attempts >=
+max_attempts` it flips to `failed` — that combination *is* the dead
+letter, no new status value needed. The same route also promotes
+"Scheduled Messages" out of `draft_saves` (`draft_type = 'message'`,
+payload holds `thread_id`/`body`/`scheduled_at`) into real `messages` rows
+once due — reusing the existing drafts table instead of adding scheduling
+columns to `messages`/`message_threads`.
+
+### Webhook logging, retry, and provider status
+
+New `webhook_events` table (provider/event_type/external_id/payload/status/attempts/last_error)
+logs every inbound Stripe/Resend/Twilio webhook — the Stripe webhook route
+previously processed events with zero persisted record of having received
+them. New `/api/resend/webhook` and `/api/twilio/webhook` routes verify
+signatures by hand (svix HMAC-SHA256 for Resend, HMAC-SHA1 for Twilio),
+exactly mirroring the pre-existing hand-rolled `verifyStripeSignature` —
+no provider SDKs added — and update `email_log`/`sms_log` with real
+delivery/open/bounce status (`delivered_at`, `opened_at`, `open_count`,
+`bounced_at`, `failed_reason` columns), closing the "Delivery Status" /
+"Open Tracking" gap.
+
+New `provider_status` table (one row each for `email`/`sms`/`stripe`,
+platform-wide — these are our own vendor credentials, not a per-workspace
+setting) is written by `record_provider_check()`, called from every real
+send/webhook path via `lib/providerHealth.ts`. That RPC's `EXECUTE` grant
+is service-role only — it has no per-caller authorization concept of its
+own (unlike every `has_permission`-gated RPC elsewhere), so it's called via
+the service-role client rather than the caller's session, the same
+privilege tier the Stripe webhook route already used for its writes.
+`GET /api/provider-status` still reports live env-var configuration; it
+doesn't yet read this new table, which tracks *health* (recent
+success/failure streaks) rather than just presence.
+
+### Client Portal backend
+
+The portal had document/messaging/billing tables to read from but no
+identity: `client_portal_users` tracked *invitations*, never linked to a
+real signed-in principal. It's the deliberate boundary `clients`'s own
+comment already stated ("clients never become staff and staff never
+become clients") that made this a new identity, not a reuse of
+`workspace_users`/`roles`. Added: `client_portal_users.user_id` (→
+`auth.users`, populated once someone accepts), `invitation_token` +
+`token_expires_at`, and `invite_portal_user`/`accept_portal_invitation`/`get_portal_invitation_preview`
+RPCs mirroring `create_workspace_invitation`/`accept_workspace_invitation_by_token`
+line for line. `is_portal_user(client_id)` and
+`is_portal_user_for_entity(entity_type, entity_id)` are the one shared RLS
+building block every portal policy below uses — same shape as
+`is_workspace_member`, scoped to a client instead of a workspace.
+
+Additive portal RLS policies (never replacing the existing staff
+policies) now cover: `attachments` (client-visible, non-archived, own
+entity) + the `client-documents` storage bucket, `document_requests` +
+`document_request_item_statuses`, `signature_requests` +
+`signature_request_signers`, `message_threads` + `messages` (portal can
+open a thread and post, never see `is_internal` messages), `invoices` /
+`quotes` / `payments` / `client_ledger` (read-only), `activity_log`, and
+`irs_notices`. Rather than duplicate `record_signature`/`decline_signature`/`fulfill_document_request_item`
+into `portal_*` copies, all three were extended in place to accept a
+portal caller (signer email match + `is_portal_user_for_entity`) alongside
+the existing staff `has_permission` check — one signing/fulfillment code
+path for both audiences.
+
+**Tax Organizers are now the actual Portal Organizer API.** New
+`organizer_responses` + `organizer_response_answers` tables are the
+missing instance layer under `organizer_templates`/`organizer_fields`
+(exactly the same template-vs-instance shape as
+`document_requests`/`document_request_item_statuses`) — a client can now
+read and fill in their own organizer from the portal, and
+`submit_organizer_response()` accepts either a staff caller or the portal
+user themselves, but only ever sets `status = 'submitted'`; moving it to
+`'reviewed'` has no portal-writable policy, so that step stays staff-only.
+
+No portal frontend was built this pass — this is the backend those pages
+will call.
+
+### Tax Office backend gaps
+
+`engagement_tax_details` (one-to-one satellite on `engagements`, same
+"module-agnostic core + satellite" pattern as `client_addresses`/etc.)
+adds `tax_year`, `return_type`, `is_amended`/`original_engagement_id`,
+`is_extended`/`extension_filed_date`/`extension_due_date`, and
+`efile_status` (`not_filed → ready_to_file → transmitted →
+accepted`/`rejected`, or `paper_filed`) — none of which existed anywhere
+before. New `irs_notices` table uses the same polymorphic
+`entity_type`/`entity_id` convention as `notes`/`attachments`, so a notice
+can hang off a client or a specific engagement, and a new
+`record_irs_notice_activity()` trigger surfaces it in the existing
+Timeline for free (same integration decision as the Document Center's
+activity triggers). "Reviewer Queue" (`v_reviewer_queue`), "Engagement/Return
+Statuses" (the existing 12-state status engine), and "Service Packages" /
+"Default Folder Templates" / "Default Request Templates" were already
+built in earlier phases and needed no changes.
+
+### Reporting backend
+
+Every table already has a queryable PostgREST API gated by its own RLS —
+that was already true for all 8 report categories before this pass. Two
+new `security_invoker` views (matching every other `v_*` view's
+convention) were added because they're genuine multi-table aggregations,
+not just gaps in table access: `v_staff_productivity` (open engagements,
+tasks completed/overdue, pending reviews per staff member — reusing
+`v_reviewer_queue` rather than re-deriving pending-review counts) and
+`v_tax_season_metrics` (return volume/e-file status/extensions/open IRS
+notices by tax year, built on the two tables above). No new report pages
+were built — these views exist for whichever future report reads them.
 
 ## Billing
 
@@ -471,12 +601,17 @@ audit-and-fix pass should invent unasked.
   account, and a live Twilio account — all require credentials/dashboard
   access this session doesn't have. The integration code for all three
   exists and degrades gracefully without them.
-- Client Portal — not started, explicitly deferred.
+- Client Portal — backend only as of the Backend Completion sprint
+  (identity, RLS, organizer/document/signature/messaging/billing access);
+  no portal frontend exists yet.
 - Frontend permission-gating (hiding actions a role can't perform) beyond
   RLS enforcement itself.
 - Automated test coverage.
-- No per-workspace `notification_preferences`; no scheduler for
-  appointment/workflow/billing reminders (see Email/SMS Infrastructure).
+- No per-workspace `notification_preferences` (which events a user wants
+  and on which channel) — `notification_queue` now has a real dispatcher
+  (see Backend Completion Sprint), but nothing yet enqueues appointment,
+  workflow, or billing reminder jobs into it; only the client-notification
+  send path is wired to fire on demand today.
 - Payment Plans (recurring billing) and automated payment-receipt emails.
 - The engagement-level "Send Message" modal logs but doesn't dispatch
   email/SMS yet (the client-level one does, as of this pass).
@@ -485,8 +620,21 @@ audit-and-fix pass should invent unasked.
 - 6 of 8 report categories are still `ComingSoon` shells (Clients,
   Engagements, Billing, Staff, Compliance, Growth) — the engine exists,
   those specific reports don't yet.
-- Signature Center is staff-recorded only — no e-sign provider
-  integration, no public client-facing signing link (see Document Center).
+- Signature Center has no third-party e-sign provider integration. A
+  portal user can now sign/decline their own documents (backend only, see
+  Backend Completion Sprint) once portal auth is wired to a frontend;
+  there is still no *public*, unauthenticated signing link.
+- Client Portal auth has no frontend yet — no invite-acceptance page, no
+  portal login/session UI, no portal dashboard/document/organizer/signature
+  pages. The RLS and RPCs they'll call are built and smoke-tested; nothing
+  renders them.
+- Notification Dispatcher templates must exist as a `published`
+  `email_templates`/`sms_templates` row matching the job's `template_key`
+  before a queued job can send — nothing seeds these automatically for the
+  new reminder/notice use cases this pass didn't wire up triggers for.
+- `provider_status` tracks live health from real send/webhook attempts;
+  `GET /api/provider-status` (used by any settings UI) still only reports
+  env-var presence and hasn't been switched to read the new table.
 - No OCR, auto-classification, duplicate detection, or AI metadata
   extraction on documents — `attachments.ai_metadata` is reserved but
   unpopulated, per this pass's explicit instruction not to implement AI yet.

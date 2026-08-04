@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmailViaResend } from "@/lib/email/resend";
+import { recordProviderCheck } from "@/lib/providerHealth";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -17,5 +18,8 @@ export async function POST(request: Request) {
   }
 
   const result = await sendEmailViaResend({ to, subject, html });
+  if (result.reason === undefined) {
+    await recordProviderCheck("email", result.sent, result.error);
+  }
   return NextResponse.json({ ok: true, ...result });
 }

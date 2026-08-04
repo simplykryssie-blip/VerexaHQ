@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createCheckoutSession } from "@/lib/stripe/client";
+import { recordProviderCheck } from "@/lib/providerHealth";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -40,8 +41,12 @@ export async function POST(request: Request) {
   });
 
   if (!result.ok) {
+    if (result.reason !== "Stripe is not configured for this environment.") {
+      await recordProviderCheck("stripe", false, result.reason);
+    }
     return NextResponse.json({ configured: false, reason: result.reason }, { status: 200 });
   }
+  await recordProviderCheck("stripe", true);
 
   await supabase.from("invoices").update({ stripe_checkout_url: result.data.url }).eq("id", invoiceId);
 
