@@ -1,37 +1,25 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
-import { EmptyState } from "@/components/EmptyState";
+import { ClientWorkspace } from "./ClientWorkspace";
 
-export const dynamic = 'force-dynamic';
-import {
-  AddContactForm,
-  AddAddressForm,
-  AddPhoneForm,
-  AddEmailForm,
-  AddRelationshipForm,
-  AddPortalUserForm,
-  AddNoteForm,
-} from "./AddForms";
-
-function displayName(c: {
-  client_type: string;
-  first_name: string | null;
-  last_name: string | null;
-  business_name: string | null;
-}) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
-}
+export const dynamic = "force-dynamic";
 
 export default async function ClientDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const supabase = createClient();
-  const { data: client } = await supabase.from("clients").select("*").eq("id", params.id).single();
+  const { data: client } = await supabase
+    .from("clients")
+    .select(
+      `*,
+      relationship_manager:user_profiles!clients_relationship_manager_id_fkey(id, display_name),
+      default_reviewer:user_profiles!clients_default_reviewer_id_fkey(id, display_name),
+      default_compliance_officer:user_profiles!clients_default_compliance_officer_id_fkey(id, display_name)`
+    )
+    .eq("id", params.id)
+    .single();
   if (!client) notFound();
 
   const [
@@ -44,6 +32,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: engagements },
     { data: notes },
     { data: documents },
+    { data: quotes },
+    { data: invoices },
+    { data: payments },
+    { data: ledgerEntries },
+    { data: messageThreads },
+    { data: clientActivity },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -53,229 +47,167 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     supabase.from("client_portal_users").select("*").eq("client_id", client.id).order("display_order"),
     supabase
       .from("engagements")
-      .select("id, engagement_number, status, engagement_type_id, open_date, due_date")
+      .select(
+        `id, engagement_number, status, review_status, priority, due_date, open_date, completed_date, current_stage,
+        engagement_types(name),
+        assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
+        reviewer:user_profiles!engagements_reviewer_id_fkey(id, display_name),
+        compliance_officer:user_profiles!engagements_compliance_officer_id_fkey(id, display_name)`
+      )
       .eq("client_id", client.id)
       .order("open_date", { ascending: false }),
     supabase
       .from("notes")
-      .select("id, body, is_pinned, created_at")
+      .select("id, body, is_pinned, is_internal, is_private, created_at")
       .eq("entity_type", "client")
       .eq("entity_id", client.id)
       .order("created_at", { ascending: false }),
     supabase
       .from("attachments")
-      .select("id, file_name, created_at")
+      .select("id, file_name, category, version, mime_type, file_size_bytes, created_at")
       .eq("entity_type", "client")
       .eq("entity_id", client.id)
       .order("created_at", { ascending: false }),
+    supabase.from("quotes").select("*").eq("client_id", client.id).order("created_at", { ascending: false }),
+    supabase.from("invoices").select("*").eq("client_id", client.id).order("created_at", { ascending: false }),
+    supabase.from("payments").select("*").eq("client_id", client.id).order("payment_date", { ascending: false }),
+    supabase
+      .from("client_ledger")
+      .select("*")
+      .eq("client_id", client.id)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("message_threads")
+      .select("*")
+      .eq("entity_type", "client")
+      .eq("entity_id", client.id)
+      .order("last_message_at", { ascending: false, nullsFirst: false }),
+    supabase
+      .from("activity_log")
+      .select("id, description, activity_type, created_at")
+      .eq("entity_type", "client")
+      .eq("entity_id", client.id)
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
 
-  return (
-    <>
-      <PageHeader
-        title={displayName(client)}
-        description={`${client.client_type === "business" ? "Business" : "Individual"} client -- ${client.lifecycle_status}`}
-      />
+  const { data: documentRequestTemplates } = await supabase
+    .from("document_request_templates")
+    .select("id, name")
+    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("status", "published")
+    .order("name");
 
-      <div className="flex-1 space-y-6 px-8 py-6">
-        {/* Overview */}
-        <Section title="Overview">
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-            <Field label="Primary email" value={client.primary_email} />
-            <Field label="Primary phone" value={client.primary_phone} />
-            <Field
-              label="Address"
-              value={[client.address_line1, client.city, client.state].filter(Boolean).join(", ") || null}
-            />
-          </dl>
-        </Section>
+  const engagementIds = (engagements ?? []).map((e) => e.id);
 
-        {/* Contacts -- Progressive Disclosure: only render existing rows */}
-        <Section title="Contacts" action={<AddContactForm clientId={client.id} workspaceId={workspace.id} />}>
-          {!contacts || contacts.length === 0 ? (
-            <EmptyState message="No additional contacts." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {contacts.map((c) => (
-                <li key={c.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="text-slate">
-                    {[c.first_name, c.last_name].filter(Boolean).join(" ")}
-                    {c.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                  </span>
-                  <span className="text-muted">{c.email ?? c.phone ?? ""}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+  const [{ data: engagementActivity }, { data: threadMessages }] = await Promise.all([
+    engagementIds.length > 0
+      ? supabase
+          .from("activity_log")
+          .select("id, description, activity_type, created_at")
+          .eq("entity_type", "engagement")
+          .in("entity_id", engagementIds)
+          .order("created_at", { ascending: false })
+          .limit(30)
+      : Promise.resolve({ data: [] as { id: string; description: string; activity_type: string; created_at: string }[] }),
+    messageThreads && messageThreads.length > 0
+      ? supabase
+          .from("messages")
+          .select("*")
+          .in("thread_id", messageThreads.map((t) => t.id))
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] as { id: string; thread_id: string; sender_type: string; body: string; is_internal: boolean; created_at: string; sender_id: string | null; workspace_id: string }[] }),
+  ]);
 
-        <Section title="Addresses" action={<AddAddressForm clientId={client.id} workspaceId={workspace.id} />}>
-          {!addresses || addresses.length === 0 ? (
-            <EmptyState message="No additional addresses." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {addresses.map((a) => (
-                <li key={a.id} className="py-2 text-sm text-slate">
-                  <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                  {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
+  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string }[] = [];
+  if (engagementIds.length > 0) {
+    const { data: workflowRuns } = await supabase
+      .from("workflow_runs")
+      .select("id, engagement_id")
+      .in("engagement_id", engagementIds);
+    const runIds = (workflowRuns ?? []).map((r) => r.id);
+    if (runIds.length > 0) {
+      const { data: stageRows } = await supabase.from("workflow_stages").select("id, workflow_run_id").in("workflow_run_id", runIds);
+      const stageIds = (stageRows ?? []).map((s) => s.id);
+      if (stageIds.length > 0) {
+        const { data: taskRows } = await supabase
+          .from("tasks")
+          .select("id, title, status, due_date, workflow_stage_id")
+          .in("workflow_stage_id", stageIds)
+          .neq("status", "completed")
+          .order("due_date");
+        const stageToRun = new Map((stageRows ?? []).map((s) => [s.id, s.workflow_run_id]));
+        const runToEngagement = new Map((workflowRuns ?? []).map((r) => [r.id, r.engagement_id]));
+        tasks = (taskRows ?? []).map((t) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          due_date: t.due_date,
+          engagement_id: runToEngagement.get(stageToRun.get(t.workflow_stage_id) ?? "") ?? "",
+        }));
+      }
+    }
+  }
 
-        <Section title="Phone Numbers" action={<AddPhoneForm clientId={client.id} workspaceId={workspace.id} />}>
-          {!phones || phones.length === 0 ? (
-            <EmptyState message="No additional phone numbers." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {phones.map((p) => (
-                <li key={p.id} className="py-2 text-sm text-slate">
-                  <span className="mr-2 capitalize text-muted">{p.phone_type}:</span>
-                  {p.phone_number}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section title="Email Addresses" action={<AddEmailForm clientId={client.id} workspaceId={workspace.id} />}>
-          {!emails || emails.length === 0 ? (
-            <EmptyState message="No additional email addresses." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {emails.map((e) => (
-                <li key={e.id} className="py-2 text-sm text-slate">
-                  <span className="mr-2 capitalize text-muted">{e.email_type}:</span>
-                  {e.email}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section
-          title="Relationships"
-          action={<AddRelationshipForm clientId={client.id} workspaceId={workspace.id} />}
-        >
-          {!relationships || relationships.length === 0 ? (
-            <EmptyState message="No relationships recorded." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {relationships.map((r) => (
-                <li key={r.id} className="py-2 text-sm text-slate">
-                  <span className="mr-2 capitalize text-muted">{r.relationship_type}:</span>
-                  {r.related_name ?? r.related_client_id}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section title="Portal Users" action={<AddPortalUserForm clientId={client.id} workspaceId={workspace.id} />}>
-          {!portalUsers || portalUsers.length === 0 ? (
-            <EmptyState message="No portal users invited yet." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {portalUsers.map((p) => (
-                <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className="text-slate">
-                    {p.invited_name ?? p.invited_email}
-                    {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                  </span>
-                  <span className="capitalize text-muted">{p.status}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        {/* Engagements: existing only, + New Engagement */}
-        <Section
-          title="Engagements"
-          action={
-            <Link
-              href={`/engagements/new?clientId=${client.id}`}
-              className="text-sm font-medium text-accent hover:underline"
-            >
-              + New Engagement
-            </Link>
-          }
-        >
-          {!engagements || engagements.length === 0 ? (
-            <EmptyState message="No engagements yet." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {engagements.map((e) => (
-                <li key={e.id} className="flex items-center justify-between py-2 text-sm">
-                  <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
-                    {e.engagement_number}
-                  </Link>
-                  <span className="text-muted">{e.status}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section title="Documents">
-          {!documents || documents.length === 0 ? (
-            <EmptyState message="No documents uploaded yet." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {documents.map((d) => (
-                <li key={d.id} className="py-2 text-sm text-slate">
-                  {d.file_name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-
-        <Section title="Notes" action={<AddNoteForm entityType="client" entityId={client.id} workspaceId={workspace.id} />}>
-          {!notes || notes.length === 0 ? (
-            <EmptyState message="No notes yet." />
-          ) : (
-            <ul className="space-y-3">
-              {notes.map((n) => (
-                <li key={n.id} className="rounded-lg bg-surfaceMuted p-3 text-sm text-slate">
-                  <p>{n.body}</p>
-                  <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-      </div>
-    </>
+  // Best-effort "missing documents" estimate: requested items come from each
+  // engagement's service document-request template; there's no FK tying a
+  // specific attachment to a specific requested item, so this is a count
+  // comparison, not an exact per-item match.
+  let requestedDocumentCount = 0;
+  const serviceIds = Array.from(
+    new Set(
+      (engagements ?? [])
+        .map((e) => (e as unknown as { service_id?: string }).service_id)
+        .filter((v): v is string => Boolean(v))
+    )
   );
-}
+  if (serviceIds.length > 0) {
+    const { data: services } = await supabase
+      .from("services")
+      .select("id, document_request_template_id")
+      .in("id", serviceIds)
+      .not("document_request_template_id", "is", null);
+    const templateIds = (services ?? []).map((s) => s.document_request_template_id).filter((v): v is string => Boolean(v));
+    if (templateIds.length > 0) {
+      const { count } = await supabase
+        .from("document_request_items")
+        .select("id", { count: "exact", head: true })
+        .in("document_request_template_id", templateIds);
+      requestedDocumentCount = count ?? 0;
+    }
+  }
 
-function Field({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-0.5 text-slate">{value ?? "--"}</dd>
-    </div>
+  const timeline = [...(clientActivity ?? []), ...(engagementActivity ?? [])].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
-}
 
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
+  const outstandingBalance = ledgerEntries && ledgerEntries.length > 0 ? ledgerEntries[0].balance_after : 0;
+
   return (
-    <div className="rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {action}
-      </div>
-      <div className="px-5 py-3">{children}</div>
-    </div>
+    <ClientWorkspace
+      workspace={workspace}
+      client={client}
+      contacts={contacts ?? []}
+      addresses={addresses ?? []}
+      phones={phones ?? []}
+      emails={emails ?? []}
+      relationships={relationships ?? []}
+      portalUsers={portalUsers ?? []}
+      engagements={engagements ?? []}
+      notes={notes ?? []}
+      documents={documents ?? []}
+      quotes={quotes ?? []}
+      invoices={invoices ?? []}
+      payments={payments ?? []}
+      ledgerEntries={ledgerEntries ?? []}
+      outstandingBalance={outstandingBalance}
+      messageThreads={messageThreads ?? []}
+      messages={threadMessages ?? []}
+      timeline={timeline}
+      tasks={tasks}
+      requestedDocumentCount={requestedDocumentCount}
+      documentRequestTemplates={documentRequestTemplates ?? []}
+    />
   );
 }

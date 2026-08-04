@@ -510,6 +510,9 @@ export type Database = {
           postal_code: string | null
           primary_email: string | null
           primary_phone: string | null
+          relationship_manager_id: string | null
+          default_reviewer_id: string | null
+          default_compliance_officer_id: string | null
           search_vector: unknown | null
           ssn_encrypted: string | null
           ssn_hash: string | null
@@ -548,6 +551,9 @@ export type Database = {
           postal_code?: string | null
           primary_email?: string | null
           primary_phone?: string | null
+          relationship_manager_id?: string | null
+          default_reviewer_id?: string | null
+          default_compliance_officer_id?: string | null
           ssn_encrypted?: string | null
           ssn_hash?: string | null
           ssn_last4?: string | null
@@ -585,6 +591,9 @@ export type Database = {
           postal_code?: string | null
           primary_email?: string | null
           primary_phone?: string | null
+          relationship_manager_id?: string | null
+          default_reviewer_id?: string | null
+          default_compliance_officer_id?: string | null
           ssn_encrypted?: string | null
           ssn_hash?: string | null
           ssn_last4?: string | null
@@ -606,6 +615,27 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_relationship_manager_id_fkey"
+            columns: ["relationship_manager_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_default_reviewer_id_fkey"
+            columns: ["default_reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_default_compliance_officer_id_fkey"
+            columns: ["default_compliance_officer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3811,6 +3841,883 @@ export type Database = {
           workspace_type?: string
         }
         Relationships: []
+      }
+      engagement_pricing: {
+        Row: {
+          id: string
+          workspace_id: string
+          engagement_id: string
+          pricing_method: string
+          base_amount: number | null
+          final_amount: number | null
+          discount_amount: number
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          engagement_id: string
+          pricing_method?: string
+          base_amount?: number | null
+          final_amount?: number | null
+          discount_amount?: number
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          engagement_id?: string
+          pricing_method?: string
+          base_amount?: number | null
+          final_amount?: number | null
+          discount_amount?: number
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_pricing_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: true
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_pricing_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_pricing_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          engagement_id: string | null
+          quote_number: string | null
+          title: string
+          status: string
+          line_items: Json
+          subtotal: number
+          discount_amount: number
+          tax_amount: number
+          total_amount: number
+          valid_until: string | null
+          sent_at: string | null
+          accepted_at: string | null
+          declined_at: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          engagement_id?: string | null
+          quote_number?: string | null
+          title: string
+          status?: string
+          line_items?: Json
+          subtotal?: number
+          discount_amount?: number
+          tax_amount?: number
+          total_amount?: number
+          valid_until?: string | null
+          sent_at?: string | null
+          accepted_at?: string | null
+          declined_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          engagement_id?: string | null
+          quote_number?: string | null
+          title?: string
+          status?: string
+          line_items?: Json
+          subtotal?: number
+          discount_amount?: number
+          tax_amount?: number
+          total_amount?: number
+          valid_until?: string | null
+          sent_at?: string | null
+          accepted_at?: string | null
+          declined_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      change_orders: {
+        Row: {
+          id: string
+          workspace_id: string
+          engagement_id: string
+          quote_id: string | null
+          description: string
+          amount_delta: number
+          status: string
+          created_by: string | null
+          approved_by: string | null
+          approved_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          engagement_id: string
+          quote_id?: string | null
+          description: string
+          amount_delta?: number
+          status?: string
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          engagement_id?: string
+          quote_id?: string | null
+          description?: string
+          amount_delta?: number
+          status?: string
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "change_orders_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "change_orders_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "change_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "change_orders_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          engagement_id: string | null
+          invoice_number: string | null
+          status: string
+          issue_date: string
+          due_date: string | null
+          line_items: Json
+          subtotal: number
+          discount_amount: number
+          tax_amount: number
+          total_amount: number
+          amount_paid: number
+          notes: string | null
+          sent_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          engagement_id?: string | null
+          invoice_number?: string | null
+          status?: string
+          issue_date?: string
+          due_date?: string | null
+          line_items?: Json
+          subtotal?: number
+          discount_amount?: number
+          tax_amount?: number
+          total_amount?: number
+          amount_paid?: number
+          notes?: string | null
+          sent_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          engagement_id?: string | null
+          invoice_number?: string | null
+          status?: string
+          issue_date?: string
+          due_date?: string | null
+          line_items?: Json
+          subtotal?: number
+          discount_amount?: number
+          tax_amount?: number
+          total_amount?: number
+          amount_paid?: number
+          notes?: string | null
+          sent_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          type: string
+          brand: string | null
+          last4: string | null
+          exp_month: number | null
+          exp_year: number | null
+          is_default: boolean
+          external_reference: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          type: string
+          brand?: string | null
+          last4?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          is_default?: boolean
+          external_reference?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          type?: string
+          brand?: string | null
+          last4?: string | null
+          exp_month?: number | null
+          exp_year?: number | null
+          is_default?: boolean
+          external_reference?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          invoice_id: string | null
+          payment_method_id: string | null
+          amount: number
+          currency: string
+          status: string
+          payment_date: string
+          reference: string | null
+          notes: string | null
+          recorded_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          invoice_id?: string | null
+          payment_method_id?: string | null
+          amount: number
+          currency?: string
+          status?: string
+          payment_date?: string
+          reference?: string | null
+          notes?: string | null
+          recorded_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          invoice_id?: string | null
+          payment_method_id?: string | null
+          amount?: number
+          currency?: string
+          status?: string
+          payment_date?: string
+          reference?: string | null
+          notes?: string | null
+          recorded_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurring_billing: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          engagement_id: string | null
+          frequency: string
+          amount: number
+          next_billing_date: string
+          status: string
+          payment_method_id: string | null
+          description: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          engagement_id?: string | null
+          frequency: string
+          amount: number
+          next_billing_date: string
+          status?: string
+          payment_method_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          engagement_id?: string | null
+          frequency?: string
+          amount?: number
+          next_billing_date?: string
+          status?: string
+          payment_method_id?: string | null
+          description?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_billing_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_billing_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_billing_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_billing_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_billing_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_ledger: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          entry_type: string
+          reference_table: string | null
+          reference_id: string | null
+          amount: number
+          balance_after: number
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          entry_type: string
+          reference_table?: string | null
+          reference_id?: string | null
+          amount: number
+          balance_after: number
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          entry_type?: string
+          reference_table?: string | null
+          reference_id?: string | null
+          amount?: number
+          balance_after?: number
+          description?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_ledger_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_ledger_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      message_threads: {
+        Row: {
+          id: string
+          workspace_id: string
+          entity_type: string
+          entity_id: string
+          subject: string | null
+          channel: string
+          status: string
+          last_message_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          entity_type?: string
+          entity_id: string
+          subject?: string | null
+          channel?: string
+          status?: string
+          last_message_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          entity_type?: string
+          entity_id?: string
+          subject?: string | null
+          channel?: string
+          status?: string
+          last_message_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_threads_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_threads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          id: string
+          workspace_id: string
+          thread_id: string
+          sender_type: string
+          sender_id: string | null
+          body: string
+          is_internal: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          thread_id: string
+          sender_type?: string
+          sender_id?: string | null
+          body: string
+          is_internal?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          thread_id?: string
+          sender_type?: string
+          sender_id?: string | null
+          body?: string
+          is_internal?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "message_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_log: {
+        Row: {
+          id: string
+          workspace_id: string
+          message_id: string | null
+          template_key: string | null
+          recipient_email: string
+          subject: string | null
+          status: string
+          provider_reference: string | null
+          sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          message_id?: string | null
+          template_key?: string | null
+          recipient_email: string
+          subject?: string | null
+          status?: string
+          provider_reference?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          message_id?: string | null
+          template_key?: string | null
+          recipient_email?: string
+          subject?: string | null
+          status?: string
+          provider_reference?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_log_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_log: {
+        Row: {
+          id: string
+          workspace_id: string
+          message_id: string | null
+          template_key: string | null
+          recipient_phone: string
+          body: string
+          status: string
+          provider_reference: string | null
+          sent_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          message_id?: string | null
+          template_key?: string | null
+          recipient_phone: string
+          body: string
+          status?: string
+          provider_reference?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          message_id?: string | null
+          template_key?: string | null
+          recipient_phone?: string
+          body?: string
+          status?: string
+          provider_reference?: string | null
+          sent_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_log_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_preferences: {
+        Row: {
+          id: string
+          workspace_id: string
+          client_id: string
+          preferred_channel: string
+          email_opt_in: boolean
+          sms_opt_in: boolean
+          do_not_contact: boolean
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          client_id: string
+          preferred_channel?: string
+          email_opt_in?: boolean
+          sms_opt_in?: boolean
+          do_not_contact?: boolean
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          client_id?: string
+          preferred_channel?: string
+          email_opt_in?: boolean
+          sms_opt_in?: boolean
+          do_not_contact?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_preferences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_preferences_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
