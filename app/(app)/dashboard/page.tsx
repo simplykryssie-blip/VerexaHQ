@@ -14,7 +14,7 @@ async function getCounts(workspaceId: string) {
       .from("engagements")
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspaceId)
-      .not("status", "in", "(Completed,Archived)"),
+      .not("status", "in", '("Completed","Archived")'),
     supabase
       .from("tasks")
       .select("id", { count: "exact", head: true })
