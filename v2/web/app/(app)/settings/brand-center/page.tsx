@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { BrandCenterForm } from "./BrandCenterForm";
 
+export const dynamic = 'force-dynamic';
+
 export default async function BrandCenterPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;

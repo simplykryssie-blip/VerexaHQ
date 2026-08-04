@@ -4,6 +4,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 
+export const dynamic = 'force-dynamic';
+
 export default async function EngagementsPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;

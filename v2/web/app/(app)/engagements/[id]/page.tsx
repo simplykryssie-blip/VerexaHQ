@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+
+export const dynamic = 'force-dynamic';
 import { StatusSelect } from "./StatusSelect";
 import { TaskRow } from "./TaskRow";
 import { AddEngagementNoteForm } from "./AddEngagementNoteForm";

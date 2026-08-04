@@ -3,6 +3,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 async function getCounts(workspaceId: string) {
   const supabase = createClient();
 

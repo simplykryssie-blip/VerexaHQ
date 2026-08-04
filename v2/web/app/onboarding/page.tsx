@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+export const dynamic = 'force-dynamic';
+
 const WORKSPACE_TYPES = [
   { value: "independent_ptin", label: "Independent PTIN" },
   { value: "ero_office", label: "ERO Office" },

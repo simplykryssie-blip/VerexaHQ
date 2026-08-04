@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { NewClientButton } from "./NewClientButton";
 
+export const dynamic = 'force-dynamic';
+
 function clientDisplayName(c: {
   client_type: string;
   first_name: string | null;

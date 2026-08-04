@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
 
+export const dynamic = 'force-dynamic';
+
 export default async function RolesPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;

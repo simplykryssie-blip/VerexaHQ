@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { EmptyState } from "@/components/EmptyState";
 
+export const dynamic = 'force-dynamic';
+
 export default async function NotificationsPage() {
   const supabase = createClient();
   const {

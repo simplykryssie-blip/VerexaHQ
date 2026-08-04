@@ -3,6 +3,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
 import { SecurityForm } from "./SecurityForm";
 
+export const dynamic = 'force-dynamic';
+
 export default async function SecurityPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;

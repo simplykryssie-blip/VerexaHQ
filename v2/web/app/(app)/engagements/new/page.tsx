@@ -3,6 +3,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { NewEngagementForm } from "./NewEngagementForm";
 
+export const dynamic = 'force-dynamic';
+
 export default async function NewEngagementPage({
   searchParams,
 }: {
