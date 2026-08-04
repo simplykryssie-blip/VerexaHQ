@@ -1,187 +1,55 @@
-"use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useWorkspace } from "@/components/WorkspaceProvider";
-import { friendlyError } from "@/lib/friendlyError";
-type Event = {
-  id: string;
-  title: string;
-  date: string;
-  kind: string;
-  client_id: string | null;
-};
-type DeadlineRow = { id: string; deadline_title: string; due_date: string; client_id: string | null };
-type CalendarEventRow = { id: string; event_title: string; start_at: string; client_id: string | null; event_category: string | null };
-export default function CalendarPage() {
-  const { activeWorkspaceId } = useWorkspace();
-  const [cursor, setCursor] = useState(() => new Date());
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(async () => {
-    if (!activeWorkspaceId) return;
-    setLoading(true);
-    const start = new Date(
-      cursor.getFullYear(),
-      cursor.getMonth(),
-      1,
-    ).toISOString();
-    const end = new Date(
-      cursor.getFullYear(),
-      cursor.getMonth() + 1,
-      1,
-    ).toISOString();
-    const [d, c] = await Promise.all([
-      supabase
-        .from("deadlines")
-        .select("id,deadline_title,due_date,client_id")
-        .eq("workspace_id", activeWorkspaceId)
-        .gte("due_date", start.slice(0, 10))
-        .lt("due_date", end.slice(0, 10)),
-      supabase
-        .from("workspace_calendar_events")
-        .select("id,event_title,start_at,client_id,event_category")
-        .eq("workspace_id", activeWorkspaceId)
-        .neq("event_status", "canceled")
-        .gte("start_at", start)
-        .lt("start_at", end),
-    ]);
-    const firstError = d.error ?? c.error;
-    if (firstError) {
-      setError(friendlyError(firstError, "We couldn't load your calendar right now. Please try again."));
-      setLoading(false);
-      return;
-    }
-    setError(null);
-    setEvents([
-      ...((d.data as DeadlineRow[]) ?? []).map((r) => ({
-        id: r.id,
-        title: r.deadline_title,
-        date: r.due_date,
-        kind: "Deadline",
-        client_id: r.client_id,
-      })),
-      ...((c.data as CalendarEventRow[]) ?? []).map((r) => ({
-        id: r.id,
-        title: r.event_title,
-        date: r.start_at,
-        kind: r.event_category || "Event",
-        client_id: r.client_id,
-      })),
-    ]);
-    setLoading(false);
-  }, [activeWorkspaceId, cursor]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  const days = useMemo(() => {
-    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-    const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
-    const a: (Date | null)[] = Array(first.getDay()).fill(null);
-    for (let i = 1; i <= last.getDate(); i++)
-      a.push(new Date(cursor.getFullYear(), cursor.getMonth(), i));
-    while (a.length % 7) a.push(null);
-    return a;
-  }, [cursor]);
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { PageHeader } from "@/components/PageHeader";
+import { CalendarView, type CalendarItem } from "./CalendarView";
+
+export const dynamic = 'force-dynamic';
+
+export default async function CalendarPage() {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return null;
+
+  const supabase = createClient();
+  const [{ data: engagements }, { data: tasks }] = await Promise.all([
+    supabase
+      .from("engagements")
+      .select("id, engagement_number, due_date")
+      .eq("workspace_id", workspace.id)
+      .not("due_date", "is", null),
+    supabase
+      .from("tasks")
+      .select("id, title, due_date")
+      .eq("workspace_id", workspace.id)
+      .not("due_date", "is", null)
+      .neq("status", "completed"),
+  ]);
+
+  const items: CalendarItem[] = [
+    ...(engagements ?? []).map((e) => ({
+      id: e.id,
+      date: e.due_date as string,
+      label: e.engagement_number ?? "Engagement",
+      href: `/engagements/${e.id}`,
+      kind: "engagement" as const,
+    })),
+    ...(tasks ?? []).map((t) => ({
+      id: t.id,
+      date: t.due_date as string,
+      label: t.title,
+      href: undefined,
+      kind: "task" as const,
+    })),
+  ];
+
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Calendar</h1>
-          <p className="mt-1 text-sm text-muted">
-            Deadlines and firm events in one place.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() =>
-              setCursor(
-                new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1),
-              )
-            }
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white"
-          >
-            <ChevronLeft />
-          </button>
-          <button
-            onClick={() => setCursor(new Date())}
-            className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold"
-          >
-            Today
-          </button>
-          <button
-            onClick={() =>
-              setCursor(
-                new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1),
-              )
-            }
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white"
-          >
-            <ChevronRight />
-          </button>
-        </div>
+    <>
+      <PageHeader
+        title="Calendar"
+        description="Engagement and task due dates across your workspace."
+      />
+      <div className="flex-1 px-8 py-6">
+        <CalendarView items={items} />
       </div>
-      <h2 className="mb-3 text-lg font-bold text-ink">
-        {cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-      </h2>
-      {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      )}
-      {loading && (
-        <div className="mb-4 text-sm text-muted">Loading calendar…</div>
-      )}
-      <div className="overflow-x-auto">
-        <div className="min-w-[760px] overflow-hidden rounded-2xl border border-line bg-white">
-          <div className="grid grid-cols-7 bg-paper">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div
-                key={d}
-                className="p-3 text-xs font-bold uppercase text-muted"
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {days.map((day, i) => {
-              const items = day
-                ? events.filter(
-                    (e) =>
-                      new Date(e.date).toDateString() === day.toDateString(),
-                  )
-                : [];
-              return (
-                <div
-                  key={i}
-                  className="min-h-28 border-r border-t border-line p-2 last:border-r-0"
-                >
-                  <div className="text-xs font-semibold text-muted">
-                    {day?.getDate()}
-                  </div>
-                  {items.slice(0, 3).map((e) => (
-                    <Link
-                      key={`${e.kind}-${e.id}`}
-                      href={
-                        e.client_id ? `/clients/${e.client_id}` : "/deadlines"
-                      }
-                      className="mt-1 block truncate rounded-lg bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-800"
-                    >
-                      {e.title}
-                    </Link>
-                  ))}
-                  {items.length > 3 && (
-                    <div className="mt-1 text-[10px] text-muted">
-                      +{items.length - 3} more
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

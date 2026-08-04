@@ -1,125 +1,103 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, Loader2 } from "lucide-react";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { Logo } from "@/components/Logo";
+import { createClient } from "@/lib/supabase/client";
+
+export const dynamic = 'force-dynamic';
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createClient();
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) router.replace("/setup");
-  }, [router]);
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setLoading(true);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    setLoading(true);
+
+    const { error } =
+      mode === "sign-in"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+
     setLoading(false);
-    if (signInError) {
-      setError(
-        "We could not sign you in. Check your email and password and try again.",
-      );
+
+    if (error) {
+      setError(error.message);
       return;
     }
-    router.replace("/dashboard");
+
+    router.push("/dashboard");
+    router.refresh();
   }
 
   return (
-    <main className="min-h-screen bg-paper px-4 py-10 grid place-items-center">
-      <div className="w-full max-w-md">
-        <div className="mb-8 flex justify-center">
-          <Logo size={25} dark showTagline />
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-2xl border border-line bg-white p-6 shadow-sm sm:p-8"
-        >
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-ink">Welcome back</h1>
-            <p className="mt-1 text-sm text-muted">
-              Sign in to your firm command center.
-            </p>
-          </div>
-          <div className="space-y-4">
-            <label className="block text-sm font-semibold text-ink">
+    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm">
+        <h1 className="text-xl font-semibold text-ink">Verexa Tax Office</h1>
+        <p className="mt-1 text-sm text-muted">
+          {mode === "sign-in" ? "Sign in to your workspace" : "Create your account"}
+        </p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate" htmlFor="email">
               Email
-              <input
-                className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-3 font-normal focus:border-teal focus:outline-none"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
             </label>
-            <label className="block text-sm font-semibold text-ink">
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              autoComplete="email"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate" htmlFor="password">
               Password
-              <input
-                className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-3 font-normal focus:border-teal focus:outline-none"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
             </label>
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+            />
           </div>
+
           {error && (
-            <div
-              role="alert"
-              className="mt-4 flex gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700"
-            >
-              <AlertCircle size={17} className="mt-0.5 shrink-0" />
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
               {error}
-            </div>
+            </p>
           )}
-          <div className="mt-3 text-right">
-            <Link
-              href="/forgot-password"
-              className="text-sm font-semibold text-[#108A64] hover:underline"
-            >
-              Forgot password?
-            </Link>
-          </div>
+
           <button
+            type="submit"
             disabled={loading}
-            className="brand-gradient mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60"
+            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
           >
-            {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Signing in…
-              </>
-            ) : (
-              <>
-                Sign in
-                <ArrowRight size={18} />
-              </>
-            )}
+            {loading ? "Please wait..." : mode === "sign-in" ? "Sign in" : "Create account"}
           </button>
-          <p className="mt-6 text-center text-sm text-muted">
-            Founding Beta member?{" "}
-            <Link
-              href="/signup"
-              className="font-semibold text-[#108A64] hover:underline"
-            >
-              Create your account
-            </Link>
-          </p>
         </form>
+
+        <button
+          type="button"
+          onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}
+          className="mt-4 w-full text-center text-sm text-accent hover:underline"
+        >
+          {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+        </button>
       </div>
-    </main>
+    </div>
   );
 }
