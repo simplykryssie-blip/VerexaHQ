@@ -403,6 +403,7 @@ export type Database = {
       branding: {
         Row: {
           accent_color: string
+          billing_email: string | null
           business_email: string | null
           business_phone: string | null
           custom_domain: string | null
@@ -411,10 +412,12 @@ export type Database = {
           email_from_name: string | null
           email_header_logo_url: string | null
           logo_url: string | null
+          notification_email: string | null
           pdf_header_logo_url: string | null
           portal_logo_url: string | null
           portal_subdomain: string | null
           primary_color: string
+          reply_to_email: string | null
           secondary_color: string
           sidebar_logo_url: string | null
           support_email: string | null
@@ -426,6 +429,7 @@ export type Database = {
         }
         Insert: {
           accent_color?: string
+          billing_email?: string | null
           business_email?: string | null
           business_phone?: string | null
           custom_domain?: string | null
@@ -434,10 +438,12 @@ export type Database = {
           email_from_name?: string | null
           email_header_logo_url?: string | null
           logo_url?: string | null
+          notification_email?: string | null
           pdf_header_logo_url?: string | null
           portal_logo_url?: string | null
           portal_subdomain?: string | null
           primary_color?: string
+          reply_to_email?: string | null
           secondary_color?: string
           sidebar_logo_url?: string | null
           support_email?: string | null
@@ -449,6 +455,7 @@ export type Database = {
         }
         Update: {
           accent_color?: string
+          billing_email?: string | null
           business_email?: string | null
           business_phone?: string | null
           custom_domain?: string | null
@@ -457,10 +464,12 @@ export type Database = {
           email_from_name?: string | null
           email_header_logo_url?: string | null
           logo_url?: string | null
+          notification_email?: string | null
           pdf_header_logo_url?: string | null
           portal_logo_url?: string | null
           portal_subdomain?: string | null
           primary_color?: string
+          reply_to_email?: string | null
           secondary_color?: string
           sidebar_logo_url?: string | null
           support_email?: string | null
@@ -3783,6 +3792,66 @@ export type Database = {
           },
         ]
       }
+      workspace_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          role_id: string
+          status: string
+          token: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role_id: string
+          status?: string
+          token?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          role_id?: string
+          status?: string
+          token?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invitations_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_users: {
         Row: {
           created_at: string
@@ -4921,6 +4990,20 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      accept_workspace_invitation_by_token: {
+        Args: { p_token: string }
+        Returns: string
+      }
+      get_invitation_preview: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          status: string
+          expires_at: string
+          workspace_name: string
+          role_name: string
+        }[]
+      }
       advance_onboarding_step: {
         Args: {
           p_selected_blueprint_id?: string
@@ -5008,6 +5091,23 @@ export type Database = {
       create_workspace: {
         Args: { p_name: string; p_timezone?: string; p_workspace_type?: string }
         Returns: string
+      }
+      create_workspace_invitation: {
+        Args: { p_email: string; p_role_id: string; p_workspace_id: string }
+        Returns: {
+          id: string
+          workspace_id: string
+          email: string
+          role_id: string
+          token: string
+          status: string
+          invited_by: string | null
+          accepted_by: string | null
+          accepted_at: string | null
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
       }
       current_workspace_ids: { Args: never; Returns: string[] }
       decline_config_object_share: {

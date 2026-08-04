@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +17,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
@@ -56,13 +58,20 @@ export default function LoginPage() {
 
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
 
+    await fetch("/api/auth/set-remember", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remember: rememberMe }),
+    });
+
+    setLoading(false);
     router.push("/dashboard");
     router.refresh();
   }
@@ -192,6 +201,23 @@ export default function LoginPage() {
                 className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 autoComplete="new-password"
               />
+            </div>
+          )}
+
+          {mode === "sign-in" && (
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm text-slate">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                />
+                Remember me
+              </label>
+              <Link href="/forgot-password" className="text-sm text-accent hover:underline">
+                Forgot password?
+              </Link>
             </div>
           )}
 

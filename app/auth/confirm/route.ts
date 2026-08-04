@@ -11,15 +11,30 @@ export async function GET(request: Request) {
 
   const supabase = createClient();
 
+  // Email-link flows (verification, password reset, invitations) don't offer a
+  // "remember me" choice, so default to persistent -- matches the password
+  // login form's default and avoids the "remember me" middleware check
+  // signing the user straight back out for lacking the marker cookie.
+  function withRememberMarker(response: NextResponse) {
+    response.cookies.set("sb_remember", "persistent", {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24 * 400,
+    });
+    return response;
+  }
+
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return withRememberMarker(NextResponse.redirect(`${origin}${next}`));
     }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return withRememberMarker(NextResponse.redirect(`${origin}${next}`));
     }
   }
 

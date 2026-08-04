@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/confirm"];
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/confirm", "/forgot-password", "/accept-invitation"];
 
 export async function updateSession(request: NextRequest) {
   try {
@@ -49,6 +49,19 @@ export async function updateSession(request: NextRequest) {
       const redirectUrl = new URL("/login", request.url);
       redirectUrl.searchParams.set("next", request.nextUrl.pathname);
       return NextResponse.redirect(redirectUrl);
+    }
+
+    // "Remember me" enforcement: a "temporary" marker is a true browser-session
+    // cookie (no maxAge), unlike the underlying Supabase auth cookies which this
+    // client version always persists long-term regardless of options. If the
+    // marker is gone while the auth cookies remain, the browser was closed and
+    // reopened on a session the user asked not to be remembered -- sign out.
+    if (user && !isPublicPath && !request.cookies.get("sb_remember")) {
+      await supabase.auth.signOut();
+      const redirectUrl = new URL("/login", request.url);
+      const signedOutResponse = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((cookie) => signedOutResponse.cookies.set(cookie));
+      return signedOutResponse;
     }
 
     if (user && request.nextUrl.pathname === "/login") {
