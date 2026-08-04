@@ -28,7 +28,7 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
   {
     slug: "documents",
     title: "Documents",
-    description: "Missing documents across open engagements, by client.",
+    description: "Missing documents, upload activity, signatures, storage, and request completion.",
   },
   {
     slug: "staff-productivity",

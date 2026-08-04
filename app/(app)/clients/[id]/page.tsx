@@ -38,6 +38,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: ledgerEntries },
     { data: messageThreads },
     { data: clientActivity },
+    { data: documentFolders },
+    { data: staffMembers },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -64,7 +66,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .order("created_at", { ascending: false }),
     supabase
       .from("attachments")
-      .select("id, file_name, category, version, mime_type, file_size_bytes, created_at")
+      .select(
+        `id, file_name, storage_path, category, tags, version, mime_type, file_size_bytes, folder_id,
+        is_favorite, is_archived, is_locked, visibility, created_at, uploaded_by`
+      )
       .eq("entity_type", "client")
       .eq("entity_id", client.id)
       .order("created_at", { ascending: false }),
@@ -90,6 +95,17 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .eq("entity_id", client.id)
       .order("created_at", { ascending: false })
       .limit(30),
+    supabase
+      .from("document_folders")
+      .select("id, name, parent_folder_id, display_order")
+      .eq("entity_type", "client")
+      .eq("entity_id", client.id)
+      .order("display_order"),
+    supabase
+      .from("workspace_users")
+      .select("user_id, user_profiles(id, display_name)")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "active"),
   ]);
 
   const { data: documentRequestTemplates } = await supabase
@@ -98,6 +114,62 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
     .eq("status", "published")
     .order("name");
+
+  const { data: documentRequestRows } = await supabase
+    .from("document_requests")
+    .select(
+      `id, title, due_date, status, created_at,
+      items:document_request_item_statuses(id, name, is_required, status)`
+    )
+    .eq("entity_type", "client")
+    .eq("entity_id", client.id)
+    .order("created_at", { ascending: false });
+
+  const documentIds = (documents ?? []).map((d) => d.id);
+  const { data: signatureRequestRows } =
+    documentIds.length > 0
+      ? await supabase
+          .from("signature_requests")
+          .select(
+            `id, title, status, due_date, attachment_id, created_at,
+            attachment:attachments!signature_requests_attachment_id_fkey(file_name),
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at)`
+          )
+          .in("attachment_id", documentIds)
+          .order("created_at", { ascending: false })
+      : { data: [] as never[] };
+
+  const staffById = new Map(
+    (staffMembers ?? [])
+      .map((m: any) => m.user_profiles)
+      .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
+      .map((p: any) => [p.id, p])
+  );
+
+  const documentsWithUploader = (documents ?? []).map((d: any) => ({
+    ...d,
+    uploaded_by: d.uploaded_by ? staffById.get(d.uploaded_by) ?? null : null,
+  }));
+
+  const documentRequests = (documentRequestRows ?? []).map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    due_date: r.due_date,
+    status: r.status,
+    created_at: r.created_at,
+    items: r.items ?? [],
+  }));
+
+  const signatureRequests = (signatureRequestRows ?? []).map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    due_date: r.due_date,
+    attachment_id: r.attachment_id,
+    attachment_file_name: r.attachment?.file_name ?? "Document",
+    created_at: r.created_at,
+    signers: r.signers ?? [],
+  }));
 
   const engagementIds = (engagements ?? []).map((e) => e.id);
 
@@ -177,7 +249,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       portalUsers={portalUsers ?? []}
       engagements={engagements ?? []}
       notes={notes ?? []}
-      documents={documents ?? []}
+      documents={documentsWithUploader}
+      documentFolders={documentFolders ?? []}
+      documentRequests={documentRequests}
+      signatureRequests={signatureRequests}
       quotes={quotes ?? []}
       invoices={invoices ?? []}
       payments={payments ?? []}

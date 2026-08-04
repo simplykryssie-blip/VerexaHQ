@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
+import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
+import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import {
   OverviewTab,
   ContactsTab,
   RelationshipsTab,
   EngagementsTab,
-  DocumentsTab,
   MessagesTab,
   BillingTab,
   TimelineTab,
@@ -20,7 +21,6 @@ import {
   type PortalUserRow,
   type RelationshipRow,
   type NoteRow,
-  type DocumentRow,
   type ActivityRow,
   type TaskRow,
   type QuoteRow,
@@ -90,6 +90,9 @@ export function ClientWorkspace({
   engagements,
   notes,
   documents,
+  documentFolders,
+  documentRequests,
+  signatureRequests,
   quotes,
   invoices,
   payments,
@@ -113,6 +116,9 @@ export function ClientWorkspace({
   engagements: EngagementRow[];
   notes: NoteRow[];
   documents: DocumentRow[];
+  documentFolders: DocumentFolderRow[];
+  documentRequests: DocumentRequestRow[];
+  signatureRequests: SignatureRequestRow[];
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   payments: PaymentRow[];
@@ -219,7 +225,19 @@ export function ClientWorkspace({
               <RelationshipsTab clientId={client.id} workspaceId={workspace.id} relationships={relationships} />
             )}
             {tab === "Engagements" && <EngagementsTab engagements={engagements} client={client} />}
-            {tab === "Documents" && <DocumentsTab documents={documents} requestedDocumentCount={requestedDocumentCount} />}
+            {tab === "Documents" && (
+              <DocumentWorkspace
+                workspaceId={workspace.id}
+                entityType="client"
+                entityId={client.id}
+                folders={documentFolders}
+                documents={documents}
+                requests={documentRequests}
+                requestTemplates={documentRequestTemplates}
+                signatureRequests={signatureRequests}
+                activity={timeline}
+              />
+            )}
             {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}
             {tab === "Billing" && (
               <BillingTab quotes={quotes} invoices={invoices} payments={payments} outstandingBalance={outstandingBalance} />

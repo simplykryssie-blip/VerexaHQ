@@ -4,6 +4,7 @@ import {
   Users,
   Briefcase,
   Calendar,
+  FolderOpen,
   BarChart3,
   Settings,
 } from "lucide-react";
@@ -19,6 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Calendar", href: "/calendar", icon: Calendar },
+  { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

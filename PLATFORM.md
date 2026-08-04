@@ -168,12 +168,111 @@ team.
 Clients, Engagements, Billing, Documents, Staff, Compliance, Growth).
 **Two are fully wired** end-to-end (permission-gated via `has_permission`,
 live data, sortable/searchable/exportable): `/reports/financial` (revenue
-by month + invoice/collections table) and `/reports/documents` (missing
-documents by engagement, the same estimate methodology as the Client
-Workspace's Documents tab, applied workspace-wide). The other 6 stay
-honest `ComingSoon` shells — the sprint asked for the engine, not every
-report, and building six more real reports without real per-category data
-questions answered first would mean guessing at what each should show.
+by month + invoice/collections table) and `/reports/documents` (see
+Document Center below — now five tab-switched sub-reports on live request
+data, not an estimate). The other 6 stay honest `ComingSoon` shells — the
+sprint asked for the engine, not every report, and building six more real
+reports without real per-category data questions answered first would mean
+guessing at what each should show.
+
+## Document Center
+
+A shared `DocumentWorkspace` component (`components/documents/`) replaces
+the old flat "list of file names" Documents tab on both the Client and
+Engagement Workspaces — same tabs (Overview, Files, Requests, Signatures,
+Activity), same folder tree, same upload/preview/bulk-action UI, for
+either entity, because the mission required "every client and engagement
+should expose the same document experience." Nothing in either workspace's
+existing data model changed shape; `attachments` (the pre-existing
+universal-attachments table) was extended in place with `folder_id`,
+`is_favorite`, `is_archived`, `visibility`, `replaces_attachment_id`,
+`is_latest_version`, `is_locked`, and a reserved, currently-empty
+`ai_metadata jsonb` column — no new documents table.
+
+### Folder templates and auto-provisioning
+
+`document_folders` holds the actual per-engagement/per-client folder tree
+(self-referencing `parent_folder_id`). `document_folder_templates` +
+`document_folder_template_items` follow the exact global-template
+convention already used by `services`/`engagement_types`/
+`document_request_templates`: `workspace_id = null` rows are the shipped
+system templates every workspace sees, workspace-owned rows are firm
+customizations. Five system templates are seeded (1040 Individual Return,
+Bookkeeping, Payroll, Business Formation, Compliance) matching the
+mission's own folder lists. `services.document_folder_template_id` links a
+service to a template; `trg_apply_document_folder_template` (`AFTER INSERT
+ON engagements`) walks the template with a recursive CTE and clones it into
+real `document_folders` rows for the new engagement, preserving
+parent/child structure via a runtime id-map — the same "auto-provision on
+creation" shape as the rest of the workspace-provisioning engine, just
+scoped to one engagement instead of one workspace.
+
+### Document Requests: the missing instance layer
+
+The template table (`document_request_templates`) already existed; there
+was no table tracking an actual request sent to an actual client and
+whether it had been fulfilled. `document_requests` (title, due date,
+status) + `document_request_item_statuses` (per required/optional item,
+pending/uploaded/waived) is that instance layer. `create_document_request`
+seeds the item statuses from a template atomically; a trigger
+(`check_document_request_completion`) flips the parent request to
+`completed` the moment its last required item is fulfilled — so "missing
+documents," "overdue requests," and "completion %" are all read directly
+off live rows, not estimated by comparing unrelated counts.
+
+### Signature Center — scope and honest limits
+
+`signature_requests` + `signature_request_signers` model pending →
+signed/declined → completed, multiple signers, and an automatic document
+lock (`attachments.is_locked = true`, set by `record_signature()` once
+every signer has signed). This is **not** a DocuSign/HelloSign integration
+and there is **no public client-facing signing link** — building either
+means either a paid e-sign provider or the (explicitly out-of-scope)
+Client Portal. What exists is a staff-recorded capture: a staff member
+types the signer's full name to confirm a signature obtained in person or
+through another channel (`signature_type = 'typed'`; `'drawn'` is modeled
+in the schema for a future canvas-signature capture but no UI captures it
+yet). Treat this as an internal record-keeping tool, not a legally
+self-service e-signature flow.
+
+### Activity feed integration, not a new feed
+
+Three new trigger functions (`record_attachment_activity`,
+`record_document_request_activity`, `record_signature_activity`) write to
+the existing `activity_log` table — the curated, human-readable feed
+already rendered by the Client/Engagement Workspace Timeline tabs — using
+the **parent** entity's `entity_type`/`entity_id` (e.g., a document
+uploaded to an engagement logs against that engagement, the same
+convention `record_engagement_created()` and friends already use). Upload,
+archive, restore, rename, and delete events, request-created events, and
+signed/declined events all surface in Timeline for free. No new activity
+table, no new feed component.
+
+### Document Center hub (`/documents`) — operational only
+
+Five stat cards (pending requests, missing documents, overdue requests,
+pending signatures, storage used) plus pending-requests / pending-
+signatures / recent-uploads lists, all workspace-wide, all live queries,
+each linking to `/reports/documents` for the analytical breakdown. Per the
+mission's own rule for this page ("nothing analytical belongs here"), two
+items the brief asked for have no honest home yet and were deliberately
+left out rather than faked: **"pending review"** (there is no
+document-level review-status field anywhere in the schema — only
+engagement-level `review_status`) and **"recently viewed"** (no
+view-tracking exists on `attachments`). Both would need new schema, which
+this pass's brief explicitly forbade ("Do not redesign the database").
+
+### `/reports/documents` — five tab-switched reports
+
+Missing Documents, Upload Activity, Signatures, Storage, and Request
+Completion, switched via a `?report=` query param on one route (same
+`ReportLayout`/`FilterBar`/`SortableTable`/`ExportButtons` engine as
+`/reports/financial` — no new export mechanism). The old version of this
+report page approximated "missing documents" by comparing unrelated counts
+(requested-via-template vs. uploaded, with no row-level link between
+them); it's been replaced with a query against the real
+`document_requests`/`document_request_item_statuses` rows, so the number
+is now exact, not an estimate.
 
 ## Email / SMS Infrastructure
 
@@ -386,6 +485,16 @@ audit-and-fix pass should invent unasked.
 - 6 of 8 report categories are still `ComingSoon` shells (Clients,
   Engagements, Billing, Staff, Compliance, Growth) — the engine exists,
   those specific reports don't yet.
+- Signature Center is staff-recorded only — no e-sign provider
+  integration, no public client-facing signing link (see Document Center).
+- No OCR, auto-classification, duplicate detection, or AI metadata
+  extraction on documents — `attachments.ai_metadata` is reserved but
+  unpopulated, per this pass's explicit instruction not to implement AI yet.
+- Office documents (Word/Excel/PowerPoint) have no inline preview — PDF,
+  images, and text files preview inline; everything else downloads.
+- No document-level review-status field, so the Document Center hub has no
+  "pending review" card; no view-tracking on `attachments`, so it has no
+  "recently viewed" card.
 - No true drag-and-drop widget reordering (up/down buttons only) and no
   `.xlsx` export (CSV, which Excel opens natively) — both deliberate
   scope calls to avoid adding a new dependency for one feature.

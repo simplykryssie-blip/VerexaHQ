@@ -774,49 +774,73 @@ export type Database = {
       }
       attachments: {
         Row: {
+          ai_metadata: Json | null
           category: string | null
           created_at: string
           entity_id: string
           entity_type: string
           file_name: string
           file_size_bytes: number | null
+          folder_id: string | null
           id: string
+          is_archived: boolean
+          is_favorite: boolean
+          is_latest_version: boolean
+          is_locked: boolean
           mime_type: string | null
+          replaces_attachment_id: string | null
           search_vector: unknown | null
           storage_path: string
           tags: string[] | null
           uploaded_by: string | null
           version: number | null
+          visibility: string
           workspace_id: string
         }
         Insert: {
+          ai_metadata?: Json | null
           category?: string | null
           created_at?: string
           entity_id: string
           entity_type?: string
           file_name: string
           file_size_bytes?: number | null
+          folder_id?: string | null
           id?: string
+          is_archived?: boolean
+          is_favorite?: boolean
+          is_latest_version?: boolean
+          is_locked?: boolean
           mime_type?: string | null
+          replaces_attachment_id?: string | null
           storage_path: string
           tags?: string[] | null
           uploaded_by?: string | null
           version?: number | null
+          visibility?: string
           workspace_id: string
         }
         Update: {
+          ai_metadata?: Json | null
           category?: string | null
           created_at?: string
           entity_id?: string
           entity_type?: string
           file_name?: string
           file_size_bytes?: number | null
+          folder_id?: string | null
           id?: string
+          is_archived?: boolean
+          is_favorite?: boolean
+          is_latest_version?: boolean
+          is_locked?: boolean
           mime_type?: string | null
+          replaces_attachment_id?: string | null
           storage_path?: string
           tags?: string[] | null
           uploaded_by?: string | null
           version?: number | null
+          visibility?: string
           workspace_id?: string
         }
         Relationships: [
@@ -825,6 +849,20 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_replaces_attachment_id_fkey"
+            columns: ["replaces_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "attachments"
             referencedColumns: ["id"]
           },
         ]
@@ -2359,6 +2397,198 @@ export type Database = {
           },
         ]
       }
+      document_folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_order: number
+          entity_id: string
+          entity_type: string
+          id: string
+          name: string
+          parent_folder_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          entity_id: string
+          entity_type: string
+          id?: string
+          name: string
+          parent_folder_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          name?: string
+          parent_folder_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "document_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_folders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_folder_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          module: string
+          name: string
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          module: string
+          name: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          module?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_folder_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_folder_template_items: {
+        Row: {
+          created_at: string
+          display_order: number
+          document_folder_template_id: string
+          id: string
+          name: string
+          parent_item_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          document_folder_template_id: string
+          id?: string
+          name: string
+          parent_item_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          document_folder_template_id?: string
+          id?: string
+          name?: string
+          parent_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_folder_template_items_document_folder_template_i_fkey"
+            columns: ["document_folder_template_id"]
+            isOneToOne: false
+            referencedRelation: "document_folder_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_folder_template_items_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "document_folder_template_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_request_item_statuses: {
+        Row: {
+          document_request_id: string
+          document_request_item_id: string | null
+          fulfilled_by_attachment_id: string | null
+          id: string
+          is_required: boolean
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          document_request_id: string
+          document_request_item_id?: string | null
+          fulfilled_by_attachment_id?: string | null
+          id?: string
+          is_required?: boolean
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          document_request_id?: string
+          document_request_item_id?: string | null
+          fulfilled_by_attachment_id?: string | null
+          id?: string
+          is_required?: boolean
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_request_item_statuses_document_request_id_fkey"
+            columns: ["document_request_id"]
+            isOneToOne: false
+            referencedRelation: "document_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_request_item_statuses_document_request_item_id_fkey"
+            columns: ["document_request_item_id"]
+            isOneToOne: false
+            referencedRelation: "document_request_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_request_item_statuses_fulfilled_by_attachment_i_fkey"
+            columns: ["fulfilled_by_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "attachments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_request_items: {
         Row: {
           category: string
@@ -2443,6 +2673,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "document_request_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          document_request_template_id: string | null
+          due_date: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          document_request_template_id?: string | null
+          due_date?: string | null
+          entity_id: string
+          entity_type?: string
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          document_request_template_id?: string | null
+          due_date?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_requests_document_request_template_id_fkey"
+            columns: ["document_request_template_id"]
+            isOneToOne: false
+            referencedRelation: "document_request_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_requests_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3448,6 +3735,7 @@ export type Database = {
           default_price: number | null
           description: string | null
           display_order: number
+          document_folder_template_id: string | null
           document_request_template_id: string | null
           engagement_letter_template_id: string | null
           estimated_duration_minutes: number | null
@@ -3480,6 +3768,7 @@ export type Database = {
           default_price?: number | null
           description?: string | null
           display_order?: number
+          document_folder_template_id?: string | null
           document_request_template_id?: string | null
           engagement_letter_template_id?: string | null
           estimated_duration_minutes?: number | null
@@ -3512,6 +3801,7 @@ export type Database = {
           default_price?: number | null
           description?: string | null
           display_order?: number
+          document_folder_template_id?: string | null
           document_request_template_id?: string | null
           engagement_letter_template_id?: string | null
           estimated_duration_minutes?: number | null
@@ -3543,6 +3833,13 @@ export type Database = {
             columns: ["billing_rule_id"]
             isOneToOne: false
             referencedRelation: "billing_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_document_folder_template_id_fkey"
+            columns: ["document_folder_template_id"]
+            isOneToOne: false
+            referencedRelation: "document_folder_templates"
             referencedColumns: ["id"]
           },
           {
@@ -3599,6 +3896,116 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_requests: {
+        Row: {
+          attachment_id: string
+          created_at: string
+          created_by: string | null
+          due_date: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attachment_id: string
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attachment_id?: string
+          created_at?: string
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_requests_attachment_id_fkey"
+            columns: ["attachment_id"]
+            isOneToOne: false
+            referencedRelation: "attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signature_request_signers: {
+        Row: {
+          created_at: string
+          decline_reason: string | null
+          declined_at: string | null
+          id: string
+          sign_order: number
+          signature_image_path: string | null
+          signature_request_id: string
+          signature_type: string | null
+          signed_at: string | null
+          signer_email: string | null
+          signer_name: string
+          status: string
+          typed_name: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          decline_reason?: string | null
+          declined_at?: string | null
+          id?: string
+          sign_order?: number
+          signature_image_path?: string | null
+          signature_request_id: string
+          signature_type?: string | null
+          signed_at?: string | null
+          signer_email?: string | null
+          signer_name: string
+          status?: string
+          typed_name?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          decline_reason?: string | null
+          declined_at?: string | null
+          id?: string
+          sign_order?: number
+          signature_image_path?: string | null
+          signature_request_id?: string
+          signature_type?: string | null
+          signed_at?: string | null
+          signer_email?: string | null
+          signer_name?: string
+          status?: string
+          typed_name?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signature_request_signers_signature_request_id_fkey"
+            columns: ["signature_request_id"]
+            isOneToOne: false
+            referencedRelation: "signature_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -5121,9 +5528,24 @@ export type Database = {
           updated_at: string
         }
       }
+      create_document_request: {
+        Args: {
+          p_workspace_id: string
+          p_entity_type: string
+          p_entity_id: string
+          p_template_id: string
+          p_title: string
+          p_due_date?: string
+        }
+        Returns: string
+      }
       current_workspace_ids: { Args: never; Returns: string[] }
       decline_config_object_share: {
         Args: { p_share_id: string }
+        Returns: undefined
+      }
+      decline_signature: {
+        Args: { p_signer_id: string; p_reason?: string }
         Returns: undefined
       }
       decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
@@ -5145,6 +5567,10 @@ export type Database = {
         Args: { p_id: string; p_table: string }
         Returns: boolean
       }
+      fulfill_document_request_item: {
+        Args: { p_item_status_id: string; p_attachment_id: string }
+        Returns: undefined
+      }
       is_account_locked: { Args: { p_user_id: string }; Returns: boolean }
       merge_clients: {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
@@ -5160,6 +5586,15 @@ export type Database = {
           p_workspace_id?: string
         }
         Returns: string
+      }
+      record_signature: {
+        Args: {
+          p_signer_id: string
+          p_signature_type: string
+          p_signature_image_path?: string
+          p_typed_name?: string
+        }
+        Returns: undefined
       }
       record_login_attempt: {
         Args: {

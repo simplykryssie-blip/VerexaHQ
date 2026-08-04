@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
+import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
+import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import {
   OverviewTab,
   WorkflowTab,
   TasksTab,
-  DocumentsTab,
   MessagesTab,
   ReviewTab,
   BillingTab,
@@ -18,7 +19,6 @@ import {
   type ProgressRow,
   type StageRow,
   type TaskRow,
-  type DocumentRow,
   type NoteRow,
   type MessageThreadRow,
   type MessageRow,
@@ -61,6 +61,10 @@ export function EngagementWorkspace({
   stages,
   tasks,
   documents,
+  documentFolders,
+  documentRequests,
+  documentRequestTemplates,
+  signatureRequests,
   notes,
   messageThreads,
   messages,
@@ -80,6 +84,10 @@ export function EngagementWorkspace({
   stages: StageRow[];
   tasks: TaskRow[];
   documents: DocumentRow[];
+  documentFolders: DocumentFolderRow[];
+  documentRequests: DocumentRequestRow[];
+  documentRequestTemplates: { id: string; name: string }[];
+  signatureRequests: SignatureRequestRow[];
   notes: NoteRow[];
   messageThreads: MessageThreadRow[];
   messages: MessageRow[];
@@ -160,7 +168,19 @@ export function EngagementWorkspace({
             {tab === "Tasks" && (
               <TasksTab workspaceId={workspace.id} engagementId={engagement.id} tasks={tasks} staffOptions={staffOptions} />
             )}
-            {tab === "Documents" && <DocumentsTab documents={documents} />}
+            {tab === "Documents" && (
+              <DocumentWorkspace
+                workspaceId={workspace.id}
+                entityType="engagement"
+                entityId={engagement.id}
+                folders={documentFolders}
+                documents={documents}
+                requests={documentRequests}
+                requestTemplates={documentRequestTemplates}
+                signatureRequests={signatureRequests}
+                activity={timeline}
+              />
+            )}
             {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}
             {tab === "Review" && (
               <ReviewTab stages={stages} shares={shares} reviewActions={reviewActions} staffOptions={staffOptions} />

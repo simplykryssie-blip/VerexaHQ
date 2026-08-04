@@ -269,31 +269,6 @@ export function TasksTab({
   );
 }
 
-// ------------------------------------------------------------- Documents
-
-export function DocumentsTab({ documents }: { documents: DocumentRow[] }) {
-  return (
-    <Section title="Documents">
-      {documents.length === 0 ? (
-        <EmptyState message="No documents uploaded yet." />
-      ) : (
-        <ul className="divide-y divide-border">
-          {documents.map((d) => (
-            <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-              <span className="text-slate">{d.file_name}</span>
-              <span className="text-xs text-muted">
-                {d.category ? `${d.category} -- ` : ""}
-                {d.version ? `v${d.version} -- ` : ""}
-                {new Date(d.created_at).toLocaleDateString()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
 // -------------------------------------------------------------- Messages
 
 export function MessagesTab({ threads, messages }: { threads: MessageThreadRow[]; messages: MessageRow[] }) {
@@ -587,7 +562,6 @@ export type TaskRow = {
   assigned_staff: StaffRef;
   dependencies: TaskDependency[];
 };
-export type DocumentRow = { id: string; file_name: string; category: string | null; version: number | null; created_at: string };
 export type NoteRow = { id: string; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type MessageThreadRow = { id: string; subject: string | null; channel: string };
 export type MessageRow = { id: string; thread_id: string; body: string; is_internal: boolean; created_at: string };

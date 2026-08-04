@@ -385,38 +385,6 @@ export function EngagementsTab({ engagements, client }: { engagements: Engagemen
   );
 }
 
-// --------------------------------------------------------------- Documents
-
-export function DocumentsTab({ documents, requestedDocumentCount }: { documents: DocumentRow[]; requestedDocumentCount: number }) {
-  return (
-    <div className="space-y-6">
-      {requestedDocumentCount > 0 && (
-        <p className="text-sm text-muted">
-          {requestedDocumentCount} document{requestedDocumentCount === 1 ? "" : "s"} requested via engagement services --{" "}
-          {documents.length} uploaded so far.
-        </p>
-      )}
-      <Section title="Uploaded documents">
-        {documents.length === 0 ? (
-          <EmptyState message="No documents uploaded yet." />
-        ) : (
-          <ul className="divide-y divide-border">
-            {documents.map((d) => (
-              <li key={d.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{d.file_name}</span>
-                <span className="text-xs text-muted">
-                  {d.category ? `${d.category} -- ` : ""}
-                  {d.version ? `v${d.version} -- ` : ""}
-                  {new Date(d.created_at).toLocaleDateString()}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </div>
-  );
-}
 
 // ----------------------------------------------------------------- Messages
 
@@ -588,7 +556,6 @@ export type EmailRow = { id: string; email_type: string; email: string };
 export type PortalUserRow = { id: string; invited_name: string | null; invited_email: string; is_primary: boolean; status: string };
 export type RelationshipRow = { id: string; relationship_type: string; related_name: string | null; related_client_id: string | null };
 export type NoteRow = { id: string; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
-export type DocumentRow = { id: string; file_name: string; category: string | null; version: number | null; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string };
 export type QuoteRow = { id: string; quote_number: string | null; title: string; status: string; total_amount: number };
