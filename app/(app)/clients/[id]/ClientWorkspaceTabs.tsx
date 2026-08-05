@@ -59,6 +59,7 @@ export function OverviewTab({
   outstandingBalance,
   requestedDocumentCount,
   documentsCount,
+  organizerResponses,
 }: {
   client: {
     id: string;
@@ -80,6 +81,7 @@ export function OverviewTab({
   outstandingBalance: number;
   requestedDocumentCount: number;
   documentsCount: number;
+  organizerResponses: OrganizerResponseRow[];
 }) {
   const openEngagements = engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived");
   const openTasks = tasks.filter((t) => t.status !== "completed");
@@ -142,6 +144,24 @@ export function OverviewTab({
           <p className="py-2 text-sm text-slate">
             ~{missingDocuments} document{missingDocuments === 1 ? "" : "s"} still requested but not yet uploaded.
           </p>
+        )}
+      </Section>
+
+      <Section title="Organizers">
+        {organizerResponses.length === 0 ? (
+          <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {organizerResponses.map((o) => (
+              <li key={o.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-slate">{o.template_name}</span>
+                <span className="capitalize text-muted">
+                  {o.status.replace("_", " ")}
+                  {o.submitted_at && ` -- submitted ${new Date(o.submitted_at).toLocaleDateString()}`}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </Section>
 
@@ -593,3 +613,4 @@ export type EngagementRow = {
   compliance_officer: StaffRef;
 };
 export type ClientHeaderInfo = { relationship_manager: StaffRef; default_reviewer: StaffRef; default_compliance_officer: StaffRef };
+export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };

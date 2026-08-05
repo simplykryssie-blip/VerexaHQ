@@ -30,6 +30,7 @@ import {
   type MessageRow,
   type EngagementRow,
   type ClientHeaderInfo,
+  type OrganizerResponseRow,
 } from "./ClientWorkspaceTabs";
 
 type Workspace = { id: string; name: string };
@@ -103,6 +104,8 @@ export function ClientWorkspace({
   tasks,
   requestedDocumentCount,
   documentRequestTemplates,
+  organizerTemplates,
+  organizerResponses,
   permissions,
   paymentPlansByInvoice,
 }: {
@@ -131,6 +134,8 @@ export function ClientWorkspace({
   tasks: TaskRow[];
   requestedDocumentCount: number;
   documentRequestTemplates: { id: string; name: string }[];
+  organizerTemplates: { id: string; name: string }[];
+  organizerResponses: OrganizerResponseRow[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
@@ -177,6 +182,7 @@ export function ClientWorkspace({
           clientId={client.id}
           workspaceId={workspace.id}
           documentRequestTemplates={documentRequestTemplates}
+          organizerTemplates={organizerTemplates}
           primaryEmail={client.primary_email}
           primaryPhone={client.primary_phone}
           permissions={permissions}
@@ -212,6 +218,7 @@ export function ClientWorkspace({
                 outstandingBalance={outstandingBalance}
                 requestedDocumentCount={requestedDocumentCount}
                 documentsCount={documents.length}
+                organizerResponses={organizerResponses}
               />
             )}
             {tab === "Contacts" && (

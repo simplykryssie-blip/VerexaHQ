@@ -126,6 +126,19 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .eq("status", "published")
     .order("name");
 
+  const { data: organizerTemplates } = await supabase
+    .from("organizer_templates")
+    .select("id, name")
+    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("status", "published")
+    .order("name");
+
+  const { data: organizerResponses } = await supabase
+    .from("organizer_responses")
+    .select("id, status, submitted_at, organizer_templates(name)")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false });
+
   const { data: documentRequestRows } = await supabase
     .from("document_requests")
     .select(
@@ -274,6 +287,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       timeline={timeline}
       tasks={tasks}
       requestedDocumentCount={requestedDocumentCount}
+      organizerTemplates={organizerTemplates ?? []}
+      organizerResponses={(organizerResponses ?? []).map((o: any) => ({
+        id: o.id,
+        status: o.status,
+        submitted_at: o.submitted_at,
+        template_name: o.organizer_templates?.name ?? "Organizer",
+      }))}
       documentRequestTemplates={documentRequestTemplates ?? []}
       paymentPlansByInvoice={paymentPlansByInvoice}
     />

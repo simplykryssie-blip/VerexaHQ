@@ -3,16 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, MessageSquare, Upload, FileText, Receipt, StickyNote, ClipboardList } from "lucide-react";
+import { Plus, MessageSquare, Upload, FileText, Receipt, StickyNote, ClipboardList, BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Modal } from "@/components/Modal";
+import { renderEmail } from "@/lib/email/template";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 type Props = {
   clientId: string;
   workspaceId: string;
   documentRequestTemplates: { id: string; name: string }[];
+  organizerTemplates: { id: string; name: string }[];
   primaryEmail: string | null;
   primaryPhone: string | null;
   permissions: ActionPermissions;
@@ -38,11 +40,11 @@ function ActionButton({
   );
 }
 
-export function QuickActions({ clientId, workspaceId, documentRequestTemplates, primaryEmail, primaryPhone, permissions }: Props) {
+export function QuickActions({ clientId, workspaceId, documentRequestTemplates, organizerTemplates, primaryEmail, primaryPhone, permissions }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [modal, setModal] = useState<
-    "message" | "upload" | "request" | "invoice" | "quote" | "note" | null
+    "message" | "upload" | "request" | "organizer" | "invoice" | "quote" | "note" | null
   >(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -104,6 +106,9 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates, 
         {permissions.documentsUpload && <ActionButton icon={Upload} label="Upload Document" onClick={() => setModal("upload")} />}
         {permissions.documentsRequest && (
           <ActionButton icon={ClipboardList} label="Request Documents" onClick={() => setModal("request")} />
+        )}
+        {permissions.documentsRequest && (
+          <ActionButton icon={BookOpen} label="Send Organizer" onClick={() => setModal("organizer")} />
         )}
         {permissions.billingManage && <ActionButton icon={Receipt} label="Create Invoice" onClick={() => setModal("invoice")} />}
         {permissions.billingManage && <ActionButton icon={FileText} label="Create Quote" onClick={() => setModal("quote")} />}
@@ -259,6 +264,60 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates, 
                   body: `Please upload the following documents: ${template?.name ?? ""}.`,
                 });
                 if (error) return error.message;
+                setModal(null);
+                router.refresh();
+              }}
+            />
+          )}
+        </Modal>
+      )}
+
+      {modal === "organizer" && (
+        <Modal title="Send organizer" onClose={() => setModal(null)}>
+          {organizerTemplates.length === 0 ? (
+            <p className="text-sm text-muted">
+              No organizer templates are published yet -- add one in Settings first.
+            </p>
+          ) : (
+            <InlineAddForm
+              label="Send"
+              fields={[
+                {
+                  name: "organizer_template_id",
+                  label: "Organizer",
+                  type: "select",
+                  required: true,
+                  options: organizerTemplates.map((t) => ({ value: t.id, label: t.name })),
+                },
+              ]}
+              onSubmit={async (v) => {
+                const template = organizerTemplates.find((t) => t.id === v.organizer_template_id);
+                const { error } = await supabase.from("organizer_responses").insert({
+                  workspace_id: workspaceId,
+                  client_id: clientId,
+                  organizer_template_id: v.organizer_template_id,
+                });
+                if (error) return error.message;
+
+                if (primaryEmail) {
+                  const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                  await fetch("/api/email/send", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      to: primaryEmail,
+                      sender: "notifications",
+                      subject: `New organizer to complete: ${template?.name ?? ""}`,
+                      html: renderEmail({
+                        heading: "An organizer is ready for you",
+                        bodyHtml: `<p>Please log in to your client portal and complete the <strong>${template?.name ?? "organizer"}</strong> when you have a chance.</p>`,
+                        ctaLabel: "Go to portal",
+                        ctaUrl: `${appUrl}/portal/organizer`,
+                      }),
+                    }),
+                  });
+                }
+
                 setModal(null);
                 router.refresh();
               }}
