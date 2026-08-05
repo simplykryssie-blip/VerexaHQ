@@ -892,3 +892,22 @@ session has no dashboard access to any of the three.
   as `pending` past its due date until someone pays or a future job marks
   it. `billing_rules.late_fee_*` columns exist but aren't wired to
   anything yet.
+
+## Deferred to post-beta (explicit decisions, not oversights)
+
+- **Edit SSN/EIN/ITIN after client creation.** `create_client` accepts and
+  encrypts these at creation; there's no equivalent update path yet, so a
+  typo or missing value at intake can't be fixed without a DB-level fix.
+  Needs a new encryption-aware update RPC mirroring whatever
+  `create_client` does internally, plus a small edit UI in the Contacts
+  tab's Identity section.
+- **Live Zoom/video-conferencing API integration for Appointments.**
+  Shipped as a plain "paste your meeting link" field for beta
+  (`appointments.meeting_url`); the real ask is Zoom OAuth + auto-creating
+  the meeting/link when an appointment is scheduled, not just storing a
+  pasted URL.
+- **Per-contact portal invite Resend/Reset actions.** The Contacts tab
+  rework added one-click Invite per contact, but Resend-invite and
+  Reset-password (TaxDome's 3-dot-menu actions) weren't built — would need
+  `invitation_token` added to the portal-user query plus small action
+  buttons next to a contact whose portal status is `pending`.
