@@ -2,6 +2,8 @@ import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { TaxIdReveal } from "./TaxIdReveal";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
+import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanForm";
+import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import {
   AddContactForm,
   AddAddressForm,
@@ -427,11 +429,17 @@ export function BillingTab({
   invoices,
   payments,
   outstandingBalance,
+  workspaceId,
+  paymentPlansByInvoice,
+  canManageBilling,
 }: {
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   payments: PaymentRow[];
   outstandingBalance: number;
+  workspaceId: string;
+  paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
+  canManageBilling: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -464,19 +472,27 @@ export function BillingTab({
           <EmptyState message="No invoices yet." />
         ) : (
           <ul className="divide-y divide-border">
-            {invoices.map((i) => (
-              <li key={i.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
-                <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
-                  </span>
-                  {i.status !== "paid" && i.status !== "void" && i.status !== "draft" && (
-                    <PaymentLinkButton invoiceId={i.id} />
+            {invoices.map((i) => {
+              const plans = paymentPlansByInvoice[i.id] ?? [];
+              const isOutstanding = i.status !== "paid" && i.status !== "void" && i.status !== "draft";
+              return (
+                <li key={i.id} className="py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="capitalize text-muted">
+                        {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                      </span>
+                      {isOutstanding && <PaymentLinkButton invoiceId={i.id} />}
+                    </div>
+                  </div>
+                  {isOutstanding && canManageBilling && plans.length === 0 && (
+                    <CreatePaymentPlanForm invoiceId={i.id} workspaceId={workspaceId} balanceDue={i.total_amount - i.amount_paid} />
                   )}
-                </div>
-              </li>
-            ))}
+                  <PaymentPlanList plans={plans} />
+                </li>
+              );
+            })}
           </ul>
         )}
       </Section>

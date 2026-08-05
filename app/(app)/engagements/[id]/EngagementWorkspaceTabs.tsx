@@ -523,6 +523,8 @@ export type ClientRef = {
   relationship_manager_id: string | null;
   default_reviewer_id: string | null;
   default_compliance_officer_id: string | null;
+  primary_email: string | null;
+  primary_phone: string | null;
 };
 export type EngagementRow = {
   id: string;

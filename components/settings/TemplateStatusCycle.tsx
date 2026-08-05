@@ -17,7 +17,7 @@ export function TemplateStatusCycle({
   id,
   status,
 }: {
-  table: "email_templates" | "sms_templates" | "engagement_letter_templates" | "services";
+  table: "email_templates" | "sms_templates" | "engagement_letter_templates" | "services" | "pricing_rules" | "billing_rules";
   id: string;
   status: string;
 }) {

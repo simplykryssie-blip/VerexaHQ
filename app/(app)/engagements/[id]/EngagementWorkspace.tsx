@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
+import type { ActionPermissions } from "@/lib/actionPermissions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
@@ -60,6 +61,7 @@ function clientLabel(c: { client_type: string; first_name: string | null; last_n
 
 export function EngagementWorkspace({
   workspace,
+  permissions,
   engagement,
   stages,
   tasks,
@@ -85,6 +87,7 @@ export function EngagementWorkspace({
   irsNotices,
 }: {
   workspace: Workspace;
+  permissions: ActionPermissions;
   engagement: EngagementRow;
   stages: StageRow[];
   tasks: TaskRow[];
@@ -137,7 +140,14 @@ export function EngagementWorkspace({
       />
 
       <div className="border-b border-border bg-surface px-8 py-3">
-        <QuickActions engagementId={engagement.id} clientId={client?.id ?? ""} workspaceId={workspace.id} />
+        <QuickActions
+          engagementId={engagement.id}
+          clientId={client?.id ?? ""}
+          workspaceId={workspace.id}
+          primaryEmail={client?.primary_email ?? null}
+          primaryPhone={client?.primary_phone ?? null}
+          permissions={permissions}
+        />
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -192,6 +202,8 @@ export function EngagementWorkspace({
                 requestTemplates={documentRequestTemplates}
                 signatureRequests={signatureRequests}
                 activity={timeline}
+                canRequestDocuments={permissions.documentsRequest}
+                canRequestSignatures={permissions.signaturesRequest}
               />
             )}
             {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}

@@ -533,16 +533,30 @@ the Vercel dashboard after a push lands.
 
 ## Testing
 
-No automated test suite (unit or E2E) exists yet. What actually gets run
-before anything is considered done:
-
-- `tsc --noEmit` and `next build` after every change.
+- `npm test` (vitest) runs `tests/critical-paths.test.ts`, which calls the
+  `run_critical_path_smoke_tests()` Postgres RPC (see Beta Readiness
+  Completion Sprint below) covering auth/permissions, billing/payment
+  plans, document upload + public e-signature signing, and portal access
+  isolation. Requires `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+  in the environment (present in deployment, not in this dev container) —
+  the suite skips with a clear message rather than failing when they're
+  absent. Verified passing by calling the RPC directly against the live
+  database.
+- `tsc --noEmit`, `next lint`, and `next build` after every change.
 - Supabase security + performance advisors after every migration, with
-  findings either fixed or explicitly noted as intentional (e.g. the one
-  `anon`-callable RPC above).
+  findings either fixed or explicitly noted as intentional. This pass
+  caught and fixed a real issue: two new functions
+  (`enqueue_reminder_notifications`, `run_critical_path_smoke_tests`) had
+  been silently granted EXECUTE to `anon`/`authenticated` by Supabase's
+  default privileges on function creation — `revoke ... from public` alone
+  doesn't remove that, only an explicit `revoke ... from anon, authenticated`
+  does. Both are now `service_role`-only. The dozens of other
+  `anon`/`authenticated`-callable `SECURITY DEFINER` functions the linter
+  flags are the app's established, intentional architecture (every RPC
+  does its own internal permission check) and were accepted in prior
+  certified sprints.
 - Targeted SQL smoke tests (`DO $$ ... $$` blocks that create, assert, and
-  clean up a real scenario) for new schema/RPCs — used for the billing
-  cascade, task dependencies, and the invitation create/preview/accept path.
+  clean up a real scenario) for new schema/RPCs throughout every sprint.
 - No scripted browser E2E exists. Manual click-through has covered the core
   flows as they were built; there is no regression suite guarding against
   breaking them later.
@@ -687,52 +701,177 @@ mock data anywhere.
   pages fetch full unpaginated result sets, matching the pre-existing
   pattern elsewhere in the app — real work, not attempted here.
 
+## Beta Readiness Completion Sprint
+
+Scope: close the remaining gaps from the Frontend Completion Sprint's own
+list, moving the app from "feature-complete" to "closed-beta ready."
+Explicit scope decisions: skip AI/OCR (still out of scope per longstanding
+instruction), skip a third-party e-sign vendor (built first-party instead),
+target smoke tests for critical paths rather than full coverage, and treat
+Resend/Stripe/Twilio credentials as a deployment-time task since this
+session has no dashboard access to any of the three.
+
+- **Public e-signature links.** `signature_request_signers` gained an
+  `access_token` (uuid, unique). Three new token-authorized functions —
+  `get_signature_request_by_token`, `record_signature_by_token`,
+  `decline_signature_by_token` — let an external signer with no account
+  view and sign a specific document via `/sign/[token]`
+  (`app/sign/[token]/page.tsx` + `components/sign/PublicSignView.tsx`),
+  authorized purely by the unguessable token (the same trust model as any
+  magic link), not by session. The PDF itself is served through
+  `/api/sign/[token]/file`, which validates the token with the
+  service-role client before minting a short-lived signed storage URL —
+  the token holder never gets direct storage access. Staff get a "Copy
+  link" action per pending signer in `SignaturesPanel`. Migration:
+  `public_signature_link`.
+- **Notification preferences + reminder automation.** New
+  `notification_preferences` table (opt-out model: no row = enabled) and
+  `is_notification_enabled()` helper. A new `enqueue_reminder_notifications()`
+  RPC scans invoices, pending signatures, workflow stages, and (once added)
+  appointments for upcoming due dates and enqueues deduplicated reminder
+  jobs into the existing `notification_queue` — deduplication is a new
+  `dedupe_key` column plus a partial unique index, so the job is safe to
+  run on every tick. Wired to a new `/api/cron/enqueue-reminders` route on
+  a 6-hour Vercel Cron schedule. Preference toggles surfaced in
+  `/settings/notifications` (staff: workflow stage due) and
+  `/portal/notifications` (portal: invoice due). Migrations:
+  `notification_preferences_and_reminders`, `appointment_reminders`.
+- **Appointments**, previously nonexistent, built end-to-end: `appointments`
+  table (client_id/engagement_id/staff_id all optional, `portal_visible`
+  flag), two new permissions (`appointments.view`/`appointments.manage`)
+  granted to the same role sets as the equivalent document permissions,
+  full RLS including a portal-select policy. New `/appointments` staff
+  page (`AppointmentsManager` — create/filter/status-cycle/delete, gated
+  on `appointments.manage`) and `/portal/appointments` (read-only,
+  RLS-scoped). Appointments now appear on `/calendar` alongside engagement
+  and task due dates, and the dashboard's "Schedule Appointment" quick
+  action finally points somewhere real. Migration: `appointments`.
+- **Payment plans + automated payment receipts.** New `payment_plans`
+  table (per-invoice installments) with staff-side creation
+  (`CreatePaymentPlanForm`, even split with rounding absorbed into the
+  last installment) and portal-side per-installment "Pay now" via the
+  *same* `/api/stripe/checkout-session` route, extended to accept
+  `paymentPlanId` alongside the existing `invoiceId`. The Stripe webhook
+  now resolves either path and, on a plan installment, marks that specific
+  `payment_plans` row paid. A new `payments_enqueue_receipt` trigger fires
+  on every `payments` insert (webhook-driven today, any future manual
+  "record payment" path automatically) and emails the client's primary
+  portal user a receipt — no application code has to remember to call it.
+  Migrations: `payment_plans`, `seed_payment_receipt_template`.
+- **`GET /api/provider-status`** now merges env-var presence with real
+  health from the `provider_status` table (status/consecutive
+  failures/last success/last error) instead of only reporting whether
+  credentials are set. `/settings/integrations` — previously a bare
+  "coming soon" stub — now renders it, admin-gated.
+- **Engagement-level "Send Message" now dispatches** email/SMS exactly
+  like the client-level one always did; the engagement page's `clients`
+  query gained `primary_email`/`primary_phone` to make that possible.
+- **UI permission-gating pass.** `lib/actionPermissions.ts` centralizes
+  the `has_permission` lookups for documents.upload/request,
+  signatures.request, billing.manage, messages.send/internal_note, and
+  engagements.manage into one round-trip, consumed by both QuickActions
+  components (client- and engagement-level) to hide — not just
+  RLS-reject — actions a role can't perform, including narrowing the
+  message-channel dropdown to only the channels the caller can actually
+  use. `DocumentWorkspace`'s Requests/Signatures creation UI gained the
+  same real permission gates (previously gated only on `audience==="staff"`,
+  which let any staff role see a create button regardless of their actual
+  role). "New Client"/"New Engagement" are now hidden (not just
+  RLS-blocked on submit) for roles without `clients.create`/
+  `engagements.manage`, and direct navigation to `/engagements/new`
+  server-side redirects to an access-denied state instead of showing a
+  form that would fail on submit.
+- **Pagination.** `SortableTable` (used by 7 of the report pages) now
+  paginates client-side with Previous/Next controls, so a large report no
+  longer renders every row into the DOM at once. `/clients` and
+  `/engagements` — the two tables most likely to grow into the thousands
+  and the only two list pages using a raw `<table>` instead of
+  `SortableTable` — got real server-side `.range()` pagination via a new
+  `components/Pager.tsx` and a `?page=` query param. `/tax` and
+  `/reports/compliance` were left unpaginated (lower realistic row counts,
+  lower priority) — a remaining, explicitly scoped-out gap.
+- **Organizer `file_upload`/`signature` fields** are real interactive
+  widgets now, not "go elsewhere" notes: `file_upload` uploads straight to
+  the `client-documents` bucket and inserts a real `attachments` row
+  (value stored as `{attachment_id, file_name}`); `signature` captures a
+  typed name + timestamp inline (value stored as `{typed_name, signed_at}`)
+  — a deliberate simplification consistent with this app's in-app typed-name
+  signing model, not the full `signature_requests` workflow.
+- **Settings → Service Packages** can now create Pricing Rules and Billing
+  Rules inline (`CreatePricingBillingRuleForms.tsx`) instead of only
+  selecting pre-existing ones — the two simplest, flattest sub-objects in
+  the service package's dependency graph. Organizer/document-request/
+  folder/engagement-letter templates remain select-only; each is its own
+  multi-field builder object and inline-creating all four was judged out
+  of scope for this pass.
+- **Per-user dashboard personalization.** New `user_widget_preferences`
+  table overlays per-user hide/show/reorder on top of the shared,
+  role-scoped `dashboard_widgets` rows — no duplicate dashboards or
+  widgets per user, just an optional override row. The dashboard's
+  "Customize" controls, previously gated to workspace admins editing the
+  shared layout, are now available to every user and write to their own
+  overlay only. Migration: `user_widget_preferences`.
+- **Critical-path smoke test suite.** A new `run_critical_path_smoke_tests()`
+  Postgres RPC (service-role only) codifies the ad hoc SQL smoke tests run
+  throughout this and prior sprints into a permanent, idempotent check
+  covering auth/permissions, billing/payment plans, document upload +
+  public signing, and portal access isolation — each check builds its own
+  fixtures and cleans them up. `npm test` (new vitest dependency) calls it
+  through a real `@supabase/supabase-js` service-role client. Verified
+  passing directly against the live database; running it via `npm test`
+  needs `SUPABASE_SERVICE_ROLE_KEY` set, which this dev container doesn't
+  have (see Testing above).
+- **Security fix found via the advisor, not a user report**: two new
+  functions had been silently granted `EXECUTE` to `anon`/`authenticated`
+  by Supabase's default privileges despite an explicit
+  `revoke ... from public` — that revoke only clears the `PUBLIC`
+  pseudo-role, not the concrete `anon`/`authenticated` roles Supabase
+  grants to by default on every new function. Fixed with explicit
+  `revoke ... from anon, authenticated` in migration
+  `tighten_new_function_grants` (and `tighten_payment_receipt_trigger_grants`
+  for the receipt trigger function). Everything else the linter flags
+  matches this app's established, already-certified pattern: every RPC is
+  `SECURITY DEFINER` with its own internal `has_permission`/
+  `is_portal_user`-style check, which is why it's callable from
+  `anon`/`authenticated` at all.
+
 ## Known gaps going into beta
 
 - Resend domain verification, GoDaddy DNS (SPF/DKIM/DMARC), a live Stripe
   account, and a live Twilio account — all require credentials/dashboard
   access this session doesn't have. The integration code for all three
-  exists and degrades gracefully without them.
-- Frontend permission-gating (hiding actions a role can't perform) beyond
-  RLS enforcement itself.
-- Automated test coverage.
-- No pagination/infinite scroll/loading skeletons on the new report, tax
-  office, and portal pages — they fetch full unpaginated result sets, same
-  as the rest of the app. Fine at current data volumes, a real risk at
-  scale.
-- No Appointments feature anywhere in the app (nav, portal, or backend) —
-  there's no backing table, so it wasn't attempted rather than half-built.
-- Organizer `file_upload` and `signature` field types render a short
-  redirect note ("use Documents"/"use Signatures" instead) rather than an
-  inline widget — a deliberate simplification, not a full implementation.
-- Settings → Service Packages creates a `services` row wired to *existing*
-  pricing rules, billing rules, organizer templates, document-request
-  templates, folder templates, and engagement-letter templates via
-  dropdowns; it does not create those sub-objects themselves.
-- No per-workspace `notification_preferences` (which events a user wants
-  and on which channel) — `notification_queue` now has a real dispatcher
-  (see Backend Completion Sprint), but nothing yet enqueues appointment,
-  workflow, or billing reminder jobs into it; only the client-notification
-  send path is wired to fire on demand today.
-- Payment Plans (recurring billing) and automated payment-receipt emails.
-- The engagement-level "Send Message" modal logs but doesn't dispatch
-  email/SMS yet (the client-level one does, as of this pass).
-- Per-user dashboard personalization — today's hide/show/reorder is
-  workspace-wide and admin-managed (see Widget Engine), not per person.
-- Signature Center has no third-party e-sign provider integration —
-  in-app typed-name signing only, and no *public*, unauthenticated
-  signing link (a signer must be a staff user or an authenticated portal
-  user).
-- Notification Dispatcher templates must exist as a `published`
-  `email_templates`/`sms_templates` row matching the job's `template_key`
-  before a queued job can send — nothing seeds these automatically for the
-  new reminder/notice use cases this pass didn't wire up triggers for.
-- `provider_status` tracks live health from real send/webhook attempts;
-  `GET /api/provider-status` (used by any settings UI) still only reports
-  env-var presence and hasn't been switched to read the new table.
+  exists and degrades gracefully without them; `/settings/integrations`
+  shows live health once they're configured.
 - No OCR, auto-classification, duplicate detection, or AI metadata
   extraction on documents — `attachments.ai_metadata` is reserved but
-  unpopulated, per this pass's explicit instruction not to implement AI yet.
+  unpopulated, per repeated explicit instruction not to implement AI.
+- No third-party e-sign *vendor* (DocuSign/HelloSign-style) — signing is
+  first-party: in-app typed-name for staff/portal, or the public token
+  link for anyone else. No notarization, no advanced identity verification
+  on signers.
+- Automated test coverage is one RPC-backed smoke suite covering 4
+  critical paths (see Testing), not comprehensive unit/E2E coverage. No
+  scripted browser E2E exists at all.
+- `/tax` and `/reports/compliance` still fetch unbounded result sets — the
+  two report/hub pages `SortableTable`'s new pagination and the
+  clients/engagements `.range()` pagination didn't reach, on the judgment
+  that their realistic row counts are lower priority than clients/
+  engagements/the other 7 reports. No infinite scroll or loading
+  skeletons anywhere.
+- Organizer `signature` fields capture a typed name inline (not a drawn
+  signature or the full `signature_requests` workflow); `file_upload`
+  fields upload one file with no multi-file or drag-and-drop support.
+- Settings → Service Packages can create Pricing Rules and Billing Rules
+  inline; Organizer/Document-Request/Folder/Engagement-Letter templates
+  are still select-only (each is its own multi-field builder object).
+- No per-workspace control over *which* reminder types fire at all (only
+  per-user opt-out of the ones that exist) — Owners/Admins can't
+  configure lookback windows or disable a reminder category workspace-wide.
+- Notification Dispatcher templates must exist as a `published`
+  `email_templates`/`sms_templates` row matching the job's `template_key`
+  before a queued job can send — the reminder/receipt templates this pass
+  added are seeded, but any *new* reminder type added later needs its own
+  seeded template.
 - Office documents (Word/Excel/PowerPoint) have no inline preview — PDF,
   images, and text files preview inline; everything else downloads.
 - No document-level review-status field, so the Document Center hub has no
@@ -741,9 +880,15 @@ mock data anywhere.
 - No true drag-and-drop widget reordering (up/down buttons only) and no
   `.xlsx` export (CSV, which Excel opens natively) — both deliberate
   scope calls to avoid adding a new dependency for one feature.
-- Toasts, skeletons, and the accessibility fixes above are applied to what
-  was built this pass and a couple of existing components they touch —
-  not swept across every pre-existing page.
-- Manual QA this pass was a code-level route/link/permission audit, not a
-  live click-through in a browser (no browser tool available in this
-  session).
+- Accessibility has been spot-checked on new components as they were
+  built, not swept as a full contrast/screen-reader audit across the app.
+- Manual QA across every sprint has been a code-level route/link/
+  permission audit, not a live click-through in a browser (no browser
+  tool available in this session).
+- Appointments has no recurrence (one-off events only), no calendar
+  invite (.ics) emails, and no conflict/double-booking detection.
+- Payment Plans have no automatic overdue-installment handling (no
+  `overdue` status transition job, no late-fee application) — a plan sits
+  as `pending` past its due date until someone pays or a future job marks
+  it. `billing_rules.late_fee_*` columns exist but aren't wired to
+  anything yet.

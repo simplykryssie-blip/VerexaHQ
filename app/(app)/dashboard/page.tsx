@@ -12,6 +12,9 @@ export default async function DashboardPage() {
 
   const supabase = createClient();
   const { data: dashboardId } = await supabase.rpc("ensure_default_dashboard", { p_workspace_id: workspace.id });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [{ data: widgets }, data] = await Promise.all([
     dashboardId
@@ -24,13 +27,33 @@ export default async function DashboardPage() {
     getDashboardData(workspace.id),
   ]);
 
+  const widgetIds = (widgets ?? []).map((w) => w.id);
+  const { data: preferences } =
+    user && widgetIds.length > 0
+      ? await supabase
+          .from("user_widget_preferences")
+          .select("dashboard_widget_id, is_visible, display_order")
+          .eq("user_id", user.id)
+          .in("dashboard_widget_id", widgetIds)
+      : { data: [] as { dashboard_widget_id: string; is_visible: boolean | null; display_order: number | null }[] };
+  const prefByWidget = new Map((preferences ?? []).map((p) => [p.dashboard_widget_id, p]));
+
+  const mergedWidgets = (widgets ?? []).map((w) => {
+    const pref = prefByWidget.get(w.id);
+    return {
+      ...w,
+      is_visible: pref?.is_visible ?? w.is_visible,
+      display_order: pref?.display_order ?? w.display_order,
+    };
+  });
+
   const priorities = computeTodaysPriorities(data);
 
   return (
     <DashboardShell
       workspaceName={workspace.name}
       isAdmin={workspace.is_owner}
-      widgets={widgets ?? []}
+      widgets={mergedWidgets}
       data={data}
       priorities={priorities}
     />

@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { MessageSquare, Upload, Receipt, FileText, StickyNote } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import type { ActionPermissions } from "@/lib/actionPermissions";
 
-type Props = { engagementId: string; clientId: string; workspaceId: string };
+type Props = {
+  engagementId: string;
+  clientId: string;
+  workspaceId: string;
+  primaryEmail: string | null;
+  primaryPhone: string | null;
+  permissions: ActionPermissions;
+};
 
 function ActionButton({
   icon: Icon,
@@ -44,7 +52,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-export function QuickActions({ engagementId, clientId, workspaceId }: Props) {
+export function QuickActions({ engagementId, clientId, workspaceId, primaryEmail, primaryPhone, permissions }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [modal, setModal] = useState<"message" | "upload" | "invoice" | "quote" | "note" | null>(null);
@@ -94,10 +102,12 @@ export function QuickActions({ engagementId, clientId, workspaceId }: Props) {
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <ActionButton icon={MessageSquare} label="Send Message" onClick={() => setModal("message")} />
-        <ActionButton icon={Upload} label="Upload Document" onClick={() => setModal("upload")} />
-        <ActionButton icon={Receipt} label="Create Invoice" onClick={() => setModal("invoice")} />
-        <ActionButton icon={FileText} label="Create Quote" onClick={() => setModal("quote")} />
+        {(permissions.messagesSend || permissions.messagesInternalNote) && (
+          <ActionButton icon={MessageSquare} label="Send Message" onClick={() => setModal("message")} />
+        )}
+        {permissions.documentsUpload && <ActionButton icon={Upload} label="Upload Document" onClick={() => setModal("upload")} />}
+        {permissions.billingManage && <ActionButton icon={Receipt} label="Create Invoice" onClick={() => setModal("invoice")} />}
+        {permissions.billingManage && <ActionButton icon={FileText} label="Create Quote" onClick={() => setModal("quote")} />}
         <ActionButton icon={StickyNote} label="Add Note" onClick={() => setModal("note")} />
       </div>
 
@@ -112,10 +122,14 @@ export function QuickActions({ engagementId, clientId, workspaceId }: Props) {
                 type: "select",
                 required: true,
                 options: [
-                  { value: "portal", label: "Client portal" },
-                  { value: "email", label: "Email" },
-                  { value: "sms", label: "SMS" },
-                  { value: "internal", label: "Internal note" },
+                  ...(permissions.messagesSend
+                    ? [
+                        { value: "portal", label: "Client portal" },
+                        { value: "email", label: "Email" },
+                        { value: "sms", label: "SMS" },
+                      ]
+                    : []),
+                  ...(permissions.messagesInternalNote ? [{ value: "internal", label: "Internal note" }] : []),
                 ],
               },
               { name: "body", label: "Message", required: true },
@@ -147,6 +161,21 @@ export function QuickActions({ engagementId, clientId, workspaceId }: Props) {
                 is_internal: isInternal,
               });
               if (error) return error.message;
+
+              if (v.channel === "email" && primaryEmail) {
+                await fetch("/api/email/send", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ to: primaryEmail, subject: "New message", html: `<p>${v.body}</p>` }),
+                });
+              } else if (v.channel === "sms" && primaryPhone) {
+                await fetch("/api/sms/send", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ to: primaryPhone, body: v.body }),
+                });
+              }
+
               setModal(null);
               router.refresh();
             }}

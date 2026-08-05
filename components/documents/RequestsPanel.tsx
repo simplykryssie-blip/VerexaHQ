@@ -25,6 +25,7 @@ export function RequestsPanel({
   entityType,
   entityId,
   audience = "staff",
+  canCreate = true,
 }: {
   requests: DocumentRequestRow[];
   templates: DocumentRequestTemplateOption[];
@@ -32,6 +33,7 @@ export function RequestsPanel({
   entityType: EntityType;
   entityId: string;
   audience?: Audience;
+  canCreate?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -85,7 +87,7 @@ export function RequestsPanel({
 
   return (
     <div className="space-y-4">
-      {audience === "staff" && (
+      {audience === "staff" && canCreate && (
         <div className="rounded-xl border border-border bg-surface p-4">
           <h3 className="text-sm font-semibold text-ink">New document request</h3>
           {templates.length === 0 ? (

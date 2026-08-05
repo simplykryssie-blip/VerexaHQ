@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PenLine, X } from "lucide-react";
+import { PenLine, X, Link as LinkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -24,11 +24,13 @@ export function SignaturesPanel({
   documents,
   workspaceId,
   audience = "staff",
+  canCreate = true,
 }: {
   signatureRequests: SignatureRequestRow[];
   documents: DocumentRow[];
   workspaceId: string;
   audience?: Audience;
+  canCreate?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -95,6 +97,12 @@ export function SignaturesPanel({
     router.refresh();
   }
 
+  async function copySigningLink(token: string) {
+    const url = `${process.env.NEXT_PUBLIC_APP_URL ?? window.location.origin}/sign/${token}`;
+    await navigator.clipboard.writeText(url);
+    toast.show("Signing link copied -- send it to anyone, no account needed", "success");
+  }
+
   async function decline(signerId: string) {
     const reason = window.prompt("Reason for declining (optional):") ?? undefined;
     const { error } = await supabase.rpc("decline_signature", { p_signer_id: signerId, p_reason: reason || undefined });
@@ -111,13 +119,13 @@ export function SignaturesPanel({
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">Signature requests</h3>
-          {audience === "staff" && (
+          {audience === "staff" && canCreate && (
             <button type="button" onClick={() => setCreating((v) => !v)} className="text-sm font-medium text-accent hover:underline">
               {creating ? "Cancel" : "New request"}
             </button>
           )}
         </div>
-        {audience === "staff" && creating && (
+        {audience === "staff" && canCreate && creating && (
           <form onSubmit={createRequest} className="mt-3 space-y-3">
             <input
               required
@@ -188,6 +196,16 @@ export function SignaturesPanel({
                       </span>
                       {s.status === "pending" ? (
                         <span className="flex items-center gap-2">
+                          {audience === "staff" && (
+                            <button
+                              type="button"
+                              onClick={() => copySigningLink(s.access_token)}
+                              className="flex items-center gap-1 text-accent hover:underline"
+                              title="Copy a public signing link -- no account needed"
+                            >
+                              <LinkIcon size={12} /> Copy link
+                            </button>
+                          )}
                           <button type="button" onClick={() => setSigningId(s.id)} className="flex items-center gap-1 text-accent hover:underline">
                             <PenLine size={12} /> Mark signed
                           </button>

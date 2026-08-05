@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
 import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
+import { CreatePricingRuleForm, CreateBillingRuleForm } from "@/components/settings/CreatePricingBillingRuleForms";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +35,8 @@ export default async function ServicePackagesPage() {
       .or(orFilter)
       .order("name"),
     supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
-    supabase.from("pricing_rules").select("id, name").or(orFilter).order("name"),
-    supabase.from("billing_rules").select("id, name").or(orFilter).order("name"),
+    supabase.from("pricing_rules").select("id, name, status, pricing_method").or(orFilter).order("name"),
+    supabase.from("billing_rules").select("id, name, status, invoice_timing").or(orFilter).order("name"),
     supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
@@ -50,7 +51,38 @@ export default async function ServicePackagesPage() {
         engagement letter templates for engagements created against it.
       </p>
 
-      <div className="mt-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Pricing rules</h3>
+          <div className="mt-2 space-y-2">
+            {(pricingRules ?? []).map((r) => (
+              <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                <span className="text-slate">
+                  {r.name} <span className="text-xs text-muted">({r.pricing_method.replace(/_/g, " ")})</span>
+                </span>
+                <TemplateStatusCycle table="pricing_rules" id={r.id} status={r.status} />
+              </div>
+            ))}
+            <CreatePricingRuleForm workspaceId={workspace.id} />
+          </div>
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Billing rules</h3>
+          <div className="mt-2 space-y-2">
+            {(billingRules ?? []).map((r) => (
+              <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                <span className="text-slate">
+                  {r.name} <span className="text-xs text-muted">({r.invoice_timing.replace(/_/g, " ")})</span>
+                </span>
+                <TemplateStatusCycle table="billing_rules" id={r.id} status={r.status} />
+              </div>
+            ))}
+            <CreateBillingRuleForm workspaceId={workspace.id} />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6">
         <CreateServiceForm
           workspaceId={workspace.id}
           categories={categories ?? []}

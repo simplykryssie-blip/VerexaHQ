@@ -22,6 +22,17 @@ export default async function PortalBillingPage() {
     supabase.from("client_ledger").select("balance_after").eq("client_id", identity.clientId).order("created_at", { ascending: false }).limit(1),
   ]);
 
+  type PlanRow = { id: string; invoice_id: string; installment_number: number; amount: number; due_date: string; status: string };
+  const invoiceIds = (invoices ?? []).map((i) => i.id);
+  const { data: paymentPlanRows } =
+    invoiceIds.length > 0
+      ? await supabase.from("payment_plans").select("id, invoice_id, installment_number, amount, due_date, status").in("invoice_id", invoiceIds)
+      : { data: [] as PlanRow[] };
+  const plansByInvoice = new Map<string, PlanRow[]>();
+  for (const p of paymentPlanRows ?? []) {
+    plansByInvoice.set(p.invoice_id, [...(plansByInvoice.get(p.invoice_id) ?? []), p]);
+  }
+
   const outstandingBalance = ledgerEntries && ledgerEntries.length > 0 ? ledgerEntries[0].balance_after : 0;
 
   return (
@@ -41,20 +52,41 @@ export default async function PortalBillingPage() {
             <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
               {(invoices ?? []).map((inv) => {
                 const balance = inv.total_amount - inv.amount_paid;
+                const plans = plansByInvoice.get(inv.id) ?? [];
+                const hasPlan = plans.length > 0;
                 return (
-                  <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-                    <div>
-                      <p className="font-medium text-slate">{inv.invoice_number ?? "Invoice"}</p>
-                      <p className="text-xs text-muted">
-                        Issued {new Date(inv.issue_date).toLocaleDateString()}
-                        {inv.due_date && ` -- due ${new Date(inv.due_date).toLocaleDateString()}`}
-                      </p>
+                  <li key={inv.id} className="px-4 py-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate">{inv.invoice_number ?? "Invoice"}</p>
+                        <p className="text-xs text-muted">
+                          Issued {new Date(inv.issue_date).toLocaleDateString()}
+                          {inv.due_date && ` -- due ${new Date(inv.due_date).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs capitalize text-muted">{inv.status}</span>
+                        <span className="font-medium text-ink">{money(inv.total_amount)}</span>
+                        {balance > 0 && inv.status !== "draft" && !hasPlan && <PortalPayButton invoiceId={inv.id} />}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs capitalize text-muted">{inv.status}</span>
-                      <span className="font-medium text-ink">{money(inv.total_amount)}</span>
-                      {balance > 0 && inv.status !== "draft" && <PortalPayButton invoiceId={inv.id} />}
-                    </div>
+                    {hasPlan && (
+                      <ul className="mt-2 space-y-1.5 border-t border-border pt-2">
+                        {plans
+                          .sort((a, b) => a.installment_number - b.installment_number)
+                          .map((p) => (
+                            <li key={p.id} className="flex items-center justify-between text-xs">
+                              <span className="text-slate">
+                                Installment {p.installment_number} -- {money(p.amount)} due {new Date(p.due_date).toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-2">
+                                <span className="capitalize text-muted">{p.status}</span>
+                                {p.status === "pending" && <PortalPayButton paymentPlanId={p.id} label="Pay installment" />}
+                              </span>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
                   </li>
                 );
               })}

@@ -13,7 +13,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
   const supabase = createClient();
   const { data: response } = await supabase
     .from("organizer_responses")
-    .select("id, status, organizer_template_id, organizer_templates(name)")
+    .select("id, status, organizer_template_id, workspace_id, client_id, engagement_id, organizer_templates(name)")
     .eq("id", params.id)
     .eq("client_id", identity.clientId)
     .maybeSingle();
@@ -37,7 +37,15 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         description={readOnly ? "This organizer has been submitted and can no longer be edited." : "Fill in what you can -- you can save progress and come back."}
       />
       <div className="max-w-2xl flex-1 px-8 py-6">
-        <OrganizerForm responseId={response.id} fields={fields ?? []} initialAnswers={answers ?? []} readOnly={readOnly} />
+        <OrganizerForm
+          responseId={response.id}
+          fields={fields ?? []}
+          initialAnswers={answers ?? []}
+          readOnly={readOnly}
+          workspaceId={response.workspace_id}
+          entityType={response.engagement_id ? "engagement" : "client"}
+          entityId={response.engagement_id ?? response.client_id}
+        />
       </div>
     </>
   );

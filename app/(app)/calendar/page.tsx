@@ -10,7 +10,7 @@ export default async function CalendarPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: engagements }, { data: tasks }] = await Promise.all([
+  const [{ data: engagements }, { data: tasks }, { data: appointments }] = await Promise.all([
     supabase
       .from("engagements")
       .select("id, engagement_number, due_date")
@@ -22,6 +22,11 @@ export default async function CalendarPage() {
       .eq("workspace_id", workspace.id)
       .not("due_date", "is", null)
       .neq("status", "completed"),
+    supabase
+      .from("appointments")
+      .select("id, title, start_at")
+      .eq("workspace_id", workspace.id)
+      .not("status", "in", '("cancelled")'),
   ]);
 
   const items: CalendarItem[] = [
@@ -38,6 +43,13 @@ export default async function CalendarPage() {
       label: t.title,
       href: undefined,
       kind: "task" as const,
+    })),
+    ...(appointments ?? []).map((a) => ({
+      id: a.id,
+      date: a.start_at,
+      label: a.title,
+      href: "/appointments",
+      kind: "appointment" as const,
     })),
   ];
 

@@ -33,13 +33,29 @@ export async function POST(request: Request) {
         id: string;
         payment_intent: string;
         amount_total: number;
-        metadata?: { invoice_id?: string; workspace_id?: string };
+        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string };
       };
-      const invoiceId = session.metadata?.invoice_id;
       const workspaceId = session.metadata?.workspace_id;
-      if (!invoiceId || !workspaceId) {
+      let invoiceId = session.metadata?.invoice_id;
+      const paymentPlanId = session.metadata?.payment_plan_id;
+
+      if (!workspaceId || (!invoiceId && !paymentPlanId)) {
         await markWebhookProcessed(supabase, logRow?.id, workspaceId);
         return NextResponse.json({ received: true, skipped: "missing metadata" });
+      }
+
+      if (paymentPlanId) {
+        const { data: plan } = await supabase.from("payment_plans").select("invoice_id").eq("id", paymentPlanId).single();
+        if (!plan) {
+          await markWebhookProcessed(supabase, logRow?.id, workspaceId);
+          return NextResponse.json({ received: true, skipped: "payment plan not found" });
+        }
+        invoiceId = plan.invoice_id;
+      }
+
+      if (!invoiceId) {
+        await markWebhookProcessed(supabase, logRow?.id, workspaceId);
+        return NextResponse.json({ received: true, skipped: "no invoice reference" });
       }
 
       const { data: invoice } = await supabase.from("invoices").select("client_id").eq("id", invoiceId).single();
@@ -49,16 +65,25 @@ export async function POST(request: Request) {
       }
 
       // Triggers apply_payment_to_invoice, which updates the invoice status
-      // and posts the client_ledger entry -- no extra logic needed here.
-      await supabase.from("payments").insert({
-        workspace_id: workspaceId,
-        client_id: invoice.client_id,
-        invoice_id: invoiceId,
-        amount: session.amount_total / 100,
-        status: "succeeded",
-        stripe_payment_intent_id: session.payment_intent,
-        stripe_checkout_session_id: session.id,
-      });
+      // and posts the client_ledger entry, and payments_enqueue_receipt,
+      // which emails the client a receipt -- no extra logic needed here.
+      const { data: payment } = await supabase
+        .from("payments")
+        .insert({
+          workspace_id: workspaceId,
+          client_id: invoice.client_id,
+          invoice_id: invoiceId,
+          amount: session.amount_total / 100,
+          status: "succeeded",
+          stripe_payment_intent_id: session.payment_intent,
+          stripe_checkout_session_id: session.id,
+        })
+        .select("id")
+        .single();
+
+      if (paymentPlanId && payment) {
+        await supabase.from("payment_plans").update({ status: "paid", paid_payment_id: payment.id }).eq("id", paymentPlanId);
+      }
 
       await markWebhookProcessed(supabase, logRow?.id, workspaceId);
     } else {

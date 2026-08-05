@@ -3,9 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { Pager } from "@/components/Pager";
 import { NewClientButton } from "./NewClientButton";
 
 export const dynamic = 'force-dynamic';
+
+const PAGE_SIZE = 50;
 
 function clientDisplayName(c: {
   client_type: string;
@@ -17,24 +20,30 @@ function clientDisplayName(c: {
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
-export default async function ClientsPage() {
+export default async function ClientsPage({ searchParams }: { searchParams: { page?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
+  const page = Math.max(Number(searchParams.page) || 1, 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
   const supabase = createClient();
-  const [{ data: clients }, { data: engagementTypes }] = await Promise.all([
+  const [{ data: clients, count }, { data: engagementTypes }, { data: canCreate }] = await Promise.all([
     supabase
       .from("clients")
-      .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status")
+      .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", { count: "exact" })
       .eq("workspace_id", workspace.id)
       .is("merged_into_client_id", null)
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })
+      .range(from, to),
     supabase
       .from("engagement_types")
       .select("id, name")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
   ]);
 
   return (
@@ -42,14 +51,14 @@ export default async function ClientsPage() {
       <PageHeader
         title="Clients"
         description="Every client in your workspace."
-        actions={<NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} />}
+        actions={canCreate ? <NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} /> : null}
       />
       <div className="flex-1 px-8 py-6">
         {!clients || clients.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface">
             <EmptyState
               message="No clients yet. Add your first client to get started."
-              action={<NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} />}
+              action={canCreate ? <NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} /> : undefined}
             />
           </div>
         ) : (
@@ -84,6 +93,7 @@ export default async function ClientsPage() {
                 ))}
               </tbody>
             </table>
+            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/clients" />
           </div>
         )}
       </div>

@@ -33,6 +33,8 @@ export function DocumentWorkspace({
   signatureRequests,
   activity,
   audience = "staff",
+  canRequestDocuments = true,
+  canRequestSignatures = true,
 }: {
   workspaceId: string;
   entityType: EntityType;
@@ -44,6 +46,8 @@ export function DocumentWorkspace({
   signatureRequests: SignatureRequestRow[];
   activity: ActivityRow[];
   audience?: Audience;
+  canRequestDocuments?: boolean;
+  canRequestSignatures?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -162,11 +166,18 @@ export function DocumentWorkspace({
             entityType={entityType}
             entityId={entityId}
             audience={audience}
+            canCreate={canRequestDocuments}
           />
         )}
 
         {tab === "Signatures" && (
-          <SignaturesPanel signatureRequests={signatureRequests} documents={activeDocuments} workspaceId={workspaceId} audience={audience} />
+          <SignaturesPanel
+            signatureRequests={signatureRequests}
+            documents={activeDocuments}
+            workspaceId={workspaceId}
+            audience={audience}
+            canCreate={canRequestSignatures}
+          />
         )}
 
         {tab === "Activity" && (

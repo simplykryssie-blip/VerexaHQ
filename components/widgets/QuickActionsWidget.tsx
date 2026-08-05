@@ -7,7 +7,7 @@ const ACTIONS = [
   { label: "New Engagement", href: "/engagements/new", icon: Briefcase },
   { label: "Create Invoice", href: "/clients", icon: Receipt },
   { label: "Request Documents", href: "/clients", icon: ClipboardList },
-  { label: "Schedule Appointment", href: "/calendar", icon: CalendarPlus },
+  { label: "Schedule Appointment", href: "/appointments", icon: CalendarPlus },
   { label: "Invite Staff", href: "/settings/users", icon: Mail },
 ] as const;
 

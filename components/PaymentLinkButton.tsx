@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 
-export function PaymentLinkButton({ invoiceId }: { invoiceId: string }) {
+export function PaymentLinkButton({ invoiceId, paymentPlanId }: { invoiceId?: string; paymentPlanId?: string }) {
   const toast = useToast();
   const [state, setState] = useState<"idle" | "loading" | "ready" | "unconfigured" | "error">("idle");
   const [url, setUrl] = useState<string | null>(null);
@@ -14,7 +14,7 @@ export function PaymentLinkButton({ invoiceId }: { invoiceId: string }) {
     const res = await fetch("/api/stripe/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ invoiceId }),
+      body: JSON.stringify({ invoiceId, paymentPlanId }),
     });
     const data = await res.json();
 

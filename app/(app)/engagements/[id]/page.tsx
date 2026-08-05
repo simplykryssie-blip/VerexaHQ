@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { loadActionPermissions } from "@/lib/actionPermissions";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .select(
       `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage,
       client_id, service_id,
-      clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id),
+      clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id, primary_email, primary_phone),
       engagement_types(name),
       assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
       reviewer:user_profiles!engagements_reviewer_id_fkey(id, display_name),
@@ -204,7 +205,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
           .select(
             `id, title, status, due_date, attachment_id, created_at,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at)`
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token)`
           )
           .in("attachment_id", documentIds)
           .order("created_at", { ascending: false })
@@ -239,10 +240,12 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .eq("entity_id", engagement.id)
       .order("notice_date", { ascending: false }),
   ]);
+  const permissions = await loadActionPermissions(supabase, workspace.id);
 
   return (
     <EngagementWorkspace
       workspace={workspace}
+      permissions={permissions}
       engagement={engagement as never}
       stages={stagesWithSla as never}
       tasks={tasksWithDeps as never}

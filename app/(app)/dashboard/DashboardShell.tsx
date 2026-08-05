@@ -31,9 +31,9 @@ export function DashboardShell({
   priorities,
 }: {
   workspaceName: string;
-  /** Gate for showing customize controls. dashboard_widgets RLS requires
-   *  is_workspace_admin server-side regardless -- this only controls
-   *  whether the UI offers the controls at all. */
+  /** Currently unused for gating -- personalization is per-user (see
+   *  user_widget_preferences), not admin-only. Kept for a future
+   *  "reset to workspace default" admin action. */
   isAdmin: boolean;
   widgets: WidgetRow[];
   data: DashboardData;
@@ -49,11 +49,21 @@ export function DashboardShell({
   const sorted = [...rows].sort((a, b) => a.display_order - b.display_order);
   const visible = sorted.filter((w) => w.is_visible);
 
+  async function savePreference(dashboardWidgetId: string, patch: { is_visible?: boolean; display_order?: number }) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { error: new Error("Not signed in") };
+    return supabase
+      .from("user_widget_preferences")
+      .upsert({ user_id: user.id, dashboard_widget_id: dashboardWidgetId, ...patch }, { onConflict: "user_id,dashboard_widget_id" });
+  }
+
   async function toggleVisible(row: WidgetRow) {
     setSaving(row.id);
     const nextVisible = !row.is_visible;
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, is_visible: nextVisible } : r)));
-    const { error } = await supabase.from("dashboard_widgets").update({ is_visible: nextVisible }).eq("id", row.id);
+    const { error } = await savePreference(row.id, { is_visible: nextVisible });
     setSaving(null);
     if (error) {
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, is_visible: row.is_visible } : r)));
@@ -78,8 +88,8 @@ export function DashboardShell({
       })
     );
     await Promise.all([
-      supabase.from("dashboard_widgets").update({ display_order: swapWith.display_order }).eq("id", row.id),
-      supabase.from("dashboard_widgets").update({ display_order: row.display_order }).eq("id", swapWith.id),
+      savePreference(row.id, { display_order: swapWith.display_order }),
+      savePreference(swapWith.id, { display_order: row.display_order }),
     ]);
     setSaving(null);
     router.refresh();
@@ -147,18 +157,16 @@ export function DashboardShell({
         title="Dashboard"
         description={`Welcome back to ${workspaceName}.`}
         actions={
-          isAdmin ? (
-            <button
-              type="button"
-              onClick={() => setCustomizing((v) => !v)}
-              aria-pressed={customizing}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
-              }`}
-            >
-              <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
-            </button>
-          ) : undefined
+          <button
+            type="button"
+            onClick={() => setCustomizing((v) => !v)}
+            aria-pressed={customizing}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
+            }`}
+          >
+            <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
+          </button>
         }
       />
 

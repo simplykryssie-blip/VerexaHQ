@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { loadActionPermissions } from "@/lib/actionPermissions";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -108,6 +109,20 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .eq("status", "active"),
   ]);
 
+  const invoiceIds = (invoices ?? []).map((i) => i.id);
+  const { data: paymentPlanRows } =
+    invoiceIds.length > 0
+      ? await supabase
+          .from("payment_plans")
+          .select("id, invoice_id, installment_number, amount, due_date, status")
+          .in("invoice_id", invoiceIds)
+      : { data: [] as { id: string; invoice_id: string; installment_number: number; amount: number; due_date: string; status: string }[] };
+
+  const paymentPlansByInvoice: Record<string, { id: string; installment_number: number; amount: number; due_date: string; status: string }[]> = {};
+  for (const p of paymentPlanRows ?? []) {
+    (paymentPlansByInvoice[p.invoice_id] ??= []).push(p);
+  }
+
   const { data: documentRequestTemplates } = await supabase
     .from("document_request_templates")
     .select("id, name")
@@ -133,7 +148,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           .select(
             `id, title, status, due_date, attachment_id, created_at,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at)`
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token)`
           )
           .in("attachment_id", documentIds)
           .order("created_at", { ascending: false })
@@ -236,10 +251,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   );
 
   const outstandingBalance = ledgerEntries && ledgerEntries.length > 0 ? ledgerEntries[0].balance_after : 0;
+  const permissions = await loadActionPermissions(supabase, workspace.id);
 
   return (
     <ClientWorkspace
       workspace={workspace}
+      permissions={permissions}
       client={client}
       contacts={contacts ?? []}
       addresses={addresses ?? []}
@@ -264,6 +281,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       tasks={tasks}
       requestedDocumentCount={requestedDocumentCount}
       documentRequestTemplates={documentRequestTemplates ?? []}
+      paymentPlansByInvoice={paymentPlansByInvoice}
     />
   );
 }

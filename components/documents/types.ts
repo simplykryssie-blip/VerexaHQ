@@ -51,6 +51,7 @@ export type SignerRow = {
   signer_email: string | null;
   status: "pending" | "signed" | "declined";
   signed_at: string | null;
+  access_token: string;
 };
 
 export type SignatureRequestRow = {

@@ -7,7 +7,7 @@ import { useToast } from "@/components/Toast";
 // "Get payment link" button calls -- RLS already lets a portal user read
 // their own invoice, so the route works unmodified. This just redirects
 // the browser straight to Stripe instead of copying a link to clipboard.
-export function PortalPayButton({ invoiceId }: { invoiceId: string }) {
+export function PortalPayButton({ invoiceId, paymentPlanId, label = "Pay now" }: { invoiceId?: string; paymentPlanId?: string; label?: string }) {
   const toast = useToast();
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +16,7 @@ export function PortalPayButton({ invoiceId }: { invoiceId: string }) {
     const res = await fetch("/api/stripe/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ invoiceId }),
+      body: JSON.stringify({ invoiceId, paymentPlanId }),
     });
     const data = await res.json();
     setLoading(false);
@@ -39,7 +39,7 @@ export function PortalPayButton({ invoiceId }: { invoiceId: string }) {
       disabled={loading}
       className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
     >
-      {loading ? "Loading..." : "Pay now"}
+      {loading ? "Loading..." : label}
     </button>
   );
 }

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
+import type { ActionPermissions } from "@/lib/actionPermissions";
+import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import {
   OverviewTab,
@@ -104,8 +106,12 @@ export function ClientWorkspace({
   tasks,
   requestedDocumentCount,
   documentRequestTemplates,
+  permissions,
+  paymentPlansByInvoice,
 }: {
   workspace: Workspace;
+  permissions: ActionPermissions;
+  paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
   client: ClientRow;
   contacts: ContactRow[];
   addresses: AddressRow[];
@@ -176,6 +182,7 @@ export function ClientWorkspace({
           documentRequestTemplates={documentRequestTemplates}
           primaryEmail={client.primary_email}
           primaryPhone={client.primary_phone}
+          permissions={permissions}
         />
       </div>
 
@@ -236,11 +243,21 @@ export function ClientWorkspace({
                 requestTemplates={documentRequestTemplates}
                 signatureRequests={signatureRequests}
                 activity={timeline}
+                canRequestDocuments={permissions.documentsRequest}
+                canRequestSignatures={permissions.signaturesRequest}
               />
             )}
             {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}
             {tab === "Billing" && (
-              <BillingTab quotes={quotes} invoices={invoices} payments={payments} outstandingBalance={outstandingBalance} />
+              <BillingTab
+                quotes={quotes}
+                invoices={invoices}
+                payments={payments}
+                outstandingBalance={outstandingBalance}
+                workspaceId={workspace.id}
+                paymentPlansByInvoice={paymentPlansByInvoice}
+                canManageBilling={permissions.billingManage}
+              />
             )}
             {tab === "Timeline" && <TimelineTab timeline={timeline} />}
             {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}

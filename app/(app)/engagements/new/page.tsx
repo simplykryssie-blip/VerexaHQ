@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
 import { NewEngagementForm } from "./NewEngagementForm";
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,21 @@ export default async function NewEngagementPage({
   if (!workspace) return null;
 
   const supabase = createClient();
+  const { data: canCreate } = await supabase.rpc("has_permission", {
+    p_workspace_id: workspace.id,
+    p_permission_key: "engagements.manage",
+  });
+  if (!canCreate) {
+    return (
+      <>
+        <PageHeader title="New Engagement" description="Start a new engagement for a client." />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState message="You don't have permission to create engagements." />
+        </div>
+      </>
+    );
+  }
+
   const [{ data: clients }, { data: engagementTypes }] = await Promise.all([
     supabase
       .from("clients")

@@ -9,7 +9,7 @@ export type CalendarItem = {
   date: string;
   label: string;
   href?: string;
-  kind: "engagement" | "task";
+  kind: "engagement" | "task" | "appointment";
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

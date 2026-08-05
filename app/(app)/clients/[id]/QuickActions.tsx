@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, MessageSquare, Upload, FileText, Receipt, StickyNote, ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import type { ActionPermissions } from "@/lib/actionPermissions";
 
 type Props = {
   clientId: string;
@@ -13,6 +14,7 @@ type Props = {
   documentRequestTemplates: { id: string; name: string }[];
   primaryEmail: string | null;
   primaryPhone: string | null;
+  permissions: ActionPermissions;
 };
 
 function ActionButton({
@@ -51,7 +53,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-export function QuickActions({ clientId, workspaceId, documentRequestTemplates, primaryEmail, primaryPhone }: Props) {
+export function QuickActions({ clientId, workspaceId, documentRequestTemplates, primaryEmail, primaryPhone, permissions }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [modal, setModal] = useState<
@@ -103,17 +105,23 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates, 
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <Link
-          href={`/engagements/new?clientId=${clientId}`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
-        >
-          <Plus size={14} /> New Engagement
-        </Link>
-        <ActionButton icon={MessageSquare} label="Send Message" onClick={() => setModal("message")} />
-        <ActionButton icon={Upload} label="Upload Document" onClick={() => setModal("upload")} />
-        <ActionButton icon={ClipboardList} label="Request Documents" onClick={() => setModal("request")} />
-        <ActionButton icon={Receipt} label="Create Invoice" onClick={() => setModal("invoice")} />
-        <ActionButton icon={FileText} label="Create Quote" onClick={() => setModal("quote")} />
+        {permissions.engagementsManage && (
+          <Link
+            href={`/engagements/new?clientId=${clientId}`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+          >
+            <Plus size={14} /> New Engagement
+          </Link>
+        )}
+        {(permissions.messagesSend || permissions.messagesInternalNote) && (
+          <ActionButton icon={MessageSquare} label="Send Message" onClick={() => setModal("message")} />
+        )}
+        {permissions.documentsUpload && <ActionButton icon={Upload} label="Upload Document" onClick={() => setModal("upload")} />}
+        {permissions.documentsRequest && (
+          <ActionButton icon={ClipboardList} label="Request Documents" onClick={() => setModal("request")} />
+        )}
+        {permissions.billingManage && <ActionButton icon={Receipt} label="Create Invoice" onClick={() => setModal("invoice")} />}
+        {permissions.billingManage && <ActionButton icon={FileText} label="Create Quote" onClick={() => setModal("quote")} />}
         <ActionButton icon={StickyNote} label="Add Note" onClick={() => setModal("note")} />
       </div>
 
@@ -128,10 +136,14 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates, 
                 type: "select",
                 required: true,
                 options: [
-                  { value: "portal", label: "Client portal" },
-                  { value: "email", label: "Email" },
-                  { value: "sms", label: "SMS" },
-                  { value: "internal", label: "Internal note" },
+                  ...(permissions.messagesSend
+                    ? [
+                        { value: "portal", label: "Client portal" },
+                        { value: "email", label: "Email" },
+                        { value: "sms", label: "SMS" },
+                      ]
+                    : []),
+                  ...(permissions.messagesInternalNote ? [{ value: "internal", label: "Internal note" }] : []),
                 ],
               },
               { name: "body", label: "Message", required: true },
