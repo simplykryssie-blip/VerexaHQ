@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createCheckoutSession } from "@/lib/stripe/client";
 import { recordProviderCheck } from "@/lib/providerHealth";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -10,6 +11,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const allowed = await checkRateLimit(`checkout-session:${user.id}`, 10, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
   const body = (await request.json()) as { invoiceId?: string; paymentPlanId?: string };

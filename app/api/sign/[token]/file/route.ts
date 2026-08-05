@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 
 // Public, token-authorized file access for external signers with no
 // account -- the same trust model as record_signature_by_token/
 // decline_signature_by_token (see migration public_signature_link):
 // the token itself is the authorization, verified with the service-role
 // client since there's no session to run RLS against.
-export async function GET(_request: Request, { params }: { params: { token: string } }) {
+export async function GET(request: Request, { params }: { params: { token: string } }) {
+  const allowed = await checkRateLimit(`sign-file:${clientIp(request)}`, 20, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
+  }
+
   const supabase = createServiceClient();
 
   const { data: signer } = await supabase

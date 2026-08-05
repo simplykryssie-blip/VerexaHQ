@@ -3,11 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  const allowed = await checkRateLimit(`invitations:${workspace.id}`, 10, 60);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
   const { email, roleId } = (await request.json()) as { email?: string; roleId?: string };

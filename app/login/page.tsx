@@ -57,6 +57,18 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+
+    const { data: allowed } = await supabase.rpc("check_rate_limit", {
+      p_key: `login:${email.toLowerCase()}`,
+      p_max_hits: 10,
+      p_window_seconds: 300,
+    });
+    if (allowed === false) {
+      setLoading(false);
+      setError("Too many sign-in attempts. Please wait a few minutes and try again.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {

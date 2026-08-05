@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
 const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password", "/sign/"];
-const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation"];
+const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/mfa-challenge"];
 const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
+const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
 
 export async function updateSession(request: NextRequest) {
   try {
@@ -74,6 +75,42 @@ export async function updateSession(request: NextRequest) {
 
     if (user && pathname === loginPath) {
       return NextResponse.redirect(new URL(homePath, request.url));
+    }
+
+    // MFA: staff only (client portal users are out of scope for now). A
+    // verified factor that hasn't cleared this session's challenge sends the
+    // user to /mfa-challenge; a workspace that requires MFA but where this
+    // user has enrolled nothing sends them to enroll instead.
+    if (user && !isPortalPath && !MFA_EXEMPT_STAFF_PATHS.some((path) => pathname.startsWith(path))) {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal2") {
+        const redirectUrl = new URL("/mfa-challenge", request.url);
+        redirectUrl.searchParams.set("next", pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal1") {
+        const { data: membership } = await supabase
+          .from("workspace_users")
+          .select("workspace_id")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+
+        if (membership) {
+          const { data: policy } = await supabase
+            .from("workspace_security_policies")
+            .select("mfa_required")
+            .eq("workspace_id", membership.workspace_id)
+            .maybeSingle();
+
+          if (policy?.mfa_required) {
+            return NextResponse.redirect(new URL("/settings/security", request.url));
+          }
+        }
+      }
     }
 
     return response;

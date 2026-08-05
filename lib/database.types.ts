@@ -129,6 +129,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "appointments_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "appointments_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
             foreignKeyName: "appointments_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -347,6 +361,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "automation_execution_logs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -809,6 +830,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "change_orders_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -2317,6 +2345,13 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
+            foreignKeyName: "engagement_assignment_history_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
             foreignKeyName: "engagement_assignment_history_new_user_id_fkey"
             columns: ["new_user_id"]
             isOneToOne: false
@@ -2442,6 +2477,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: true
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "engagement_pricing_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: true
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -2646,6 +2688,13 @@ export type Database = {
             referencedRelation: "v_engagement_progress"
             referencedColumns: ["engagement_id"]
           },
+          {
+            foreignKeyName: "engagement_status_history_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
         ]
       }
       engagement_tax_details: {
@@ -2716,6 +2765,13 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
+            foreignKeyName: "engagement_tax_details_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: true
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
             foreignKeyName: "engagement_tax_details_original_engagement_id_fkey"
             columns: ["original_engagement_id"]
             isOneToOne: false
@@ -2727,6 +2783,13 @@ export type Database = {
             columns: ["original_engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "engagement_tax_details_original_engagement_id_fkey"
+            columns: ["original_engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -3231,6 +3294,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "invoices_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -3854,6 +3924,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "organizer_responses_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -4613,6 +4690,13 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
+            foreignKeyName: "quotes_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
             foreignKeyName: "quotes_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -4620,6 +4704,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rate_limit_hits: {
+        Row: {
+          created_at: string
+          id: number
+          rate_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          rate_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          rate_key?: string
+        }
+        Relationships: []
       }
       recurring_billing: {
         Row: {
@@ -4694,6 +4796,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "recurring_billing_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -5377,6 +5486,13 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
+            foreignKeyName: "tasks_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
             foreignKeyName: "tasks_workflow_stage_id_fkey"
             columns: ["workflow_stage_id"]
             isOneToOne: false
@@ -5663,6 +5779,13 @@ export type Database = {
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
           },
           {
@@ -6454,13 +6577,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "workflow_runs_engagement_id_fkey"
-            columns: ["engagement_id"]
-            isOneToOne: false
-            referencedRelation: "engagements"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "workflow_stages_reviewer_id_fkey"
             columns: ["reviewer_id"]
             isOneToOne: false
@@ -6572,6 +6688,10 @@ export type Database = {
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
+      }
+      check_rate_limit: {
+        Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
+        Returns: boolean
       }
       check_stage_readiness: {
         Args: { p_workflow_stage_id: string }
@@ -6691,11 +6811,11 @@ export type Database = {
       }
       encrypt_client_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_firm_secret: { Args: { p_plaintext: string }; Returns: string }
+      enqueue_reminder_notifications: { Args: never; Returns: number }
       ensure_default_dashboard: {
         Args: { p_workspace_id: string }
         Returns: string
       }
-      enqueue_reminder_notifications: { Args: never; Returns: number }
       expire_stale_engagement_shares: { Args: never; Returns: number }
       fulfill_document_request_item: {
         Args: { p_attachment_id: string; p_item_status_id: string }
@@ -6756,14 +6876,14 @@ export type Database = {
       get_signature_request_by_token: {
         Args: { p_token: string }
         Returns: {
-          attachment_id: string
           attachment_file_name: string
-          attachment_mime_type: string | null
-          decline_reason: string | null
-          declined_at: string | null
+          attachment_id: string
+          attachment_mime_type: string
+          decline_reason: string
+          declined_at: string
           request_status: string
           request_title: string
-          signed_at: string | null
+          signed_at: string
           signer_id: string
           signer_name: string
           signer_status: string
@@ -6920,7 +7040,11 @@ export type Database = {
       }
       run_critical_path_smoke_tests: {
         Args: never
-        Returns: { check_name: string; error_detail: string | null; passed: boolean }[]
+        Returns: {
+          check_name: string
+          error_detail: string
+          passed: boolean
+        }[]
       }
       set_config_object_status: {
         Args: { p_id: string; p_status: string; p_table: string }

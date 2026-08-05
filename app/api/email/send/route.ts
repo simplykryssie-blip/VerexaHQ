@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmailViaResend, SYSTEM_SENDERS, type SystemSenderKey } from "@/lib/email/resend";
 import { recordProviderCheck } from "@/lib/providerHealth";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 function isSystemSenderKey(value: unknown): value is SystemSenderKey {
   return typeof value === "string" && value in SYSTEM_SENDERS;
@@ -14,6 +15,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ ok: false, sent: false, error: "Not authenticated" }, { status: 401 });
+  }
+
+  const allowed = await checkRateLimit(`email-send:${user.id}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, sent: false, error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
   const { to, subject, html, sender } = (await request.json()) as {

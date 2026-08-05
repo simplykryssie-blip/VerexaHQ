@@ -18,6 +18,17 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
 
+    const { data: allowed } = await supabase.rpc("check_rate_limit", {
+      p_key: `password-reset:${email.toLowerCase()}`,
+      p_max_hits: 5,
+      p_window_seconds: 300,
+    });
+    if (allowed === false) {
+      setLoading(false);
+      setError("Too many requests. Please wait a few minutes and try again.");
+      return;
+    }
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
     });

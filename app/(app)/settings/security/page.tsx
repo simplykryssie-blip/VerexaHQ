@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
 import { SecurityForm } from "./SecurityForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
+import { MfaSetup } from "./MfaSetup";
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,14 @@ export default async function SecurityPage() {
         <p className="mt-1 text-sm text-muted">Update the password for your own account.</p>
         <div className="mt-4">
           <ChangePasswordForm />
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-border bg-surface p-5">
+        <h3 className="text-sm font-semibold text-ink">Two-factor authentication</h3>
+        <p className="mt-1 text-sm text-muted">Protect your own account with an authenticator app.</p>
+        <div className="mt-4">
+          <MfaSetup />
         </div>
       </div>
 
