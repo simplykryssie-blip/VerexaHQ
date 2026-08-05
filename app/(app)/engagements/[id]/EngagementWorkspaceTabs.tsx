@@ -513,6 +513,7 @@ export function NotesTab({ engagementId, workspaceId, notes }: { engagementId: s
             <li key={n.id} className="rounded-lg bg-surfaceMuted p-3 text-sm text-slate">
               {n.is_pinned && <span className="mr-2 text-xs font-medium text-accent">Pinned</span>}
               {n.is_internal && <span className="mr-2 text-xs font-medium text-muted">Internal</span>}
+              {n.subject && <p className="font-semibold text-ink">{n.subject}</p>}
               <p>{n.body}</p>
               <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
             </li>
@@ -618,7 +619,7 @@ export type TaskRow = {
   assigned_staff: StaffRef;
   dependencies: TaskDependency[];
 };
-export type NoteRow = { id: string; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
+export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type MessageThreadRow = { id: string; subject: string | null; channel: string };
 export type MessageRow = { id: string; thread_id: string; body: string; is_internal: boolean; created_at: string };
 export type ShareRow = { id: string; status: string; shared_with: { name: string } | null };

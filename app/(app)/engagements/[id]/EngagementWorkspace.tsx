@@ -15,7 +15,6 @@ import {
   MessagesTab,
   ReviewTab,
   BillingTab,
-  TimelineTab,
   NotesTab,
   AuditTab,
   type EngagementRow,
@@ -48,7 +47,6 @@ const TABS = [
   "Messages",
   "Review",
   "Billing",
-  "Timeline",
   "Notes",
   "Audit",
 ] as const;
@@ -231,7 +229,6 @@ export function EngagementWorkspace({
                 payments={payments}
               />
             )}
-            {tab === "Timeline" && <TimelineTab timeline={timeline} />}
             {tab === "Notes" && <NotesTab engagementId={engagement.id} workspaceId={workspace.id} notes={notes} />}
             {tab === "Audit" && <AuditTab assignmentHistory={assignmentHistory} statusHistory={statusHistory} />}
           </div>

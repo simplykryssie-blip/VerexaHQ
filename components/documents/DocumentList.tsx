@@ -231,6 +231,7 @@ export function DocumentList({
                   </button>
                 )}
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+                  {doc.category && <span className="rounded bg-surfaceMuted px-1.5 py-0.5 text-slate">{doc.category}</span>}
                   {(doc.version ?? 1) > 1 && <span>v{doc.version}</span>}
                   <span>{formatSize(doc.file_size_bytes)}</span>
                   <span>{new Date(doc.created_at).toLocaleDateString()}</span>

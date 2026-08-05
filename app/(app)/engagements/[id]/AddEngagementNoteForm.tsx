@@ -16,7 +16,10 @@ export function AddEngagementNoteForm({
   return (
     <InlineAddForm
       label="New Note"
-      fields={[{ name: "body", label: "Note", required: true }]}
+      fields={[
+        { name: "subject", label: "Subject" },
+        { name: "body", label: "Note", required: true },
+      ]}
       onSubmit={async (v) => {
         const {
           data: { user },
@@ -26,6 +29,7 @@ export function AddEngagementNoteForm({
           entity_type: "engagement",
           entity_id: engagementId,
           author_id: user?.id,
+          subject: v.subject || null,
           body: v.body,
         });
         if (error) return error.message;

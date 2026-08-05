@@ -63,7 +63,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .order("created_at", { ascending: false }),
     supabase
       .from("notes")
-      .select("id, body, is_pinned, is_internal, is_private, created_at")
+      .select("id, subject, body, is_pinned, is_internal, is_private, created_at")
       .eq("entity_type", "engagement")
       .eq("entity_id", engagement.id)
       .order("created_at", { ascending: false }),

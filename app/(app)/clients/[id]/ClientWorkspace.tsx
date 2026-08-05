@@ -14,7 +14,6 @@ import {
   EngagementsTab,
   MessagesTab,
   BillingTab,
-  TimelineTab,
   NotesTab,
   type ContactRow,
   type AddressRow,
@@ -69,7 +68,6 @@ const TABS = [
   "Documents",
   "Messages",
   "Billing",
-  "Timeline",
   "Notes",
 ] as const;
 
@@ -262,7 +260,6 @@ export function ClientWorkspace({
                 canManageBilling={permissions.billingManage}
               />
             )}
-            {tab === "Timeline" && <TimelineTab timeline={timeline} />}
             {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}
           </div>
         </div>

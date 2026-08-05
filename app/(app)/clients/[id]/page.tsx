@@ -57,7 +57,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .order("open_date", { ascending: false }),
     supabase
       .from("notes")
-      .select("id, body, is_pinned, is_internal, is_private, created_at")
+      .select("id, subject, body, is_pinned, is_internal, is_private, created_at")
       .eq("entity_type", "client")
       .eq("entity_id", client.id)
       .order("created_at", { ascending: false }),

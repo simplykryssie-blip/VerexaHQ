@@ -3538,6 +3538,7 @@ export type Database = {
           mentions: Json | null
           rich_content: Json | null
           search_vector: unknown
+          subject: string | null
           updated_at: string
           workspace_id: string
         }
@@ -3555,6 +3556,7 @@ export type Database = {
           mentions?: Json | null
           rich_content?: Json | null
           search_vector?: unknown
+          subject?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -3572,6 +3574,7 @@ export type Database = {
           mentions?: Json | null
           rich_content?: Json | null
           search_vector?: unknown
+          subject?: string | null
           updated_at?: string
           workspace_id?: string
         }

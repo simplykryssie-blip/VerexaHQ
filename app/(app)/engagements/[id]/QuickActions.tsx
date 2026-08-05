@@ -44,6 +44,8 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
   const supabase = createClient();
   const [modal, setModal] = useState<"message" | "upload" | "organizer" | "invoice" | "quote" | "note" | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [docName, setDocName] = useState("");
+  const [docCategory, setDocCategory] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -68,11 +70,12 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
       workspace_id: workspaceId,
       entity_type: "engagement",
       entity_id: engagementId,
-      file_name: file.name,
+      file_name: docName.trim() || file.name,
       storage_path: path,
       mime_type: file.type || null,
       file_size_bytes: file.size,
       uploaded_by: user?.id,
+      category: docCategory || null,
     });
 
     setUploading(false);
@@ -82,6 +85,8 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
     }
 
     setFile(null);
+    setDocName("");
+    setDocCategory("");
     setModal(null);
     router.refresh();
   }
@@ -181,9 +186,41 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
           <div className="space-y-3">
             <input
               type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                setFile(f);
+                if (f && !docName) setDocName(f.name.replace(/\.[^./]+$/, ""));
+              }}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm"
             />
+            <label className="block text-sm font-medium text-slate">
+              Document name
+              <input
+                type="text"
+                value={docName}
+                onChange={(e) => setDocName(e.target.value)}
+                placeholder="e.g. 2025 W-2"
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
+            <label className="block text-sm font-medium text-slate">
+              Category
+              <select
+                value={docCategory}
+                onChange={(e) => setDocCategory(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="">Uncategorized</option>
+                <option value="Tax Return">Tax Return</option>
+                <option value="W-2">W-2</option>
+                <option value="1099">1099</option>
+                <option value="Identification">Identification</option>
+                <option value="Engagement Letter">Engagement Letter</option>
+                <option value="Financial Statement">Financial Statement</option>
+                <option value="Correspondence">Correspondence</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
             {uploadError && <p className="text-sm text-danger">{uploadError}</p>}
             <div className="flex justify-end gap-2">
               <button

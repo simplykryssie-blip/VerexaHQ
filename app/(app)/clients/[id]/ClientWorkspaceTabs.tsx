@@ -590,6 +590,7 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
             <li key={n.id} className="rounded-lg bg-surfaceMuted p-3 text-sm text-slate">
               {n.is_pinned && <span className="mr-2 text-xs font-medium text-accent">Pinned</span>}
               {n.is_internal && <span className="mr-2 text-xs font-medium text-muted">Internal</span>}
+              {n.subject && <p className="font-semibold text-ink">{n.subject}</p>}
               <p>{n.body}</p>
               <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
             </li>
@@ -606,7 +607,7 @@ export type ContactRow = { id: string; first_name: string | null; last_name: str
 export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null };
 export type PortalUserRow = { id: string; invited_name: string | null; invited_email: string; is_primary: boolean; status: string };
 export type RelationshipRow = { id: string; relationship_type: string; related_name: string | null; related_client_id: string | null };
-export type NoteRow = { id: string; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
+export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string };
 export type QuoteRow = { id: string; quote_number: string | null; title: string; status: string; total_amount: number };
