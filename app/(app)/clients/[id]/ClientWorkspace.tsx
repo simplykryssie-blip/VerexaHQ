@@ -18,8 +18,6 @@ import {
   NotesTab,
   type ContactRow,
   type AddressRow,
-  type PhoneRow,
-  type EmailRow,
   type PortalUserRow,
   type RelationshipRow,
   type NoteRow,
@@ -54,6 +52,7 @@ type ClientRow = {
   ssn_last4: string | null;
   ein_last4: string | null;
   itin_last4: string | null;
+  date_of_birth: string | null;
   relationship_manager: ClientHeaderInfo["relationship_manager"];
   default_reviewer: ClientHeaderInfo["default_reviewer"];
   default_compliance_officer: ClientHeaderInfo["default_compliance_officer"];
@@ -85,8 +84,6 @@ export function ClientWorkspace({
   client,
   contacts,
   addresses,
-  phones,
-  emails,
   relationships,
   portalUsers,
   engagements,
@@ -115,8 +112,6 @@ export function ClientWorkspace({
   client: ClientRow;
   contacts: ContactRow[];
   addresses: AddressRow[];
-  phones: PhoneRow[];
-  emails: EmailRow[];
   relationships: RelationshipRow[];
   portalUsers: PortalUserRow[];
   engagements: EngagementRow[];
@@ -221,12 +216,10 @@ export function ClientWorkspace({
             )}
             {tab === "Contacts" && (
               <ContactsTab
-                clientId={client.id}
+                client={client}
                 workspaceId={workspace.id}
                 contacts={contacts}
                 addresses={addresses}
-                phones={phones}
-                emails={emails}
                 portalUsers={portalUsers}
               />
             )}

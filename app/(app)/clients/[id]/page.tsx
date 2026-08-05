@@ -26,8 +26,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const [
     { data: contacts },
     { data: addresses },
-    { data: phones },
-    { data: emails },
     { data: relationships },
     { data: portalUsers },
     { data: engagements },
@@ -44,8 +42,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
-    supabase.from("client_phones").select("*").eq("client_id", client.id).order("display_order"),
-    supabase.from("client_emails").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_relationships").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_portal_users").select("*").eq("client_id", client.id).order("display_order"),
     supabase
@@ -260,8 +256,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       client={client}
       contacts={contacts ?? []}
       addresses={addresses ?? []}
-      phones={phones ?? []}
-      emails={emails ?? []}
       relationships={relationships ?? []}
       portalUsers={portalUsers ?? []}
       engagements={engagements ?? []}
