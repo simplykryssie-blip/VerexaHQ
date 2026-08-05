@@ -159,6 +159,8 @@ export function ClientWorkspace({
   return (
     <>
       <PageHeader
+        backHref="/clients"
+        backLabel="Back to Clients"
         title={displayName(client)}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">

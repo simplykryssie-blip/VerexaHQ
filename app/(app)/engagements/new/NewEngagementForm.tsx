@@ -129,13 +129,22 @@ export function NewEngagementForm({
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-      >
-        {loading ? "Creating..." : "Create engagement"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="rounded-lg px-4 py-2 text-sm font-medium text-slate hover:bg-surfaceMuted"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {loading ? "Creating..." : "Create engagement"}
+        </button>
+      </div>
     </form>
   );
 }

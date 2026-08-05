@@ -22,7 +22,7 @@ export default async function NewEngagementPage({
   if (!canCreate) {
     return (
       <>
-        <PageHeader title="New Engagement" description="Start a new engagement for a client." />
+        <PageHeader backHref="/engagements" backLabel="Back to Engagements" title="New Engagement" description="Start a new engagement for a client." />
         <div className="flex-1 px-8 py-6">
           <EmptyState message="You don't have permission to create engagements." />
         </div>
@@ -47,7 +47,7 @@ export default async function NewEngagementPage({
 
   return (
     <>
-      <PageHeader title="New Engagement" description="Start a new engagement for a client." />
+      <PageHeader backHref="/engagements" backLabel="Back to Engagements" title="New Engagement" description="Start a new engagement for a client." />
       <div className="flex-1 px-8 py-6">
         <div className="max-w-lg rounded-xl border border-border bg-surface p-6">
           <NewEngagementForm

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, MessageSquare, Upload, FileText, Receipt, StickyNote, ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import { Modal } from "@/components/Modal";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 type Props = {
@@ -34,22 +35,6 @@ function ActionButton({
     >
       <Icon size={14} /> {label}
     </button>
-  );
-}
-
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/30 px-4 py-8">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
-          <button type="button" onClick={onClose} className="text-sm text-muted hover:text-ink">
-            Close
-          </button>
-        </div>
-        <div className="mt-4">{children}</div>
-      </div>
-    </div>
   );
 }
 

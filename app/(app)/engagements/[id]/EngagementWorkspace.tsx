@@ -122,6 +122,8 @@ export function EngagementWorkspace({
   return (
     <>
       <PageHeader
+        backHref="/engagements"
+        backLabel="Back to Engagements"
         title={engagement.engagement_number ?? "Engagement"}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
