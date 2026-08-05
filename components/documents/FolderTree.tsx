@@ -66,7 +66,7 @@ export function FolderTree({
   const roots = buildTree(folders, null);
 
   return (
-    <nav aria-label="Document folders" className="w-56 shrink-0 border-r border-border pr-3">
+    <nav aria-label="Document folders" className="w-full shrink-0 border-b border-border pb-3 sm:w-56 sm:border-b-0 sm:border-r sm:pb-0 sm:pr-3">
       <button
         type="button"
         onClick={() => onSelect(null)}

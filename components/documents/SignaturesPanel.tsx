@@ -6,7 +6,7 @@ import { PenLine, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
-import type { DocumentRow, SignatureRequestRow } from "./types";
+import type { Audience, DocumentRow, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
   return raw
@@ -23,10 +23,12 @@ export function SignaturesPanel({
   signatureRequests,
   documents,
   workspaceId,
+  audience = "staff",
 }: {
   signatureRequests: SignatureRequestRow[];
   documents: DocumentRow[];
   workspaceId: string;
+  audience?: Audience;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -109,11 +111,13 @@ export function SignaturesPanel({
       <div className="rounded-xl border border-border bg-surface p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">Signature requests</h3>
-          <button type="button" onClick={() => setCreating((v) => !v)} className="text-sm font-medium text-accent hover:underline">
-            {creating ? "Cancel" : "New request"}
-          </button>
+          {audience === "staff" && (
+            <button type="button" onClick={() => setCreating((v) => !v)} className="text-sm font-medium text-accent hover:underline">
+              {creating ? "Cancel" : "New request"}
+            </button>
+          )}
         </div>
-        {creating && (
+        {audience === "staff" && creating && (
           <form onSubmit={createRequest} className="mt-3 space-y-3">
             <input
               required
@@ -216,7 +220,9 @@ export function SignaturesPanel({
               </button>
             </div>
             <p className="mt-2 text-sm text-muted">
-              Staff-recorded signature (in person or via another channel) -- type the signer&apos;s full name to confirm.
+              {audience === "portal"
+                ? "Type your full name to sign this document electronically."
+                : "Staff-recorded signature (in person or via another channel) -- type the signer's full name to confirm."}
             </p>
             <input
               autoFocus

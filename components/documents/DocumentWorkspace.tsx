@@ -10,6 +10,7 @@ import { SignaturesPanel } from "./SignaturesPanel";
 import { EmptyState } from "@/components/EmptyState";
 import type {
   ActivityRow,
+  Audience,
   DocumentFolderRow,
   DocumentRequestRow,
   DocumentRequestTemplateOption,
@@ -31,6 +32,7 @@ export function DocumentWorkspace({
   requestTemplates,
   signatureRequests,
   activity,
+  audience = "staff",
 }: {
   workspaceId: string;
   entityType: EntityType;
@@ -41,6 +43,7 @@ export function DocumentWorkspace({
   requestTemplates: DocumentRequestTemplateOption[];
   signatureRequests: SignatureRequestRow[];
   activity: ActivityRow[];
+  audience?: Audience;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -121,9 +124,15 @@ export function DocumentWorkspace({
         {tab === "Files" && (
           <div>
             <div className="mb-4">
-              <UploadZone workspaceId={workspaceId} entityType={entityType} entityId={entityId} folderId={selectedFolderId} />
+              <UploadZone
+                workspaceId={workspaceId}
+                entityType={entityType}
+                entityId={entityId}
+                folderId={selectedFolderId}
+                visibility={audience === "portal" ? "client_visible" : "internal"}
+              />
             </div>
-            <div className="flex gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row">
               <FolderTree
                 folders={folders}
                 selectedId={selectedFolderId}
@@ -146,11 +155,18 @@ export function DocumentWorkspace({
         )}
 
         {tab === "Requests" && (
-          <RequestsPanel requests={requests} templates={requestTemplates} workspaceId={workspaceId} entityType={entityType} entityId={entityId} />
+          <RequestsPanel
+            requests={requests}
+            templates={requestTemplates}
+            workspaceId={workspaceId}
+            entityType={entityType}
+            entityId={entityId}
+            audience={audience}
+          />
         )}
 
         {tab === "Signatures" && (
-          <SignaturesPanel signatureRequests={signatureRequests} documents={activeDocuments} workspaceId={workspaceId} />
+          <SignaturesPanel signatureRequests={signatureRequests} documents={activeDocuments} workspaceId={workspaceId} audience={audience} />
         )}
 
         {tab === "Activity" && (

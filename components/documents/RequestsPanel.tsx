@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Paperclip } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
-import type { DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "./types";
+import type { Audience, DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "./types";
 
 function ProgressBar({ done, total }: { done: number; total: number }) {
   const pct = total === 0 ? 100 : Math.round((done / total) * 100);
@@ -23,49 +24,99 @@ export function RequestsPanel({
   workspaceId,
   entityType,
   entityId,
+  audience = "staff",
 }: {
   requests: DocumentRequestRow[];
   templates: DocumentRequestTemplateOption[];
   workspaceId: string;
   entityType: EntityType;
   entityId: string;
+  audience?: Audience;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+
+  async function uploadForItem(itemId: string, file: File) {
+    setUploadingItemId(itemId);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const path = `${workspaceId}/${entityId}/${Date.now()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
+    if (uploadErr) {
+      toast.show(uploadErr.message, "error");
+      setUploadingItemId(null);
+      return;
+    }
+    const { data: attachment, error: insertErr } = await supabase
+      .from("attachments")
+      .insert({
+        workspace_id: workspaceId,
+        entity_type: entityType,
+        entity_id: entityId,
+        file_name: file.name,
+        storage_path: path,
+        mime_type: file.type || null,
+        file_size_bytes: file.size,
+        uploaded_by: user?.id,
+        visibility: audience === "portal" ? "client_visible" : "internal",
+      })
+      .select("id")
+      .single();
+    if (insertErr || !attachment) {
+      toast.show(insertErr?.message ?? "Upload failed", "error");
+      setUploadingItemId(null);
+      return;
+    }
+    const { error: fulfillErr } = await supabase.rpc("fulfill_document_request_item", {
+      p_item_status_id: itemId,
+      p_attachment_id: attachment.id,
+    });
+    setUploadingItemId(null);
+    if (fulfillErr) {
+      toast.show(fulfillErr.message, "error");
+      return;
+    }
+    toast.show("Document uploaded", "success");
+    router.refresh();
+  }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-surface p-4">
-        <h3 className="text-sm font-semibold text-ink">New document request</h3>
-        {templates.length === 0 ? (
-          <p className="mt-1 text-sm text-muted">No document request templates are set up yet.</p>
-        ) : (
-          <div className="mt-2">
-            <InlineAddForm
-              label="Request Documents"
-              fields={[
-                { name: "title", label: "Title", required: true },
-                { name: "template_id", label: "Template", type: "select", required: true, options: templates.map((t) => ({ value: t.id, label: t.name })) },
-                { name: "due_date", label: "Due date" },
-              ]}
-              onSubmit={async (v) => {
-                const { error } = await supabase.rpc("create_document_request", {
-                  p_workspace_id: workspaceId,
-                  p_entity_type: entityType,
-                  p_entity_id: entityId,
-                  p_template_id: v.template_id,
-                  p_title: v.title,
-                  p_due_date: v.due_date || undefined,
-                });
-                if (error) return error.message;
-                toast.show("Document request created", "success");
-                router.refresh();
-              }}
-            />
-          </div>
-        )}
-      </div>
+      {audience === "staff" && (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <h3 className="text-sm font-semibold text-ink">New document request</h3>
+          {templates.length === 0 ? (
+            <p className="mt-1 text-sm text-muted">No document request templates are set up yet.</p>
+          ) : (
+            <div className="mt-2">
+              <InlineAddForm
+                label="Request Documents"
+                fields={[
+                  { name: "title", label: "Title", required: true },
+                  { name: "template_id", label: "Template", type: "select", required: true, options: templates.map((t) => ({ value: t.id, label: t.name })) },
+                  { name: "due_date", label: "Due date" },
+                ]}
+                onSubmit={async (v) => {
+                  const { error } = await supabase.rpc("create_document_request", {
+                    p_workspace_id: workspaceId,
+                    p_entity_type: entityType,
+                    p_entity_id: entityId,
+                    p_template_id: v.template_id,
+                    p_title: v.title,
+                    p_due_date: v.due_date || undefined,
+                  });
+                  if (error) return error.message;
+                  toast.show("Document request created", "success");
+                  router.refresh();
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {requests.length === 0 ? (
         <EmptyState message="No document requests yet." />
@@ -86,11 +137,24 @@ export function RequestsPanel({
                 <ProgressBar done={done} total={r.items.length} />
                 <ul className="mt-2 space-y-1 text-xs text-muted">
                   {r.items.map((item) => (
-                    <li key={item.id} className="flex items-center justify-between">
+                    <li key={item.id} className="flex items-center justify-between gap-2">
                       <span>
                         {item.name} {item.is_required && <span className="text-muted">(required)</span>}
                       </span>
-                      <span className="capitalize">{item.status}</span>
+                      {item.status === "pending" ? (
+                        <label className="flex shrink-0 cursor-pointer items-center gap-1 text-accent hover:underline">
+                          <Paperclip size={12} aria-hidden="true" />
+                          {uploadingItemId === item.id ? "Uploading..." : "Upload"}
+                          <input
+                            type="file"
+                            className="sr-only"
+                            disabled={uploadingItemId !== null}
+                            onChange={(e) => e.target.files?.[0] && uploadForItem(item.id, e.target.files[0])}
+                          />
+                        </label>
+                      ) : (
+                        <span className="capitalize">{item.status}</span>
+                      )}
                     </li>
                   ))}
                 </ul>

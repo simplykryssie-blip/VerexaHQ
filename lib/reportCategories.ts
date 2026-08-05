@@ -13,7 +13,7 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
   {
     slug: "clients",
     title: "Clients",
-    description: "Client growth, lifecycle status breakdown, and source tracking.",
+    description: "Client growth and lifecycle status breakdown.",
   },
   {
     slug: "engagements",
@@ -23,7 +23,7 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
   {
     slug: "billing",
     title: "Billing",
-    description: "Quotes, invoices, and payment activity across the workspace.",
+    description: "Quote funnel by status across the workspace -- see Revenue for invoices and collections.",
   },
   {
     slug: "documents",
@@ -38,7 +38,7 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
   {
     slug: "compliance",
     title: "Compliance",
-    description: "Audit log activity and workflow SLA adherence.",
+    description: "Security events, sensitive data access, failed logins, and MFA adoption. Admins only.",
   },
   {
     slug: "growth",

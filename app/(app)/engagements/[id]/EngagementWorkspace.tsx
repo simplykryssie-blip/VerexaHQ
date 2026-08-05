@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
+import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
+import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
 import {
   OverviewTab,
   WorkflowTab,
@@ -37,6 +39,7 @@ type Workspace = { id: string; name: string };
 
 const TABS = [
   "Overview",
+  "Tax",
   "Workflow",
   "Tasks",
   "Documents",
@@ -78,6 +81,8 @@ export function EngagementWorkspace({
   timeline,
   progress,
   staffOptions,
+  taxDetail,
+  irsNotices,
 }: {
   workspace: Workspace;
   engagement: EngagementRow;
@@ -101,6 +106,8 @@ export function EngagementWorkspace({
   timeline: ActivityRow[];
   progress: ProgressRow | null;
   staffOptions: StaffOption[];
+  taxDetail: TaxDetailRow;
+  irsNotices: IrsNoticeRow[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
@@ -163,6 +170,12 @@ export function EngagementWorkspace({
                 timeline={timeline}
                 staffOptions={staffOptions}
               />
+            )}
+            {tab === "Tax" && (
+              <div className="space-y-6">
+                <TaxDetailsCard engagementId={engagement.id} workspaceId={workspace.id} detail={taxDetail} />
+                <IrsNoticesPanel workspaceId={workspace.id} entityType="engagement" entityId={engagement.id} notices={irsNotices} />
+              </div>
             )}
             {tab === "Workflow" && <WorkflowTab stages={stages} />}
             {tab === "Tasks" && (

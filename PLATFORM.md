@@ -595,18 +595,120 @@ anywhere in the schema (only `notification_queue`, which is a log, not a
 settings surface). Building it is real feature work, not something an
 audit-and-fix pass should invent unasked.
 
+## Frontend Completion Sprint (Version 1.0)
+
+Scope: finish the frontend against the backend certified in the prior
+Backend Completion Sprint. Explicit constraint honored throughout: no new
+tables/triggers/RPCs/queues except where a verified backend bug was found
+(one case — see below). Everything reads/writes live Supabase data; no
+mock data anywhere.
+
+- **Client Portal, built from zero to a full app.** `lib/portal.ts`
+  (`getPortalIdentity()`) mirrors `lib/workspace.ts` but resolves against
+  `client_portal_users`, never `workspace_users` — portal users are a
+  distinct identity track sharing one Supabase Auth backend. Path-aware
+  middleware (`lib/supabase/middleware.ts` branching on
+  `pathname.startsWith("/portal")`) gives the portal its own
+  login/redirect flow. Pages: `/portal/login`,
+  `/portal/accept-invitation` (mirrors the staff flow but against
+  `get_portal_invitation_preview`/`accept_portal_invitation`),
+  `/portal/dashboard`, `/portal/engagements[/[id]]`, `/portal/documents`,
+  `/portal/messages`, `/portal/billing` (+ `PortalPayButton`, which calls
+  the *existing* `/api/stripe/checkout-session` route unmodified — RLS
+  already scopes it to the caller's own invoice), `/portal/organizer[/[id]]`,
+  `/portal/notifications`, `/portal/profile`, `/portal/activity`. The
+  biggest architectural win of this sprint: portal documents, requests,
+  and signatures reuse the exact staff components (`DocumentWorkspace`,
+  `RequestsPanel`, `SignaturesPanel`) via a new optional
+  `audience?: "staff" | "portal"` prop (default `"staff"`) that hides
+  staff-only creation UI and adjusts copy — zero duplicate document/e-sign
+  UI was written for the portal.
+- **`fulfill_document_request_item` gap closed.** This RPC existed in the
+  backend since the prior sprint but no frontend ever called it.
+  `RequestsPanel.tsx` now has a real per-pending-item "Upload" control
+  (staff and portal both) that uploads to storage, inserts the
+  `attachments` row, and calls the RPC.
+- **Communications Hub.** One reusable `MessagingHub` component
+  (`components/messaging/MessagingHub.tsx`), parameterized by `audience`,
+  used at both `/messages` (staff, cross-workspace inbox) and
+  `/portal/messages` (portal, RLS-auto-scoped) — no separate portal
+  messaging UI. Handles unread counts, marking read, internal-vs-client
+  notes, and (portal only) starting a new thread against the client
+  entity.
+- **Tax Office Experience**, new `/tax` hub with 6 tabs (Returns,
+  Reviewer Queue, IRS Notices, Extensions, Tax Years, Preparers) reading
+  `engagement_tax_details`, `irs_notices`, `v_reviewer_queue`, and
+  `v_tax_season_metrics`/`v_staff_productivity`. Added a "Tax" tab to the
+  Engagement Workspace (`TaxDetailsCard` + `IrsNoticesPanel`, both new,
+  both reused as-is from the engagement level).
+  `v_reviewer_queue` gained an `engagement_id` column (migration
+  `v_reviewer_queue_add_engagement_id`) so the queue can link back to its
+  engagement — the one schema change this sprint made outside of the bug
+  fix below, and it's additive to an existing view, not a new object.
+- **Reports**, the remaining 6 category pages built out: Clients,
+  Engagements, Billing (quotes only — invoices/payments stay under
+  Revenue), Staff Productivity, Compliance, Growth. Compliance is
+  intentionally gated on `is_workspace_admin` rather than the
+  `compliance.view` permission key, because the underlying
+  `compliance_*_view`s' own RLS restricts to admins regardless of that
+  permission grant — the page gate matches what the data actually allows.
+- **Settings**, 3 new pages: Templates (email/SMS/engagement-letter, with
+  a shared `TemplateStatusCycle` draft→published→archived control reused
+  across all template tables plus `services`), Service Packages, and
+  Feature Flags (`set_feature_flag` RPC, previously never called from any
+  frontend).
+- **Mobile-responsive shell**, applied app-wide, not just to new pages:
+  `Sidebar`/`PortalSidebar` became fixed off-canvas drawers with a
+  hamburger toggle and auto-close on navigation; `SettingsNav` becomes a
+  horizontal scrolling tab bar below `lg:`; `MessagingHub` and
+  `DocumentWorkspace`/`FolderTree` stack their two-panel layouts vertically
+  on narrow screens instead of squeezing side-by-side; `InlineAddForm`
+  (used everywhere in the app, not just new code) switched its field grid
+  to one column below `sm:`.
+- **Verified backend bug found and fixed via SQL smoke testing, not user
+  report**: `messages.read_at` (added in the prior Backend Completion
+  Sprint) had no RLS `UPDATE` policy at all — staff had
+  `messages_write`/`messages_select`/`messages_delete` only, portal had
+  `messages_portal_select`/`messages_portal_insert` only. The new
+  `MessagingHub`'s mark-as-read call was silently affecting zero rows
+  (Postgres doesn't error an `UPDATE` that matches nothing). Fixed with
+  migration `messages_read_receipt_update_policy`, adding `messages_update`
+  (staff, gated on `has_permission(workspace_id, 'messages.view')`) and
+  `messages_portal_update` (portal, gated on
+  `is_portal_user_for_entity` against the parent thread) — scoped
+  identically to the existing select policies. Re-verified with an
+  isolated insert/update/assert smoke test after applying.
+- **Accessibility**: spot-checked (not a full audit) the newest
+  components — icon-only controls have visible text or `aria-label`,
+  form labels use `htmlFor`, interactive elements carry
+  `focus:ring`/`focus:border` styles consistent with the rest of the app.
+  No screen-reader or contrast audit was run.
+- **Performance**: not addressed this sprint. New report/tax/portal
+  pages fetch full unpaginated result sets, matching the pre-existing
+  pattern elsewhere in the app — real work, not attempted here.
+
 ## Known gaps going into beta
 
 - Resend domain verification, GoDaddy DNS (SPF/DKIM/DMARC), a live Stripe
   account, and a live Twilio account — all require credentials/dashboard
   access this session doesn't have. The integration code for all three
   exists and degrades gracefully without them.
-- Client Portal — backend only as of the Backend Completion sprint
-  (identity, RLS, organizer/document/signature/messaging/billing access);
-  no portal frontend exists yet.
 - Frontend permission-gating (hiding actions a role can't perform) beyond
   RLS enforcement itself.
 - Automated test coverage.
+- No pagination/infinite scroll/loading skeletons on the new report, tax
+  office, and portal pages — they fetch full unpaginated result sets, same
+  as the rest of the app. Fine at current data volumes, a real risk at
+  scale.
+- No Appointments feature anywhere in the app (nav, portal, or backend) —
+  there's no backing table, so it wasn't attempted rather than half-built.
+- Organizer `file_upload` and `signature` field types render a short
+  redirect note ("use Documents"/"use Signatures" instead) rather than an
+  inline widget — a deliberate simplification, not a full implementation.
+- Settings → Service Packages creates a `services` row wired to *existing*
+  pricing rules, billing rules, organizer templates, document-request
+  templates, folder templates, and engagement-letter templates via
+  dropdowns; it does not create those sub-objects themselves.
 - No per-workspace `notification_preferences` (which events a user wants
   and on which channel) — `notification_queue` now has a real dispatcher
   (see Backend Completion Sprint), but nothing yet enqueues appointment,
@@ -617,17 +719,10 @@ audit-and-fix pass should invent unasked.
   email/SMS yet (the client-level one does, as of this pass).
 - Per-user dashboard personalization — today's hide/show/reorder is
   workspace-wide and admin-managed (see Widget Engine), not per person.
-- 6 of 8 report categories are still `ComingSoon` shells (Clients,
-  Engagements, Billing, Staff, Compliance, Growth) — the engine exists,
-  those specific reports don't yet.
-- Signature Center has no third-party e-sign provider integration. A
-  portal user can now sign/decline their own documents (backend only, see
-  Backend Completion Sprint) once portal auth is wired to a frontend;
-  there is still no *public*, unauthenticated signing link.
-- Client Portal auth has no frontend yet — no invite-acceptance page, no
-  portal login/session UI, no portal dashboard/document/organizer/signature
-  pages. The RLS and RPCs they'll call are built and smoke-tested; nothing
-  renders them.
+- Signature Center has no third-party e-sign provider integration —
+  in-app typed-name signing only, and no *public*, unauthenticated
+  signing link (a signer must be a staff user or an authenticated portal
+  user).
 - Notification Dispatcher templates must exist as a `published`
   `email_templates`/`sms_templates` row matching the job's `template_key`
   before a queued job can send — nothing seeds these automatically for the

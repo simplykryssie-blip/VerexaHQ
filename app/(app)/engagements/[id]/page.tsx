@@ -230,6 +230,16 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     signers: r.signers ?? [],
   }));
 
+  const [{ data: taxDetail }, { data: irsNotices }] = await Promise.all([
+    supabase.from("engagement_tax_details").select("*").eq("engagement_id", engagement.id).maybeSingle(),
+    supabase
+      .from("irs_notices")
+      .select("id, notice_type, notice_date, response_due_date, status, description")
+      .eq("entity_type", "engagement")
+      .eq("entity_id", engagement.id)
+      .order("notice_date", { ascending: false }),
+  ]);
+
   return (
     <EngagementWorkspace
       workspace={workspace}
@@ -254,6 +264,8 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       timeline={activity ?? []}
       progress={(progressRows ?? null) as never}
       staffOptions={staffOptions as never}
+      taxDetail={(taxDetail ?? null) as never}
+      irsNotices={(irsNotices ?? []) as never}
     />
   );
 }

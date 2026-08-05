@@ -1,5 +1,7 @@
 export type EntityType = "client" | "engagement";
 
+export type Audience = "staff" | "portal";
+
 export type StaffRef = { id: string; display_name: string | null } | null;
 
 export type DocumentFolderRow = {

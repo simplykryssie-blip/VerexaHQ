@@ -2,7 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/confirm", "/forgot-password", "/accept-invitation"];
+const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password"];
+const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation"];
+const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
 
 export async function updateSession(request: NextRequest) {
   try {
@@ -43,11 +45,17 @@ export async function updateSession(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const isPublicPath = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+    const pathname = request.nextUrl.pathname;
+    const isPortalPath = pathname.startsWith("/portal");
+    const loginPath = isPortalPath ? "/portal/login" : "/login";
+    const homePath = isPortalPath ? "/portal/dashboard" : "/dashboard";
+    const audiencePublicPaths = isPortalPath ? PORTAL_PUBLIC_PATHS : STAFF_PUBLIC_PATHS;
+    const isPublicPath =
+      ALWAYS_PUBLIC_PATHS.some((path) => pathname.startsWith(path)) || audiencePublicPaths.some((path) => pathname.startsWith(path));
 
     if (!user && !isPublicPath) {
-      const redirectUrl = new URL("/login", request.url);
-      redirectUrl.searchParams.set("next", request.nextUrl.pathname);
+      const redirectUrl = new URL(loginPath, request.url);
+      redirectUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(redirectUrl);
     }
 
@@ -58,14 +66,14 @@ export async function updateSession(request: NextRequest) {
     // reopened on a session the user asked not to be remembered -- sign out.
     if (user && !isPublicPath && !request.cookies.get("sb_remember")) {
       await supabase.auth.signOut();
-      const redirectUrl = new URL("/login", request.url);
+      const redirectUrl = new URL(loginPath, request.url);
       const signedOutResponse = NextResponse.redirect(redirectUrl);
       response.cookies.getAll().forEach((cookie) => signedOutResponse.cookies.set(cookie));
       return signedOutResponse;
     }
 
-    if (user && request.nextUrl.pathname === "/login") {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (user && pathname === loginPath) {
+      return NextResponse.redirect(new URL(homePath, request.url));
     }
 
     return response;

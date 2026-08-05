@@ -6,5 +6,8 @@ export async function POST(request: Request) {
   const supabase = createClient();
   await supabase.auth.signOut();
   cookies().delete("sb_remember");
-  return NextResponse.redirect(new URL("/login", request.url));
+
+  const formData = await request.formData().catch(() => null);
+  const isPortal = formData?.get("audience") === "portal";
+  return NextResponse.redirect(new URL(isPortal ? "/portal/login" : "/login", request.url));
 }

@@ -12,11 +12,13 @@ export function UploadZone({
   entityType,
   entityId,
   folderId,
+  visibility = "internal",
 }: {
   workspaceId: string;
   entityType: EntityType;
   entityId: string;
   folderId: string | null;
+  visibility?: "internal" | "client_visible";
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -50,6 +52,7 @@ export function UploadZone({
         mime_type: file.type || null,
         file_size_bytes: file.size,
         uploaded_by: user?.id,
+        visibility,
       });
       if (insertErr) failed += 1;
       else succeeded += 1;

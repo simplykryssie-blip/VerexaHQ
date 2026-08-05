@@ -5,6 +5,8 @@ import {
   Briefcase,
   Calendar,
   FolderOpen,
+  MessageSquare,
+  Landmark,
   BarChart3,
   Settings,
 } from "lucide-react";
@@ -21,6 +23,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
+  { label: "Tax Office", href: "/tax", icon: Landmark },
+  { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -38,6 +42,9 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Security", href: "/settings/security" },
   { label: "Integrations", href: "/settings/integrations" },
   { label: "Notifications", href: "/settings/notifications" },
+  { label: "Templates", href: "/settings/templates" },
+  { label: "Service Packages", href: "/settings/service-packages" },
+  { label: "Feature Flags", href: "/settings/feature-flags" },
   { label: "Workspace Preferences", href: "/settings/preferences" },
   { label: "Audit Logs", href: "/settings/audit-logs" },
 ];

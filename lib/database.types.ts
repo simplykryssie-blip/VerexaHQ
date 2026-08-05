@@ -6208,6 +6208,7 @@ export type Database = {
         Row: {
           client_id: string | null
           due_date: string | null
+          engagement_id: string | null
           engagement_number: string | null
           reviewer_id: string | null
           stage_name: string | null
@@ -6222,6 +6223,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
             referencedColumns: ["id"]
           },
           {

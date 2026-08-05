@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "email" | "tel" | "select";
+  type?: "text" | "email" | "tel" | "select" | "textarea";
   required?: boolean;
   options?: { value: string; label: string }[];
 };
@@ -53,9 +53,19 @@ export function InlineAddForm({
 
   return (
     <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surfaceMuted p-4">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {fields.map((f) =>
-          f.type === "select" ? (
+          f.type === "textarea" ? (
+            <textarea
+              key={f.name}
+              required={f.required}
+              placeholder={f.label}
+              rows={4}
+              value={values[f.name] ?? ""}
+              onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
+              className="col-span-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          ) : f.type === "select" ? (
             <select
               key={f.name}
               required={f.required}
