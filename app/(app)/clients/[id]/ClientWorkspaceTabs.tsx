@@ -6,6 +6,7 @@ import { InviteContactToPortalButton } from "./InviteContactToPortalButton";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanForm";
 import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
+import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
 import {
   AddContactForm,
   AddAddressForm,
@@ -449,6 +450,7 @@ export function MessagesTab({ threads, messages }: { threads: MessageThreadRow[]
 // ------------------------------------------------------------------ Billing
 
 export function BillingTab({
+  clientId,
   quotes,
   invoices,
   payments,
@@ -457,6 +459,7 @@ export function BillingTab({
   paymentPlansByInvoice,
   canManageBilling,
 }: {
+  clientId: string;
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   payments: PaymentRow[];
@@ -510,8 +513,18 @@ export function BillingTab({
                       {isOutstanding && <PaymentLinkButton invoiceId={i.id} />}
                     </div>
                   </div>
-                  {isOutstanding && canManageBilling && plans.length === 0 && (
-                    <CreatePaymentPlanForm invoiceId={i.id} workspaceId={workspaceId} balanceDue={i.total_amount - i.amount_paid} />
+                  {isOutstanding && canManageBilling && (
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <RecordPaymentForm
+                        invoiceId={i.id}
+                        workspaceId={workspaceId}
+                        clientId={clientId}
+                        balanceDue={i.total_amount - i.amount_paid}
+                      />
+                      {plans.length === 0 && (
+                        <CreatePaymentPlanForm invoiceId={i.id} workspaceId={workspaceId} balanceDue={i.total_amount - i.amount_paid} />
+                      )}
+                    </div>
                   )}
                   <PaymentPlanList plans={plans} />
                 </li>

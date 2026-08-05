@@ -221,7 +221,16 @@ export function EngagementWorkspace({
             {tab === "Review" && (
               <ReviewTab stages={stages} shares={shares} reviewActions={reviewActions} staffOptions={staffOptions} />
             )}
-            {tab === "Billing" && <BillingTab quotes={quotes} invoices={invoices} payments={payments} />}
+            {tab === "Billing" && (
+              <BillingTab
+                clientId={client?.id ?? ""}
+                workspaceId={workspace.id}
+                canManageBilling={permissions.billingManage}
+                quotes={quotes}
+                invoices={invoices}
+                payments={payments}
+              />
+            )}
             {tab === "Timeline" && <TimelineTab timeline={timeline} />}
             {tab === "Notes" && <NotesTab engagementId={engagement.id} workspaceId={workspace.id} notes={notes} />}
             {tab === "Audit" && <AuditTab assignmentHistory={assignmentHistory} statusHistory={statusHistory} />}

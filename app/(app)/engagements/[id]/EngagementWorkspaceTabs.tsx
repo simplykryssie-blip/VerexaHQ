@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
+import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
 import { StatusSelect } from "./StatusSelect";
 import { DueDateInput } from "./DueDateInput";
 import { TaskRow } from "./TaskRow";
@@ -385,7 +386,21 @@ export function ReviewTab({ stages, shares, reviewActions, staffOptions }: { sta
 
 // --------------------------------------------------------------- Billing
 
-export function BillingTab({ quotes, invoices, payments }: { quotes: QuoteRow[]; invoices: InvoiceRow[]; payments: PaymentRow[] }) {
+export function BillingTab({
+  clientId,
+  workspaceId,
+  canManageBilling,
+  quotes,
+  invoices,
+  payments,
+}: {
+  clientId: string;
+  workspaceId: string;
+  canManageBilling: boolean;
+  quotes: QuoteRow[];
+  invoices: InvoiceRow[];
+  payments: PaymentRow[];
+}) {
   return (
     <div className="space-y-6">
       <Section title="Quotes">
@@ -412,19 +427,32 @@ export function BillingTab({ quotes, invoices, payments }: { quotes: QuoteRow[];
           <EmptyState message="No invoices yet." />
         ) : (
           <ul className="divide-y divide-border">
-            {invoices.map((i) => (
-              <li key={i.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
-                <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
-                  </span>
-                  {i.status !== "paid" && i.status !== "void" && i.status !== "draft" && (
-                    <PaymentLinkButton invoiceId={i.id} />
+            {invoices.map((i) => {
+              const isOutstanding = i.status !== "paid" && i.status !== "void" && i.status !== "draft";
+              return (
+                <li key={i.id} className="py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="capitalize text-muted">
+                        {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                      </span>
+                      {isOutstanding && <PaymentLinkButton invoiceId={i.id} />}
+                    </div>
+                  </div>
+                  {isOutstanding && canManageBilling && (
+                    <div className="mt-2">
+                      <RecordPaymentForm
+                        invoiceId={i.id}
+                        workspaceId={workspaceId}
+                        clientId={clientId}
+                        balanceDue={i.total_amount - i.amount_paid}
+                      />
+                    </div>
                   )}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Section>

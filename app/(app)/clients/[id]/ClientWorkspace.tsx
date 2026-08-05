@@ -252,6 +252,7 @@ export function ClientWorkspace({
             {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}
             {tab === "Billing" && (
               <BillingTab
+                clientId={client.id}
                 quotes={quotes}
                 invoices={invoices}
                 payments={payments}
