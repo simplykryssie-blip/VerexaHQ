@@ -415,7 +415,15 @@ export function EngagementsTab({ engagements, client }: { engagements: Engagemen
 
 // ----------------------------------------------------------------- Messages
 
-export function MessagesTab({ threads, messages }: { threads: MessageThreadRow[]; messages: MessageRow[] }) {
+export function MessagesTab({
+  threads,
+  messages,
+  onViewDocumentRequests,
+}: {
+  threads: MessageThreadRow[];
+  messages: MessageRow[];
+  onViewDocumentRequests?: () => void;
+}) {
   return (
     <Section title="Message threads">
       {threads.length === 0 ? (
@@ -424,11 +432,19 @@ export function MessagesTab({ threads, messages }: { threads: MessageThreadRow[]
         <ul className="space-y-4">
           {threads.map((t) => {
             const threadMessages = messages.filter((m) => m.thread_id === t.id);
+            const isDocumentRequest = t.subject?.startsWith("Document request:");
             return (
               <li key={t.id} className="rounded-lg border border-border p-3">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-ink">{t.subject ?? "Message"}</span>
-                  <span className="text-xs uppercase tracking-wide text-muted">{t.channel}</span>
+                  <div className="flex items-center gap-2">
+                    {isDocumentRequest && onViewDocumentRequests && (
+                      <button type="button" onClick={onViewDocumentRequests} className="text-xs font-medium text-accent hover:underline">
+                        View request
+                      </button>
+                    )}
+                    <span className="text-xs uppercase tracking-wide text-muted">{t.channel}</span>
+                  </div>
                 </div>
                 <ul className="mt-2 space-y-1.5">
                   {threadMessages.map((m) => (

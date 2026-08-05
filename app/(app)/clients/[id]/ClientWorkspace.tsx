@@ -247,7 +247,9 @@ export function ClientWorkspace({
                 canRequestSignatures={permissions.signaturesRequest}
               />
             )}
-            {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}
+            {tab === "Messages" && (
+              <MessagesTab threads={messageThreads} messages={messages} onViewDocumentRequests={() => setTab("Documents")} />
+            )}
             {tab === "Billing" && (
               <BillingTab
                 clientId={client.id}

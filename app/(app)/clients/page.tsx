@@ -10,6 +10,22 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
 
+const STATUS_FILTERS = [
+  { value: "", label: "All" },
+  { value: "lead", label: "Leads" },
+  { value: "consult_scheduled", label: "Consult Scheduled" },
+  { value: "proposal_sent", label: "Proposal Sent" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+  { value: "archived", label: "Archived" },
+];
+
+function statusBadgeClass(status: string) {
+  if (status === "lead") return "bg-warning/10 text-warning";
+  if (status === "active") return "bg-accentSoft text-accent";
+  return "bg-surfaceMuted text-muted";
+}
+
 function clientDisplayName(c: {
   client_type: string;
   first_name: string | null;
@@ -20,23 +36,27 @@ function clientDisplayName(c: {
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
-export default async function ClientsPage({ searchParams }: { searchParams: { page?: string } }) {
+export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
+  const status = searchParams.status ?? "";
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   const supabase = createClient();
+  let clientsQuery = supabase
+    .from("clients")
+    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", { count: "exact" })
+    .eq("workspace_id", workspace.id)
+    .is("merged_into_client_id", null)
+    .order("created_at", { ascending: false })
+    .range(from, to);
+  if (status) clientsQuery = clientsQuery.eq("lifecycle_status", status);
+
   const [{ data: clients, count }, { data: engagementTypes }, { data: canCreate }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", { count: "exact" })
-      .eq("workspace_id", workspace.id)
-      .is("merged_into_client_id", null)
-      .order("created_at", { ascending: false })
-      .range(from, to),
+    clientsQuery,
     supabase
       .from("engagement_types")
       .select("id, name")
@@ -54,11 +74,24 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         actions={canCreate ? <NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} /> : null}
       />
       <div className="flex-1 px-8 py-6">
+        <div className="mb-4 flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((f) => (
+            <Link
+              key={f.value}
+              href={f.value ? `/clients?status=${f.value}` : "/clients"}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+              }`}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </div>
         {!clients || clients.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface">
             <EmptyState
-              message="No clients yet. Add your first client to get started."
-              action={canCreate ? <NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} /> : undefined}
+              message={status ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".` : "No clients yet. Add your first client to get started."}
+              action={!status && canCreate ? <NewClientButton workspaceId={workspace.id} engagementTypes={engagementTypes ?? []} /> : undefined}
             />
           </div>
         ) : (
@@ -85,15 +118,21 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
                     <td className="px-5 py-3 text-slate">{c.primary_email ?? "--"}</td>
                     <td className="px-5 py-3 text-slate">{c.primary_phone ?? "--"}</td>
                     <td className="px-5 py-3">
-                      <span className="inline-flex items-center rounded-full bg-accentSoft px-2 py-0.5 text-xs font-medium capitalize text-accent">
-                        {c.lifecycle_status}
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(c.lifecycle_status)}`}>
+                        {c.lifecycle_status === "lead" ? "Lead" : c.lifecycle_status.replace("_", " ")}
                       </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/clients" />
+            <Pager
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={count ?? clients.length}
+              basePath="/clients"
+              extraQuery={status ? `status=${status}` : ""}
+            />
           </div>
         )}
       </div>

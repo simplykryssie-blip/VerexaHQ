@@ -274,12 +274,23 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates, 
                   required: true,
                   options: documentRequestTemplates.map((t) => ({ value: t.id, label: t.name })),
                 },
+                { name: "due_date", label: "Due date (optional)" },
               ]}
               onSubmit={async (v) => {
                 const template = documentRequestTemplates.find((t) => t.id === v.template_id);
                 const {
                   data: { user },
                 } = await supabase.auth.getUser();
+                const { error: rpcError } = await supabase.rpc("create_document_request", {
+                  p_workspace_id: workspaceId,
+                  p_entity_type: "client",
+                  p_entity_id: clientId,
+                  p_template_id: v.template_id,
+                  p_title: template?.name ?? "Document request",
+                  p_due_date: v.due_date || undefined,
+                });
+                if (rpcError) return rpcError.message;
+
                 const { data: thread, error: threadError } = await supabase
                   .from("message_threads")
                   .insert({
@@ -292,13 +303,13 @@ export function QuickActions({ clientId, workspaceId, documentRequestTemplates, 
                   })
                   .select("id")
                   .single();
-                if (threadError || !thread) return threadError?.message ?? "Could not create request.";
+                if (threadError || !thread) return threadError?.message ?? "Could not log the request message.";
                 const { error } = await supabase.from("messages").insert({
                   workspace_id: workspaceId,
                   thread_id: thread.id,
                   sender_type: "staff",
                   sender_id: user?.id,
-                  body: `Please upload the following documents: ${template?.name ?? ""}.`,
+                  body: `Please upload the following documents: ${template?.name ?? ""}. See the Documents tab for the full checklist.`,
                 });
                 if (error) return error.message;
                 setModal(null);
