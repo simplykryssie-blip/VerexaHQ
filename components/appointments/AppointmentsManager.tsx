@@ -31,6 +31,7 @@ export function AppointmentsManager({
   engagements,
   staff,
   canManage,
+  currentUserId,
 }: {
   workspaceId: string;
   appointments: AppointmentRow[];
@@ -38,6 +39,7 @@ export function AppointmentsManager({
   engagements: EngagementOption[];
   staff: StaffOption[];
   canManage: boolean;
+  currentUserId: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -48,8 +50,10 @@ export function AppointmentsManager({
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [clientId, setClientId] = useState("");
+  const [clientQuery, setClientQuery] = useState("");
+  const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [engagementId, setEngagementId] = useState("");
-  const [staffId, setStaffId] = useState("");
+  const [staffId, setStaffId] = useState(currentUserId ?? "");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [portalVisible, setPortalVisible] = useState(true);
@@ -57,6 +61,11 @@ export function AppointmentsManager({
   const [saving, setSaving] = useState(false);
 
   const filteredEngagements = useMemo(() => (clientId ? engagements.filter((e) => e.client_id === clientId) : engagements), [engagements, clientId]);
+  const matchingClients = useMemo(() => {
+    const q = clientQuery.trim().toLowerCase();
+    if (!q) return clients.slice(0, 8);
+    return clients.filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8);
+  }, [clients, clientQuery]);
 
   const visibleAppointments = useMemo(() => {
     const now = Date.now();
@@ -98,8 +107,9 @@ export function AppointmentsManager({
     setDescription("");
     setLocation("");
     setClientId("");
+    setClientQuery("");
     setEngagementId("");
-    setStaffId("");
+    setStaffId(currentUserId ?? "");
     setStartAt("");
     setEndAt("");
     setPortalVisible(true);
@@ -164,21 +174,44 @@ export function AppointmentsManager({
               onChange={(e) => setTitle(e.target.value)}
               className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:col-span-2"
             />
-            <select
-              value={clientId}
-              onChange={(e) => {
-                setClientId(e.target.value);
-                setEngagementId("");
-              }}
-              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            >
-              <option value="">No client</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search clients..."
+                value={clientQuery}
+                onChange={(e) => {
+                  setClientQuery(e.target.value);
+                  setClientDropdownOpen(true);
+                  if (clientId) {
+                    setClientId("");
+                    setEngagementId("");
+                  }
+                }}
+                onFocus={() => setClientDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setClientDropdownOpen(false), 100)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              {clientDropdownOpen && matchingClients.length > 0 && (
+                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-md">
+                  {matchingClients.map((c) => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClientId(c.id);
+                          setClientQuery(c.label);
+                          setEngagementId("");
+                          setClientDropdownOpen(false);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-slate hover:bg-surfaceMuted"
+                      >
+                        {c.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <select
               value={engagementId}
               onChange={(e) => setEngagementId(e.target.value)}

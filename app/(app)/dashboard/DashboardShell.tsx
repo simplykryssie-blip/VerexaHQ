@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { KpiWidget } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
-import { QuickActionsWidget } from "@/components/widgets/QuickActionsWidget";
+import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
@@ -29,15 +29,17 @@ export function DashboardShell({
   widgets,
   data,
   priorities,
+  quickActionPermissions,
 }: {
   workspaceName: string;
-  /** Currently unused for gating -- personalization is per-user (see
-   *  user_widget_preferences), not admin-only. Kept for a future
-   *  "reset to workspace default" admin action. */
+  /** Only gates the "Invite Staff" quick action (see quickActionPermissions
+   *  below) -- widget visibility/order stays per-user (user_widget_preferences),
+   *  not admin-only. */
   isAdmin: boolean;
   widgets: WidgetRow[];
   data: DashboardData;
   priorities: PriorityItem[];
+  quickActionPermissions: Omit<QuickActionPermissions, "isAdmin">;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -141,7 +143,7 @@ export function DashboardShell({
       case "review_queue":
         return <ReviewQueueWidget items={data.reviewItems} />;
       case "quick_actions":
-        return <QuickActionsWidget />;
+        return <QuickActionsWidget permissions={{ ...quickActionPermissions, isAdmin }} />;
       case "calendar":
         return <CalendarWidget items={data.calendarItems} />;
       case "recent_activity":

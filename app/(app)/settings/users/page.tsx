@@ -68,15 +68,17 @@ export default async function UsersPage() {
         )}
       </div>
 
-      <div className="mt-8">
-        <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
-        <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>
-        <div className="mt-3 rounded-xl border border-border bg-surface p-5">
-          <InviteStaffForm roles={roles ?? []} />
+      {workspace.is_owner && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
+          <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>
+          <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+            <InviteStaffForm roles={roles ?? []} />
+          </div>
         </div>
-      </div>
+      )}
 
-      {pendingInvitations.length > 0 && (
+      {workspace.is_owner && pendingInvitations.length > 0 && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Pending invitations</h3>
           <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">

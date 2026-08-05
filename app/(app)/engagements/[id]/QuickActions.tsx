@@ -109,17 +109,20 @@ export function QuickActions({ engagementId, clientId, workspaceId, primaryEmail
                 options: [
                   ...(permissions.messagesSend
                     ? [
-                        { value: "portal", label: "Client portal" },
-                        { value: "email", label: "Email" },
-                        { value: "sms", label: "SMS" },
+                        { value: "portal", label: "Client portal inbox" },
+                        { value: "email", label: `Email${primaryEmail ? ` (${primaryEmail})` : " -- no email on file"}` },
+                        { value: "sms", label: `SMS${primaryPhone ? ` (${primaryPhone})` : " -- no phone on file"}` },
                       ]
                     : []),
-                  ...(permissions.messagesInternalNote ? [{ value: "internal", label: "Internal note" }] : []),
+                  ...(permissions.messagesInternalNote ? [{ value: "internal", label: "Internal note (staff only)" }] : []),
                 ],
               },
               { name: "body", label: "Message", required: true },
             ]}
             onSubmit={async (v) => {
+              if (v.channel === "email" && !primaryEmail) return "This client has no email on file -- add one in Contacts first.";
+              if (v.channel === "sms" && !primaryPhone) return "This client has no phone number on file -- add one in Contacts first.";
+
               const isInternal = v.channel === "internal";
               const {
                 data: { user },
@@ -205,7 +208,7 @@ export function QuickActions({ engagementId, clientId, workspaceId, primaryEmail
             fields={[
               { name: "notes", label: "Description", required: true },
               { name: "total_amount", label: "Amount", required: true },
-              { name: "due_date", label: "Due date (optional)" },
+              { name: "due_date", label: "Payment due date (optional)" },
             ]}
             onSubmit={async (v) => {
               const {

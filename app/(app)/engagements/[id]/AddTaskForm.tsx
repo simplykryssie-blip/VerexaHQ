@@ -41,7 +41,7 @@ export function AddTaskForm({
           type: "select",
           options: staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Staff" })),
         },
-        { name: "due_date", label: "Due date" },
+        { name: "due_date", label: "Task due date" },
         ...(tasks.length > 0
           ? [
               {

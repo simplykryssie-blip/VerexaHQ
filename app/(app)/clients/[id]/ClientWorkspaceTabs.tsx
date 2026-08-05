@@ -351,7 +351,7 @@ export function EngagementsTab({ engagements, client }: { engagements: Engagemen
                 <th className="px-4 py-2 font-medium">Assigned staff</th>
                 <th className="px-4 py-2 font-medium">Reviewer</th>
                 <th className="px-4 py-2 font-medium">Priority</th>
-                <th className="px-4 py-2 font-medium">Due date</th>
+                <th className="px-4 py-2 font-medium">Engagement due date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">

@@ -55,6 +55,7 @@ export default async function NewEngagementPage({
             clients={clients ?? []}
             engagementTypes={engagementTypes ?? []}
             defaultClientId={searchParams.clientId}
+            autoAssignToSelf={workspace.workspace_type === "independent_ptin"}
           />
         </div>
       </div>

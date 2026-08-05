@@ -2,6 +2,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { StatusSelect } from "./StatusSelect";
+import { DueDateInput } from "./DueDateInput";
 import { TaskRow } from "./TaskRow";
 import { AddEngagementNoteForm } from "./AddEngagementNoteForm";
 import { AddTaskForm } from "./AddTaskForm";
@@ -94,7 +95,12 @@ export function OverviewTab({
           <Field label="Priority" value={engagement.priority} />
           <Field label="Review status" value={engagement.review_status} />
           <Field label="Open date" value={engagement.open_date ? new Date(engagement.open_date).toLocaleDateString() : null} />
-          <Field label="Due date" value={engagement.due_date ? new Date(engagement.due_date).toLocaleDateString() : null} />
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted">Engagement due date</p>
+            <div className="mt-1">
+              <DueDateInput engagementId={engagement.id} currentDueDate={engagement.due_date} />
+            </div>
+          </div>
           <Field
             label="Completed date"
             value={engagement.completed_date ? new Date(engagement.completed_date).toLocaleDateString() : null}

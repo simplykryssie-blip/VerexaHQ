@@ -16,16 +16,30 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: widgets }, data] = await Promise.all([
-    dashboardId
-      ? supabase
-          .from("dashboard_widgets")
-          .select("id, widget_type, title, display_order, is_visible")
-          .eq("dashboard_id", dashboardId)
-          .order("display_order")
-      : Promise.resolve({ data: [] }),
-    getDashboardData(workspace.id),
-  ]);
+  const [{ data: widgets }, data, { data: clientsCreate }, { data: engagementsManage }, { data: billingManage }, { data: documentsRequest }, { data: appointmentsManage }] =
+    await Promise.all([
+      dashboardId
+        ? supabase
+            .from("dashboard_widgets")
+            .select("id, widget_type, title, display_order, is_visible")
+            .eq("dashboard_id", dashboardId)
+            .order("display_order")
+        : Promise.resolve({ data: [] }),
+      getDashboardData(workspace.id),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.request" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
+    ]);
+
+  const quickActionPermissions = {
+    clientsCreate: Boolean(clientsCreate),
+    engagementsManage: Boolean(engagementsManage),
+    billingManage: Boolean(billingManage),
+    documentsRequest: Boolean(documentsRequest),
+    appointmentsManage: Boolean(appointmentsManage),
+  };
 
   const widgetIds = (widgets ?? []).map((w) => w.id);
   const { data: preferences } =
@@ -56,6 +70,7 @@ export default async function DashboardPage() {
       widgets={mergedWidgets}
       data={data}
       priorities={priorities}
+      quickActionPermissions={quickActionPermissions}
     />
   );
 }

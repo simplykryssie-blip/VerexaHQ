@@ -22,17 +22,21 @@ export function NewEngagementForm({
   clients,
   engagementTypes,
   defaultClientId,
+  autoAssignToSelf,
 }: {
   workspaceId: string;
   clients: ClientOption[];
   engagementTypes: { id: string; name: string }[];
   defaultClientId?: string;
+  /** Independent PTIN workspaces are one person -- there's no one else to
+   *  assign, so skip the manual assignment step and just assign the
+   *  account holder creating the engagement. */
+  autoAssignToSelf?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [clientId, setClientId] = useState(defaultClientId ?? "");
   const [engagementTypeId, setEngagementTypeId] = useState("");
-  const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -46,13 +50,22 @@ export function NewEngagementForm({
     }
 
     setLoading(true);
+
+    let assignedStaffId: string | null = null;
+    if (autoAssignToSelf) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      assignedStaffId = user?.id ?? null;
+    }
+
     const { data, error } = await supabase
       .from("engagements")
       .insert({
         workspace_id: workspaceId,
         client_id: clientId,
         engagement_type_id: engagementTypeId || null,
-        due_date: dueDate || null,
+        assigned_staff_id: assignedStaffId,
       })
       .select("id")
       .single();
@@ -111,16 +124,6 @@ export function NewEngagementForm({
             </option>
           ))}
         </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate">Due date</label>
-        <input
-          type="date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
       </div>
 
       {error && (

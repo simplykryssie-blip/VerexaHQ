@@ -13,6 +13,9 @@ export default async function AppointmentsPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const [{ data: canView }, { data: canManage }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.view" }),
@@ -91,6 +94,7 @@ export default async function AppointmentsPage() {
           engagements={engagements}
           staff={staff}
           canManage={Boolean(canManage)}
+          currentUserId={user?.id ?? null}
         />
       </div>
     </>
