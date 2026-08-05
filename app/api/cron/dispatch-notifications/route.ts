@@ -173,7 +173,7 @@ async function findEmailTemplate(supabase: ReturnType<typeof createServiceClient
     .eq("slug", slug)
     .eq("status", "published")
     .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
-    .order("workspace_id", { ascending: false })
+    .order("workspace_id", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
   return data;
@@ -186,7 +186,7 @@ async function findSmsTemplate(supabase: ReturnType<typeof createServiceClient>,
     .eq("slug", slug)
     .eq("status", "published")
     .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
-    .order("workspace_id", { ascending: false })
+    .order("workspace_id", { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
   return data;
