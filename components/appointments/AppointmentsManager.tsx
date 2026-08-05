@@ -49,6 +49,7 @@ export function AppointmentsManager({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [meetingUrl, setMeetingUrl] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientQuery, setClientQuery] = useState("");
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
@@ -89,6 +90,7 @@ export function AppointmentsManager({
       title: title.trim(),
       description: description.trim() || null,
       location: location.trim() || null,
+      meeting_url: meetingUrl.trim() || null,
       client_id: clientId || null,
       engagement_id: engagementId || null,
       staff_id: staffId || null,
@@ -106,6 +108,7 @@ export function AppointmentsManager({
     setTitle("");
     setDescription("");
     setLocation("");
+    setMeetingUrl("");
     setClientId("");
     setClientQuery("");
     setEngagementId("");
@@ -237,10 +240,17 @@ export function AppointmentsManager({
               ))}
             </select>
             <input
-              placeholder="Location (e.g. Office, Zoom, Phone)"
+              placeholder="Location (e.g. Office, Phone)"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <input
+              type="url"
+              placeholder="Meeting link (paste your Zoom/Google Meet link)"
+              value={meetingUrl}
+              onChange={(e) => setMeetingUrl(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:col-span-2"
             />
             <label className="flex flex-col gap-1 text-xs font-medium text-muted">
               Start
@@ -303,6 +313,11 @@ export function AppointmentsManager({
                     <p className="mt-1 text-xs text-slate">{a.engagement_label ?? a.client_label}</p>
                   )}
                   {a.staff_name && <p className="text-xs text-muted">Staff: {a.staff_name}</p>}
+                  {a.meeting_url && (
+                    <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-accent hover:underline">
+                      Join meeting link
+                    </a>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {canManage ? (

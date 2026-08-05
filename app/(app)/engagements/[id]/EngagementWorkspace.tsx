@@ -85,6 +85,7 @@ export function EngagementWorkspace({
   staffOptions,
   taxDetail,
   irsNotices,
+  taxYears,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -111,6 +112,7 @@ export function EngagementWorkspace({
   staffOptions: StaffOption[];
   taxDetail: TaxDetailRow;
   irsNotices: IrsNoticeRow[];
+  taxYears: number[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
@@ -185,7 +187,7 @@ export function EngagementWorkspace({
             )}
             {tab === "Tax" && (
               <div className="space-y-6">
-                <TaxDetailsCard engagementId={engagement.id} workspaceId={workspace.id} detail={taxDetail} />
+                <TaxDetailsCard engagementId={engagement.id} workspaceId={workspace.id} detail={taxDetail} taxYears={taxYears} />
                 <IrsNoticesPanel workspaceId={workspace.id} entityType="engagement" entityId={engagement.id} notices={irsNotices} />
               </div>
             )}

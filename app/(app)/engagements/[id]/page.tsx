@@ -231,7 +231,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     signers: r.signers ?? [],
   }));
 
-  const [{ data: taxDetail }, { data: irsNotices }] = await Promise.all([
+  const [{ data: taxDetail }, { data: irsNotices }, { data: taxYears }] = await Promise.all([
     supabase.from("engagement_tax_details").select("*").eq("engagement_id", engagement.id).maybeSingle(),
     supabase
       .from("irs_notices")
@@ -239,6 +239,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .eq("entity_type", "engagement")
       .eq("entity_id", engagement.id)
       .order("notice_date", { ascending: false }),
+    supabase.from("tax_years").select("year").order("year", { ascending: false }),
   ]);
   const permissions = await loadActionPermissions(supabase, workspace.id);
 
@@ -269,6 +270,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       staffOptions={staffOptions as never}
       taxDetail={(taxDetail ?? null) as never}
       irsNotices={(irsNotices ?? []) as never}
+      taxYears={(taxYears ?? []).map((t) => t.year)}
     />
   );
 }

@@ -16,7 +16,7 @@ const ACTIONS = [
   { label: "New Engagement", href: "/engagements/new", icon: Briefcase, key: "engagementsManage" as const },
   { label: "Create Invoice", href: "/clients", icon: Receipt, key: "billingManage" as const },
   { label: "Request Documents", href: "/clients", icon: ClipboardList, key: "documentsRequest" as const },
-  { label: "Schedule Appointment", href: "/appointments", icon: CalendarPlus, key: "appointmentsManage" as const },
+  { label: "Schedule Appointment", href: "/calendar", icon: CalendarPlus, key: "appointmentsManage" as const },
   { label: "Invite Staff", href: "/settings/users", icon: Mail, key: "isAdmin" as const },
 ] as const;
 

@@ -21,7 +21,7 @@ export default async function PortalAppointmentsPage() {
   const supabase = createClient();
   const { data: appointments } = await supabase
     .from("appointments")
-    .select("id, title, description, location, start_at, end_at, status")
+    .select("id, title, description, location, meeting_url, start_at, end_at, status")
     .order("start_at", { ascending: true })
     .limit(100);
 
@@ -44,6 +44,11 @@ export default async function PortalAppointmentsPage() {
                       {a.location && ` -- ${a.location}`}
                     </p>
                     {a.description && <p className="mt-1 text-xs text-slate">{a.description}</p>}
+                    {a.meeting_url && (
+                      <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" className="mt-1 block text-xs font-medium text-accent hover:underline">
+                        Join meeting link
+                      </a>
+                    )}
                   </div>
                   <span className={`text-xs font-medium capitalize ${STATUS_STYLE[a.status] ?? "text-muted"}`}>{a.status.replace("_", "-")}</span>
                 </div>

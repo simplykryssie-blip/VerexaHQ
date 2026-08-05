@@ -71,6 +71,7 @@ export type Database = {
           engagement_id: string | null
           id: string
           location: string | null
+          meeting_url: string | null
           portal_visible: boolean
           staff_id: string | null
           start_at: string
@@ -88,6 +89,7 @@ export type Database = {
           engagement_id?: string | null
           id?: string
           location?: string | null
+          meeting_url?: string | null
           portal_visible?: boolean
           staff_id?: string | null
           start_at: string
@@ -105,6 +107,7 @@ export type Database = {
           engagement_id?: string | null
           id?: string
           location?: string | null
+          meeting_url?: string | null
           portal_visible?: boolean
           staff_id?: string | null
           start_at?: string
@@ -5522,6 +5525,24 @@ export type Database = {
           },
         ]
       }
+      tax_years: {
+        Row: {
+          created_at: string
+          id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       trusted_devices: {
         Row: {
           device_fingerprint: string
@@ -6816,6 +6837,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      ensure_next_tax_year: { Args: never; Returns: number }
       expire_stale_engagement_shares: { Args: never; Returns: number }
       fulfill_document_request_item: {
         Args: { p_attachment_id: string; p_item_status_id: string }

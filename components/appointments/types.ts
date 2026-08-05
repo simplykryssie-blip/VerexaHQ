@@ -5,6 +5,7 @@ export type AppointmentRow = {
   title: string;
   description: string | null;
   location: string | null;
+  meeting_url: string | null;
   start_at: string;
   end_at: string;
   status: AppointmentStatus;

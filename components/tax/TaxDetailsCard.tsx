@@ -20,18 +20,37 @@ export type TaxDetailRow = {
 
 const EFILE_STATUSES = ["not_filed", "ready_to_file", "transmitted", "accepted", "rejected", "paper_filed"] as const;
 
+// Most common first -- solo/individual returns dominate this practice's
+// volume, per the product's own stated tier priorities.
+const RETURN_TYPES = [
+  { value: "1040", label: "1040 -- Individual" },
+  { value: "1040-NR", label: "1040-NR -- Nonresident individual" },
+  { value: "1120-S", label: "1120-S -- S Corporation" },
+  { value: "1065", label: "1065 -- Partnership" },
+  { value: "1120", label: "1120 -- C Corporation" },
+  { value: "990", label: "990 -- Nonprofit / Exempt Organization" },
+  { value: "1041", label: "1041 -- Estates & Trusts" },
+  { value: "941", label: "941 -- Employer's Quarterly Federal Tax Return" },
+  { value: "940", label: "940 -- Employer's Annual FUTA" },
+  { value: "709", label: "709 -- Gift Tax" },
+  { value: "706", label: "706 -- Estate Tax" },
+] as const;
+
 export function TaxDetailsCard({
   engagementId,
   workspaceId,
   detail,
+  taxYears,
 }: {
   engagementId: string;
   workspaceId: string;
   detail: TaxDetailRow;
+  taxYears: number[];
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const yearOptions = detail?.tax_year && !taxYears.includes(detail.tax_year) ? [detail.tax_year, ...taxYears] : taxYears;
   const [taxYear, setTaxYear] = useState(detail?.tax_year?.toString() ?? "");
   const [returnType, setReturnType] = useState(detail?.return_type ?? "");
   const [isAmended, setIsAmended] = useState(detail?.is_amended ?? false);
@@ -74,25 +93,37 @@ export function TaxDetailsCard({
           <label htmlFor="tax_year" className="block text-xs font-medium text-muted">
             Tax year
           </label>
-          <input
+          <select
             id="tax_year"
-            type="number"
             value={taxYear}
             onChange={(e) => setTaxYear(e.target.value)}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+          >
+            <option value="">Not set</option>
+            {yearOptions.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label htmlFor="return_type" className="block text-xs font-medium text-muted">
             Return type
           </label>
-          <input
+          <select
             id="return_type"
             value={returnType}
             onChange={(e) => setReturnType(e.target.value)}
-            placeholder="1040, 1120, 1065..."
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+          >
+            <option value="">Not set</option>
+            {RETURN_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label htmlFor="efile_status" className="block text-xs font-medium text-muted">
