@@ -911,3 +911,10 @@ session has no dashboard access to any of the three.
   Reset-password (TaxDome's 3-dot-menu actions) weren't built — would need
   `invitation_token` added to the portal-user query plus small action
   buttons next to a contact whose portal status is `pending`.
+- **Re-enable Vercel SSO protection on `verexa-tax-office-v2`.** Turned off
+  on 2026-08-05 so the two beta testers could reach the app without a
+  Vercel-team login wall. Anyone with the deployment URL can currently
+  reach the real sign-up flow. Re-enable (Vercel project → Settings →
+  Deployment Protection → Vercel Authentication) once beta access no
+  longer needs to be this open, and definitely before real client SSNs are
+  flowing through it.
