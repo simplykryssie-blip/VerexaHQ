@@ -33,7 +33,7 @@ export default function LoginPage() {
       }
 
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -49,6 +49,16 @@ export default function LoginPage() {
 
       if (error) {
         setError(error.message);
+        return;
+      }
+
+      // Supabase returns a 200 with an empty identities array (rather than
+      // an error) when the email is already registered -- a deliberate
+      // anti-enumeration measure so signup responses can't be used to probe
+      // which emails exist. That's the one case we need to check for
+      // ourselves instead of trusting `error`.
+      if (data.user && data.user.identities?.length === 0) {
+        setError("An account with this email already exists. Try signing in, or use \"Forgot password?\" if you need to reset it.");
         return;
       }
 

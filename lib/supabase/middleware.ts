@@ -47,41 +47,53 @@ export async function updateSession(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     const pathname = request.nextUrl.pathname;
+    const isApiPath = pathname.startsWith("/api/");
     const isPortalPath = pathname.startsWith("/portal");
     const loginPath = isPortalPath ? "/portal/login" : "/login";
     const homePath = isPortalPath ? "/portal/dashboard" : "/dashboard";
     const audiencePublicPaths = isPortalPath ? PORTAL_PUBLIC_PATHS : STAFF_PUBLIC_PATHS;
     const isPublicPath =
-      ALWAYS_PUBLIC_PATHS.some((path) => pathname.startsWith(path)) || audiencePublicPaths.some((path) => pathname.startsWith(path));
+      isApiPath ||
+      ALWAYS_PUBLIC_PATHS.some((path) => pathname.startsWith(path)) ||
+      audiencePublicPaths.some((path) => pathname.startsWith(path));
 
-    if (!user && !isPublicPath) {
-      const redirectUrl = new URL(loginPath, request.url);
-      redirectUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(redirectUrl);
-    }
+    // API routes are never redirected -- each one already runs its own
+    // supabase.auth.getUser() check and returns 401/JSON as appropriate.
+    // A page-style redirect here would silently break fetch() callers
+    // (e.g. this exact route, /api/auth/set-remember: it's the request
+    // that CREATES the "remember me" cookie below, so if it were subject
+    // to that same check it would always find the cookie missing and
+    // sign the brand-new session straight back out).
+    if (!isApiPath) {
+      if (!user && !isPublicPath) {
+        const redirectUrl = new URL(loginPath, request.url);
+        redirectUrl.searchParams.set("next", pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
 
-    // "Remember me" enforcement: a "temporary" marker is a true browser-session
-    // cookie (no maxAge), unlike the underlying Supabase auth cookies which this
-    // client version always persists long-term regardless of options. If the
-    // marker is gone while the auth cookies remain, the browser was closed and
-    // reopened on a session the user asked not to be remembered -- sign out.
-    if (user && !isPublicPath && !request.cookies.get("sb_remember")) {
-      await supabase.auth.signOut();
-      const redirectUrl = new URL(loginPath, request.url);
-      const signedOutResponse = NextResponse.redirect(redirectUrl);
-      response.cookies.getAll().forEach((cookie) => signedOutResponse.cookies.set(cookie));
-      return signedOutResponse;
-    }
+      // "Remember me" enforcement: a "temporary" marker is a true browser-session
+      // cookie (no maxAge), unlike the underlying Supabase auth cookies which this
+      // client version always persists long-term regardless of options. If the
+      // marker is gone while the auth cookies remain, the browser was closed and
+      // reopened on a session the user asked not to be remembered -- sign out.
+      if (user && !isPublicPath && !request.cookies.get("sb_remember")) {
+        await supabase.auth.signOut();
+        const redirectUrl = new URL(loginPath, request.url);
+        const signedOutResponse = NextResponse.redirect(redirectUrl);
+        response.cookies.getAll().forEach((cookie) => signedOutResponse.cookies.set(cookie));
+        return signedOutResponse;
+      }
 
-    if (user && pathname === loginPath) {
-      return NextResponse.redirect(new URL(homePath, request.url));
+      if (user && pathname === loginPath) {
+        return NextResponse.redirect(new URL(homePath, request.url));
+      }
     }
 
     // MFA: staff only (client portal users are out of scope for now). A
     // verified factor that hasn't cleared this session's challenge sends the
     // user to /mfa-challenge; a workspace that requires MFA but where this
     // user has enrolled nothing sends them to enroll instead.
-    if (user && !isPortalPath && !MFA_EXEMPT_STAFF_PATHS.some((path) => pathname.startsWith(path))) {
+    if (user && !isApiPath && !isPortalPath && !MFA_EXEMPT_STAFF_PATHS.some((path) => pathname.startsWith(path))) {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
       if (aal && aal.currentLevel === "aal1" && aal.nextLevel === "aal2") {
