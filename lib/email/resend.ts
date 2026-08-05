@@ -6,6 +6,7 @@ export const SYSTEM_SENDERS = {
   billing: "billing@verexahq.com",
   notifications: "notifications@verexahq.com",
   team: "team@verexahq.com",
+  portal: "portal@verexahq.com",
 } as const;
 
 export type SystemSenderKey = keyof typeof SYSTEM_SENDERS;

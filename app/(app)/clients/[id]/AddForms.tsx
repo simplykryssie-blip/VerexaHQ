@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import { renderEmail } from "@/lib/email/template";
 
 type Ids = { clientId: string; workspaceId: string };
 
@@ -199,13 +200,37 @@ export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
         { name: "invited_email", label: "Email", type: "email", required: true },
       ]}
       onSubmit={async (v) => {
-        const { error } = await supabase.from("client_portal_users").insert({
-          client_id: clientId,
-          workspace_id: workspaceId,
-          invited_name: v.invited_name || null,
-          invited_email: v.invited_email,
-        });
+        const { data: invite, error } = await supabase
+          .from("client_portal_users")
+          .insert({
+            client_id: clientId,
+            workspace_id: workspaceId,
+            invited_name: v.invited_name || null,
+            invited_email: v.invited_email,
+          })
+          .select("invitation_token")
+          .single();
         if (error) return error.message;
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+        const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
+
+        await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: v.invited_email,
+            sender: "portal",
+            subject: "You've been invited to your client portal",
+            html: renderEmail({
+              heading: "You've been invited",
+              bodyHtml: `<p>You've been invited to access your client portal on VerexaHQ.</p><p>Click below to accept the invitation and set up your account.</p>`,
+              ctaLabel: "Accept invitation",
+              ctaUrl: acceptUrl,
+            }),
+          }),
+        });
+
         router.refresh();
       }}
     />
