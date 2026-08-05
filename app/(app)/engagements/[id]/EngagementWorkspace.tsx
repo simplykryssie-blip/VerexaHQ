@@ -34,6 +34,7 @@ import {
   type PaymentRow,
   type ActivityRow,
   type StaffOption,
+  type OrganizerResponseRow,
 } from "./EngagementWorkspaceTabs";
 
 type Workspace = { id: string; name: string };
@@ -69,6 +70,8 @@ export function EngagementWorkspace({
   documentFolders,
   documentRequests,
   documentRequestTemplates,
+  organizerTemplates,
+  organizerResponses,
   signatureRequests,
   notes,
   messageThreads,
@@ -96,6 +99,8 @@ export function EngagementWorkspace({
   documentFolders: DocumentFolderRow[];
   documentRequests: DocumentRequestRow[];
   documentRequestTemplates: { id: string; name: string }[];
+  organizerTemplates: { id: string; name: string }[];
+  organizerResponses: OrganizerResponseRow[];
   signatureRequests: SignatureRequestRow[];
   notes: NoteRow[];
   messageThreads: MessageThreadRow[];
@@ -148,6 +153,7 @@ export function EngagementWorkspace({
           engagementId={engagement.id}
           clientId={client?.id ?? ""}
           workspaceId={workspace.id}
+          organizerTemplates={organizerTemplates}
           primaryEmail={client?.primary_email ?? null}
           primaryPhone={client?.primary_phone ?? null}
           permissions={permissions}
@@ -183,6 +189,7 @@ export function EngagementWorkspace({
                 invoices={invoices}
                 timeline={timeline}
                 staffOptions={staffOptions}
+                organizerResponses={organizerResponses}
               />
             )}
             {tab === "Tax" && (

@@ -70,6 +70,7 @@ export function OverviewTab({
   invoices,
   timeline,
   staffOptions,
+  organizerResponses,
 }: {
   engagement: EngagementRow;
   progress: ProgressRow | null;
@@ -77,6 +78,7 @@ export function OverviewTab({
   invoices: InvoiceRow[];
   timeline: ActivityRow[];
   staffOptions: StaffOption[];
+  organizerResponses: OrganizerResponseRow[];
 }) {
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
@@ -155,6 +157,24 @@ export function OverviewTab({
           </p>
         </div>
       </div>
+
+      <Section title="Organizers">
+        {organizerResponses.length === 0 ? (
+          <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {organizerResponses.map((o) => (
+              <li key={o.id} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-slate">{o.template_name}</span>
+                <span className="capitalize text-muted">
+                  {o.status.replace("_", " ")}
+                  {o.submitted_at && ` -- submitted ${new Date(o.submitted_at).toLocaleDateString()}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
 
       <Section title="Recent activity">
         {timeline.length === 0 ? (
@@ -581,3 +601,4 @@ export type QuoteRow = { id: string; quote_number: string | null; title: string;
 export type InvoiceRow = { id: string; invoice_number: string | null; status: string; total_amount: number; amount_paid: number; due_date: string | null };
 export type PaymentRow = { id: string; status: string; amount: number; payment_date: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
+export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };
