@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import DateField from "@/components/DateField";
 import type { ServiceTemplate, PipelineStage } from "@/lib/types";
 import { friendlyError } from "@/lib/friendlyError";
+import { listActiveStaff } from "@/lib/workspaceMembers";
 
 // Heuristic default only — service_templates has no is_recurring/frequency
 // column of its own, so this just pre-selects a sensible starting choice on
@@ -185,14 +186,9 @@ export default function ActivateServiceModal({
   }, [workspaceId]);
 
   useEffect(() => {
-    supabase
-      .from("workspace_members")
-      .select("user_id, display_name, role")
-      .eq("workspace_id", workspaceId)
-      .eq("member_status", "Active")
-      .then(({ data }) =>
-        setMembers(((data as any[]) ?? []).map((m) => ({ user_id: m.user_id, label: m.display_name || m.role || "Team member" })))
-      );
+    listActiveStaff(workspaceId).then((staff) =>
+      setMembers(staff.map((s) => ({ user_id: s.userId, label: s.name })))
+    );
   }, [workspaceId]);
 
   useEffect(() => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Client, Pipeline, PipelineStage, Service } from "@/lib/types";
+import { listActiveStaff } from "@/lib/workspaceMembers";
 
 import { friendlyError } from "@/lib/friendlyError";
 const SERVICE_STATUSES = [
@@ -127,14 +128,9 @@ export default function NewServiceModal({
       setMembers([]);
       return;
     }
-    supabase
-      .from("workspace_members")
-      .select("user_id, display_name, role")
-      .eq("workspace_id", resolvedWorkspaceId)
-      .eq("member_status", "Active")
-      .then(({ data }) =>
-        setMembers(((data as any[]) ?? []).map((m) => ({ user_id: m.user_id, label: m.display_name || m.role || "Team member" })))
-      );
+    listActiveStaff(resolvedWorkspaceId).then((staff) =>
+      setMembers(staff.map((s) => ({ user_id: s.userId, label: s.name })))
+    );
   }, [resolvedWorkspaceId]);
 
   useEffect(() => {

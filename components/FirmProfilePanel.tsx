@@ -58,7 +58,7 @@ const PHONE_RE = /^[\d\s()+.-]{7,20}$/;
 
 export default function FirmProfilePanel() {
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
-  const canEdit = activeWorkspace?.role === "Owner" || activeWorkspace?.role === "Admin";
+  const canEdit = Boolean(activeWorkspace?.isAdmin);
 
   const [saved, setSaved] = useState<FirmProfile>(EMPTY);
   const [draft, setDraft] = useState<FirmProfile>(EMPTY);

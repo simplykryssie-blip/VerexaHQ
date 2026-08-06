@@ -4,112 +4,59 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import type {
-  TaxOrganizerAssignment,
-  TaxOrganizerSection,
-  TaxOrganizerQuestion,
-  TaxOrganizerAnswer,
-  Client,
-  TaxOrganizerTemplate,
-} from "@/lib/types";
+import type { OrganizerResponse, OrganizerField, OrganizerResponseAnswer, Client, OrganizerTemplate } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import OrganizerQuestionnaire from "@/components/OrganizerQuestionnaire";
 import OrganizerProgress from "@/components/OrganizerProgress";
-import { organizerPrefillValue } from "@/lib/organizerPrefill";
-import { isQuestionAnswered, isQuestionVisible } from "@/lib/organizerVisibility";
+import { isFieldAnswered, isFieldVisible } from "@/lib/organizerVisibility";
 import { friendlyOrganizerError } from "@/lib/organizerError";
 
-const STATUS_STEPS = ["draft", "sent", "submitted", "reviewed", "accepted"];
+const STATUS_STEPS = ["not_started", "in_progress", "submitted", "reviewed"];
 
 export default function OrganizerFillPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [assignment, setAssignment] = useState<TaxOrganizerAssignment | null>(null);
+  const [response, setResponse] = useState<OrganizerResponse | null>(null);
   const [client, setClient] = useState<Client | null>(null);
-  const [template, setTemplate] = useState<TaxOrganizerTemplate | null>(null);
-  const [sections, setSections] = useState<TaxOrganizerSection[]>([]);
-  const [questions, setQuestions] = useState<TaxOrganizerQuestion[]>([]);
-  const [answers, setAnswers] = useState<Map<string, TaxOrganizerAnswer>>(new Map());
+  const [template, setTemplate] = useState<OrganizerTemplate | null>(null);
+  const [fields, setFields] = useState<OrganizerField[]>([]);
+  const [answers, setAnswers] = useState<Map<string, OrganizerResponseAnswer>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
+  const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   async function load() {
     setLoading(true);
-    const { data: assignmentData, error: assignmentError } = await supabase
-      .from("tax_organizer_assignments")
+    const { data: responseData, error: responseError } = await supabase
+      .from("organizer_responses")
       .select("*")
       .eq("id", id)
       .maybeSingle();
 
-    if (assignmentError || !assignmentData) {
-      setError(friendlyOrganizerError(assignmentError, "We couldn't load this organizer assignment. Please try again."));
+    if (responseError || !responseData) {
+      setError(friendlyOrganizerError(responseError, "We couldn't load this organizer. Please try again."));
       setLoading(false);
       return;
     }
 
-    const a = assignmentData as TaxOrganizerAssignment;
-    setAssignment(a);
+    const r = responseData as OrganizerResponse;
+    setResponse(r);
 
-    const [clientRes, templateRes, sectionsRes, answersRes] = await Promise.all([
-      supabase.from("clients").select("*").eq("id", a.client_id).maybeSingle(),
-      supabase.from("tax_organizer_templates").select("*").eq("id", a.template_id).maybeSingle(),
-      supabase
-        .from("tax_organizer_sections")
-        .select("*")
-        .eq("template_id", a.template_id)
-        .order("sort_order"),
-      supabase.from("tax_organizer_answers").select("*").eq("assignment_id", a.id),
+    const [clientRes, templateRes, fieldsRes, answersRes] = await Promise.all([
+      supabase.from("clients").select("*").eq("id", r.client_id).maybeSingle(),
+      supabase.from("organizer_templates").select("*").eq("id", r.organizer_template_id).maybeSingle(),
+      supabase.from("organizer_fields").select("*").eq("organizer_template_id", r.organizer_template_id).order("display_order"),
+      supabase.from("organizer_response_answers").select("*").eq("organizer_response_id", r.id),
     ]);
 
-    const sectionList = (sectionsRes.data as TaxOrganizerSection[]) ?? [];
     setClient((clientRes.data as Client) ?? null);
-    setTemplate((templateRes.data as TaxOrganizerTemplate) ?? null);
-    setSections(sectionList);
+    setTemplate((templateRes.data as OrganizerTemplate) ?? null);
+    setFields((fieldsRes.data as OrganizerField[]) ?? []);
 
-    let questionList: TaxOrganizerQuestion[] = [];
-    if (sectionList.length > 0) {
-      const { data: questionData } = await supabase
-        .from("tax_organizer_questions")
-        .select("*")
-        .in(
-          "section_id",
-          sectionList.map((s) => s.id)
-        )
-        .order("sort_order");
-      questionList = (questionData as TaxOrganizerQuestion[]) ?? [];
-      setQuestions(questionList);
-    }
-
-    const answersMap = new Map<string, TaxOrganizerAnswer>();
-    (answersRes.data as TaxOrganizerAnswer[] | null)?.forEach((ans) =>
-      answersMap.set(ans.question_id, ans)
-    );
-
-    const clientRecord = clientRes.data as Client | null;
-    if (clientRecord) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const missingPrefills = questionList.flatMap((question) => {
-        if (answersMap.has(question.id)) return [];
-        const value = organizerPrefillValue(question, clientRecord);
-        return value === undefined ? [] : [{
-          workspace_id: a.workspace_id,
-          assignment_id: a.id,
-          question_id: question.id,
-          answer_value: value,
-          answered_by: sessionData.session?.user.id,
-        }];
-      });
-      if (missingPrefills.length > 0) {
-        const { data: inserted } = await supabase
-          .from("tax_organizer_answers")
-          .upsert(missingPrefills, { onConflict: "assignment_id,question_id", ignoreDuplicates: true })
-          .select();
-        (inserted as TaxOrganizerAnswer[] | null)?.forEach((ans) => answersMap.set(ans.question_id, ans));
-      }
-    }
+    const answersMap = new Map<string, OrganizerResponseAnswer>();
+    (answersRes.data as OrganizerResponseAnswer[] | null)?.forEach((ans) => answersMap.set(ans.organizer_field_id, ans));
     setAnswers(answersMap);
 
     setError(null);
@@ -118,67 +65,38 @@ export default function OrganizerFillPage() {
 
   useEffect(() => {
     if (id) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function saveAnswer(question: TaxOrganizerQuestion, value: unknown) {
-    if (!assignment) return;
-    setSavingQuestionId(question.id);
+  async function saveAnswer(field: OrganizerField, value: unknown) {
+    if (!response) return;
+    setSavingFieldId(field.id);
 
-    const existing = answers.get(question.id);
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
+    const { data: saved, error } = await supabase
+      .from("organizer_response_answers")
+      .upsert(
+        { organizer_response_id: response.id, organizer_field_id: field.id, value },
+        { onConflict: "organizer_response_id,organizer_field_id" },
+      )
+      .select()
+      .single();
 
-    if (existing) {
-      const { error } = await supabase
-        .from("tax_organizer_answers")
-        .update({ answer_value: value, answered_by: userId, answered_at: new Date().toISOString() })
-        .eq("id", existing.id);
-      if (!error) {
-        setAnswers((prev) => new Map(prev).set(question.id, { ...existing, answer_value: value }));
-      }
-    } else {
-      const { data: newAnswer, error } = await supabase
-        .from("tax_organizer_answers")
-        .insert({
-          workspace_id: assignment.workspace_id,
-          assignment_id: assignment.id,
-          question_id: question.id,
-          answer_value: value,
-          answered_by: userId,
-        })
-        .select()
-        .single();
-      if (!error && newAnswer) {
-        setAnswers((prev) => new Map(prev).set(question.id, newAnswer as TaxOrganizerAnswer));
-      }
+    if (!error && saved) {
+      setAnswers((prev) => new Map(prev).set(field.id, saved as OrganizerResponseAnswer));
     }
-    setSavingQuestionId(null);
+    setSavingFieldId(null);
   }
 
   async function advanceStatus(nextStatus: string) {
-    if (!assignment) return;
+    if (!response) return;
     setUpdatingStatus(true);
-    const timestampField =
-      nextStatus === "sent"
-        ? "sent_at"
-        : nextStatus === "submitted"
-        ? "submitted_at"
-        : nextStatus === "reviewed"
-        ? "reviewed_at"
-        : nextStatus === "accepted"
-        ? "accepted_at"
-        : null;
+    const payload: Record<string, unknown> = { status: nextStatus };
+    if (nextStatus === "reviewed") payload.reviewed_at = new Date().toISOString();
 
-    const payload: Record<string, unknown> = { assignment_status: nextStatus };
-    if (timestampField) payload[timestampField] = new Date().toISOString();
-
-    const { error } = await supabase
-      .from("tax_organizer_assignments")
-      .update(payload)
-      .eq("id", assignment.id);
+    const { error } = await supabase.from("organizer_responses").update(payload).eq("id", response.id);
     setUpdatingStatus(false);
     if (!error) {
-      setAssignment({ ...assignment, ...payload } as TaxOrganizerAssignment);
+      setResponse({ ...response, ...payload } as OrganizerResponse);
     }
   }
 
@@ -186,7 +104,7 @@ export default function OrganizerFillPage() {
     return <div className="text-sm text-muted">Loading organizer…</div>;
   }
 
-  if (error || !assignment) {
+  if (error || !response) {
     return (
       <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">
         {error ?? "Not found."}
@@ -200,29 +118,25 @@ export default function OrganizerFillPage() {
       : `${client.first_name} ${client.last_name}`.trim()
     : "—";
 
-  const currentStepIndex = STATUS_STEPS.indexOf(assignment.assignment_status);
+  const currentStepIndex = STATUS_STEPS.indexOf(response.status);
   const nextStatus = STATUS_STEPS[currentStepIndex + 1];
 
-  const visibleQuestions = questions.filter((q) => isQuestionVisible(q, questions, answers));
-  const remainingSections = sections.filter((s) => {
-    const sectionQuestions = visibleQuestions.filter((q) => q.section_id === s.id);
-    return sectionQuestions.length > 0 && sectionQuestions.some((q) => !isQuestionAnswered(answers.get(q.id)?.answer_value));
-  }).length;
+  const topLevelFields = fields.filter((f) => !f.parent_field_id && isFieldVisible(f, fields, answers));
+  const answeredCount = topLevelFields.filter((f) =>
+    f.field_type === "repeating_section" ? Array.isArray(answers.get(f.id)?.value) && (answers.get(f.id)!.value as unknown[]).length > 0 : isFieldAnswered(answers.get(f.id)?.value),
+  ).length;
 
   return (
     <div>
-      <button
-        onClick={() => router.push("/tax/organizers")}
-        className="flex items-center gap-1.5 text-xs text-muted mb-4 hover:text-ink"
-      >
+      <button onClick={() => router.push("/tax/organizers")} className="flex items-center gap-1.5 text-xs text-muted mb-4 hover:text-ink">
         <ArrowLeft size={13} /> Back to Organizers
       </button>
 
       <div className="flex items-center gap-3 mb-2">
         <h1 className="font-slab text-2xl font-bold text-ink">{clientName}</h1>
-        <StatusPill status={assignment.assignment_status} />
+        <StatusPill status={response.status.replaceAll("_", " ")} />
       </div>
-      <div className="text-sm text-muted mb-6">{template?.template_name}</div>
+      <div className="text-sm text-muted mb-6">{template?.name}</div>
 
       <div className="flex items-center gap-2 mb-8">
         {nextStatus && (
@@ -231,30 +145,14 @@ export default function OrganizerFillPage() {
             disabled={updatingStatus}
             className="text-xs font-semibold px-3 py-1.5 rounded-sm bg-ink text-white disabled:opacity-60"
           >
-            {updatingStatus
-              ? "Updating…"
-              : `Mark as ${nextStatus.charAt(0).toUpperCase() + nextStatus.slice(1)}`}
+            {updatingStatus ? "Updating…" : `Mark as ${nextStatus.replaceAll("_", " ")}`}
           </button>
         )}
-        <span className="text-xs text-muted">
-          {assignment.due_date ? `Due ${assignment.due_date}` : "No due date set"}
-        </span>
       </div>
 
-      <OrganizerProgress
-        answeredCount={visibleQuestions.filter((q) => isQuestionAnswered(answers.get(q.id)?.answer_value)).length}
-        totalCount={visibleQuestions.length}
-        remainingSections={remainingSections}
-        dueDate={assignment.due_date}
-      />
+      <OrganizerProgress answeredCount={answeredCount} totalCount={topLevelFields.length} />
 
-      <OrganizerQuestionnaire
-        sections={sections}
-        questions={questions}
-        answers={answers}
-        savingQuestionId={savingQuestionId}
-        onSave={saveAnswer}
-      />
+      <OrganizerQuestionnaire fields={fields} answers={answers} savingFieldId={savingFieldId} onSave={saveAnswer} />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import StatusPill from "@/components/StatusPill";
 import type { Deadline, EngagementWorkspace, Service, Task } from "@/lib/types";
 import { isOpenTaskStatus, nextEngagementAction } from "@/lib/status";
 import { friendlyError } from "@/lib/friendlyError";
+import { getWorkspaceMemberNames } from "@/lib/workspaceMembers";
 
 const VIEWS = [
   { key: "mine", label: "My Work" },
@@ -47,8 +48,6 @@ type ClientNameRow = {
   first_name: string | null;
   last_name: string | null;
 };
-
-type TeamMemberRow = { user_id: string; display_name: string | null };
 
 type EngagementLinkRow = { id: string; service_id: string; status: string };
 
@@ -99,15 +98,7 @@ export default function WorkPage() {
 
   useEffect(() => {
     if (!activeWorkspaceId) return;
-    supabase
-      .from("workspace_members")
-      .select("user_id, display_name")
-      .eq("workspace_id", activeWorkspaceId)
-      .then(({ data }) => {
-        const map = new Map<string, string>();
-        ((data as TeamMemberRow[]) ?? []).forEach((m) => map.set(m.user_id, m.display_name || "Team member"));
-        setMemberNames(map);
-      });
+    getWorkspaceMemberNames(activeWorkspaceId).then(setMemberNames);
   }, [activeWorkspaceId]);
 
   const clientNameFor = useCallback((row: ClientNameRow) => {

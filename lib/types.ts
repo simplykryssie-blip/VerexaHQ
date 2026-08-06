@@ -246,15 +246,21 @@ export type Deadline = {
   updated_at: string;
 };
 
+// Live table is workspace_users, not workspace_members. role is normalized
+// via role_id -> roles.id; display_name/avatar_url live on user_profiles,
+// not on this table (no declared FK between them — see lib/workspaceMembers.ts).
 export type WorkspaceMember = {
   id: string;
   workspace_id: string;
   user_id: string;
-  role: string;
-  member_status: string;
-  display_name: string;
-  job_title: string;
-  avatar_url: string;
+  role_id: string;
+  is_owner: boolean;
+  status: "invited" | "active" | "suspended" | "removed" | string;
+  invited_by: string | null;
+  invited_at: string | null;
+  joined_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type TaxReturn = {
@@ -319,69 +325,91 @@ export type TaxExtension = {
   notes: string | null;
 };
 
-export type TaxOrganizerTemplate = {
+// Live tables are organizer_templates/organizer_fields/organizer_responses/
+// organizer_response_answers — a flat 4-table system, not the old 5-table
+// tax_organizer_* system (which doesn't exist live: no sections table, no
+// mapped_field/explanation/example_text/placeholder/not_sure_text columns,
+// no due_date or client_tax_year linkage). Fields nest via parent_field_id
+// instead of a separate sections table; a field_type of "repeating_section"
+// is itself a real, seeded pattern (e.g. "Dependents") whose children carry
+// parent_field_id — see components/OrganizerQuestionnaire.tsx.
+// Format-mask config only applies to these two organizer field types (see
+// lib/organizerFormat.ts's ORGANIZER_FORMAT_CONFIG). The other mask helpers
+// there (phone/zip/percentage) are general-purpose and used outside the
+// organizer flow (e.g. ClientModal's zip field), so they're not part of
+// this narrower organizer-specific type.
+export type OrganizerFormatType = "ssn" | "ein";
+
+export type OrganizerFieldType =
+  | "short_text"
+  | "paragraph"
+  | "number"
+  | "currency"
+  | "date"
+  | "dropdown"
+  | "checkbox"
+  | "radio_button"
+  | "multiple_choice"
+  | "address"
+  | "ssn"
+  | "ein"
+  | "file_upload"
+  | "signature"
+  | "repeating_section";
+
+export type OrganizerTemplate = {
   id: string;
   workspace_id: string | null;
-  template_name: string;
-  tax_year: number | null;
-  return_type: string;
-  is_platform_template: boolean;
-  is_active: boolean;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: "draft" | "published" | "archived";
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
-export type TaxOrganizerSection = {
+export type OrganizerField = {
   id: string;
-  template_id: string;
-  section_title: string;
-  section_description: string | null;
-  sort_order: number;
-  estimated_minutes: number | null;
-};
-
-export type OrganizerFormatType = "ssn" | "ein" | "phone" | "zip" | "currency" | "percentage";
-
-export type TaxOrganizerQuestion = {
-  id: string;
-  section_id: string;
-  question_text: string;
+  organizer_template_id: string;
+  parent_field_id: string | null;
+  field_type: OrganizerFieldType;
+  label: string;
   help_text: string | null;
-  question_type: "text" | "boolean" | "select" | "number" | "date" | string;
-  options: string[];
+  display_order: number;
   is_required: boolean;
-  mapped_field: string | null;
-  conditional_logic: Record<string, unknown> | null;
-  sort_order: number;
-  explanation: string | null;
-  example_text: string | null;
-  placeholder: string | null;
-  not_sure_text: string | null;
-  format_type: OrganizerFormatType | null;
+  options: string[];
+  conditional_logic: Record<string, unknown>;
+  validation: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 };
 
-export type TaxOrganizerAssignment = {
+export type OrganizerResponse = {
   id: string;
   workspace_id: string;
   client_id: string;
-  client_tax_year_id: string | null;
-  template_id: string;
-  assignment_status: "draft" | "sent" | "submitted" | "reviewed" | "accepted" | string;
-  sent_at: string | null;
+  engagement_id: string | null;
+  organizer_template_id: string;
+  status: "not_started" | "in_progress" | "submitted" | "reviewed";
   submitted_at: string | null;
   reviewed_at: string | null;
-  accepted_at: string | null;
-  due_date: string | null;
-  created_by: string | null;
+  reviewed_by: string | null;
   created_at: string;
+  updated_at: string;
 };
 
-export type TaxOrganizerAnswer = {
+// value holds the answer for most field types. For a "repeating_section"
+// field, value is an array of instances, each a { [childFieldId]: value }
+// map — organizer_response_answers has no separate instance-index column,
+// so the repeating group's own answer row is the only place to store
+// multiple instances (see components/OrganizerQuestionnaire.tsx).
+export type OrganizerResponseAnswer = {
   id: string;
-  workspace_id: string;
-  assignment_id: string;
-  question_id: string;
-  answer_value: unknown;
-  answered_by: string | null;
-  answered_at: string;
+  organizer_response_id: string;
+  organizer_field_id: string;
+  value: unknown;
+  updated_at: string;
 };
 
 export type BookkeepingEngagement = {

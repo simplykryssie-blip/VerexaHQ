@@ -8,6 +8,7 @@ import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { maskZip } from "@/lib/organizerFormat";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { listActiveStaff } from "@/lib/workspaceMembers";
 
 // save_workspace_client only accepts client_type = individual | business.
 const CLIENT_TYPES = [
@@ -159,7 +160,6 @@ type ConnectedContact = {
   portal_access: boolean;
 };
 
-type WorkspaceMemberRow = { user_id: string; display_name: string | null; role: string | null };
 type TagAssignmentRow = { tag_id: string };
 type TeamMemberIdRow = { user_id: string };
 type ServiceInterestRow = { service_type: string };
@@ -352,18 +352,9 @@ export default function ClientModal({
       .eq("is_active", true)
       .order("tag_name")
       .then(({ data }) => setAvailableTags((data as ClientTag[]) ?? []));
-    supabase
-      .from("workspace_members")
-      .select("user_id, display_name, role")
-      .eq("workspace_id", workspaceId)
-      .then(({ data }) =>
-        setAvailableMembers(
-          ((data as WorkspaceMemberRow[]) ?? []).map((m) => ({
-            user_id: m.user_id,
-            label: m.display_name || m.role || "Team member",
-          }))
-        )
-      );
+    listActiveStaff(workspaceId).then((staff) =>
+      setAvailableMembers(staff.map((s) => ({ user_id: s.userId, label: s.name })))
+    );
   }, [workspaceId]);
 
   useEffect(() => {

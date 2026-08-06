@@ -16,6 +16,7 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import StatusPill from "@/components/StatusPill";
 import type { EngagementWorkspace, PipelineStage, Task } from "@/lib/types";
 import { isOpenTaskStatus, statusLabel } from "@/lib/status";
+import { getWorkspaceMemberNames } from "@/lib/workspaceMembers";
 
 import { friendlyError } from "@/lib/friendlyError";
 const TABS = [
@@ -31,7 +32,6 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number];
 
-type WorkspaceMemberRow = { user_id: string; display_name: string | null };
 type RequirementRow = { id: string; title: string; is_satisfied: boolean; is_required: boolean };
 type ClientRequestRow = { id: string; title: string; request_type: string; request_status: string };
 type FormAssignmentRow = {
@@ -106,9 +106,9 @@ export default function ServiceWorkspacePage() {
     }
     setRow(engRow as EngagementWorkspace);
 
-    const [membersRes, tasksRes, requirementsRes, requestsRes, formsRes, documentsRes, threadsRes, invoicesRes, notesRes, deadlineRes] =
+    const [memberMap, tasksRes, requirementsRes, requestsRes, formsRes, documentsRes, threadsRes, invoicesRes, notesRes, deadlineRes] =
       await Promise.all([
-        supabase.from("workspace_members").select("user_id, display_name").eq("workspace_id", activeWorkspaceId),
+        getWorkspaceMemberNames(activeWorkspaceId),
         supabase.from("tasks").select("*").eq("engagement_id", engagementId).order("due_date", { ascending: true, nullsFirst: false }),
         supabase.from("engagement_requirements").select("*").eq("engagement_id", engagementId).order("sort_order"),
         supabase.from("client_requests").select("*").eq("engagement_id", engagementId).order("created_at", { ascending: false }),
@@ -130,10 +130,6 @@ export default function ServiceWorkspacePage() {
           .limit(1),
       ]);
 
-    const memberMap = new Map<string, string>();
-    ((membersRes.data as WorkspaceMemberRow[]) ?? []).forEach((m) =>
-      memberMap.set(m.user_id, m.display_name || "Team member")
-    );
     setMembers(memberMap);
     setTasks((tasksRes.data as Task[]) ?? []);
     setRequirements((requirementsRes.data as RequirementRow[]) ?? []);

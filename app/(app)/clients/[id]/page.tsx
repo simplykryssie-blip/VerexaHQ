@@ -46,6 +46,7 @@ import type {
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import { isOpenServiceStatus, isDocumentAwaitingClient, isOpenTaskStatus } from "@/lib/status";
 import { friendlyError } from "@/lib/friendlyError";
+import { getStaffNames } from "@/lib/workspaceMembers";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusPill from "@/components/StatusPill";
@@ -334,7 +335,6 @@ export default function ClientDetailPage() {
       documentsRes,
       foldersRes,
       teamRes,
-      workspaceMembersRes,
       tagAssignmentsRes,
       workspaceTagsRes,
       identityRes,
@@ -362,7 +362,6 @@ export default function ClientDetailPage() {
       supabase.from("documents").select("*").eq("client_id", id).order("created_at", { ascending: false }),
       supabase.from("document_folders").select("*").eq("client_id", id).order("sort_order"),
       supabase.from("client_team_members").select("user_id").eq("client_id", id),
-      supabase.from("workspace_members").select("user_id, display_name, role").eq("workspace_id", c.workspace_id),
       supabase.from("client_tag_assignments").select("tag_id").eq("client_id", id),
       supabase.from("client_tags").select("*").eq("workspace_id", c.workspace_id).eq("is_active", true),
       supabase.rpc("get_client_identity_vault_masked", { p_workspace_id: c.workspace_id, p_client_id: id }),
@@ -389,13 +388,9 @@ export default function ClientDetailPage() {
     setDocuments((documentsRes.data as Document[]) ?? []);
     setFolders((foldersRes.data as DocumentFolder[]) ?? []);
 
-    const memberIds = new Set(((teamRes.data as any[]) ?? []).map((r) => r.user_id));
-    const wsMembers = (workspaceMembersRes.data as any[]) ?? [];
-    setTeam(
-      wsMembers
-        .filter((m) => memberIds.has(m.user_id))
-        .map((m) => ({ user_id: m.user_id, label: m.display_name || m.role || "Team member" }))
-    );
+    const memberIds = Array.from(new Set(((teamRes.data as any[]) ?? []).map((r) => r.user_id as string)));
+    const memberNames = await getStaffNames(memberIds);
+    setTeam(memberIds.map((userId) => ({ user_id: userId, label: memberNames.get(userId) ?? "Team member" })));
 
     const tagIds = new Set(((tagAssignmentsRes.data as any[]) ?? []).map((r) => r.tag_id));
     setTags(((workspaceTagsRes.data as ClientTag[]) ?? []).filter((t) => tagIds.has(t.id)));
