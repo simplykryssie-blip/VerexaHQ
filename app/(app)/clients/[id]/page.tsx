@@ -52,7 +52,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
-import NewServiceModal from "@/components/NewServiceModal";
+import EditEngagementModal from "@/components/EditEngagementModal";
 import ActivateServiceModal from "@/components/ActivateServiceModal";
 import ClientModal from "@/components/ClientModal";
 import ContactDetailModal from "@/components/ContactDetailModal";
@@ -294,7 +294,13 @@ export default function ClientDetailPage() {
   const { showSuccess, showError } = useToast();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
-  const [editingService, setEditingService] = useState<Service | null>(null);
+  // NewServiceModal (which used to open here) updated a per-client `services`
+  // row that doesn't exist on the live schema -- a client's service is a real
+  // `engagements` row instead (client_id, service_id, workflow_id,
+  // current_stage, priority, etc.), so "Edit" now opens EditEngagementModal
+  // against the engagement id looked up via serviceEngagements, not the
+  // service id itself.
+  const [editingEngagementId, setEditingEngagementId] = useState<string | null>(null);
   const [contactActionError, setContactActionError] = useState<string | null>(null);
   const [removeContactTarget, setRemoveContactTarget] = useState<LinkedContact | null>(null);
   const [removingContact, setRemovingContact] = useState(false);
@@ -712,7 +718,7 @@ export default function ClientDetailPage() {
               ) : (
                 <div className="divide-y divide-line">
                   {services.slice(0, 4).map((s) => (
-                    <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                    <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => { const engId = serviceEngagements.get(s.id); if (engId) setEditingEngagementId(engId); }} />
                   ))}
                 </div>
               )}
@@ -860,7 +866,7 @@ export default function ClientDetailPage() {
             ) : (
               <div className="divide-y divide-line">
                 {services.map((s) => (
-                  <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                  <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => { const engId = serviceEngagements.get(s.id); if (engId) setEditingEngagementId(engId); }} />
                 ))}
               </div>
             )}
@@ -1268,8 +1274,8 @@ export default function ClientDetailPage() {
           onActivated={handleServiceActivated}
         />
       )}
-      {editingService && (
-        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={refresh} onDeleted={refresh} />
+      {editingEngagementId && (
+        <EditEngagementModal engagementId={editingEngagementId} onClose={() => setEditingEngagementId(null)} onSaved={refresh} />
       )}
       {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={refresh} />}
       <ConfirmDialog

@@ -5,7 +5,6 @@ import { Plus, Pencil } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Pipeline, PipelineStage, Service, Client } from "@/lib/types";
 import NewPipelineModal from "@/components/NewPipelineModal";
-import NewServiceModal from "@/components/NewServiceModal";
 
 import { friendlyError } from "@/lib/friendlyError";
 type ServiceWithClient = Service & { clientName: string };
@@ -18,8 +17,6 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPipelineModal, setShowPipelineModal] = useState(false);
-  const [showServiceModal, setShowServiceModal] = useState(false);
-  const [editingService, setEditingService] = useState<ServiceWithClient | null>(null);
 
   async function loadPipelines() {
     const { data, error } = await supabase
@@ -159,8 +156,9 @@ export default function PipelinePage() {
           </button>
           {pipelines.length > 0 && (
             <button
-              onClick={() => setShowServiceModal(true)}
-              className="flex items-center gap-1.5 bg-ink text-white text-xs font-semibold px-3 py-1.5 rounded-sm hover:bg-[#14273A] transition-colors"
+              disabled
+              title="Retired: NewServiceModal updated a per-client services row that doesn't exist live. Activate a service from a client's profile instead."
+              className="flex cursor-not-allowed items-center gap-1.5 bg-paper text-muted text-xs font-semibold px-3 py-1.5 rounded-sm border border-line"
             >
               <Plus size={13} /> Service
             </button>
@@ -172,12 +170,6 @@ export default function PipelinePage() {
         <NewPipelineModal
           onClose={() => setShowPipelineModal(false)}
           onCreated={loadPipelines}
-        />
-      )}
-      {showServiceModal && (
-        <NewServiceModal
-          onClose={() => setShowServiceModal(false)}
-          onSaved={loadBoard}
         />
       )}
 
@@ -250,8 +242,9 @@ export default function PipelinePage() {
                         {svc.clientName}
                       </div>
                       <button
-                        onClick={() => setEditingService(svc)}
-                        className="text-muted hover:text-ink"
+                        disabled
+                        title="Retired: NewServiceModal updated a per-client services row that doesn't exist live. Edit this from the client's profile instead."
+                        className="cursor-not-allowed text-line"
                         aria-label="Edit service"
                       >
                         <Pencil size={12} />
@@ -284,14 +277,6 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {editingService && (
-        <NewServiceModal
-          service={editingService}
-          onClose={() => setEditingService(null)}
-          onSaved={loadBoard}
-          onDeleted={loadBoard}
-        />
-      )}
     </div>
   );
 }
