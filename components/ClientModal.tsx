@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { Client } from "@/lib/types";
@@ -8,6 +8,7 @@ import { clientDisplayName } from "@/lib/clientDisplay";
 import { useWorkspace } from "@/components/WorkspaceProvider";
 import { maskZip } from "@/lib/organizerFormat";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { listActiveStaff, type StaffOption } from "@/lib/workspaceMembers";
 
 // create_client only accepts client_type = individual | business (the live
 // clients_client_type_check also allows trust/estate/organization, but
@@ -127,7 +128,6 @@ export default function ClientModal({
   const { activeWorkspaceId } = useWorkspace();
   const isEditing = !!client;
   const workspaceId = client?.workspace_id ?? activeWorkspaceId;
-  const isEditingBusiness = client?.client_type === "business";
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -149,10 +149,18 @@ export default function ClientModal({
     state: client?.state ?? "",
     postal_code: client?.postal_code ?? "",
     lifecycle_status: client?.lifecycle_status || "lead",
+    relationship_manager_id: client?.relationship_manager_id ?? "",
+    default_reviewer_id: client?.default_reviewer_id ?? "",
+    default_compliance_officer_id: client?.default_compliance_officer_id ?? "",
   });
 
+  const [staff, setStaff] = useState<StaffOption[]>([]);
+  useEffect(() => {
+    if (!workspaceId) return;
+    listActiveStaff(workspaceId).then(setStaff);
+  }, [workspaceId]);
+
   const isEntity = form.client_type === "business";
-  const identityType = isEntity ? "ein" : "ssn";
   const identityLabel = isEntity ? "EIN" : "SSN";
   const existingLast4 = isEntity ? client?.ein_last4 : client?.ssn_last4;
 
@@ -282,6 +290,9 @@ export default function ClientModal({
       city: form.city || null,
       state: form.state || null,
       postal_code: form.postal_code || null,
+      relationship_manager_id: form.relationship_manager_id || null,
+      default_reviewer_id: form.default_reviewer_id || null,
+      default_compliance_officer_id: form.default_compliance_officer_id || null,
     };
     if (isEditing) {
       updatePayload.first_name = isEntity ? null : form.first_name;
@@ -452,6 +463,29 @@ export default function ClientModal({
                     className="client-input w-1/2"
                   />
                 </div>
+              </div>
+            </Section>
+
+            <Section label="Team assignment">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <StaffSelect
+                  label="Relationship manager"
+                  value={form.relationship_manager_id}
+                  staff={staff}
+                  onChange={(id) => setForm({ ...form, relationship_manager_id: id })}
+                />
+                <StaffSelect
+                  label="Default reviewer"
+                  value={form.default_reviewer_id}
+                  staff={staff}
+                  onChange={(id) => setForm({ ...form, default_reviewer_id: id })}
+                />
+                <StaffSelect
+                  label="Compliance officer"
+                  value={form.default_compliance_officer_id}
+                  staff={staff}
+                  onChange={(id) => setForm({ ...form, default_compliance_officer_id: id })}
+                />
               </div>
             </Section>
 
@@ -629,5 +663,31 @@ function Section({ label, children }: { label: string; children: React.ReactNode
       <div className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">{label}</div>
       {children}
     </div>
+  );
+}
+
+function StaffSelect({
+  label,
+  value,
+  staff,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  staff: StaffOption[];
+  onChange: (id: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs text-muted">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="client-input mt-1 w-full">
+        <option value="">Unassigned</option>
+        {staff.map((s) => (
+          <option key={s.userId} value={s.userId}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
