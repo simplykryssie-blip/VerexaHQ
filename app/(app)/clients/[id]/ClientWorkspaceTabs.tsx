@@ -7,10 +7,12 @@ import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanForm";
 import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
+import { AddRelationshipForm, RelationshipsList } from "./RelationshipsSection";
+import { ClientAssignmentForm } from "./ClientAssignmentForm";
+import { AddAppointmentForm } from "./AddAppointmentForm";
 import {
   AddContactForm,
   AddAddressForm,
-  AddRelationshipForm,
   AddPortalUserForm,
   AddNoteForm,
 } from "./AddForms";
@@ -50,21 +52,37 @@ function money(n: number | null | undefined) {
 
 // ---------------------------------------------------------------- Overview
 
+function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
+  if (c.client_type === "business" && c.business_name) return c.business_name;
+  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
+}
+
 export function OverviewTab({
   client,
+  workspaceId,
+  contacts,
+  addresses,
+  portalUsers,
+  relationships,
+  staffOptions,
+  accountHolder,
   engagements,
   tasks,
-  timeline,
+  appointments,
   invoices,
   notes,
   outstandingBalance,
-  requestedDocumentCount,
-  documentsCount,
   organizerResponses,
+  onCreateInvoice,
+  onShowNotes,
+  onCreateNote,
 }: {
   client: {
     id: string;
     client_type: string;
+    first_name: string | null;
+    last_name: string | null;
+    business_name: string | null;
     primary_email: string | null;
     primary_phone: string | null;
     address_line1: string | null;
@@ -73,41 +91,49 @@ export function OverviewTab({
     ssn_last4: string | null;
     ein_last4: string | null;
     itin_last4: string | null;
+    date_of_birth: string | null;
+    relationship_manager: ClientHeaderInfo["relationship_manager"];
+    default_reviewer: ClientHeaderInfo["default_reviewer"];
+    default_compliance_officer: ClientHeaderInfo["default_compliance_officer"];
   };
+  workspaceId: string;
+  contacts: ContactRow[];
+  addresses: AddressRow[];
+  portalUsers: PortalUserRow[];
+  relationships: RelationshipRow[];
+  staffOptions: StaffOption[];
+  accountHolder: { id: string; display_name: string | null } | null;
   engagements: EngagementRow[];
   tasks: TaskRow[];
-  timeline: ActivityRow[];
+  appointments: AppointmentRow[];
   invoices: InvoiceRow[];
   notes: NoteRow[];
   outstandingBalance: number;
-  requestedDocumentCount: number;
-  documentsCount: number;
   organizerResponses: OrganizerResponseRow[];
+  onCreateInvoice: () => void;
+  onShowNotes: () => void;
+  onCreateNote: () => void;
 }) {
+  const portalByEmail = new Map(portalUsers.filter((p) => p.invited_email).map((p) => [p.invited_email.toLowerCase(), p]));
+  const matchedPortalIds = new Set(
+    contacts.map((c) => (c.email ? portalByEmail.get(c.email.toLowerCase())?.id : undefined)).filter((id): id is string => Boolean(id))
+  );
+  const unmatchedPortalUsers = portalUsers.filter((p) => !matchedPortalIds.has(p.id));
+
   const openEngagements = engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived");
   const openTasks = tasks.filter((t) => t.status !== "completed");
-  const upcomingDeadlines = [
-    ...engagements.filter((e) => e.due_date).map((e) => ({ label: e.engagement_number ?? "Engagement", date: e.due_date as string })),
-    ...tasks.filter((t) => t.due_date).map((t) => ({ label: t.title, date: t.due_date as string })),
+  const upcomingItems = [
+    ...appointments.map((a) => ({ label: a.title, date: a.start_at, kind: "Appointment" })),
+    ...tasks.filter((t) => t.due_date).map((t) => ({ label: t.title, date: t.due_date as string, kind: "Task" })),
+    ...engagements.filter((e) => e.due_date).map((e) => ({ label: e.engagement_number ?? "Engagement", date: e.due_date as string, kind: "Deadline" })),
   ]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .slice(0, 5);
+    .slice(0, 6);
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
-  const missingDocuments = Math.max(requestedDocumentCount - documentsCount, 0);
+  const recentNotes = [...notes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
 
   return (
     <div className="space-y-6">
-      <Section title="Summary">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-          <Field label="Primary email" value={client.primary_email} />
-          <Field label="Primary phone" value={client.primary_phone} />
-          <Field label="Address" value={[client.address_line1, client.city, client.state].filter(Boolean).join(", ") || null} />
-        </dl>
-        <p className="mt-3 text-xs text-muted">
-          SSN/EIN/ITIN and date of birth are on the <span className="font-medium text-slate">Contacts</span> tab.
-        </p>
-      </Section>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-surface p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Current engagements</p>
@@ -123,35 +149,143 @@ export function OverviewTab({
         </div>
       </div>
 
-      <Section title="Upcoming deadlines">
-        {upcomingDeadlines.length === 0 ? (
-          <EmptyState message="No upcoming deadlines." />
+      <Section title="Identifying info">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+          <Field label="Name" value={clientDisplayName(client)} />
+          <Field label="Primary email" value={client.primary_email} />
+          <Field label="Primary phone" value={client.primary_phone} />
+          {client.client_type === "individual" ? (
+            <>
+              <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
+              <TaxIdReveal clientId={client.id} kind="itin" last4={client.itin_last4} />
+            </>
+          ) : (
+            <TaxIdReveal clientId={client.id} kind="ein" last4={client.ein_last4} />
+          )}
+          <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
+        </dl>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <ClientAssignmentForm
+            clientId={client.id}
+            relationshipManager={client.relationship_manager}
+            defaultReviewer={client.default_reviewer}
+            defaultComplianceOfficer={client.default_compliance_officer}
+            accountHolder={accountHolder}
+            staffOptions={staffOptions}
+          />
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Contacts</h3>
+            <AddContactForm clientId={client.id} workspaceId={workspaceId} />
+          </div>
+          {contacts.length === 0 ? (
+            <EmptyState message="No contacts yet." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {contacts.map((c) => {
+                const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+                const portal = c.email ? portalByEmail.get(c.email.toLowerCase()) : undefined;
+                return (
+                  <li key={c.id} className="py-3 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-medium text-slate">
+                        {name || "Unnamed contact"}
+                        {c.title && <span className="ml-2 text-xs font-normal text-muted">{c.title}</span>}
+                        {c.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                      </span>
+                      {portal ? (
+                        <span className="text-xs capitalize text-muted">Portal: {portal.status}</span>
+                      ) : c.email ? (
+                        <InviteContactToPortalButton clientId={client.id} workspaceId={workspaceId} name={name} email={c.email} />
+                      ) : null}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
+                      {c.email && <span>{c.email}</span>}
+                      {c.phone && <span>{c.phone}</span>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {unmatchedPortalUsers.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-1 flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Other portal invites</h4>
+                <AddPortalUserForm clientId={client.id} workspaceId={workspaceId} />
+              </div>
+              <ul className="divide-y divide-border">
+                {unmatchedPortalUsers.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between py-2 text-sm">
+                    <span className="text-slate">
+                      {p.invited_name ?? p.invited_email}
+                      {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                    </span>
+                    <span className="capitalize text-muted">{p.status}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
+            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
+          </div>
+          {addresses.length === 0 ? (
+            <EmptyState message="No additional addresses." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {addresses.map((a) => (
+                <li key={a.id} className="py-2 text-sm text-slate">
+                  <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
+                  {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Relationships</h3>
+            <AddRelationshipForm clientId={client.id} workspaceId={workspaceId} />
+          </div>
+          <RelationshipsList relationships={relationships} />
+        </div>
+      </Section>
+
+      <Section
+        title="Engagements"
+        action={
+          <Link href={`/engagements/new?clientId=${client.id}`} className="text-xs font-medium text-accent hover:underline">
+            + Add Engagement
+          </Link>
+        }
+      >
+        {engagements.length === 0 ? (
+          <EmptyState message="No engagements yet." />
         ) : (
           <ul className="divide-y divide-border">
-            {upcomingDeadlines.map((d, i) => (
-              <li key={i} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{d.label}</span>
-                <span className="text-muted">{new Date(d.date).toLocaleDateString()}</span>
+            {engagements.map((e) => (
+              <li key={e.id} className="flex items-center justify-between py-2 text-sm">
+                <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
+                  {e.engagement_number ?? "Engagement"}
+                </Link>
+                <span className="text-slate">{e.status}</span>
               </li>
             ))}
           </ul>
         )}
       </Section>
 
-      <Section title="Missing documents">
-        {missingDocuments === 0 ? (
-          <EmptyState message="Nothing outstanding." />
-        ) : (
-          <p className="py-2 text-sm text-slate">
-            ~{missingDocuments} document{missingDocuments === 1 ? "" : "s"} still requested but not yet uploaded.
-          </p>
-        )}
-      </Section>
-
-      <Section title="Organizers">
-        {organizerResponses.length === 0 ? (
-          <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
-        ) : (
+      {organizerResponses.length > 0 && (
+        <Section title="Organizers">
           <ul className="divide-y divide-border">
             {organizerResponses.map((o) => (
               <li key={o.id} className="flex items-center justify-between py-2 text-sm">
@@ -163,14 +297,31 @@ export function OverviewTab({
               </li>
             ))}
           </ul>
+        </Section>
+      )}
+
+      <Section title="Upcoming" action={<AddAppointmentForm clientId={client.id} workspaceId={workspaceId} />}>
+        {upcomingItems.length === 0 ? (
+          <EmptyState message="Nothing upcoming." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {upcomingItems.map((d, i) => (
+              <li key={i} className="flex items-center justify-between py-2 text-sm">
+                <span className="text-slate">
+                  <span className="mr-2 text-xs uppercase tracking-wide text-muted">{d.kind}</span>
+                  {d.label}
+                </span>
+                <span className="text-muted">{new Date(d.date).toLocaleDateString()}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </Section>
 
-      <Section title="Outstanding invoices">
-        {outstandingInvoices.length === 0 ? (
-          <EmptyState message="No outstanding invoices." />
-        ) : (
-          <ul className="divide-y divide-border">
+      <Section title="Billing" action={<button type="button" onClick={onCreateInvoice} className="text-xs font-medium text-accent hover:underline">+ Create Invoice</button>}>
+        <p className="text-sm text-slate">Outstanding balance: <span className="font-semibold text-ink">{money(outstandingBalance)}</span></p>
+        {outstandingInvoices.length > 0 && (
+          <ul className="mt-2 divide-y divide-border">
             {outstandingInvoices.map((i) => (
               <li key={i.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
@@ -183,179 +334,30 @@ export function OverviewTab({
         )}
       </Section>
 
-      <Section title="Recent activity">
-        {timeline.length === 0 ? (
-          <EmptyState message="No activity recorded yet." />
-        ) : (
-          <ul className="space-y-2">
-            {timeline.slice(0, 8).map((a) => (
-              <li key={a.id} className="flex items-center justify-between text-sm">
-                <span className="text-slate">{a.description}</span>
-                <span className="text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-
-      <Section title="Recent messages" action={undefined}>
-        {notes.length === 0 ? (
+      <Section
+        title="Notes"
+        action={
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onShowNotes} className="text-xs font-medium text-accent hover:underline">Show more</button>
+            <button type="button" onClick={onCreateNote} className="text-xs font-medium text-accent hover:underline">+ Create a note</button>
+          </div>
+        }
+      >
+        {recentNotes.length === 0 ? (
           <EmptyState message="No notes yet." />
         ) : (
           <ul className="space-y-2">
-            {notes.slice(0, 3).map((n) => (
+            {recentNotes.map((n) => (
               <li key={n.id} className="text-sm text-slate">
+                {n.subject && <span className="font-semibold text-ink">{n.subject}: </span>}
                 {n.body}
+                <span className="ml-2 text-xs text-muted">{new Date(n.created_at).toLocaleDateString()}</span>
               </li>
             ))}
           </ul>
         )}
       </Section>
     </div>
-  );
-}
-
-// ---------------------------------------------------------------- Contacts
-
-export function ContactsTab({
-  client,
-  workspaceId,
-  contacts,
-  addresses,
-  portalUsers,
-}: {
-  client: {
-    id: string;
-    client_type: string;
-    ssn_last4: string | null;
-    ein_last4: string | null;
-    itin_last4: string | null;
-    date_of_birth: string | null;
-  };
-  workspaceId: string;
-  contacts: ContactRow[];
-  addresses: AddressRow[];
-  portalUsers: PortalUserRow[];
-}) {
-  const portalByEmail = new Map(
-    portalUsers.filter((p) => p.invited_email).map((p) => [p.invited_email.toLowerCase(), p])
-  );
-  const matchedPortalIds = new Set(
-    contacts
-      .map((c) => (c.email ? portalByEmail.get(c.email.toLowerCase())?.id : undefined))
-      .filter((id): id is string => Boolean(id))
-  );
-  const unmatchedPortalUsers = portalUsers.filter((p) => !matchedPortalIds.has(p.id));
-
-  return (
-    <div className="space-y-6">
-      <Section title="Identity">
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-          {client.client_type === "individual" ? (
-            <>
-              <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
-              <TaxIdReveal clientId={client.id} kind="itin" last4={client.itin_last4} />
-            </>
-          ) : (
-            <TaxIdReveal clientId={client.id} kind="ein" last4={client.ein_last4} />
-          )}
-          <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
-        </dl>
-      </Section>
-
-      <Section title="Contacts" action={<AddContactForm clientId={client.id} workspaceId={workspaceId} />}>
-        {contacts.length === 0 ? (
-          <EmptyState message="No contacts yet." />
-        ) : (
-          <ul className="divide-y divide-border">
-            {contacts.map((c) => {
-              const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
-              const portal = c.email ? portalByEmail.get(c.email.toLowerCase()) : undefined;
-              return (
-                <li key={c.id} className="py-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium text-slate">
-                      {name || "Unnamed contact"}
-                      {c.title && <span className="ml-2 text-xs font-normal text-muted">{c.title}</span>}
-                      {c.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                    </span>
-                    {portal ? (
-                      <span className="text-xs capitalize text-muted">Portal: {portal.status}</span>
-                    ) : c.email ? (
-                      <InviteContactToPortalButton clientId={client.id} workspaceId={workspaceId} name={name} email={c.email} />
-                    ) : null}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
-                    {c.email && <span>{c.email}</span>}
-                    {c.phone && <span>{c.phone}</span>}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Section>
-
-      {unmatchedPortalUsers.length > 0 && (
-        <Section title="Other portal invites" action={<AddPortalUserForm clientId={client.id} workspaceId={workspaceId} />}>
-          <ul className="divide-y divide-border">
-            {unmatchedPortalUsers.map((p) => (
-              <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">
-                  {p.invited_name ?? p.invited_email}
-                  {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                </span>
-                <span className="capitalize text-muted">{p.status}</span>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      <Section title="Addresses" action={<AddAddressForm clientId={client.id} workspaceId={workspaceId} />}>
-        {addresses.length === 0 ? (
-          <EmptyState message="No additional addresses." />
-        ) : (
-          <ul className="divide-y divide-border">
-            {addresses.map((a) => (
-              <li key={a.id} className="py-2 text-sm text-slate">
-                <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
-    </div>
-  );
-}
-
-// ----------------------------------------------------------- Relationships
-
-export function RelationshipsTab({
-  clientId,
-  workspaceId,
-  relationships,
-}: {
-  clientId: string;
-  workspaceId: string;
-  relationships: RelationshipRow[];
-}) {
-  return (
-    <Section title="Relationships" action={<AddRelationshipForm clientId={clientId} workspaceId={workspaceId} />}>
-      {relationships.length === 0 ? (
-        <EmptyState message="No relationships recorded." />
-      ) : (
-        <ul className="divide-y divide-border">
-          {relationships.map((r) => (
-            <li key={r.id} className="py-2 text-sm text-slate">
-              <span className="mr-2 capitalize text-muted">{r.relationship_type}:</span>
-              {r.related_name ?? r.related_client_id}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
   );
 }
 
@@ -622,7 +624,14 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
 export type ContactRow = { id: string; first_name: string | null; last_name: string | null; title: string | null; email: string | null; phone: string | null; is_primary: boolean };
 export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null };
 export type PortalUserRow = { id: string; invited_name: string | null; invited_email: string; is_primary: boolean; status: string };
-export type RelationshipRow = { id: string; relationship_type: string; related_name: string | null; related_client_id: string | null };
+export type RelationshipRow = {
+  id: string;
+  relationship_type: string;
+  related_name: string | null;
+  related_client_id: string | null;
+  related_dob: string | null;
+  related_ssn_last4: string | null;
+};
 export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string };
@@ -632,6 +641,7 @@ export type PaymentRow = { id: string; status: string; amount: number; payment_d
 export type MessageThreadRow = { id: string; subject: string | null; channel: string };
 export type MessageRow = { id: string; thread_id: string; body: string; is_internal: boolean; created_at: string };
 type StaffRef = { id: string; display_name: string | null } | null;
+export type StaffOption = { id: string; display_name: string | null };
 export type EngagementRow = {
   id: string;
   engagement_number: string | null;
@@ -644,3 +654,4 @@ export type EngagementRow = {
 };
 export type ClientHeaderInfo = { relationship_manager: StaffRef; default_reviewer: StaffRef; default_compliance_officer: StaffRef };
 export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };
+export type AppointmentRow = { id: string; title: string; start_at: string; location: string | null };

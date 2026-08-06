@@ -9,8 +9,6 @@ import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import {
   OverviewTab,
-  ContactsTab,
-  RelationshipsTab,
   EngagementsTab,
   MessagesTab,
   BillingTab,
@@ -30,6 +28,8 @@ import {
   type EngagementRow,
   type ClientHeaderInfo,
   type OrganizerResponseRow,
+  type AppointmentRow,
+  type StaffOption,
 } from "./ClientWorkspaceTabs";
 
 type Workspace = { id: string; name: string };
@@ -62,8 +62,6 @@ type LedgerEntry = { id: string; balance_after: number; created_at: string };
 
 const TABS = [
   "Overview",
-  "Contacts",
-  "Relationships",
   "Engagements",
   "Documents",
   "Messages",
@@ -106,6 +104,9 @@ export function ClientWorkspace({
   organizerResponses,
   permissions,
   paymentPlansByInvoice,
+  appointments,
+  staffOptions,
+  accountHolder,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -134,6 +135,9 @@ export function ClientWorkspace({
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
   organizerResponses: OrganizerResponseRow[];
+  appointments: AppointmentRow[];
+  staffOptions: StaffOption[];
+  accountHolder: { id: string; display_name: string | null } | null;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
 
@@ -208,28 +212,24 @@ export function ClientWorkspace({
             {tab === "Overview" && (
               <OverviewTab
                 client={client}
-                engagements={engagements}
-                tasks={tasks}
-                timeline={timeline}
-                invoices={invoices}
-                notes={notes}
-                outstandingBalance={outstandingBalance}
-                requestedDocumentCount={requestedDocumentCount}
-                documentsCount={documents.length}
-                organizerResponses={organizerResponses}
-              />
-            )}
-            {tab === "Contacts" && (
-              <ContactsTab
-                client={client}
                 workspaceId={workspace.id}
                 contacts={contacts}
                 addresses={addresses}
                 portalUsers={portalUsers}
+                relationships={relationships}
+                staffOptions={staffOptions}
+                accountHolder={accountHolder}
+                engagements={engagements}
+                tasks={tasks}
+                appointments={appointments}
+                invoices={invoices}
+                notes={notes}
+                outstandingBalance={outstandingBalance}
+                organizerResponses={organizerResponses}
+                onCreateInvoice={() => setTab("Billing")}
+                onShowNotes={() => setTab("Notes")}
+                onCreateNote={() => setTab("Notes")}
               />
-            )}
-            {tab === "Relationships" && (
-              <RelationshipsTab clientId={client.id} workspaceId={workspace.id} relationships={relationships} />
             )}
             {tab === "Engagements" && <EngagementsTab engagements={engagements} client={client} />}
             {tab === "Documents" && (

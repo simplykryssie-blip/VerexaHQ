@@ -76,48 +76,6 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
   );
 }
 
-export function AddRelationshipForm({ clientId, workspaceId }: Ids) {
-  const router = useRouter();
-  const supabase = createClient();
-  return (
-    <InlineAddForm
-      label="Add Relationship"
-      fields={[
-        {
-          name: "relationship_type",
-          label: "Type",
-          type: "select",
-          required: true,
-          options: [
-            "spouse",
-            "dependent",
-            "parent",
-            "child",
-            "business",
-            "trust",
-            "estate",
-            "partner",
-            "owner",
-            "officer",
-            "other",
-          ].map((v) => ({ value: v, label: v[0].toUpperCase() + v.slice(1) })),
-        },
-        { name: "related_name", label: "Name", required: true },
-      ]}
-      onSubmit={async (v) => {
-        const { error } = await supabase.from("client_relationships").insert({
-          client_id: clientId,
-          workspace_id: workspaceId,
-          relationship_type: v.relationship_type,
-          related_name: v.related_name,
-        });
-        if (error) return error.message;
-        router.refresh();
-      }}
-    />
-  );
-}
-
 export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
   const router = useRouter();
   const supabase = createClient();

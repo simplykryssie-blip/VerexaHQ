@@ -39,6 +39,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: clientActivity },
     { data: documentFolders },
     { data: staffMembers },
+    { data: appointments },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -103,7 +104,22 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .select("user_id, user_profiles(id, display_name)")
       .eq("workspace_id", workspace.id)
       .eq("status", "active"),
+    supabase
+      .from("appointments")
+      .select("id, title, start_at, location")
+      .eq("client_id", client.id)
+      .gte("start_at", new Date().toISOString())
+      .order("start_at", { ascending: true })
+      .limit(5),
   ]);
+
+  const { data: ownerRow } = await supabase
+    .from("workspace_users")
+    .select("user_id, user_profiles(id, display_name)")
+    .eq("workspace_id", workspace.id)
+    .eq("is_owner", true)
+    .maybeSingle();
+  const accountHolder = (ownerRow as any)?.user_profiles ?? null;
 
   const invoiceIds = (invoices ?? []).map((i) => i.id);
   const { data: paymentPlanRows } =
@@ -169,6 +185,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
       .map((p: any) => [p.id, p])
   );
+  const staffOptions = Array.from(staffById.values());
 
   const documentsWithUploader = (documents ?? []).map((d: any) => ({
     ...d,
@@ -296,6 +313,9 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       }))}
       documentRequestTemplates={documentRequestTemplates ?? []}
       paymentPlansByInvoice={paymentPlansByInvoice}
+      appointments={appointments ?? []}
+      staffOptions={staffOptions}
+      accountHolder={accountHolder}
     />
   );
 }

@@ -1211,7 +1211,10 @@ export type Database = {
           id: string
           notes: string | null
           related_client_id: string | null
+          related_dob: string | null
           related_name: string | null
+          related_ssn_encrypted: string | null
+          related_ssn_last4: string | null
           relationship_type: string
           updated_at: string
           workspace_id: string
@@ -1223,7 +1226,10 @@ export type Database = {
           id?: string
           notes?: string | null
           related_client_id?: string | null
+          related_dob?: string | null
           related_name?: string | null
+          related_ssn_encrypted?: string | null
+          related_ssn_last4?: string | null
           relationship_type: string
           updated_at?: string
           workspace_id: string
@@ -1235,7 +1241,10 @@ export type Database = {
           id?: string
           notes?: string | null
           related_client_id?: string | null
+          related_dob?: string | null
           related_name?: string | null
+          related_ssn_encrypted?: string | null
+          related_ssn_last4?: string | null
           relationship_type?: string
           updated_at?: string
           workspace_id?: string
@@ -6759,6 +6768,18 @@ export type Database = {
         }
         Returns: Json
       }
+      create_client_relationship: {
+        Args: {
+          p_client_id: string
+          p_related_client_id?: string
+          p_related_dob?: string
+          p_related_name: string
+          p_related_ssn?: string
+          p_relationship_type: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       create_document_request: {
         Args: {
           p_due_date?: string
@@ -7047,6 +7068,7 @@ export type Database = {
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
       reveal_client_itin: { Args: { p_client_id: string }; Returns: string }
+      reveal_client_relationship_ssn: { Args: { p_relationship_id: string }; Returns: string }
       reveal_client_ssn: { Args: { p_client_id: string }; Returns: string }
       reveal_firm_efin: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ein: { Args: { p_workspace_id: string }; Returns: string }
