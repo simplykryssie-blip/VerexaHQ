@@ -1,7 +1,14 @@
+// NOTE: address/city/state/zip_code/status/email/phone/account_type/
+// account_name/middle_name/assigned_to/source below do NOT exist on the
+// live `clients` table -- kept here only because other, still-unfixed
+// files in this codebase read them (see the VerexaHQ PR history). New code
+// should use the *_line1/postal_code/lifecycle_status/primary_email/
+// primary_phone fields added below instead, which match the live schema
+// (confirmed directly against daxpavvsotvsyqqntddc).
 export type Client = {
   id: string;
   workspace_id: string;
-  client_type: "individual" | "business" | "family" | string;
+  client_type: "individual" | "business" | "trust" | "estate" | "organization" | string;
   account_type:
     | "individual"
     | "household"
@@ -30,6 +37,22 @@ export type Client = {
   account_name: string | null;
   middle_name: string | null;
   occupation: string | null;
+  // Live columns (confirmed against daxpavvsotvsyqqntddc):
+  lifecycle_status: "lead" | "consult_scheduled" | "proposal_sent" | "active" | "inactive" | "archived" | string;
+  primary_email: string | null;
+  primary_phone: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  postal_code: string | null;
+  country: string | null;
+  has_portal_access: boolean;
+  ssn_last4: string | null;
+  ein_last4: string | null;
+  itin_last4: string | null;
+  relationship_manager_id: string | null;
+  default_reviewer_id: string | null;
+  default_compliance_officer_id: string | null;
+  notes: string | null;
 };
 
 export type Contact = {

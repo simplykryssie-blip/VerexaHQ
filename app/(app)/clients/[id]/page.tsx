@@ -1206,7 +1206,13 @@ export default function ClientDetailPage() {
 
       {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={refresh} onDeleted={() => router.push("/clients")} />}
       {showAddContactModal && (
-        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={refresh} />
+        // NOTE: this used to jump ClientModal straight to a "link an
+        // existing contact" step (initialStep/initialContactMode props),
+        // which was removed along with the rest of the contacts/
+        // account_contacts linking flow -- neither table exists live. This
+        // whole Contacts card (below) still reads from account_contacts
+        // and is independently broken; flagged, not fixed, in this pass.
+        <ClientModal client={client} onClose={() => setShowAddContactModal(false)} onSaved={refresh} />
       )}
       {viewingContact && viewingContact.link.contacts && (
         <ContactDetailModal
