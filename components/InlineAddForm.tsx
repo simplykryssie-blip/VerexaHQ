@@ -15,12 +15,14 @@ export function InlineAddForm({
   label,
   fields,
   onSubmit,
+  defaultOpen = false,
 }: {
   label: string;
   fields: FieldDef[];
   onSubmit: (values: Record<string, string>) => Promise<string | void>;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [values, setValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

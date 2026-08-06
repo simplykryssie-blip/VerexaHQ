@@ -68,7 +68,23 @@ export default async function UsersPage() {
         )}
       </div>
 
-      {workspace.is_owner && (
+      {workspace.is_owner && workspace.workspace_type === "independent_ptin" && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
+          <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>
+          <div className="mt-3 rounded-xl border border-border bg-surfaceMuted p-5 opacity-60">
+            <div className="pointer-events-none">
+              <InviteStaffForm roles={roles ?? []} />
+            </div>
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            Independent PTIN workspaces are solo accounts and can&apos;t add staff. Upgrade to an ERO Office or Service
+            Bureau workspace to invite team members.
+          </p>
+        </div>
+      )}
+
+      {workspace.is_owner && workspace.workspace_type !== "independent_ptin" && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
           <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>

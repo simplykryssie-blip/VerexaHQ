@@ -17,7 +17,14 @@ export function TemplateStatusCycle({
   id,
   status,
 }: {
-  table: "email_templates" | "sms_templates" | "engagement_letter_templates" | "services" | "pricing_rules" | "billing_rules";
+  table:
+    | "email_templates"
+    | "sms_templates"
+    | "engagement_letter_templates"
+    | "services"
+    | "pricing_rules"
+    | "billing_rules"
+    | "organizer_templates";
   id: string;
   status: string;
 }) {

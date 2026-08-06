@@ -11,6 +11,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  if (workspace.workspace_type === "independent_ptin") {
+    return NextResponse.json(
+      { error: "Independent PTIN workspaces can't add staff. Upgrade to an ERO Office or Service Bureau to invite team members." },
+      { status: 403 }
+    );
+  }
+
   const allowed = await checkRateLimit(`invitations:${workspace.id}`, 10, 60);
   if (!allowed) {
     return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });

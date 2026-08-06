@@ -219,6 +219,7 @@ export function QuickActions({
           ) : (
             <InlineAddForm
               label="Send request"
+              defaultOpen
               fields={[
                 {
                   name: "template_id",
@@ -282,6 +283,7 @@ export function QuickActions({
           ) : (
             <InlineAddForm
               label="Send"
+              defaultOpen
               fields={[
                 {
                   name: "organizer_template_id",
@@ -357,6 +359,7 @@ export function QuickActions({
         <Modal title="Add note" onClose={() => setModal(null)}>
           <InlineAddForm
             label="Save"
+            defaultOpen
             fields={[{ name: "body", label: "Note", required: true }]}
             onSubmit={async (v) => {
               const {

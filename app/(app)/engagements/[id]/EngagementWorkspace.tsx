@@ -36,7 +36,7 @@ import {
   type OrganizerResponseRow,
 } from "./EngagementWorkspaceTabs";
 
-type Workspace = { id: string; name: string };
+type Workspace = { id: string; name: string; workspace_type: string };
 
 const TABS = [
   "Overview",
@@ -118,6 +118,7 @@ export function EngagementWorkspace({
   taxYears: number[];
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const showStaffRoles = workspace.workspace_type !== "independent_ptin";
 
   const client = engagement.clients;
   const reviewCount = stages.filter((s) => s.status === "Waiting" || s.status === "In Progress").length;
@@ -140,7 +141,7 @@ export function EngagementWorkspace({
             {engagement.engagement_types?.name && <span>{engagement.engagement_types.name}</span>}
             <span className="capitalize">{engagement.status}</span>
             <span>Assigned: {engagement.assigned_staff?.display_name ?? "Unassigned"}</span>
-            <span>Reviewer: {engagement.reviewer?.display_name ?? "Unassigned"}</span>
+            {showStaffRoles && <span>Reviewer: {engagement.reviewer?.display_name ?? "Unassigned"}</span>}
             {engagement.due_date && <span>Due {new Date(engagement.due_date).toLocaleDateString()}</span>}
           </div>
         }
@@ -190,6 +191,7 @@ export function EngagementWorkspace({
                 timeline={timeline}
                 staffOptions={staffOptions}
                 organizerResponses={organizerResponses}
+                showStaffRoles={showStaffRoles}
               />
             )}
             {tab === "Tax" && (

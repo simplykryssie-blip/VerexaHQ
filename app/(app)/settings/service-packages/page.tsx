@@ -4,6 +4,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
 import { CreatePricingRuleForm, CreateBillingRuleForm } from "@/components/settings/CreatePricingBillingRuleForms";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { ServiceEditRow } from "@/components/settings/ServiceEditRow";
+import { PricingRuleEditRow, BillingRuleEditRow } from "@/components/settings/RuleEditRow";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +33,16 @@ export default async function ServicePackagesPage() {
   ] = await Promise.all([
     supabase
       .from("services")
-      .select("id, name, slug, status, default_price, is_bookable, is_portal_visible, service_categories(name)")
+      .select(
+        `id, name, slug, status, default_price, is_bookable, is_portal_visible, workspace_id, service_categories(name),
+        service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_request_template_id,
+        document_folder_template_id, engagement_letter_template_id`
+      )
       .or(orFilter)
       .order("name"),
     supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
-    supabase.from("pricing_rules").select("id, name, status, pricing_method").or(orFilter).order("name"),
-    supabase.from("billing_rules").select("id, name, status, invoice_timing").or(orFilter).order("name"),
+    supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
+    supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
     supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
@@ -56,10 +62,8 @@ export default async function ServicePackagesPage() {
           <h3 className="text-sm font-semibold text-ink">Pricing rules</h3>
           <div className="mt-2 space-y-2">
             {(pricingRules ?? []).map((r) => (
-              <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-                <span className="text-slate">
-                  {r.name} <span className="text-xs text-muted">({r.pricing_method.replace(/_/g, " ")})</span>
-                </span>
+              <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                <PricingRuleEditRow rule={r} />
                 <TemplateStatusCycle table="pricing_rules" id={r.id} status={r.status} />
               </div>
             ))}
@@ -70,10 +74,8 @@ export default async function ServicePackagesPage() {
           <h3 className="text-sm font-semibold text-ink">Billing rules</h3>
           <div className="mt-2 space-y-2">
             {(billingRules ?? []).map((r) => (
-              <div key={r.id} className="flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-                <span className="text-slate">
-                  {r.name} <span className="text-xs text-muted">({r.invoice_timing.replace(/_/g, " ")})</span>
-                </span>
+              <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                <BillingRuleEditRow rule={r} />
                 <TemplateStatusCycle table="billing_rules" id={r.id} status={r.status} />
               </div>
             ))}
@@ -102,8 +104,17 @@ export default async function ServicePackagesPage() {
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {(services ?? []).map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-ink">{s.name}</p>
+                <div className="flex-1">
+                  <ServiceEditRow
+                    service={s as never}
+                    categories={categories ?? []}
+                    pricingRules={pricingRules ?? []}
+                    billingRules={billingRules ?? []}
+                    organizerTemplates={organizerTemplates ?? []}
+                    documentRequestTemplates={documentRequestTemplates ?? []}
+                    documentFolderTemplates={documentFolderTemplates ?? []}
+                    engagementLetterTemplates={engagementLetterTemplates ?? []}
+                  />
                   <p className="text-xs text-muted">
                     {(s.service_categories as unknown as { name?: string } | null)?.name ?? "Uncategorized"} -- {money(s.default_price)}
                     {s.is_bookable && " -- Bookable"}

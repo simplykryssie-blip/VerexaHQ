@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { renderEmail } from "@/lib/email/template";
 
 type EngagementTypeOption = { id: string; name: string };
 
@@ -37,33 +36,10 @@ export function NewClientButton({
   const [itin, setItin] = useState("");
   const [ein, setEin] = useState("");
   const [inviteToPortal, setInviteToPortal] = useState(false);
-  const [inviteSubject, setInviteSubject] = useState("You've been invited to your client portal");
-  const [inviteBody, setInviteBody] = useState(
-    `<p>You've been invited to access your client portal on ${workspaceName}.</p><p>Click below to accept the invitation and set up your account.</p>`
-  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const isBusiness = clientType === "business";
-
-  useEffect(() => {
-    if (!open) return;
-    supabase
-      .from("email_templates")
-      .select("subject, body_html, workspace_id")
-      .eq("slug", "portal-invite-email")
-      .eq("status", "published")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspaceId}`)
-      .order("workspace_id", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!data) return;
-        setInviteSubject(data.subject.replace(/\{\{\s*firm_name\s*\}\}/g, workspaceName));
-        setInviteBody(data.body_html.replace(/\{\{\s*firm_name\s*\}\}/g, workspaceName));
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
 
   function toggleService(id: string) {
     setServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -178,20 +154,16 @@ export function NewClientButton({
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
+      const invitedName = clientType === "individual" ? [firstName, lastName].filter(Boolean).join(" ") : `${contactFirstName} ${contactLastName}`;
 
-      await fetch("/api/email/send", {
+      await fetch("/api/portal-invitations/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          to: email,
-          sender: "portal",
-          subject: inviteSubject,
-          html: renderEmail({
-            heading: "You've been invited",
-            bodyHtml: inviteBody,
-            ctaLabel: "Accept invitation",
-            ctaUrl: acceptUrl,
-          }),
+          clientId: result.client_id,
+          invitedEmail: email,
+          invitedName,
+          acceptUrl,
         }),
       });
     }
@@ -392,22 +364,10 @@ export function NewClientButton({
                   Invite to client portal
                 </label>
                 {inviteToPortal && (
-                  <div className="mt-2 space-y-2">
-                    <input
-                      value={inviteSubject}
-                      onChange={(e) => setInviteSubject(e.target.value)}
-                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
-                    <textarea
-                      value={inviteBody}
-                      onChange={(e) => setInviteBody(e.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
-                    <p className="text-xs text-muted">
-                      This is your firm&apos;s default invite message (editable here just for this invite). Change the firm-wide default in Settings &gt; Templates.
-                    </p>
-                  </div>
+                  <p className="mt-2 text-xs text-muted">
+                    The client will receive your firm&apos;s Client Portal Invite email with a secure activation link.
+                    Edit the message in Settings &gt; Templates.
+                  </p>
                 )}
               </div>
 

@@ -73,6 +73,7 @@ export function OverviewTab({
   timeline,
   staffOptions,
   organizerResponses,
+  showStaffRoles = true,
 }: {
   engagement: EngagementRow;
   progress: ProgressRow | null;
@@ -81,6 +82,7 @@ export function OverviewTab({
   timeline: ActivityRow[];
   staffOptions: StaffOption[];
   organizerResponses: OrganizerResponseRow[];
+  showStaffRoles?: boolean;
 }) {
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
@@ -134,6 +136,7 @@ export function OverviewTab({
               : null,
           }}
           staffOptions={staffOptions}
+          showReviewAndCompliance={showStaffRoles}
         />
       </Section>
 

@@ -32,7 +32,7 @@ import {
   type StaffOption,
 } from "./ClientWorkspaceTabs";
 
-type Workspace = { id: string; name: string };
+type Workspace = { id: string; name: string; workspace_type: string };
 
 type ClientRow = {
   id: string;
@@ -140,6 +140,7 @@ export function ClientWorkspace({
   accountHolder: { id: string; display_name: string | null } | null;
 }) {
   const [tab, setTab] = useState<Tab>("Overview");
+  const showStaffRoles = workspace.workspace_type !== "independent_ptin";
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
   const primaryService = openEngagement
@@ -169,9 +170,13 @@ export function ClientWorkspace({
             <span className="capitalize">{client.client_type}</span>
             {primaryService && <span>{primaryService}</span>}
             <span className="capitalize">{client.lifecycle_status}</span>
-            <span>Relationship manager: {client.relationship_manager?.display_name ?? "Unassigned"}</span>
-            <span>Reviewer: {client.default_reviewer?.display_name ?? "Unassigned"}</span>
-            <span>Compliance: {client.default_compliance_officer?.display_name ?? "Unassigned"}</span>
+            {showStaffRoles && (
+              <>
+                <span>Relationship manager: {client.relationship_manager?.display_name ?? "Unassigned"}</span>
+                <span>Reviewer: {client.default_reviewer?.display_name ?? "Unassigned"}</span>
+                <span>Compliance: {client.default_compliance_officer?.display_name ?? "Unassigned"}</span>
+              </>
+            )}
             <span>Client since {new Date(client.created_at).toLocaleDateString()}</span>
             <span>Portal: {portalStatus}</span>
             {client.tags?.length > 0 && <span>Tags: {client.tags.join(", ")}</span>}
@@ -215,6 +220,7 @@ export function ClientWorkspace({
               <OverviewTab
                 client={client}
                 workspaceId={workspace.id}
+                showStaffRoles={showStaffRoles}
                 contacts={contacts}
                 addresses={addresses}
                 portalUsers={portalUsers}

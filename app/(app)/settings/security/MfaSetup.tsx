@@ -105,9 +105,12 @@ export function MfaSetup() {
         </div>
       ) : enrolling ? (
         <form onSubmit={confirmEnroll} className="space-y-3">
+          <p className="text-sm text-slate">
+            Scan this QR code with an authenticator app (Google Authenticator, Authy, 1Password).
+          </p>
           {qrCode && (
             <img
-              src={`data:image/svg+xml;utf-8,${encodeURIComponent(qrCode)}`}
+              src={qrCode}
               alt="Scan with your authenticator app"
               className="h-40 w-40 rounded-lg border border-border"
             />
@@ -119,6 +122,10 @@ export function MfaSetup() {
           )}
           <div>
             <label className="block text-sm font-medium text-slate">6-digit code</label>
+            <p className="text-xs text-muted">
+              After scanning, your authenticator app will display a new 6-digit code every 30 seconds. Enter the
+              current code from the app here -- it&apos;s not something you make up yourself.
+            </p>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}

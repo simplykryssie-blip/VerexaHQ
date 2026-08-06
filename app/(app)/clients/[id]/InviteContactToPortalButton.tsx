@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { renderEmail } from "@/lib/email/template";
 
 export function InviteContactToPortalButton({
   clientId,
@@ -38,19 +37,14 @@ export function InviteContactToPortalButton({
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
     const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
 
-    await fetch("/api/email/send", {
+    await fetch("/api/portal-invitations/send-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        to: email,
-        sender: "portal",
-        subject: "You've been invited to your client portal",
-        html: renderEmail({
-          heading: "You've been invited",
-          bodyHtml: `<p>You've been invited to access your client portal on VerexaHQ.</p><p>Click below to accept the invitation and set up your account.</p>`,
-          ctaLabel: "Accept invitation",
-          ctaUrl: acceptUrl,
-        }),
+        clientId,
+        invitedEmail: email,
+        invitedName: name,
+        acceptUrl,
       }),
     });
 

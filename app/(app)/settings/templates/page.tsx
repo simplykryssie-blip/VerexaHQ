@@ -4,6 +4,9 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
+import { CreateOrganizerTemplateForm } from "@/components/settings/CreateOrganizerTemplateForm";
+import { OrganizerTemplateRow } from "@/components/settings/OrganizerTemplateRow";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,7 @@ const TABS = [
   { key: "email", label: "Email" },
   { key: "sms", label: "SMS" },
   { key: "engagement-letter", label: "Engagement Letters" },
+  { key: "organizers", label: "Organizers" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -25,12 +29,23 @@ export default async function TemplatesPage({ searchParams }: { searchParams: { 
   const activeTab: TabKey = TABS.some((t) => t.key === searchParams.tab) ? (searchParams.tab as TabKey) : "email";
 
   const supabase = createClient();
+  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
+  const isOrganizers = activeTab === "organizers";
   const table = activeTab === "email" ? "email_templates" : activeTab === "sms" ? "sms_templates" : "engagement_letter_templates";
-  const { data: templates } = await supabase
-    .from(table)
-    .select("*")
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
-    .order("name");
+
+  const { data: templates } = isOrganizers
+    ? { data: null }
+    : await supabase.from(table).select("*").or(orFilter).order("name");
+
+  const { data: organizerTemplates } = isOrganizers
+    ? await supabase.from("organizer_templates").select("*").or(orFilter).order("name")
+    : { data: null };
+
+  const organizerTemplateIds = (organizerTemplates ?? []).map((t) => t.id);
+  const { data: organizerFields } =
+    isOrganizers && organizerTemplateIds.length > 0
+      ? await supabase.from("organizer_fields").select("*").in("organizer_template_id", organizerTemplateIds)
+      : { data: [] as { id: string; organizer_template_id: string; field_type: string; label: string; is_required: boolean; display_order: number; options: unknown }[] };
 
   const tabNav = (
     <nav className="flex gap-1 border-b border-border">
@@ -58,44 +73,88 @@ export default async function TemplatesPage({ searchParams }: { searchParams: { 
 
       <div className="mt-4">{tabNav}</div>
 
-      <div className="mt-4">
-        <CreateTemplateForm workspaceId={workspace.id} kind={activeTab === "engagement-letter" ? "engagement_letter" : activeTab} />
-      </div>
-
-      <div className="mt-4">
-        {(templates ?? []).length === 0 ? (
-          <EmptyState message="No templates yet." />
-        ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-            {(templates ?? []).map((t: any) => {
-              const bodyText = t.body_html ?? t.body ?? "";
-              const tokens = mergeFieldTokens(`${t.subject ?? ""} ${bodyText}`);
-              return (
-                <li key={t.id} className="px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-ink">
-                        {t.name} {!t.workspace_id && <span className="ml-1.5 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
-                      </p>
-                      <p className="text-xs text-muted">{t.slug}</p>
+      {isOrganizers ? (
+        <>
+          <p className="mt-2 text-sm text-muted">
+            Organizers are the questionnaires clients complete in their portal. Click one to view or edit its questions.
+          </p>
+          <div className="mt-4">
+            <CreateOrganizerTemplateForm workspaceId={workspace.id} />
+          </div>
+          <div className="mt-4">
+            {(organizerTemplates ?? []).length === 0 ? (
+              <EmptyState message="No organizers yet." />
+            ) : (
+              <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+                {(organizerTemplates ?? []).map((t) => (
+                  <li key={t.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <OrganizerTemplateRow
+                            template={t}
+                            fields={(organizerFields ?? []).filter((f) => f.organizer_template_id === t.id) as never}
+                          />
+                          {!t.workspace_id && (
+                            <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted">{t.slug}</p>
+                      </div>
+                      <TemplateStatusCycle table="organizer_templates" id={t.id} status={t.status} />
                     </div>
-                    <TemplateStatusCycle table={table} id={t.id} status={t.status} />
-                  </div>
-                  {tokens.length > 0 && (
-                    <p className="mt-1.5 flex flex-wrap gap-1 text-xs text-muted">
-                      {tokens.map((tok) => (
-                        <span key={tok} className="rounded bg-surfaceMuted px-1.5 py-0.5">
-                          {tok}
-                        </span>
-                      ))}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mt-4">
+            <CreateTemplateForm workspaceId={workspace.id} kind={activeTab === "engagement-letter" ? "engagement_letter" : activeTab} />
+          </div>
+
+          <div className="mt-4">
+            {(templates ?? []).length === 0 ? (
+              <EmptyState message="No templates yet." />
+            ) : (
+              <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+                {(templates ?? []).map((t: any) => {
+                  const bodyText = t.body_html ?? t.body ?? "";
+                  const tokens = mergeFieldTokens(`${t.subject ?? ""} ${bodyText}`);
+                  return (
+                    <li key={t.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <TemplateEditRow
+                              kind={activeTab === "engagement-letter" ? "engagement_letter" : activeTab}
+                              template={t}
+                            />
+                            {!t.workspace_id && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
+                          </div>
+                          <p className="text-xs text-muted">{t.slug}</p>
+                        </div>
+                        <TemplateStatusCycle table={table} id={t.id} status={t.status} />
+                      </div>
+                      {tokens.length > 0 && (
+                        <p className="mt-1.5 flex flex-wrap gap-1 text-xs text-muted">
+                          {tokens.map((tok) => (
+                            <span key={tok} className="rounded bg-surfaceMuted px-1.5 py-0.5">
+                              {tok}
+                            </span>
+                          ))}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

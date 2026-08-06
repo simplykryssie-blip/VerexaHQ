@@ -6217,12 +6217,15 @@ export type Database = {
           is_ero: boolean
           is_ptin_preparer: boolean
           is_service_bureau: boolean
+          mailing_address: string | null
           name: string
+          phone: string | null
           primary_contact_email: string | null
           slug: string
           status: string
           timezone: string
           updated_at: string
+          website: string | null
           workspace_type: string
         }
         Insert: {
@@ -6232,12 +6235,15 @@ export type Database = {
           is_ero?: boolean
           is_ptin_preparer?: boolean
           is_service_bureau?: boolean
+          mailing_address?: string | null
           name: string
+          phone?: string | null
           primary_contact_email?: string | null
           slug: string
           status?: string
           timezone?: string
           updated_at?: string
+          website?: string | null
           workspace_type?: string
         }
         Update: {
@@ -6247,12 +6253,15 @@ export type Database = {
           is_ero?: boolean
           is_ptin_preparer?: boolean
           is_service_bureau?: boolean
+          mailing_address?: string | null
           name?: string
+          phone?: string | null
           primary_contact_email?: string | null
           slug?: string
           status?: string
           timezone?: string
           updated_at?: string
+          website?: string | null
           workspace_type?: string
         }
         Relationships: []

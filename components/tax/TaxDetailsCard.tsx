@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -16,6 +16,7 @@ export type TaxDetailRow = {
   efile_transmitted_at: string | null;
   efile_accepted_at: string | null;
   efile_rejected_reason: string | null;
+  updated_at?: string;
 } | null;
 
 const EFILE_STATUSES = ["not_filed", "ready_to_file", "transmitted", "accepted", "rejected", "paper_filed"] as const;
@@ -58,9 +59,23 @@ export function TaxDetailsCard({
   const [extensionDueDate, setExtensionDueDate] = useState(detail?.extension_due_date ?? "");
   const [efileStatus, setEfileStatus] = useState(detail?.efile_status ?? "not_filed");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTaxYear(detail?.tax_year?.toString() ?? "");
+    setReturnType(detail?.return_type ?? "");
+    setIsAmended(detail?.is_amended ?? false);
+    setIsExtended(detail?.is_extended ?? false);
+    setExtensionDueDate(detail?.extension_due_date ?? "");
+    setEfileStatus(detail?.efile_status ?? "not_filed");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.updated_at]);
 
   async function save() {
     setSaving(true);
+    setSaved(false);
+    setSaveError(null);
     const { error } = await supabase.from("engagement_tax_details").upsert(
       {
         engagement_id: engagementId,
@@ -78,9 +93,11 @@ export function TaxDetailsCard({
     );
     setSaving(false);
     if (error) {
+      setSaveError(error.message);
       toast.show(error.message, "error");
       return;
     }
+    setSaved(true);
     toast.show("Tax details saved", "success");
     router.refresh();
   }
@@ -167,14 +184,18 @@ export function TaxDetailsCard({
           </div>
         )}
       </div>
-      <button
-        type="button"
-        onClick={save}
-        disabled={saving}
-        className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-      >
-        {saving ? "Saving..." : "Save tax details"}
-      </button>
+      <div className="mt-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {saving ? "Saving..." : "Save tax details"}
+        </button>
+        {saved && !saveError && <span className="text-sm text-success">Saved.</span>}
+        {saveError && <span className="text-sm text-danger">{saveError}</span>}
+      </div>
     </div>
   );
 }

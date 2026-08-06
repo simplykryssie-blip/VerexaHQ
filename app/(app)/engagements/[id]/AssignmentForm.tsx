@@ -18,6 +18,7 @@ export function AssignmentForm({
   complianceOfficer,
   clientDefaults,
   staffOptions,
+  showReviewAndCompliance = true,
 }: {
   engagementId: string;
   assignedStaff: StaffRef;
@@ -25,6 +26,7 @@ export function AssignmentForm({
   complianceOfficer: StaffRef;
   clientDefaults: { relationship_manager: StaffRef; default_reviewer: StaffRef; default_compliance_officer: StaffRef };
   staffOptions: StaffOption[];
+  showReviewAndCompliance?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -34,6 +36,7 @@ export function AssignmentForm({
     reviewer_id: reviewer?.id ?? "",
     compliance_officer_id: complianceOfficer?.id ?? "",
   });
+  const visibleRoles = showReviewAndCompliance ? ROLES : ROLES.filter((r) => r.key === "assigned_staff_id");
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,7 +62,7 @@ export function AssignmentForm({
 
   return (
     <div className="space-y-4">
-      {ROLES.map((field) => {
+      {visibleRoles.map((field) => {
         const defaultStaff = clientDefaults[field.defaultKey];
         const differs = Boolean(defaultStaff?.id) && values[field.key] !== defaultStaff?.id;
         return (

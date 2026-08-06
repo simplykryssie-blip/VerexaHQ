@@ -61,6 +61,7 @@ function clientDisplayName(c: { client_type: string; first_name: string | null; 
 export function OverviewTab({
   client,
   workspaceId,
+  showStaffRoles = true,
   contacts,
   addresses,
   portalUsers,
@@ -98,6 +99,7 @@ export function OverviewTab({
     default_compliance_officer: ClientHeaderInfo["default_compliance_officer"];
   };
   workspaceId: string;
+  showStaffRoles?: boolean;
   contacts: ContactRow[];
   addresses: AddressRow[];
   portalUsers: PortalUserRow[];
@@ -166,16 +168,18 @@ export function OverviewTab({
           <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
         </dl>
 
-        <div className="mt-4 border-t border-border pt-4">
-          <ClientAssignmentForm
-            clientId={client.id}
-            relationshipManager={client.relationship_manager}
-            defaultReviewer={client.default_reviewer}
-            defaultComplianceOfficer={client.default_compliance_officer}
-            accountHolder={accountHolder}
-            staffOptions={staffOptions}
-          />
-        </div>
+        {showStaffRoles && (
+          <div className="mt-4 border-t border-border pt-4">
+            <ClientAssignmentForm
+              clientId={client.id}
+              relationshipManager={client.relationship_manager}
+              defaultReviewer={client.default_reviewer}
+              defaultComplianceOfficer={client.default_compliance_officer}
+              accountHolder={accountHolder}
+              staffOptions={staffOptions}
+            />
+          </div>
+        )}
 
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
