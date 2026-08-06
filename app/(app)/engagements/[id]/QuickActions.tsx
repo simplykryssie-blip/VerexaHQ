@@ -6,6 +6,7 @@ import { MessageSquare, Upload, Receipt, FileText, StickyNote, BookOpen } from "
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Modal } from "@/components/Modal";
+import { SendMessageForm } from "@/components/SendMessageForm";
 import { renderEmail } from "@/lib/email/template";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
@@ -108,75 +109,14 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
 
       {modal === "message" && (
         <Modal title="Send message" onClose={() => setModal(null)}>
-          <InlineAddForm
-            label="Send"
-            fields={[
-              {
-                name: "channel",
-                label: "Channel",
-                type: "select",
-                required: true,
-                options: [
-                  ...(permissions.messagesSend
-                    ? [
-                        { value: "portal", label: "Client portal inbox" },
-                        { value: "email", label: `Email${primaryEmail ? ` (${primaryEmail})` : " -- no email on file"}` },
-                        { value: "sms", label: `SMS${primaryPhone ? ` (${primaryPhone})` : " -- no phone on file"}` },
-                      ]
-                    : []),
-                  ...(permissions.messagesInternalNote ? [{ value: "internal", label: "Internal note (staff only)" }] : []),
-                ],
-              },
-              { name: "body", label: "Message", required: true },
-            ]}
-            onSubmit={async (v) => {
-              if (v.channel === "email" && !primaryEmail) return "This client has no email on file -- add one in Contacts first.";
-              if (v.channel === "sms" && !primaryPhone) return "This client has no phone number on file -- add one in Contacts first.";
-
-              const isInternal = v.channel === "internal";
-              const {
-                data: { user },
-              } = await supabase.auth.getUser();
-              const { data: thread, error: threadError } = await supabase
-                .from("message_threads")
-                .insert({
-                  workspace_id: workspaceId,
-                  entity_type: "engagement",
-                  entity_id: engagementId,
-                  channel: isInternal ? "internal" : v.channel,
-                  subject: isInternal ? "Internal note" : "Message",
-                  created_by: user?.id,
-                })
-                .select("id")
-                .single();
-              if (threadError || !thread) return threadError?.message ?? "Could not create thread.";
-              const { error } = await supabase.from("messages").insert({
-                workspace_id: workspaceId,
-                thread_id: thread.id,
-                sender_type: "staff",
-                sender_id: user?.id,
-                body: v.body,
-                is_internal: isInternal,
-              });
-              if (error) return error.message;
-
-              if (v.channel === "email" && primaryEmail) {
-                await fetch("/api/email/send", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ to: primaryEmail, subject: "New message", html: `<p>${v.body}</p>` }),
-                });
-              } else if (v.channel === "sms" && primaryPhone) {
-                await fetch("/api/sms/send", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ to: primaryPhone, body: v.body }),
-                });
-              }
-
-              setModal(null);
-              router.refresh();
-            }}
+          <SendMessageForm
+            workspaceId={workspaceId}
+            entityType="engagement"
+            entityId={engagementId}
+            primaryEmail={primaryEmail}
+            primaryPhone={primaryPhone}
+            permissions={permissions}
+            onSent={() => setModal(null)}
           />
         </Modal>
       )}
