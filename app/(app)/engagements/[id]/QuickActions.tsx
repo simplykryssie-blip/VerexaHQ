@@ -7,13 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Modal } from "@/components/Modal";
 import { SendMessageForm } from "@/components/SendMessageForm";
+import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
 import { renderEmail } from "@/lib/email/template";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 type Props = {
   engagementId: string;
   clientId: string;
+  clientName: string;
   workspaceId: string;
+  workspaceName: string;
   organizerTemplates: { id: string; name: string }[];
   primaryEmail: string | null;
   primaryPhone: string | null;
@@ -40,7 +43,17 @@ function ActionButton({
   );
 }
 
-export function QuickActions({ engagementId, clientId, workspaceId, organizerTemplates, primaryEmail, primaryPhone, permissions }: Props) {
+export function QuickActions({
+  engagementId,
+  clientId,
+  clientName,
+  workspaceId,
+  workspaceName,
+  organizerTemplates,
+  primaryEmail,
+  primaryPhone,
+  permissions,
+}: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [modal, setModal] = useState<"message" | "upload" | "organizer" | "invoice" | "quote" | "note" | null>(null);
@@ -239,62 +252,29 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
       )}
 
       {modal === "invoice" && (
-        <Modal title="Create invoice" onClose={() => setModal(null)}>
-          <InlineAddForm
-            label="Create"
-            fields={[
-              { name: "notes", label: "Description", required: true },
-              { name: "total_amount", label: "Amount", required: true },
-              { name: "due_date", label: "Payment due date (optional)" },
-            ]}
-            onSubmit={async (v) => {
-              const {
-                data: { user },
-              } = await supabase.auth.getUser();
-              const { error } = await supabase.from("invoices").insert({
-                workspace_id: workspaceId,
-                client_id: clientId,
-                engagement_id: engagementId,
-                status: "sent",
-                total_amount: Number(v.total_amount) || 0,
-                subtotal: Number(v.total_amount) || 0,
-                notes: v.notes,
-                due_date: v.due_date || null,
-                created_by: user?.id,
-              });
-              if (error) return error.message;
-              setModal(null);
-              router.refresh();
-            }}
+        <Modal title="Create invoice" onClose={() => setModal(null)} size="xl">
+          <InvoiceQuoteForm
+            kind="invoice"
+            workspaceId={workspaceId}
+            clientId={clientId}
+            engagementId={engagementId}
+            firmName={workspaceName}
+            clientName={clientName}
+            onDone={() => setModal(null)}
           />
         </Modal>
       )}
 
       {modal === "quote" && (
-        <Modal title="Create quote" onClose={() => setModal(null)}>
-          <InlineAddForm
-            label="Create"
-            fields={[
-              { name: "title", label: "Title", required: true },
-              { name: "total_amount", label: "Amount", required: true },
-            ]}
-            onSubmit={async (v) => {
-              const {
-                data: { user },
-              } = await supabase.auth.getUser();
-              const { error } = await supabase.from("quotes").insert({
-                workspace_id: workspaceId,
-                client_id: clientId,
-                engagement_id: engagementId,
-                title: v.title,
-                total_amount: Number(v.total_amount) || 0,
-                subtotal: Number(v.total_amount) || 0,
-                created_by: user?.id,
-              });
-              if (error) return error.message;
-              setModal(null);
-              router.refresh();
-            }}
+        <Modal title="Create quote" onClose={() => setModal(null)} size="xl">
+          <InvoiceQuoteForm
+            kind="quote"
+            workspaceId={workspaceId}
+            clientId={clientId}
+            engagementId={engagementId}
+            firmName={workspaceName}
+            clientName={clientName}
+            onDone={() => setModal(null)}
           />
         </Modal>
       )}

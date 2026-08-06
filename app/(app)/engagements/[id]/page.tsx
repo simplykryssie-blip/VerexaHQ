@@ -282,8 +282,8 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       reviewActions={(reviewActions ?? []) as never}
       assignmentHistory={(assignmentHistory ?? []) as never}
       statusHistory={statusHistory ?? []}
-      quotes={quotes ?? []}
-      invoices={invoices ?? []}
+      quotes={(quotes ?? []) as never}
+      invoices={(invoices ?? []) as never}
       payments={(payments ?? []) as never}
       timeline={activity ?? []}
       progress={(progressRows ?? null) as never}

@@ -6,10 +6,12 @@ export function Modal({
   title,
   onClose,
   children,
+  size = "md",
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  size?: "md" | "xl";
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg"
+        className={`w-full rounded-2xl border border-border bg-surface p-6 shadow-lg ${size === "xl" ? "max-w-4xl" : "max-w-md"}`}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-ink">{title}</h2>

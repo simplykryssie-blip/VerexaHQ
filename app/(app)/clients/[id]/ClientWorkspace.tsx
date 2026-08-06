@@ -182,7 +182,9 @@ export function ClientWorkspace({
       <div className="border-b border-border bg-surface px-8 py-3">
         <QuickActions
           clientId={client.id}
+          clientName={displayName(client)}
           workspaceId={workspace.id}
+          workspaceName={workspace.name}
           documentRequestTemplates={documentRequestTemplates}
           organizerTemplates={organizerTemplates}
           primaryEmail={client.primary_email}
@@ -253,6 +255,8 @@ export function ClientWorkspace({
             {tab === "Billing" && (
               <BillingTab
                 clientId={client.id}
+                clientName={displayName(client)}
+                workspaceName={workspace.name}
                 quotes={quotes}
                 invoices={invoices}
                 payments={payments}

@@ -294,8 +294,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       documentFolders={documentFolders ?? []}
       documentRequests={documentRequests}
       signatureRequests={signatureRequests}
-      quotes={quotes ?? []}
-      invoices={invoices ?? []}
+      quotes={(quotes ?? []) as never}
+      invoices={(invoices ?? []) as never}
       payments={payments ?? []}
       ledgerEntries={ledgerEntries ?? []}
       outstandingBalance={outstandingBalance}

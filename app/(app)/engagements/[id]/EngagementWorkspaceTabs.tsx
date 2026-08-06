@@ -2,6 +2,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
+import { PreviewButton } from "@/components/billing/PreviewButton";
 import { StatusSelect } from "./StatusSelect";
 import { DueDateInput } from "./DueDateInput";
 import { TaskRow } from "./TaskRow";
@@ -388,6 +389,8 @@ export function ReviewTab({ stages, shares, reviewActions, staffOptions }: { sta
 
 export function BillingTab({
   clientId,
+  clientName,
+  workspaceName,
   workspaceId,
   canManageBilling,
   quotes,
@@ -395,6 +398,8 @@ export function BillingTab({
   payments,
 }: {
   clientId: string;
+  clientName: string;
+  workspaceName: string;
   workspaceId: string;
   canManageBilling: boolean;
   quotes: QuoteRow[];
@@ -413,9 +418,26 @@ export function BillingTab({
                 <span className="text-slate">
                   {q.quote_number} -- {q.title}
                 </span>
-                <span className="capitalize text-muted">
-                  {q.status} -- {money(q.total_amount)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="capitalize text-muted">
+                    {q.status} -- {money(q.total_amount)}
+                  </span>
+                  <PreviewButton
+                    kind="quote"
+                    firmName={workspaceName}
+                    clientName={clientName}
+                    number={q.quote_number}
+                    issueDate={q.created_at}
+                    dueDate={q.valid_until}
+                    lineItems={q.line_items ?? []}
+                    subtotal={q.subtotal}
+                    discountAmount={q.discount_amount}
+                    taxAmount={q.tax_amount}
+                    totalAmount={q.total_amount}
+                    notes={q.notes}
+                    status={q.status}
+                  />
+                </div>
               </li>
             ))}
           </ul>
@@ -437,6 +459,21 @@ export function BillingTab({
                       <span className="capitalize text-muted">
                         {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
                       </span>
+                      <PreviewButton
+                        kind="invoice"
+                        firmName={workspaceName}
+                        clientName={clientName}
+                        number={i.invoice_number}
+                        issueDate={i.issue_date}
+                        dueDate={i.due_date}
+                        lineItems={i.line_items ?? []}
+                        subtotal={i.subtotal}
+                        discountAmount={i.discount_amount}
+                        taxAmount={i.tax_amount}
+                        totalAmount={i.total_amount}
+                        notes={i.notes}
+                        status={i.status}
+                      />
                       {isOutstanding && <PaymentLinkButton invoiceId={i.id} />}
                     </div>
                   </div>
@@ -626,8 +663,34 @@ export type ShareRow = { id: string; status: string; shared_with: { name: string
 export type ReviewActionRow = { id: string; engagement_share_id: string; action: string; comment: string | null; created_at: string; actor_id: string | null };
 export type AssignmentHistoryRow = { id: string; assignment_role: string; previous_user: StaffRef; new_user: StaffRef; changed_at: string; reason: string | null };
 export type StatusHistoryRow = { id: string; old_status: string | null; new_status: string; changed_at: string | null; reason: string | null };
-export type QuoteRow = { id: string; quote_number: string | null; title: string; status: string; total_amount: number };
-export type InvoiceRow = { id: string; invoice_number: string | null; status: string; total_amount: number; amount_paid: number; due_date: string | null };
+export type QuoteRow = {
+  id: string;
+  quote_number: string | null;
+  title: string;
+  status: string;
+  total_amount: number;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  line_items: { description: string; quantity: number; unit_price: number }[];
+  created_at: string;
+  valid_until: string | null;
+  notes: string | null;
+};
+export type InvoiceRow = {
+  id: string;
+  invoice_number: string | null;
+  status: string;
+  total_amount: number;
+  amount_paid: number;
+  due_date: string | null;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  line_items: { description: string; quantity: number; unit_price: number }[];
+  issue_date: string | null;
+  notes: string | null;
+};
 export type PaymentRow = { id: string; status: string; amount: number; payment_date: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };

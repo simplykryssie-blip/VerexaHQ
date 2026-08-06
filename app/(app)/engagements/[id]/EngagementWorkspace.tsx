@@ -150,7 +150,9 @@ export function EngagementWorkspace({
         <QuickActions
           engagementId={engagement.id}
           clientId={client?.id ?? ""}
+          clientName={client ? clientLabel(client) : ""}
           workspaceId={workspace.id}
+          workspaceName={workspace.name}
           organizerTemplates={organizerTemplates}
           primaryEmail={client?.primary_email ?? null}
           primaryPhone={client?.primary_phone ?? null}
@@ -222,6 +224,8 @@ export function EngagementWorkspace({
             {tab === "Billing" && (
               <BillingTab
                 clientId={client?.id ?? ""}
+                clientName={client ? clientLabel(client) : ""}
+                workspaceName={workspace.name}
                 workspaceId={workspace.id}
                 canManageBilling={permissions.billingManage}
                 quotes={quotes}
