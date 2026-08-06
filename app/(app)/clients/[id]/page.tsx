@@ -1251,12 +1251,16 @@ export default function ClientDetailPage() {
         <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={refresh} onDeleted={refresh} />
       )}
       {(showActivateModal || activatingRequestedService) && (
+        // initialServiceType/requestedServiceLabel/remainingRequestedServices
+        // were removed along with ActivateServiceModal's "requested service"
+        // prefill -- they were sourced from client_service_interests, which
+        // doesn't exist live (same table already confirmed dead when tags/
+        // service-interests were removed from ClientModal). RequestedServicesCard
+        // below still queries that dead table independently -- flagged, not
+        // fixed, in this pass.
         <ActivateServiceModal
           clientId={client.id}
           workspaceId={client.workspace_id}
-          initialServiceType={activatingRequestedService?.serviceType}
-          requestedServiceLabel={activatingRequestedService?.label}
-          remainingRequestedServices={remainingRequestedServices}
           onClose={() => {
             setShowActivateModal(false);
             setActivatingRequestedService(null);
