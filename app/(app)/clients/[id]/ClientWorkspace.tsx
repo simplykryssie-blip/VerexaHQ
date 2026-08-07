@@ -221,6 +221,7 @@ export function ClientWorkspace({
                 client={client}
                 workspaceId={workspace.id}
                 showStaffRoles={showStaffRoles}
+                canEditSensitive={permissions.clientsEditSensitive}
                 contacts={contacts}
                 addresses={addresses}
                 portalUsers={portalUsers}

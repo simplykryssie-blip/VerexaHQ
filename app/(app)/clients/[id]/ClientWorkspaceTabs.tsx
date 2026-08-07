@@ -67,6 +67,7 @@ export function OverviewTab({
   client,
   workspaceId,
   showStaffRoles = true,
+  canEditSensitive,
   contacts,
   addresses,
   portalUsers,
@@ -105,6 +106,7 @@ export function OverviewTab({
   };
   workspaceId: string;
   showStaffRoles?: boolean;
+  canEditSensitive: boolean;
   contacts: ContactRow[];
   addresses: AddressRow[];
   portalUsers: PortalUserRow[];
@@ -166,7 +168,14 @@ export function OverviewTab({
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
               <TaxIdReveal clientId={client.id} kind="itin" last4={client.itin_last4} />
-              <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
+              {canEditSensitive ? (
+                <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
+              ) : (
+                <Field
+                  label="Date of birth"
+                  value={client.date_of_birth ? new Date(client.date_of_birth).toLocaleDateString() : null}
+                />
+              )}
             </>
           ) : (
             <TaxIdReveal clientId={client.id} kind="ein" last4={client.ein_last4} />

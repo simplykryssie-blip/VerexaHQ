@@ -8,6 +8,7 @@ export type ActionPermissions = {
   messagesSend: boolean;
   messagesInternalNote: boolean;
   engagementsManage: boolean;
+  clientsEditSensitive: boolean;
 };
 
 // Centralizes the has_permission lookups QuickActions needs to hide (not
@@ -22,6 +23,7 @@ export async function loadActionPermissions(supabase: SupabaseClient, workspaceI
     { data: messagesSend },
     { data: messagesInternalNote },
     { data: engagementsManage },
+    { data: clientsEditSensitive },
   ] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspaceId, p_permission_key: "documents.upload" }),
     supabase.rpc("has_permission", { p_workspace_id: workspaceId, p_permission_key: "documents.request" }),
@@ -30,6 +32,7 @@ export async function loadActionPermissions(supabase: SupabaseClient, workspaceI
     supabase.rpc("has_permission", { p_workspace_id: workspaceId, p_permission_key: "messages.send" }),
     supabase.rpc("has_permission", { p_workspace_id: workspaceId, p_permission_key: "messages.internal_note" }),
     supabase.rpc("has_permission", { p_workspace_id: workspaceId, p_permission_key: "engagements.manage" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspaceId, p_permission_key: "clients.edit_sensitive" }),
   ]);
 
   return {
@@ -40,5 +43,6 @@ export async function loadActionPermissions(supabase: SupabaseClient, workspaceI
     messagesSend: Boolean(messagesSend),
     messagesInternalNote: Boolean(messagesInternalNote),
     engagementsManage: Boolean(engagementsManage),
+    clientsEditSensitive: Boolean(clientsEditSensitive),
   };
 }
