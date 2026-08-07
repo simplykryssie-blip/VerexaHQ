@@ -50,6 +50,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .select(
         `id, engagement_number, status, review_status, priority, due_date, open_date, completed_date, current_stage,
         engagement_types(name),
+        engagement_tax_details!engagement_tax_details_engagement_id_fkey(tax_year),
         assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
         reviewer:user_profiles!engagements_reviewer_id_fkey(id, display_name),
         compliance_officer:user_profiles!engagements_compliance_officer_id_fkey(id, display_name)`

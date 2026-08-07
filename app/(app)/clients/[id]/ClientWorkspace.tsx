@@ -9,7 +9,6 @@ import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import {
   OverviewTab,
-  EngagementsTab,
   MessagesTab,
   BillingTab,
   NotesTab,
@@ -62,7 +61,6 @@ type LedgerEntry = { id: string; balance_after: number; created_at: string };
 
 const TABS = [
   "Overview",
-  "Engagements",
   "Documents",
   "Messages",
   "Billing",
@@ -239,7 +237,6 @@ export function ClientWorkspace({
                 onCreateNote={() => setTab("Notes")}
               />
             )}
-            {tab === "Engagements" && <EngagementsTab engagements={engagements} client={client} />}
             {tab === "Documents" && (
               <DocumentWorkspace
                 workspaceId={workspace.id}

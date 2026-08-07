@@ -295,16 +295,59 @@ export function OverviewTab({
         {engagements.length === 0 ? (
           <EmptyState message="No engagements yet." />
         ) : (
-          <ul className="divide-y divide-border">
-            {engagements.map((e) => (
-              <li key={e.id} className="flex items-center justify-between py-2 text-sm">
-                <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
-                  {e.engagement_number ?? "Engagement"}
-                </Link>
-                <span className="text-slate">{e.status}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                  <th className="px-4 py-2 font-medium">Number</th>
+                  <th className="px-4 py-2 font-medium">Service</th>
+                  <th className="px-4 py-2 font-medium">Status</th>
+                  <th className="px-4 py-2 font-medium">Assigned staff</th>
+                  <th className="px-4 py-2 font-medium">Reviewer</th>
+                  <th className="px-4 py-2 font-medium">Priority</th>
+                  <th className="px-4 py-2 font-medium">Tax year</th>
+                  <th className="px-4 py-2 font-medium">Next due date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {engagements.map((e) => {
+                  const staffDiffers = e.assigned_staff?.id && e.assigned_staff.id !== client.relationship_manager?.id;
+                  const reviewerDiffers = e.reviewer?.id && e.reviewer.id !== client.default_reviewer?.id;
+                  const taxYear = engagementTaxYear(e);
+                  return (
+                    <tr key={e.id} className="hover:bg-surfaceMuted">
+                      <td className="px-4 py-2">
+                        <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
+                          {e.engagement_number ?? "Engagement"}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2 text-slate">{e.engagement_types?.name ?? "--"}</td>
+                      <td className="px-4 py-2 text-slate">{e.status}</td>
+                      <td className="px-4 py-2 text-slate">
+                        {e.assigned_staff?.display_name ?? "Unassigned"}
+                        {staffDiffers && (
+                          <span className="ml-1 text-xs text-warning" title="Differs from this client's default relationship manager">
+                            (differs from default)
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-slate">
+                        {e.reviewer?.display_name ?? "--"}
+                        {reviewerDiffers && (
+                          <span className="ml-1 text-xs text-warning" title="Differs from this client's default reviewer">
+                            (differs from default)
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-slate">{e.priority ?? "--"}</td>
+                      <td className="px-4 py-2 text-slate">{taxYear ?? "--"}</td>
+                      <td className="px-4 py-2 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Section>
 
@@ -386,58 +429,6 @@ export function OverviewTab({
 }
 
 // ------------------------------------------------------------- Engagements
-
-export function EngagementsTab({ engagements, client }: { engagements: EngagementRow[]; client: ClientHeaderInfo }) {
-  return (
-    <Section title="Engagements">
-      {engagements.length === 0 ? (
-        <EmptyState message="No engagements yet." />
-      ) : (
-        <div className="overflow-hidden rounded-lg border border-border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                <th className="px-4 py-2 font-medium">Number</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 font-medium">Assigned staff</th>
-                <th className="px-4 py-2 font-medium">Reviewer</th>
-                <th className="px-4 py-2 font-medium">Priority</th>
-                <th className="px-4 py-2 font-medium">Engagement due date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {engagements.map((e) => {
-                const staffDiffers = e.assigned_staff?.id && e.assigned_staff.id !== client.relationship_manager?.id;
-                const reviewerDiffers = e.reviewer?.id && e.reviewer.id !== client.default_reviewer?.id;
-                return (
-                  <tr key={e.id} className="hover:bg-surfaceMuted">
-                    <td className="px-4 py-2">
-                      <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
-                        {e.engagement_number ?? "Engagement"}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2 text-slate">{e.status}</td>
-                    <td className="px-4 py-2 text-slate">
-                      {e.assigned_staff?.display_name ?? "Unassigned"}
-                      {staffDiffers && <span className="ml-1 text-xs text-warning">(≠ default)</span>}
-                    </td>
-                    <td className="px-4 py-2 text-slate">
-                      {e.reviewer?.display_name ?? "--"}
-                      {reviewerDiffers && <span className="ml-1 text-xs text-warning">(≠ default)</span>}
-                    </td>
-                    <td className="px-4 py-2 text-slate">{e.priority ?? "--"}</td>
-                    <td className="px-4 py-2 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Section>
-  );
-}
-
 
 // ----------------------------------------------------------------- Messages
 
@@ -737,7 +728,14 @@ export type EngagementRow = {
   assigned_staff: StaffRef;
   reviewer: StaffRef;
   compliance_officer: StaffRef;
+  engagement_types: { name: string } | null;
+  engagement_tax_details: { tax_year: number | null }[] | { tax_year: number | null } | null;
 };
+
+function engagementTaxYear(e: EngagementRow): number | null {
+  const detail = Array.isArray(e.engagement_tax_details) ? e.engagement_tax_details[0] : e.engagement_tax_details;
+  return detail?.tax_year ?? null;
+}
 export type ClientHeaderInfo = { relationship_manager: StaffRef; default_reviewer: StaffRef; default_compliance_officer: StaffRef };
 export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };
 export type AppointmentRow = { id: string; title: string; start_at: string; location: string | null };
