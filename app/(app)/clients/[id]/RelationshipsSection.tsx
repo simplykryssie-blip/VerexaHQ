@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
+import { InlineAddForm } from "@/components/InlineAddForm";
+import { Pencil, Trash2 } from "lucide-react";
 import type { RelationshipRow } from "./ClientWorkspaceTabs";
 
 const RELATIONSHIP_TYPES = ["spouse", "dependent", "parent", "child", "business", "trust", "estate", "partner", "owner", "officer", "other"];
@@ -205,26 +207,97 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
   );
 }
 
+function EditRelationshipForm({ relationship }: { relationship: RelationshipRow }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Edit"
+      submitLabel="Save changes"
+      initialValues={{
+        relationship_type: relationship.relationship_type,
+        related_name: relationship.related_name ?? "",
+        related_dob: relationship.related_dob ?? "",
+      }}
+      fields={[
+        {
+          name: "relationship_type",
+          label: "Type",
+          type: "select",
+          required: true,
+          options: RELATIONSHIP_TYPES.map((t) => ({ value: t, label: t[0].toUpperCase() + t.slice(1) })),
+        },
+        // related_name is disabled when the relationship is linked to a real client record,
+        // since that name should stay in sync with the linked client rather than diverge.
+        ...(relationship.related_client_id ? [] : [{ name: "related_name", label: "Name", required: true }]),
+        { name: "related_dob", label: "Date of birth", type: "date" as const },
+      ]}
+      trigger={(openForm) => (
+        <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit relationship">
+          <Pencil size={13} />
+        </button>
+      )}
+      onSubmit={async (v) => {
+        const { error } = await supabase
+          .from("client_relationships")
+          .update({
+            relationship_type: v.relationship_type,
+            ...(relationship.related_client_id ? {} : { related_name: v.related_name }),
+            related_dob: v.related_dob || null,
+          })
+          .eq("id", relationship.id);
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+function DeleteRelationshipButton({ relationshipId }: { relationshipId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  async function handleDelete() {
+    if (!window.confirm("Remove this relationship? This can't be undone.")) return;
+    const { error } = await supabase.from("client_relationships").delete().eq("id", relationshipId);
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    router.refresh();
+  }
+  return (
+    <button type="button" onClick={handleDelete} className="text-muted hover:text-danger" aria-label="Delete relationship">
+      <Trash2 size={13} />
+    </button>
+  );
+}
+
 export function RelationshipsList({ relationships }: { relationships: RelationshipRow[] }) {
   if (relationships.length === 0) return <EmptyState message="No relationships recorded." />;
   return (
     <ul className="divide-y divide-border">
       {relationships.map((r) => (
-        <li key={r.id} className="py-2 text-sm text-slate">
-          <span className="mr-2 capitalize text-muted">{r.relationship_type}:</span>
-          {r.related_client_id ? (
-            <a href={`/clients/${r.related_client_id}`} className="text-accent hover:underline">
-              {r.related_name}
-            </a>
-          ) : (
-            r.related_name
-          )}
-          {r.related_dob && <span className="ml-2 text-xs text-muted">DOB {new Date(r.related_dob).toLocaleDateString()}</span>}
-          {r.related_ssn_last4 && (
-            <span className="ml-2 text-xs text-muted">
-              <RevealRelationshipSsn relationshipId={r.id} last4={r.related_ssn_last4} />
-            </span>
-          )}
+        <li key={r.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+          <div>
+            <span className="mr-2 capitalize text-muted">{r.relationship_type}:</span>
+            {r.related_client_id ? (
+              <a href={`/clients/${r.related_client_id}`} className="text-accent hover:underline">
+                {r.related_name}
+              </a>
+            ) : (
+              r.related_name
+            )}
+            {r.related_dob && <span className="ml-2 text-xs text-muted">DOB {new Date(r.related_dob).toLocaleDateString()}</span>}
+            {r.related_ssn_last4 && (
+              <span className="ml-2 text-xs text-muted">
+                <RevealRelationshipSsn relationshipId={r.id} last4={r.related_ssn_last4} />
+              </span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <EditRelationshipForm relationship={r} />
+            <DeleteRelationshipButton relationshipId={r.id} />
+          </div>
         </li>
       ))}
     </ul>

@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "email" | "tel" | "select" | "textarea";
+  type?: "text" | "email" | "tel" | "date" | "select" | "textarea";
   required?: boolean;
   options?: { value: string; label: string }[];
 };
@@ -16,14 +16,20 @@ export function InlineAddForm({
   fields,
   onSubmit,
   defaultOpen = false,
+  initialValues,
+  submitLabel = "Save",
+  trigger,
 }: {
   label: string;
   fields: FieldDef[];
   onSubmit: (values: Record<string, string>) => Promise<string | void>;
   defaultOpen?: boolean;
+  initialValues?: Record<string, string>;
+  submitLabel?: string;
+  trigger?: (openForm: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -37,11 +43,12 @@ export function InlineAddForm({
       setError(result);
       return;
     }
-    setValues({});
+    setValues(initialValues ?? {});
     setOpen(false);
   }
 
   if (!open) {
+    if (trigger) return <>{trigger(() => setOpen(true))}</>;
     return (
       <button
         type="button"
@@ -113,7 +120,7 @@ export function InlineAddForm({
           disabled={loading}
           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
         >
-          {loading ? "Saving..." : "Save"}
+          {loading ? "Saving..." : submitLabel}
         </button>
       </div>
     </form>

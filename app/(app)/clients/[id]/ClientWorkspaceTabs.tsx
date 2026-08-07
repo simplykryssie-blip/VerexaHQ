@@ -13,10 +13,15 @@ import { ClientAssignmentForm } from "./ClientAssignmentForm";
 import { AddAppointmentForm } from "./AddAppointmentForm";
 import {
   AddContactForm,
+  EditContactForm,
+  DeleteContactButton,
   AddAddressForm,
+  EditAddressForm,
+  DeleteAddressButton,
   AddPortalUserForm,
   AddNoteForm,
 } from "./AddForms";
+import { EditClientProfileForm } from "./EditClientProfileForm";
 
 function Section({
   title,
@@ -152,7 +157,7 @@ export function OverviewTab({
         </div>
       </div>
 
-      <Section title="Identifying info">
+      <Section title="Identifying info" action={<EditClientProfileForm client={client} />}>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
@@ -202,11 +207,15 @@ export function OverviewTab({
                         {c.title && <span className="ml-2 text-xs font-normal text-muted">{c.title}</span>}
                         {c.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                       </span>
-                      {portal ? (
-                        <span className="text-xs capitalize text-muted">Portal: {portal.status}</span>
-                      ) : c.email ? (
-                        <InviteContactToPortalButton clientId={client.id} workspaceId={workspaceId} name={name} email={c.email} />
-                      ) : null}
+                      <div className="flex items-center gap-2">
+                        {portal ? (
+                          <span className="text-xs capitalize text-muted">Portal: {portal.status}</span>
+                        ) : c.email ? (
+                          <InviteContactToPortalButton clientId={client.id} workspaceId={workspaceId} name={name} email={c.email} />
+                        ) : null}
+                        <EditContactForm contact={c} />
+                        <DeleteContactButton contactId={c.id} />
+                      </div>
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
                       {c.email && <span>{c.email}</span>}
@@ -249,9 +258,15 @@ export function OverviewTab({
           ) : (
             <ul className="divide-y divide-border">
               {addresses.map((a) => (
-                <li key={a.id} className="py-2 text-sm text-slate">
-                  <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                  {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                  <span>
+                    <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
+                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <EditAddressForm address={a} />
+                    <DeleteAddressButton addressId={a.id} />
+                  </div>
                 </li>
               ))}
             </ul>

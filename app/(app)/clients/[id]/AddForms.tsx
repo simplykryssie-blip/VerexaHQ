@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import { Pencil, Trash2 } from "lucide-react";
+import type { ContactRow, AddressRow } from "./ClientWorkspaceTabs";
 
 type Ids = { clientId: string; workspaceId: string };
 
@@ -15,6 +17,7 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
       fields={[
         { name: "first_name", label: "First name", required: true },
         { name: "last_name", label: "Last name", required: true },
+        { name: "title", label: "Title (optional)" },
         { name: "email", label: "Email" },
         { name: "phone", label: "Phone" },
       ]}
@@ -24,6 +27,7 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
           workspace_id: workspaceId,
           first_name: v.first_name,
           last_name: v.last_name,
+          title: v.title || null,
           email: v.email || null,
           phone: v.phone || null,
         });
@@ -31,6 +35,69 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
         router.refresh();
       }}
     />
+  );
+}
+
+export function EditContactForm({ contact }: { contact: ContactRow }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Edit"
+      submitLabel="Save changes"
+      initialValues={{
+        first_name: contact.first_name ?? "",
+        last_name: contact.last_name ?? "",
+        title: contact.title ?? "",
+        email: contact.email ?? "",
+        phone: contact.phone ?? "",
+      }}
+      fields={[
+        { name: "first_name", label: "First name", required: true },
+        { name: "last_name", label: "Last name", required: true },
+        { name: "title", label: "Title (optional)" },
+        { name: "email", label: "Email" },
+        { name: "phone", label: "Phone" },
+      ]}
+      trigger={(openForm) => (
+        <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit contact">
+          <Pencil size={13} />
+        </button>
+      )}
+      onSubmit={async (v) => {
+        const { error } = await supabase
+          .from("client_contacts")
+          .update({
+            first_name: v.first_name,
+            last_name: v.last_name,
+            title: v.title || null,
+            email: v.email || null,
+            phone: v.phone || null,
+          })
+          .eq("id", contact.id);
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+export function DeleteContactButton({ contactId }: { contactId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  async function handleDelete() {
+    if (!window.confirm("Delete this contact? This can't be undone.")) return;
+    const { error } = await supabase.from("client_contacts").delete().eq("id", contactId);
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    router.refresh();
+  }
+  return (
+    <button type="button" onClick={handleDelete} className="text-muted hover:text-danger" aria-label="Delete contact">
+      <Trash2 size={13} />
+    </button>
   );
 }
 
@@ -72,6 +139,76 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
         router.refresh();
       }}
     />
+  );
+}
+
+const ADDRESS_TYPE_OPTIONS = [
+  { value: "mailing", label: "Mailing" },
+  { value: "business", label: "Business" },
+  { value: "seasonal", label: "Seasonal" },
+  { value: "other", label: "Other" },
+];
+
+export function EditAddressForm({ address }: { address: AddressRow }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Edit"
+      submitLabel="Save changes"
+      initialValues={{
+        address_type: address.address_type,
+        street: address.street ?? "",
+        city: address.city ?? "",
+        state: address.state ?? "",
+        zip: address.zip ?? "",
+      }}
+      fields={[
+        { name: "address_type", label: "Type", type: "select", required: true, options: ADDRESS_TYPE_OPTIONS },
+        { name: "street", label: "Street", required: true },
+        { name: "city", label: "City" },
+        { name: "state", label: "State" },
+        { name: "zip", label: "ZIP" },
+      ]}
+      trigger={(openForm) => (
+        <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit address">
+          <Pencil size={13} />
+        </button>
+      )}
+      onSubmit={async (v) => {
+        const { error } = await supabase
+          .from("client_addresses")
+          .update({
+            address_type: v.address_type,
+            street: v.street,
+            city: v.city || null,
+            state: v.state || null,
+            zip: v.zip || null,
+          })
+          .eq("id", address.id);
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+export function DeleteAddressButton({ addressId }: { addressId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  async function handleDelete() {
+    if (!window.confirm("Delete this address? This can't be undone.")) return;
+    const { error } = await supabase.from("client_addresses").delete().eq("id", addressId);
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    router.refresh();
+  }
+  return (
+    <button type="button" onClick={handleDelete} className="text-muted hover:text-danger" aria-label="Delete address">
+      <Trash2 size={13} />
+    </button>
   );
 }
 
