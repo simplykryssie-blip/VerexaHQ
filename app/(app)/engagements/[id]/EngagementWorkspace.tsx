@@ -7,7 +7,7 @@ import { DeleteEngagementButton } from "./DeleteEngagementButton";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
-import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
+import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
 import {
   OverviewTab,
@@ -40,8 +40,8 @@ import {
 type Workspace = { id: string; name: string; workspace_type: string };
 
 const TABS = [
-  "Overview",
-  "Tax",
+  "Details",
+  "IRS Notices",
   "Workflow",
   "Tasks",
   "Documents",
@@ -118,7 +118,7 @@ export function EngagementWorkspace({
   irsNotices: IrsNoticeRow[];
   taxYears: number[];
 }) {
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = workspace.workspace_type !== "independent_ptin";
 
   const client = engagement.clients;
@@ -184,7 +184,7 @@ export function EngagementWorkspace({
           </nav>
 
           <div className="px-8 py-6">
-            {tab === "Overview" && (
+            {tab === "Details" && (
               <OverviewTab
                 engagement={engagement}
                 progress={progress}
@@ -195,14 +195,12 @@ export function EngagementWorkspace({
                 organizerResponses={organizerResponses}
                 showStaffRoles={showStaffRoles}
                 taxDetail={taxDetail}
-                onViewTax={() => setTab("Tax")}
+                taxYears={taxYears}
+                workspaceId={workspace.id}
               />
             )}
-            {tab === "Tax" && (
-              <div className="space-y-6">
-                <TaxDetailsCard engagementId={engagement.id} workspaceId={workspace.id} detail={taxDetail} taxYears={taxYears} />
-                <IrsNoticesPanel workspaceId={workspace.id} entityType="engagement" entityId={engagement.id} notices={irsNotices} />
-              </div>
+            {tab === "IRS Notices" && (
+              <IrsNoticesPanel workspaceId={workspace.id} entityType="engagement" entityId={engagement.id} notices={irsNotices} />
             )}
             {tab === "Workflow" && <WorkflowTab stages={stages} />}
             {tab === "Tasks" && (
