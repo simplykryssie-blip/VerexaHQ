@@ -30,19 +30,21 @@ export default async function NewEngagementPage({
     );
   }
 
-  const [{ data: clients }, { data: engagementTypes }] = await Promise.all([
-    supabase
-      .from("clients")
-      .select("id, first_name, last_name, business_name, client_type")
-      .eq("workspace_id", workspace.id)
-      .is("merged_into_client_id", null)
-      .order("created_at", { ascending: false }),
+  const [{ data: defaultClient }, { data: engagementTypes }, { count: clientCount }] = await Promise.all([
+    searchParams.clientId
+      ? supabase
+          .from("clients")
+          .select("id, first_name, last_name, business_name, client_type")
+          .eq("id", searchParams.clientId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
     supabase
       .from("engagement_types")
       .select("id, name")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),
+    supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).is("merged_into_client_id", null),
   ]);
 
   return (
@@ -52,9 +54,9 @@ export default async function NewEngagementPage({
         <div className="max-w-lg rounded-xl border border-border bg-surface p-6">
           <NewEngagementForm
             workspaceId={workspace.id}
-            clients={clients ?? []}
+            hasAnyClients={(clientCount ?? 0) > 0}
+            defaultClient={defaultClient ?? null}
             engagementTypes={engagementTypes ?? []}
-            defaultClientId={searchParams.clientId}
             autoAssignToSelf={workspace.workspace_type === "independent_ptin"}
           />
         </div>

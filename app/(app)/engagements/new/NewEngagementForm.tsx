@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { UserPlus } from "lucide-react";
 
 type ClientOption = {
   id: string;
@@ -17,17 +18,233 @@ function clientLabel(c: ClientOption) {
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
+function ClientSearchField({
+  workspaceId,
+  selected,
+  onSelect,
+}: {
+  workspaceId: string;
+  selected: ClientOption | null;
+  onSelect: (client: ClientOption | null) => void;
+}) {
+  const supabase = createClient();
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ClientOption[]>([]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newClientType, setNewClientType] = useState<"individual" | "business">("individual");
+  const [newFirstName, setNewFirstName] = useState("");
+  const [newLastName, setNewLastName] = useState("");
+  const [newBusinessName, setNewBusinessName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, business_name, client_type")
+        .eq("workspace_id", workspaceId)
+        .is("merged_into_client_id", null)
+        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,business_name.ilike.%${query}%`)
+        .limit(8);
+      setResults((data as ClientOption[]) ?? []);
+    }, 200);
+    return () => clearTimeout(timeout);
+  }, [query, workspaceId, supabase]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setResults([]);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  async function createClientInline(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    if (newClientType === "individual" && (!newFirstName.trim() || !newLastName.trim())) {
+      setCreateError("First and last name are required.");
+      return;
+    }
+    if (newClientType === "business" && !newBusinessName.trim()) {
+      setCreateError("Business name is required.");
+      return;
+    }
+    setCreating(true);
+    const { data, error } = await supabase.rpc("create_client", {
+      p_workspace_id: workspaceId,
+      p_client_type: newClientType,
+      p_first_name: newClientType === "individual" ? newFirstName.trim() : undefined,
+      p_last_name: newClientType === "individual" ? newLastName.trim() : undefined,
+      p_business_name: newClientType === "business" ? newBusinessName.trim() : undefined,
+      p_primary_email: newEmail || undefined,
+      p_primary_phone: newPhone || undefined,
+    });
+    setCreating(false);
+    if (error) {
+      setCreateError(error.message);
+      return;
+    }
+    const result = data as { client_id: string };
+    onSelect({
+      id: result.client_id,
+      first_name: newClientType === "individual" ? newFirstName.trim() : null,
+      last_name: newClientType === "individual" ? newLastName.trim() : null,
+      business_name: newClientType === "business" ? newBusinessName.trim() : null,
+      client_type: newClientType,
+    });
+    setShowCreate(false);
+    setNewFirstName("");
+    setNewLastName("");
+    setNewBusinessName("");
+    setNewEmail("");
+    setNewPhone("");
+  }
+
+  if (selected) {
+    return (
+      <div className="mt-1 flex items-center justify-between rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm">
+        <span className="font-medium text-ink">{clientLabel(selected)}</span>
+        <button type="button" onClick={() => onSelect(null)} className="text-xs font-medium text-accent hover:underline">
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search clients by name..."
+        className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      />
+      {results.length > 0 && (
+        <ul className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-sm">
+          {results.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(c);
+                  setQuery("");
+                  setResults([]);
+                }}
+                className="block w-full px-3 py-2 text-left text-sm text-slate hover:bg-surfaceMuted"
+              >
+                {clientLabel(c)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!showCreate ? (
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+        >
+          <UserPlus size={13} /> No match -- create a new client
+        </button>
+      ) : (
+        <div className="mt-2 space-y-2 rounded-lg border border-border bg-surfaceMuted p-3">
+          <div className="flex gap-2">
+            {(["individual", "business"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setNewClientType(t)}
+                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium capitalize transition ${
+                  newClientType === t ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surface"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          {newClientType === "individual" ? (
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                placeholder="First name"
+                value={newFirstName}
+                onChange={(e) => setNewFirstName(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <input
+                placeholder="Last name"
+                value={newLastName}
+                onChange={(e) => setNewLastName(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+          ) : (
+            <input
+              placeholder="Business name"
+              value={newBusinessName}
+              onChange={(e) => setNewBusinessName(e.target.value)}
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="email"
+              placeholder="Email (optional)"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <input
+              type="tel"
+              placeholder="Phone (optional)"
+              value={newPhone}
+              onChange={(e) => setNewPhone(e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <p className="text-xs text-muted">Address and other details can be filled in later from the client&apos;s profile.</p>
+          {createError && <p className="text-xs text-danger">{createError}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setShowCreate(false)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate hover:bg-surface">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={createClientInline}
+              disabled={creating}
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {creating ? "Creating..." : "Create client"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function NewEngagementForm({
   workspaceId,
-  clients,
+  hasAnyClients,
+  defaultClient,
   engagementTypes,
-  defaultClientId,
   autoAssignToSelf,
 }: {
   workspaceId: string;
-  clients: ClientOption[];
+  hasAnyClients: boolean;
+  defaultClient: ClientOption | null;
   engagementTypes: { id: string; name: string }[];
-  defaultClientId?: string;
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -35,7 +252,7 @@ export function NewEngagementForm({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [clientId, setClientId] = useState(defaultClientId ?? "");
+  const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
   const [engagementTypeId, setEngagementTypeId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,8 +261,8 @@ export function NewEngagementForm({
     e.preventDefault();
     setError(null);
 
-    if (!clientId) {
-      setError("Select a client.");
+    if (!selectedClient) {
+      setError("Select or create a client.");
       return;
     }
 
@@ -63,7 +280,7 @@ export function NewEngagementForm({
       .from("engagements")
       .insert({
         workspace_id: workspaceId,
-        client_id: clientId,
+        client_id: selectedClient.id,
         engagement_type_id: engagementTypeId || null,
         assigned_staff_id: assignedStaffId,
       })
@@ -81,10 +298,10 @@ export function NewEngagementForm({
     router.refresh();
   }
 
-  if (clients.length === 0) {
+  if (!hasAnyClients && !selectedClient) {
     return (
       <p className="text-sm text-muted">
-        You need at least one client before you can create an engagement.
+        Search below to create your first client, then start an engagement for them.
       </p>
     );
   }
@@ -93,21 +310,7 @@ export function NewEngagementForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate">Client</label>
-        <select
-          required
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="" disabled>
-            Select a client
-          </option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {clientLabel(c)}
-            </option>
-          ))}
-        </select>
+        <ClientSearchField workspaceId={workspaceId} selected={selectedClient} onSelect={setSelectedClient} />
       </div>
 
       <div>
