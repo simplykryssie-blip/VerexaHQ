@@ -10,6 +10,16 @@ import { AddEngagementNoteForm } from "./AddEngagementNoteForm";
 import { AddTaskForm } from "./AddTaskForm";
 import { StageReviewActions } from "./StageReviewActions";
 import { AssignmentForm } from "./AssignmentForm";
+import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
+
+const EFILE_LABEL: Record<string, string> = {
+  not_filed: "Not filed",
+  ready_to_file: "Ready to file",
+  transmitted: "Transmitted",
+  accepted: "Accepted",
+  rejected: "Rejected",
+  paper_filed: "Paper filed",
+};
 
 function Section({
   title,
@@ -74,6 +84,8 @@ export function OverviewTab({
   staffOptions,
   organizerResponses,
   showStaffRoles = true,
+  taxDetail,
+  onViewTax,
 }: {
   engagement: EngagementRow;
   progress: ProgressRow | null;
@@ -83,6 +95,8 @@ export function OverviewTab({
   staffOptions: StaffOption[];
   organizerResponses: OrganizerResponseRow[];
   showStaffRoles?: boolean;
+  taxDetail: TaxDetailRow;
+  onViewTax: () => void;
 }) {
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
@@ -90,6 +104,25 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
+      <Section
+        title="Tax"
+        action={
+          <button type="button" onClick={onViewTax} className="text-xs font-medium text-accent hover:underline">
+            View Tax details &rarr;
+          </button>
+        }
+      >
+        {taxDetail ? (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+            <Field label="Tax year" value={taxDetail.tax_year} />
+            <Field label="Return type" value={taxDetail.return_type} />
+            <Field label="E-file status" value={EFILE_LABEL[taxDetail.efile_status] ?? taxDetail.efile_status} />
+          </div>
+        ) : (
+          <p className="text-sm text-muted">No tax details recorded yet.</p>
+        )}
+      </Section>
+
       <Section title="Status & progress">
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
           <div>

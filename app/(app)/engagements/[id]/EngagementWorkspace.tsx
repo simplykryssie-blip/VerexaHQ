@@ -194,6 +194,8 @@ export function EngagementWorkspace({
                 staffOptions={staffOptions}
                 organizerResponses={organizerResponses}
                 showStaffRoles={showStaffRoles}
+                taxDetail={taxDetail}
+                onViewTax={() => setTab("Tax")}
               />
             )}
             {tab === "Tax" && (
