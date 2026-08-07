@@ -7,6 +7,20 @@ import { createClient } from "@/lib/supabase/client";
 
 type EngagementTypeOption = { id: string; name: string };
 
+function digitsOnly(value: string) {
+  return value.replace(/\D/g, "").slice(0, 9);
+}
+
+function formatSsnOrItin(value: string) {
+  const d = digitsOnly(value);
+  return [d.slice(0, 3), d.slice(3, 5), d.slice(5, 9)].filter(Boolean).join("-");
+}
+
+function formatEin(value: string) {
+  const d = digitsOnly(value);
+  return [d.slice(0, 2), d.slice(2, 9)].filter(Boolean).join("-");
+}
+
 export function NewClientButton({
   workspaceId,
   workspaceName,
@@ -63,6 +77,18 @@ export function NewClientButton({
     }
     if (inviteToPortal && !email) {
       setError("An email is required to invite this client to the portal.");
+      return;
+    }
+    if (clientType === "individual" && ssn && digitsOnly(ssn).length !== 9) {
+      setError("SSN must be exactly 9 digits.");
+      return;
+    }
+    if (clientType === "individual" && itin && digitsOnly(itin).length !== 9) {
+      setError("ITIN must be exactly 9 digits.");
+      return;
+    }
+    if (clientType === "business" && ein && digitsOnly(ein).length !== 9) {
+      setError("EIN must be exactly 9 digits.");
       return;
     }
 
@@ -237,23 +263,29 @@ export function NewClientButton({
               {clientType === "individual" ? (
                 <div className="grid grid-cols-2 gap-3">
                   <input
-                    placeholder="SSN (optional)"
+                    inputMode="numeric"
+                    maxLength={11}
+                    placeholder="SSN (optional, XXX-XX-XXXX)"
                     value={ssn}
-                    onChange={(e) => setSsn(e.target.value)}
+                    onChange={(e) => setSsn(formatSsnOrItin(e.target.value))}
                     className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <input
-                    placeholder="ITIN (optional)"
+                    inputMode="numeric"
+                    maxLength={11}
+                    placeholder="ITIN (optional, XXX-XX-XXXX)"
                     value={itin}
-                    onChange={(e) => setItin(e.target.value)}
+                    onChange={(e) => setItin(formatSsnOrItin(e.target.value))}
                     className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
               ) : (
                 <input
-                  placeholder="EIN (optional)"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="EIN (optional, XX-XXXXXXX)"
                   value={ein}
-                  onChange={(e) => setEin(e.target.value)}
+                  onChange={(e) => setEin(formatEin(e.target.value))}
                   className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
               )}
