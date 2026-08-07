@@ -263,7 +263,7 @@ export default function ActivateServiceModal({
                 {staff.length > 0 && (
                   <Field label="Assigned team member (optional)">
                     <select value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)} className="w-full rounded-lg border border-line px-2.5 py-2 text-sm">
-                      <option value="">Unassigned (defaults to the client's relationship manager, if set)</option>
+                      <option value="">Unassigned (defaults to the client&apos;s relationship manager, if set)</option>
                       {staff.map((m) => (
                         <option key={m.userId} value={m.userId}>
                           {m.name}
