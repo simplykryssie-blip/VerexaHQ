@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
+import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { getCurrentWorkspace } from "@/lib/workspace";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex h-screen overflow-hidden bg-surfaceMuted">
         <Sidebar workspaceName={workspace.name} />
         <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
+          <GlobalClientDraftBanner />
           {children}
         </main>
       </div>

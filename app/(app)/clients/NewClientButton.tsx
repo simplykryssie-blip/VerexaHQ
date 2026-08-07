@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
-import { ResumeClientDraftBanner } from "@/components/ResumeClientDraftBanner";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 
 const DRAFT_KEY = "new-client-button";
@@ -56,9 +55,9 @@ export function NewClientButton({
   engagementTypes: EngagementTypeOption[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
   const [clientType, setClientType] = useState<"individual" | "business">("individual");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -83,8 +82,16 @@ export function NewClientButton({
   const isBusiness = clientType === "business";
 
   useEffect(() => {
-    setHasDraft(Boolean(loadClientDraft<Draft>(DRAFT_KEY)));
-  }, []);
+    // Landed here from the global draft banner (which can surface this
+    // resume option from any page, not just this one) -- reopen the form
+    // pre-filled instead of requiring the user to notice and re-open it.
+    if (searchParams.get("resumeClientDraft") !== DRAFT_KEY) return;
+    const draft = loadClientDraft<Draft>(DRAFT_KEY);
+    if (draft) applyDraft(draft);
+    setOpen(true);
+    router.replace("/clients");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   function applyDraft(draft: Draft) {
     setClientType(draft.clientType);
@@ -104,18 +111,6 @@ export function NewClientButton({
     setItin(draft.itin);
     setEin(draft.ein);
     setInviteToPortal(draft.inviteToPortal);
-  }
-
-  function handleResumeDraft() {
-    const draft = loadClientDraft<Draft>(DRAFT_KEY);
-    if (draft) applyDraft(draft);
-    setHasDraft(false);
-    setOpen(true);
-  }
-
-  function handleDiscardDraft() {
-    clearClientDraft(DRAFT_KEY);
-    setHasDraft(false);
   }
 
   function currentDraft(): Draft {
@@ -299,7 +294,6 @@ export function NewClientButton({
 
   return (
     <>
-      {hasDraft && !open && <ResumeClientDraftBanner onResume={handleResumeDraft} onDiscard={handleDiscardDraft} />}
       <button
         type="button"
         onClick={() => setOpen(true)}

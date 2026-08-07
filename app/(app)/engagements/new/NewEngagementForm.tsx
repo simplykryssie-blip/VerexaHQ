@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { UserPlus } from "lucide-react";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
-import { ResumeClientDraftBanner } from "@/components/ResumeClientDraftBanner";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 
 const DRAFT_KEY = "new-engagement-inline";
@@ -54,15 +53,14 @@ function ClientSearchField({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<{ matchedOn: string[]; existingClientId: string } | null>(null);
-  const [hasDraft, setHasDraft] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
-    setHasDraft(Boolean(loadClientDraft<InlineDraft>(DRAFT_KEY)));
-  }, []);
-
-  function resumeDraft() {
+    // Landed here from the global draft banner -- reopen the inline create
+    // panel pre-filled instead of requiring a second manual step.
+    if (searchParams.get("resumeClientDraft") !== DRAFT_KEY) return;
     const draft = loadClientDraft<InlineDraft>(DRAFT_KEY);
     if (draft) {
       setNewClientType(draft.clientType);
@@ -72,14 +70,10 @@ function ClientSearchField({
       setNewEmail(draft.email);
       setNewPhone(draft.phone);
     }
-    setHasDraft(false);
     setShowCreate(true);
-  }
-
-  function discardDraft() {
-    clearClientDraft(DRAFT_KEY);
-    setHasDraft(false);
-  }
+    router.replace("/engagements/new");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -171,7 +165,6 @@ function ClientSearchField({
 
   return (
     <div ref={containerRef} className="relative">
-      {hasDraft && !showCreate && <ResumeClientDraftBanner onResume={resumeDraft} onDiscard={discardDraft} />}
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
