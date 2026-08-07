@@ -299,12 +299,14 @@ export function NewEngagementForm({
   hasAnyClients,
   defaultClient,
   engagementTypes,
+  services,
   autoAssignToSelf,
 }: {
   workspaceId: string;
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
   engagementTypes: { id: string; name: string }[];
+  services: { id: string; name: string; process_id: string | null }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -314,6 +316,7 @@ export function NewEngagementForm({
   const supabase = createClient();
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
   const [engagementTypeId, setEngagementTypeId] = useState("");
+  const [serviceId, setServiceId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -323,6 +326,10 @@ export function NewEngagementForm({
 
     if (!selectedClient) {
       setError("Select or create a client.");
+      return;
+    }
+    if (!serviceId) {
+      setError("Select a service.");
       return;
     }
 
@@ -336,12 +343,40 @@ export function NewEngagementForm({
       assignedStaffId = user?.id ?? null;
     }
 
+    // The service is what actually connects this engagement to a real
+    // workflow -- workflow_id/current_stage are how process_stages (and the
+    // stage editor built against them) know which engagements they affect,
+    // so every new engagement needs to land on the service's process's
+    // first stage rather than being created structurally disconnected from it.
+    const selectedService = services.find((s) => s.id === serviceId);
+    let workflowId: string | null = null;
+    let currentStage: string | null = null;
+    if (selectedService?.process_id) {
+      workflowId = selectedService.process_id;
+      const { data: firstStage, error: stageError } = await supabase
+        .from("process_stages")
+        .select("name")
+        .eq("process_id", selectedService.process_id)
+        .order("display_order", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (stageError) {
+        setLoading(false);
+        setError(stageError.message);
+        return;
+      }
+      currentStage = firstStage?.name ?? null;
+    }
+
     const { data, error } = await supabase
       .from("engagements")
       .insert({
         workspace_id: workspaceId,
         client_id: selectedClient.id,
         engagement_type_id: engagementTypeId || null,
+        service_id: serviceId,
+        workflow_id: workflowId,
+        current_stage: currentStage,
         assigned_staff_id: assignedStaffId,
       })
       .select("id")
@@ -366,6 +401,14 @@ export function NewEngagementForm({
     );
   }
 
+  if (services.length === 0) {
+    return (
+      <p className="text-sm text-muted">
+        No published services yet -- add one in Settings &gt; Service Packages before creating an engagement.
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
@@ -374,7 +417,27 @@ export function NewEngagementForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-slate">Engagement type</label>
+        <label className="block text-sm font-medium text-slate">Service</label>
+        <select
+          required
+          value={serviceId}
+          onChange={(e) => setServiceId(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          <option value="" disabled>
+            Select a service
+          </option>
+          {services.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate">Engagement type (optional)</label>
         <select
           value={engagementTypeId}
           onChange={(e) => setEngagementTypeId(e.target.value)}
