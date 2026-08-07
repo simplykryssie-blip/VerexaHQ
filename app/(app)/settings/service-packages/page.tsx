@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
@@ -5,6 +6,7 @@ import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
 import { CreatePricingRuleForm, CreateBillingRuleForm } from "@/components/settings/CreatePricingBillingRuleForms";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { ServiceEditRow } from "@/components/settings/ServiceEditRow";
+import { CloneServiceButton } from "@/components/settings/CloneServiceButton";
 import { PricingRuleEditRow, BillingRuleEditRow } from "@/components/settings/RuleEditRow";
 
 export const dynamic = "force-dynamic";
@@ -120,6 +122,15 @@ export default async function ServicePackagesPage() {
                     {s.is_bookable && " -- Bookable"}
                     {s.is_portal_visible && " -- Portal visible"}
                   </p>
+                  <div className="mt-1">
+                    {s.workspace_id ? (
+                      <Link href={`/settings/service-packages/${s.id}`} className="text-xs font-medium text-accent hover:underline">
+                        Manage stages
+                      </Link>
+                    ) : (
+                      <CloneServiceButton serviceId={s.id} workspaceId={workspace.id} />
+                    )}
+                  </div>
                 </div>
                 <TemplateStatusCycle table="services" id={s.id} status={s.status} />
               </li>
