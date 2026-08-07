@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
+import { DeleteEngagementButton } from "./DeleteEngagementButton";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
@@ -145,6 +146,7 @@ export function EngagementWorkspace({
             {engagement.due_date && <span>Due {new Date(engagement.due_date).toLocaleDateString()}</span>}
           </div>
         }
+        actions={permissions.engagementsManage && <DeleteEngagementButton engagementId={engagement.id} workspaceId={workspace.id} />}
       />
 
       <div className="border-b border-border bg-surface px-8 py-3">
