@@ -56,7 +56,7 @@ export function IrsNoticesPanel({
               { name: "notice_type", label: "Notice type (e.g. CP2000)", required: true },
               { name: "notice_date", label: "Notice date", required: true },
               { name: "response_due_date", label: "Response due date" },
-              { name: "description", label: "Description" },
+              { name: "description", label: "Description", type: "textarea" },
             ]}
             onSubmit={async (v) => {
               const { error } = await supabase.from("irs_notices").insert({
