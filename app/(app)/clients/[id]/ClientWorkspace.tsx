@@ -35,6 +35,7 @@ type Workspace = { id: string; name: string; workspace_type: string };
 
 type ClientRow = {
   id: string;
+  client_number: string | null;
   client_type: string;
   first_name: string | null;
   last_name: string | null;
@@ -165,6 +166,7 @@ export function ClientWorkspace({
         title={displayName(client)}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+            {client.client_number && <span className="font-medium text-slate">{client.client_number}</span>}
             <span className="capitalize">{client.client_type}</span>
             {primaryService && <span>{primaryService}</span>}
             <span className="capitalize">{client.lifecycle_status}</span>

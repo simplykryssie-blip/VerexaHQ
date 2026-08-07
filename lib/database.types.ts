@@ -1279,6 +1279,7 @@ export type Database = {
           address_line2: string | null
           business_name: string | null
           city: string | null
+          client_number: string | null
           client_type: string
           country: string
           created_at: string
@@ -1320,6 +1321,7 @@ export type Database = {
           address_line2?: string | null
           business_name?: string | null
           city?: string | null
+          client_number?: string | null
           client_type?: string
           country?: string
           created_at?: string
@@ -1361,6 +1363,7 @@ export type Database = {
           address_line2?: string | null
           business_name?: string | null
           city?: string | null
+          client_number?: string | null
           client_type?: string
           country?: string
           created_at?: string
