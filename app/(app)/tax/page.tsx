@@ -52,7 +52,9 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
   if (activeTab === "returns") {
     const { data: rows } = await supabase
       .from("engagement_tax_details")
-      .select("engagement_id, tax_year, return_type, efile_status, is_extended, engagements(id, engagement_number, status, due_date, client_id, clients(first_name, last_name, business_name, client_type))")
+      .select(
+        "engagement_id, tax_year, return_type, efile_status, is_extended, federal_refund_amount, federal_balance_due, engagements(id, engagement_number, status, due_date, client_id, clients(first_name, last_name, business_name, client_type))"
+      )
       .order("tax_year", { ascending: false });
 
     return (
@@ -72,6 +74,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                     <th className="px-4 py-2 text-left font-medium">Tax year</th>
                     <th className="px-4 py-2 text-left font-medium">Status</th>
                     <th className="px-4 py-2 text-left font-medium">E-file</th>
+                    <th className="px-4 py-2 text-left font-medium">Refund / Balance</th>
                     <th className="px-4 py-2 text-left font-medium">Due</th>
                   </tr>
                 </thead>
@@ -98,6 +101,15 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                         <td className="px-4 py-2 text-slate">{r.tax_year ?? "--"}</td>
                         <td className="px-4 py-2 text-slate capitalize">{e.status}</td>
                         <td className="px-4 py-2 text-slate">{EFILE_LABEL[r.efile_status] ?? r.efile_status}</td>
+                        <td className="px-4 py-2 text-slate">
+                          {r.federal_refund_amount ? (
+                            <span className="text-success">+${Number(r.federal_refund_amount).toLocaleString()}</span>
+                          ) : r.federal_balance_due ? (
+                            <span className="text-danger">-${Number(r.federal_balance_due).toLocaleString()}</span>
+                          ) : (
+                            "--"
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
                       </tr>
                     );

@@ -2719,6 +2719,9 @@ export type Database = {
           engagement_id: string
           extension_due_date: string | null
           extension_filed_date: string | null
+          federal_balance_due: number | null
+          federal_refund_amount: number | null
+          filing_status: string | null
           is_amended: boolean
           is_extended: boolean
           original_engagement_id: string | null
@@ -2736,6 +2739,9 @@ export type Database = {
           engagement_id: string
           extension_due_date?: string | null
           extension_filed_date?: string | null
+          federal_balance_due?: number | null
+          federal_refund_amount?: number | null
+          filing_status?: string | null
           is_amended?: boolean
           is_extended?: boolean
           original_engagement_id?: string | null
@@ -2753,6 +2759,9 @@ export type Database = {
           engagement_id?: string
           extension_due_date?: string | null
           extension_filed_date?: string | null
+          federal_balance_due?: number | null
+          federal_refund_amount?: number | null
+          filing_status?: string | null
           is_amended?: boolean
           is_extended?: boolean
           original_engagement_id?: string | null
@@ -7077,7 +7086,10 @@ export type Database = {
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
       reveal_client_itin: { Args: { p_client_id: string }; Returns: string }
-      reveal_client_relationship_ssn: { Args: { p_relationship_id: string }; Returns: string }
+      reveal_client_relationship_ssn: {
+        Args: { p_relationship_id: string }
+        Returns: string
+      }
       reveal_client_ssn: { Args: { p_client_id: string }; Returns: string }
       reveal_firm_efin: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ein: { Args: { p_workspace_id: string }; Returns: string }

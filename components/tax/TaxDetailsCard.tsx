@@ -8,6 +8,9 @@ import { useToast } from "@/components/Toast";
 export type TaxDetailRow = {
   tax_year: number | null;
   return_type: string | null;
+  filing_status: string | null;
+  federal_refund_amount: number | null;
+  federal_balance_due: number | null;
   is_amended: boolean;
   is_extended: boolean;
   extension_filed_date: string | null;
@@ -20,6 +23,14 @@ export type TaxDetailRow = {
 } | null;
 
 const EFILE_STATUSES = ["not_filed", "ready_to_file", "transmitted", "accepted", "rejected", "paper_filed"] as const;
+
+const FILING_STATUSES = [
+  { value: "single", label: "Single" },
+  { value: "mfj", label: "Married Filing Jointly" },
+  { value: "mfs", label: "Married Filing Separately" },
+  { value: "hoh", label: "Head of Household" },
+  { value: "qss", label: "Qualifying Surviving Spouse" },
+] as const;
 
 // Most common first -- solo/individual returns dominate this practice's
 // volume, per the product's own stated tier priorities.
@@ -54,6 +65,9 @@ export function TaxDetailsCard({
   const yearOptions = detail?.tax_year && !taxYears.includes(detail.tax_year) ? [detail.tax_year, ...taxYears] : taxYears;
   const [taxYear, setTaxYear] = useState(detail?.tax_year?.toString() ?? "");
   const [returnType, setReturnType] = useState(detail?.return_type ?? "");
+  const [filingStatus, setFilingStatus] = useState(detail?.filing_status ?? "");
+  const [federalRefundAmount, setFederalRefundAmount] = useState(detail?.federal_refund_amount?.toString() ?? "");
+  const [federalBalanceDue, setFederalBalanceDue] = useState(detail?.federal_balance_due?.toString() ?? "");
   const [isAmended, setIsAmended] = useState(detail?.is_amended ?? false);
   const [isExtended, setIsExtended] = useState(detail?.is_extended ?? false);
   const [extensionDueDate, setExtensionDueDate] = useState(detail?.extension_due_date ?? "");
@@ -65,6 +79,9 @@ export function TaxDetailsCard({
   useEffect(() => {
     setTaxYear(detail?.tax_year?.toString() ?? "");
     setReturnType(detail?.return_type ?? "");
+    setFilingStatus(detail?.filing_status ?? "");
+    setFederalRefundAmount(detail?.federal_refund_amount?.toString() ?? "");
+    setFederalBalanceDue(detail?.federal_balance_due?.toString() ?? "");
     setIsAmended(detail?.is_amended ?? false);
     setIsExtended(detail?.is_extended ?? false);
     setExtensionDueDate(detail?.extension_due_date ?? "");
@@ -82,6 +99,9 @@ export function TaxDetailsCard({
         workspace_id: workspaceId,
         tax_year: taxYear ? parseInt(taxYear, 10) : null,
         return_type: returnType || null,
+        filing_status: filingStatus || null,
+        federal_refund_amount: federalRefundAmount ? parseFloat(federalRefundAmount) : null,
+        federal_balance_due: federalBalanceDue ? parseFloat(federalBalanceDue) : null,
         is_amended: isAmended,
         is_extended: isExtended,
         extension_due_date: isExtended ? extensionDueDate || null : null,
@@ -143,6 +163,24 @@ export function TaxDetailsCard({
           </select>
         </div>
         <div>
+          <label htmlFor="filing_status" className="block text-xs font-medium text-muted">
+            Filing status
+          </label>
+          <select
+            id="filing_status"
+            value={filingStatus}
+            onChange={(e) => setFilingStatus(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">Not set</option>
+            {FILING_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label htmlFor="efile_status" className="block text-xs font-medium text-muted">
             E-file status
           </label>
@@ -158,6 +196,36 @@ export function TaxDetailsCard({
               </option>
             ))}
           </select>
+        </div>
+        <div>
+          <label htmlFor="federal_refund_amount" className="block text-xs font-medium text-muted">
+            Federal refund
+          </label>
+          <input
+            id="federal_refund_amount"
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            value={federalRefundAmount}
+            onChange={(e) => setFederalRefundAmount(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+        <div>
+          <label htmlFor="federal_balance_due" className="block text-xs font-medium text-muted">
+            Federal balance due
+          </label>
+          <input
+            id="federal_balance_due"
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            value={federalBalanceDue}
+            onChange={(e) => setFederalBalanceDue(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
         </div>
         <div className="flex flex-col justify-center gap-2">
           <label className="flex items-center gap-2 text-sm text-slate">
