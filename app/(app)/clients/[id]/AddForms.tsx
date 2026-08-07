@@ -13,7 +13,7 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
   const supabase = createClient();
   return (
     <InlineAddForm
-      label="Add Contact"
+      label="Add a contact"
       fields={[
         { name: "first_name", label: "First name", required: true },
         { name: "last_name", label: "Last name", required: true },

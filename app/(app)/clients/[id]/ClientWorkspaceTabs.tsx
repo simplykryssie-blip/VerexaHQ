@@ -8,7 +8,7 @@ import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanFor
 import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
 import { PreviewButton } from "@/components/billing/PreviewButton";
-import { AddRelationshipForm, RelationshipsList } from "./RelationshipsSection";
+import { AddRelationshipForm, LinkExistingClientForm, RelationshipsList } from "./RelationshipsSection";
 import { ClientAssignmentForm } from "./ClientAssignmentForm";
 import { AddAppointmentForm } from "./AddAppointmentForm";
 import {
@@ -190,8 +190,17 @@ export function OverviewTab({
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Contacts</h3>
-            <AddContactForm clientId={client.id} workspaceId={workspaceId} />
+            <div className="flex items-center gap-3">
+              <LinkExistingClientForm clientId={client.id} workspaceId={workspaceId} />
+              <AddContactForm clientId={client.id} workspaceId={workspaceId} />
+            </div>
           </div>
+          {relationships.length > 0 && (
+            <div className="mb-3">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Linked clients</p>
+              <RelationshipsList relationships={relationships} />
+            </div>
+          )}
           {contacts.length === 0 ? (
             <EmptyState message="No contacts yet." />
           ) : (

@@ -43,6 +43,147 @@ function RevealRelationshipSsn({ relationshipId, last4 }: { relationshipId: stri
   );
 }
 
+// "Link an existing client" -- search-and-select only, no freeform name/dob/ssn
+// entry, since this always points at a real client record rather than creating
+// a standalone contact person. Distinct from AddRelationshipForm's fuller flow
+// (which also handles relationships that aren't linked to any client record)
+// even though both write to client_relationships.
+export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: string; workspaceId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [open, setOpen] = useState(false);
+  const [relationshipType, setRelationshipType] = useState(RELATIONSHIP_TYPES[0]);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ClientSearchResult[]>([]);
+  const [selectedClient, setSelectedClient] = useState<ClientSearchResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function search(q: string) {
+    setQuery(q);
+    setSelectedClient(null);
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("clients")
+      .select("id, client_type, first_name, last_name, business_name")
+      .eq("workspace_id", workspaceId)
+      .neq("id", clientId)
+      .is("merged_into_client_id", null)
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,business_name.ilike.%${q}%`)
+      .limit(6);
+    setResults(
+      (data ?? []).map((c) => ({
+        id: c.id,
+        label: c.client_type === "business" && c.business_name ? c.business_name : [c.first_name, c.last_name].filter(Boolean).join(" "),
+      }))
+    );
+  }
+
+  async function link(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!selectedClient) {
+      setError("Search for and select an existing client.");
+      return;
+    }
+    setSaving(true);
+    const { error: rpcError } = await supabase.rpc("create_client_relationship", {
+      p_client_id: clientId,
+      p_workspace_id: workspaceId,
+      p_relationship_type: relationshipType,
+      p_related_name: selectedClient.label,
+      p_related_client_id: selectedClient.id,
+    });
+    setSaving(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    setOpen(false);
+    setQuery("");
+    setSelectedClient(null);
+    router.refresh();
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="text-xs font-medium text-accent hover:underline">
+        + Link existing client
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={link} className="mt-2 space-y-2 rounded-lg border border-border bg-surfaceMuted p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1 text-xs text-muted">
+          Relationship
+          <select
+            value={relationshipType}
+            onChange={(e) => setRelationshipType(e.target.value)}
+            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {RELATIONSHIP_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t[0].toUpperCase() + t.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="relative flex flex-col gap-1 text-xs text-muted">
+          Search existing clients
+          <input
+            value={selectedClient ? selectedClient.label : query}
+            onChange={(e) => {
+              if (selectedClient) return;
+              search(e.target.value);
+            }}
+            disabled={Boolean(selectedClient)}
+            placeholder="Start typing..."
+            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surface"
+          />
+          {selectedClient && (
+            <button type="button" onClick={() => { setSelectedClient(null); setQuery(""); }} className="absolute right-1.5 top-6 text-xs text-accent hover:underline">
+              Clear
+            </button>
+          )}
+          {results.length > 0 && (
+            <ul className="absolute top-full z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-sm">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedClient(r);
+                      setQuery(r.label);
+                      setResults([]);
+                    }}
+                    className="block w-full px-2 py-1.5 text-left text-sm text-slate hover:bg-surfaceMuted"
+                  >
+                    {r.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </label>
+      </div>
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate hover:bg-surface">
+          Cancel
+        </button>
+        <button type="submit" disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
+          {saving ? "Linking..." : "Link client"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function AddRelationshipForm({ clientId, workspaceId }: { clientId: string; workspaceId: string }) {
   const router = useRouter();
   const supabase = createClient();
