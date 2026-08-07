@@ -161,11 +161,11 @@ export function OverviewTab({
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
               <TaxIdReveal clientId={client.id} kind="itin" last4={client.itin_last4} />
+              <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
             </>
           ) : (
             <TaxIdReveal clientId={client.id} kind="ein" last4={client.ein_last4} />
           )}
-          <DateOfBirthInput clientId={client.id} currentDate={client.date_of_birth} />
         </dl>
 
         {showStaffRoles && (
@@ -181,6 +181,7 @@ export function OverviewTab({
           </div>
         )}
 
+        {client.client_type === "business" && (
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Contacts</h3>
@@ -236,6 +237,7 @@ export function OverviewTab({
             </div>
           )}
         </div>
+        )}
 
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
@@ -256,6 +258,7 @@ export function OverviewTab({
           )}
         </div>
 
+        {client.client_type === "individual" && (
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Relationships</h3>
@@ -263,6 +266,7 @@ export function OverviewTab({
           </div>
           <RelationshipsList relationships={relationships} />
         </div>
+        )}
       </Section>
 
       <Section
