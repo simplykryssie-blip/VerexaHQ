@@ -4,6 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { UserPlus } from "lucide-react";
+import { DuplicateClientModal } from "@/components/DuplicateClientModal";
+import { ResumeClientDraftBanner } from "@/components/ResumeClientDraftBanner";
+import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
+
+const DRAFT_KEY = "new-engagement-inline";
+
+type InlineDraft = {
+  clientType: "individual" | "business";
+  firstName: string;
+  lastName: string;
+  businessName: string;
+  email: string;
+  phone: string;
+};
 
 type ClientOption = {
   id: string;
@@ -39,7 +53,33 @@ function ClientSearchField({
   const [newPhone, setNewPhone] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<{ matchedOn: string[]; existingClientId: string } | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    setHasDraft(Boolean(loadClientDraft<InlineDraft>(DRAFT_KEY)));
+  }, []);
+
+  function resumeDraft() {
+    const draft = loadClientDraft<InlineDraft>(DRAFT_KEY);
+    if (draft) {
+      setNewClientType(draft.clientType);
+      setNewFirstName(draft.firstName);
+      setNewLastName(draft.lastName);
+      setNewBusinessName(draft.businessName);
+      setNewEmail(draft.email);
+      setNewPhone(draft.phone);
+    }
+    setHasDraft(false);
+    setShowCreate(true);
+  }
+
+  function discardDraft() {
+    clearClientDraft(DRAFT_KEY);
+    setHasDraft(false);
+  }
 
   useEffect(() => {
     if (!query.trim()) {
@@ -95,7 +135,13 @@ function ClientSearchField({
       setCreateError(error.message);
       return;
     }
-    const result = data as { client_id: string };
+    const result = data as { client_id: string; is_new: boolean; duplicate_matched_on: string[] };
+    if (!result.is_new) {
+      // Matched an existing client -- don't select it into this engagement
+      // silently. Block here until the user confirms it's not a duplicate.
+      setDuplicateMatch({ matchedOn: result.duplicate_matched_on ?? [], existingClientId: result.client_id });
+      return;
+    }
     onSelect({
       id: result.client_id,
       first_name: newClientType === "individual" ? newFirstName.trim() : null,
@@ -109,6 +155,7 @@ function ClientSearchField({
     setNewBusinessName("");
     setNewEmail("");
     setNewPhone("");
+    clearClientDraft(DRAFT_KEY);
   }
 
   if (selected) {
@@ -124,6 +171,7 @@ function ClientSearchField({
 
   return (
     <div ref={containerRef} className="relative">
+      {hasDraft && !showCreate && <ResumeClientDraftBanner onResume={resumeDraft} onDiscard={discardDraft} />}
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -229,6 +277,25 @@ function ClientSearchField({
             </button>
           </div>
         </div>
+      )}
+
+      {duplicateMatch && (
+        <DuplicateClientModal
+          matchedOn={duplicateMatch.matchedOn}
+          existingClientId={duplicateMatch.existingClientId}
+          onCancel={() => setDuplicateMatch(null)}
+          onViewExisting={() => {
+            saveClientDraft(DRAFT_KEY, {
+              clientType: newClientType,
+              firstName: newFirstName,
+              lastName: newLastName,
+              businessName: newBusinessName,
+              email: newEmail,
+              phone: newPhone,
+            } satisfies InlineDraft);
+            router.push(`/clients/${duplicateMatch.existingClientId}`);
+          }}
+        />
       )}
     </div>
   );

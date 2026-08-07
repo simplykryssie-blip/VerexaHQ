@@ -1,11 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { DuplicateClientModal } from "@/components/DuplicateClientModal";
+import { ResumeClientDraftBanner } from "@/components/ResumeClientDraftBanner";
+import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
+
+const DRAFT_KEY = "new-client-button";
 
 type EngagementTypeOption = { id: string; name: string };
+
+type Draft = {
+  clientType: "individual" | "business";
+  firstName: string;
+  lastName: string;
+  businessName: string;
+  email: string;
+  phone: string;
+  contactFirstName: string;
+  contactLastName: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+  serviceIds: string[];
+  ssn: string;
+  itin: string;
+  ein: string;
+  inviteToPortal: boolean;
+};
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, "").slice(0, 9);
@@ -33,6 +58,7 @@ export function NewClientButton({
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
   const [clientType, setClientType] = useState<"individual" | "business">("individual");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -52,8 +78,67 @@ export function NewClientButton({
   const [inviteToPortal, setInviteToPortal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [duplicateMatch, setDuplicateMatch] = useState<{ matchedOn: string[]; existingClientId: string } | null>(null);
 
   const isBusiness = clientType === "business";
+
+  useEffect(() => {
+    setHasDraft(Boolean(loadClientDraft<Draft>(DRAFT_KEY)));
+  }, []);
+
+  function applyDraft(draft: Draft) {
+    setClientType(draft.clientType);
+    setFirstName(draft.firstName);
+    setLastName(draft.lastName);
+    setBusinessName(draft.businessName);
+    setEmail(draft.email);
+    setPhone(draft.phone);
+    setContactFirstName(draft.contactFirstName);
+    setContactLastName(draft.contactLastName);
+    setStreet(draft.street);
+    setCity(draft.city);
+    setState(draft.state);
+    setZip(draft.zip);
+    setServiceIds(draft.serviceIds);
+    setSsn(draft.ssn);
+    setItin(draft.itin);
+    setEin(draft.ein);
+    setInviteToPortal(draft.inviteToPortal);
+  }
+
+  function handleResumeDraft() {
+    const draft = loadClientDraft<Draft>(DRAFT_KEY);
+    if (draft) applyDraft(draft);
+    setHasDraft(false);
+    setOpen(true);
+  }
+
+  function handleDiscardDraft() {
+    clearClientDraft(DRAFT_KEY);
+    setHasDraft(false);
+  }
+
+  function currentDraft(): Draft {
+    return {
+      clientType,
+      firstName,
+      lastName,
+      businessName,
+      email,
+      phone,
+      contactFirstName,
+      contactLastName,
+      street,
+      city,
+      state,
+      zip,
+      serviceIds,
+      ssn,
+      itin,
+      ein,
+      inviteToPortal,
+    };
+  }
 
   function toggleService(id: string) {
     setServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -114,7 +199,18 @@ export function NewClientButton({
       return;
     }
 
-    const result = data as { client_id: string };
+    const result = data as { client_id: string; is_new: boolean; duplicate_matched_on: string[] };
+    setLoading(false);
+
+    if (!result.is_new) {
+      // Matched an existing client -- stop here. No address, contact,
+      // engagement, or portal invite gets attached until the user confirms
+      // this genuinely isn't a duplicate.
+      setDuplicateMatch({ matchedOn: result.duplicate_matched_on ?? [], existingClientId: result.client_id });
+      return;
+    }
+
+    setLoading(true);
 
     const { error: addressError } = await supabase.from("client_addresses").insert({
       client_id: result.client_id,
@@ -196,12 +292,14 @@ export function NewClientButton({
 
     setLoading(false);
     setOpen(false);
+    clearClientDraft(DRAFT_KEY);
     router.push(`/clients/${result.client_id}`);
     router.refresh();
   }
 
   return (
     <>
+      {hasDraft && !open && <ResumeClientDraftBanner onResume={handleResumeDraft} onDiscard={handleDiscardDraft} />}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -428,6 +526,18 @@ export function NewClientButton({
             </form>
           </div>
         </div>
+      )}
+
+      {duplicateMatch && (
+        <DuplicateClientModal
+          matchedOn={duplicateMatch.matchedOn}
+          existingClientId={duplicateMatch.existingClientId}
+          onCancel={() => setDuplicateMatch(null)}
+          onViewExisting={() => {
+            saveClientDraft(DRAFT_KEY, currentDraft());
+            router.push(`/clients/${duplicateMatch.existingClientId}`);
+          }}
+        />
       )}
     </>
   );
