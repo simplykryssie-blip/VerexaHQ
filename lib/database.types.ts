@@ -6726,6 +6726,10 @@ export type Database = {
         Args: { p_token: string }
         Returns: string
       }
+      add_process_stage: {
+        Args: { p_service_id: string; p_stage_name: string }
+        Returns: string
+      }
       advance_onboarding_step: {
         Args: {
           p_selected_blueprint_id?: string
@@ -6866,6 +6870,14 @@ export type Database = {
       }
       decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_firm_secret: { Args: { p_ciphertext: string }; Returns: string }
+      delete_process_stage: {
+        Args: {
+          p_destination_stage_id?: string
+          p_new_stage_name?: string
+          p_stage_id: string
+        }
+        Returns: undefined
+      }
       duplicate_config_object: {
         Args: {
           p_id: string
@@ -7073,6 +7085,10 @@ export type Database = {
           p_token: string
           p_typed_name?: string
         }
+        Returns: undefined
+      }
+      rename_process_stage: {
+        Args: { p_new_name: string; p_stage_id: string }
         Returns: undefined
       }
       respond_to_engagement_share: {
