@@ -17,7 +17,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage,
       client_id, service_id,
       clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id, primary_email, primary_phone),
-      engagement_types(name),
+      services(name),
       assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
       reviewer:user_profiles!engagements_reviewer_id_fkey(id, display_name),
       compliance_officer:user_profiles!engagements_compliance_officer_id_fkey(id, display_name)`

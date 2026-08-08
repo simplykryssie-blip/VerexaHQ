@@ -143,7 +143,7 @@ export function ClientWorkspace({
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
   const primaryService = openEngagement
-    ? (openEngagement as unknown as { engagement_types?: { name: string } | null }).engagement_types?.name
+    ? (openEngagement as unknown as { services?: { name: string } | null }).services?.name
     : undefined;
   const portalStatus = portalUsers.some((p) => p.status === "active")
     ? "Active"

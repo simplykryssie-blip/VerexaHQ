@@ -13,7 +13,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
   const supabase = createClient();
   const { data: engagement } = await supabase
     .from("engagements")
-    .select("id, engagement_number, status, due_date, client_id, engagement_types(name), engagement_tax_details(tax_year, return_type, is_extended, extension_due_date, efile_status)")
+    .select("id, engagement_number, status, due_date, client_id, services(name), engagement_tax_details(tax_year, return_type, is_extended, extension_due_date, efile_status)")
     .eq("id", params.id)
     .eq("client_id", identity.clientId)
     .maybeSingle();
@@ -65,7 +65,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
   return (
     <>
       <PageHeader
-        title={(engagement.engagement_types as unknown as { name?: string } | null)?.name ?? "Engagement"}
+        title={(engagement.services as unknown as { name?: string } | null)?.name ?? "Engagement"}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
             <span>{engagement.engagement_number}</span>

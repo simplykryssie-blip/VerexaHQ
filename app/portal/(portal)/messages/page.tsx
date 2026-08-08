@@ -23,10 +23,10 @@ export default async function PortalMessagesPage() {
   const engagementIds = Array.from(new Set((threads ?? []).filter((t) => t.entity_type === "engagement").map((t) => t.entity_id)));
   const { data: engagements } =
     engagementIds.length > 0
-      ? await supabase.from("engagements").select("id, engagement_number, engagement_types(name)").in("id", engagementIds)
-      : { data: [] as { id: string; engagement_number: string | null; engagement_types: { name: string } | null }[] };
+      ? await supabase.from("engagements").select("id, engagement_number, services(name)").in("id", engagementIds)
+      : { data: [] as { id: string; engagement_number: string | null; services: { name: string } | null }[] };
   const engagementLabel = new Map(
-    (engagements ?? []).map((e) => [e.id, `${(e.engagement_types as unknown as { name?: string } | null)?.name ?? "Engagement"} -- ${e.engagement_number ?? ""}`])
+    (engagements ?? []).map((e) => [e.id, `${(e.services as unknown as { name?: string } | null)?.name ?? "Engagement"} -- ${e.engagement_number ?? ""}`])
   );
 
   const threadsWithLabel = (threads ?? []).map((t) => ({

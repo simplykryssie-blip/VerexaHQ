@@ -14,7 +14,7 @@ export default async function PortalEngagementsPage() {
   const supabase = createClient();
   const { data: engagements } = await supabase
     .from("engagements")
-    .select("id, engagement_number, status, due_date, open_date, engagement_types(name), engagement_tax_details(tax_year, return_type, efile_status)")
+    .select("id, engagement_number, status, due_date, open_date, services(name), engagement_tax_details(tax_year, return_type, efile_status)")
     .eq("client_id", identity.clientId)
     .order("open_date", { ascending: false });
 
@@ -32,7 +32,7 @@ export default async function PortalEngagementsPage() {
                 <li key={e.id}>
                   <Link href={`/portal/engagements/${e.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-surfaceMuted">
                     <div>
-                      <p className="font-medium text-slate">{(e.engagement_types as unknown as { name?: string } | null)?.name ?? "Engagement"}</p>
+                      <p className="font-medium text-slate">{(e.services as unknown as { name?: string } | null)?.name ?? "Engagement"}</p>
                       <p className="text-xs text-muted">
                         {e.engagement_number}
                         {taxDetail?.tax_year && ` -- Tax year ${taxDetail.tax_year}`}

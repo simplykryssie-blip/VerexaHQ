@@ -18,7 +18,7 @@ export default async function PortalDashboardPage() {
     await Promise.all([
       supabase
         .from("engagements")
-        .select("id, engagement_number, status, due_date, engagement_types(name)")
+        .select("id, engagement_number, status, due_date, services(name)")
         .eq("client_id", identity.clientId)
         .order("open_date", { ascending: false }),
       supabase
@@ -65,7 +65,7 @@ export default async function PortalDashboardPage() {
                 {activeEngagements.slice(0, 6).map((e) => (
                   <li key={e.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                     <div>
-                      <p className="font-medium text-slate">{(e.engagement_types as unknown as { name?: string } | null)?.name ?? "Engagement"}</p>
+                      <p className="font-medium text-slate">{(e.services as unknown as { name?: string } | null)?.name ?? "Engagement"}</p>
                       <p className="text-xs text-muted">{e.engagement_number}</p>
                     </div>
                     <span className="text-xs capitalize text-muted">{e.status}</span>

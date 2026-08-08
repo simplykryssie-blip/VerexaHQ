@@ -139,7 +139,7 @@ export function EngagementWorkspace({
                 {clientLabel(client)}
               </a>
             )}
-            {engagement.engagement_types?.name && <span>{engagement.engagement_types.name}</span>}
+            {engagement.services?.name && <span>{engagement.services.name}</span>}
             <span className="capitalize">{engagement.status}</span>
             <span>Assigned: {engagement.assigned_staff?.display_name ?? "Unassigned"}</span>
             {showStaffRoles && <span>Reviewer: {engagement.reviewer?.display_name ?? "Unassigned"}</span>}

@@ -339,7 +339,7 @@ export function OverviewTab({
                           {e.engagement_number ?? "Engagement"}
                         </Link>
                       </td>
-                      <td className="px-4 py-2 text-slate">{e.engagement_types?.name ?? "--"}</td>
+                      <td className="px-4 py-2 text-slate">{e.services?.name ?? "--"}</td>
                       <td className="px-4 py-2 text-slate">{e.status}</td>
                       <td className="px-4 py-2 text-slate">
                         {e.assigned_staff?.display_name ?? "Unassigned"}
@@ -746,7 +746,7 @@ export type EngagementRow = {
   assigned_staff: StaffRef;
   reviewer: StaffRef;
   compliance_officer: StaffRef;
-  engagement_types: { name: string } | null;
+  services: { name: string } | null;
   engagement_tax_details: { tax_year: number | null }[] | { tax_year: number | null } | null;
 };
 

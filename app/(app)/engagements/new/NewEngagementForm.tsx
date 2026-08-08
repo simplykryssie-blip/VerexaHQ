@@ -298,14 +298,12 @@ export function NewEngagementForm({
   workspaceId,
   hasAnyClients,
   defaultClient,
-  engagementTypes,
   services,
   autoAssignToSelf,
 }: {
   workspaceId: string;
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
-  engagementTypes: { id: string; name: string }[];
   services: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
@@ -315,7 +313,6 @@ export function NewEngagementForm({
   const router = useRouter();
   const supabase = createClient();
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
-  const [engagementTypeId, setEngagementTypeId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
@@ -352,7 +349,6 @@ export function NewEngagementForm({
       p_workspace_id: workspaceId,
       p_client_id: selectedClient.id,
       p_service_id: serviceId,
-      p_engagement_type_id: engagementTypeId || undefined,
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
     });
@@ -409,22 +405,6 @@ export function NewEngagementForm({
           ))}
         </select>
         <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate">Engagement type (optional)</label>
-        <select
-          value={engagementTypeId}
-          onChange={(e) => setEngagementTypeId(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="">Not set</option>
-          {engagementTypes.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div>

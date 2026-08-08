@@ -640,7 +640,7 @@ export type EngagementRow = {
   open_date: string | null;
   completed_date: string | null;
   clients: ClientRef | null;
-  engagement_types: { name: string } | null;
+  services: { name: string } | null;
   assigned_staff: StaffRef;
   reviewer: StaffRef;
   compliance_officer: StaffRef;

@@ -30,7 +30,7 @@ export default async function NewEngagementPage({
     );
   }
 
-  const [{ data: defaultClient }, { data: engagementTypes }, { data: services }, { count: clientCount }] = await Promise.all([
+  const [{ data: defaultClient }, { data: services }, { count: clientCount }] = await Promise.all([
     searchParams.clientId
       ? supabase
           .from("clients")
@@ -38,12 +38,6 @@ export default async function NewEngagementPage({
           .eq("id", searchParams.clientId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    supabase
-      .from("engagement_types")
-      .select("id, name")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
-      .eq("status", "published")
-      .order("display_order"),
     supabase
       .from("services")
       .select("id, name")
@@ -62,7 +56,6 @@ export default async function NewEngagementPage({
             workspaceId={workspace.id}
             hasAnyClients={(clientCount ?? 0) > 0}
             defaultClient={defaultClient ?? null}
-            engagementTypes={engagementTypes ?? []}
             services={services ?? []}
             autoAssignToSelf={workspace.workspace_type === "independent_ptin"}
           />

@@ -40,7 +40,7 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
 
   const { data: engagements } = await supabase
     .from("engagements")
-    .select("id, engagement_number, status, priority, open_date, completed_date, client_id, clients(first_name, last_name, business_name, client_type), engagement_types(name)")
+    .select("id, engagement_number, status, priority, open_date, completed_date, client_id, clients(first_name, last_name, business_name, client_type), services(name)")
     .eq("workspace_id", workspace.id)
     .order("open_date", { ascending: false });
 
@@ -52,7 +52,7 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
       engagement_number: e.engagement_number,
       clientLabel: clientLabel(e.clients as never),
       client_id: e.client_id,
-      typeName: (e.engagement_types as unknown as { name?: string } | null)?.name ?? "--",
+      typeName: (e.services as unknown as { name?: string } | null)?.name ?? "--",
       status: e.status,
       priority: e.priority,
       open_date: e.open_date,
