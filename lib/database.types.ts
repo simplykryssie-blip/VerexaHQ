@@ -3798,6 +3798,7 @@ export type Database = {
       organizer_response_answers: {
         Row: {
           id: string
+          instance_index: number
           organizer_field_id: string
           organizer_response_id: string
           updated_at: string
@@ -3805,6 +3806,7 @@ export type Database = {
         }
         Insert: {
           id?: string
+          instance_index?: number
           organizer_field_id: string
           organizer_response_id: string
           updated_at?: string
@@ -3812,6 +3814,7 @@ export type Database = {
         }
         Update: {
           id?: string
+          instance_index?: number
           organizer_field_id?: string
           organizer_response_id?: string
           updated_at?: string

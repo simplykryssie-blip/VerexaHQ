@@ -25,7 +25,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
       .select("id, field_type, label, help_text, is_required, options, parent_field_id, display_order")
       .eq("organizer_template_id", response.organizer_template_id)
       .order("display_order"),
-    supabase.from("organizer_response_answers").select("organizer_field_id, value").eq("organizer_response_id", response.id),
+    supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
   ]);
 
   const readOnly = response.status === "submitted" || response.status === "reviewed";

@@ -16,7 +16,7 @@ type FieldRow = {
   parent_field_id: string | null;
 };
 
-type AnswerRow = { organizer_field_id: string; value: unknown };
+type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
 
 export function OrganizerForm({
   responseId,
@@ -38,12 +38,38 @@ export function OrganizerForm({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+
+  const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
+  const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
+  const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
+
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const a of initialAnswers) {
+      if (repeaterChildIds.has(a.organizer_field_id)) continue;
       if (a.value !== null && a.value !== undefined) map[a.organizer_field_id] = String(a.value);
     }
     return map;
+  });
+  const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>(() => {
+    const result: Record<string, Record<string, string>[]> = {};
+    for (const repeater of repeaterFields) {
+      const childIds = new Set((childFieldsByParent.get(repeater.id) ?? []).map((c) => c.id));
+      const relevant = initialAnswers.filter((a) => childIds.has(a.organizer_field_id));
+      const maxInstance = relevant.reduce((max, a) => Math.max(max, a.instance_index ?? 0), -1);
+      const rows: Record<string, string>[] = [];
+      for (let i = 0; i <= maxInstance; i++) {
+        const row: Record<string, string> = {};
+        for (const a of relevant) {
+          if ((a.instance_index ?? 0) === i && a.value !== null && a.value !== undefined) {
+            row[a.organizer_field_id] = String(a.value);
+          }
+        }
+        rows.push(row);
+      }
+      result[repeater.id] = rows;
+    }
+    return result;
   });
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -58,9 +84,38 @@ export function OrganizerForm({
       organizer_response_id: responseId,
       organizer_field_id,
       value,
+      instance_index: 0,
     }));
+
+    for (const repeater of repeaterFields) {
+      const children = childFieldsByParent.get(repeater.id) ?? [];
+      const repRows = repeaterRows[repeater.id] ?? [];
+      for (const child of children) {
+        // Clear out any rows beyond the current count (e.g. a dependent was
+        // removed) so stale answers don't linger under a dropped instance.
+        const { error: deleteError } = await supabase
+          .from("organizer_response_answers")
+          .delete()
+          .eq("organizer_response_id", responseId)
+          .eq("organizer_field_id", child.id)
+          .gte("instance_index", repRows.length);
+        if (deleteError) {
+          toast.show(deleteError.message, "error");
+          setSaving(false);
+          return;
+        }
+        repRows.forEach((row, i) => {
+          if (row[child.id] !== undefined) {
+            rows.push({ organizer_response_id: responseId, organizer_field_id: child.id, value: row[child.id], instance_index: i });
+          }
+        });
+      }
+    }
+
     if (rows.length > 0) {
-      const { error } = await supabase.from("organizer_response_answers").upsert(rows, { onConflict: "organizer_response_id,organizer_field_id" });
+      const { error } = await supabase
+        .from("organizer_response_answers")
+        .upsert(rows, { onConflict: "organizer_response_id,organizer_field_id,instance_index" });
       if (error) {
         toast.show(error.message, "error");
         setSaving(false);
@@ -89,18 +144,32 @@ export function OrganizerForm({
 
   return (
     <div className="space-y-4">
-      {topLevelFields.map((field) => (
-        <FieldInput
-          key={field.id}
-          field={field}
-          value={answers[field.id] ?? ""}
-          onChange={saveAnswer}
-          disabled={readOnly}
-          workspaceId={workspaceId}
-          entityType={entityType}
-          entityId={entityId}
-        />
-      ))}
+      {topLevelFields.map((field) =>
+        field.field_type === "repeating_section" ? (
+          <RepeatingSectionInput
+            key={field.id}
+            field={field}
+            childFields={childFieldsByParent.get(field.id) ?? []}
+            rows={repeaterRows[field.id] ?? []}
+            onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
+            disabled={readOnly}
+            workspaceId={workspaceId}
+            entityType={entityType}
+            entityId={entityId}
+          />
+        ) : (
+          <FieldInput
+            key={field.id}
+            field={field}
+            value={answers[field.id] ?? ""}
+            onChange={saveAnswer}
+            disabled={readOnly}
+            workspaceId={workspaceId}
+            entityType={entityType}
+            entityId={entityId}
+          />
+        )
+      )}
 
       {!readOnly && (
         <div className="flex items-center gap-2 pt-2">
@@ -121,6 +190,81 @@ export function OrganizerForm({
             {submitting ? "Submitting..." : "Submit organizer"}
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+function RepeatingSectionInput({
+  field,
+  childFields,
+  rows,
+  onChange,
+  disabled,
+  workspaceId,
+  entityType,
+  entityId,
+}: {
+  field: FieldRow;
+  childFields: FieldRow[];
+  rows: Record<string, string>[];
+  onChange: (rows: Record<string, string>[]) => void;
+  disabled: boolean;
+  workspaceId: string;
+  entityType: "client" | "engagement";
+  entityId: string;
+}) {
+  function updateRow(index: number, childFieldId: string, value: string) {
+    onChange(rows.map((row, i) => (i === index ? { ...row, [childFieldId]: value } : row)));
+  }
+
+  function removeRow(index: number) {
+    onChange(rows.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <label className="block text-sm font-medium text-ink">
+        {field.label} {field.is_required && <span className="text-danger">*</span>}
+      </label>
+      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+
+      <div className="mt-3 space-y-3">
+        {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
+        {rows.map((row, index) => (
+          <div key={index} className="rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                {field.label} {index + 1}
+              </p>
+              {!disabled && (
+                <button type="button" onClick={() => removeRow(index)} className="text-xs font-medium text-danger hover:underline">
+                  Remove
+                </button>
+              )}
+            </div>
+            <div className="mt-2 space-y-3">
+              {childFields.map((child) => (
+                <FieldInput
+                  key={child.id}
+                  field={child}
+                  value={row[child.id] ?? ""}
+                  onChange={(fieldId, value) => updateRow(index, fieldId, value)}
+                  disabled={disabled}
+                  workspaceId={workspaceId}
+                  entityType={entityType}
+                  entityId={entityId}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {!disabled && (
+        <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+          + Add another
+        </button>
       )}
     </div>
   );

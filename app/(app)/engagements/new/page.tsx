@@ -34,13 +34,13 @@ export default async function NewEngagementPage({
     searchParams.clientId
       ? supabase
           .from("clients")
-          .select("id, first_name, last_name, business_name, client_type")
+          .select("id, first_name, last_name, business_name, client_type, primary_email")
           .eq("id", searchParams.clientId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supabase
       .from("services")
-      .select("id, name")
+      .select("id, name, organizer_template_id, organizer_templates(name)")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),

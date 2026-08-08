@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { UserPlus } from "lucide-react";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
+import { renderEmail } from "@/lib/email/template";
 
 const DRAFT_KEY = "new-engagement-inline";
 
@@ -24,6 +25,7 @@ type ClientOption = {
   last_name: string | null;
   business_name: string | null;
   client_type: string;
+  primary_email?: string | null;
 };
 
 function clientLabel(c: ClientOption) {
@@ -83,7 +85,7 @@ function ClientSearchField({
     const timeout = setTimeout(async () => {
       const { data } = await supabase
         .from("clients")
-        .select("id, first_name, last_name, business_name, client_type")
+        .select("id, first_name, last_name, business_name, client_type, primary_email")
         .eq("workspace_id", workspaceId)
         .is("merged_into_client_id", null)
         .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,business_name.ilike.%${query}%`)
@@ -142,6 +144,7 @@ function ClientSearchField({
       last_name: newClientType === "individual" ? newLastName.trim() : null,
       business_name: newClientType === "business" ? newBusinessName.trim() : null,
       client_type: newClientType,
+      primary_email: newEmail || null,
     });
     setShowCreate(false);
     setNewFirstName("");
@@ -304,7 +307,7 @@ export function NewEngagementForm({
   workspaceId: string;
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
-  services: { id: string; name: string }[];
+  services: { id: string; name: string; organizer_template_id: string | null; organizer_templates: { name: string } | null }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -317,6 +320,13 @@ export function NewEngagementForm({
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [organizerPrompt, setOrganizerPrompt] = useState<{
+    engagementId: string;
+    organizerTemplateId: string;
+    organizerName: string;
+  } | null>(null);
+  const [sendingOrganizer, setSendingOrganizer] = useState(false);
+  const [organizerError, setOrganizerError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -360,8 +370,96 @@ export function NewEngagementForm({
       return;
     }
 
-    router.push(`/engagements/${data as string}`);
+    const engagementId = data as string;
+    const selectedService = services.find((s) => s.id === serviceId);
+    if (selectedService?.organizer_template_id) {
+      setOrganizerPrompt({
+        engagementId,
+        organizerTemplateId: selectedService.organizer_template_id,
+        organizerName: selectedService.organizer_templates?.name ?? "organizer",
+      });
+      return;
+    }
+
+    router.push(`/engagements/${engagementId}`);
     router.refresh();
+  }
+
+  function goToEngagement(engagementId: string) {
+    router.push(`/engagements/${engagementId}`);
+    router.refresh();
+  }
+
+  async function sendOrganizerNow() {
+    if (!organizerPrompt || !selectedClient) return;
+    setSendingOrganizer(true);
+    setOrganizerError(null);
+
+    const { error: responseError } = await supabase.from("organizer_responses").insert({
+      workspace_id: workspaceId,
+      client_id: selectedClient.id,
+      engagement_id: organizerPrompt.engagementId,
+      organizer_template_id: organizerPrompt.organizerTemplateId,
+    });
+    if (responseError) {
+      setSendingOrganizer(false);
+      setOrganizerError(responseError.message);
+      return;
+    }
+
+    const { count: existingPortalUsers } = await supabase
+      .from("client_portal_users")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", selectedClient.id);
+
+    const primaryEmail = selectedClient.primary_email;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+
+    if (!existingPortalUsers) {
+      // No portal access yet -- invite and send the organizer in the same
+      // email rather than two separate manual steps. The invite email
+      // already looks up the client's open organizer_responses and names
+      // them, so creating the response first (above) means this one email
+      // covers both.
+      const { data: invite, error: inviteError } = await supabase
+        .from("client_portal_users")
+        .insert({ client_id: selectedClient.id, workspace_id: workspaceId, invited_name: clientLabel(selectedClient), invited_email: primaryEmail ?? "" })
+        .select("invitation_token")
+        .single();
+      if (inviteError) {
+        setSendingOrganizer(false);
+        setOrganizerError(inviteError.message);
+        return;
+      }
+      if (primaryEmail) {
+        const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
+        await fetch("/api/portal-invitations/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: selectedClient.id, invitedEmail: primaryEmail, invitedName: clientLabel(selectedClient), acceptUrl }),
+        });
+      }
+    } else if (primaryEmail) {
+      // Already has portal access -- just notify them the organizer is ready.
+      await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: primaryEmail,
+          sender: "notifications",
+          subject: `New organizer to complete: ${organizerPrompt.organizerName}`,
+          html: renderEmail({
+            heading: "An organizer is ready for you",
+            bodyHtml: `<p>Please log in to your client portal and complete the <strong>${organizerPrompt.organizerName}</strong> when you have a chance.</p>`,
+            ctaLabel: "Go to portal",
+            ctaUrl: `${appUrl}/portal/organizer`,
+          }),
+        }),
+      });
+    }
+
+    setSendingOrganizer(false);
+    goToEngagement(organizerPrompt.engagementId);
   }
 
   if (!hasAnyClients && !selectedClient) {
@@ -381,6 +479,7 @@ export function NewEngagementForm({
   }
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-slate">Client</label>
@@ -444,5 +543,37 @@ export function NewEngagementForm({
         </button>
       </div>
     </form>
+
+    {organizerPrompt && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-lg">
+          <h3 className="text-sm font-semibold text-ink">Send organizer now?</h3>
+          <p className="mt-2 text-sm text-slate">
+            Send <strong>{organizerPrompt.organizerName}</strong> to <strong>{selectedClient ? clientLabel(selectedClient) : "the client"}</strong> now?
+            {selectedClient && !selectedClient.primary_email && " This client has no email on file, so it will be ready in their portal but no notification will be sent."}
+          </p>
+          {organizerError && <p className="mt-2 text-xs text-danger">{organizerError}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => goToEngagement(organizerPrompt.engagementId)}
+              disabled={sendingOrganizer}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted disabled:opacity-60"
+            >
+              Later
+            </button>
+            <button
+              type="button"
+              onClick={sendOrganizerNow}
+              disabled={sendingOrganizer}
+              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {sendingOrganizer ? "Sending..." : "Yes, send"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
