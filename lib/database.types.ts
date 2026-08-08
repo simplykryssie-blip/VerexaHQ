@@ -6821,6 +6821,7 @@ export type Database = {
           p_assigned_staff_id?: string
           p_client_id: string
           p_engagement_type_id?: string
+          p_priority?: Database["public"]["Enums"]["engagement_priority"]
           p_service_id: string
           p_workspace_id: string
         }

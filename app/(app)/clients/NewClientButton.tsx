@@ -25,6 +25,7 @@ type Draft = {
   state: string;
   zip: string;
   serviceIds: string[];
+  priority: "Low" | "Medium" | "High" | "Urgent";
   ssn: string;
   itin: string;
   ein: string;
@@ -71,6 +72,7 @@ export function NewClientButton({
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [ssn, setSsn] = useState("");
   const [itin, setItin] = useState("");
   const [ein, setEin] = useState("");
@@ -107,6 +109,7 @@ export function NewClientButton({
     setState(draft.state);
     setZip(draft.zip);
     setServiceIds(draft.serviceIds);
+    setPriority(draft.priority);
     setSsn(draft.ssn);
     setItin(draft.itin);
     setEin(draft.ein);
@@ -128,6 +131,7 @@ export function NewClientButton({
       state,
       zip,
       serviceIds,
+      priority,
       ssn,
       itin,
       ein,
@@ -247,6 +251,7 @@ export function NewClientButton({
         p_workspace_id: workspaceId,
         p_client_id: result.client_id,
         p_service_id: serviceId,
+        p_priority: priority,
       });
       if (engagementError) {
         setLoading(false);
@@ -484,6 +489,23 @@ export function NewClientButton({
                   </div>
                 )}
               </div>
+
+              {serviceIds.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium uppercase tracking-wide text-muted">Priority</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as "Low" | "Medium" | "High" | "Urgent")}
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                  <p className="mt-1 text-xs text-muted">Applies to every engagement created for this client.</p>
+                </div>
+              )}
 
               <div className="border-t border-border pt-4">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate">

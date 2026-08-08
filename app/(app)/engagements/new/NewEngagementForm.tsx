@@ -317,6 +317,7 @@ export function NewEngagementForm({
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
   const [engagementTypeId, setEngagementTypeId] = useState("");
   const [serviceId, setServiceId] = useState("");
+  const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -353,6 +354,7 @@ export function NewEngagementForm({
       p_service_id: serviceId,
       p_engagement_type_id: engagementTypeId || undefined,
       p_assigned_staff_id: assignedStaffId ?? undefined,
+      p_priority: priority,
     });
 
     setLoading(false);
@@ -422,6 +424,20 @@ export function NewEngagementForm({
               {t.name}
             </option>
           ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate">Priority</label>
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as "Low" | "Medium" | "High" | "Urgent")}
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Urgent">Urgent</option>
         </select>
       </div>
 
