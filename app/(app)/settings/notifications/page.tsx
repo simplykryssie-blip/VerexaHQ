@@ -2,11 +2,22 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { EmptyState } from "@/components/EmptyState";
 import { NotificationPreferenceToggle } from "@/components/settings/NotificationPreferenceToggle";
+import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
 
 export const dynamic = 'force-dynamic';
 
+// Every (event_type, channel) pair actually gated by is_notification_enabled()
+// for staff recipients. signature_due and the create_notification()-driven
+// engagement events aren't gated at all today, so they have no row here.
 const PREFERENCE_ROWS = [
-  { eventType: "workflow_stage_due", channel: "Email", label: "Workflow stage due soon", description: "A stage assigned to you is due within 2 days." },
+  { eventType: "workflow_stage_due", channel: "Email", label: "Workflow stage due soon (Email)", description: "A stage assigned to you is due within 2 days." },
+  { eventType: "workflow_stage_due", channel: "SMS", label: "Workflow stage due soon (SMS)", description: "Text version of the above." },
+  { eventType: "appointment_reminder", channel: "Email", label: "Appointment reminder (Email)", description: "An appointment assigned to you starts within a day." },
+  { eventType: "appointment_reminder", channel: "SMS", label: "Appointment reminder (SMS)", description: "Text version of the above." },
+  { eventType: "funds_received_reminder", channel: "Email", label: "Confirm funds received (Email)", description: "A check/ACH/wire invoice's expected deposit date has arrived." },
+  { eventType: "funds_received_reminder", channel: "SMS", label: "Confirm funds received (SMS)", description: "Text version of the above." },
+  { eventType: "subscription_renewal_reminder", channel: "Email", label: "Subscription renewal reminder (Email)", description: "Your firm's Verexa subscription renews in 7 days." },
+  { eventType: "subscription_renewal_reminder", channel: "SMS", label: "Subscription renewal reminder (SMS)", description: "Text version of the above." },
 ];
 
 export default async function NotificationsPage() {
@@ -21,7 +32,7 @@ export default async function NotificationsPage() {
   const [{ data: notifications }, { data: preferences }] = await Promise.all([
     supabase
       .from("notification_queue")
-      .select("id, event_type, status, created_at, channels")
+      .select("id, event_type, template_key, payload, entity_type, entity_id, status, created_at, channels, read_at")
       .eq("recipient_user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -64,7 +75,7 @@ export default async function NotificationsPage() {
         <h2 className="text-base font-semibold text-ink">Recent notifications</h2>
         <p className="mt-1 text-sm text-muted">
           Notifications queued for you. In-app entries here are the delivery surface for the &quot;In-App&quot; channel; email/SMS
-          reminders send separately once the provider credentials above are configured.
+          reminders send separately once the provider credentials above are configured. The bell in the top corner shows these live.
         </p>
 
         <div className="mt-4 rounded-xl border border-border bg-surface">
@@ -72,12 +83,15 @@ export default async function NotificationsPage() {
             <EmptyState message="No notifications yet." />
           ) : (
             <ul className="divide-y divide-border">
-              {notifications.map((n) => (
-                <li key={n.id} className="flex items-center justify-between px-5 py-3 text-sm">
-                  <span className="text-slate">{n.event_type ?? "Notification"}</span>
-                  <span className="text-xs text-muted">{new Date(n.created_at).toLocaleString()}</span>
-                </li>
-              ))}
+              {notifications.map((n) => {
+                const { title } = presentNotification(n as NotificationRow);
+                return (
+                  <li key={n.id} className="flex items-center justify-between px-5 py-3 text-sm">
+                    <span className={n.read_at ? "text-slate" : "font-medium text-ink"}>{title}</span>
+                    <span className="text-xs text-muted">{new Date(n.created_at).toLocaleString()}</span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

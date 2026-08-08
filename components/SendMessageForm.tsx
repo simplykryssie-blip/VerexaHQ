@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 export function SendMessageForm({
@@ -24,6 +25,7 @@ export function SendMessageForm({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const channelOptions = [
     ...(permissions.messagesSend
       ? [
@@ -96,17 +98,39 @@ export function SendMessageForm({
     }
 
     if (channel === "email" && primaryEmail) {
-      await fetch("/api/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: primaryEmail, subject: threadSubject, html: `<p>${body}</p>` }),
-      });
+      try {
+        const res = await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: primaryEmail, subject: threadSubject, html: `<p>${body}</p>` }),
+        });
+        const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
+        if (!data.sent) {
+          toast.show(`Message saved, but the email wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
+        } else {
+          toast.show("Message sent", "success");
+        }
+      } catch {
+        toast.show("Message saved, but the email wasn't delivered.", "error");
+      }
     } else if (channel === "sms" && primaryPhone) {
-      await fetch("/api/sms/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: primaryPhone, body }),
-      });
+      try {
+        const res = await fetch("/api/sms/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: primaryPhone, body }),
+        });
+        const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
+        if (!data.sent) {
+          toast.show(`Message saved, but the SMS wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
+        } else {
+          toast.show("Message sent", "success");
+        }
+      } catch {
+        toast.show("Message saved, but the SMS wasn't delivered.", "error");
+      }
+    } else {
+      toast.show(isInternal ? "Note saved" : "Message saved", "success");
     }
 
     setSending(false);

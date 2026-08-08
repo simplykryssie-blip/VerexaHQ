@@ -3609,12 +3609,15 @@ export type Database = {
           channels: string[] | null
           created_at: string
           dedupe_key: string | null
+          entity_id: string | null
+          entity_type: string | null
           error: string | null
           event_type: string | null
           id: string
           max_attempts: number
           payload: Json
           priority: string | null
+          read_at: string | null
           recipient_email: string | null
           recipient_phone: string | null
           recipient_user_id: string | null
@@ -3630,12 +3633,15 @@ export type Database = {
           channels?: string[] | null
           created_at?: string
           dedupe_key?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
           error?: string | null
           event_type?: string | null
           id?: string
           max_attempts?: number
           payload?: Json
           priority?: string | null
+          read_at?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
           recipient_user_id?: string | null
@@ -3651,12 +3657,15 @@ export type Database = {
           channels?: string[] | null
           created_at?: string
           dedupe_key?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
           error?: string | null
           event_type?: string | null
           id?: string
           max_attempts?: number
           payload?: Json
           priority?: string | null
+          read_at?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
           recipient_user_id?: string | null
@@ -7029,6 +7038,8 @@ export type Database = {
       create_notification: {
         Args: {
           p_channels?: string[]
+          p_entity_id?: string
+          p_entity_type?: string
           p_event_type: string
           p_payload?: Json
           p_priority?: string
@@ -7256,6 +7267,14 @@ export type Database = {
       is_workspace_member: {
         Args: { p_workspace_id: string }
         Returns: boolean
+      }
+      mark_all_notifications_read: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      mark_notification_read: {
+        Args: { p_notification_id: string }
+        Returns: undefined
       }
       merge_clients: {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
