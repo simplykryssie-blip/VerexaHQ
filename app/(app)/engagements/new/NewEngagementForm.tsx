@@ -306,7 +306,7 @@ export function NewEngagementForm({
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
   engagementTypes: { id: string; name: string }[];
-  services: { id: string; name: string; process_id: string | null }[];
+  services: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -343,44 +343,17 @@ export function NewEngagementForm({
       assignedStaffId = user?.id ?? null;
     }
 
-    // The service is what actually connects this engagement to a real
-    // workflow -- workflow_id/current_stage are how process_stages (and the
-    // stage editor built against them) know which engagements they affect,
-    // so every new engagement needs to land on the service's process's
-    // first stage rather than being created structurally disconnected from it.
-    const selectedService = services.find((s) => s.id === serviceId);
-    let workflowId: string | null = null;
-    let currentStage: string | null = null;
-    if (selectedService?.process_id) {
-      workflowId = selectedService.process_id;
-      const { data: firstStage, error: stageError } = await supabase
-        .from("process_stages")
-        .select("name")
-        .eq("process_id", selectedService.process_id)
-        .order("display_order", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (stageError) {
-        setLoading(false);
-        setError(stageError.message);
-        return;
-      }
-      currentStage = firstStage?.name ?? null;
-    }
-
-    const { data, error } = await supabase
-      .from("engagements")
-      .insert({
-        workspace_id: workspaceId,
-        client_id: selectedClient.id,
-        engagement_type_id: engagementTypeId || null,
-        service_id: serviceId,
-        workflow_id: workflowId,
-        current_stage: currentStage,
-        assigned_staff_id: assignedStaffId,
-      })
-      .select("id")
-      .single();
+    // create_engagement is the single source of truth for deriving
+    // workflow_id/current_stage from a service's process -- this form and
+    // the bundled engagement step in NewClientButton.tsx both call it, so
+    // the derivation can't drift out of sync between the two entry points.
+    const { data, error } = await supabase.rpc("create_engagement", {
+      p_workspace_id: workspaceId,
+      p_client_id: selectedClient.id,
+      p_service_id: serviceId,
+      p_engagement_type_id: engagementTypeId || undefined,
+      p_assigned_staff_id: assignedStaffId ?? undefined,
+    });
 
     setLoading(false);
 
@@ -389,7 +362,7 @@ export function NewEngagementForm({
       return;
     }
 
-    router.push(`/engagements/${data.id}`);
+    router.push(`/engagements/${data as string}`);
     router.refresh();
   }
 

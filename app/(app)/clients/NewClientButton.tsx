@@ -9,7 +9,7 @@ import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/client
 
 const DRAFT_KEY = "new-client-button";
 
-type EngagementTypeOption = { id: string; name: string };
+type ServiceOption = { id: string; name: string };
 
 type Draft = {
   clientType: "individual" | "business";
@@ -48,11 +48,11 @@ function formatEin(value: string) {
 export function NewClientButton({
   workspaceId,
   workspaceName,
-  engagementTypes,
+  services,
 }: {
   workspaceId: string;
   workspaceName: string;
-  engagementTypes: EngagementTypeOption[];
+  services: ServiceOption[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -240,10 +240,13 @@ export function NewClientButton({
     }
 
     for (const serviceId of serviceIds) {
-      const { error: engagementError } = await supabase.from("engagements").insert({
-        workspace_id: workspaceId,
-        client_id: result.client_id,
-        engagement_type_id: serviceId,
+      // Same shared create_engagement RPC NewEngagementForm.tsx uses --
+      // derives workflow_id/current_stage from the service's process so
+      // this bundled path can't fall out of sync with the standalone one.
+      const { error: engagementError } = await supabase.rpc("create_engagement", {
+        p_workspace_id: workspaceId,
+        p_client_id: result.client_id,
+        p_service_id: serviceId,
       });
       if (engagementError) {
         setLoading(false);
@@ -460,22 +463,22 @@ export function NewClientButton({
 
               <div className="border-t border-border pt-4">
                 <label className="block text-xs font-medium uppercase tracking-wide text-muted">Services</label>
-                {engagementTypes.length === 0 ? (
-                  <p className="mt-1 text-xs text-muted">No services are set up yet -- add engagement types in Settings first.</p>
+                {services.length === 0 ? (
+                  <p className="mt-1 text-xs text-muted">No services are set up yet -- add one in Settings &gt; Service Packages first.</p>
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {engagementTypes.map((t) => (
+                    {services.map((s) => (
                       <button
-                        key={t.id}
+                        key={s.id}
                         type="button"
-                        onClick={() => toggleService(t.id)}
+                        onClick={() => toggleService(s.id)}
                         className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                          serviceIds.includes(t.id)
+                          serviceIds.includes(s.id)
                             ? "border-accent bg-accentSoft text-accent"
                             : "border-border text-slate hover:bg-surfaceMuted"
                         }`}
                       >
-                        {t.name}
+                        {s.name}
                       </button>
                     ))}
                   </div>

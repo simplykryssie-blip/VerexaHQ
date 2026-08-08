@@ -46,7 +46,7 @@ export default async function NewEngagementPage({
       .order("display_order"),
     supabase
       .from("services")
-      .select("id, name, process_id")
+      .select("id, name")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),

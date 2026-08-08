@@ -55,10 +55,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .range(from, to);
   if (status) clientsQuery = clientsQuery.eq("lifecycle_status", status);
 
-  const [{ data: clients, count }, { data: engagementTypes }, { data: canCreate }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: canCreate }] = await Promise.all([
     clientsQuery,
     supabase
-      .from("engagement_types")
+      .from("services")
       .select("id, name")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
@@ -71,7 +71,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       <PageHeader
         title="Clients"
         description="Every client in your workspace."
-        actions={canCreate ? <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} engagementTypes={engagementTypes ?? []} /> : null}
+        actions={canCreate ? <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} /> : null}
       />
       <div className="flex-1 px-8 py-6">
         <div className="mb-4 flex flex-wrap gap-2">
@@ -91,7 +91,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           <div className="rounded-xl border border-border bg-surface">
             <EmptyState
               message={status ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".` : "No clients yet. Add your first client to get started."}
-              action={!status && canCreate ? <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} engagementTypes={engagementTypes ?? []} /> : undefined}
+              action={!status && canCreate ? <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} /> : undefined}
             />
           </div>
         ) : (

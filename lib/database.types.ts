@@ -6816,6 +6816,16 @@ export type Database = {
         }
         Returns: string
       }
+      create_engagement: {
+        Args: {
+          p_assigned_staff_id?: string
+          p_client_id: string
+          p_engagement_type_id?: string
+          p_service_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       create_notification: {
         Args: {
           p_channels?: string[]
