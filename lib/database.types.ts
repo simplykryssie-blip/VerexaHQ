@@ -2825,53 +2825,6 @@ export type Database = {
           },
         ]
       }
-      engagement_types: {
-        Row: {
-          created_at: string
-          description: string | null
-          display_order: number
-          id: string
-          module: string
-          name: string
-          slug: string
-          status: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          display_order?: number
-          id?: string
-          module?: string
-          name: string
-          slug: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          display_order?: number
-          id?: string
-          module?: string
-          name?: string
-          slug?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "engagement_types_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       engagements: {
         Row: {
           archived_date: string | null
@@ -2884,7 +2837,6 @@ export type Database = {
           current_stage: string | null
           due_date: string | null
           engagement_number: string | null
-          engagement_type_id: string | null
           id: string
           internal_reference: string | null
           open_date: string | null
@@ -2911,7 +2863,6 @@ export type Database = {
           current_stage?: string | null
           due_date?: string | null
           engagement_number?: string | null
-          engagement_type_id?: string | null
           id?: string
           internal_reference?: string | null
           open_date?: string | null
@@ -2938,7 +2889,6 @@ export type Database = {
           current_stage?: string | null
           due_date?: string | null
           engagement_number?: string | null
-          engagement_type_id?: string | null
           id?: string
           internal_reference?: string | null
           open_date?: string | null
@@ -2981,13 +2931,6 @@ export type Database = {
             columns: ["compliance_officer_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagements_engagement_type_id_fkey"
-            columns: ["engagement_type_id"]
-            isOneToOne: false
-            referencedRelation: "engagement_types"
             referencedColumns: ["id"]
           },
           {
@@ -6820,7 +6763,6 @@ export type Database = {
         Args: {
           p_assigned_staff_id?: string
           p_client_id: string
-          p_engagement_type_id?: string
           p_priority?: Database["public"]["Enums"]["engagement_priority"]
           p_service_id: string
           p_workspace_id: string
