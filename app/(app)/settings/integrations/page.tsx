@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEmailConfigured, isSmsConfigured, isStripeConfigured } from "@/lib/providerStatus";
+import { isEmailConfigured, isSmsConfigured, isStripeConfigured, isZoomConfigured } from "@/lib/providerStatus";
 import { EmptyState } from "@/components/EmptyState";
 import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 
@@ -10,6 +10,7 @@ const PROVIDERS = [
   { key: "email", label: "Resend (Email)", configured: isEmailConfigured },
   { key: "sms", label: "Twilio (SMS)", configured: isSmsConfigured },
   { key: "stripe", label: "Stripe (Payments)", configured: isStripeConfigured },
+  { key: "zoom", label: "Zoom (Meetings)", configured: isZoomConfigured },
 ] as const;
 
 const STATUS_STYLE: Record<string, string> = {

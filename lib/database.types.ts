@@ -5706,6 +5706,51 @@ export type Database = {
           },
         ]
       }
+      user_zoom_connections: {
+        Row: {
+          access_token_encrypted: string | null
+          connected_at: string
+          created_at: string
+          id: string
+          refresh_token_encrypted: string | null
+          refresh_token_rotated_at: string | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+          zoom_email: string | null
+          zoom_user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          connected_at?: string
+          created_at?: string
+          id?: string
+          refresh_token_encrypted?: string | null
+          refresh_token_rotated_at?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+          zoom_email?: string | null
+          zoom_user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          connected_at?: string
+          created_at?: string
+          id?: string
+          refresh_token_encrypted?: string | null
+          refresh_token_rotated_at?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+          zoom_email?: string | null
+          zoom_user_id?: string
+        }
+        Relationships: []
+      }
       webhook_events: {
         Row: {
           attempts: number
@@ -7035,6 +7080,7 @@ export type Database = {
       }
       decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_firm_secret: { Args: { p_ciphertext: string }; Returns: string }
+      decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
       delete_process_stage: {
         Args: {
           p_destination_stage_id?: string
@@ -7054,6 +7100,7 @@ export type Database = {
       }
       encrypt_client_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_firm_secret: { Args: { p_plaintext: string }; Returns: string }
+      encrypt_zoom_secret: { Args: { p_plaintext: string }; Returns: string }
       enqueue_reminder_notifications: { Args: never; Returns: number }
       ensure_default_dashboard: {
         Args: { p_workspace_id: string }

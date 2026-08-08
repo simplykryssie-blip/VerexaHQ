@@ -6,6 +6,7 @@ import { CalendarPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
+import { renderEmail } from "@/lib/email/template";
 import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "./types";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -60,6 +61,8 @@ export function AppointmentsManager({
   const [portalVisible, setPortalVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [creatingZoomMeeting, setCreatingZoomMeeting] = useState(false);
+  const [sendingInviteId, setSendingInviteId] = useState<string | null>(null);
 
   const filteredEngagements = useMemo(() => (clientId ? engagements.filter((e) => e.client_id === clientId) : engagements), [engagements, clientId]);
   const matchingClients = useMemo(() => {
@@ -117,6 +120,65 @@ export function AppointmentsManager({
     setEndAt("");
     setPortalVisible(true);
     router.refresh();
+  }
+
+  async function createZoomMeeting() {
+    if (!title.trim() || !startAt || !endAt) {
+      toast.show("Add a title, start time, and end time first.", "error");
+      return;
+    }
+    setCreatingZoomMeeting(true);
+    try {
+      const start = new Date(startAt);
+      const durationMinutes = Math.max(15, Math.round((new Date(endAt).getTime() - start.getTime()) / 60000));
+      const res = await fetch("/api/zoom/meetings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title.trim(), startAt: start.toISOString(), durationMinutes }),
+      });
+      const data = (await res.json()) as { configured?: boolean; joinUrl?: string; reason?: string; error?: string };
+      if (data.configured && data.joinUrl) {
+        setMeetingUrl(data.joinUrl);
+        toast.show("Zoom meeting created", "success");
+      } else {
+        toast.show(data.reason ?? data.error ?? "Couldn't create the Zoom meeting.", "error");
+      }
+    } catch {
+      toast.show("Couldn't create the Zoom meeting.", "error");
+    } finally {
+      setCreatingZoomMeeting(false);
+    }
+  }
+
+  async function sendInvite(a: AppointmentRow) {
+    if (!a.client_email || !a.meeting_url) return;
+    setSendingInviteId(a.id);
+    try {
+      const res = await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: a.client_email,
+          sender: "notifications",
+          subject: `Meeting invite: ${a.title}`,
+          html: renderEmail({
+            heading: "You're invited to a meeting",
+            bodyHtml: `<p><strong>${a.title}</strong></p><p>${new Date(a.start_at).toLocaleString([], {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}</p>`,
+            ctaLabel: "Join meeting",
+            ctaUrl: a.meeting_url,
+          }),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.show("Invite sent", "success");
+    } catch {
+      toast.show("Couldn't send the invite.", "error");
+    } finally {
+      setSendingInviteId(null);
+    }
   }
 
   async function updateStatus(id: string, status: string) {
@@ -245,13 +307,23 @@ export function AppointmentsManager({
               onChange={(e) => setLocation(e.target.value)}
               className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <input
-              type="url"
-              placeholder="Meeting link (paste your Zoom/Google Meet link)"
-              value={meetingUrl}
-              onChange={(e) => setMeetingUrl(e.target.value)}
-              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:col-span-2"
-            />
+            <div className="flex gap-2 sm:col-span-2">
+              <input
+                type="url"
+                placeholder="Meeting link (paste your Zoom/Google Meet link)"
+                value={meetingUrl}
+                onChange={(e) => setMeetingUrl(e.target.value)}
+                className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                type="button"
+                onClick={createZoomMeeting}
+                disabled={creatingZoomMeeting}
+                className="shrink-0 whitespace-nowrap rounded-lg border border-border px-3 py-2 text-xs font-medium text-slate hover:bg-surfaceMuted disabled:opacity-60"
+              >
+                {creatingZoomMeeting ? "Creating..." : "Create Zoom meeting"}
+              </button>
+            </div>
             <label className="flex flex-col gap-1 text-xs font-medium text-muted">
               Start
               <input
@@ -314,9 +386,21 @@ export function AppointmentsManager({
                   )}
                   {a.staff_name && <p className="text-xs text-muted">Staff: {a.staff_name}</p>}
                   {a.meeting_url && (
-                    <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-accent hover:underline">
-                      Join meeting link
-                    </a>
+                    <div className="flex items-center gap-3">
+                      <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-accent hover:underline">
+                        Join meeting link
+                      </a>
+                      {canManage && a.client_email && (
+                        <button
+                          type="button"
+                          onClick={() => sendInvite(a)}
+                          disabled={sendingInviteId === a.id}
+                          className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
+                        >
+                          {sendingInviteId === a.id ? "Sending..." : "Send invite to client"}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-2">

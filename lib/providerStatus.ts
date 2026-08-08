@@ -18,3 +18,7 @@ export function isSmsConfigured() {
 export function isStripeConfigured() {
   return !!process.env.STRIPE_SECRET_KEY;
 }
+
+export function isZoomConfigured() {
+  return !!process.env.ZOOM_CLIENT_ID && !!process.env.ZOOM_CLIENT_SECRET;
+}

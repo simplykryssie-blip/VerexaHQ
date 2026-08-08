@@ -50,14 +50,14 @@ export default async function CalendarPage() {
       supabase
         .from("appointments")
         .select(
-          "id, title, description, location, meeting_url, start_at, end_at, status, portal_visible, client_id, engagement_id, staff_id, clients(first_name, last_name, business_name, client_type), engagements(engagement_number)"
+          "id, title, description, location, meeting_url, start_at, end_at, status, portal_visible, client_id, engagement_id, staff_id, clients(first_name, last_name, business_name, client_type, primary_email), engagements(engagement_number)"
         )
         .eq("workspace_id", workspace.id)
         .order("start_at", { ascending: true })
         .limit(200),
       supabase
         .from("clients")
-        .select("id, first_name, last_name, business_name, client_type")
+        .select("id, first_name, last_name, business_name, client_type, primary_email")
         .eq("workspace_id", workspace.id)
         .is("merged_into_client_id", null),
       supabase.from("engagements").select("id, engagement_number, client_id").eq("workspace_id", workspace.id),
@@ -76,6 +76,7 @@ export default async function CalendarPage() {
     portal_visible: a.portal_visible,
     client_id: a.client_id,
     client_label: a.clients ? clientLabel(a.clients) : null,
+    client_email: a.clients?.primary_email ?? null,
     engagement_id: a.engagement_id,
     engagement_label: a.engagements ? `${a.engagements.engagement_number ?? "Engagement"}${a.clients ? ` -- ${clientLabel(a.clients)}` : ""}` : null,
     staff_id: a.staff_id,
@@ -89,7 +90,7 @@ export default async function CalendarPage() {
     if (a.staff_id) a.staff_name = staffNameById.get(a.staff_id) ?? null;
   }
 
-  const clients: ClientOption[] = (clientRows ?? []).map((c: any) => ({ id: c.id, label: clientLabel(c) }));
+  const clients: ClientOption[] = (clientRows ?? []).map((c: any) => ({ id: c.id, label: clientLabel(c), email: c.primary_email ?? null }));
   const engagementOpts: EngagementOption[] = (engagementOptions ?? []).map((e) => ({
     id: e.id,
     client_id: e.client_id,

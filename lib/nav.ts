@@ -35,6 +35,7 @@ export type SettingsNavItem = {
 };
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
+  { label: "My Account", href: "/settings/my-account" },
   { label: "Firm Profile", href: "/settings/firm-profile" },
   { label: "Brand Center", href: "/settings/brand-center" },
   { label: "Users & Staff", href: "/settings/users" },
