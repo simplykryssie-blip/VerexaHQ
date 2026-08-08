@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createRefund } from "@/lib/stripe/client";
+import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
+import { getWorkspaceConnectAccount } from "@/lib/stripe/workspaceConnect";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -32,8 +34,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This payment has already been refunded." }, { status: 400 });
   }
 
+  if (!isStripeConfigured()) {
+    return NextResponse.json({ configured: false, reason: "Stripe is not configured for this environment." }, { status: 200 });
+  }
+
+  const connectAccount = await getWorkspaceConnectAccount(supabase, payment.workspace_id);
+  if (!connectAccount.ok) {
+    return NextResponse.json({ configured: false, reason: connectAccount.reason }, { status: 200 });
+  }
+
   const refundAmount = amount ?? payment.amount;
-  const result = await createRefund({ paymentIntentId: payment.stripe_payment_intent_id, amount: refundAmount });
+  const result = await createRefund({
+    paymentIntentId: payment.stripe_payment_intent_id,
+    amount: refundAmount,
+    connectedAccountId: connectAccount.accountId,
+  });
   if (!result.ok) {
     if (result.reason !== "Stripe is not configured for this environment.") {
       await recordProviderCheck("stripe", false, result.reason);

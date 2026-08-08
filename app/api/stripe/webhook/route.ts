@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyStripeSignature } from "@/lib/stripe/client";
 import { createServiceClient } from "@/lib/supabase/service";
+import { handleCheckoutSessionCompleted, markWebhookFailed, markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -35,57 +36,11 @@ export async function POST(request: Request) {
         amount_total: number;
         metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string };
       };
-      const workspaceId = session.metadata?.workspace_id;
-      let invoiceId = session.metadata?.invoice_id;
-      const paymentPlanId = session.metadata?.payment_plan_id;
-
-      if (!workspaceId || (!invoiceId && !paymentPlanId)) {
-        await markWebhookProcessed(supabase, logRow?.id, workspaceId);
-        return NextResponse.json({ received: true, skipped: "missing metadata" });
+      const result = await handleCheckoutSessionCompleted(supabase, session);
+      await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
       }
-
-      if (paymentPlanId) {
-        const { data: plan } = await supabase.from("payment_plans").select("invoice_id").eq("id", paymentPlanId).single();
-        if (!plan) {
-          await markWebhookProcessed(supabase, logRow?.id, workspaceId);
-          return NextResponse.json({ received: true, skipped: "payment plan not found" });
-        }
-        invoiceId = plan.invoice_id;
-      }
-
-      if (!invoiceId) {
-        await markWebhookProcessed(supabase, logRow?.id, workspaceId);
-        return NextResponse.json({ received: true, skipped: "no invoice reference" });
-      }
-
-      const { data: invoice } = await supabase.from("invoices").select("client_id").eq("id", invoiceId).single();
-      if (!invoice) {
-        await markWebhookProcessed(supabase, logRow?.id, workspaceId);
-        return NextResponse.json({ received: true, skipped: "invoice not found" });
-      }
-
-      // Triggers apply_payment_to_invoice, which updates the invoice status
-      // and posts the client_ledger entry, and payments_enqueue_receipt,
-      // which emails the client a receipt -- no extra logic needed here.
-      const { data: payment } = await supabase
-        .from("payments")
-        .insert({
-          workspace_id: workspaceId,
-          client_id: invoice.client_id,
-          invoice_id: invoiceId,
-          amount: session.amount_total / 100,
-          status: "succeeded",
-          stripe_payment_intent_id: session.payment_intent,
-          stripe_checkout_session_id: session.id,
-        })
-        .select("id")
-        .single();
-
-      if (paymentPlanId && payment) {
-        await supabase.from("payment_plans").update({ status: "paid", paid_payment_id: payment.id }).eq("id", paymentPlanId);
-      }
-
-      await markWebhookProcessed(supabase, logRow?.id, workspaceId);
     } else {
       await markWebhookProcessed(supabase, logRow?.id, undefined);
     }
@@ -95,24 +50,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ received: true });
-}
-
-async function markWebhookProcessed(
-  supabase: ReturnType<typeof createServiceClient>,
-  webhookEventId: string | undefined,
-  workspaceId: string | undefined
-) {
-  if (!webhookEventId) return;
-  await supabase
-    .from("webhook_events")
-    .update({ status: "processed", processed_at: new Date().toISOString(), workspace_id: workspaceId ?? null })
-    .eq("id", webhookEventId);
-}
-
-async function markWebhookFailed(supabase: ReturnType<typeof createServiceClient>, webhookEventId: string | undefined, error: string) {
-  if (!webhookEventId) return;
-  await supabase
-    .from("webhook_events")
-    .update({ status: "failed", last_error: error, attempts: 1 })
-    .eq("id", webhookEventId);
 }

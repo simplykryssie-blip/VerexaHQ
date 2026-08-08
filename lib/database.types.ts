@@ -6184,6 +6184,13 @@ export type Database = {
           primary_contact_email: string | null
           slug: string
           status: string
+          stripe_charges_enabled: boolean
+          stripe_connect_account_type: string | null
+          stripe_connect_status: string
+          stripe_connect_updated_at: string | null
+          stripe_connected_account_id: string | null
+          stripe_details_submitted: boolean
+          stripe_payouts_enabled: boolean
           timezone: string
           updated_at: string
           website: string | null
@@ -6202,6 +6209,13 @@ export type Database = {
           primary_contact_email?: string | null
           slug: string
           status?: string
+          stripe_charges_enabled?: boolean
+          stripe_connect_account_type?: string | null
+          stripe_connect_status?: string
+          stripe_connect_updated_at?: string | null
+          stripe_connected_account_id?: string | null
+          stripe_details_submitted?: boolean
+          stripe_payouts_enabled?: boolean
           timezone?: string
           updated_at?: string
           website?: string | null
@@ -6220,6 +6234,13 @@ export type Database = {
           primary_contact_email?: string | null
           slug?: string
           status?: string
+          stripe_charges_enabled?: boolean
+          stripe_connect_account_type?: string | null
+          stripe_connect_status?: string
+          stripe_connect_updated_at?: string | null
+          stripe_connected_account_id?: string | null
+          stripe_details_submitted?: boolean
+          stripe_payouts_enabled?: boolean
           timezone?: string
           updated_at?: string
           website?: string | null

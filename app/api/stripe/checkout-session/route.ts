@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createCheckoutSession } from "@/lib/stripe/client";
+import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getWorkspaceConnectAccount } from "@/lib/stripe/workspaceConnect";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -27,6 +29,10 @@ export async function POST(request: Request) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
+  if (!isStripeConfigured()) {
+    return NextResponse.json({ configured: false, reason: "Stripe is not configured for this environment." }, { status: 200 });
+  }
+
   if (paymentPlanId) {
     const { data: plan, error: planError } = await supabase
       .from("payment_plans")
@@ -40,6 +46,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "This installment is already paid." }, { status: 400 });
     }
 
+    const connectAccount = await getWorkspaceConnectAccount(supabase, plan.workspace_id);
+    if (!connectAccount.ok) {
+      return NextResponse.json({ configured: false, reason: connectAccount.reason }, { status: 200 });
+    }
+
     const invoiceNumber = (plan.invoices as unknown as { invoice_number: string | null } | null)?.invoice_number ?? plan.id;
     const result = await createCheckoutSession({
       amount: plan.amount,
@@ -47,6 +58,7 @@ export async function POST(request: Request) {
       successUrl: `${appUrl}/portal/billing?paid=1`,
       cancelUrl: `${appUrl}/portal/billing?paid=0`,
       metadata: { payment_plan_id: plan.id, workspace_id: plan.workspace_id },
+      connectedAccountId: connectAccount.accountId,
     });
 
     if (!result.ok) {
@@ -78,12 +90,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This invoice has no remaining balance." }, { status: 400 });
   }
 
+  const connectAccount = await getWorkspaceConnectAccount(supabase, invoice.workspace_id);
+  if (!connectAccount.ok) {
+    return NextResponse.json({ configured: false, reason: connectAccount.reason }, { status: 200 });
+  }
+
   const result = await createCheckoutSession({
     amount: balanceDue,
     description: `Invoice ${invoice.invoice_number ?? invoice.id}`,
     successUrl: `${appUrl}/clients?paid=1`,
     cancelUrl: `${appUrl}/clients?paid=0`,
     metadata: { invoice_id: invoice.id, workspace_id: invoice.workspace_id },
+    connectedAccountId: connectAccount.accountId,
   });
 
   if (!result.ok) {

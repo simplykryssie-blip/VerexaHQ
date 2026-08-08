@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEmailConfigured, isSmsConfigured, isStripeConfigured } from "@/lib/providerStatus";
 import { EmptyState } from "@/components/EmptyState";
+import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,8 @@ export default async function IntegrationsPage() {
     .select("provider, status, consecutive_failures, last_check_at, last_success_at, last_error");
   const byProvider = new Map((health ?? []).map((h) => [h.provider, h]));
 
+  const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connect_status").eq("id", workspace!.id).single();
+
   return (
     <div className="max-w-2xl">
       <h2 className="text-base font-semibold text-ink">Integrations</h2>
@@ -66,6 +69,15 @@ export default async function IntegrationsPage() {
             </div>
           );
         })}
+      </div>
+
+      <h2 className="mt-8 text-base font-semibold text-ink">Stripe Connect</h2>
+      <p className="mt-1 text-sm text-muted">
+        Connect your firm&apos;s own Stripe account to accept client payments. Funds go straight to your account -- Verexa charges no
+        platform fee on transactions.
+      </p>
+      <div className="mt-6 rounded-xl border border-border bg-surface">
+        <ConnectStripeButton connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"} />
       </div>
     </div>
   );
