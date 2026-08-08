@@ -1946,6 +1946,7 @@ export type Database = {
           category: string
           conditional_logic: Json
           created_at: string
+          default_folder_name: string | null
           display_order: number
           document_request_template_id: string
           id: string
@@ -1958,6 +1959,7 @@ export type Database = {
           category: string
           conditional_logic?: Json
           created_at?: string
+          default_folder_name?: string | null
           display_order?: number
           document_request_template_id: string
           id?: string
@@ -1970,6 +1972,7 @@ export type Database = {
           category?: string
           conditional_logic?: Json
           created_at?: string
+          default_folder_name?: string | null
           display_order?: number
           document_request_template_id?: string
           id?: string
