@@ -4,80 +4,54 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabasePortal } from "@/lib/supabasePortal";
-import type {
-  TaxOrganizerAssignment,
-  TaxOrganizerSection,
-  TaxOrganizerQuestion,
-  TaxOrganizerAnswer,
-  TaxOrganizerTemplate,
-} from "@/lib/types";
+import type { OrganizerResponse, OrganizerField, OrganizerResponseAnswer, OrganizerTemplate } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 import OrganizerQuestionnaire from "@/components/OrganizerQuestionnaire";
 import OrganizerProgress from "@/components/OrganizerProgress";
-import { isQuestionAnswered, isQuestionVisible } from "@/lib/organizerVisibility";
+import { isFieldAnswered, isFieldVisible } from "@/lib/organizerVisibility";
 import { friendlyOrganizerError } from "@/lib/organizerError";
 
 export default function PortalOrganizerPage() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
   const router = useRouter();
 
-  const [assignment, setAssignment] = useState<TaxOrganizerAssignment | null>(null);
-  const [template, setTemplate] = useState<TaxOrganizerTemplate | null>(null);
-  const [sections, setSections] = useState<TaxOrganizerSection[]>([]);
-  const [questions, setQuestions] = useState<TaxOrganizerQuestion[]>([]);
-  const [answers, setAnswers] = useState<Map<string, TaxOrganizerAnswer>>(new Map());
+  const [response, setResponse] = useState<OrganizerResponse | null>(null);
+  const [template, setTemplate] = useState<OrganizerTemplate | null>(null);
+  const [fields, setFields] = useState<OrganizerField[]>([]);
+  const [answers, setAnswers] = useState<Map<string, OrganizerResponseAnswer>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [savingQuestionId, setSavingQuestionId] = useState<string | null>(null);
+  const [savingFieldId, setSavingFieldId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function load() {
     setLoading(true);
-    const { data: assignmentData, error: assignmentError } = await supabasePortal
-      .from("tax_organizer_assignments")
+    const { data: responseData, error: responseError } = await supabasePortal
+      .from("organizer_responses")
       .select("*")
       .eq("id", assignmentId)
       .maybeSingle();
 
-    if (assignmentError || !assignmentData) {
-      setError(friendlyOrganizerError(assignmentError, "We couldn't find this organizer. Please check the link or contact your preparer."));
+    if (responseError || !responseData) {
+      setError(friendlyOrganizerError(responseError, "We couldn't find this organizer. Please check the link or contact your preparer."));
       setLoading(false);
       return;
     }
 
-    const a = assignmentData as TaxOrganizerAssignment;
-    setAssignment(a);
+    const r = responseData as OrganizerResponse;
+    setResponse(r);
 
-    const [templateRes, sectionsRes, answersRes] = await Promise.all([
-      supabasePortal.from("tax_organizer_templates").select("*").eq("id", a.template_id).maybeSingle(),
-      supabasePortal
-        .from("tax_organizer_sections")
-        .select("*")
-        .eq("template_id", a.template_id)
-        .order("sort_order"),
-      supabasePortal.from("tax_organizer_answers").select("*").eq("assignment_id", a.id),
+    const [templateRes, fieldsRes, answersRes] = await Promise.all([
+      supabasePortal.from("organizer_templates").select("*").eq("id", r.organizer_template_id).maybeSingle(),
+      supabasePortal.from("organizer_fields").select("*").eq("organizer_template_id", r.organizer_template_id).order("display_order"),
+      supabasePortal.from("organizer_response_answers").select("*").eq("organizer_response_id", r.id),
     ]);
 
-    const sectionList = (sectionsRes.data as TaxOrganizerSection[]) ?? [];
-    setTemplate((templateRes.data as TaxOrganizerTemplate) ?? null);
-    setSections(sectionList);
+    setTemplate((templateRes.data as OrganizerTemplate) ?? null);
+    setFields((fieldsRes.data as OrganizerField[]) ?? []);
 
-    if (sectionList.length > 0) {
-      const { data: questionData } = await supabasePortal
-        .from("tax_organizer_questions")
-        .select("*")
-        .in(
-          "section_id",
-          sectionList.map((s) => s.id)
-        )
-        .order("sort_order");
-      setQuestions((questionData as TaxOrganizerQuestion[]) ?? []);
-    }
-
-    const answersMap = new Map<string, TaxOrganizerAnswer>();
-    (answersRes.data as TaxOrganizerAnswer[] | null)?.forEach((ans) =>
-      answersMap.set(ans.question_id, ans)
-    );
+    const answersMap = new Map<string, OrganizerResponseAnswer>();
+    (answersRes.data as OrganizerResponseAnswer[] | null)?.forEach((ans) => answersMap.set(ans.organizer_field_id, ans));
     setAnswers(answersMap);
     setError(null);
     setLoading(false);
@@ -88,126 +62,94 @@ export default function PortalOrganizerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignmentId]);
 
-  async function saveAnswer(question: TaxOrganizerQuestion, value: unknown) {
-    if (!assignment) return;
-    setSavingQuestionId(question.id);
-    const existing = answers.get(question.id);
+  async function saveAnswer(field: OrganizerField, value: unknown) {
+    if (!response) return;
+    setSavingFieldId(field.id);
 
-    if (existing) {
-      const { error } = await supabasePortal
-        .from("tax_organizer_answers")
-        .update({ answer_value: value, answered_at: new Date().toISOString() })
-        .eq("id", existing.id);
-      if (!error) {
-        setAnswers((prev) => new Map(prev).set(question.id, { ...existing, answer_value: value }));
-      }
-    } else {
-      const { data: newAnswer, error } = await supabasePortal
-        .from("tax_organizer_answers")
-        .insert({
-          workspace_id: assignment.workspace_id,
-          assignment_id: assignment.id,
-          question_id: question.id,
-          answer_value: value,
-        })
-        .select()
-        .single();
-      if (!error && newAnswer) {
-        setAnswers((prev) => new Map(prev).set(question.id, newAnswer as TaxOrganizerAnswer));
-      }
+    if (response.status === "not_started") {
+      await supabasePortal.from("organizer_responses").update({ status: "in_progress" }).eq("id", response.id);
+      setResponse((prev) => (prev ? { ...prev, status: "in_progress" } : prev));
     }
-    setSavingQuestionId(null);
+
+    const { data: saved, error } = await supabasePortal
+      .from("organizer_response_answers")
+      .upsert(
+        { organizer_response_id: response.id, organizer_field_id: field.id, value },
+        { onConflict: "organizer_response_id,organizer_field_id" },
+      )
+      .select()
+      .single();
+
+    if (!error && saved) {
+      setAnswers((prev) => new Map(prev).set(field.id, saved as OrganizerResponseAnswer));
+    }
+    setSavingFieldId(null);
   }
 
   async function submitForReview() {
-    if (!assignment) return;
-    const missing = questions.filter((question) => {
-      if (!question.is_required) return false;
-      const value = answers.get(question.id)?.answer_value;
-      return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
-    });
+    if (!response) return;
+    const topLevelFields = fields.filter((f) => !f.parent_field_id && isFieldVisible(f, fields, answers));
+    const missing = topLevelFields.filter((f) => f.is_required && !isFieldAnswered(answers.get(f.id)?.value));
     if (missing.length > 0) {
       setError(`Please answer ${missing.length} more required question${missing.length === 1 ? "" : "s"} before submitting.`);
       return;
     }
     setSubmitting(true);
     const { error: submitError } = await supabasePortal
-      .from("tax_organizer_assignments")
-      .update({ assignment_status: "submitted", submitted_at: new Date().toISOString() })
-      .eq("id", assignment.id);
+      .from("organizer_responses")
+      .update({ status: "submitted", submitted_at: new Date().toISOString() })
+      .eq("id", response.id);
     setSubmitting(false);
     if (submitError) {
       setError(friendlyOrganizerError(submitError, "We couldn't submit your organizer right now. Please try again in a moment."));
       return;
     }
-    setAssignment({ ...assignment, assignment_status: "submitted", submitted_at: new Date().toISOString() });
+    setResponse({ ...response, status: "submitted", submitted_at: new Date().toISOString() });
     setError(null);
   }
 
   if (loading) return <div className="text-sm text-muted">Loading…</div>;
 
-  if (error || !assignment) {
-    return (
-      <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">
-        {error ?? "Not found."}
-      </div>
-    );
+  if (error || !response) {
+    return <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">{error ?? "Not found."}</div>;
   }
 
-  const visibleQuestions = questions.filter((q) => isQuestionVisible(q, questions, answers));
-  const answeredCount = visibleQuestions.filter((q) => isQuestionAnswered(answers.get(q.id)?.answer_value)).length;
-  const remainingSections = sections.filter((s) => {
-    const sectionQuestions = visibleQuestions.filter((q) => q.section_id === s.id);
-    return sectionQuestions.length > 0 && sectionQuestions.some((q) => !isQuestionAnswered(answers.get(q.id)?.answer_value));
-  }).length;
+  const topLevelFields = fields.filter((f) => !f.parent_field_id && isFieldVisible(f, fields, answers));
+  const answeredCount = topLevelFields.filter((f) =>
+    f.field_type === "repeating_section" ? Array.isArray(answers.get(f.id)?.value) && (answers.get(f.id)!.value as unknown[]).length > 0 : isFieldAnswered(answers.get(f.id)?.value),
+  ).length;
+
+  const canEdit = response.status === "not_started" || response.status === "in_progress";
 
   return (
     <div>
-      <button
-        onClick={() => router.push("/portal")}
-        className="flex items-center gap-1.5 text-xs text-muted mb-4 hover:text-ink"
-      >
+      <button onClick={() => router.push("/portal")} className="flex items-center gap-1.5 text-xs text-muted mb-4 hover:text-ink">
         <ArrowLeft size={13} /> Back to Home
       </button>
 
       <div className="flex items-center gap-3 mb-1">
-        <h1 className="font-slab text-2xl font-bold text-ink">{template?.template_name}</h1>
-        <StatusPill status={assignment.assignment_status} />
+        <h1 className="font-slab text-2xl font-bold text-ink">{template?.name}</h1>
+        <StatusPill status={response.status.replaceAll("_", " ")} />
       </div>
       <p className="text-sm text-muted mb-4">
-        We&apos;ll ask a few questions so we can prepare your return correctly. Answer what you
-        know now — you can always come back and finish later.
+        We&apos;ll ask a few questions so we can prepare your return correctly. Answer what you know now — you can always
+        come back and finish later.
       </p>
 
-      <OrganizerProgress
-        answeredCount={answeredCount}
-        totalCount={visibleQuestions.length}
-        remainingSections={remainingSections}
-        dueDate={assignment.due_date}
-      />
+      <OrganizerProgress answeredCount={answeredCount} totalCount={topLevelFields.length} />
 
-      {error && (
-        <div className="mb-6 text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">
-          {error}
-        </div>
-      )}
+      {error && <div className="mb-6 text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3">{error}</div>}
 
-      <OrganizerQuestionnaire
-        sections={sections}
-        questions={questions}
-        answers={answers}
-        savingQuestionId={savingQuestionId}
-        onSave={saveAnswer}
-      />
+      <OrganizerQuestionnaire fields={fields} answers={answers} savingFieldId={savingFieldId} onSave={saveAnswer} />
 
-      <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
-        <p className="text-xs text-muted flex-1">Your answers save automatically. Submit only when the organizer is complete.</p>
-        {assignment.assignment_status !== "submitted" && assignment.assignment_status !== "accepted" && (
+      {canEdit && (
+        <div className="mt-6 flex flex-col sm:flex-row sm:items-center gap-3">
+          <p className="text-xs text-muted flex-1">Your answers save automatically. Submit only when the organizer is complete.</p>
           <button type="button" onClick={submitForReview} disabled={submitting} className="px-4 py-2 rounded-sm bg-ink text-white text-sm font-semibold disabled:opacity-60">
             {submitting ? "Submitting…" : "Submit for Review"}
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

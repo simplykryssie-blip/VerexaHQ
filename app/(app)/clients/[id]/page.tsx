@@ -46,12 +46,13 @@ import type {
 import { clientDisplayName, clientInitials, accountTypeMeta } from "@/lib/clientDisplay";
 import { isOpenServiceStatus, isDocumentAwaitingClient, isOpenTaskStatus } from "@/lib/status";
 import { friendlyError } from "@/lib/friendlyError";
+import { getStaffNames } from "@/lib/workspaceMembers";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import StatusPill from "@/components/StatusPill";
 import NewTaskModal from "@/components/NewTaskModal";
 import NewDeadlineModal from "@/components/NewDeadlineModal";
-import NewServiceModal from "@/components/NewServiceModal";
+import EditEngagementModal from "@/components/EditEngagementModal";
 import ActivateServiceModal from "@/components/ActivateServiceModal";
 import ClientModal from "@/components/ClientModal";
 import ContactDetailModal from "@/components/ContactDetailModal";
@@ -293,7 +294,13 @@ export default function ClientDetailPage() {
   const { showSuccess, showError } = useToast();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
-  const [editingService, setEditingService] = useState<Service | null>(null);
+  // NewServiceModal (which used to open here) updated a per-client `services`
+  // row that doesn't exist on the live schema -- a client's service is a real
+  // `engagements` row instead (client_id, service_id, workflow_id,
+  // current_stage, priority, etc.), so "Edit" now opens EditEngagementModal
+  // against the engagement id looked up via serviceEngagements, not the
+  // service id itself.
+  const [editingEngagementId, setEditingEngagementId] = useState<string | null>(null);
   const [contactActionError, setContactActionError] = useState<string | null>(null);
   const [removeContactTarget, setRemoveContactTarget] = useState<LinkedContact | null>(null);
   const [removingContact, setRemovingContact] = useState(false);
@@ -334,7 +341,6 @@ export default function ClientDetailPage() {
       documentsRes,
       foldersRes,
       teamRes,
-      workspaceMembersRes,
       tagAssignmentsRes,
       workspaceTagsRes,
       identityRes,
@@ -362,7 +368,6 @@ export default function ClientDetailPage() {
       supabase.from("documents").select("*").eq("client_id", id).order("created_at", { ascending: false }),
       supabase.from("document_folders").select("*").eq("client_id", id).order("sort_order"),
       supabase.from("client_team_members").select("user_id").eq("client_id", id),
-      supabase.from("workspace_members").select("user_id, display_name, role").eq("workspace_id", c.workspace_id),
       supabase.from("client_tag_assignments").select("tag_id").eq("client_id", id),
       supabase.from("client_tags").select("*").eq("workspace_id", c.workspace_id).eq("is_active", true),
       supabase.rpc("get_client_identity_vault_masked", { p_workspace_id: c.workspace_id, p_client_id: id }),
@@ -389,13 +394,9 @@ export default function ClientDetailPage() {
     setDocuments((documentsRes.data as Document[]) ?? []);
     setFolders((foldersRes.data as DocumentFolder[]) ?? []);
 
-    const memberIds = new Set(((teamRes.data as any[]) ?? []).map((r) => r.user_id));
-    const wsMembers = (workspaceMembersRes.data as any[]) ?? [];
-    setTeam(
-      wsMembers
-        .filter((m) => memberIds.has(m.user_id))
-        .map((m) => ({ user_id: m.user_id, label: m.display_name || m.role || "Team member" }))
-    );
+    const memberIds = Array.from(new Set(((teamRes.data as any[]) ?? []).map((r) => r.user_id as string)));
+    const memberNames = await getStaffNames(memberIds);
+    setTeam(memberIds.map((userId) => ({ user_id: userId, label: memberNames.get(userId) ?? "Team member" })));
 
     const tagIds = new Set(((tagAssignmentsRes.data as any[]) ?? []).map((r) => r.tag_id));
     setTags(((workspaceTagsRes.data as ClientTag[]) ?? []).filter((t) => tagIds.has(t.id)));
@@ -717,7 +718,7 @@ export default function ClientDetailPage() {
               ) : (
                 <div className="divide-y divide-line">
                   {services.slice(0, 4).map((s) => (
-                    <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                    <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => { const engId = serviceEngagements.get(s.id); if (engId) setEditingEngagementId(engId); }} />
                   ))}
                 </div>
               )}
@@ -865,7 +866,7 @@ export default function ClientDetailPage() {
             ) : (
               <div className="divide-y divide-line">
                 {services.map((s) => (
-                  <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => setEditingService(s)} />
+                  <ServiceRow key={s.id} s={s} engagementId={serviceEngagements.get(s.id)} onEdit={() => { const engId = serviceEngagements.get(s.id); if (engId) setEditingEngagementId(engId); }} />
                 ))}
               </div>
             )}
@@ -1211,7 +1212,13 @@ export default function ClientDetailPage() {
 
       {showClientModal && <ClientModal client={client} onClose={() => setShowClientModal(false)} onSaved={refresh} onDeleted={() => router.push("/clients")} />}
       {showAddContactModal && (
-        <ClientModal client={client} initialStep={2} initialContactMode="link" onClose={() => setShowAddContactModal(false)} onSaved={refresh} />
+        // NOTE: this used to jump ClientModal straight to a "link an
+        // existing contact" step (initialStep/initialContactMode props),
+        // which was removed along with the rest of the contacts/
+        // account_contacts linking flow -- neither table exists live. This
+        // whole Contacts card (below) still reads from account_contacts
+        // and is independently broken; flagged, not fixed, in this pass.
+        <ClientModal client={client} onClose={() => setShowAddContactModal(false)} onSaved={refresh} />
       )}
       {viewingContact && viewingContact.link.contacts && (
         <ContactDetailModal
@@ -1250,12 +1257,16 @@ export default function ClientDetailPage() {
         <NewDeadlineModal clientId={client.id} deadline={editingDeadline} onClose={() => setEditingDeadline(null)} onSaved={refresh} onDeleted={refresh} />
       )}
       {(showActivateModal || activatingRequestedService) && (
+        // initialServiceType/requestedServiceLabel/remainingRequestedServices
+        // were removed along with ActivateServiceModal's "requested service"
+        // prefill -- they were sourced from client_service_interests, which
+        // doesn't exist live (same table already confirmed dead when tags/
+        // service-interests were removed from ClientModal). RequestedServicesCard
+        // below still queries that dead table independently -- flagged, not
+        // fixed, in this pass.
         <ActivateServiceModal
           clientId={client.id}
           workspaceId={client.workspace_id}
-          initialServiceType={activatingRequestedService?.serviceType}
-          requestedServiceLabel={activatingRequestedService?.label}
-          remainingRequestedServices={remainingRequestedServices}
           onClose={() => {
             setShowActivateModal(false);
             setActivatingRequestedService(null);
@@ -1263,8 +1274,8 @@ export default function ClientDetailPage() {
           onActivated={handleServiceActivated}
         />
       )}
-      {editingService && (
-        <NewServiceModal clientId={client.id} service={editingService} onClose={() => setEditingService(null)} onSaved={refresh} onDeleted={refresh} />
+      {editingEngagementId && (
+        <EditEngagementModal engagementId={editingEngagementId} onClose={() => setEditingEngagementId(null)} onSaved={refresh} />
       )}
       {showInvoiceModal && <NewInvoiceModal clientId={client.id} onClose={() => setShowInvoiceModal(false)} onSaved={refresh} />}
       <ConfirmDialog

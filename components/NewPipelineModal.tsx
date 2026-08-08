@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useWorkspace } from "@/components/WorkspaceProvider";
 
 export default function NewPipelineModal({
   onClose,
@@ -11,6 +12,7 @@ export default function NewPipelineModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { activeWorkspaceId } = useWorkspace();
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [stages, setStages] = useState<string[]>(["New Lead", "In Progress", "Complete"]);
@@ -34,24 +36,18 @@ export default function NewPipelineModal({
     setSaving(true);
     setError(null);
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userId = sessionData.session?.user.id;
-    const { data: member } = await supabase
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (!member) {
+    if (!activeWorkspaceId) {
       setError("Could not determine your workspace.");
       setSaving(false);
       return;
     }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
 
     const { data: pipeline, error: pipelineError } = await supabase
       .from("pipelines")
       .insert({
-        workspace_id: member.workspace_id,
+        workspace_id: activeWorkspaceId,
         pipeline_name: name,
         pipeline_type: type,
         description: "",
@@ -70,7 +66,7 @@ export default function NewPipelineModal({
     const stageRows = stages
       .filter((s) => s.trim().length > 0)
       .map((stage_name, idx) => ({
-        workspace_id: member.workspace_id,
+        workspace_id: activeWorkspaceId,
         pipeline_id: pipeline.id,
         stage_name,
         stage_description: "",

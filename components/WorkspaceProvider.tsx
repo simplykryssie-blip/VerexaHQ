@@ -16,6 +16,11 @@ export type WorkspaceInfo = {
   id: string;
   name: string;
   role: string;
+  isOwner: boolean;
+  // Mirrors is_workspace_admin(): is_owner OR role slug in (owner, admin).
+  // Use this instead of comparing `role` to a literal string, so UI gates
+  // stay in sync with what the RLS/RPC layer actually allows.
+  isAdmin: boolean;
   readOnly: boolean;
 };
 type WorkspaceContextValue = {
@@ -39,25 +44,39 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("list_my_active_workspaces");
-    if (error) {
-      showError(friendlyError(error, "Couldn't load your workspaces. Please refresh the page."));
-    } else {
-      const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => {
-        const role = String(row.role ?? "Staff");
-        return {
-          id: String(row.workspace_id),
-          name: String(row.business_name ?? "My firm"),
-          role,
-          readOnly: [
-            "staff",
-            "member",
-            "viewer",
-            "read_only",
-            "client_portal",
-          ].includes(role.toLowerCase()),
-        };
-      });
+    try {
+      // list_my_active_workspaces does not exist in the live database.
+      // get_my_workspaces() is the real RPC: it joins workspace_users ->
+      // workspaces -> roles, scoped to auth.uid(), and returns every
+      // membership regardless of status — filter to "active" here.
+      const { data, error } = await supabase.rpc("get_my_workspaces");
+      if (error) {
+        // eslint-disable-next-line no-console -- keep a trace of the raw
+        // error even though the toast below only shows a friendly message.
+        console.error("Failed to load workspaces:", error);
+        showError(friendlyError(error, "Couldn't load your workspaces. Please refresh the page."));
+        setWorkspaces([]);
+        return;
+      }
+      const rows = ((data ?? []) as Record<string, unknown>[])
+        .filter((row) => row.status === "active")
+        .map((row) => {
+          const role = String(row.role_slug ?? "staff");
+          const isOwner = Boolean(row.is_owner);
+          return {
+            id: String(row.workspace_id),
+            name: String(row.workspace_name ?? "My firm"),
+            role,
+            isOwner,
+            isAdmin: isOwner || role === "owner" || role === "admin",
+            // No live role slug maps cleanly to the old "read only" concept
+            // (staff/member/viewer/read_only/client_portal) — defaulting to
+            // false for every role rather than guessing. Revisit once
+            // there's a product decision on which of the 10 roles, if any,
+            // should be read-only in this UI.
+            readOnly: false,
+          };
+        });
       setWorkspaces(rows);
       const saved =
         typeof window !== "undefined"
@@ -68,8 +87,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           ? current
           : (rows.find((row) => row.id === saved)?.id ?? rows[0]?.id ?? null),
       );
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("Unexpected error loading workspaces:", err);
+      showError("Couldn't load your workspaces. Please refresh the page.");
+      setWorkspaces([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [showError]);
 
   useEffect(() => {

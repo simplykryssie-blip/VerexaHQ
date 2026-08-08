@@ -13,10 +13,13 @@ export default function AcceptTeamInvitationPage() {
 
   useEffect(() => {
     (async () => {
-      const { data, error: acceptError } = await supabase.rpc("accept_my_workspace_member_invitation", {
-        p_invitation_id: invitationId,
+      // The [invitationId] route param is actually the invitation's token —
+      // accept_workspace_invitation_by_token is the real live RPC and takes
+      // a token, not an internal invitation id.
+      const { data, error: acceptError } = await supabase.rpc("accept_workspace_invitation_by_token", {
+        p_token: invitationId,
       });
-      if (acceptError || !data?.ok) {
+      if (acceptError || !data) {
         setStatus("error");
         setError(friendlyError(acceptError, "This invitation link is invalid, expired, or was sent to a different email address."));
         return;

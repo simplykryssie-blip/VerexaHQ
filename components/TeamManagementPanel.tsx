@@ -7,60 +7,58 @@ import { useWorkspace } from "@/components/WorkspaceProvider";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { friendlyError } from "@/lib/friendlyError";
+import { getStaffNames } from "@/lib/workspaceMembers";
 
-const INVITE_ROLES = ["Admin", "Manager", "Staff", "Preparer", "Bookkeeper", "Payroll"] as const;
+type RoleRow = { id: string; slug: string; name: string };
 
 type TeamMemberRow = {
-  id: string;
-  role: string;
-  member_status: string;
-  display_name: string | null;
-  job_title: string | null;
+  id: string; // workspace_users.id
   user_id: string;
+  status: string; // invited | active | suspended | removed
+  is_owner: boolean;
+  role_id: string;
+  role_name: string;
+  display_name: string;
   last_active_at: string | null;
 };
 
 type InvitationRow = {
   id: string;
-  invite_email: string;
-  invited_role: string;
-  invitation_status: "sent" | "accepted" | "expired" | "revoked";
-  sent_at: string;
+  email: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  token: string;
+  role_id: string;
+  role_name: string;
   expires_at: string;
-  accepted_at: string | null;
-  revoked_at: string | null;
   created_at: string;
 };
 
-function roleLabel(role: string) {
-  return role === "Owner" ? "Account Owner" : role;
-}
-
-function InvitationStatusBadge({ status, expiresAt }: { status: InvitationRow["invitation_status"]; expiresAt: string }) {
-  const isExpired = status === "sent" && new Date(expiresAt).getTime() < Date.now();
+function InvitationStatusBadge({ status, expiresAt }: { status: InvitationRow["status"]; expiresAt: string }) {
+  const isExpired = status === "pending" && new Date(expiresAt).getTime() < Date.now();
   const effective = isExpired ? "expired" : status;
   const style: Record<string, string> = {
-    sent: "bg-blue-50 text-blue-700",
+    pending: "bg-blue-50 text-blue-700",
     accepted: "bg-emerald-50 text-emerald-700",
     expired: "bg-amber-50 text-amber-700",
     revoked: "bg-paper text-muted",
   };
-  const label: Record<string, string> = { sent: "Pending", accepted: "Accepted", expired: "Expired", revoked: "Revoked" };
+  const label: Record<string, string> = { pending: "Pending", accepted: "Accepted", expired: "Expired", revoked: "Revoked" };
   return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${style[effective]}`}>{label[effective]}</span>;
 }
 
 export default function TeamManagementPanel() {
   const { activeWorkspaceId, activeWorkspace } = useWorkspace();
   const { showSuccess, showError } = useToast();
-  const isOwner = activeWorkspace?.role === "Owner";
+  const isAdmin = Boolean(activeWorkspace?.isAdmin);
 
+  const [roles, setRoles] = useState<RoleRow[]>([]);
   const [members, setMembers] = useState<TeamMemberRow[]>([]);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<(typeof INVITE_ROLES)[number]>("Staff");
+  const [inviteRoleId, setInviteRoleId] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [freshLink, setFreshLink] = useState<{ email: string; link: string } | null>(null);
@@ -72,55 +70,95 @@ export default function TeamManagementPanel() {
     if (!activeWorkspaceId) return;
     setLoading(true);
     setError(null);
-    const [m, i] = await Promise.all([
+
+    const [rolesRes, membersRes, invitationsRes] = await Promise.all([
       supabase
-        .from("workspace_members")
-        .select("id,role,member_status,display_name,job_title,user_id,last_active_at")
+        .from("roles")
+        .select("id, slug, name")
+        .or(`workspace_id.is.null,workspace_id.eq.${activeWorkspaceId}`)
+        .order("name"),
+      supabase
+        .from("workspace_users")
+        .select("id, user_id, status, is_owner, role_id, last_active_at, role:roles(name)")
         .eq("workspace_id", activeWorkspaceId)
         .order("created_at", { ascending: true }),
-      isOwner
-        ? supabase.rpc("list_workspace_member_invitations", { p_workspace_id: activeWorkspaceId })
-        : Promise.resolve({ data: [], error: null }),
+      isAdmin
+        ? supabase
+            .from("workspace_invitations")
+            .select("id, email, status, token, role_id, expires_at, created_at, role:roles(name)")
+            .eq("workspace_id", activeWorkspaceId)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] as unknown[], error: null }),
     ]);
-    if (m.error) {
-      setError(friendlyError(m.error, "Couldn't load your team."));
+
+    if (membersRes.error) {
+      setError(friendlyError(membersRes.error, "Couldn't load your team."));
       setLoading(false);
       return;
     }
-    setMembers((m.data as TeamMemberRow[]) ?? []);
-    if (i.error) {
-      setError(friendlyError(i.error, "Couldn't load pending invitations."));
+
+    const roleRows = (rolesRes.data as RoleRow[]) ?? [];
+    setRoles(roleRows);
+    setInviteRoleId((current) => current || roleRows.find((r) => r.slug === "staff")?.id || roleRows[0]?.id || "");
+
+    const rawMembers = (membersRes.data as any[]) ?? [];
+    const nameMap = await getStaffNames(rawMembers.map((m) => m.user_id));
+    setMembers(
+      rawMembers.map((m) => ({
+        id: m.id,
+        user_id: m.user_id,
+        status: m.status,
+        is_owner: m.is_owner,
+        role_id: m.role_id,
+        role_name: m.role?.name ?? "Team member",
+        display_name: nameMap.get(m.user_id) ?? "Team member",
+        last_active_at: m.last_active_at,
+      })),
+    );
+
+    if (invitationsRes.error) {
+      setError(friendlyError(invitationsRes.error, "Couldn't load pending invitations."));
     } else {
-      setInvitations((i.data as InvitationRow[]) ?? []);
+      setInvitations(
+        ((invitationsRes.data as any[]) ?? []).map((inv) => ({
+          id: inv.id,
+          email: inv.email,
+          status: inv.status,
+          token: inv.token,
+          role_id: inv.role_id,
+          role_name: inv.role?.name ?? "Team member",
+          expires_at: inv.expires_at,
+          created_at: inv.created_at,
+        })),
+      );
     }
     setLoading(false);
-  }, [activeWorkspaceId, isOwner]);
+  }, [activeWorkspaceId, isAdmin]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  function buildInviteLink(invitationId: string) {
-    return `${window.location.origin}/team/accept/${invitationId}`;
+  function buildInviteLink(token: string) {
+    return `${window.location.origin}/team/accept/${token}`;
   }
 
   async function sendInvite(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeWorkspaceId || !inviteEmail.trim()) return;
+    if (!activeWorkspaceId || !inviteEmail.trim() || !inviteRoleId) return;
     setInviting(true);
     setInviteError(null);
-    const { data, error: inviteErr } = await supabase.rpc("invite_workspace_member", {
+    const { data, error: inviteErr } = await supabase.rpc("create_workspace_invitation", {
       p_workspace_id: activeWorkspaceId,
-      p_invite_email: inviteEmail.trim(),
-      p_role: inviteRole,
-      p_permissions: {},
+      p_email: inviteEmail.trim(),
+      p_role_id: inviteRoleId,
     });
     setInviting(false);
-    if (inviteErr || !data?.ok) {
+    if (inviteErr || !data) {
       setInviteError(friendlyError(inviteErr, "Couldn't send that invitation."));
       return;
     }
-    setFreshLink({ email: data.invite_email, link: buildInviteLink(data.invitation_id) });
+    setFreshLink({ email: data.email, link: buildInviteLink(data.token) });
     setInviteEmail("");
     setShowInvite(false);
     showSuccess("Invitation created.");
@@ -128,23 +166,31 @@ export default function TeamManagementPanel() {
   }
 
   async function resend(inv: InvitationRow) {
+    if (!activeWorkspaceId) return;
     setBusyId(inv.id);
-    const { data, error: resendErr } = await supabase.rpc("resend_workspace_member_invitation", { p_invitation_id: inv.id });
+    // create_workspace_invitation upserts on (workspace_id, email) while
+    // status = 'pending' — calling it again regenerates the token and
+    // resets the 7-day expiry, which is exactly a "resend".
+    const { data, error: resendErr } = await supabase.rpc("create_workspace_invitation", {
+      p_workspace_id: activeWorkspaceId,
+      p_email: inv.email,
+      p_role_id: inv.role_id,
+    });
     setBusyId(null);
-    if (resendErr || !data?.ok) {
+    if (resendErr || !data) {
       showError(friendlyError(resendErr, "Couldn't resend that invitation."));
       return;
     }
-    setFreshLink({ email: inv.invite_email, link: buildInviteLink(inv.id) });
+    setFreshLink({ email: inv.email, link: buildInviteLink(data.token) });
     showSuccess("Invitation refreshed.");
     void load();
   }
 
   async function revoke(inv: InvitationRow) {
     setBusyId(inv.id);
-    const { data, error: revokeErr } = await supabase.rpc("revoke_workspace_member_invitation", { p_invitation_id: inv.id });
+    const { error: revokeErr } = await supabase.from("workspace_invitations").update({ status: "revoked" }).eq("id", inv.id);
     setBusyId(null);
-    if (revokeErr || !data?.ok) {
+    if (revokeErr) {
       showError(friendlyError(revokeErr, "Couldn't revoke that invitation."));
       return;
     }
@@ -152,16 +198,11 @@ export default function TeamManagementPanel() {
     void load();
   }
 
-  async function changeRole(member: TeamMemberRow, role: string) {
-    if (!activeWorkspaceId) return;
+  async function changeRole(member: TeamMemberRow, roleId: string) {
     setBusyId(member.id);
-    const { data, error: roleErr } = await supabase.rpc("set_workspace_member_role", {
-      p_workspace_id: activeWorkspaceId,
-      p_user_id: member.user_id,
-      p_role: role,
-    });
+    const { error: roleErr } = await supabase.from("workspace_users").update({ role_id: roleId }).eq("id", member.id);
     setBusyId(null);
-    if (roleErr || !data?.ok) {
+    if (roleErr) {
       showError(friendlyError(roleErr, "Couldn't change that team member's role."));
       return;
     }
@@ -172,13 +213,13 @@ export default function TeamManagementPanel() {
   async function removeMember(member: TeamMemberRow) {
     if (!activeWorkspaceId) return;
     setBusyId(member.id);
-    const { data, error: removeErr } = await supabase.rpc("remove_workspace_member", {
+    const { error: removeErr } = await supabase.rpc("revoke_workspace_user", {
       p_workspace_id: activeWorkspaceId,
       p_user_id: member.user_id,
     });
     setBusyId(null);
     setRemoveTarget(null);
-    if (removeErr || !data?.ok) {
+    if (removeErr) {
       showError(friendlyError(removeErr, "Couldn't remove that team member."));
       return;
     }
@@ -194,15 +235,15 @@ export default function TeamManagementPanel() {
 
   if (loading) return <p className="text-sm text-muted">Loading team…</p>;
 
-  const activeMembers = members.filter((m) => m.member_status !== "Removed");
-  const visibleInvitations = invitations.filter((inv) => inv.invitation_status === "sent" || inv.invitation_status === "expired");
+  const activeMembers = members.filter((m) => m.status !== "removed");
+  const visibleInvitations = invitations.filter((inv) => inv.status === "pending" || inv.status === "expired");
 
   return (
     <div className="max-w-3xl space-y-5">
       <section className="rounded-2xl border border-line bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-bold text-ink">Team members</h2>
-          {isOwner && (
+          {isAdmin && (
             <button
               onClick={() => {
                 setInviteError(null);
@@ -214,7 +255,7 @@ export default function TeamManagementPanel() {
             </button>
           )}
         </div>
-        {!isOwner && <p className="mt-1 text-xs text-muted">Only the Account Owner can invite, change roles, or remove team members.</p>}
+        {!isAdmin && <p className="mt-1 text-xs text-muted">Only workspace owners/admins can invite, change roles, or remove team members.</p>}
         {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
         <div className="mt-4 divide-y divide-line">
@@ -226,22 +267,21 @@ export default function TeamManagementPanel() {
                 <div className="min-w-0">
                   <div className="font-semibold text-ink">{m.display_name || "Team member"}</div>
                   <div className="text-xs text-muted">
-                    {m.job_title ? `${m.job_title} · ` : ""}
-                    {m.member_status}
+                    {m.status}
                     {m.last_active_at ? ` · Last active ${new Date(m.last_active_at).toLocaleDateString()}` : ""}
                   </div>
                 </div>
-                {isOwner && m.role !== "Owner" ? (
+                {isAdmin && !m.is_owner ? (
                   <div className="flex items-center gap-2">
                     <select
-                      value={m.role}
+                      value={m.role_id}
                       disabled={busyId === m.id}
                       onChange={(e) => changeRole(m, e.target.value)}
                       className="rounded-lg border border-line px-2.5 py-1.5 text-xs font-semibold text-ink disabled:opacity-50"
                     >
-                      {INVITE_ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
                         </option>
                       ))}
                     </select>
@@ -254,7 +294,9 @@ export default function TeamManagementPanel() {
                     </button>
                   </div>
                 ) : (
-                  <span className="rounded-full bg-paper px-3 py-1 text-xs font-semibold">{roleLabel(m.role)}</span>
+                  <span className="rounded-full bg-paper px-3 py-1 text-xs font-semibold">
+                    {m.is_owner ? "Account Owner" : m.role_name}
+                  </span>
                 )}
               </div>
             ))
@@ -262,7 +304,7 @@ export default function TeamManagementPanel() {
         </div>
       </section>
 
-      {isOwner && (
+      {isAdmin && (
         <section className="rounded-2xl border border-line bg-white p-5">
           <h2 className="font-bold text-ink">Pending invitations</h2>
           {visibleInvitations.length === 0 ? (
@@ -272,10 +314,10 @@ export default function TeamManagementPanel() {
               {visibleInvitations.map((inv) => (
                 <div key={inv.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                   <div>
-                    <div className="font-semibold text-ink">{inv.invite_email}</div>
+                    <div className="font-semibold text-ink">{inv.email}</div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-                      {inv.invited_role}
-                      <InvitationStatusBadge status={inv.invitation_status} expiresAt={inv.expires_at} />
+                      {inv.role_name}
+                      <InvitationStatusBadge status={inv.status} expiresAt={inv.expires_at} />
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -345,13 +387,13 @@ export default function TeamManagementPanel() {
                 className="w-full rounded-sm border border-line px-3 py-2 text-sm"
               />
               <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as (typeof INVITE_ROLES)[number])}
+                value={inviteRoleId}
+                onChange={(e) => setInviteRoleId(e.target.value)}
                 className="w-full rounded-sm border border-line px-3 py-2 text-sm"
               >
-                {INVITE_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
                   </option>
                 ))}
               </select>

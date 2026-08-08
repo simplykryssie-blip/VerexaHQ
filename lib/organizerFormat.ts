@@ -53,6 +53,10 @@ export type FormatConfig = {
   inputMode: "numeric" | "decimal";
 };
 
+// Only ssn/ein are real organizer_fields.field_type values — the organizer
+// form only ever needs this config for those two. maskPhone/maskZip/
+// maskPercentage above remain general-purpose exports used elsewhere
+// (e.g. ClientModal's zip field, PayrollClientModal's FEIN field).
 export const ORGANIZER_FORMAT_CONFIG: Record<OrganizerFormatType, FormatConfig> = {
   ssn: {
     mask: maskSsn,
@@ -69,37 +73,5 @@ export const ORGANIZER_FORMAT_CONFIG: Record<OrganizerFormatType, FormatConfig> 
     isComplete: (v) => /^\d{2}-\d{7}$/.test(v),
     errorMessage: "Please enter a valid EIN. Example: 12-3456789",
     inputMode: "numeric",
-  },
-  phone: {
-    mask: maskPhone,
-    example: "(337) 555-1234",
-    placeholder: "(337) 555-1234",
-    isComplete: (v) => /^\(\d{3}\) \d{3}-\d{4}$/.test(v),
-    errorMessage: "Please enter a valid phone number. Example: (337) 555-1234",
-    inputMode: "numeric",
-  },
-  zip: {
-    mask: maskZip,
-    example: "70501",
-    placeholder: "70501",
-    isComplete: (v) => /^\d{5}(-\d{4})?$/.test(v),
-    errorMessage: "Please enter a valid ZIP code. Example: 70501",
-    inputMode: "numeric",
-  },
-  currency: {
-    mask: (raw) => raw.replace(/[^0-9.]/g, ""),
-    example: "1,000.00",
-    placeholder: "0.00",
-    isComplete: () => true,
-    errorMessage: "Please enter a valid dollar amount. Example: 1,000.00",
-    inputMode: "decimal",
-  },
-  percentage: {
-    mask: maskPercentage,
-    example: "25",
-    placeholder: "25",
-    isComplete: () => true,
-    errorMessage: "Please enter a valid percentage. Example: 25",
-    inputMode: "decimal",
   },
 };

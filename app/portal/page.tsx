@@ -6,14 +6,14 @@ import { Download } from "lucide-react";
 import { supabasePortal } from "@/lib/supabasePortal";
 import { usePortal } from "@/components/portal/PortalContext";
 import type {
-  TaxOrganizerAssignment,
-  TaxOrganizerTemplate,
+  OrganizerResponse,
+  OrganizerTemplate,
   ClientPortalTodo,
   BookkeepingReportDelivery,
 } from "@/lib/types";
 import StatusPill from "@/components/StatusPill";
 
-type AssignmentRow = TaxOrganizerAssignment & { templateName: string };
+type AssignmentRow = OrganizerResponse & { templateName: string };
 
 export default function PortalHomePage() {
   const { access } = usePortal();
@@ -28,7 +28,7 @@ export default function PortalHomePage() {
       setLoading(true);
       const [assignmentsRes, todosRes, reportsRes] = await Promise.all([
         supabasePortal
-          .from("tax_organizer_assignments")
+          .from("organizer_responses")
           .select("*")
           .eq("client_id", access!.client_id)
           .order("created_at", { ascending: false }),
@@ -47,23 +47,23 @@ export default function PortalHomePage() {
           .order("delivered_at", { ascending: false }),
       ]);
 
-      const assignmentList = (assignmentsRes.data as TaxOrganizerAssignment[]) ?? [];
-      const templateIds = Array.from(new Set(assignmentList.map((a) => a.template_id)));
+      const assignmentList = (assignmentsRes.data as OrganizerResponse[]) ?? [];
+      const templateIds = Array.from(new Set(assignmentList.map((a) => a.organizer_template_id)));
       let templatesMap = new Map<string, string>();
       if (templateIds.length > 0) {
         const { data: templatesData } = await supabasePortal
-          .from("tax_organizer_templates")
-          .select("id, template_name")
+          .from("organizer_templates")
+          .select("id, name")
           .in("id", templateIds);
-        (templatesData as Pick<TaxOrganizerTemplate, "id" | "template_name">[] | null)?.forEach(
-          (t) => templatesMap.set(t.id, t.template_name)
+        (templatesData as Pick<OrganizerTemplate, "id" | "name">[] | null)?.forEach(
+          (t) => templatesMap.set(t.id, t.name)
         );
       }
 
       setAssignments(
         assignmentList.map((a) => ({
           ...a,
-          templateName: templatesMap.get(a.template_id) ?? "Tax Organizer",
+          templateName: templatesMap.get(a.organizer_template_id) ?? "Tax Organizer",
         }))
       );
       setTodos((todosRes.data as ClientPortalTodo[]) ?? []);
@@ -118,11 +118,8 @@ export default function PortalHomePage() {
             >
               <div>
                 <div className="font-semibold text-ink text-sm">{a.templateName}</div>
-                <div className="text-xs text-muted mt-0.5">
-                  {a.due_date ? `Due ${a.due_date}` : "No due date"}
-                </div>
               </div>
-              <StatusPill status={a.assignment_status} />
+              <StatusPill status={a.status.replaceAll("_", " ")} />
             </Link>
           ))}
         </div>

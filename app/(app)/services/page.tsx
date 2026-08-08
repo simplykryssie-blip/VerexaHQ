@@ -4,7 +4,6 @@ import Link from "next/link";
 import { BriefcaseBusiness, Plus, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/components/WorkspaceProvider";
-import NewServiceModal from "@/components/NewServiceModal";
 import type { Service } from "@/lib/types";
 type Row = Service & {
   clients: {
@@ -18,7 +17,6 @@ export default function ServicesPage() {
   const { activeWorkspaceId } = useWorkspace();
   const [rows, setRows] = useState<Row[]>([]);
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
     if (!activeWorkspaceId) return;
@@ -52,8 +50,9 @@ export default function ServicesPage() {
         sub="Manage every client engagement from start to completion."
         action={
           <button
-            onClick={() => setOpen(true)}
-            className="brand-gradient flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
+            disabled
+            title="Retired: NewServiceModal updated a per-client services row that doesn't exist live. Activate a service from a client's profile instead."
+            className="flex cursor-not-allowed items-center gap-2 rounded-xl border border-line bg-paper px-4 py-2.5 text-sm font-semibold text-muted"
           >
             <Plus size={17} />
             New service
@@ -133,15 +132,6 @@ export default function ServicesPage() {
           </tbody>
         </table>
       </div>
-      {open && (
-        <NewServiceModal
-          onClose={() => setOpen(false)}
-          onSaved={() => {
-            setOpen(false);
-            void load();
-          }}
-        />
-      )}
     </div>
   );
 }
