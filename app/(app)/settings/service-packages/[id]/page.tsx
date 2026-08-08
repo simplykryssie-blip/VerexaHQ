@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { StageEditor } from "@/components/settings/StageEditor";
+import { FolderTemplateEditor } from "@/components/settings/FolderTemplateEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -15,19 +16,34 @@ export default async function ServiceStagesPage({ params }: { params: { id: stri
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, name, workspace_id, process_id")
+    .select("id, name, workspace_id, process_id, document_folder_template_id")
     .eq("id", params.id)
     .maybeSingle();
   if (!service) notFound();
 
   const isSystemDefault = !service.workspace_id;
 
-  const [{ data: canEdit }, { data: process }] = await Promise.all([
+  const [{ data: canEdit }, { data: isWorkspaceAdmin }, { data: process }, { data: folderTemplate }] = await Promise.all([
     isSystemDefault ? Promise.resolve({ data: false }) : supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     service.process_id
       ? supabase.from("processes").select("id, name, workspace_id").eq("id", service.process_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    service.document_folder_template_id
+      ? supabase.from("document_folder_templates").select("id, name, workspace_id").eq("id", service.document_folder_template_id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
+
+  const { data: folderItems } = folderTemplate
+    ? await supabase
+        .from("document_folder_template_items")
+        .select("id, parent_item_id, name, display_order")
+        .eq("document_folder_template_id", folderTemplate.id)
+        .order("display_order")
+    : { data: [] as { id: string; parent_item_id: string | null; name: string; display_order: number }[] };
+
+  const folderTemplateIsSystemDefault = folderTemplate ? !folderTemplate.workspace_id : false;
+  const canEditFolders = Boolean(isWorkspaceAdmin) && !folderTemplateIsSystemDefault;
 
   const [{ data: stages }, { data: tasks }, { data: stageCounts }] = await Promise.all([
     process
@@ -72,6 +88,25 @@ export default async function ServiceStagesPage({ params }: { params: { id: stri
           tasks={(tasks ?? []) as never}
           engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
         />
+      </div>
+
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-ink">Document folders</h3>
+        <p className="mt-1 text-sm text-muted">
+          The folder structure auto-created in every new engagement using this service. Renaming or deleting a folder here only
+          affects future engagements -- it never touches folders already created for existing ones.
+        </p>
+        <div className="mt-3">
+          <FolderTemplateEditor
+            serviceId={service.id}
+            workspaceId={workspace.id}
+            templateId={folderTemplate?.id ?? null}
+            templateName={folderTemplate?.name ?? null}
+            isSystemDefault={folderTemplateIsSystemDefault}
+            canEdit={canEditFolders}
+            items={folderItems ?? []}
+          />
+        </div>
       </div>
     </div>
   );

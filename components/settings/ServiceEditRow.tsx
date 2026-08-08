@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 type Option = { id: string; name: string };
@@ -154,12 +155,19 @@ export function ServiceEditRow({
                 options={documentRequestTemplates}
                 placeholder="Document request template"
               />
-              <Select
-                value={documentFolderTemplateId}
-                onChange={setDocumentFolderTemplateId}
-                options={documentFolderTemplates}
-                placeholder="Document folder template"
-              />
+              <div>
+                <Select
+                  value={documentFolderTemplateId}
+                  onChange={setDocumentFolderTemplateId}
+                  options={documentFolderTemplates}
+                  placeholder="Document folder template"
+                />
+                {documentFolderTemplateId && (
+                  <Link href={`/settings/service-packages/${service.id}`} className="mt-1 inline-block text-xs font-medium text-accent hover:underline">
+                    Manage folders
+                  </Link>
+                )}
+              </div>
               <Select
                 value={engagementLetterTemplateId}
                 onChange={setEngagementLetterTemplateId}
