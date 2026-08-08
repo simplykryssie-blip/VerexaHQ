@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { verifyStripeSignature } from "@/lib/stripe/client";
 import { createServiceClient } from "@/lib/supabase/service";
 import { handleCheckoutSessionCompleted, markWebhookFailed, markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
+import {
+  handleSubscriptionCreated,
+  handleSubscriptionUpdated,
+  handleSubscriptionDeleted,
+  handleTrialWillEnd,
+  handleInvoicePaymentSucceeded,
+  handleInvoicePaymentFailed,
+} from "@/lib/stripe/subscriptionWebhooks";
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -38,6 +46,45 @@ export async function POST(request: Request) {
       };
       const result = await handleCheckoutSessionCompleted(supabase, session);
       await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
+    } else if (event.type === "customer.subscription.created") {
+      const subscription = event.data.object as Parameters<typeof handleSubscriptionCreated>[1];
+      const result = await handleSubscriptionCreated(supabase, subscription);
+      await markWebhookProcessed(supabase, logRow?.id, subscription.metadata?.workspace_id);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
+    } else if (event.type === "customer.subscription.updated") {
+      const subscription = event.data.object as Parameters<typeof handleSubscriptionUpdated>[1];
+      const result = await handleSubscriptionUpdated(supabase, subscription);
+      await markWebhookProcessed(supabase, logRow?.id, subscription.metadata?.workspace_id);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
+    } else if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object as Parameters<typeof handleSubscriptionDeleted>[1];
+      await handleSubscriptionDeleted(supabase, subscription);
+      await markWebhookProcessed(supabase, logRow?.id, subscription.metadata?.workspace_id);
+    } else if (event.type === "customer.subscription.trial_will_end") {
+      const subscription = event.data.object as Parameters<typeof handleTrialWillEnd>[1];
+      const result = await handleTrialWillEnd(supabase, subscription);
+      await markWebhookProcessed(supabase, logRow?.id, subscription.metadata?.workspace_id);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
+    } else if (event.type === "invoice.payment_succeeded") {
+      const invoice = event.data.object as Parameters<typeof handleInvoicePaymentSucceeded>[1];
+      const result = await handleInvoicePaymentSucceeded(supabase, invoice);
+      await markWebhookProcessed(supabase, logRow?.id, undefined);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
+    } else if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object as Parameters<typeof handleInvoicePaymentFailed>[1];
+      const result = await handleInvoicePaymentFailed(supabase, invoice);
+      await markWebhookProcessed(supabase, logRow?.id, undefined);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });
       }

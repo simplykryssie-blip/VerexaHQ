@@ -3179,11 +3179,13 @@ export type Database = {
           discount_amount: number
           due_date: string | null
           engagement_id: string | null
+          expected_deposit_date: string | null
           id: string
           invoice_number: string | null
           issue_date: string
           line_items: Json
           notes: string | null
+          payment_method: string | null
           sent_at: string | null
           status: string
           stripe_checkout_url: string | null
@@ -3201,11 +3203,13 @@ export type Database = {
           discount_amount?: number
           due_date?: string | null
           engagement_id?: string | null
+          expected_deposit_date?: string | null
           id?: string
           invoice_number?: string | null
           issue_date?: string
           line_items?: Json
           notes?: string | null
+          payment_method?: string | null
           sent_at?: string | null
           status?: string
           stripe_checkout_url?: string | null
@@ -3223,11 +3227,13 @@ export type Database = {
           discount_amount?: number
           due_date?: string | null
           engagement_id?: string | null
+          expected_deposit_date?: string | null
           id?: string
           invoice_number?: string | null
           issue_date?: string
           line_items?: Json
           notes?: string | null
+          payment_method?: string | null
           sent_at?: string | null
           status?: string
           stripe_checkout_url?: string | null
@@ -4297,6 +4303,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_subscription_plans: {
+        Row: {
+          base_price_cents: number
+          created_at: string
+          currency: string
+          email_overage_rate_cents: number
+          id: string
+          included_seats: number
+          is_active: boolean
+          name: string
+          per_seat_price_cents: number
+          slug: string
+          sms_overage_rate_cents: number
+          storage_overage_rate_cents: number
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          base_price_cents: number
+          created_at?: string
+          currency?: string
+          email_overage_rate_cents?: number
+          id?: string
+          included_seats?: number
+          is_active?: boolean
+          name: string
+          per_seat_price_cents?: number
+          slug: string
+          sms_overage_rate_cents?: number
+          storage_overage_rate_cents?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          base_price_cents?: number
+          created_at?: string
+          currency?: string
+          email_overage_rate_cents?: number
+          id?: string
+          included_seats?: number
+          is_active?: boolean
+          name?: string
+          per_seat_price_cents?: number
+          slug?: string
+          sms_overage_rate_cents?: number
+          storage_overage_rate_cents?: number
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       pricing_rules: {
         Row: {
@@ -6113,6 +6173,128 @@ export type Database = {
           },
         ]
       }
+      workspace_subscription_invoices: {
+        Row: {
+          amount_due: number
+          amount_paid: number
+          created_at: string
+          hosted_invoice_url: string | null
+          id: string
+          paid_at: string | null
+          period_end: string | null
+          period_start: string | null
+          status: string
+          stripe_invoice_id: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_due: number
+          amount_paid?: number
+          created_at?: string
+          hosted_invoice_url?: string | null
+          id?: string
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status: string
+          stripe_invoice_id: string
+          workspace_id: string
+        }
+        Update: {
+          amount_due?: number
+          amount_paid?: number
+          created_at?: string
+          hosted_invoice_url?: string | null
+          id?: string
+          paid_at?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          status?: string
+          stripe_invoice_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_subscription_invoices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_subscriptions: {
+        Row: {
+          card_funding_type: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          locked_plan_snapshot: Json | null
+          plan_id: string
+          price_change_effective_date: string | null
+          price_change_notice_sent_at: string | null
+          seat_count: number
+          stripe_customer_id: string | null
+          stripe_status: string
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          card_funding_type?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          locked_plan_snapshot?: Json | null
+          plan_id: string
+          price_change_effective_date?: string | null
+          price_change_notice_sent_at?: string | null
+          seat_count?: number
+          stripe_customer_id?: string | null
+          stripe_status?: string
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          card_funding_type?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          locked_plan_snapshot?: Json | null
+          plan_id?: string
+          price_change_effective_date?: string | null
+          price_change_notice_sent_at?: string | null
+          seat_count?: number
+          stripe_customer_id?: string | null
+          stripe_status?: string
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_users: {
         Row: {
           created_at: string
@@ -6191,6 +6373,7 @@ export type Database = {
           stripe_connected_account_id: string | null
           stripe_details_submitted: boolean
           stripe_payouts_enabled: boolean
+          suspension_reason: string | null
           timezone: string
           updated_at: string
           website: string | null
@@ -6216,6 +6399,7 @@ export type Database = {
           stripe_connected_account_id?: string | null
           stripe_details_submitted?: boolean
           stripe_payouts_enabled?: boolean
+          suspension_reason?: string | null
           timezone?: string
           updated_at?: string
           website?: string | null
@@ -6241,6 +6425,7 @@ export type Database = {
           stripe_connected_account_id?: string | null
           stripe_details_submitted?: boolean
           stripe_payouts_enabled?: boolean
+          suspension_reason?: string | null
           timezone?: string
           updated_at?: string
           website?: string | null
@@ -6948,6 +7133,13 @@ export type Database = {
           signer_status: string
           workspace_id: string
           workspace_name: string
+        }[]
+      }
+      get_workspace_billing_admin: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          email: string
+          user_id: string
         }[]
       }
       has_config_object_share_access: {

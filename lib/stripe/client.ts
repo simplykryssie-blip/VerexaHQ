@@ -186,6 +186,32 @@ export function deriveConnectStatus(
 }
 
 /**
+ * Moves a subscription item onto a new Price. Used for grandfathered price
+ * migrations: called exactly once, at the renewal where a workspace's
+ * locked price-change effective date has been reached, never mid-cycle.
+ */
+export async function updateSubscriptionItemPrice({
+  subscriptionItemId,
+  priceId,
+}: {
+  subscriptionItemId: string;
+  priceId: string;
+}): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({ price: priceId, proration_behavior: "none" });
+  const res = await fetch(`${STRIPE_API}/subscription_items/${subscriptionItemId}`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string };
+  return { ok: true, data };
+}
+
+/**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.
  */
