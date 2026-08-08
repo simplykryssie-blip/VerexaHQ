@@ -84,15 +84,37 @@ async function pauseWorkspaceForBilling(supabase: ReturnType<typeof createServic
 }
 
 /**
- * Only reactivates a workspace suspended specifically for billing -- never
- * overrides a manual suspension unrelated to payment.
+ * Only reactivates a workspace suspended for one of the given billing
+ * reasons -- never overrides a manual suspension unrelated to payment.
  */
-async function resumeWorkspaceFromBilling(supabase: ReturnType<typeof createServiceClient>, workspaceId: string) {
+async function resumeWorkspaceFromBilling(
+  supabase: ReturnType<typeof createServiceClient>,
+  workspaceId: string,
+  allowedReasons: string[] = ["billing_past_due"]
+) {
   await supabase
     .from("workspaces")
     .update({ status: "active", suspension_reason: null })
     .eq("id", workspaceId)
-    .eq("suspension_reason", "billing_past_due");
+    .in("suspension_reason", allowedReasons);
+}
+
+/**
+ * cancel_at_period_end: true (set via Stripe's hosted Customer Portal) means
+ * the workspace already had full access through its paid term -- this event
+ * fires only once that term has actually ended, so lock out immediately,
+ * no grace period. No refund logic here; none was requested for
+ * cancellation.
+ *
+ * v2, not implemented: once a credit-ledger system exists for seat/usage
+ * top-ups, any unused top-up balance must be forfeited (not refunded) here.
+ */
+async function lockWorkspaceForCancellation(supabase: ReturnType<typeof createServiceClient>, workspaceId: string) {
+  await supabase
+    .from("workspaces")
+    .update({ status: "suspended", suspension_reason: "subscription_canceled" })
+    .eq("id", workspaceId)
+    .neq("status", "archived");
 }
 
 export async function handleSubscriptionCreated(
@@ -120,6 +142,10 @@ export async function handleSubscriptionCreated(
     },
     { onConflict: "workspace_id" }
   );
+
+  // A brand-new subscription always clears whatever billing lock the
+  // workspace was under -- a past-due pause or a prior cancellation.
+  await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
 
   return {};
 }
@@ -185,7 +211,18 @@ export async function handleSubscriptionDeleted(
   supabase: ReturnType<typeof createServiceClient>,
   subscription: StripeSubscription
 ): Promise<{ skipped?: string }> {
+  const { data: existing } = await supabase
+    .from("workspace_subscriptions")
+    .select("workspace_id")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle();
+
   await supabase.from("workspace_subscriptions").update({ stripe_status: "canceled" }).eq("stripe_subscription_id", subscription.id);
+
+  if (existing?.workspace_id) {
+    await lockWorkspaceForCancellation(supabase, existing.workspace_id);
+  }
+
   return {};
 }
 
