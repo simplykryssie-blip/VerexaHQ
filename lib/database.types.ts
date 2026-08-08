@@ -7069,6 +7069,10 @@ export type Database = {
       reveal_firm_efin: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ein: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ptin: { Args: { p_workspace_id: string }; Returns: string }
+      reveal_organizer_answer: {
+        Args: { p_answer_id: string }
+        Returns: string
+      }
       review_comment: {
         Args: { p_comment: string; p_engagement_share_id: string }
         Returns: undefined

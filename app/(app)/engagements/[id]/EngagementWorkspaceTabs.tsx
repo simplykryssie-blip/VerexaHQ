@@ -11,6 +11,7 @@ import { AddTaskForm } from "./AddTaskForm";
 import { StageReviewActions } from "./StageReviewActions";
 import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
+import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
 
 function Section({
   title,
@@ -176,17 +177,61 @@ export function OverviewTab({
         {organizerResponses.length === 0 ? (
           <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
         ) : (
-          <ul className="divide-y divide-border">
+          <div className="space-y-3">
             {organizerResponses.map((o) => (
-              <li key={o.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{o.template_name}</span>
-                <span className="capitalize text-muted">
-                  {o.status.replace("_", " ")}
-                  {o.submitted_at && ` -- submitted ${new Date(o.submitted_at).toLocaleDateString()}`}
-                </span>
-              </li>
+              <div key={o.id} className="rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate">{o.template_name}</span>
+                  <span className="capitalize text-muted">
+                    {o.status.replace("_", " ")}
+                    {o.submitted_at && ` -- submitted ${new Date(o.submitted_at).toLocaleDateString()}`}
+                  </span>
+                </div>
+
+                {o.status === "submitted" && (
+                  <div className="mt-3 space-y-3 border-t border-border pt-3">
+                    {(o.topLevel ?? []).map((f) => (
+                      <div key={f.fieldId} className="flex items-start justify-between gap-4 text-sm">
+                        <span className="text-muted">{f.label}</span>
+                        <span className="text-right text-slate">
+                          {f.maskable && f.answerId ? <OrganizerAnswerReveal answerId={f.answerId} masked={f.display} /> : f.display}
+                        </span>
+                      </div>
+                    ))}
+
+                    {(o.repeaters ?? []).map((r) => (
+                      <div key={r.fieldId}>
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted">{r.label}</p>
+                        {r.instances.length === 0 ? (
+                          <p className="mt-1 text-xs text-muted">None provided.</p>
+                        ) : (
+                          <div className="mt-2 space-y-2">
+                            {r.instances.map((instance) => (
+                              <div key={instance.index} className="rounded-lg bg-surfaceMuted p-2">
+                                <p className="text-xs font-medium text-ink">
+                                  {r.label} {instance.index + 1}
+                                </p>
+                                <div className="mt-1 space-y-1">
+                                  {instance.fields.map((f) => (
+                                    <div key={f.fieldId} className="flex items-start justify-between gap-4 text-xs">
+                                      <span className="text-muted">{f.label}</span>
+                                      <span className="text-right text-slate">
+                                        {f.maskable && f.answerId ? <OrganizerAnswerReveal answerId={f.answerId} masked={f.display} /> : f.display}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </Section>
 
@@ -705,4 +750,13 @@ export type InvoiceRow = {
 };
 export type PaymentRow = { id: string; status: string; amount: number; payment_date: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
-export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };
+export type OrganizerFieldAnswer = { fieldId: string; answerId: string | null; label: string; fieldType: string; display: string; maskable: boolean };
+export type OrganizerRepeaterGroup = { fieldId: string; label: string; instances: { index: number; fields: OrganizerFieldAnswer[] }[] };
+export type OrganizerResponseRow = {
+  id: string;
+  status: string;
+  submitted_at: string | null;
+  template_name: string;
+  topLevel?: OrganizerFieldAnswer[];
+  repeaters?: OrganizerRepeaterGroup[];
+};

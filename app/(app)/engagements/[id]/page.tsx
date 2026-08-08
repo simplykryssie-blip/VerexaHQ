@@ -6,6 +6,88 @@ import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
 
+type OrganizerFieldRow = { id: string; organizer_template_id: string; label: string; field_type: string; parent_field_id: string | null; display_order: number };
+type OrganizerAnswerRow = { id: string; organizer_response_id: string; organizer_field_id: string; value: unknown; instance_index: number };
+
+function formatOrganizerValue(fieldType: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "--";
+  const str = String(value);
+  if (fieldType === "checkbox") return str === "true" ? "Yes" : "No";
+  if (fieldType === "date") {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? str : d.toLocaleDateString();
+  }
+  if (fieldType === "currency") {
+    const n = Number(str);
+    return isNaN(n) ? str : `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (fieldType === "file_upload") {
+    try {
+      const parsed = JSON.parse(str);
+      return parsed?.file_name ?? "Uploaded file";
+    } catch {
+      return "Uploaded file";
+    }
+  }
+  if (fieldType === "signature") {
+    try {
+      const parsed = JSON.parse(str);
+      return parsed?.typed_name ? `Signed by ${parsed.typed_name} on ${new Date(parsed.signed_at).toLocaleDateString()}` : "Signed";
+    } catch {
+      return "Signed";
+    }
+  }
+  return str;
+}
+
+function maskLast4(value: unknown): string {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  const last4 = digits.slice(-4);
+  return last4 ? `••• •• ${last4}` : "--";
+}
+
+function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow | undefined) {
+  const maskable = (field.field_type === "ssn" || field.field_type === "ein") && answer !== undefined && answer.value !== null;
+  return {
+    fieldId: field.id,
+    answerId: answer?.id ?? null,
+    label: field.label,
+    fieldType: field.field_type,
+    display: maskable ? maskLast4(answer?.value) : formatOrganizerValue(field.field_type, answer?.value),
+    maskable,
+  };
+}
+
+function buildOrganizerResponseDetail(responseId: string, templateId: string, allAnswers: OrganizerAnswerRow[], allFields: OrganizerFieldRow[]) {
+  const templateFields = allFields.filter((f) => f.organizer_template_id === templateId);
+  const responseAnswers = allAnswers.filter((a) => a.organizer_response_id === responseId);
+
+  const topLevel = templateFields
+    .filter((f) => !f.parent_field_id && f.field_type !== "repeating_section")
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id)));
+
+  const repeaters = templateFields
+    .filter((f) => f.field_type === "repeating_section" && !f.parent_field_id)
+    .sort((a, b) => a.display_order - b.display_order)
+    .map((repeater) => {
+      const children = templateFields.filter((f) => f.parent_field_id === repeater.id).sort((a, b) => a.display_order - b.display_order);
+      const childIds = new Set(children.map((c) => c.id));
+      const childAnswers = responseAnswers.filter((a) => childIds.has(a.organizer_field_id));
+      const maxInstance = childAnswers.reduce((max, a) => Math.max(max, a.instance_index ?? 0), -1);
+      const instances = [];
+      for (let i = 0; i <= maxInstance; i++) {
+        instances.push({
+          index: i,
+          fields: children.map((c) => buildFieldAnswer(c, childAnswers.find((a) => a.organizer_field_id === c.id && a.instance_index === i))),
+        });
+      }
+      return { fieldId: repeater.id, label: repeater.label, instances };
+    });
+
+  return { topLevel, repeaters };
+}
+
 export default async function EngagementDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
@@ -196,9 +278,42 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const { data: organizerResponses } = await supabase
     .from("organizer_responses")
-    .select("id, status, submitted_at, organizer_templates(name)")
+    .select("id, status, submitted_at, organizer_template_id, organizer_templates(name)")
     .eq("engagement_id", engagement.id)
     .order("created_at", { ascending: false });
+
+  // Answers are only meaningful once a response is submitted -- fetch and
+  // build the read-only detail (top-level fields + repeating-section
+  // instances grouped by instance_index) only for those, server-side, so
+  // masked ssn/ein values never reach the client bundle: only a precomputed
+  // last-4 display string is sent, and the real value is fetched later via
+  // reveal_organizer_answer() on demand.
+  const submittedResponses = (organizerResponses ?? []).filter((r) => r.status === "submitted");
+  const submittedResponseIds = submittedResponses.map((r) => r.id);
+  const submittedTemplateIds = Array.from(new Set(submittedResponses.map((r) => r.organizer_template_id)));
+
+  const [{ data: organizerAnswerRows }, { data: organizerFieldRows }] = await Promise.all([
+    submittedResponseIds.length > 0
+      ? supabase
+          .from("organizer_response_answers")
+          .select("id, organizer_response_id, organizer_field_id, value, instance_index")
+          .in("organizer_response_id", submittedResponseIds)
+      : Promise.resolve({ data: [] as { id: string; organizer_response_id: string; organizer_field_id: string; value: unknown; instance_index: number }[] }),
+    submittedTemplateIds.length > 0
+      ? supabase
+          .from("organizer_fields")
+          .select("id, organizer_template_id, label, field_type, parent_field_id, display_order")
+          .in("organizer_template_id", submittedTemplateIds)
+      : Promise.resolve({
+          data: [] as { id: string; organizer_template_id: string; label: string; field_type: string; parent_field_id: string | null; display_order: number }[],
+        }),
+  ]);
+
+  const organizerResponsesWithDetail = (organizerResponses ?? []).map((r) => {
+    if (r.status !== "submitted") return { ...r, topLevel: undefined, repeaters: undefined };
+    const { topLevel, repeaters } = buildOrganizerResponseDetail(r.id, r.organizer_template_id, organizerAnswerRows ?? [], organizerFieldRows ?? []);
+    return { ...r, topLevel, repeaters };
+  });
 
   const { data: documentRequestRows } = await supabase
     .from("document_requests")
@@ -268,11 +383,13 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       documentRequests={documentRequests}
       documentRequestTemplates={documentRequestTemplates ?? []}
       organizerTemplates={organizerTemplates ?? []}
-      organizerResponses={(organizerResponses ?? []).map((o: any) => ({
+      organizerResponses={organizerResponsesWithDetail.map((o: any) => ({
         id: o.id,
         status: o.status,
         submitted_at: o.submitted_at,
         template_name: o.organizer_templates?.name ?? "Organizer",
+        topLevel: o.topLevel,
+        repeaters: o.repeaters,
       }))}
       signatureRequests={signatureRequests}
       notes={notes ?? []}
