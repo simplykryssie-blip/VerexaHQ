@@ -53,7 +53,7 @@ export default async function ServicePackagesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-base font-semibold text-ink">Service Packages</h2>
+      <h2 className="text-base font-semibold text-ink">Workflow Setup</h2>
       <p className="mt-1 text-sm text-muted">
         The offerings clients can be sold -- each ties together pricing, billing, organizer, document request, folder, and
         engagement letter templates for engagements created against it.

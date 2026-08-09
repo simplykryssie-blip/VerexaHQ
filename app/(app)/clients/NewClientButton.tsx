@@ -469,7 +469,7 @@ export function NewClientButton({
               <div className="border-t border-border pt-4">
                 <label className="block text-xs font-medium uppercase tracking-wide text-muted">Services</label>
                 {services.length === 0 ? (
-                  <p className="mt-1 text-xs text-muted">No services are set up yet -- add one in Settings &gt; Service Packages first.</p>
+                  <p className="mt-1 text-xs text-muted">No services are set up yet -- add one in Settings &gt; Workflow Setup first.</p>
                 ) : (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {services.map((s) => (

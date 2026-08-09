@@ -473,7 +473,7 @@ export function NewEngagementForm({
   if (services.length === 0) {
     return (
       <p className="text-sm text-muted">
-        No published services yet -- add one in Settings &gt; Service Packages before creating an engagement.
+        No published services yet -- add one in Settings &gt; Workflow Setup before creating an engagement.
       </p>
     );
   }
