@@ -68,11 +68,12 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    const { data: allowed } = await supabase.rpc("check_rate_limit", {
-      p_key: `login:${email.toLowerCase()}`,
-      p_max_hits: 10,
-      p_window_seconds: 300,
+    const rateLimitResponse = await fetch("/api/auth/rate-limit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "login", email }),
     });
+    const { allowed } = await rateLimitResponse.json();
     if (allowed === false) {
       setLoading(false);
       setError("Too many sign-in attempts. Please wait a few minutes and try again.");

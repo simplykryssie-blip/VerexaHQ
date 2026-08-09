@@ -12,6 +12,15 @@ export default async function SecurityPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+  const { data: canManageSecurity } = await supabase.rpc("has_permission", {
+    p_workspace_id: workspace.id,
+    p_permission_key: "security.manage",
+  });
+
+  if (canManageSecurity) {
+    await supabase.rpc("ensure_workspace_security_policy", { p_workspace_id: workspace.id });
+  }
+
   const { data: policy } = await supabase
     .from("workspace_security_policies")
     .select("*")

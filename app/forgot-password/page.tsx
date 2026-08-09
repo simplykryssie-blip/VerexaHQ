@@ -18,11 +18,12 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
 
-    const { data: allowed } = await supabase.rpc("check_rate_limit", {
-      p_key: `password-reset:${email.toLowerCase()}`,
-      p_max_hits: 5,
-      p_window_seconds: 300,
+    const rateLimitResponse = await fetch("/api/auth/rate-limit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "password-reset", email }),
     });
+    const { allowed } = await rateLimitResponse.json();
     if (allowed === false) {
       setLoading(false);
       setError("Too many requests. Please wait a few minutes and try again.");
