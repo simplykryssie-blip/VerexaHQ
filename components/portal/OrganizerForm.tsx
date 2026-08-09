@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { formatAddressValue } from "@/lib/organizer/formatValue";
 
 type FieldRow = {
   id: string;
@@ -43,11 +44,15 @@ export function OrganizerForm({
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
   const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
 
+  const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
+  const answerToString = (fieldId: string, value: unknown): string =>
+    fieldTypeById.get(fieldId) === "address" ? formatAddressValue(value) : String(value);
+
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     for (const a of initialAnswers) {
       if (repeaterChildIds.has(a.organizer_field_id)) continue;
-      if (a.value !== null && a.value !== undefined) map[a.organizer_field_id] = String(a.value);
+      if (a.value !== null && a.value !== undefined) map[a.organizer_field_id] = answerToString(a.organizer_field_id, a.value);
     }
     return map;
   });
@@ -62,7 +67,7 @@ export function OrganizerForm({
         const row: Record<string, string> = {};
         for (const a of relevant) {
           if ((a.instance_index ?? 0) === i && a.value !== null && a.value !== undefined) {
-            row[a.organizer_field_id] = String(a.value);
+            row[a.organizer_field_id] = answerToString(a.organizer_field_id, a.value);
           }
         }
         rows.push(row);

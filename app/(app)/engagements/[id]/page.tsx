@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
+import { formatAddressValue } from "@/lib/organizer/formatValue";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,9 @@ function formatOrganizerValue(fieldType: string, value: unknown): string {
   if (fieldType === "currency") {
     const n = Number(str);
     return isNaN(n) ? str : `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (fieldType === "address") {
+    return formatAddressValue(value) || "--";
   }
   if (fieldType === "file_upload") {
     try {
