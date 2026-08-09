@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { formatAddressValue } from "@/lib/organizer/formatValue";
+import { formatAddressValue, normalizeOptions } from "@/lib/organizer/formatValue";
+import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 
 type FieldRow = {
   id: string;
@@ -15,6 +16,7 @@ type FieldRow = {
   is_required: boolean;
   options: unknown;
   parent_field_id: string | null;
+  conditional_logic?: unknown;
 };
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
@@ -145,7 +147,9 @@ export function OrganizerForm({
     router.refresh();
   }
 
-  const topLevelFields = fields.filter((f) => !f.parent_field_id);
+  const topLevelFields = fields
+    .filter((f) => !f.parent_field_id)
+    .filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
 
   return (
     <div className="space-y-4">
@@ -440,7 +444,7 @@ function FieldInput({
   entityType: "client" | "engagement";
   entityId: string;
 }) {
-  const options = Array.isArray(field.options) ? (field.options as { label?: string; value?: string }[]) : [];
+  const options = normalizeOptions(field.options);
 
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
@@ -472,11 +476,48 @@ function FieldInput({
           >
             <option value="">Select...</option>
             {options.map((o, i) => (
-              <option key={i} value={o.value ?? o.label ?? ""}>
-                {o.label ?? o.value}
+              <option key={i} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
+        ) : field.field_type === "radio_button" ? (
+          <div className="space-y-1.5">
+            {options.map((o, i) => (
+              <label key={i} className="flex items-center gap-2 text-sm text-slate">
+                <input
+                  type="radio"
+                  name={`field-${field.id}`}
+                  checked={value === o.value}
+                  disabled={disabled}
+                  onChange={() => onChange(field.id, o.value)}
+                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : field.field_type === "multiple_choice" ? (
+          <div className="space-y-1.5">
+            {options.map((o, i) => {
+              const selected = value ? value.split(",") : [];
+              return (
+                <label key={i} className="flex items-center gap-2 text-sm text-slate">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.value)}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      const next = e.target.checked ? [...selected, o.value] : selected.filter((v) => v !== o.value);
+                      onChange(field.id, next.join(","));
+                    }}
+                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                  />
+                  {o.label}
+                </label>
+              );
+            })}
+          </div>
         ) : field.field_type === "checkbox" ? (
           <input
             id={`field-${field.id}`}
@@ -490,6 +531,15 @@ function FieldInput({
           <input
             id={`field-${field.id}`}
             type="date"
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          />
+        ) : field.field_type === "number" ? (
+          <input
+            id={`field-${field.id}`}
+            type="number"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}

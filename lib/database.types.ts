@@ -7333,6 +7333,10 @@ export type Database = {
         Args: { p_new_name: string; p_stage_id: string }
         Returns: undefined
       }
+      reorder_organizer_fields: {
+        Args: { p_field_ids: string[]; p_template_id: string }
+        Returns: undefined
+      }
       respond_to_engagement_share: {
         Args: {
           p_approve: boolean

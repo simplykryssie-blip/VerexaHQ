@@ -4,8 +4,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
-import { CreateOrganizerTemplateForm } from "@/components/settings/CreateOrganizerTemplateForm";
-import { OrganizerTemplateRow } from "@/components/settings/OrganizerTemplateRow";
+import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 
 export type TemplateTabKey = "email" | "sms" | "engagement-letter" | "organizers";
 export type TemplateTab = { key: TemplateTabKey; label: string };
@@ -48,8 +47,21 @@ export async function TemplateLibrary({
   const organizerTemplateIds = (organizerTemplates ?? []).map((t) => t.id);
   const { data: organizerFields } =
     isOrganizers && organizerTemplateIds.length > 0
-      ? await supabase.from("organizer_fields").select("*").in("organizer_template_id", organizerTemplateIds)
-      : { data: [] as { id: string; organizer_template_id: string; field_type: string; label: string; is_required: boolean; display_order: number; options: unknown }[] };
+      ? await supabase.from("organizer_fields").select("id, organizer_template_id, parent_field_id").in("organizer_template_id", organizerTemplateIds)
+      : { data: [] as { id: string; organizer_template_id: string; parent_field_id: string | null }[] };
+
+  const organizerCards: OrganizerCard[] = (organizerTemplates ?? []).map((t) => {
+    const fieldsForTemplate = (organizerFields ?? []).filter((f) => f.organizer_template_id === t.id);
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      status: t.status,
+      workspace_id: t.workspace_id,
+      topLevelFieldCount: fieldsForTemplate.filter((f) => !f.parent_field_id).length,
+      totalFieldCount: fieldsForTemplate.length,
+    };
+  });
 
   const tabNav = (
     <nav className="flex gap-1 border-b border-border">
@@ -68,48 +80,16 @@ export async function TemplateLibrary({
   );
 
   return (
-    <div className="max-w-3xl">
+    <div className={isOrganizers ? "max-w-6xl" : "max-w-3xl"}>
       <h2 className="text-base font-semibold text-ink">{heading}</h2>
       <p className="mt-1 text-sm text-muted">{description}</p>
 
       <div className="mt-4">{tabNav}</div>
 
       {isOrganizers ? (
-        <>
-          <p className="mt-2 text-sm text-muted">
-            Organizers are the questionnaires clients complete in their portal. Click one to view or edit its questions.
-          </p>
-          <div className="mt-4">
-            <CreateOrganizerTemplateForm workspaceId={workspaceId} />
-          </div>
-          <div className="mt-4">
-            {(organizerTemplates ?? []).length === 0 ? (
-              <EmptyState message="No organizers yet." />
-            ) : (
-              <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-                {(organizerTemplates ?? []).map((t) => (
-                  <li key={t.id} className="px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <OrganizerTemplateRow
-                            template={t}
-                            fields={(organizerFields ?? []).filter((f) => f.organizer_template_id === t.id) as never}
-                          />
-                          {!t.workspace_id && (
-                            <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted">{t.slug}</p>
-                      </div>
-                      <TemplateStatusCycle table="organizer_templates" id={t.id} status={t.status} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </>
+        <div className="mt-4">
+          <OrganizerLibrary workspaceId={workspaceId} templates={organizerCards} />
+        </div>
       ) : (
         <>
           <div className="mt-4">
