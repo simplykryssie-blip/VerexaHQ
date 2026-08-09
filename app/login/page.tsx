@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -68,35 +69,33 @@ export default function LoginPage() {
 
     setLoading(true);
 
-    const rateLimitResponse = await fetch("/api/auth/rate-limit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "login", email }),
-    });
-    const { allowed } = await rateLimitResponse.json();
-    if (allowed === false) {
+    try {
+      const allowed = await checkRateLimitClientSide("login", email);
+      if (allowed === false) {
+        setError("Too many sign-in attempts. Please wait a few minutes and try again.");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      await fetch("/api/auth/set-remember", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ remember: rememberMe }),
+      });
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-      setError("Too many sign-in attempts. Please wait a few minutes and try again.");
-      return;
     }
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      setLoading(false);
-      setError(error.message);
-      return;
-    }
-
-    await fetch("/api/auth/set-remember", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ remember: rememberMe }),
-    });
-
-    setLoading(false);
-    router.push("/dashboard");
-    router.refresh();
   }
 
   if (checkEmail) {

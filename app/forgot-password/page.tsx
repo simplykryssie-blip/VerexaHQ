@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
 
 export const dynamic = "force-dynamic";
 
@@ -18,30 +19,28 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
 
-    const rateLimitResponse = await fetch("/api/auth/rate-limit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "password-reset", email }),
-    });
-    const { allowed } = await rateLimitResponse.json();
-    if (allowed === false) {
+    try {
+      const allowed = await checkRateLimitClientSide("password-reset", email);
+      if (allowed === false) {
+        setError("Too many requests. Please wait a few minutes and try again.");
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setSent(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-      setError("Too many requests. Please wait a few minutes and try again.");
-      return;
     }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
-      return;
-    }
-
-    setSent(true);
   }
 
   if (sent) {
