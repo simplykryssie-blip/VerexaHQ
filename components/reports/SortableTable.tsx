@@ -4,22 +4,32 @@ import { useEffect, useState } from "react";
 import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 
-export type ReportColumn<T> = {
+// Plain metadata only -- no functions. Server Components that build a table
+// compute each cell's content themselves (see lib/reports/buildReportTable.ts)
+// and pass the result here, because a function value in a prop passed from a
+// Server Component to this Client Component fails at the RSC boundary
+// ("Functions cannot be passed directly to Client Components").
+export type ReportColumn = {
   key: string;
   label: string;
   align?: "left" | "right";
-  render: (row: T) => React.ReactNode;
-  sortValue?: (row: T) => string | number;
+  sortable?: boolean;
 };
 
-export function SortableTable<T extends { id: string }>({
+export type ReportRow = {
+  id: string;
+  cells: Record<string, React.ReactNode>;
+  sortValues?: Record<string, string | number>;
+};
+
+export function SortableTable({
   columns,
   rows,
   emptyMessage = "No data for this filter.",
   pageSize = 25,
 }: {
-  columns: ReportColumn<T>[];
-  rows: T[];
+  columns: ReportColumn[];
+  rows: ReportRow[];
   emptyMessage?: string;
   pageSize?: number;
 }) {
@@ -29,10 +39,10 @@ export function SortableTable<T extends { id: string }>({
   const sorted = (() => {
     if (!sort) return rows;
     const column = columns.find((c) => c.key === sort.key);
-    if (!column?.sortValue) return rows;
+    if (!column?.sortable) return rows;
     return [...rows].sort((a, b) => {
-      const av = column.sortValue!(a);
-      const bv = column.sortValue!(b);
+      const av = a.sortValues?.[sort.key] ?? "";
+      const bv = b.sortValues?.[sort.key] ?? "";
       if (av < bv) return -1 * sort.dir;
       if (av > bv) return 1 * sort.dir;
       return 0;
@@ -58,7 +68,7 @@ export function SortableTable<T extends { id: string }>({
             <tr className="border-b border-border bg-surfaceMuted text-xs uppercase tracking-wide text-muted">
               {columns.map((c) => (
                 <th key={c.key} scope="col" className={`px-4 py-2 font-medium ${c.align === "right" ? "text-right" : "text-left"}`}>
-                  {c.sortValue ? (
+                  {c.sortable ? (
                     <button
                       type="button"
                       onClick={() => setSort((prev) => ({ key: c.key, dir: prev?.key === c.key ? (prev.dir === 1 ? -1 : 1) : 1 }))}
@@ -78,7 +88,7 @@ export function SortableTable<T extends { id: string }>({
               <tr key={row.id} className="hover:bg-surfaceMuted">
                 {columns.map((c) => (
                   <td key={c.key} className={`px-4 py-2 text-slate ${c.align === "right" ? "text-right" : "text-left"}`}>
-                    {c.render(row)}
+                    {row.cells[c.key]}
                   </td>
                 ))}
               </tr>

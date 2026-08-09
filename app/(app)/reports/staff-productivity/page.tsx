@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { FilterBar } from "@/components/reports/FilterBar";
-import { SortableTable, type ReportColumn } from "@/components/reports/SortableTable";
+import { SortableTable } from "@/components/reports/SortableTable";
+import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -57,7 +58,7 @@ export default async function StaffReportPage({ searchParams }: { searchParams: 
     rows = rows.filter((r) => r.name.toLowerCase().includes(q));
   }
 
-  const columns: ReportColumn<StaffRow>[] = [
+  const columnDefs: ReportColumnDef<StaffRow>[] = [
     { key: "name", label: "Staff member", render: (r) => <span className="font-medium text-ink">{r.name}</span>, sortValue: (r) => r.name },
     { key: "open", label: "Open engagements", align: "right", render: (r) => r.open_engagements, sortValue: (r) => r.open_engagements },
     {
@@ -71,6 +72,8 @@ export default async function StaffReportPage({ searchParams }: { searchParams: 
     { key: "tasks_overdue", label: "Tasks overdue", align: "right", render: (r) => r.tasks_overdue, sortValue: (r) => r.tasks_overdue },
     { key: "reviews", label: "Pending reviews", align: "right", render: (r) => r.pending_reviews, sortValue: (r) => r.pending_reviews },
   ];
+
+  const { columns, tableRows } = buildReportTable(rows, columnDefs);
 
   const csvRows = rows.map((r) => ({
     "Staff member": r.name,
@@ -88,7 +91,7 @@ export default async function StaffReportPage({ searchParams }: { searchParams: 
       filters={<FilterBar reportKey="staff-productivity" showDateRange={false} searchPlaceholder="Search staff member..." />}
       actions={<ExportButtons rows={csvRows} filename="staff-productivity-report" />}
     >
-      <SortableTable columns={columns} rows={rows} emptyMessage="No staff activity yet." />
+      <SortableTable columns={columns} rows={tableRows} emptyMessage="No staff activity yet." />
     </ReportLayout>
   );
 }

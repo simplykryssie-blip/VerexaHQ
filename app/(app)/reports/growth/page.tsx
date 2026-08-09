@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { FilterBar } from "@/components/reports/FilterBar";
-import { SortableTable, type ReportColumn } from "@/components/reports/SortableTable";
+import { SortableTable } from "@/components/reports/SortableTable";
+import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
@@ -65,11 +66,13 @@ export default async function GrowthReportPage({ searchParams }: { searchParams:
 
   const chartData = rows.slice(-6).map((r) => ({ label: r.month, value: r.newClients }));
 
-  const columns: ReportColumn<MonthRow>[] = [
+  const columnDefs: ReportColumnDef<MonthRow>[] = [
     { key: "month", label: "Month", render: (r) => r.month, sortValue: (r) => r.id },
     { key: "clients", label: "New clients", align: "right", render: (r) => r.newClients, sortValue: (r) => r.newClients },
     { key: "engagements", label: "New engagements", align: "right", render: (r) => r.newEngagements, sortValue: (r) => r.newEngagements },
   ];
+
+  const { columns, tableRows } = buildReportTable(rows.slice().reverse(), columnDefs);
 
   const csvRows = rows.map((r) => ({ Month: r.month, "New clients": r.newClients, "New engagements": r.newEngagements }));
 
@@ -88,7 +91,7 @@ export default async function GrowthReportPage({ searchParams }: { searchParams:
           </div>
         </div>
       )}
-      <SortableTable columns={columns} rows={rows.slice().reverse()} emptyMessage="No growth data yet." />
+      <SortableTable columns={columns} rows={tableRows} emptyMessage="No growth data yet." />
     </ReportLayout>
   );
 }

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { FilterBar } from "@/components/reports/FilterBar";
-import { SortableTable, type ReportColumn } from "@/components/reports/SortableTable";
+import { SortableTable } from "@/components/reports/SortableTable";
+import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 import { clientLabel } from "@/lib/documentEntityLabels";
@@ -71,7 +72,7 @@ export default async function BillingReportPage({ searchParams }: { searchParams
     byStatus.set(r.status, entry);
   }
 
-  const columns: ReportColumn<QuoteRow>[] = [
+  const columnDefs: ReportColumnDef<QuoteRow>[] = [
     {
       key: "client",
       label: "Client",
@@ -87,6 +88,8 @@ export default async function BillingReportPage({ searchParams }: { searchParams
     { key: "amount", label: "Amount", align: "right", render: (r) => money(r.total_amount), sortValue: (r) => r.total_amount },
     { key: "created", label: "Created", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
   ];
+
+  const { columns, tableRows } = buildReportTable(rows, columnDefs);
 
   const csvRows = rows.map((r) => ({ Client: r.clientLabel, Quote: r.quote_number ?? "", Status: r.status, Amount: r.total_amount, Created: r.created_at }));
 
@@ -106,7 +109,7 @@ export default async function BillingReportPage({ searchParams }: { searchParams
           </div>
         ))}
       </div>
-      <SortableTable columns={columns} rows={rows} emptyMessage="No quotes match this filter." />
+      <SortableTable columns={columns} rows={tableRows} emptyMessage="No quotes match this filter." />
     </ReportLayout>
   );
 }

@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { FilterBar } from "@/components/reports/FilterBar";
-import { SortableTable, type ReportColumn } from "@/components/reports/SortableTable";
+import { SortableTable } from "@/components/reports/SortableTable";
+import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
@@ -71,7 +72,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
   const byStatus = new Map<string, number>();
   for (const r of rows) byStatus.set(r.lifecycle_status, (byStatus.get(r.lifecycle_status) ?? 0) + 1);
 
-  const columns: ReportColumn<ClientRow>[] = [
+  const columnDefs: ReportColumnDef<ClientRow>[] = [
     {
       key: "client",
       label: "Client",
@@ -86,6 +87,8 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     { key: "status", label: "Lifecycle status", render: (r) => <span className="capitalize">{r.lifecycle_status}</span>, sortValue: (r) => r.lifecycle_status },
     { key: "created", label: "Added", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
   ];
+
+  const { columns, tableRows } = buildReportTable(rows, columnDefs);
 
   const csvRows = rows.map((r) => ({ Client: r.clientLabel, Type: r.client_type, "Lifecycle status": r.lifecycle_status, Added: r.created_at }));
 
@@ -117,7 +120,7 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
           </ul>
         </div>
       </div>
-      <SortableTable columns={columns} rows={rows} emptyMessage="No clients match this filter." />
+      <SortableTable columns={columns} rows={tableRows} emptyMessage="No clients match this filter." />
     </ReportLayout>
   );
 }

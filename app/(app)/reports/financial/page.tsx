@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { FilterBar } from "@/components/reports/FilterBar";
-import { SortableTable, type ReportColumn } from "@/components/reports/SortableTable";
+import { SortableTable } from "@/components/reports/SortableTable";
+import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
@@ -95,7 +96,7 @@ export default async function FinancialReportPage({
     .slice(-6)
     .map(([label, value]) => ({ label, value }));
 
-  const columns: ReportColumn<InvoiceRow>[] = [
+  const columnDefs: ReportColumnDef<InvoiceRow>[] = [
     {
       key: "invoice_number",
       label: "Invoice",
@@ -125,6 +126,8 @@ export default async function FinancialReportPage({
     },
   ];
 
+  const { columns, tableRows } = buildReportTable(rows, columnDefs);
+
   const csvRows = rows.map((r) => ({
     Invoice: r.invoice_number ?? "",
     Client: r.clientLabel,
@@ -150,7 +153,7 @@ export default async function FinancialReportPage({
           </div>
         </div>
       )}
-      <SortableTable columns={columns} rows={rows} emptyMessage="No invoices match this filter." />
+      <SortableTable columns={columns} rows={tableRows} emptyMessage="No invoices match this filter." />
     </ReportLayout>
   );
 }

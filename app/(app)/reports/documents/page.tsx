@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { FilterBar } from "@/components/reports/FilterBar";
-import { SortableTable, type ReportColumn } from "@/components/reports/SortableTable";
+import { SortableTable } from "@/components/reports/SortableTable";
+import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
@@ -92,7 +93,7 @@ export default async function DocumentsReportPage({
     rows = rows.filter((r) => r.missing > 0);
     if (q) rows = rows.filter((r) => r.title.toLowerCase().includes(q) || r.entityLabel.toLowerCase().includes(q));
 
-    const columns: ReportColumn<Row>[] = [
+    const columnDefs: ReportColumnDef<Row>[] = [
       {
         key: "entity",
         label: "Client / Engagement",
@@ -112,6 +113,7 @@ export default async function DocumentsReportPage({
         sortValue: (r) => r.dueDate ?? "",
       },
     ];
+    const { columns, tableRows } = buildReportTable(rows, columnDefs);
     const csvRows = rows.map((r) => ({ Entity: r.entityLabel, Request: r.title, Missing: r.missing, Due: r.dueDate ?? "" }));
 
     return (
@@ -126,7 +128,7 @@ export default async function DocumentsReportPage({
         }
         actions={<ExportButtons rows={csvRows} filename="missing-documents-report" />}
       >
-        <SortableTable columns={columns} rows={rows} emptyMessage="No open requests have missing required documents." />
+        <SortableTable columns={columns} rows={tableRows} emptyMessage="No open requests have missing required documents." />
       </ReportLayout>
     );
   }
@@ -163,7 +165,7 @@ export default async function DocumentsReportPage({
     });
     if (q) rows = rows.filter((r) => r.fileName.toLowerCase().includes(q) || r.entityLabel.toLowerCase().includes(q));
 
-    const columns: ReportColumn<Row>[] = [
+    const columnDefs: ReportColumnDef<Row>[] = [
       { key: "file", label: "File", render: (r) => r.fileName, sortValue: (r) => r.fileName },
       {
         key: "entity",
@@ -179,6 +181,7 @@ export default async function DocumentsReportPage({
       { key: "category", label: "Category", render: (r) => r.category, sortValue: (r) => r.category },
       { key: "date", label: "Uploaded", render: (r) => new Date(r.createdAt).toLocaleString(), sortValue: (r) => r.createdAt },
     ];
+    const { columns, tableRows } = buildReportTable(rows, columnDefs);
     const csvRows = rows.map((r) => ({ File: r.fileName, Entity: r.entityLabel, "Uploaded by": r.uploadedBy, Category: r.category, Uploaded: r.createdAt }));
 
     return (
@@ -193,7 +196,7 @@ export default async function DocumentsReportPage({
         }
         actions={<ExportButtons rows={csvRows} filename="upload-activity-report" />}
       >
-        <SortableTable columns={columns} rows={rows} emptyMessage="No uploads in this range." />
+        <SortableTable columns={columns} rows={tableRows} emptyMessage="No uploads in this range." />
       </ReportLayout>
     );
   }
@@ -221,13 +224,14 @@ export default async function DocumentsReportPage({
     }));
     if (q) rows = rows.filter((r) => r.title.toLowerCase().includes(q) || r.document.toLowerCase().includes(q));
 
-    const columns: ReportColumn<Row>[] = [
+    const columnDefs: ReportColumnDef<Row>[] = [
       { key: "title", label: "Request", render: (r) => r.title, sortValue: (r) => r.title },
       { key: "document", label: "Document", render: (r) => r.document, sortValue: (r) => r.document },
       { key: "status", label: "Status", render: (r) => <span className="capitalize">{r.status}</span>, sortValue: (r) => r.status },
       { key: "signers", label: "Signed", align: "right", render: (r) => `${r.signed} / ${r.total}`, sortValue: (r) => r.signed },
       { key: "due", label: "Due", render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString() : "--"), sortValue: (r) => r.dueDate ?? "" },
     ];
+    const { columns, tableRows } = buildReportTable(rows, columnDefs);
     const csvRows = rows.map((r) => ({ Request: r.title, Document: r.document, Status: r.status, Signed: `${r.signed}/${r.total}`, Due: r.dueDate ?? "" }));
 
     return (
@@ -242,7 +246,7 @@ export default async function DocumentsReportPage({
         }
         actions={<ExportButtons rows={csvRows} filename="signature-report" />}
       >
-        <SortableTable columns={columns} rows={rows} emptyMessage="No signature requests yet." />
+        <SortableTable columns={columns} rows={tableRows} emptyMessage="No signature requests yet." />
       </ReportLayout>
     );
   }
@@ -270,11 +274,12 @@ export default async function DocumentsReportPage({
     let rows: Row[] = Array.from(byCategory.entries()).map(([category, v]) => ({ id: category, category, count: v.count, bytes: v.bytes }));
     if (q) rows = rows.filter((r) => r.category.toLowerCase().includes(q));
 
-    const columns: ReportColumn<Row>[] = [
+    const columnDefs: ReportColumnDef<Row>[] = [
       { key: "category", label: "Category", render: (r) => r.category, sortValue: (r) => r.category },
       { key: "count", label: "Documents", align: "right", render: (r) => r.count, sortValue: (r) => r.count },
       { key: "size", label: "Storage used", align: "right", render: (r) => formatSize(r.bytes), sortValue: (r) => r.bytes },
     ];
+    const { columns, tableRows } = buildReportTable(rows, columnDefs);
     const csvRows = rows.map((r) => ({ Category: r.category, Documents: r.count, "Storage used": formatSize(r.bytes) }));
 
     return (
@@ -289,7 +294,7 @@ export default async function DocumentsReportPage({
         }
         actions={<ExportButtons rows={csvRows} filename="storage-report" />}
       >
-        <SortableTable columns={columns} rows={rows} emptyMessage="No documents uploaded yet." />
+        <SortableTable columns={columns} rows={tableRows} emptyMessage="No documents uploaded yet." />
       </ReportLayout>
     );
   }
@@ -324,7 +329,7 @@ export default async function DocumentsReportPage({
   });
   if (q) rows = rows.filter((r) => r.title.toLowerCase().includes(q) || r.entityLabel.toLowerCase().includes(q));
 
-  const columns: ReportColumn<Row>[] = [
+  const columnDefs: ReportColumnDef<Row>[] = [
     {
       key: "entity",
       label: "Client / Engagement",
@@ -340,6 +345,7 @@ export default async function DocumentsReportPage({
     { key: "pct", label: "Completion", align: "right", render: (r) => `${r.pct}%`, sortValue: (r) => r.pct },
     { key: "due", label: "Due", render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString() : "--"), sortValue: (r) => r.dueDate ?? "" },
   ];
+  const { columns, tableRows } = buildReportTable(rows, columnDefs);
   const csvRows = rows.map((r) => ({ Entity: r.entityLabel, Request: r.title, Status: r.status, "Completion %": r.pct, Due: r.dueDate ?? "" }));
 
   return (
@@ -354,7 +360,7 @@ export default async function DocumentsReportPage({
       }
       actions={<ExportButtons rows={csvRows} filename="request-completion-report" />}
     >
-      <SortableTable columns={columns} rows={rows} emptyMessage="No document requests yet." />
+      <SortableTable columns={columns} rows={tableRows} emptyMessage="No document requests yet." />
     </ReportLayout>
   );
 }
