@@ -211,6 +211,8 @@ export async function updateSubscriptionItemPrice({
   return { ok: true, data };
 }
 
+const STRIPE_SIGNATURE_TOLERANCE_SECONDS = 300;
+
 /**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.
@@ -225,6 +227,11 @@ export async function verifyStripeSignature(payload: string, signatureHeader: st
   const timestamp = parts.t;
   const signature = parts.v1;
   if (!timestamp || !signature) return false;
+
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  const ageSeconds = Math.abs(Date.now() / 1000 - timestampSeconds);
+  if (ageSeconds > STRIPE_SIGNATURE_TOLERANCE_SECONDS) return false;
 
   const crypto = await import("crypto");
   const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
