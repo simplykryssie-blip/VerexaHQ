@@ -7118,6 +7118,10 @@ export type Database = {
         Returns: string
       }
       ensure_next_tax_year: { Args: never; Returns: number }
+      ensure_workspace_security_policy: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       expire_stale_engagement_shares: { Args: never; Returns: number }
       fulfill_document_request_item: {
         Args: { p_attachment_id: string; p_item_status_id: string }
