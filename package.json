@@ -13,6 +13,9 @@
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.110.6",
+    "@tiptap/pm": "^3.29.2",
+    "@tiptap/react": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
     "lucide-react": "^0.383.0",
     "next": "^14.2.35",
     "papaparse": "^5.4.1",

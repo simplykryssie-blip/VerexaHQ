@@ -5,6 +5,7 @@ import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
+import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
 
 export type TemplateTabKey = "email" | "sms" | "engagement-letter" | "organizers";
 export type TemplateTab = { key: TemplateTabKey; label: string };
@@ -34,11 +35,25 @@ export async function TemplateLibrary({
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
   const isOrganizers = activeTab === "organizers";
+  const isEngagementLetters = activeTab === "engagement-letter";
   const table = activeTab === "email" ? "email_templates" : activeTab === "sms" ? "sms_templates" : "engagement_letter_templates";
 
-  const { data: templates } = isOrganizers
+  const { data: templates } = isOrganizers || isEngagementLetters
     ? { data: null }
     : await supabase.from(table).select("*").or(orFilter).order("name");
+
+  const { data: engagementLetterTemplates } = isEngagementLetters
+    ? await supabase.from("engagement_letter_templates").select("id, name, status, workspace_id, requires_signature, merge_fields").or(orFilter).order("name")
+    : { data: null };
+
+  const engagementLetterCards: EngagementLetterCard[] = (engagementLetterTemplates ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    status: t.status,
+    workspace_id: t.workspace_id,
+    requires_signature: t.requires_signature,
+    merge_field_count: Array.isArray(t.merge_fields) ? t.merge_fields.length : 0,
+  }));
 
   const { data: organizerTemplates } = isOrganizers
     ? await supabase.from("organizer_templates").select("*").or(orFilter).order("name")
@@ -80,7 +95,7 @@ export async function TemplateLibrary({
   );
 
   return (
-    <div className={isOrganizers ? "max-w-6xl" : "max-w-3xl"}>
+    <div className={isOrganizers || isEngagementLetters ? "max-w-6xl" : "max-w-3xl"}>
       <h2 className="text-base font-semibold text-ink">{heading}</h2>
       <p className="mt-1 text-sm text-muted">{description}</p>
 
@@ -90,10 +105,14 @@ export async function TemplateLibrary({
         <div className="mt-4">
           <OrganizerLibrary workspaceId={workspaceId} templates={organizerCards} />
         </div>
+      ) : isEngagementLetters ? (
+        <div className="mt-4">
+          <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} />
+        </div>
       ) : (
         <>
           <div className="mt-4">
-            <CreateTemplateForm workspaceId={workspaceId} kind={activeTab === "engagement-letter" ? "engagement_letter" : activeTab} />
+            <CreateTemplateForm workspaceId={workspaceId} kind={activeTab} />
           </div>
 
           <div className="mt-4">
@@ -109,10 +128,7 @@ export async function TemplateLibrary({
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-1.5">
-                            <TemplateEditRow
-                              kind={activeTab === "engagement-letter" ? "engagement_letter" : activeTab}
-                              template={t}
-                            />
+                            <TemplateEditRow kind={activeTab} template={t} />
                             {!t.workspace_id && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
                           </div>
                           <p className="text-xs text-muted">{t.slug}</p>
