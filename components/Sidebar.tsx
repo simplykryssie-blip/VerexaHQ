@@ -10,6 +10,13 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // Some hrefs are prefixes of others (e.g. "/settings" and
+  // "/settings/templates"), so pick the longest matching href rather than
+  // highlighting every ancestor at once.
+  const activeNavHref = NAV_ITEMS.filter(
+    (candidate) => pathname === candidate.href || pathname.startsWith(candidate.href + "/")
+  ).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
@@ -49,7 +56,7 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const active = item.href === activeNavHref;
             const Icon = item.icon;
             return (
               <Link

@@ -9,6 +9,7 @@ import {
   Landmark,
   BarChart3,
   Settings,
+  LayoutTemplate,
 } from "lucide-react";
 
 export type NavItem = {
@@ -26,6 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Tax Office", href: "/tax", icon: Landmark },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
+  { label: "Templates", href: "/settings/templates", icon: LayoutTemplate },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -43,7 +45,6 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Security", href: "/settings/security" },
   { label: "Integrations", href: "/settings/integrations" },
   { label: "Notifications", href: "/settings/notifications" },
-  { label: "Templates", href: "/settings/templates" },
   { label: "Automations", href: "/settings/automations" },
   { label: "Workflow Setup", href: "/settings/service-packages" },
   { label: "Feature Flags", href: "/settings/feature-flags" },
