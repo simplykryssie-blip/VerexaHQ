@@ -53,7 +53,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
     if (!typedName.trim()) return;
     setSubmitting(true);
     setError(null);
-    const { error: rpcError } = await supabase.rpc("sign_public_engagement_letter", {
+    const { data, error: rpcError } = await supabase.rpc("sign_public_engagement_letter", {
       p_token: token,
       p_first_name: firstName.trim(),
       p_last_name: lastName.trim() || null,
@@ -65,6 +65,17 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
     if (rpcError) {
       setError(rpcError.message);
       return;
+    }
+    const signatureId = (data as { signature_id?: string } | null)?.signature_id;
+    if (signatureId) {
+      fetch("/api/documents/file-signed-engagement-letter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureId }),
+      }).catch(() => {
+        // Best-effort -- the signature itself is already recorded and safe;
+        // filing it into Documents can be retried later if this fails.
+      });
     }
     setStep("done");
   }

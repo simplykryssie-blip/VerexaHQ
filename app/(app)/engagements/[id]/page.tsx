@@ -286,6 +286,13 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .eq("engagement_id", engagement.id)
     .order("created_at", { ascending: false });
 
+  const { data: engagementLetterTemplates } = await supabase
+    .from("engagement_letter_templates")
+    .select("id, name, body_html")
+    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("status", "published")
+    .order("name");
+
   // Answers are only meaningful once a response is submitted -- fetch and
   // build the read-only detail (top-level fields + repeating-section
   // instances grouped by instance_index) only for those, server-side, so
@@ -395,6 +402,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
         topLevel: o.topLevel,
         repeaters: o.repeaters,
       }))}
+      engagementLetterTemplates={engagementLetterTemplates ?? []}
       signatureRequests={signatureRequests}
       notes={notes ?? []}
       messageThreads={messageThreads ?? []}

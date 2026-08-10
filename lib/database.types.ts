@@ -2441,6 +2441,73 @@ export type Database = {
           },
         ]
       }
+      engagement_letter_public_signatures: {
+        Row: {
+          client_id: string
+          created_at: string
+          engagement_letter_template_id: string
+          filed_as_attachment: boolean
+          id: string
+          resolved_body_html: string
+          signed_at: string
+          signer_email: string
+          signer_name: string
+          signer_phone: string | null
+          typed_name: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          engagement_letter_template_id: string
+          filed_as_attachment?: boolean
+          id?: string
+          resolved_body_html: string
+          signed_at?: string
+          signer_email: string
+          signer_name: string
+          signer_phone?: string | null
+          typed_name: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          engagement_letter_template_id?: string
+          filed_as_attachment?: boolean
+          id?: string
+          resolved_body_html?: string
+          signed_at?: string
+          signer_email?: string
+          signer_name?: string
+          signer_phone?: string | null
+          typed_name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_letter_public_signatures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_letter_public_signatures_engagement_letter_templ_fkey"
+            columns: ["engagement_letter_template_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_letter_public_signatures_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_pricing: {
         Row: {
           base_amount: number | null
@@ -3866,7 +3933,9 @@ export type Database = {
           client_id: string
           created_at: string
           engagement_id: string | null
+          filed_as_attachment: boolean
           id: string
+          is_public_submission: boolean
           organizer_template_id: string
           reviewed_at: string | null
           reviewed_by: string | null
@@ -3879,7 +3948,9 @@ export type Database = {
           client_id: string
           created_at?: string
           engagement_id?: string | null
+          filed_as_attachment?: boolean
           id?: string
+          is_public_submission?: boolean
           organizer_template_id: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -3892,7 +3963,9 @@ export type Database = {
           client_id?: string
           created_at?: string
           engagement_id?: string | null
+          filed_as_attachment?: boolean
           id?: string
+          is_public_submission?: boolean
           organizer_template_id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -7294,6 +7367,10 @@ export type Database = {
       }
       mark_all_notifications_read: {
         Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      mark_document_request_item_received: {
+        Args: { p_item_status_id: string }
         Returns: undefined
       }
       mark_notification_read: {

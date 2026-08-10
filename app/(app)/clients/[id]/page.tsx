@@ -156,6 +156,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
 
+  const { data: engagementLetterTemplates } = await supabase
+    .from("engagement_letter_templates")
+    .select("id, name, body_html")
+    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("status", "published")
+    .order("name");
+
   const { data: documentRequestRows } = await supabase
     .from("document_requests")
     .select(
@@ -313,6 +320,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         template_name: o.organizer_templates?.name ?? "Organizer",
       }))}
       documentRequestTemplates={documentRequestTemplates ?? []}
+      engagementLetterTemplates={engagementLetterTemplates ?? []}
       paymentPlansByInvoice={paymentPlansByInvoice}
       appointments={appointments ?? []}
       staffOptions={staffOptions}

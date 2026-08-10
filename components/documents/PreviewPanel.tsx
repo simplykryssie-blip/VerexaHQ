@@ -32,7 +32,7 @@ export function PreviewPanel({ document: doc, onClose }: { document: DocumentRow
           return;
         }
         setUrl(data.signedUrl);
-        if (doc.mime_type?.startsWith("text/")) {
+        if (doc.mime_type?.startsWith("text/") && doc.mime_type !== "text/html") {
           try {
             const res = await fetch(data.signedUrl);
             setTextContent(await res.text());
@@ -82,19 +82,19 @@ export function PreviewPanel({ document: doc, onClose }: { document: DocumentRow
         <div className="flex-1 overflow-auto bg-surfaceMuted p-4">
           {error && <p className="text-sm text-danger">{error}</p>}
           {!error && !url && <p className="text-sm text-muted">Loading preview...</p>}
-          {url && isPreviewable(doc.mime_type) && doc.mime_type === "application/pdf" && (
+          {url && (doc.mime_type === "application/pdf" || doc.mime_type === "text/html") && (
             <iframe src={url} title={doc.file_name} className="h-full min-h-[60vh] w-full rounded-lg border border-border bg-white" />
           )}
           {url && doc.mime_type?.startsWith("image/") && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={doc.file_name} className="mx-auto max-h-full rounded-lg" />
           )}
-          {url && doc.mime_type?.startsWith("text/") && (
+          {url && doc.mime_type?.startsWith("text/") && doc.mime_type !== "text/html" && (
             <pre className="whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 text-sm text-slate">
               {textContent ?? "Loading text..."}
             </pre>
           )}
-          {url && !isPreviewable(doc.mime_type) && (
+          {url && !isPreviewable(doc.mime_type) && doc.mime_type !== "text/html" && (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <p className="text-sm text-muted">
                 Inline preview isn&apos;t available for this file type ({doc.mime_type ?? "unknown"}).

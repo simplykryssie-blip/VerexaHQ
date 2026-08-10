@@ -85,6 +85,16 @@ export function RequestsPanel({
     router.refresh();
   }
 
+  async function markReceived(itemId: string) {
+    const { error } = await supabase.rpc("mark_document_request_item_received", { p_item_status_id: itemId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Marked as received", "success");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-4">
       {audience === "staff" && canCreate && (
@@ -99,7 +109,7 @@ export function RequestsPanel({
                 fields={[
                   { name: "title", label: "Title", required: true },
                   { name: "template_id", label: "Template", type: "select", required: true, options: templates.map((t) => ({ value: t.id, label: t.name })) },
-                  { name: "due_date", label: "Due date" },
+                  { name: "due_date", label: "Due date", type: "date" },
                 ]}
                 onSubmit={async (v) => {
                   const { error } = await supabase.rpc("create_document_request", {
@@ -144,16 +154,23 @@ export function RequestsPanel({
                         {item.name} {item.is_required && <span className="text-muted">(required)</span>}
                       </span>
                       {item.status === "pending" ? (
-                        <label className="flex shrink-0 cursor-pointer items-center gap-1 text-accent hover:underline">
-                          <Paperclip size={12} aria-hidden="true" />
-                          {uploadingItemId === item.id ? "Uploading..." : "Upload"}
-                          <input
-                            type="file"
-                            className="sr-only"
-                            disabled={uploadingItemId !== null}
-                            onChange={(e) => e.target.files?.[0] && uploadForItem(item.id, e.target.files[0])}
-                          />
-                        </label>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <label className="flex cursor-pointer items-center gap-1 text-accent hover:underline">
+                            <Paperclip size={12} aria-hidden="true" />
+                            {uploadingItemId === item.id ? "Uploading..." : "Upload"}
+                            <input
+                              type="file"
+                              className="sr-only"
+                              disabled={uploadingItemId !== null}
+                              onChange={(e) => e.target.files?.[0] && uploadForItem(item.id, e.target.files[0])}
+                            />
+                          </label>
+                          {audience === "staff" && (
+                            <button type="button" onClick={() => markReceived(item.id)} className="text-muted hover:text-accent hover:underline">
+                              Mark received
+                            </button>
+                          )}
+                        </span>
                       ) : (
                         <span className="capitalize">{item.status}</span>
                       )}

@@ -6,7 +6,8 @@ import { PenLine, X, Link as LinkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
-import type { Audience, DocumentRow, SignatureRequestRow } from "./types";
+import { renderTemplate } from "@/lib/templates/render";
+import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
   return raw
@@ -22,12 +23,22 @@ function parseSigners(raw: string) {
 export function SignaturesPanel({
   signatureRequests,
   documents,
+  templates = [],
+  entityType,
+  entityId,
+  clientName,
+  firmName,
   workspaceId,
   audience = "staff",
   canCreate = true,
 }: {
   signatureRequests: SignatureRequestRow[];
   documents: DocumentRow[];
+  templates?: EngagementLetterTemplateOption[];
+  entityType?: EntityType;
+  entityId?: string;
+  clientName?: string;
+  firmName?: string;
   workspaceId: string;
   audience?: Audience;
   canCreate?: boolean;
@@ -36,26 +47,88 @@ export function SignaturesPanel({
   const supabase = createClient();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const [source, setSource] = useState<"upload" | "template">("template");
   const [title, setTitle] = useState("");
   const [attachmentId, setAttachmentId] = useState("");
+  const [templateId, setTemplateId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [signersRaw, setSignersRaw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [signingId, setSigningId] = useState<string | null>(null);
   const [typedName, setTypedName] = useState("");
 
+  async function resolveAttachmentId(): Promise<string | null> {
+    if (source === "upload") return attachmentId || null;
+
+    const template = templates.find((t) => t.id === templateId);
+    if (!template || !entityType || !entityId) return null;
+
+    const html = renderTemplate(template.body_html, {
+      client_name: clientName ?? "",
+      firm_name: firmName ?? "",
+      firm_address: "",
+      firm_phone: "",
+    });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const fileName = `${template.name}.html`;
+    const path = `${workspaceId}/${entityId}/${Date.now()}-${fileName}`;
+    const blob = new Blob([html], { type: "text/html" });
+    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "text/html" });
+    if (uploadErr) {
+      setError(uploadErr.message);
+      return null;
+    }
+    const { data: attachment, error: insertErr } = await supabase
+      .from("attachments")
+      .insert({
+        workspace_id: workspaceId,
+        entity_type: entityType,
+        entity_id: entityId,
+        file_name: fileName,
+        storage_path: path,
+        mime_type: "text/html",
+        file_size_bytes: blob.size,
+        uploaded_by: user?.id,
+        visibility: "internal",
+        category: "Engagement Letter",
+      })
+      .select("id")
+      .single();
+    if (insertErr || !attachment) {
+      setError(insertErr?.message ?? "Could not prepare the template for signing.");
+      return null;
+    }
+    return attachment.id;
+  }
+
   async function createRequest(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     const signers = parseSigners(signersRaw);
-    if (!attachmentId || signers.length === 0) {
+    if (source === "upload" && !attachmentId) {
       setError("Choose a document and at least one signer.");
+      return;
+    }
+    if (source === "template" && !templateId) {
+      setError("Choose a template and at least one signer.");
+      return;
+    }
+    if (signers.length === 0) {
+      setError("Add at least one signer.");
+      return;
+    }
+
+    const resolvedAttachmentId = await resolveAttachmentId();
+    if (!resolvedAttachmentId) {
+      setError((prev) => prev ?? "Could not prepare the document to sign.");
       return;
     }
 
     const { data: request, error: reqError } = await supabase
       .from("signature_requests")
-      .insert({ workspace_id: workspaceId, attachment_id: attachmentId, title, due_date: dueDate || null })
+      .insert({ workspace_id: workspaceId, attachment_id: resolvedAttachmentId, title, due_date: dueDate || null })
       .select("id")
       .single();
     if (reqError || !request) {
@@ -75,6 +148,7 @@ export function SignaturesPanel({
     setCreating(false);
     setTitle("");
     setAttachmentId("");
+    setTemplateId("");
     setDueDate("");
     setSignersRaw("");
     router.refresh();
@@ -134,21 +208,61 @@ export function SignaturesPanel({
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <select
-              required
-              value={attachmentId}
-              onChange={(e) => setAttachmentId(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            >
-              <option value="" disabled>
-                Select document to sign
-              </option>
-              {documents.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.file_name}
+            <div className="flex gap-1 rounded-lg bg-surfaceMuted p-1 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setSource("template")}
+                className={`flex-1 rounded-md px-2 py-1.5 transition ${source === "template" ? "bg-surface text-accent shadow-sm" : "text-muted"}`}
+              >
+                Form template
+              </button>
+              <button
+                type="button"
+                onClick={() => setSource("upload")}
+                className={`flex-1 rounded-md px-2 py-1.5 transition ${source === "upload" ? "bg-surface text-accent shadow-sm" : "text-muted"}`}
+              >
+                Uploaded file
+              </button>
+            </div>
+            {source === "template" ? (
+              templates.length === 0 ? (
+                <p className="text-xs text-muted">
+                  No engagement letter templates are published yet -- add one in Settings &gt; Templates, or switch to Uploaded file.
+                </p>
+              ) : (
+                <select
+                  required
+                  value={templateId}
+                  onChange={(e) => setTemplateId(e.target.value)}
+                  className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="" disabled>
+                    Select a form template
+                  </option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )
+            ) : (
+              <select
+                required
+                value={attachmentId}
+                onChange={(e) => setAttachmentId(e.target.value)}
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="" disabled>
+                  Select document to sign
                 </option>
-              ))}
-            </select>
+                {documents.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.file_name}
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               type="date"
               value={dueDate}

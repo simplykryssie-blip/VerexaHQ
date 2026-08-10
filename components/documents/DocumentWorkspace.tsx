@@ -15,12 +15,10 @@ import type {
   DocumentRequestRow,
   DocumentRequestTemplateOption,
   DocumentRow,
+  EngagementLetterTemplateOption,
   EntityType,
   SignatureRequestRow,
 } from "./types";
-
-const TABS = ["Overview", "Files", "Requests", "Signatures", "Activity"] as const;
-type Tab = (typeof TABS)[number];
 
 export function DocumentWorkspace({
   workspaceId,
@@ -31,6 +29,9 @@ export function DocumentWorkspace({
   requests,
   requestTemplates,
   signatureRequests,
+  signatureTemplates = [],
+  clientName,
+  firmName,
   activity,
   audience = "staff",
   canRequestDocuments = true,
@@ -44,13 +45,16 @@ export function DocumentWorkspace({
   requests: DocumentRequestRow[];
   requestTemplates: DocumentRequestTemplateOption[];
   signatureRequests: SignatureRequestRow[];
+  signatureTemplates?: EngagementLetterTemplateOption[];
+  clientName?: string;
+  firmName?: string;
   activity: ActivityRow[];
   audience?: Audience;
   canRequestDocuments?: boolean;
   canRequestSignatures?: boolean;
 }) {
-  const [tab, setTab] = useState<Tab>("Overview");
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showActivity, setShowActivity] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<DocumentRow | null>(null);
 
   const activeDocuments = documents.filter((d) => !d.is_archived);
@@ -66,122 +70,99 @@ export function DocumentWorkspace({
 
   const pendingRequests = requests.filter((r) => r.status === "open");
   const pendingSignatures = signatureRequests.filter((r) => r.status === "pending");
-  const recentUploads = [...activeDocuments].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
 
   return (
-    <div>
-      <nav className="flex gap-1 border-b border-border">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-              tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            {t}
-            {t === "Requests" && pendingRequests.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] text-accent">{pendingRequests.length}</span>
-            )}
-            {t === "Signatures" && pendingSignatures.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] text-accent">{pendingSignatures.length}</span>
-            )}
-          </button>
-        ))}
-      </nav>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">Documents</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">{activeDocuments.length}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">Pending Requests</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">{pendingRequests.length}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <p className="text-xs uppercase tracking-wide text-muted">Pending Signatures</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">{pendingSignatures.length}</p>
+        </div>
+      </div>
 
-      <div className="pt-4">
-        {tab === "Overview" && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Documents</p>
-              <p className="mt-1 text-2xl font-semibold text-ink">{activeDocuments.length}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Pending Requests</p>
-              <p className="mt-1 text-2xl font-semibold text-ink">{pendingRequests.length}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Pending Signatures</p>
-              <p className="mt-1 text-2xl font-semibold text-ink">{pendingSignatures.length}</p>
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-4 sm:col-span-2">
-              <p className="text-xs uppercase tracking-wide text-muted">Recent uploads</p>
-              {recentUploads.length === 0 ? (
-                <p className="mt-2 text-sm text-muted">No documents uploaded yet.</p>
-              ) : (
-                <ul className="mt-2 space-y-1.5">
-                  {recentUploads.map((d) => (
-                    <li key={d.id}>
-                      <button type="button" onClick={() => setPreviewDoc(d)} className="text-sm text-slate hover:text-accent hover:underline">
-                        {d.file_name}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === "Files" && (
-          <div>
-            <div className="mb-4">
-              <UploadZone
-                workspaceId={workspaceId}
-                entityType={entityType}
-                entityId={entityId}
-                folderId={selectedFolderId}
-                visibility={audience === "portal" ? "client_visible" : "internal"}
-              />
-            </div>
-            <div className="flex flex-col gap-4 sm:flex-row">
-              <FolderTree
-                folders={folders}
-                selectedId={selectedFolderId}
-                onSelect={setSelectedFolderId}
-                counts={folderCounts}
-                totalCount={activeDocuments.length}
-              />
-              <div className="flex-1">
-                <DocumentList
-                  documents={documentsInScope}
-                  folders={folders}
-                  onPreview={setPreviewDoc}
-                  workspaceId={workspaceId}
-                  entityType={entityType}
-                  entityId={entityId}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "Requests" && (
-          <RequestsPanel
-            requests={requests}
-            templates={requestTemplates}
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-ink">Files</h3>
+        <div className="mb-4">
+          <UploadZone
             workspaceId={workspaceId}
             entityType={entityType}
             entityId={entityId}
-            audience={audience}
-            canCreate={canRequestDocuments}
+            folderId={selectedFolderId}
+            visibility={audience === "portal" ? "client_visible" : "internal"}
           />
-        )}
-
-        {tab === "Signatures" && (
-          <SignaturesPanel
-            signatureRequests={signatureRequests}
-            documents={activeDocuments}
-            workspaceId={workspaceId}
-            audience={audience}
-            canCreate={canRequestSignatures}
+        </div>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <FolderTree
+            folders={folders}
+            selectedId={selectedFolderId}
+            onSelect={setSelectedFolderId}
+            counts={folderCounts}
+            totalCount={activeDocuments.length}
           />
-        )}
+          <div className="flex-1">
+            <DocumentList
+              documents={documentsInScope}
+              folders={folders}
+              onPreview={setPreviewDoc}
+              workspaceId={workspaceId}
+              entityType={entityType}
+              entityId={entityId}
+            />
+          </div>
+        </div>
+      </div>
 
-        {tab === "Activity" && (
-          <div className="rounded-xl border border-border bg-surface">
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-ink">
+          Requests{pendingRequests.length > 0 && <span className="ml-1.5 rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] font-medium text-accent">{pendingRequests.length}</span>}
+        </h3>
+        <RequestsPanel
+          requests={requests}
+          templates={requestTemplates}
+          workspaceId={workspaceId}
+          entityType={entityType}
+          entityId={entityId}
+          audience={audience}
+          canCreate={canRequestDocuments}
+        />
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-ink">
+          Signatures{pendingSignatures.length > 0 && <span className="ml-1.5 rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] font-medium text-accent">{pendingSignatures.length}</span>}
+        </h3>
+        <SignaturesPanel
+          signatureRequests={signatureRequests}
+          documents={activeDocuments}
+          templates={signatureTemplates}
+          entityType={entityType}
+          entityId={entityId}
+          clientName={clientName}
+          firmName={firmName}
+          workspaceId={workspaceId}
+          audience={audience}
+          canCreate={canRequestSignatures}
+        />
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowActivity((v) => !v)}
+          className="text-sm font-medium text-accent hover:underline"
+        >
+          {showActivity ? "Hide activity" : "Show activity"}
+        </button>
+        {showActivity && (
+          <div className="mt-3 rounded-xl border border-border bg-surface">
             {activity.length === 0 ? (
               <EmptyState message="No document activity yet." />
             ) : (

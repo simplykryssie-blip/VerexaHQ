@@ -74,7 +74,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       }
     }
 
-    const { error: rpcError } = await supabase.rpc("submit_public_organizer_response", {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("submit_public_organizer_response", {
       p_token: token,
       p_first_name: firstName.trim(),
       p_last_name: lastName.trim() || null,
@@ -87,6 +87,17 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     if (rpcError) {
       setError(rpcError.message);
       return;
+    }
+    const responseId = (rpcData as { response_id?: string } | null)?.response_id;
+    if (responseId) {
+      fetch("/api/documents/file-organizer-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responseId }),
+      }).catch(() => {
+        // Best-effort -- the submission itself is already recorded; filing
+        // it into Documents can be retried later if this fails.
+      });
     }
     setStep("done");
   }

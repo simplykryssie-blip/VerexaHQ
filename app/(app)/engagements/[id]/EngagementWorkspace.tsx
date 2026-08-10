@@ -71,6 +71,7 @@ export function EngagementWorkspace({
   documentRequestTemplates,
   organizerTemplates,
   organizerResponses,
+  engagementLetterTemplates,
   signatureRequests,
   notes,
   messageThreads,
@@ -100,6 +101,7 @@ export function EngagementWorkspace({
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
   organizerResponses: OrganizerResponseRow[];
+  engagementLetterTemplates: { id: string; name: string; body_html: string }[];
   signatureRequests: SignatureRequestRow[];
   notes: NoteRow[];
   messageThreads: MessageThreadRow[];
@@ -213,6 +215,9 @@ export function EngagementWorkspace({
                 requests={documentRequests}
                 requestTemplates={documentRequestTemplates}
                 signatureRequests={signatureRequests}
+                signatureTemplates={engagementLetterTemplates}
+                clientName={client ? clientLabel(client) : undefined}
+                firmName={workspace.name}
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
                 canRequestSignatures={permissions.signaturesRequest}

@@ -102,6 +102,7 @@ export function ClientWorkspace({
   documentRequestTemplates,
   organizerTemplates,
   organizerResponses,
+  engagementLetterTemplates,
   permissions,
   paymentPlansByInvoice,
   appointments,
@@ -135,6 +136,7 @@ export function ClientWorkspace({
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
   organizerResponses: OrganizerResponseRow[];
+  engagementLetterTemplates: { id: string; name: string; body_html: string }[];
   appointments: AppointmentRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
@@ -248,6 +250,9 @@ export function ClientWorkspace({
                 requests={documentRequests}
                 requestTemplates={documentRequestTemplates}
                 signatureRequests={signatureRequests}
+                signatureTemplates={engagementLetterTemplates}
+                clientName={displayName(client)}
+                firmName={workspace.name}
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
                 canRequestSignatures={permissions.signaturesRequest}

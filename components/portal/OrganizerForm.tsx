@@ -143,6 +143,14 @@ export function OrganizerForm({
       toast.show(error.message, "error");
       return;
     }
+    fetch("/api/documents/file-organizer-response", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ responseId }),
+    }).catch(() => {
+      // Best-effort -- the submission itself is already recorded; filing
+      // it into Documents can be retried later if this fails.
+    });
     toast.show("Organizer submitted", "success");
     router.refresh();
   }

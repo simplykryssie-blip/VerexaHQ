@@ -73,3 +73,5 @@ export type SignatureRequestRow = {
 export type ActivityRow = { id: string; description: string; created_at: string };
 
 export type DocumentRequestTemplateOption = { id: string; name: string };
+
+export type EngagementLetterTemplateOption = { id: string; name: string; body_html: string };

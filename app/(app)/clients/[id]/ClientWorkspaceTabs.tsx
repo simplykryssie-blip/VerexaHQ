@@ -519,11 +519,18 @@ export function MessagesTab({
   ];
 
   const [channel, setChannel] = useState(channelOptions[0]?.value ?? "");
+  const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   const threadsById = new Map(threads.map((t) => [t.id, t]));
+  const existingEmailThread = threads.find((t) => t.channel === "email" && !t.subject?.startsWith("Document request:"));
+
+  useEffect(() => {
+    if (channel === "email") setSubject(existingEmailThread?.subject ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
@@ -547,7 +554,9 @@ export function MessagesTab({
       data: { user },
     } = await supabase.auth.getUser();
 
-    let threadId = threads.find((t) => t.channel === channel && !t.subject?.startsWith("Document request:"))?.id;
+    const existingThread = threads.find((t) => t.channel === channel && !t.subject?.startsWith("Document request:"));
+    let threadId = existingThread?.id;
+    const resolvedSubject = channel === "email" ? subject.trim() || "Message" : isInternal ? "Internal note" : "Message";
 
     if (!threadId) {
       const { data: thread, error: threadError } = await supabase
@@ -557,7 +566,7 @@ export function MessagesTab({
           entity_type: "client",
           entity_id: clientId,
           channel,
-          subject: isInternal ? "Internal note" : "Message",
+          subject: resolvedSubject,
           created_by: user?.id,
         })
         .select("id")
@@ -568,6 +577,8 @@ export function MessagesTab({
         return;
       }
       threadId = thread.id;
+    } else if (channel === "email" && subject.trim() && subject.trim() !== existingThread?.subject) {
+      await supabase.from("message_threads").update({ subject: resolvedSubject }).eq("id", threadId);
     }
 
     const { error: messageError } = await supabase.from("messages").insert({
@@ -589,7 +600,7 @@ export function MessagesTab({
         const res = await fetch("/api/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: primaryEmail, subject: "Message", html: `<p>${body}</p>` }),
+          body: JSON.stringify({ to: primaryEmail, subject: resolvedSubject, html: `<p>${body}</p>` }),
         });
         const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
         if (!data.sent) toast.show(`Message saved, but the email wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
@@ -677,6 +688,17 @@ export function MessagesTab({
             </select>
             {error && <p className="text-xs text-danger">{error}</p>}
           </div>
+          {channel === "email" && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              <label className="font-medium text-muted">Subject</label>
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Message"
+                className="flex-1 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+          )}
           <div className="mt-2 flex items-end gap-2">
             <textarea
               value={body}
@@ -688,7 +710,7 @@ export function MessagesTab({
                 }
               }}
               placeholder="Type a message... (Enter for a new line, Cmd/Ctrl+Enter to send)"
-              rows={2}
+              rows={channel === "email" ? 6 : 2}
               className="flex-1 resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <button
