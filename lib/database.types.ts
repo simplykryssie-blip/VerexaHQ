@@ -2917,6 +2917,8 @@ export type Database = {
           internal_reference: string | null
           open_date: string | null
           owner_workspace_id: string | null
+          pipeline_id: string | null
+          pipeline_stage_id: string | null
           priority: Database["public"]["Enums"]["engagement_priority"] | null
           review_status: Database["public"]["Enums"]["review_status"] | null
           reviewer_id: string | null
@@ -2943,6 +2945,8 @@ export type Database = {
           internal_reference?: string | null
           open_date?: string | null
           owner_workspace_id?: string | null
+          pipeline_id?: string | null
+          pipeline_stage_id?: string | null
           priority?: Database["public"]["Enums"]["engagement_priority"] | null
           review_status?: Database["public"]["Enums"]["review_status"] | null
           reviewer_id?: string | null
@@ -2969,6 +2973,8 @@ export type Database = {
           internal_reference?: string | null
           open_date?: string | null
           owner_workspace_id?: string | null
+          pipeline_id?: string | null
+          pipeline_stage_id?: string | null
           priority?: Database["public"]["Enums"]["engagement_priority"] | null
           review_status?: Database["public"]["Enums"]["review_status"] | null
           reviewer_id?: string | null
@@ -7203,6 +7209,10 @@ export type Database = {
         Returns: string
       }
       ensure_next_tax_year: { Args: never; Returns: number }
+      ensure_default_pipeline: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       ensure_workspace_security_policy: {
         Args: { p_workspace_id: string }
         Returns: undefined

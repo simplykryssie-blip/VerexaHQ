@@ -19,6 +19,7 @@ import {
   Workflow,
   Flag,
   ScrollText,
+  Kanban,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -39,6 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Contacts", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
+  { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
