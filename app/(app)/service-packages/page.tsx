@@ -1,22 +1,13 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { Workflow } from "lucide-react";
-import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
-import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
 import { CreatePricingRuleForm, CreateBillingRuleForm } from "@/components/settings/CreatePricingBillingRuleForms";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
-import { ServiceEditRow } from "@/components/settings/ServiceEditRow";
-import { CloneServiceButton } from "@/components/settings/CloneServiceButton";
 import { PricingRuleEditRow, BillingRuleEditRow } from "@/components/settings/RuleEditRow";
+import { ServiceGallery, type ServiceCard } from "@/components/settings/ServiceGallery";
 
 export const dynamic = "force-dynamic";
-
-function money(n: number | null) {
-  if (n === null) return "--";
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 export default async function ServicePackagesPage() {
   const workspace = await getCurrentWorkspace();
@@ -53,8 +44,26 @@ export default async function ServicePackagesPage() {
     supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
   ]);
 
+  const serviceCards: ServiceCard[] = (services ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    status: s.status,
+    workspace_id: s.workspace_id,
+    default_price: s.default_price,
+    is_bookable: s.is_bookable,
+    is_portal_visible: s.is_portal_visible,
+    categoryName: (s.service_categories as unknown as { name?: string } | null)?.name ?? null,
+    service_category_id: s.service_category_id,
+    pricing_rule_id: s.pricing_rule_id,
+    billing_rule_id: s.billing_rule_id,
+    organizer_template_id: s.organizer_template_id,
+    document_request_template_id: s.document_request_template_id,
+    document_folder_template_id: s.document_folder_template_id,
+    engagement_letter_template_id: s.engagement_letter_template_id,
+  }));
+
   return (
-    <div className="max-w-3xl">
+    <div className="max-w-6xl">
       <SettingsSectionHeader
         icon={Workflow}
         title="Workflow Setup"
@@ -88,57 +97,21 @@ export default async function ServicePackagesPage() {
         </div>
       </div>
 
-      <div className="mt-6">
-        <CreateServiceForm
-          workspaceId={workspace.id}
-          categories={categories ?? []}
-          pricingRules={pricingRules ?? []}
-          billingRules={billingRules ?? []}
-          organizerTemplates={organizerTemplates ?? []}
-          documentRequestTemplates={documentRequestTemplates ?? []}
-          documentFolderTemplates={documentFolderTemplates ?? []}
-          engagementLetterTemplates={engagementLetterTemplates ?? []}
-        />
-      </div>
-
-      <div className="mt-4">
-        {(services ?? []).length === 0 ? (
-          <EmptyState icon={Workflow} message="No service packages yet." />
-        ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-            {(services ?? []).map((s) => (
-              <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="flex-1">
-                  <ServiceEditRow
-                    service={s as never}
-                    categories={categories ?? []}
-                    pricingRules={pricingRules ?? []}
-                    billingRules={billingRules ?? []}
-                    organizerTemplates={organizerTemplates ?? []}
-                    documentRequestTemplates={documentRequestTemplates ?? []}
-                    documentFolderTemplates={documentFolderTemplates ?? []}
-                    engagementLetterTemplates={engagementLetterTemplates ?? []}
-                  />
-                  <p className="text-xs text-muted">
-                    {(s.service_categories as unknown as { name?: string } | null)?.name ?? "Uncategorized"} -- {money(s.default_price)}
-                    {s.is_bookable && " -- Bookable"}
-                    {s.is_portal_visible && " -- Portal visible"}
-                  </p>
-                  <div className="mt-1">
-                    {s.workspace_id ? (
-                      <Link href={`/settings/service-packages/${s.id}`} className="text-xs font-medium text-accent hover:underline">
-                        Manage stages
-                      </Link>
-                    ) : (
-                      <CloneServiceButton serviceId={s.id} workspaceId={workspace.id} />
-                    )}
-                  </div>
-                </div>
-                <TemplateStatusCycle table="services" id={s.id} status={s.status} />
-              </li>
-            ))}
-          </ul>
-        )}
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-ink">Service packages</h3>
+        <div className="mt-2">
+          <ServiceGallery
+            workspaceId={workspace.id}
+            services={serviceCards}
+            categories={categories ?? []}
+            pricingRules={pricingRules ?? []}
+            billingRules={billingRules ?? []}
+            organizerTemplates={organizerTemplates ?? []}
+            documentRequestTemplates={documentRequestTemplates ?? []}
+            documentFolderTemplates={documentFolderTemplates ?? []}
+            engagementLetterTemplates={engagementLetterTemplates ?? []}
+          />
+        </div>
       </div>
     </div>
   );

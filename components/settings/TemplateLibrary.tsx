@@ -1,21 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { FileText, type LucideIcon } from "lucide-react";
-import { EmptyState } from "@/components/EmptyState";
+import { type LucideIcon } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
-import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
-import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
-import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
+import { EmailSmsTemplateGallery } from "@/components/settings/EmailSmsTemplateGallery";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
 
 export type TemplateTabKey = "email" | "sms" | "engagement-letter" | "organizers";
 export type TemplateTab = { key: TemplateTabKey; label: string };
-
-function mergeFieldTokens(text: string) {
-  const matches = text.match(/\{\{\s*[\w.]+\s*\}\}/g) ?? [];
-  return Array.from(new Set(matches));
-}
 
 export async function TemplateLibrary({
   workspaceId,
@@ -99,7 +91,7 @@ export async function TemplateLibrary({
   );
 
   return (
-    <div className={isOrganizers || isEngagementLetters ? "max-w-6xl" : "max-w-3xl"}>
+    <div className="max-w-6xl">
       <SettingsSectionHeader icon={icon} title={heading} description={description} />
 
       <div className="mt-4">{tabNav}</div>
@@ -113,47 +105,9 @@ export async function TemplateLibrary({
           <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} />
         </div>
       ) : (
-        <>
-          <div className="mt-4">
-            <CreateTemplateForm workspaceId={workspaceId} kind={activeTab} />
-          </div>
-
-          <div className="mt-4">
-            {(templates ?? []).length === 0 ? (
-              <EmptyState icon={FileText} message="No templates yet." />
-            ) : (
-              <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
-                {(templates ?? []).map((t: any) => {
-                  const bodyText = t.body_html ?? t.body ?? "";
-                  const tokens = mergeFieldTokens(`${t.subject ?? ""} ${bodyText}`);
-                  return (
-                    <li key={t.id} className="px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <TemplateEditRow kind={activeTab} template={t} />
-                            {!t.workspace_id && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
-                          </div>
-                          <p className="text-xs text-muted">{t.slug}</p>
-                        </div>
-                        <TemplateStatusCycle table={table} id={t.id} status={t.status} />
-                      </div>
-                      {tokens.length > 0 && (
-                        <p className="mt-1.5 flex flex-wrap gap-1 text-xs text-muted">
-                          {tokens.map((tok) => (
-                            <span key={tok} className="rounded bg-surfaceMuted px-1.5 py-0.5">
-                              {tok}
-                            </span>
-                          ))}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </>
+        <div className="mt-4">
+          <EmailSmsTemplateGallery kind={activeTab as "email" | "sms"} workspaceId={workspaceId} templates={templates ?? []} />
+        </div>
       )}
     </div>
   );

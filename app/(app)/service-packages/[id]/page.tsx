@@ -69,7 +69,7 @@ export default async function ServiceStagesPage({ params }: { params: { id: stri
 
   return (
     <div className="max-w-3xl">
-      <Link href="/settings/service-packages" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+      <Link href="/service-packages" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Workflow Setup
       </Link>
       <h2 className="text-base font-semibold text-ink">{service.name}</h2>

@@ -33,7 +33,7 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, primar
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
       >
         <BookOpen size={14} /> Send Organizer
       </button>

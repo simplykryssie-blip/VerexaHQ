@@ -15,6 +15,8 @@ export function CreateServiceForm({
   documentRequestTemplates,
   documentFolderTemplates,
   engagementLetterTemplates,
+  defaultOpen,
+  onSuccess,
 }: {
   workspaceId: string;
   categories: Option[];
@@ -24,6 +26,8 @@ export function CreateServiceForm({
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
   engagementLetterTemplates: Option[];
+  defaultOpen?: boolean;
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -33,6 +37,7 @@ export function CreateServiceForm({
   return (
     <InlineAddForm
       label="New Service Package"
+      defaultOpen={defaultOpen}
       fields={[
         { name: "name", label: "Name", required: true },
         { name: "slug", label: "Slug (unique key)", required: true },
@@ -62,6 +67,7 @@ export function CreateServiceForm({
         });
         if (error) return error.message;
         router.refresh();
+        onSuccess?.();
       }}
     />
   );

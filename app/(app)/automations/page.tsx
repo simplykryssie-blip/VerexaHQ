@@ -11,7 +11,7 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
   return (
     <TemplateLibrary
       workspaceId={workspace.id}
-      basePath="/settings/automations"
+      basePath="/automations"
       tabs={[
         { key: "email", label: "Email" },
         { key: "sms", label: "SMS" },

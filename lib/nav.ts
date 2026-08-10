@@ -40,6 +40,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Templates", href: "/templates", icon: LayoutTemplate },
+  { label: "Automations", href: "/automations", icon: Zap },
+  { label: "Workflow Setup", href: "/service-packages", icon: Workflow },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -58,8 +60,6 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
-  { label: "Automations", href: "/settings/automations", icon: Zap },
-  { label: "Workflow Setup", href: "/settings/service-packages", icon: Workflow },
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
   { label: "Workspace Preferences", href: "/settings/preferences", icon: SlidersHorizontal },
   { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText },

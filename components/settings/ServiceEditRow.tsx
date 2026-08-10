@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Modal } from "@/components/Modal";
 
 type Option = { id: string; name: string };
 
@@ -60,6 +61,7 @@ export function ServiceEditRow({
   documentRequestTemplates,
   documentFolderTemplates,
   engagementLetterTemplates,
+  onClose,
 }: {
   service: ServiceRow;
   categories: Option[];
@@ -69,10 +71,10 @@ export function ServiceEditRow({
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
   engagementLetterTemplates: Option[];
+  onClose: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSystem = !service.workspace_id;
@@ -113,100 +115,92 @@ export function ServiceEditRow({
       setError(updateError.message);
       return;
     }
-    setOpen(false);
     router.refresh();
+    onClose();
   }
 
   return (
-    <div className="flex-1">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="text-left text-sm font-medium text-ink hover:text-accent hover:underline">
-        {service.name}
-      </button>
-
-      {open && (
-        <div className="mt-2 space-y-2 rounded-lg border border-border bg-surfaceMuted p-3">
-          {isSystem ? (
-            <p className="text-xs text-muted">This is a system default and can&apos;t be edited here.</p>
-          ) : (
-            <>
+    <Modal title={isSystem ? service.name : `Edit ${service.name}`} onClose={onClose} size="xl">
+      {isSystem ? (
+        <p className="text-sm text-muted">This is a system default and can&apos;t be edited here. Clone it to customize.</p>
+      ) : (
+        <div className="space-y-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name"
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
+            <input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              placeholder="Default price"
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
+            <Select value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />
+          </div>
+          <Select value={organizerTemplateId} onChange={setOrganizerTemplateId} options={organizerTemplates} placeholder="Organizer template" />
+          <Select
+            value={documentRequestTemplateId}
+            onChange={setDocumentRequestTemplateId}
+            options={documentRequestTemplates}
+            placeholder="Document request template"
+          />
+          <div>
+            <Select
+              value={documentFolderTemplateId}
+              onChange={setDocumentFolderTemplateId}
+              options={documentFolderTemplates}
+              placeholder="Document folder template"
+            />
+            {documentFolderTemplateId && (
+              <Link href={`/service-packages/${service.id}`} className="mt-1 inline-block text-xs font-medium text-accent hover:underline">
+                Manage folders
+              </Link>
+            )}
+          </div>
+          <Select
+            value={engagementLetterTemplateId}
+            onChange={setEngagementLetterTemplateId}
+            options={engagementLetterTemplates}
+            placeholder="Engagement letter template"
+          />
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-sm text-slate">
+              <input type="checkbox" checked={isBookable} onChange={(e) => setIsBookable(e.target.checked)} className="h-4 w-4 rounded border-border" />
+              Bookable
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate">
               <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Name"
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                type="checkbox"
+                checked={isPortalVisible}
+                onChange={(e) => setIsPortalVisible(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
               />
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
-                <input
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="Default price"
-                  className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
-                <Select value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />
-              </div>
-              <Select value={organizerTemplateId} onChange={setOrganizerTemplateId} options={organizerTemplates} placeholder="Organizer template" />
-              <Select
-                value={documentRequestTemplateId}
-                onChange={setDocumentRequestTemplateId}
-                options={documentRequestTemplates}
-                placeholder="Document request template"
-              />
-              <div>
-                <Select
-                  value={documentFolderTemplateId}
-                  onChange={setDocumentFolderTemplateId}
-                  options={documentFolderTemplates}
-                  placeholder="Document folder template"
-                />
-                {documentFolderTemplateId && (
-                  <Link href={`/settings/service-packages/${service.id}`} className="mt-1 inline-block text-xs font-medium text-accent hover:underline">
-                    Manage folders
-                  </Link>
-                )}
-              </div>
-              <Select
-                value={engagementLetterTemplateId}
-                onChange={setEngagementLetterTemplateId}
-                options={engagementLetterTemplates}
-                placeholder="Engagement letter template"
-              />
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm text-slate">
-                  <input type="checkbox" checked={isBookable} onChange={(e) => setIsBookable(e.target.checked)} className="h-4 w-4 rounded border-border" />
-                  Bookable
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate">
-                  <input
-                    type="checkbox"
-                    checked={isPortalVisible}
-                    onChange={(e) => setIsPortalVisible(e.target.checked)}
-                    className="h-4 w-4 rounded border-border"
-                  />
-                  Portal visible
-                </label>
-              </div>
-              {error && <p className="text-sm text-danger">{error}</p>}
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surface">
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={saving}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </>
-          )}
+              Portal visible
+            </label>
+          </div>
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
         </div>
       )}
-    </div>
+    </Modal>
   );
 }

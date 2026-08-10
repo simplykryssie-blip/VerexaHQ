@@ -4,7 +4,17 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 
-export function CreateTemplateForm({ workspaceId, kind }: { workspaceId: string; kind: "email" | "sms" | "engagement_letter" }) {
+export function CreateTemplateForm({
+  workspaceId,
+  kind,
+  defaultOpen,
+  onSuccess,
+}: {
+  workspaceId: string;
+  kind: "email" | "sms" | "engagement_letter";
+  defaultOpen?: boolean;
+  onSuccess?: () => void;
+}) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -22,6 +32,7 @@ export function CreateTemplateForm({ workspaceId, kind }: { workspaceId: string;
   return (
     <InlineAddForm
       label="New Template"
+      defaultOpen={defaultOpen}
       fields={fields}
       onSubmit={async (v) => {
         const { error } = await supabase.from(table).insert({
@@ -35,6 +46,7 @@ export function CreateTemplateForm({ workspaceId, kind }: { workspaceId: string;
         } as never);
         if (error) return error.message;
         router.refresh();
+        onSuccess?.();
       }}
     />
   );
