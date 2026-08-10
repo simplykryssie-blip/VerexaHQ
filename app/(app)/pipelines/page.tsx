@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { clientLabel } from "@/lib/documentEntityLabels";
-import { PipelineBoard, type BoardEngagement, type PipelineOption, type StageOption } from "@/components/pipelines/PipelineBoard";
+import { PipelineBoard, type BoardEngagement, type PipelineOption, type StageOption, type UnassignedOption } from "@/components/pipelines/PipelineBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +34,24 @@ export default async function PipelinesPage({ searchParams }: { searchParams: { 
 
   const selectedPipeline = pipelineOptions.find((p) => p.id === searchParams.pipeline) ?? pipelineOptions[0] ?? null;
 
-  const { data: engagements } = selectedPipeline
-    ? await supabase
-        .from("engagements")
-        .select("id, engagement_number, priority, due_date, pipeline_stage_id, client_id, clients(first_name, last_name, business_name, client_type)")
-        .eq("workspace_id", workspace.id)
-        .or(`pipeline_id.eq.${selectedPipeline.id},pipeline_id.is.null`)
-        .order("created_at", { ascending: false })
-        .limit(500)
-    : { data: [] };
+  const [{ data: engagements }, { data: candidates }] = await Promise.all([
+    selectedPipeline
+      ? supabase
+          .from("engagements")
+          .select("id, engagement_number, priority, due_date, pipeline_stage_id, client_id, clients(first_name, last_name, business_name, client_type)")
+          .eq("workspace_id", workspace.id)
+          .eq("pipeline_id", selectedPipeline.id)
+          .order("created_at", { ascending: false })
+          .limit(500)
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("engagements")
+      .select("id, engagement_number, clients(first_name, last_name, business_name, client_type)")
+      .eq("workspace_id", workspace.id)
+      .is("pipeline_id", null)
+      .order("created_at", { ascending: false })
+      .limit(200),
+  ]);
 
   const boardItems: BoardEngagement[] = (engagements ?? []).map((e) => ({
     id: e.id,
@@ -52,6 +61,11 @@ export default async function PipelinesPage({ searchParams }: { searchParams: { 
     pipeline_stage_id: e.pipeline_stage_id,
     clientLabel: clientLabel(e.clients as never),
     clientHref: `/clients/${e.client_id}`,
+  }));
+
+  const candidateOptions: UnassignedOption[] = (candidates ?? []).map((e) => ({
+    id: e.id,
+    label: `${e.engagement_number ?? "Engagement"} -- ${clientLabel(e.clients as never)}`,
   }));
 
   return (
@@ -66,6 +80,7 @@ export default async function PipelinesPage({ searchParams }: { searchParams: { 
           pipelines={pipelineOptions}
           selectedPipelineId={selectedPipeline?.id ?? null}
           engagements={boardItems}
+          unassignedEngagements={candidateOptions}
           canManage={Boolean(canManage)}
         />
       </div>

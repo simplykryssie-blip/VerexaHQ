@@ -10,6 +10,7 @@ import { slugify, uniqueSlug } from "@/lib/roleSlug";
 
 export type StageOption = { id: string; name: string; display_order: number; color: string | null; is_terminal: boolean };
 export type PipelineOption = { id: string; name: string; stages: StageOption[] };
+export type UnassignedOption = { id: string; label: string };
 export type BoardEngagement = {
   id: string;
   engagement_number: string | null;
@@ -32,12 +33,14 @@ export function PipelineBoard({
   pipelines,
   selectedPipelineId,
   engagements: initial,
+  unassignedEngagements,
   canManage,
 }: {
   workspaceId: string;
   pipelines: PipelineOption[];
   selectedPipelineId: string | null;
   engagements: BoardEngagement[];
+  unassignedEngagements: UnassignedOption[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -49,10 +52,14 @@ export function PipelineBoard({
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [creatingPipeline, setCreatingPipeline] = useState(false);
   const [newPipelineName, setNewPipelineName] = useState("");
+  const [editingPipelineId, setEditingPipelineId] = useState<string | null>(null);
+  const [editingPipelineName, setEditingPipelineName] = useState("");
   const [addingStage, setAddingStage] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
   const [editingStageName, setEditingStageName] = useState("");
+  const [addingEngagement, setAddingEngagement] = useState(false);
+  const [pickedEngagementId, setPickedEngagementId] = useState("");
   const [saving, setSaving] = useState(false);
 
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId) ?? null;
@@ -63,15 +70,35 @@ export function PipelineBoard({
 
     setEngagements((prev) => prev.map((e) => (e.id === id ? { ...e, pipeline_stage_id: stageId } : e)));
 
-    const { error } = await supabase
-      .from("engagements")
-      .update(stageId ? { pipeline_stage_id: stageId } : { pipeline_stage_id: null, pipeline_id: null })
-      .eq("id", id);
+    const { error } = await supabase.from("engagements").update({ pipeline_stage_id: stageId }).eq("id", id);
     if (error) {
       setEngagements((prev) => prev.map((e) => (e.id === id ? { ...e, pipeline_stage_id: current.pipeline_stage_id } : e)));
       toast.show(error.message, "error");
       return;
     }
+    router.refresh();
+  }
+
+  async function removeFromPipeline(id: string) {
+    setEngagements((prev) => prev.filter((e) => e.id !== id));
+    const { error } = await supabase.from("engagements").update({ pipeline_id: null, pipeline_stage_id: null }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+    }
+    router.refresh();
+  }
+
+  async function addEngagementToPipeline() {
+    if (!selectedPipeline || !pickedEngagementId) return;
+    setSaving(true);
+    const { error } = await supabase.from("engagements").update({ pipeline_id: selectedPipeline.id }).eq("id", pickedEngagementId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setAddingEngagement(false);
+    setPickedEngagementId("");
     router.refresh();
   }
 
@@ -101,6 +128,33 @@ export function PipelineBoard({
     router.refresh();
   }
 
+  async function renamePipeline(pipelineId: string) {
+    setEditingPipelineId(null);
+    if (!editingPipelineName.trim()) return;
+    const { error } = await supabase.from("pipelines").update({ name: editingPipelineName.trim() }).eq("id", pipelineId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function deletePipeline(pipelineId: string) {
+    if (!window.confirm("Delete this pipeline and its stages? Engagements in it will go back to unassigned.")) return;
+    const { error } = await supabase.from("pipelines").delete().eq("id", pipelineId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    const remaining = pipelines.filter((p) => p.id !== pipelineId);
+    if (remaining.length > 0) {
+      router.push(`/pipelines?pipeline=${remaining[0].id}`);
+    } else {
+      router.push("/pipelines");
+    }
+    router.refresh();
+  }
+
   async function addStage() {
     if (!selectedPipeline || !newStageName.trim()) return;
     setSaving(true);
@@ -119,9 +173,9 @@ export function PipelineBoard({
   }
 
   async function renameStage(stageId: string) {
+    setEditingStageId(null);
     if (!editingStageName.trim()) return;
     const { error } = await supabase.from("pipeline_stages").update({ name: editingStageName.trim() }).eq("id", stageId);
-    setEditingStageId(null);
     if (error) {
       toast.show(error.message, "error");
       return;
@@ -130,7 +184,7 @@ export function PipelineBoard({
   }
 
   async function deleteStage(stageId: string) {
-    if (!window.confirm("Delete this stage? Engagements in it will move to Unassigned.")) return;
+    if (!window.confirm("Delete this stage? Engagements in it will move to No stage yet.")) return;
     const { error } = await supabase.from("pipeline_stages").delete().eq("id", stageId);
     if (error) {
       toast.show(error.message, "error");
@@ -139,10 +193,10 @@ export function PipelineBoard({
     router.refresh();
   }
 
-  const unassigned = engagements.filter((e) => !e.pipeline_stage_id);
+  const noStageYet = engagements.filter((e) => !e.pipeline_stage_id);
 
-  function Column({ stageId, title, items, terminal }: { stageId: string | null; title: React.ReactNode; items: BoardEngagement[]; terminal?: boolean }) {
-    const key = stageId ?? "unassigned";
+  function StageSection({ stageId, title, items, terminal }: { stageId: string | null; title: React.ReactNode; items: BoardEngagement[]; terminal?: boolean }) {
+    const key = stageId ?? "no-stage";
     return (
       <div
         onDragOver={(e) => {
@@ -156,7 +210,7 @@ export function PipelineBoard({
           const id = e.dataTransfer.getData("text/plain");
           if (id) moveTo(id, stageId);
         }}
-        className={`flex w-72 shrink-0 flex-col rounded-xl border bg-surfaceMuted transition ${
+        className={`rounded-xl border bg-surfaceMuted transition ${
           dragOverStage === key ? "border-accent ring-2 ring-accent/30" : "border-border"
         }`}
       >
@@ -164,7 +218,8 @@ export function PipelineBoard({
           <div className="min-w-0 flex-1">{title}</div>
           <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium text-muted">{items.length}</span>
         </div>
-        <div className="flex-1 space-y-2 px-2 pb-2" style={{ minHeight: "60px" }}>
+        <div className="flex flex-wrap gap-2 px-3 pb-3" style={{ minHeight: "56px" }}>
+          {items.length === 0 && <p className="py-2 text-xs text-muted">Drop engagements here.</p>}
           {items.map((e) => {
             const overdue = Boolean(e.due_date && new Date(e.due_date) < new Date() && !terminal);
             return (
@@ -177,13 +232,24 @@ export function PipelineBoard({
                   setDraggingId(e.id);
                 }}
                 onDragEnd={() => setDraggingId(null)}
-                className={`cursor-grab rounded-lg border border-border bg-surface p-3 shadow-sm transition active:cursor-grabbing ${
+                className={`w-64 shrink-0 cursor-grab rounded-lg border border-border bg-surface p-3 shadow-sm transition active:cursor-grabbing ${
                   draggingId === e.id ? "opacity-40" : ""
                 }`}
               >
-                <Link href={`/engagements/${e.id}`} className="text-sm font-medium text-accent hover:underline">
-                  {e.engagement_number ?? "Engagement"}
-                </Link>
+                <div className="flex items-start justify-between gap-1">
+                  <Link href={`/engagements/${e.id}`} className="text-sm font-medium text-accent hover:underline">
+                    {e.engagement_number ?? "Engagement"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => removeFromPipeline(e.id)}
+                    className="shrink-0 text-muted hover:text-danger"
+                    aria-label="Remove from pipeline"
+                    title="Remove from pipeline"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
                 <p className="mt-0.5 truncate text-sm text-slate">
                   <Link href={e.clientHref} className="hover:text-accent hover:underline">
                     {e.clientLabel}
@@ -216,17 +282,51 @@ export function PipelineBoard({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        {pipelines.map((p) => (
-          <Link
-            key={p.id}
-            href={`/pipelines?pipeline=${p.id}`}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              p.id === selectedPipelineId ? "bg-accent text-white" : "bg-surfaceMuted text-muted hover:text-ink"
-            }`}
-          >
-            {p.name}
-          </Link>
-        ))}
+        {pipelines.map((p) =>
+          editingPipelineId === p.id ? (
+            <input
+              key={p.id}
+              autoFocus
+              value={editingPipelineName}
+              onChange={(e) => setEditingPipelineName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && renamePipeline(p.id)}
+              onBlur={() => renamePipeline(p.id)}
+              className="rounded-full border border-accent px-3 py-1.5 text-xs font-medium focus:outline-none"
+            />
+          ) : (
+            <span
+              key={p.id}
+              className={`group inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1 text-xs font-medium transition ${
+                p.id === selectedPipelineId ? "bg-accent text-white" : "bg-surfaceMuted text-muted hover:text-ink"
+              }`}
+            >
+              <Link href={`/pipelines?pipeline=${p.id}`}>{p.name}</Link>
+              {canManage && (
+                <span className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingPipelineId(p.id);
+                      setEditingPipelineName(p.name);
+                    }}
+                    className={`rounded p-0.5 ${p.id === selectedPipelineId ? "hover:bg-white/20" : "hover:bg-surface"}`}
+                    aria-label="Rename pipeline"
+                  >
+                    <Pencil size={10} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deletePipeline(p.id)}
+                    className={`rounded p-0.5 ${p.id === selectedPipelineId ? "hover:bg-white/20" : "hover:bg-surface"}`}
+                    aria-label="Delete pipeline"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </span>
+              )}
+            </span>
+          )
+        )}
         {canManage && !creatingPipeline && (
           <button
             type="button"
@@ -262,11 +362,50 @@ export function PipelineBoard({
       )}
 
       {selectedPipeline && (
-        <div className="overflow-x-auto pb-2">
-          <div className="flex gap-3" style={{ minWidth: "max-content" }}>
-            <Column stageId={null} title={<h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Unassigned</h3>} items={unassigned} />
+        <>
+          <div className="mb-3 flex items-center justify-between">
+            {addingEngagement ? (
+              <div className="flex flex-1 items-center gap-2">
+                <select
+                  autoFocus
+                  value={pickedEngagementId}
+                  onChange={(e) => setPickedEngagementId(e.target.value)}
+                  className="flex-1 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">Select an engagement...</option>
+                  {unassignedEngagements.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={addEngagementToPipeline}
+                  disabled={saving || !pickedEngagementId}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                >
+                  Add
+                </button>
+                <button type="button" onClick={() => setAddingEngagement(false)} className="text-muted hover:text-ink">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingEngagement(true)}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+              >
+                <Plus size={14} /> Add an engagement to this pipeline
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <StageSection stageId={null} title={<h3 className="text-xs font-semibold uppercase tracking-wide text-muted">No stage yet</h3>} items={noStageYet} />
             {selectedPipeline.stages.map((stage) => (
-              <Column
+              <StageSection
                 key={stage.id}
                 stageId={stage.id}
                 terminal={stage.is_terminal}
@@ -285,7 +424,7 @@ export function PipelineBoard({
                     <div className="flex items-center gap-1.5">
                       <h3 className="truncate text-xs font-semibold uppercase tracking-wide text-muted">{stage.name}</h3>
                       {canManage && (
-                        <span className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                        <span className="flex shrink-0 items-center gap-1">
                           <button
                             type="button"
                             onClick={() => {
@@ -308,30 +447,28 @@ export function PipelineBoard({
               />
             ))}
             {canManage && (
-              <div className="flex w-56 shrink-0 flex-col rounded-xl border border-dashed border-border p-3">
+              <div className="rounded-xl border border-dashed border-border p-3">
                 {addingStage ? (
-                  <div className="space-y-2">
+                  <div className="flex items-center gap-2">
                     <input
                       autoFocus
                       value={newStageName}
                       onChange={(e) => setNewStageName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && addStage()}
                       placeholder="Stage name"
-                      className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      className="flex-1 max-w-xs rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={addStage}
-                        disabled={saving || !newStageName.trim()}
-                        className="rounded-lg bg-accent px-2.5 py-1 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-                      >
-                        Add
-                      </button>
-                      <button type="button" onClick={() => setAddingStage(false)} className="text-xs text-muted hover:text-ink">
-                        Cancel
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={addStage}
+                      disabled={saving || !newStageName.trim()}
+                      className="rounded-lg bg-accent px-2.5 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                    >
+                      Add
+                    </button>
+                    <button type="button" onClick={() => setAddingStage(false)} className="text-xs text-muted hover:text-ink">
+                      Cancel
+                    </button>
                   </div>
                 ) : (
                   <button
@@ -345,7 +482,7 @@ export function PipelineBoard({
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
     </div>
   );
