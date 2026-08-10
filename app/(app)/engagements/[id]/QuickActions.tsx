@@ -2,202 +2,45 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Upload, Receipt, FileText, StickyNote, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Modal } from "@/components/Modal";
-import { SendMessageForm } from "@/components/SendMessageForm";
-import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
 import { renderEmail } from "@/lib/email/template";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 type Props = {
   engagementId: string;
   clientId: string;
-  clientName: string;
   workspaceId: string;
-  workspaceName: string;
   organizerTemplates: { id: string; name: string }[];
   primaryEmail: string | null;
-  primaryPhone: string | null;
   permissions: ActionPermissions;
 };
 
-function ActionButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof MessageSquare;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
-    >
-      <Icon size={14} /> {label}
-    </button>
-  );
-}
-
-export function QuickActions({
-  engagementId,
-  clientId,
-  clientName,
-  workspaceId,
-  workspaceName,
-  organizerTemplates,
-  primaryEmail,
-  primaryPhone,
-  permissions,
-}: Props) {
+// Mirrors the client workspace's QuickActions: Send Organizer is the only
+// action without a natural tab home, so it's the only one that stays
+// outside the tabs. Documents/Billing/Notes/Messages actions live in their
+// tabs instead.
+export function QuickActions({ engagementId, clientId, workspaceId, organizerTemplates, primaryEmail, permissions }: Props) {
   const router = useRouter();
   const supabase = createClient();
-  const [modal, setModal] = useState<"message" | "upload" | "organizer" | "invoice" | "quote" | "note" | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [docName, setDocName] = useState("");
-  const [docCategory, setDocCategory] = useState("");
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  async function handleUpload() {
-    if (!file) return;
-    setUploading(true);
-    setUploadError(null);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const path = `${workspaceId}/${clientId}/${Date.now()}-${file.name}`;
-    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
-    if (uploadErr) {
-      setUploading(false);
-      setUploadError(uploadErr.message);
-      return;
-    }
-
-    const { error: insertErr } = await supabase.from("attachments").insert({
-      workspace_id: workspaceId,
-      entity_type: "engagement",
-      entity_id: engagementId,
-      file_name: docName.trim() || file.name,
-      storage_path: path,
-      mime_type: file.type || null,
-      file_size_bytes: file.size,
-      uploaded_by: user?.id,
-      category: docCategory || null,
-    });
-
-    setUploading(false);
-    if (insertErr) {
-      setUploadError(insertErr.message);
-      return;
-    }
-
-    setFile(null);
-    setDocName("");
-    setDocCategory("");
-    setModal(null);
-    router.refresh();
-  }
+  if (!permissions.documentsRequest) return null;
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        {(permissions.messagesSend || permissions.messagesInternalNote) && (
-          <ActionButton icon={MessageSquare} label="Send Message" onClick={() => setModal("message")} />
-        )}
-        {permissions.documentsUpload && <ActionButton icon={Upload} label="Upload Document" onClick={() => setModal("upload")} />}
-        {permissions.documentsRequest && (
-          <ActionButton icon={BookOpen} label="Send Organizer" onClick={() => setModal("organizer")} />
-        )}
-        {permissions.billingManage && <ActionButton icon={Receipt} label="Create Invoice" onClick={() => setModal("invoice")} />}
-        {permissions.billingManage && <ActionButton icon={FileText} label="Create Quote" onClick={() => setModal("quote")} />}
-        <ActionButton icon={StickyNote} label="Add Note" onClick={() => setModal("note")} />
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+      >
+        <BookOpen size={14} /> Send Organizer
+      </button>
 
-      {modal === "message" && (
-        <Modal title="Send message" onClose={() => setModal(null)}>
-          <SendMessageForm
-            workspaceId={workspaceId}
-            entityType="engagement"
-            entityId={engagementId}
-            primaryEmail={primaryEmail}
-            primaryPhone={primaryPhone}
-            permissions={permissions}
-            onSent={() => setModal(null)}
-          />
-        </Modal>
-      )}
-
-      {modal === "upload" && (
-        <Modal title="Upload document" onClose={() => setModal(null)}>
-          <div className="space-y-3">
-            <input
-              type="file"
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setFile(f);
-                if (f && !docName) setDocName(f.name.replace(/\.[^./]+$/, ""));
-              }}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            />
-            <label className="block text-sm font-medium text-slate">
-              Document name
-              <input
-                type="text"
-                value={docName}
-                onChange={(e) => setDocName(e.target.value)}
-                placeholder="e.g. 2025 W-2"
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </label>
-            <label className="block text-sm font-medium text-slate">
-              Category
-              <select
-                value={docCategory}
-                onChange={(e) => setDocCategory(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              >
-                <option value="">Uncategorized</option>
-                <option value="Tax Return">Tax Return</option>
-                <option value="W-2">W-2</option>
-                <option value="1099">1099</option>
-                <option value="Identification">Identification</option>
-                <option value="Engagement Letter">Engagement Letter</option>
-                <option value="Financial Statement">Financial Statement</option>
-                <option value="Correspondence">Correspondence</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
-            {uploadError && <p className="text-sm text-danger">{uploadError}</p>}
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!file || uploading}
-                onClick={handleUpload}
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-              >
-                {uploading ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {modal === "organizer" && (
-        <Modal title="Send organizer" onClose={() => setModal(null)}>
+      {open && (
+        <Modal title="Send organizer" onClose={() => setOpen(false)}>
           {organizerTemplates.length === 0 ? (
             <p className="text-sm text-muted">
               No organizer templates are published yet -- add one in Settings first.
@@ -244,64 +87,11 @@ export function QuickActions({
                   });
                 }
 
-                setModal(null);
+                setOpen(false);
                 router.refresh();
               }}
             />
           )}
-        </Modal>
-      )}
-
-      {modal === "invoice" && (
-        <Modal title="Create invoice" onClose={() => setModal(null)} size="xl">
-          <InvoiceQuoteForm
-            kind="invoice"
-            workspaceId={workspaceId}
-            clientId={clientId}
-            engagementId={engagementId}
-            firmName={workspaceName}
-            clientName={clientName}
-            onDone={() => setModal(null)}
-          />
-        </Modal>
-      )}
-
-      {modal === "quote" && (
-        <Modal title="Create quote" onClose={() => setModal(null)} size="xl">
-          <InvoiceQuoteForm
-            kind="quote"
-            workspaceId={workspaceId}
-            clientId={clientId}
-            engagementId={engagementId}
-            firmName={workspaceName}
-            clientName={clientName}
-            onDone={() => setModal(null)}
-          />
-        </Modal>
-      )}
-
-      {modal === "note" && (
-        <Modal title="Add note" onClose={() => setModal(null)}>
-          <InlineAddForm
-            label="Save"
-            defaultOpen
-            fields={[{ name: "body", label: "Note", required: true }]}
-            onSubmit={async (v) => {
-              const {
-                data: { user },
-              } = await supabase.auth.getUser();
-              const { error } = await supabase.from("notes").insert({
-                workspace_id: workspaceId,
-                entity_type: "engagement",
-                entity_id: engagementId,
-                author_id: user?.id,
-                body: v.body,
-              });
-              if (error) return error.message;
-              setModal(null);
-              router.refresh();
-            }}
-          />
         </Modal>
       )}
     </>
