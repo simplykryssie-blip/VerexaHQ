@@ -2,51 +2,40 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, CalendarX, X } from "lucide-react";
+import { CalendarPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { EmptyState } from "@/components/EmptyState";
-import { renderEmail } from "@/lib/email/template";
-import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "./types";
+import type { ClientOption, EngagementOption, StaffOption } from "./types";
 
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Scheduled",
-  confirmed: "Confirmed",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  no_show: "No-show",
-};
+export type AppointmentFilter = "upcoming" | "past" | "all";
 
-const STATUS_STYLE: Record<string, string> = {
-  scheduled: "text-accent",
-  confirmed: "text-green-700",
-  completed: "text-muted",
-  cancelled: "text-danger",
-  no_show: "text-danger",
-};
-
-export function AppointmentsManager({
+// Filter tabs + the "New appointment" toggle and its inline create form.
+// Lives at the top of the Calendar page, above the month grid, so the
+// controls are visible without scrolling past it -- the filtered list
+// itself (AppointmentsList) stays below the grid.
+export function AppointmentsToolbar({
   workspaceId,
-  appointments,
   clients,
   engagements,
   staff,
   canManage,
   currentUserId,
+  filter,
+  onFilterChange,
 }: {
   workspaceId: string;
-  appointments: AppointmentRow[];
   clients: ClientOption[];
   engagements: EngagementOption[];
   staff: StaffOption[];
   canManage: boolean;
   currentUserId: string | null;
+  filter: AppointmentFilter;
+  onFilterChange: (filter: AppointmentFilter) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
-  const [filter, setFilter] = useState<"upcoming" | "past" | "all">("upcoming");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -62,7 +51,6 @@ export function AppointmentsManager({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [creatingZoomMeeting, setCreatingZoomMeeting] = useState(false);
-  const [sendingInviteId, setSendingInviteId] = useState<string | null>(null);
 
   const filteredEngagements = useMemo(() => (clientId ? engagements.filter((e) => e.client_id === clientId) : engagements), [engagements, clientId]);
   const matchingClients = useMemo(() => {
@@ -70,15 +58,6 @@ export function AppointmentsManager({
     if (!q) return clients.slice(0, 8);
     return clients.filter((c) => c.label.toLowerCase().includes(q)).slice(0, 8);
   }, [clients, clientQuery]);
-
-  const visibleAppointments = useMemo(() => {
-    const now = Date.now();
-    return appointments.filter((a) => {
-      if (filter === "upcoming") return new Date(a.start_at).getTime() >= now;
-      if (filter === "past") return new Date(a.start_at).getTime() < now;
-      return true;
-    });
-  }, [appointments, filter]);
 
   async function createAppointment(e: React.FormEvent) {
     e.preventDefault();
@@ -150,66 +129,15 @@ export function AppointmentsManager({
     }
   }
 
-  async function sendInvite(a: AppointmentRow) {
-    if (!a.client_email || !a.meeting_url) return;
-    setSendingInviteId(a.id);
-    try {
-      const res = await fetch("/api/email/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: a.client_email,
-          sender: "notifications",
-          subject: `Meeting invite: ${a.title}`,
-          html: renderEmail({
-            heading: "You're invited to a meeting",
-            bodyHtml: `<p><strong>${a.title}</strong></p><p>${new Date(a.start_at).toLocaleString([], {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}</p>`,
-            ctaLabel: "Join meeting",
-            ctaUrl: a.meeting_url,
-          }),
-        }),
-      });
-      if (!res.ok) throw new Error();
-      toast.show("Invite sent", "success");
-    } catch {
-      toast.show("Couldn't send the invite.", "error");
-    } finally {
-      setSendingInviteId(null);
-    }
-  }
-
-  async function updateStatus(id: string, status: string) {
-    const { error: updateError } = await supabase.from("appointments").update({ status }).eq("id", id);
-    if (updateError) {
-      toast.show(updateError.message, "error");
-      return;
-    }
-    router.refresh();
-  }
-
-  async function remove(id: string) {
-    if (!window.confirm("Delete this appointment?")) return;
-    const { error: deleteError } = await supabase.from("appointments").delete().eq("id", id);
-    if (deleteError) {
-      toast.show(deleteError.message, "error");
-      return;
-    }
-    toast.show("Appointment deleted", "info");
-    router.refresh();
-  }
-
   return (
-    <div className="space-y-4">
+    <div className="rounded-xl border border-border bg-surface p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
           {(["upcoming", "past", "all"] as const).map((f) => (
             <button
               key={f}
               type="button"
-              onClick={() => setFilter(f)}
+              onClick={() => onFilterChange(f)}
               className={`rounded-md px-3 py-1 text-xs font-medium capitalize transition ${
                 filter === f ? "bg-accentSoft text-accent" : "text-muted hover:text-ink"
               }`}
@@ -230,7 +158,7 @@ export function AppointmentsManager({
       </div>
 
       {canManage && creating && (
-        <form onSubmit={createAppointment} className="rounded-xl border border-border bg-surface p-4">
+        <form onSubmit={createAppointment} className="mt-3 border-t border-border pt-3">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input
               required
@@ -365,79 +293,6 @@ export function AppointmentsManager({
             {saving ? "Scheduling..." : "Schedule appointment"}
           </button>
         </form>
-      )}
-
-      {visibleAppointments.length === 0 ? (
-        <EmptyState
-          icon={CalendarX}
-          message={
-            filter === "upcoming"
-              ? "Nothing scheduled -- new appointments will show up here."
-              : filter === "past"
-                ? "No past appointments."
-                : "No appointments yet."
-          }
-        />
-      ) : (
-        <ul className="space-y-2">
-          {visibleAppointments.map((a) => (
-            <li key={a.id} className="rounded-xl border border-border bg-surface p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-ink">{a.title}</p>
-                  <p className="text-xs text-muted">
-                    {new Date(a.start_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} --{" "}
-                    {new Date(a.end_at).toLocaleTimeString([], { timeStyle: "short" })}
-                    {a.location && ` -- ${a.location}`}
-                  </p>
-                  {(a.client_label || a.engagement_label) && (
-                    <p className="mt-1 text-xs text-slate">{a.engagement_label ?? a.client_label}</p>
-                  )}
-                  {a.staff_name && <p className="text-xs text-muted">Staff: {a.staff_name}</p>}
-                  {a.meeting_url && (
-                    <div className="flex items-center gap-3">
-                      <a href={a.meeting_url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-accent hover:underline">
-                        Join meeting link
-                      </a>
-                      {canManage && a.client_email && (
-                        <button
-                          type="button"
-                          onClick={() => sendInvite(a)}
-                          disabled={sendingInviteId === a.id}
-                          className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
-                        >
-                          {sendingInviteId === a.id ? "Sending..." : "Send invite to client"}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {canManage ? (
-                    <select
-                      value={a.status}
-                      onChange={(e) => updateStatus(a.id, e.target.value)}
-                      className={`rounded-lg border border-border bg-surface px-2 py-1 text-xs font-medium capitalize focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent ${STATUS_STYLE[a.status]}`}
-                    >
-                      {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className={`text-xs font-medium capitalize ${STATUS_STYLE[a.status]}`}>{STATUS_LABEL[a.status]}</span>
-                  )}
-                  {canManage && (
-                    <button type="button" onClick={() => remove(a.id)} aria-label="Delete appointment" className="text-muted hover:text-danger">
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
