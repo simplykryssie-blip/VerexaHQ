@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Send, Lock } from "lucide-react";
+import { Search, Send, Lock, Inbox, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -185,7 +185,7 @@ export function MessagingHub({
         <ul className="flex-1 divide-y divide-border overflow-y-auto">
           {visibleThreads.length === 0 ? (
             <li className="p-4">
-              <EmptyState message="No conversations." />
+              <EmptyState icon={Inbox} message="No conversations." />
             </li>
           ) : (
             visibleThreads.map((t) => {
@@ -259,7 +259,7 @@ export function MessagingHub({
           </div>
         ) : !selectedThread ? (
           <div className="flex flex-1 items-center justify-center">
-            <EmptyState message="Select a conversation." />
+            <EmptyState icon={MessageSquare} message="Select a conversation." />
           </div>
         ) : (
           <>
@@ -276,7 +276,7 @@ export function MessagingHub({
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {threadMessages.length === 0 ? (
-                <EmptyState message="No messages yet." />
+                <EmptyState icon={Send} message="No messages yet -- send one below to start the conversation." />
               ) : (
                 threadMessages.map((m) => {
                   const mine = m.sender_type === (audience === "staff" ? "staff" : "client");
@@ -297,7 +297,7 @@ export function MessagingHub({
                           </span>
                         )}
                         <p className="whitespace-pre-wrap">{m.body}</p>
-                        <p className={`mt-1 text-[10px] ${mine ? "text-white/70" : "text-muted"}`}>
+                        <p className={`mt-1 text-[10px] ${mine && !m.is_internal ? "text-white/70" : "text-muted"}`}>
                           {new Date(m.created_at).toLocaleString()}
                         </p>
                       </div>
