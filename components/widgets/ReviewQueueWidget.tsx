@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { Inbox } from "lucide-react";
 import { WidgetShell } from "./WidgetShell";
+import { EmptyState } from "./EmptyState";
 import type { ReviewItem } from "@/lib/dashboard/data";
 
 export function ReviewQueueWidget({ items }: { items: ReviewItem[] }) {
   return (
     <WidgetShell title="Review Queue">
       {items.length === 0 ? (
-        <p className="text-sm text-muted">Nothing waiting on review.</p>
+        <EmptyState icon={Inbox} message="Nothing waiting on review." />
       ) : (
         <ul className="space-y-2">
           {items.slice(0, 5).map((item) => (

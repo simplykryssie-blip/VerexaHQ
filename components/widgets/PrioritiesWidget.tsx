@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { CheckCircle2 } from "lucide-react";
 import { WidgetShell } from "./WidgetShell";
+import { EmptyState } from "./EmptyState";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
 
 export function PrioritiesWidget({ items }: { items: PriorityItem[] }) {
   return (
     <WidgetShell title="Today's Priorities">
       {items.length === 0 ? (
-        <p className="text-sm text-muted">Nothing urgent -- you&apos;re caught up.</p>
+        <EmptyState icon={CheckCircle2} message="Nothing urgent -- you're caught up." />
       ) : (
         <ol className="space-y-2">
           {items.map((item, i) => (

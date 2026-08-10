@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { UserPlus, Briefcase, Receipt, ClipboardList, CalendarPlus, Mail } from "lucide-react";
+import { UserPlus, Briefcase, Receipt, ClipboardList, CalendarPlus, Mail, Lock } from "lucide-react";
 import { WidgetShell } from "./WidgetShell";
+import { EmptyState } from "./EmptyState";
 
 export type QuickActionPermissions = {
   clientsCreate: boolean;
@@ -26,7 +27,7 @@ export function QuickActionsWidget({ permissions }: { permissions: QuickActionPe
   return (
     <WidgetShell title="Quick Actions">
       {visible.length === 0 ? (
-        <p className="text-sm text-muted">No quick actions available for your role.</p>
+        <EmptyState icon={Lock} message="No quick actions available for your role." />
       ) : (
         <nav aria-label="Quick actions" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {visible.map((a) => (
