@@ -8,6 +8,7 @@ import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildRepor
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
+import { Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export default async function DocumentsReportPage({
   if (!canView) {
     return (
       <ReportLayout title="Documents">
-        <EmptyState message="You don't have permission to view document reports." />
+        <EmptyState icon={Lock} message="You don't have permission to view document reports." />
       </ReportLayout>
     );
   }

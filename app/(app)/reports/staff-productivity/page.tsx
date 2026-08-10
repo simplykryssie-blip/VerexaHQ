@@ -6,6 +6,7 @@ import { SortableTable } from "@/components/reports/SortableTable";
 import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
+import { Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export default async function StaffReportPage({ searchParams }: { searchParams: 
   if (!canView) {
     return (
       <ReportLayout title="Staff">
-        <EmptyState message="You don't have permission to view staff reports." />
+        <EmptyState icon={Lock} message="You don't have permission to view staff reports." />
       </ReportLayout>
     );
   }

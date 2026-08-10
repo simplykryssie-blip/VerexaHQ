@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 
 // Plain metadata only -- no functions. Server Components that build a table
@@ -57,7 +57,7 @@ export function SortableTable({
     setPage(0);
   }, [rows]);
 
-  if (rows.length === 0) return <EmptyState message={emptyMessage} />;
+  if (rows.length === 0) return <EmptyState icon={Search} message={emptyMessage} />;
 
   return (
     <div className="rounded-xl border border-border bg-surface">

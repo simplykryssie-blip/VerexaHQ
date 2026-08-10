@@ -8,6 +8,7 @@ import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildRepor
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
+import { Lock } from "lucide-react";
 import { clientLabel } from "@/lib/documentEntityLabels";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
   if (!canView) {
     return (
       <ReportLayout title="Engagements">
-        <EmptyState message="You don't have permission to view engagement reports." />
+        <EmptyState icon={Lock} message="You don't have permission to view engagement reports." />
       </ReportLayout>
     );
   }
