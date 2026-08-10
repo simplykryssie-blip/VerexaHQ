@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, X } from "lucide-react";
+import { CalendarPlus, CalendarX, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -368,7 +368,16 @@ export function AppointmentsManager({
       )}
 
       {visibleAppointments.length === 0 ? (
-        <EmptyState message="No appointments." />
+        <EmptyState
+          icon={CalendarX}
+          message={
+            filter === "upcoming"
+              ? "Nothing scheduled -- new appointments will show up here."
+              : filter === "past"
+                ? "No past appointments."
+                : "No appointments yet."
+          }
+        />
       ) : (
         <ul className="space-y-2">
           {visibleAppointments.map((a) => (

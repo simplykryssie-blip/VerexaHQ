@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
@@ -28,7 +29,7 @@ export default async function CalendarPage() {
       <>
         <PageHeader title="Calendar" description="Engagement and task due dates, and appointments, across your workspace." />
         <div className="flex-1 px-8 py-6">
-          <EmptyState message="You don't have permission to view the calendar." />
+          <EmptyState icon={Lock} message="You don't have permission to view the calendar." />
         </div>
       </>
     );
