@@ -41,19 +41,26 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-/** Wraps Tiptap for both the editable document editor and the read-only sandbox
- * preview -- reusing the same trusted editor to render interpolated content
- * avoids adding a separate HTML sanitizer just for the preview. */
+/** Wraps Tiptap for the editable document/email editor and the read-only
+ * sandbox preview -- reusing the same trusted editor to render interpolated
+ * content avoids adding a separate HTML sanitizer just for the preview.
+ * `documentStyle` gives the content area a paper-page look (engagement
+ * letters); `bare` skips the outer border/background so a caller can nest
+ * this under its own chrome (the email composer's Subject line). */
 export function RichTextEditor({
   content,
   onChange,
   editable = true,
   onEditorReady,
+  documentStyle = false,
+  bare = false,
 }: {
   content: string;
   onChange?: (html: string) => void;
   editable?: boolean;
   onEditorReady?: (editor: Editor) => void;
+  documentStyle?: boolean;
+  bare?: boolean;
 }) {
   const editor = useEditor({
     extensions: [StarterKit],
@@ -63,7 +70,9 @@ export function RichTextEditor({
     onUpdate: ({ editor }) => onChange?.(editor.getHTML()),
     editorProps: {
       attributes: {
-        class: "prose prose-sm max-w-none focus:outline-none min-h-[240px] px-4 py-3",
+        class: documentStyle
+          ? "prose prose-sm max-w-none focus:outline-none min-h-[520px] px-10 py-10 sm:px-14 sm:py-12"
+          : "prose prose-sm max-w-none focus:outline-none min-h-[240px] px-4 py-3",
       },
     },
   });
@@ -83,8 +92,14 @@ export function RichTextEditor({
 
   if (!editor) return null;
 
+  const wrapperClass = bare
+    ? ""
+    : documentStyle
+      ? "mx-auto max-w-[720px] overflow-hidden rounded-sm bg-white shadow-lg ring-1 ring-border/60"
+      : "overflow-hidden rounded-xl border border-border bg-surface";
+
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+    <div className={wrapperClass}>
       {editable && <Toolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>

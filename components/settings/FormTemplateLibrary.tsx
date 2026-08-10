@@ -1,44 +1,23 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { type LucideIcon } from "lucide-react";
+import { LayoutTemplate } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
-import { EmailSmsTemplateGallery } from "@/components/settings/EmailSmsTemplateGallery";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
 
-export type TemplateTabKey = "email" | "sms" | "engagement-letter" | "organizers";
-export type TemplateTab = { key: TemplateTabKey; label: string };
+export type FormTemplateTabKey = "engagement-letter" | "organizers";
 
-export async function TemplateLibrary({
-  workspaceId,
-  basePath,
-  tabs,
-  heading,
-  description,
-  icon,
-  activeTabParam,
-}: {
-  workspaceId: string;
-  basePath: string;
-  tabs: TemplateTab[];
-  heading: string;
-  description: string;
-  icon: LucideIcon;
-  activeTabParam?: string;
-}) {
-  const activeTab: TemplateTabKey = tabs.some((t) => t.key === activeTabParam) ? (activeTabParam as TemplateTabKey) : tabs[0].key;
+// Split out from the old generic TemplateLibrary so this route's bundle never
+// pulls in the Email/SMS composer's Tiptap dependency -- see EmailSmsLibrary
+// for that side.
+export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { workspaceId: string; activeTabParam?: string }) {
+  const activeTab: FormTemplateTabKey = activeTabParam === "organizers" ? "organizers" : "engagement-letter";
+  const isOrganizers = activeTab === "organizers";
 
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
-  const isOrganizers = activeTab === "organizers";
-  const isEngagementLetters = activeTab === "engagement-letter";
-  const table = activeTab === "email" ? "email_templates" : activeTab === "sms" ? "sms_templates" : "engagement_letter_templates";
 
-  const { data: templates } = isOrganizers || isEngagementLetters
-    ? { data: null }
-    : await supabase.from(table).select("*").or(orFilter).order("name");
-
-  const { data: engagementLetterTemplates } = isEngagementLetters
+  const { data: engagementLetterTemplates } = !isOrganizers
     ? await supabase.from("engagement_letter_templates").select("id, name, status, workspace_id, requires_signature, merge_fields").or(orFilter).order("name")
     : { data: null };
 
@@ -74,41 +53,42 @@ export async function TemplateLibrary({
     };
   });
 
-  const tabNav = (
-    <nav className="flex gap-1 border-b border-border">
-      {tabs.map((t) => (
-        <Link
-          key={t.key}
-          href={`${basePath}?tab=${t.key}`}
-          className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-            activeTab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-          }`}
-        >
-          {t.label}
-        </Link>
-      ))}
-    </nav>
-  );
+  const tabs: { key: FormTemplateTabKey; label: string }[] = [
+    { key: "engagement-letter", label: "Engagement Letters" },
+    { key: "organizers", label: "Organizers" },
+  ];
 
   return (
     <div className="max-w-6xl">
-      <SettingsSectionHeader icon={icon} title={heading} description={description} />
+      <SettingsSectionHeader
+        icon={LayoutTemplate}
+        title="Form Templates"
+        description="Engagement letter and organizer templates. See Email & SMS in the Templates menu for message templates."
+      />
 
-      <div className="mt-4">{tabNav}</div>
+      <div className="mt-4">
+        <nav className="flex gap-1 border-b border-border">
+          {tabs.map((t) => (
+            <Link
+              key={t.key}
+              href={`/templates?tab=${t.key}`}
+              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+                activeTab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
 
-      {isOrganizers ? (
-        <div className="mt-4">
+      <div className="mt-4">
+        {isOrganizers ? (
           <OrganizerLibrary workspaceId={workspaceId} templates={organizerCards} />
-        </div>
-      ) : isEngagementLetters ? (
-        <div className="mt-4">
+        ) : (
           <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} />
-        </div>
-      ) : (
-        <div className="mt-4">
-          <EmailSmsTemplateGallery kind={activeTab as "email" | "sms"} workspaceId={workspaceId} templates={templates ?? []} />
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

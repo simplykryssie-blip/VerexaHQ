@@ -46,6 +46,10 @@ export function EmailSmsTemplateGallery({
   const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // A just-created template won't be in `templates` until the server
+  // component re-fetches after router.refresh() -- this stub keeps the edit
+  // modal showing something in that gap so create -> compose feels instant.
+  const [pendingTemplate, setPendingTemplate] = useState<TemplateRow | null>(null);
 
   const Icon = kind === "email" ? Mail : MessageSquare;
   const kindLabel = kind === "email" ? "email" : "SMS";
@@ -55,7 +59,7 @@ export function EmailSmsTemplateGallery({
     [templates, query, status]
   );
 
-  const editing = templates.find((t) => t.id === editingId) ?? null;
+  const editing = templates.find((t) => t.id === editingId) ?? (pendingTemplate?.id === editingId ? pendingTemplate : null);
 
   return (
     <div>
@@ -154,11 +158,29 @@ export function EmailSmsTemplateGallery({
         )}
       </div>
 
-      {editing && <TemplateEditRow kind={kind} template={editing} onClose={() => setEditingId(null)} />}
+      {editing && (
+        <TemplateEditRow
+          kind={kind}
+          template={editing}
+          onClose={() => {
+            setEditingId(null);
+            setPendingTemplate(null);
+          }}
+        />
+      )}
 
       {creating && (
         <Modal title={`New ${kindLabel} template`} onClose={() => setCreating(false)}>
-          <CreateTemplateForm workspaceId={workspaceId} kind={kind} defaultOpen onSuccess={() => setCreating(false)} />
+          <CreateTemplateForm
+            workspaceId={workspaceId}
+            kind={kind}
+            defaultOpen
+            onSuccess={(row) => {
+              setCreating(false);
+              setPendingTemplate({ id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, subject: "", body_html: "", body: "" });
+              setEditingId(row.id);
+            }}
+          />
         </Modal>
       )}
     </div>

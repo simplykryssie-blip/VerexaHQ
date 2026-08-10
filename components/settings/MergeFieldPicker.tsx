@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MERGE_FIELD_GROUPS } from "@/lib/engagementLetters/mergeFields";
+import { MERGE_FIELD_GROUPS } from "@/lib/mergeFields";
 
 export function MergeFieldPicker({ onInsert, disabled }: { onInsert: (token: string) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);

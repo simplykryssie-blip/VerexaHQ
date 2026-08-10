@@ -7,10 +7,10 @@ import type { Editor } from "@tiptap/react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
-import { RichTextEditor, insertTextAtCursor } from "./RichTextEditor";
-import { MergeFieldPicker } from "./MergeFieldPicker";
+import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { EngagementLetterPreview } from "./EngagementLetterPreview";
-import { extractMergeFieldTokens } from "@/lib/engagementLetters/mergeFields";
+import { extractMergeFieldTokens } from "@/lib/mergeFields";
 
 export type EngagementLetterTemplateRow = {
   id: string;
@@ -102,7 +102,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
         {view === "preview" ? (
           <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} />
         ) : (
-          <div className="mx-auto max-w-2xl space-y-4">
+          <div className="mx-auto max-w-[720px] space-y-4">
             <div className="rounded-xl border border-border bg-surface p-4">
               <label className="block text-xs font-medium uppercase tracking-wide text-muted">
                 Name
@@ -132,23 +132,22 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               </label>
             </div>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted">Body</p>
-                {!readOnly && (
-                  <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
-                )}
-              </div>
-              <RichTextEditor
-                content={bodyHtml}
-                editable={!readOnly}
-                onEditorReady={(editor) => (editorRef.current = editor)}
-                onChange={(html) => {
-                  setBodyHtml(html);
-                  setDirty(true);
-                }}
-              />
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
+              {!readOnly && (
+                <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
+              )}
             </div>
+            <RichTextEditor
+              content={bodyHtml}
+              editable={!readOnly}
+              documentStyle
+              onEditorReady={(editor) => (editorRef.current = editor)}
+              onChange={(html) => {
+                setBodyHtml(html);
+                setDirty(true);
+              }}
+            />
 
             {usedTokens.length > 0 && (
               <div className="rounded-xl border border-border bg-surface p-4">
