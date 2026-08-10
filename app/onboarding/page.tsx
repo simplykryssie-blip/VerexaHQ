@@ -29,6 +29,11 @@ export default function OnboardingPage() {
     });
   }, [supabase]);
 
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -124,6 +129,10 @@ export default function OnboardingPage() {
             {loading ? "Creating..." : "Create workspace"}
           </button>
         </form>
+
+        <button type="button" onClick={signOut} className="mt-4 w-full text-center text-sm text-accent hover:underline">
+          Sign out
+        </button>
       </div>
     </div>
   );
