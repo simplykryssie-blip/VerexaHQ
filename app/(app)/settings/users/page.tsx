@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
+import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +14,10 @@ export default async function UsersPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: members }, { data: roles }, { data: invitations }] = await Promise.all([
+  const [{ data: members }, { data: roles }, { data: invitations }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("workspace_users")
-      .select("id, status, is_owner, user_profiles(display_name), roles(name)")
+      .select("id, status, is_owner, role_id, user_profiles(display_name), roles(name)")
       .eq("workspace_id", workspace.id)
       .order("created_at" as never, { ascending: true }),
     supabase
@@ -29,6 +30,7 @@ export default async function UsersPage() {
       .select("id, email, status, expires_at, roles(name)")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false }),
+    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
   ]);
 
   const pendingInvitations = (invitations ?? []).filter((i) => i.status === "pending");
@@ -53,13 +55,20 @@ export default async function UsersPage() {
               {members.map((m) => {
                 const profile = m.user_profiles as unknown as { display_name: string | null } | null;
                 const role = m.roles as unknown as { name: string } | null;
+                const canChangeRole = isAdmin && !m.is_owner && m.status === "active";
                 return (
                   <tr key={m.id}>
                     <td className="px-5 py-3 text-slate">
                       {profile?.display_name ?? "--"}
                       {m.is_owner && <span className="ml-2 text-xs text-accent">Owner</span>}
                     </td>
-                    <td className="px-5 py-3 text-slate">{role?.name ?? "--"}</td>
+                    <td className="px-5 py-3 text-slate">
+                      {canChangeRole ? (
+                        <ChangeMemberRoleSelect memberId={m.id} currentRoleId={m.role_id} roles={roles ?? []} />
+                      ) : (
+                        role?.name ?? "--"
+                      )}
+                    </td>
                     <td className="px-5 py-3 capitalize text-slate">{m.status}</td>
                   </tr>
                 );
