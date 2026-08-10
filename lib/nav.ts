@@ -12,14 +12,12 @@ import {
   LayoutTemplate,
   UserCircle,
   Building2,
-  Palette,
   KeyRound,
   ShieldCheck,
   Plug,
   Bell,
   Workflow,
   Flag,
-  SlidersHorizontal,
   ScrollText,
 } from "lucide-react";
 
@@ -67,13 +65,11 @@ export type SettingsNavItem = {
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "My Account", href: "/settings/my-account", icon: UserCircle },
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
-  { label: "Brand Center", href: "/settings/brand-center", icon: Palette },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
-  { label: "Workspace Preferences", href: "/settings/preferences", icon: SlidersHorizontal },
   { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText },
 ];
