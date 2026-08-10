@@ -10,6 +10,7 @@ import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { EngagementLetterPreview } from "./EngagementLetterPreview";
+import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
 import { extractMergeFieldTokens } from "@/lib/mergeFields";
 
 export type EngagementLetterTemplateRow = {
@@ -21,6 +22,8 @@ export type EngagementLetterTemplateRow = {
   body_html: string;
   requires_signature: boolean;
   merge_fields: unknown;
+  public_token: string;
+  is_public: boolean;
 };
 
 export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
@@ -71,6 +74,15 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!readOnly && (
+            <PublicLinkToggle
+              table="engagement_letter_templates"
+              id={template.id}
+              path="e"
+              publicToken={template.public_token}
+              initialIsPublic={template.is_public}
+            />
+          )}
           {!readOnly && <TemplateStatusCycle table="engagement_letter_templates" id={template.id} status={template.status} />}
           <button
             type="button"

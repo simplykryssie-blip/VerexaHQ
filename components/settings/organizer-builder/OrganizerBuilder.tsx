@@ -10,6 +10,7 @@ import { FieldPalette } from "./FieldPalette";
 import { FieldCanvas } from "./FieldCanvas";
 import { FieldPropertiesPanel } from "./FieldPropertiesPanel";
 import { OrganizerPreviewPanel } from "./OrganizerPreviewPanel";
+import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
 import type { BuilderField, BuilderTemplate } from "./types";
 
 function sortByOrder(fields: BuilderField[]): BuilderField[] {
@@ -143,7 +144,16 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             {template.name} {readOnly && <span className="ml-1 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {!readOnly && (
+            <PublicLinkToggle
+              table="organizer_templates"
+              id={template.id}
+              path="o"
+              publicToken={template.public_token}
+              initialIsPublic={template.is_public}
+            />
+          )}
           <button
             type="button"
             onClick={() => setView((v) => (v === "build" ? "preview" : "build"))}

@@ -12,7 +12,11 @@ export default async function OrganizerBuilderPage({ params }: { params: { id: s
 
   const supabase = createClient();
   const [{ data: template }, { data: fields }] = await Promise.all([
-    supabase.from("organizer_templates").select("id, name, slug, description, status, workspace_id").eq("id", params.id).maybeSingle(),
+    supabase
+      .from("organizer_templates")
+      .select("id, name, slug, description, status, workspace_id, public_token, is_public")
+      .eq("id", params.id)
+      .maybeSingle(),
     supabase
       .from("organizer_fields")
       .select("id, organizer_template_id, parent_field_id, field_type, label, help_text, display_order, is_required, options, conditional_logic")
