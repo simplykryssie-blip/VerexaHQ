@@ -10,6 +10,18 @@ import {
   BarChart3,
   Settings,
   LayoutTemplate,
+  UserCircle,
+  Building2,
+  Palette,
+  KeyRound,
+  ShieldCheck,
+  Plug,
+  Bell,
+  Zap,
+  Workflow,
+  Flag,
+  SlidersHorizontal,
+  ScrollText,
 } from "lucide-react";
 
 export type NavItem = {
@@ -34,20 +46,21 @@ export const NAV_ITEMS: NavItem[] = [
 export type SettingsNavItem = {
   label: string;
   href: string;
+  icon: LucideIcon;
 };
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
-  { label: "My Account", href: "/settings/my-account" },
-  { label: "Firm Profile", href: "/settings/firm-profile" },
-  { label: "Brand Center", href: "/settings/brand-center" },
-  { label: "Users & Staff", href: "/settings/users" },
-  { label: "Roles & Permissions", href: "/settings/roles" },
-  { label: "Security", href: "/settings/security" },
-  { label: "Integrations", href: "/settings/integrations" },
-  { label: "Notifications", href: "/settings/notifications" },
-  { label: "Automations", href: "/settings/automations" },
-  { label: "Workflow Setup", href: "/settings/service-packages" },
-  { label: "Feature Flags", href: "/settings/feature-flags" },
-  { label: "Workspace Preferences", href: "/settings/preferences" },
-  { label: "Audit Logs", href: "/settings/audit-logs" },
+  { label: "My Account", href: "/settings/my-account", icon: UserCircle },
+  { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "Brand Center", href: "/settings/brand-center", icon: Palette },
+  { label: "Users & Staff", href: "/settings/users", icon: Users },
+  { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
+  { label: "Security", href: "/settings/security", icon: ShieldCheck },
+  { label: "Integrations", href: "/settings/integrations", icon: Plug },
+  { label: "Notifications", href: "/settings/notifications", icon: Bell },
+  { label: "Automations", href: "/settings/automations", icon: Zap },
+  { label: "Workflow Setup", href: "/settings/service-packages", icon: Workflow },
+  { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
+  { label: "Workspace Preferences", href: "/settings/preferences", icon: SlidersHorizontal },
+  { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText },
 ];

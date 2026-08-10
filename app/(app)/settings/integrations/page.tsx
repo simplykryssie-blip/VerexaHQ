@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEmailConfigured, isSmsConfigured, isStripeConfigured, isZoomConfigured } from "@/lib/providerStatus";
+import { Plug, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 
 export const dynamic = "force-dynamic";
@@ -29,9 +31,9 @@ export default async function IntegrationsPage() {
   if (!isAdmin) {
     return (
       <div className="max-w-2xl">
-        <h2 className="text-base font-semibold text-ink">Integrations</h2>
+        <SettingsSectionHeader icon={Plug} title="Integrations" />
         <div className="mt-6 rounded-xl border border-border bg-surface">
-          <EmptyState message="Only workspace admins can view integration status." />
+          <EmptyState icon={Lock} message="Only workspace admins can view integration status." />
         </div>
       </div>
     );
@@ -46,11 +48,16 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-base font-semibold text-ink">Integrations</h2>
-      <p className="mt-1 text-sm text-muted">
-        Live status of the third-party providers Verexa sends through. &quot;Configured&quot; means credentials are set in the environment;
-        the status badge reflects actual send/webhook health once something has gone through.
-      </p>
+      <SettingsSectionHeader
+        icon={Plug}
+        title="Integrations"
+        description={
+          <>
+            Live status of the third-party providers Verexa sends through. &quot;Configured&quot; means credentials are set in the environment;
+            the status badge reflects actual send/webhook health once something has gone through.
+          </>
+        }
+      />
       <div className="mt-6 divide-y divide-border rounded-xl border border-border bg-surface">
         {PROVIDERS.map((p) => {
           const h = byProvider.get(p.key);

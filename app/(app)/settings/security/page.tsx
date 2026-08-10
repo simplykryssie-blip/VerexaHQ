@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { ShieldCheck } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { SecurityForm } from "./SecurityForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { MfaSetup } from "./MfaSetup";
@@ -29,8 +31,7 @@ export default async function SecurityPage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-base font-semibold text-ink">Security</h2>
-      <p className="mt-1 text-sm text-muted">Your account password and this workspace&apos;s security policy.</p>
+      <SettingsSectionHeader icon={ShieldCheck} title="Security" description="Your account password and this workspace's security policy." />
 
       <div className="mt-6 rounded-xl border border-border bg-surface p-5">
         <h3 className="text-sm font-semibold text-ink">Change your password</h3>
@@ -53,7 +54,7 @@ export default async function SecurityPage() {
         <p className="mt-1 text-sm text-muted">Password, session, lockout, and MFA policy for everyone in this workspace.</p>
         <div className="mt-4">
           {!policy ? (
-            <EmptyState message="No security policy configured yet -- defaults apply." />
+            <EmptyState icon={ShieldCheck} message="No security policy configured yet -- defaults apply." />
           ) : (
             <SecurityForm workspaceId={workspace.id} policy={policy} />
           )}

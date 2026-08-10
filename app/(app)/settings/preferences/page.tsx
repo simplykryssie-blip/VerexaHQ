@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { SlidersHorizontal } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,14 +19,15 @@ export default async function PreferencesPage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-base font-semibold text-ink">Workspace Preferences</h2>
-      <p className="mt-1 text-sm text-muted">
-        Free-form workspace settings (business hours, notification defaults, engagement terms, etc.).
-      </p>
+      <SettingsSectionHeader
+        icon={SlidersHorizontal}
+        title="Workspace Preferences"
+        description="Free-form workspace settings (business hours, notification defaults, engagement terms, etc.)."
+      />
 
       <div className="mt-6 rounded-xl border border-border bg-surface">
         {!settings || settings.length === 0 ? (
-          <EmptyState message="No workspace preferences have been set yet." />
+          <EmptyState icon={SlidersHorizontal} message="No workspace preferences have been set yet." />
         ) : (
           <ul className="divide-y divide-border">
             {settings.map((s) => (

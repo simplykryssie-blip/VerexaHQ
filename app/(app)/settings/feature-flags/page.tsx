@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { Flag } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { FeatureFlagToggle } from "@/components/settings/FeatureFlagToggle";
 
 export const dynamic = "force-dynamic";
@@ -26,17 +28,18 @@ export default async function FeatureFlagsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-base font-semibold text-ink">Feature Flags</h2>
-      <p className="mt-1 text-sm text-muted">
-        Turn optional modules on or off for this workspace. Core features can&apos;t be disabled.
-      </p>
+      <SettingsSectionHeader
+        icon={Flag}
+        title="Feature Flags"
+        description="Turn optional modules on or off for this workspace. Core features can't be disabled."
+      />
 
       {!isAdmin && (
         <p className="mt-4 text-sm text-muted">Only workspace admins can change feature flags.</p>
       )}
 
       {(flags ?? []).length === 0 ? (
-        <EmptyState message="No feature flags found." />
+        <EmptyState icon={Flag} message="No feature flags found." />
       ) : (
         <div className="mt-6 space-y-6">
           {Array.from(byModule.entries()).map(([module, moduleFlags]) => (

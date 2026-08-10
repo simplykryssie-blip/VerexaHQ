@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { FileText, type LucideIcon } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
@@ -21,6 +23,7 @@ export async function TemplateLibrary({
   tabs,
   heading,
   description,
+  icon,
   activeTabParam,
 }: {
   workspaceId: string;
@@ -28,6 +31,7 @@ export async function TemplateLibrary({
   tabs: TemplateTab[];
   heading: string;
   description: string;
+  icon: LucideIcon;
   activeTabParam?: string;
 }) {
   const activeTab: TemplateTabKey = tabs.some((t) => t.key === activeTabParam) ? (activeTabParam as TemplateTabKey) : tabs[0].key;
@@ -96,8 +100,7 @@ export async function TemplateLibrary({
 
   return (
     <div className={isOrganizers || isEngagementLetters ? "max-w-6xl" : "max-w-3xl"}>
-      <h2 className="text-base font-semibold text-ink">{heading}</h2>
-      <p className="mt-1 text-sm text-muted">{description}</p>
+      <SettingsSectionHeader icon={icon} title={heading} description={description} />
 
       <div className="mt-4">{tabNav}</div>
 
@@ -117,7 +120,7 @@ export async function TemplateLibrary({
 
           <div className="mt-4">
             {(templates ?? []).length === 0 ? (
-              <EmptyState message="No templates yet." />
+              <EmptyState icon={FileText} message="No templates yet." />
             ) : (
               <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
                 {(templates ?? []).map((t: any) => {

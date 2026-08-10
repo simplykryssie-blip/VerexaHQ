@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { FirmContactForm } from "./FirmContactForm";
 
 export const dynamic = 'force-dynamic';
@@ -25,15 +27,15 @@ export default async function FirmProfilePage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-base font-semibold text-ink">Firm Profile</h2>
-      <p className="mt-1 text-sm text-muted">
-        Your firm&apos;s tax practice identifiers. EIN/EFIN/PTIN are encrypted -- only the last 4 digits are
-        ever shown here.
-      </p>
+      <SettingsSectionHeader
+        icon={Building2}
+        title="Firm Profile"
+        description="Your firm's tax practice identifiers. EIN/EFIN/PTIN are encrypted -- only the last 4 digits are ever shown here."
+      />
 
       <div className="mt-6 rounded-xl border border-border bg-surface p-5">
         {!profile ? (
-          <EmptyState message="No firm tax profile set up yet." />
+          <EmptyState icon={FileText} message="No firm tax profile set up yet." />
         ) : (
           <dl className="grid grid-cols-2 gap-4 text-sm">
             <div>

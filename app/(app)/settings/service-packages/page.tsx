@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { Workflow } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
 import { CreatePricingRuleForm, CreateBillingRuleForm } from "@/components/settings/CreatePricingBillingRuleForms";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -53,11 +55,11 @@ export default async function ServicePackagesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-base font-semibold text-ink">Workflow Setup</h2>
-      <p className="mt-1 text-sm text-muted">
-        The offerings clients can be sold -- each ties together pricing, billing, organizer, document request, folder, and
-        engagement letter templates for engagements created against it.
-      </p>
+      <SettingsSectionHeader
+        icon={Workflow}
+        title="Workflow Setup"
+        description="The offerings clients can be sold -- each ties together pricing, billing, organizer, document request, folder, and engagement letter templates for engagements created against it."
+      />
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
@@ -101,7 +103,7 @@ export default async function ServicePackagesPage() {
 
       <div className="mt-4">
         {(services ?? []).length === 0 ? (
-          <EmptyState message="No service packages yet." />
+          <EmptyState icon={Workflow} message="No service packages yet." />
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {(services ?? []).map((s) => (

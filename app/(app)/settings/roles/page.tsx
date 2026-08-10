@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { KeyRound } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,15 +19,15 @@ export default async function RolesPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-base font-semibold text-ink">Roles & Permissions</h2>
-      <p className="mt-1 text-sm text-muted">
-        System roles are shared across every Verexa workspace; workspace-custom roles are specific to
-        yours.
-      </p>
+      <SettingsSectionHeader
+        icon={KeyRound}
+        title="Roles & Permissions"
+        description="System roles are shared across every Verexa workspace; workspace-custom roles are specific to yours."
+      />
 
       <div className="mt-6 rounded-xl border border-border bg-surface">
         {!roles || roles.length === 0 ? (
-          <EmptyState message="No roles found." />
+          <EmptyState icon={KeyRound} message="No roles found." />
         ) : (
           <table className="w-full text-sm">
             <thead>

@@ -1,4 +1,5 @@
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { LayoutTemplate } from "lucide-react";
 import { TemplateLibrary } from "@/components/settings/TemplateLibrary";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: { 
       ]}
       heading="Templates"
       description="Engagement letter and organizer templates. Email and SMS templates moved to Settings > Automations."
+      icon={LayoutTemplate}
       activeTabParam={searchParams.tab}
     />
   );

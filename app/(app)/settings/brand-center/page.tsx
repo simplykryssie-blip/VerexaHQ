@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { Palette } from "lucide-react";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { BrandCenterForm } from "./BrandCenterForm";
 
 export const dynamic = 'force-dynamic';
@@ -17,10 +19,7 @@ export default async function BrandCenterPage() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-base font-semibold text-ink">Brand Center</h2>
-      <p className="mt-1 text-sm text-muted">
-        How your firm appears across the app and client portal.
-      </p>
+      <SettingsSectionHeader icon={Palette} title="Brand Center" description="How your firm appears across the app and client portal." />
 
       <div className="mt-6 rounded-xl border border-border bg-surface p-5">
         <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />

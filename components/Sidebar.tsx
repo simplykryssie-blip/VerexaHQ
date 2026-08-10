@@ -76,7 +76,7 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
                 href={item.href}
                 className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
               >
-                <Icon size={18} strokeWidth={2} />
+                <Icon size={18} strokeWidth={2} className="shrink-0" />
                 {item.label}
               </Link>
             );

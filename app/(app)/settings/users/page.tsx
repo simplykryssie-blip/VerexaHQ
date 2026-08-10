@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { Users, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 
@@ -33,12 +35,11 @@ export default async function UsersPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-base font-semibold text-ink">Users & Staff</h2>
-      <p className="mt-1 text-sm text-muted">Everyone with access to this workspace.</p>
+      <SettingsSectionHeader icon={Users} title="Users & Staff" description="Everyone with access to this workspace." />
 
       <div className="mt-6 rounded-xl border border-border bg-surface">
         {!members || members.length === 0 ? (
-          <EmptyState message="No workspace members found." />
+          <EmptyState icon={Users} message="No workspace members found." />
         ) : (
           <table className="w-full text-sm">
             <thead>
@@ -71,16 +72,12 @@ export default async function UsersPage() {
       {workspace.is_owner && workspace.workspace_type === "independent_ptin" && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
-          <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>
-          <div className="mt-3 rounded-xl border border-border bg-surfaceMuted p-5 opacity-60">
-            <div className="pointer-events-none">
-              <InviteStaffForm roles={roles ?? []} />
-            </div>
+          <div className="mt-3 rounded-xl border border-border bg-surface">
+            <EmptyState
+              icon={Lock}
+              message="Independent PTIN workspaces are solo accounts and can't add staff. Upgrade to an ERO Office or Service Bureau workspace to invite team members."
+            />
           </div>
-          <p className="mt-2 text-sm text-muted">
-            Independent PTIN workspaces are solo accounts and can&apos;t add staff. Upgrade to an ERO Office or Service
-            Bureau workspace to invite team members.
-          </p>
         </div>
       )}
 
