@@ -21,6 +21,7 @@ import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
 import type { ActionPermissions } from "@/lib/actionPermissions";
+import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 
 function Section({
   title,
@@ -61,20 +62,7 @@ function staffName(staff: StaffRef) {
 
 // ---------------------------------------------------------------- Overview
 
-const STATUS_OPTIONS = [
-  "New",
-  "Waiting On Client",
-  "Waiting On Staff",
-  "In Progress",
-  "Waiting On Review",
-  "Corrections Requested",
-  "Approved",
-  "Waiting On Signature",
-  "Waiting On Payment",
-  "Ready To Release",
-  "Completed",
-  "Archived",
-];
+const STATUS_OPTIONS = ENGAGEMENT_STATUS_OPTIONS;
 
 export function OverviewTab({
   engagement,

@@ -4,31 +4,58 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Pager } from "@/components/Pager";
+import { clientLabel } from "@/lib/documentEntityLabels";
+import { EngagementBoard, type BoardEngagement } from "@/components/engagements/EngagementBoard";
 
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
+const BOARD_CAP = 500;
 
-export default async function EngagementsPage({ searchParams }: { searchParams: { page?: string } }) {
+export default async function EngagementsPage({ searchParams }: { searchParams: { page?: string; view?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
+  const view = searchParams.view === "board" ? "board" : "table";
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
   const supabase = createClient();
-  const [{ data: engagements, count }, { data: canCreate }] = await Promise.all([
-    supabase
-      .from("engagements")
-      .select("id, engagement_number, status, priority, due_date, clients(first_name, last_name, business_name, client_type)", {
-        count: "exact",
-      })
-      .eq("workspace_id", workspace.id)
-      .order("created_at", { ascending: false })
-      .range(from, to),
+
+  const [{ data: engagements, count }, { data: canCreate }, { data: boardEngagements }] = await Promise.all([
+    view === "table"
+      ? supabase
+          .from("engagements")
+          .select("id, engagement_number, status, priority, due_date, clients(first_name, last_name, business_name, client_type)", {
+            count: "exact",
+          })
+          .eq("workspace_id", workspace.id)
+          .order("created_at", { ascending: false })
+          .range(from, to)
+      : Promise.resolve({ data: null, count: null }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
+    view === "board"
+      ? supabase
+          .from("engagements")
+          .select("id, engagement_number, status, priority, due_date, client_id, clients(first_name, last_name, business_name, client_type)")
+          .eq("workspace_id", workspace.id)
+          .order("created_at", { ascending: false })
+          .limit(BOARD_CAP)
+      : Promise.resolve({ data: null }),
   ]);
+
+  const boardItems: BoardEngagement[] = (boardEngagements ?? []).map((e) => ({
+    id: e.id,
+    engagement_number: e.engagement_number,
+    status: e.status,
+    priority: e.priority,
+    due_date: e.due_date,
+    clientLabel: clientLabel(e.clients as never),
+    clientHref: `/clients/${e.client_id}`,
+  }));
+
+  const isEmpty = view === "table" ? !engagements || engagements.length === 0 : boardItems.length === 0;
 
   return (
     <>
@@ -47,10 +74,31 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
         }
       />
       <div className="flex-1 px-8 py-6">
-        {!engagements || engagements.length === 0 ? (
+        <nav className="mb-4 flex gap-1 border-b border-border">
+          <Link
+            href="/engagements?view=table"
+            className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+              view === "table" ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
+            }`}
+          >
+            Table
+          </Link>
+          <Link
+            href="/engagements?view=board"
+            className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
+              view === "board" ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
+            }`}
+          >
+            Board
+          </Link>
+        </nav>
+
+        {isEmpty ? (
           <div className="rounded-xl border border-border bg-surface">
             <EmptyState message="No engagements yet." />
           </div>
+        ) : view === "board" ? (
+          <EngagementBoard engagements={boardItems} />
         ) : (
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
             <table className="w-full text-sm">
@@ -64,7 +112,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {engagements.map((e) => {
+                {(engagements ?? []).map((e) => {
                   const c = e.clients as unknown as {
                     first_name: string | null;
                     last_name: string | null;
@@ -94,7 +142,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
                 })}
               </tbody>
             </table>
-            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? engagements.length} basePath="/engagements" />
+            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? engagements?.length ?? 0} basePath="/engagements" />
           </div>
         )}
       </div>
