@@ -18,6 +18,8 @@ export type ServiceCard = {
   status: string;
   workspace_id: string | null;
   default_price: number | null;
+  description: string | null;
+  estimated_duration_minutes: number | null;
   is_bookable: boolean;
   is_portal_visible: boolean;
   categoryName: string | null;
@@ -152,7 +154,11 @@ export function ServiceGallery({
                         <TemplateStatusCycle table="services" id={s.id} status={s.status} />
                       )}
                       {price && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">{price}</span>}
-                      {s.is_bookable && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Bookable</span>}
+                      {s.is_bookable && (
+                        <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
+                          Bookable{s.estimated_duration_minutes ? ` -- ${s.estimated_duration_minutes} min` : ""}
+                        </span>
+                      )}
                       {s.is_portal_visible && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Portal visible</span>}
                     </div>
 

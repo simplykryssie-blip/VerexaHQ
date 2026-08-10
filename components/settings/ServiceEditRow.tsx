@@ -14,6 +14,8 @@ type ServiceRow = {
   status: string;
   workspace_id: string | null;
   default_price: number | null;
+  description: string | null;
+  estimated_duration_minutes: number | null;
   is_bookable: boolean;
   is_portal_visible: boolean;
   service_category_id: string | null;
@@ -81,6 +83,8 @@ export function ServiceEditRow({
 
   const [name, setName] = useState(service.name);
   const [price, setPrice] = useState(service.default_price?.toString() ?? "");
+  const [description, setDescription] = useState(service.description ?? "");
+  const [durationMinutes, setDurationMinutes] = useState(service.estimated_duration_minutes?.toString() ?? "");
   const [isBookable, setIsBookable] = useState(service.is_bookable);
   const [isPortalVisible, setIsPortalVisible] = useState(service.is_portal_visible);
   const [categoryId, setCategoryId] = useState(service.service_category_id ?? "");
@@ -99,6 +103,8 @@ export function ServiceEditRow({
       .update({
         name,
         default_price: price ? Number(price) : null,
+        description: description.trim() || null,
+        estimated_duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         is_bookable: isBookable,
         is_portal_visible: isPortalVisible,
         service_category_id: categoryId || null,
@@ -131,6 +137,13 @@ export function ServiceEditRow({
             placeholder="Name"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description (shown to clients when booking)"
+            rows={2}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
           <div className="grid grid-cols-2 gap-2">
             <Select value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
             <input
@@ -140,6 +153,15 @@ export function ServiceEditRow({
               className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>
+          <input
+            type="number"
+            min="5"
+            step="5"
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(e.target.value)}
+            placeholder="Duration in minutes (used for self-booking)"
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
           <div className="grid grid-cols-2 gap-2">
             <Select value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
             <Select value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />

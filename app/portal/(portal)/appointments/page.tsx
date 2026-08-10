@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { BookAppointment } from "@/components/portal/BookAppointment";
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +27,26 @@ export default async function PortalAppointmentsPage() {
     .order("start_at", { ascending: true })
     .limit(100);
 
+  // Bookable services aren't readable via the portal session's normal RLS
+  // scope (no established precedent for the portal reading `services`), so
+  // this uses the service-role client -- the portal session itself is still
+  // verified above via getPortalIdentity().
+  const serviceClient = createServiceClient();
+  const { data: bookableServices } = await serviceClient
+    .from("services")
+    .select("id, name, description, estimated_duration_minutes")
+    .eq("workspace_id", identity.workspaceId)
+    .eq("is_bookable", true)
+    .eq("status", "published")
+    .order("name");
+
   return (
     <>
-      <PageHeader title="Appointments" description="Your upcoming and past appointments with your firm." />
+      <PageHeader
+        title="Appointments"
+        description="Your upcoming and past appointments with your firm."
+        actions={<BookAppointment services={bookableServices ?? []} />}
+      />
       <div className="flex-1 px-8 py-6">
         {(appointments ?? []).length === 0 ? (
           <EmptyState message="No appointments scheduled." />

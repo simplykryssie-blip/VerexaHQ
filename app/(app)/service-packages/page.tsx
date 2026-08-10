@@ -29,7 +29,7 @@ export default async function ServicePackagesPage() {
     supabase
       .from("services")
       .select(
-        `id, name, slug, status, default_price, is_bookable, is_portal_visible, workspace_id, service_categories(name),
+        `id, name, slug, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
         service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_request_template_id,
         document_folder_template_id, engagement_letter_template_id`
       )
@@ -50,6 +50,8 @@ export default async function ServicePackagesPage() {
     status: s.status,
     workspace_id: s.workspace_id,
     default_price: s.default_price,
+    description: s.description,
+    estimated_duration_minutes: s.estimated_duration_minutes,
     is_bookable: s.is_bookable,
     is_portal_visible: s.is_portal_visible,
     categoryName: (s.service_categories as unknown as { name?: string } | null)?.name ?? null,
