@@ -61,9 +61,6 @@ export function RolesManager({
     return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [permissions]);
 
-  const systemRoles = roles.filter((r) => r.is_system_role);
-  const customRoles = roles.filter((r) => !r.is_system_role);
-
   function selectRole(role: RoleRow) {
     setSelectedId(role.id);
     setEditingMeta(false);
@@ -159,66 +156,43 @@ export function RolesManager({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-      <div>
-        <div className="rounded-xl border border-border bg-surface">
-          <div className="border-b border-border px-4 py-2.5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">System roles</h3>
-          </div>
-          <ul className="divide-y divide-border">
-            {systemRoles.map((r) => (
-              <li key={r.id}>
-                <button
-                  type="button"
-                  onClick={() => selectRole(r)}
-                  className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition ${
-                    selectedId === r.id ? "bg-accentSoft text-accent" : "text-slate hover:bg-surfaceMuted"
-                  }`}
-                >
-                  <span>{r.name}</span>
-                  <span className="text-xs text-muted">{r.permissionIds.length}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-border bg-surface">
-          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Custom roles</h3>
-            {isAdmin && (
-              <button type="button" onClick={() => setCreating(true)} className="text-accent hover:text-accent/80" aria-label="New custom role">
-                <Plus size={14} />
-              </button>
-            )}
-          </div>
-          {customRoles.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-muted">No custom roles yet.</p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {customRoles.map((r) => (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectRole(r)}
-                    className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition ${
-                      selectedId === r.id ? "bg-accentSoft text-accent" : "text-slate hover:bg-surfaceMuted"
-                    }`}
-                  >
-                    <span>{r.name}</span>
-                    <span className="text-xs text-muted">{r.permissionIds.length}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+      <div className="rounded-xl border border-border bg-surface">
+        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Roles</h3>
           {isAdmin && (
-            <div className="border-t border-border px-4 py-2.5">
-              <button type="button" onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline">
-                <Plus size={14} /> New custom role
-              </button>
-            </div>
+            <button type="button" onClick={() => setCreating(true)} className="text-accent hover:text-accent/80" aria-label="New custom role">
+              <Plus size={14} />
+            </button>
           )}
         </div>
+        <ul className="divide-y divide-border">
+          {roles.map((r) => (
+            <li key={r.id}>
+              <button
+                type="button"
+                onClick={() => selectRole(r)}
+                className={`flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition ${
+                  selectedId === r.id ? "bg-accentSoft text-accent" : "text-slate hover:bg-surfaceMuted"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{r.name}</span>
+                  <span className="shrink-0 rounded-full bg-surfaceMuted px-1.5 py-0.5 text-[10px] font-medium text-muted">
+                    {r.is_system_role ? "System" : "Custom"}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-muted">{r.permissionIds.length}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {isAdmin && (
+          <div className="border-t border-border px-4 py-2.5">
+            <button type="button" onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline">
+              <Plus size={14} /> New custom role
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-border bg-surface">
