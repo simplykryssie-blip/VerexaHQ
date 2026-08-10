@@ -5,8 +5,20 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
+import { friendlyAuthError } from "@/lib/authErrors";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+    <span>Streamline. Automate. Grow.</span>
+  </>
+);
 
 export default function LoginPage() {
   const router = useRouter();
@@ -79,7 +91,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        setError(error.message);
+        setError(friendlyAuthError(error.message));
         return;
       }
 
@@ -100,175 +112,160 @@ export default function LoginPage() {
 
   if (checkEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-ink">Check your email</h1>
-          <p className="mt-3 text-sm text-muted">
-            Account created successfully. Please verify your email -- a confirmation link has
-            been sent to <span className="font-medium text-slate">{email}</span>.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setCheckEmail(false);
-              setMode("sign-in");
-            }}
-            className="mt-6 w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90"
-          >
-            Back to sign in
-          </button>
-        </div>
-      </div>
+      <AuthShell
+        eyebrow="Firm workspace"
+        railHeading="Run your practice, not paperwork."
+        railSub="Engagements, documents, billing, and e-signatures -- one workspace for the whole firm."
+        railFoot={RAIL_FOOT}
+      >
+        <h1 className={styles.cardTitle}>Check your email</h1>
+        <p className={styles.lede}>
+          Account created successfully. Please verify your email -- a confirmation link has been sent to{" "}
+          <strong>{email}</strong>.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            setCheckEmail(false);
+            setMode("sign-in");
+          }}
+          className={styles.submit}
+        >
+          Back to sign in
+        </button>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">VerexaHQ</h1>
-        <p className="mt-1 text-sm text-muted">
-          {mode === "sign-in" ? "Sign in to your workspace" : "Create your account"}
-        </p>
+    <AuthShell
+      eyebrow="Firm workspace"
+      railHeading="Run your practice, not paperwork."
+      railSub="Engagements, documents, billing, and e-signatures -- one workspace for the whole firm."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>{mode === "sign-in" ? "Sign in to your workspace" : "Create your account"}</h1>
+      <p className={styles.lede}>
+        {mode === "sign-in" ? "Use the email and password for your firm account." : "Set up your firm's workspace."}
+      </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          {mode === "sign-up" && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-slate" htmlFor="first_name">
-                    First name
-                  </label>
-                  <input
-                    id="first_name"
-                    required
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    autoComplete="given-name"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate" htmlFor="last_name">
-                    Last name
-                  </label>
-                  <input
-                    id="last_name"
-                    required
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    autoComplete="family-name"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate" htmlFor="company_name">
-                  Company / Firm name
-                </label>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        {mode === "sign-up" && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className={styles.field}>
+                <label htmlFor="first_name">First name</label>
                 <input
-                  id="company_name"
+                  id="first_name"
                   required
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Acme Tax Advisors"
-                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                  autoComplete="organization"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className={styles.input}
+                  autoComplete="given-name"
                 />
               </div>
-            </>
-          )}
+              <div className={styles.field}>
+                <label htmlFor="last_name">Last name</label>
+                <input
+                  id="last_name"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className={styles.input}
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
+            <div className={styles.field}>
+              <label htmlFor="company_name">Company / Firm name</label>
+              <input
+                id="company_name"
+                required
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Acme Tax Advisors"
+                className={styles.input}
+                autoComplete="organization"
+              />
+            </div>
+          </>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="email">
-              Email
-            </label>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@yourfirm.com"
+            className={styles.input}
+            autoComplete="email"
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={mode === "sign-in" ? "Enter your password" : "Create a password"}
+            className={styles.input}
+            autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+          />
+        </div>
+
+        {mode === "sign-up" && (
+          <div className={styles.field}>
+            <label htmlFor="confirm_password">Confirm password</label>
             <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete="email"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
+              id="confirm_password"
               type="password"
               required
               minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={styles.input}
+              autoComplete="new-password"
             />
           </div>
+        )}
 
-          {mode === "sign-up" && (
-            <div>
-              <label className="block text-sm font-medium text-slate" htmlFor="confirm_password">
-                Confirm password
-              </label>
-              <input
-                id="confirm_password"
-                type="password"
-                required
-                minLength={6}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                autoComplete="new-password"
-              />
-            </div>
-          )}
+        {mode === "sign-in" && (
+          <div className={styles.row}>
+            <label className={styles.remember}>
+              <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+              Remember me
+            </label>
+            <Link href="/forgot-password" className={styles.link}>
+              Forgot password?
+            </Link>
+          </div>
+        )}
 
-          {mode === "sign-in" && (
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-slate">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                />
-                Remember me
-              </label>
-              <Link href="/forgot-password" className="text-sm text-accent hover:underline">
-                Forgot password?
-              </Link>
-            </div>
-          )}
+        {error && <AuthError>{error}</AuthError>}
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-          >
-            {loading ? "Please wait..." : mode === "sign-in" ? "Sign in" : "Create account"}
-          </button>
-        </form>
-
-        <button
-          type="button"
-          onClick={() => {
-            setError(null);
-            setMode(mode === "sign-in" ? "sign-up" : "sign-in");
-          }}
-          className="mt-4 w-full text-center text-sm text-accent hover:underline"
-        >
-          {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? (mode === "sign-in" ? "Signing in…" : "Creating account…") : mode === "sign-in" ? "Sign in" : "Create account"}
         </button>
-      </div>
-    </div>
+      </form>
+
+      <button
+        type="button"
+        onClick={() => {
+          setError(null);
+          setMode(mode === "sign-in" ? "sign-up" : "sign-in");
+        }}
+        className={styles.link}
+        style={{ marginTop: 16, display: "block", textAlign: "center", width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+      >
+        {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+      </button>
+    </AuthShell>
   );
 }

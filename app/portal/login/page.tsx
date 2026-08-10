@@ -4,8 +4,24 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyAuthError } from "@/lib/authErrors";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
 export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path
+        d="M7 1L12 3v4c0 3.5-2.2 5.7-5 6.5C4.2 12.7 2 10.5 2 7V3l5-2Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+    <span>Encrypted &amp; audit-logged, firm-side</span>
+  </>
+);
 
 export default function PortalLoginPage() {
   const router = useRouter();
@@ -24,7 +40,7 @@ export default function PortalLoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setLoading(false);
-      setError(error.message);
+      setError(friendlyAuthError(error.message));
       return;
     }
 
@@ -40,76 +56,69 @@ export default function PortalLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">Client Portal</h1>
-        <p className="mt-1 text-sm text-muted">Sign in to view your documents, messages, and billing.</p>
+    <AuthShell
+      eyebrow="Client portal"
+      railHeading="Your documents, your return — one place."
+      railSub="Every file and message here is encrypted and visible only to your tax team."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>Client Portal</h1>
+      <p className={styles.lede}>Sign in to view your documents, messages, and billing.</p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete="email"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete="current-password"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className={styles.input}
+            autoComplete="email"
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            className={styles.input}
+            autoComplete="current-password"
+          />
+        </div>
 
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-sm text-slate">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-              />
-              Remember me
-            </label>
-            <Link href="/forgot-password" className="text-sm text-accent hover:underline">
-              Forgot password?
-            </Link>
-          </div>
+        <div className={styles.row}>
+          <label className={styles.remember}>
+            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+            Remember me
+          </label>
+          <Link href="/forgot-password" className={styles.link}>
+            Forgot password?
+          </Link>
+        </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </p>
-          )}
+        {error && <AuthError>{error}</AuthError>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-          >
-            {loading ? "Please wait..." : "Sign in"}
-          </button>
-        </form>
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
 
-        <p className="mt-6 text-center text-xs text-muted">
-          Firm staff should sign in at <Link href="/login" className="text-accent hover:underline">the staff login</Link> instead.
-        </p>
-      </div>
-    </div>
+      <p className={styles.crosslink}>
+        Firm staff should sign in at{" "}
+        <Link href="/login" className={styles.link}>
+          the staff login
+        </Link>{" "}
+        instead.
+      </p>
+    </AuthShell>
   );
 }

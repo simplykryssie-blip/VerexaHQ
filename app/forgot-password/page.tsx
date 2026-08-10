@@ -4,8 +4,19 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
 export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+    <span>Streamline. Automate. Grow.</span>
+  </>
+);
 
 export default function ForgotPasswordPage() {
   const supabase = createClient();
@@ -45,65 +56,61 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-        <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-ink">Check your email</h1>
-          <p className="mt-3 text-sm text-muted">
-            If an account exists for <span className="font-medium text-slate">{email}</span>, a password reset
-            link has been sent.
-          </p>
-          <Link
-            href="/login"
-            className="mt-6 inline-block w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90"
-          >
-            Back to sign in
-          </Link>
-        </div>
-      </div>
+      <AuthShell
+        eyebrow="Account recovery"
+        railHeading="Almost there."
+        railSub="Check your inbox for a link to choose a new password."
+        railFoot={RAIL_FOOT}
+      >
+        <h1 className={styles.cardTitle}>Check your email</h1>
+        <p className={styles.lede}>
+          If an account exists for <strong>{email}</strong>, a password reset link has been sent.
+        </p>
+        <Link href="/login" className={styles.submit} style={{ textDecoration: "none" }}>
+          Back to sign in
+        </Link>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">Reset your password</h1>
-        <p className="mt-1 text-sm text-muted">We&apos;ll email you a link to choose a new password.</p>
+    <AuthShell
+      eyebrow="Account recovery"
+      railHeading="Get back into your account."
+      railSub="We'll email you a secure link to choose a new password."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>Reset your password</h1>
+      <p className={styles.lede}>We&apos;ll email you a link to choose a new password.</p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete="email"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@yourfirm.com"
+            className={styles.input}
+            autoComplete="email"
+          />
+        </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </p>
-          )}
+        {error && <AuthError>{error}</AuthError>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-          >
-            {loading ? "Sending..." : "Send reset link"}
-          </button>
-        </form>
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Sending…" : "Send reset link"}
+        </button>
+      </form>
 
-        <Link href="/login" className="mt-4 block text-center text-sm text-accent hover:underline">
+      <p className={styles.crosslink}>
+        <Link href="/login" className={styles.link}>
           Back to sign in
         </Link>
-      </div>
-    </div>
+      </p>
+    </AuthShell>
   );
 }
