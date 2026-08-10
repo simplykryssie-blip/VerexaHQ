@@ -11,7 +11,7 @@ export default async function TemplatesPage({ searchParams }: { searchParams: { 
   return (
     <TemplateLibrary
       workspaceId={workspace.id}
-      basePath="/settings/templates"
+      basePath="/templates"
       tabs={[
         { key: "engagement-letter", label: "Engagement Letters" },
         { key: "organizers", label: "Organizers" },

@@ -61,7 +61,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
   return (
     <div className="flex h-screen flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
-        <Link href="/settings/templates?tab=engagement-letter" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+        <Link href="/templates?tab=engagement-letter" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
           <ArrowLeft size={14} /> Engagement letters
         </Link>
         <div className="text-center">

@@ -29,7 +29,7 @@ export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceI
     name: t.name,
     status: t.status,
     isSystem: !t.workspace_id,
-    href: `/settings/templates/engagement-letters/${t.id}`,
+    href: `/templates/engagement-letters/${t.id}`,
     actionLabel: t.workspace_id ? "Edit" : "View",
     badges: [
       ...(t.requires_signature ? ["Requires signature"] : []),
@@ -51,7 +51,7 @@ export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceI
       setError(error?.message ?? "Could not create engagement letter.");
       return;
     }
-    router.push(`/settings/templates/engagement-letters/${data.id}`);
+    router.push(`/templates/engagement-letters/${data.id}`);
   }
 
   return (

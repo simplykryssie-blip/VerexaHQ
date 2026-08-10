@@ -39,7 +39,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Tax Office", href: "/tax", icon: Landmark },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Templates", href: "/settings/templates", icon: LayoutTemplate },
+  { label: "Templates", href: "/templates", icon: LayoutTemplate },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

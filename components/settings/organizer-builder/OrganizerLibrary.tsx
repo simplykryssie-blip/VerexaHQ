@@ -32,7 +32,7 @@ export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: stri
     description: t.description,
     status: t.status,
     isSystem: !t.workspace_id,
-    href: `/settings/templates/organizers/${t.id}`,
+    href: `/templates/organizers/${t.id}`,
     actionLabel: t.workspace_id ? "Edit" : "View",
     badges: [
       `${t.topLevelFieldCount} fields`,
@@ -54,7 +54,7 @@ export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: stri
       setError(error?.message ?? "Could not create organizer.");
       return;
     }
-    router.push(`/settings/templates/organizers/${data.id}`);
+    router.push(`/templates/organizers/${data.id}`);
   }
 
   return (

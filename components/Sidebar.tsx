@@ -13,9 +13,9 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Some hrefs are prefixes of others (e.g. "/settings" and
-  // "/settings/templates"), so pick the longest matching href rather than
-  // highlighting every ancestor at once.
+  // If a future nav href is a prefix of another (e.g. "/settings" and
+  // "/settings/security"), pick the longest match rather than highlighting
+  // every ancestor at once.
   const activeNavHref = NAV_ITEMS.filter(
     (candidate) => pathname === candidate.href || pathname.startsWith(candidate.href + "/")
   ).sort((a, b) => b.href.length - a.href.length)[0]?.href;
