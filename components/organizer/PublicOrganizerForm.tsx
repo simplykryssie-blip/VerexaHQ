@@ -1,0 +1,399 @@
+"use client";
+
+import { useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { normalizeOptions } from "@/lib/organizer/formatValue";
+import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
+
+type FieldRow = {
+  id: string;
+  field_type: string;
+  label: string;
+  help_text: string | null;
+  is_required: boolean;
+  options: unknown;
+  parent_field_id: string | null;
+  conditional_logic?: unknown;
+};
+
+type TemplateData = {
+  template: { id: string; name: string; description: string | null };
+  workspace_name: string;
+  fields: FieldRow[];
+};
+
+// Standalone from OrganizerForm.tsx on purpose: that component persists
+// progress incrementally against an already-created organizer_responses row
+// (responseId) and uploads files to authenticated Storage. Here there's no
+// response row (and no session) until the single atomic submit succeeds, and
+// file uploads aren't possible pre-authentication -- different enough of a
+// lifecycle that sharing the component would mean threading a lot of
+// "is this the public flow?" branches through it instead.
+export function PublicOrganizerForm({ token, data }: { token: string; data: TemplateData }) {
+  const supabase = createClient();
+  const { template, workspace_name, fields } = data;
+
+  const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
+  const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
+  const topLevelFields = fields.filter((f) => !f.parent_field_id);
+
+  const [step, setStep] = useState<"contact" | "form" | "done">("contact");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const visibleTopLevelFields = topLevelFields.filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+
+  function setAnswer(fieldId: string, value: string) {
+    setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  }
+
+  async function submit() {
+    if (!firstName.trim() || !email.trim()) {
+      setError("Name and email are required.");
+      setStep("contact");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+
+    const rows = Object.entries(answers).map(([field_id, value]) => ({ field_id, value, instance_index: 0 }));
+    for (const repeater of repeaterFields) {
+      const children = childFieldsByParent.get(repeater.id) ?? [];
+      const repRows = repeaterRows[repeater.id] ?? [];
+      for (const child of children) {
+        repRows.forEach((row, i) => {
+          if (row[child.id] !== undefined) rows.push({ field_id: child.id, value: row[child.id], instance_index: i });
+        });
+      }
+    }
+
+    const { error: rpcError } = await supabase.rpc("submit_public_organizer_response", {
+      p_token: token,
+      p_first_name: firstName.trim(),
+      p_last_name: lastName.trim() || null,
+      p_email: email.trim(),
+      p_phone: phone.trim() || null,
+      p_answers: rows,
+    });
+
+    setSubmitting(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    setStep("done");
+  }
+
+  if (step === "done") {
+    return (
+      <div className="mx-auto max-w-md p-8 text-center">
+        <h1 className="text-lg font-semibold text-ink">Thank you</h1>
+        <p className="mt-2 text-sm text-muted">
+          Your information was submitted to {workspace_name}. They&apos;ll be in touch soon.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-8">
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">{workspace_name}</p>
+        <h1 className="text-lg font-semibold text-ink">{template.name}</h1>
+        {template.description && <p className="mt-1 text-sm text-muted">{template.description}</p>}
+      </div>
+
+      {step === "contact" && (
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-ink">First name *</label>
+              <input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink">Last name</label>
+              <input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink">Email *</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink">Phone</label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </div>
+          </div>
+          {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+          <button
+            type="button"
+            onClick={() => {
+              if (!firstName.trim() || !email.trim()) {
+                setError("Name and email are required.");
+                return;
+              }
+              setError(null);
+              setStep("form");
+            }}
+            className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            Continue
+          </button>
+        </div>
+      )}
+
+      {step === "form" && (
+        <div className="space-y-4">
+          {visibleTopLevelFields.map((field) =>
+            field.field_type === "repeating_section" ? (
+              <PublicRepeatingSection
+                key={field.id}
+                field={field}
+                childFields={childFieldsByParent.get(field.id) ?? []}
+                rows={repeaterRows[field.id] ?? []}
+                onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
+              />
+            ) : (
+              <PublicFieldInput key={field.id} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
+            )
+          )}
+
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStep("contact")}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
+            >
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {submitting ? "Submitting..." : "Submit"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PublicRepeatingSection({
+  field,
+  childFields,
+  rows,
+  onChange,
+}: {
+  field: FieldRow;
+  childFields: FieldRow[];
+  rows: Record<string, string>[];
+  onChange: (rows: Record<string, string>[]) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <label className="block text-sm font-medium text-ink">
+        {field.label} {field.is_required && <span className="text-danger">*</span>}
+      </label>
+      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+
+      <div className="mt-3 space-y-3">
+        {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
+        {rows.map((row, index) => (
+          <div key={index} className="rounded-lg border border-border p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                {field.label} {index + 1}
+              </p>
+              <button
+                type="button"
+                onClick={() => onChange(rows.filter((_, i) => i !== index))}
+                className="text-xs font-medium text-danger hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+            <div className="mt-2 space-y-3">
+              {childFields.map((child) => (
+                <PublicFieldInput
+                  key={child.id}
+                  field={child}
+                  value={row[child.id] ?? ""}
+                  onChange={(fieldId, value) => onChange(rows.map((r, i) => (i === index ? { ...r, [fieldId]: value } : r)))}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+        + Add another
+      </button>
+    </div>
+  );
+}
+
+function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: string; onChange: (fieldId: string, value: string) => void }) {
+  const options = normalizeOptions(field.options);
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-4">
+      <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
+        {field.label} {field.is_required && <span className="text-danger">*</span>}
+      </label>
+      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+
+      <div className="mt-2">
+        {field.field_type === "file_upload" ? (
+          <p className="text-xs text-muted">File uploads aren&apos;t available before you&apos;re a client -- your preparer will follow up separately.</p>
+        ) : field.field_type === "signature" ? (
+          value ? (
+            <p className="text-sm text-green-700">Signed by {JSON.parse(value).typed_name}</p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                placeholder="Type your full name"
+                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const target = e.target as HTMLInputElement;
+                    if (target.value.trim()) onChange(field.id, JSON.stringify({ typed_name: target.value.trim(), signed_at: new Date().toISOString() }));
+                  }
+                }}
+                onBlur={(e) => {
+                  if (e.target.value.trim()) onChange(field.id, JSON.stringify({ typed_name: e.target.value.trim(), signed_at: new Date().toISOString() }));
+                }}
+              />
+            </div>
+          )
+        ) : field.field_type === "dropdown" ? (
+          <select
+            id={`field-${field.id}`}
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">Select...</option>
+            {options.map((o, i) => (
+              <option key={i} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        ) : field.field_type === "radio_button" ? (
+          <div className="space-y-1.5">
+            {options.map((o, i) => (
+              <label key={i} className="flex items-center gap-2 text-sm text-slate">
+                <input
+                  type="radio"
+                  name={`field-${field.id}`}
+                  checked={value === o.value}
+                  onChange={() => onChange(field.id, o.value)}
+                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : field.field_type === "multiple_choice" ? (
+          <div className="space-y-1.5">
+            {options.map((o, i) => {
+              const selected = value ? value.split(",") : [];
+              return (
+                <label key={i} className="flex items-center gap-2 text-sm text-slate">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.value)}
+                    onChange={(e) => {
+                      const next = e.target.checked ? [...selected, o.value] : selected.filter((v) => v !== o.value);
+                      onChange(field.id, next.join(","));
+                    }}
+                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                  />
+                  {o.label}
+                </label>
+              );
+            })}
+          </div>
+        ) : field.field_type === "checkbox" ? (
+          <input
+            id={`field-${field.id}`}
+            type="checkbox"
+            checked={value === "true"}
+            onChange={(e) => onChange(field.id, e.target.checked ? "true" : "false")}
+            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+          />
+        ) : field.field_type === "date" ? (
+          <input
+            id={`field-${field.id}`}
+            type="date"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : field.field_type === "number" ? (
+          <input
+            id={`field-${field.id}`}
+            type="number"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : field.field_type === "currency" ? (
+          <input
+            id={`field-${field.id}`}
+            type="number"
+            step="0.01"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : field.field_type === "ssn" || field.field_type === "ein" ? (
+          <input
+            id={`field-${field.id}`}
+            type="text"
+            inputMode="numeric"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : (
+          <textarea
+            id={`field-${field.id}`}
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            rows={field.field_type === "address" ? 3 : 2}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        )}
+      </div>
+    </div>
+  );
+}

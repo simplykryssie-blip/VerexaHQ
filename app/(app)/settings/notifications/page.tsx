@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { Bell } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { NotificationPreferenceToggle } from "@/components/settings/NotificationPreferenceToggle";
 import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
 
@@ -46,8 +48,7 @@ export default async function NotificationsPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <h2 className="text-base font-semibold text-ink">Reminder preferences</h2>
-        <p className="mt-1 text-sm text-muted">Choose which automated reminders you receive by email. On by default.</p>
+        <SettingsSectionHeader icon={Bell} title="Reminder preferences" description="Choose which automated reminders you receive by email. On by default." />
         {workspace ? (
           <div className="mt-4 divide-y divide-border rounded-xl border border-border bg-surface">
             {PREFERENCE_ROWS.map((row) => (
@@ -80,7 +81,7 @@ export default async function NotificationsPage() {
 
         <div className="mt-4 rounded-xl border border-border bg-surface">
           {!notifications || notifications.length === 0 ? (
-            <EmptyState message="No notifications yet." />
+            <EmptyState icon={Bell} message="No notifications yet." />
           ) : (
             <ul className="divide-y divide-border">
               {notifications.map((n) => {

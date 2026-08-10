@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
+import { Lock, ShieldAlert, Eye, LogIn, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
   if (!isAdmin) {
     return (
       <ReportLayout title="Compliance">
-        <EmptyState message="Compliance reports are visible to workspace admins only." />
+        <EmptyState icon={Lock} message="Compliance reports are visible to workspace admins only." />
       </ReportLayout>
     );
   }
@@ -62,7 +63,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
     return (
       <ReportLayout title="Compliance" description="Security-relevant events and sensitive-data access." filters={tabNav} actions={<ExportButtons rows={csvRows} filename="compliance-security-events" />}>
         {(events ?? []).length === 0 ? (
-          <EmptyState message="No security events recorded." />
+          <EmptyState icon={ShieldAlert} message="No security events recorded." />
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {(events ?? []).map((e) => (
@@ -94,7 +95,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
     return (
       <ReportLayout title="Compliance" description="Security-relevant events and sensitive-data access." filters={tabNav} actions={<ExportButtons rows={csvRows} filename="compliance-sensitive-reveals" />}>
         {(reveals ?? []).length === 0 ? (
-          <EmptyState message="No sensitive data has been revealed." />
+          <EmptyState icon={Eye} message="No sensitive data has been revealed." />
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {(reveals ?? []).map((r) => (
@@ -128,7 +129,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
     return (
       <ReportLayout title="Compliance" description="Security-relevant events and sensitive-data access." filters={tabNav} actions={<ExportButtons rows={csvRows} filename="compliance-failed-logins" />}>
         {(logins ?? []).length === 0 ? (
-          <EmptyState message="No failed login attempts recorded." />
+          <EmptyState icon={LogIn} message="No failed login attempts recorded." />
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {(logins ?? []).map((l) => (
@@ -159,7 +160,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
       actions={<ExportButtons rows={csvRows} filename="compliance-mfa-status" />}
     >
       {(mfa ?? []).length === 0 ? (
-        <EmptyState message="No staff found." />
+        <EmptyState icon={Users} message="No staff found." />
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
           {(mfa ?? []).map((m) => (

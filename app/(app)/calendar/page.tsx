@@ -1,9 +1,10 @@
+import { Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
-import { CalendarView, type CalendarItem } from "./CalendarView";
-import { AppointmentsManager } from "@/components/appointments/AppointmentsManager";
+import type { CalendarItem } from "./CalendarView";
+import { CalendarPageClient } from "./CalendarPageClient";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "@/components/appointments/types";
 
@@ -28,7 +29,7 @@ export default async function CalendarPage() {
       <>
         <PageHeader title="Calendar" description="Engagement and task due dates, and appointments, across your workspace." />
         <div className="flex-1 px-8 py-6">
-          <EmptyState message="You don't have permission to view the calendar." />
+          <EmptyState icon={Lock} message="You don't have permission to view the calendar." />
         </div>
       </>
     );
@@ -130,10 +131,10 @@ export default async function CalendarPage() {
         title="Calendar"
         description="Engagement and task due dates, and appointments, in one place."
       />
-      <div className="flex-1 space-y-6 px-8 py-6">
-        <CalendarView items={items} />
-        <AppointmentsManager
+      <div className="flex-1 px-8 py-6">
+        <CalendarPageClient
           workspaceId={workspace.id}
+          items={items}
           appointments={appointments}
           clients={clients}
           engagements={engagementOpts}

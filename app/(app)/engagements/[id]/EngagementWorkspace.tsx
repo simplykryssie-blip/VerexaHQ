@@ -153,12 +153,9 @@ export function EngagementWorkspace({
         <QuickActions
           engagementId={engagement.id}
           clientId={client?.id ?? ""}
-          clientName={client ? clientLabel(client) : ""}
           workspaceId={workspace.id}
-          workspaceName={workspace.name}
           organizerTemplates={organizerTemplates}
           primaryEmail={client?.primary_email ?? null}
-          primaryPhone={client?.primary_phone ?? null}
           permissions={permissions}
         />
       </div>
@@ -221,7 +218,17 @@ export function EngagementWorkspace({
                 canRequestSignatures={permissions.signaturesRequest}
               />
             )}
-            {tab === "Messages" && <MessagesTab threads={messageThreads} messages={messages} />}
+            {tab === "Messages" && (
+              <MessagesTab
+                workspaceId={workspace.id}
+                engagementId={engagement.id}
+                primaryEmail={client?.primary_email ?? null}
+                primaryPhone={client?.primary_phone ?? null}
+                permissions={permissions}
+                threads={messageThreads}
+                messages={messages}
+              />
+            )}
             {tab === "Review" && (
               <ReviewTab stages={stages} shares={shares} reviewActions={reviewActions} staffOptions={staffOptions} />
             )}
@@ -231,6 +238,7 @@ export function EngagementWorkspace({
                 clientName={client ? clientLabel(client) : ""}
                 workspaceName={workspace.name}
                 workspaceId={workspace.id}
+                engagementId={engagement.id}
                 canManageBilling={permissions.billingManage}
                 quotes={quotes}
                 invoices={invoices}

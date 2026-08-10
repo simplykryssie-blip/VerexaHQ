@@ -1,7 +1,7 @@
 "use client";
 
-import { RichTextEditor } from "./RichTextEditor";
-import { interpolateSample } from "@/lib/engagementLetters/mergeFields";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
+import { interpolateSample } from "@/lib/mergeFields";
 
 /** Sandbox preview only -- interpolates {{tokens}} with realistic placeholder
  * values, not real client/engagement data (no send pipeline exists yet, same
@@ -12,14 +12,16 @@ export function EngagementLetterPreview({ bodyHtml, requiresSignature }: { bodyH
   const interpolated = interpolateSample(bodyHtml);
 
   return (
-    <div className="mx-auto max-w-2xl rounded-xl border border-border bg-surface p-6 shadow-sm">
+    <div className="mx-auto max-w-[720px]">
       <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>
       <p className="mt-1 text-xs text-muted">Sandbox only -- merge fields below are realistic placeholder values, not real client data.</p>
       <div className="mt-4">
-        <RichTextEditor content={interpolated} editable={false} />
+        <RichTextEditor content={interpolated} editable={false} documentStyle />
       </div>
       {requiresSignature && (
-        <div className="mt-4 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">Signature capture area</div>
+        <div className="mt-4 rounded-lg border border-dashed border-border bg-surface p-4 text-center text-xs text-muted">
+          Signature capture area
+        </div>
       )}
     </div>
   );

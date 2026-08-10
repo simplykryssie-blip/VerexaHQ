@@ -20,4 +20,6 @@ export type BuilderTemplate = {
   description: string | null;
   status: string;
   workspace_id: string | null;
+  public_token: string;
+  is_public: boolean;
 };

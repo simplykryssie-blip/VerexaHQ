@@ -8,6 +8,7 @@ import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildRepor
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 import { clientLabel } from "@/lib/documentEntityLabels";
+import { Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,7 @@ export default async function BillingReportPage({ searchParams }: { searchParams
   if (!canView) {
     return (
       <ReportLayout title="Billing">
-        <EmptyState message="You don't have permission to view billing reports." />
+        <EmptyState icon={Lock} message="You don't have permission to view billing reports." />
       </ReportLayout>
     );
   }

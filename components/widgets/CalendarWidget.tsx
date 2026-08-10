@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { CalendarCheck } from "lucide-react";
 import { WidgetShell } from "./WidgetShell";
+import { EmptyState } from "./EmptyState";
 import type { CalendarItem } from "@/lib/dashboard/data";
 
 export function CalendarWidget({ items }: { items: CalendarItem[] }) {
@@ -7,7 +9,7 @@ export function CalendarWidget({ items }: { items: CalendarItem[] }) {
   return (
     <WidgetShell title="Calendar" reportHref="/calendar">
       {upcoming.length === 0 ? (
-        <p className="text-sm text-muted">No upcoming deadlines.</p>
+        <EmptyState icon={CalendarCheck} message="No upcoming deadlines." />
       ) : (
         <ul className="space-y-2">
           {upcoming.map((item) => {

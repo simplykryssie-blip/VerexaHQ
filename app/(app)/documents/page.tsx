@@ -5,6 +5,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
+import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function DocumentCenterHubPage() {
     );
   }
 
-  const [{ data: openRequests }, { data: pendingSignatures }, { data: recentUploads }, { data: storageRows }] = await Promise.all([
+  const [{ data: openRequests }, { data: pendingSignatures }, { data: allDocuments }, { data: storageRows }, { data: staffMembers }] = await Promise.all([
     supabase
       .from("document_requests")
       .select(
@@ -65,15 +66,29 @@ export default async function DocumentCenterHubPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("attachments")
-      .select("id, file_name, entity_type, entity_id, created_at")
+      .select(
+        `id, file_name, storage_path, category, tags, version, mime_type, file_size_bytes, folder_id,
+        is_favorite, is_archived, is_locked, visibility, created_at, uploaded_by, entity_type, entity_id`
+      )
       .eq("workspace_id", workspace.id)
-      .eq("is_archived", false)
       .order("created_at", { ascending: false })
-      .limit(10),
+      .limit(500),
     supabase.from("attachments").select("file_size_bytes").eq("workspace_id", workspace.id).eq("is_archived", false),
+    supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id).eq("status", "active"),
   ]);
 
-  const labelMap = await buildEntityLabelMap(supabase, [...(openRequests ?? []), ...(recentUploads ?? [])]);
+  const labelMap = await buildEntityLabelMap(supabase, [...(openRequests ?? []), ...(allDocuments ?? [])]);
+
+  const staffById = new Map(
+    (staffMembers ?? [])
+      .map((m: any) => m.user_profiles)
+      .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
+      .map((p: any) => [p.id, p])
+  );
+  const documentsWithUploader = (allDocuments ?? []).map((d: any) => ({
+    ...d,
+    uploaded_by: d.uploaded_by ? staffById.get(d.uploaded_by) ?? null : null,
+  }));
 
   const missingDocuments = (openRequests ?? []).reduce(
     (sum, r) => sum + (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length,
@@ -149,30 +164,11 @@ export default async function DocumentCenterHubPage() {
               </ul>
             )}
           </section>
+        </div>
 
-          <section className="rounded-xl border border-border bg-surface lg:col-span-2">
-            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Recently uploaded</h2>
-            {(recentUploads ?? []).length === 0 ? (
-              <EmptyState message="No documents uploaded yet." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {(recentUploads ?? []).map((d) => {
-                  const entity = labelMap.get(`${d.entity_type}:${d.entity_id}`);
-                  return (
-                    <li key={d.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                      <span className="truncate text-slate">{d.file_name}</span>
-                      <span className="flex items-center gap-3 text-xs text-muted">
-                        <Link href={entity?.href ?? "#"} className="text-accent hover:underline">
-                          {entity?.label ?? "--"}
-                        </Link>
-                        {new Date(d.created_at).toLocaleDateString()}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-ink">All documents</h2>
+          <AllDocumentsPanel workspaceId={workspace.id} documents={documentsWithUploader as never} entityLabels={labelMap} />
         </div>
       </div>
     </>

@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { UserCircle } from "lucide-react";
 import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +27,11 @@ export default async function MyAccountPage({
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-base font-semibold text-ink">My Account</h2>
-      <p className="mt-1 text-sm text-muted">Personal connections and preferences -- these are yours alone, not shared with the rest of your workspace.</p>
+      <SettingsSectionHeader
+        icon={UserCircle}
+        title="My Account"
+        description="Personal connections and preferences -- these are yours alone, not shared with the rest of your workspace."
+      />
 
       <h3 className="mt-6 text-sm font-semibold text-ink">Video meetings</h3>
       <div className="mt-3">

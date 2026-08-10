@@ -10,6 +10,7 @@ import { FieldPalette } from "./FieldPalette";
 import { FieldCanvas } from "./FieldCanvas";
 import { FieldPropertiesPanel } from "./FieldPropertiesPanel";
 import { OrganizerPreviewPanel } from "./OrganizerPreviewPanel";
+import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
 import type { BuilderField, BuilderTemplate } from "./types";
 
 function sortByOrder(fields: BuilderField[]): BuilderField[] {
@@ -134,7 +135,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   return (
     <div className="flex h-screen flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
-        <Link href="/settings/templates?tab=organizers" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+        <Link href="/templates?tab=organizers" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
           <ArrowLeft size={14} /> Organizer templates
         </Link>
         <div className="text-center">
@@ -143,7 +144,16 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             {template.name} {readOnly && <span className="ml-1 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {!readOnly && (
+            <PublicLinkToggle
+              table="organizer_templates"
+              id={template.id}
+              path="o"
+              publicToken={template.public_token}
+              initialIsPublic={template.is_public}
+            />
+          )}
           <button
             type="button"
             onClick={() => setView((v) => (v === "build" ? "preview" : "build"))}

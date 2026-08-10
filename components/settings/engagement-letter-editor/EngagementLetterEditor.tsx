@@ -7,10 +7,11 @@ import type { Editor } from "@tiptap/react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
-import { RichTextEditor, insertTextAtCursor } from "./RichTextEditor";
-import { MergeFieldPicker } from "./MergeFieldPicker";
+import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { EngagementLetterPreview } from "./EngagementLetterPreview";
-import { extractMergeFieldTokens } from "@/lib/engagementLetters/mergeFields";
+import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
+import { extractMergeFieldTokens } from "@/lib/mergeFields";
 
 export type EngagementLetterTemplateRow = {
   id: string;
@@ -21,6 +22,8 @@ export type EngagementLetterTemplateRow = {
   body_html: string;
   requires_signature: boolean;
   merge_fields: unknown;
+  public_token: string;
+  is_public: boolean;
 };
 
 export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
@@ -61,7 +64,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
   return (
     <div className="flex h-screen flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
-        <Link href="/settings/templates?tab=engagement-letter" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+        <Link href="/templates?tab=engagement-letter" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
           <ArrowLeft size={14} /> Engagement letters
         </Link>
         <div className="text-center">
@@ -71,6 +74,15 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!readOnly && (
+            <PublicLinkToggle
+              table="engagement_letter_templates"
+              id={template.id}
+              path="e"
+              publicToken={template.public_token}
+              initialIsPublic={template.is_public}
+            />
+          )}
           {!readOnly && <TemplateStatusCycle table="engagement_letter_templates" id={template.id} status={template.status} />}
           <button
             type="button"
@@ -102,7 +114,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
         {view === "preview" ? (
           <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} />
         ) : (
-          <div className="mx-auto max-w-2xl space-y-4">
+          <div className="mx-auto max-w-[720px] space-y-4">
             <div className="rounded-xl border border-border bg-surface p-4">
               <label className="block text-xs font-medium uppercase tracking-wide text-muted">
                 Name
@@ -132,23 +144,22 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               </label>
             </div>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted">Body</p>
-                {!readOnly && (
-                  <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
-                )}
-              </div>
-              <RichTextEditor
-                content={bodyHtml}
-                editable={!readOnly}
-                onEditorReady={(editor) => (editorRef.current = editor)}
-                onChange={(html) => {
-                  setBodyHtml(html);
-                  setDirty(true);
-                }}
-              />
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
+              {!readOnly && (
+                <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
+              )}
             </div>
+            <RichTextEditor
+              content={bodyHtml}
+              editable={!readOnly}
+              documentStyle
+              onEditorReady={(editor) => (editorRef.current = editor)}
+              onChange={(html) => {
+                setBodyHtml(html);
+                setDirty(true);
+              }}
+            />
 
             {usedTokens.length > 0 && (
               <div className="rounded-xl border border-border bg-surface p-4">

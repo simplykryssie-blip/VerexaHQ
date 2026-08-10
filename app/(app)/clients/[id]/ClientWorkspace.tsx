@@ -187,13 +187,9 @@ export function ClientWorkspace({
       <div className="border-b border-border bg-surface px-8 py-3">
         <QuickActions
           clientId={client.id}
-          clientName={displayName(client)}
           workspaceId={workspace.id}
-          workspaceName={workspace.name}
-          documentRequestTemplates={documentRequestTemplates}
           organizerTemplates={organizerTemplates}
           primaryEmail={client.primary_email}
-          primaryPhone={client.primary_phone}
           permissions={permissions}
         />
       </div>
@@ -256,7 +252,16 @@ export function ClientWorkspace({
               />
             )}
             {tab === "Messages" && (
-              <MessagesTab threads={messageThreads} messages={messages} onViewDocumentRequests={() => setTab("Documents")} />
+              <MessagesTab
+                workspaceId={workspace.id}
+                clientId={client.id}
+                primaryEmail={client.primary_email}
+                primaryPhone={client.primary_phone}
+                permissions={permissions}
+                threads={messageThreads}
+                messages={messages}
+                onViewDocumentRequests={() => setTab("Documents")}
+              />
             )}
             {tab === "Billing" && (
               <BillingTab

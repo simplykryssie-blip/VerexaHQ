@@ -2391,8 +2391,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_public: boolean
           merge_fields: Json
           name: string
+          public_token: string
           requires_signature: boolean
           slug: string
           status: string
@@ -2404,8 +2406,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_public?: boolean
           merge_fields?: Json
           name: string
+          public_token?: string
           requires_signature?: boolean
           slug: string
           status?: string
@@ -2417,8 +2421,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_public?: boolean
           merge_fields?: Json
           name?: string
+          public_token?: string
           requires_signature?: boolean
           slug?: string
           status?: string
@@ -3946,7 +3952,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          is_public: boolean
           name: string
+          public_token: string
           slug: string
           status: string
           updated_at: string
@@ -3957,7 +3965,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          is_public?: boolean
           name: string
+          public_token?: string
           slug: string
           status?: string
           updated_at?: string
@@ -3968,7 +3978,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          is_public?: boolean
           name?: string
+          public_token?: string
           slug?: string
           status?: string
           updated_at?: string
@@ -7179,6 +7191,14 @@ export type Database = {
           token_expires_at: string
         }[]
       }
+      get_public_engagement_letter_template: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      get_public_organizer_template: {
+        Args: { p_token: string }
+        Returns: Json
+      }
       get_signature_request_by_token: {
         Args: { p_token: string }
         Returns: {
@@ -7438,6 +7458,17 @@ export type Database = {
         }
         Returns: string
       }
+      sign_public_engagement_letter: {
+        Args: {
+          p_email: string
+          p_first_name: string
+          p_last_name: string | null
+          p_phone: string | null
+          p_token: string
+          p_typed_name: string
+        }
+        Returns: Json
+      }
       start_engagement_workflow: {
         Args: { p_engagement_id: string; p_process_id: string }
         Returns: string
@@ -7445,6 +7476,17 @@ export type Database = {
       submit_organizer_response: {
         Args: { p_response_id: string }
         Returns: undefined
+      }
+      submit_public_organizer_response: {
+        Args: {
+          p_answers: Json
+          p_email: string
+          p_first_name: string
+          p_last_name: string | null
+          p_phone: string | null
+          p_token: string
+        }
+        Returns: Json
       }
       withdraw_engagement_share: {
         Args: { p_engagement_share_id: string }

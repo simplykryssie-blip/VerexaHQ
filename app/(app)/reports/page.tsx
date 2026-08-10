@@ -12,10 +12,15 @@ export default function ReportsPage() {
             <Link
               key={c.slug}
               href={`/reports/${c.slug}`}
-              className="rounded-xl border border-border bg-surface p-5 transition hover:border-accent"
+              className="flex items-start gap-4 rounded-xl border border-border bg-surface p-5 transition hover:border-accent hover:shadow-sm"
             >
-              <h2 className="text-sm font-semibold text-ink">{c.title}</h2>
-              <p className="mt-1 text-sm text-muted">{c.description}</p>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
+                <c.icon size={18} strokeWidth={2} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-ink">{c.title}</h2>
+                <p className="mt-1 text-sm text-muted">{c.description}</p>
+              </div>
             </Link>
           ))}
         </div>

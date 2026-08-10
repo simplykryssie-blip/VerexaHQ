@@ -4,37 +4,47 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 
-export function CreateTemplateForm({ workspaceId, kind }: { workspaceId: string; kind: "email" | "sms" | "engagement_letter" }) {
+// Only asks for the two identifying fields (matches the Organizer/Engagement
+// Letter create-modal pattern) -- the actual subject/body get written in the
+// real composer (TemplateEditRow) immediately after, via onSuccess.
+export function CreateTemplateForm({
+  workspaceId,
+  kind,
+  defaultOpen,
+  onSuccess,
+}: {
+  workspaceId: string;
+  kind: "email" | "sms";
+  defaultOpen?: boolean;
+  onSuccess?: (row: { id: string; name: string }) => void;
+}) {
   const router = useRouter();
   const supabase = createClient();
-
-  const table = kind === "email" ? "email_templates" : kind === "sms" ? "sms_templates" : "engagement_letter_templates";
-  const bodyField = kind === "sms" ? "body" : "body_html";
-  const bodyLabel = kind === "sms" ? "Message (use {{merge_fields}})" : "Body HTML (use {{merge_fields}})";
-
-  const fields = [
-    { name: "name", label: "Name", required: true },
-    { name: "slug", label: "Slug (unique key)", required: true },
-    ...(kind === "email" ? [{ name: "subject", label: "Subject", required: true }] : []),
-    { name: bodyField, label: bodyLabel, required: true, type: "textarea" as const },
-  ];
+  const table = kind === "email" ? "email_templates" : "sms_templates";
 
   return (
     <InlineAddForm
       label="New Template"
-      fields={fields}
+      defaultOpen={defaultOpen}
+      fields={[
+        { name: "name", label: "Name", required: true },
+        { name: "slug", label: "Slug (unique key)", required: true },
+      ]}
       onSubmit={async (v) => {
-        const { error } = await supabase.from(table).insert({
-          workspace_id: workspaceId,
-          name: v.name,
-          slug: v.slug,
-          ...(kind === "email" ? { subject: v.subject, body_html: v.body_html } : {}),
-          ...(kind === "sms" ? { body: v.body } : {}),
-          ...(kind === "engagement_letter" ? { body_html: v.body_html } : {}),
-          status: "draft",
-        } as never);
-        if (error) return error.message;
+        const { data, error } = await supabase
+          .from(table)
+          .insert({
+            workspace_id: workspaceId,
+            name: v.name,
+            slug: v.slug,
+            status: "draft",
+            ...(kind === "email" ? { subject: "", body_html: "" } : { body: "" }),
+          } as never)
+          .select("id, name")
+          .single();
+        if (error || !data) return error?.message ?? "Could not create template.";
         router.refresh();
+        onSuccess?.(data as { id: string; name: string });
       }}
     />
   );

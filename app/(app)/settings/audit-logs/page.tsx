@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { ScrollText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 export const dynamic = 'force-dynamic';
 
@@ -18,12 +20,11 @@ export default async function AuditLogsPage() {
 
   return (
     <div className="max-w-3xl">
-      <h2 className="text-base font-semibold text-ink">Audit Logs</h2>
-      <p className="mt-1 text-sm text-muted">The last 50 audit events for this workspace.</p>
+      <SettingsSectionHeader icon={ScrollText} title="Audit Logs" description="The last 50 audit events for this workspace." />
 
       <div className="mt-6 rounded-xl border border-border bg-surface">
         {!logs || logs.length === 0 ? (
-          <EmptyState message="No audit events recorded yet." />
+          <EmptyState icon={ScrollText} message="No audit events recorded yet." />
         ) : (
           <table className="w-full text-sm">
             <thead>

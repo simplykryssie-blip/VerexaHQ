@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { FileSignature } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { EmptyState } from "@/components/EmptyState";
-import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 
 export type EngagementLetterCard = {
   id: string;
@@ -16,28 +15,27 @@ export type EngagementLetterCard = {
   merge_field_count: number;
 };
 
-const STATUS_FILTERS = [
-  { value: "all", label: "All statuses" },
-  { value: "draft", label: "Draft" },
-  { value: "published", label: "Published" },
-  { value: "archived", label: "Archived" },
-];
-
 export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceId: string; templates: EngagementLetterCard[] }) {
   const router = useRouter();
   const supabase = createClient();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const filtered = useMemo(
-    () => templates.filter((t) => (!query || t.name.toLowerCase().includes(query.toLowerCase())) && (status === "all" || t.status === status)),
-    [templates, query, status]
-  );
+  const cards: GalleryCard[] = templates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    status: t.status,
+    isSystem: !t.workspace_id,
+    href: `/templates/engagement-letters/${t.id}`,
+    actionLabel: t.workspace_id ? "Edit" : "View",
+    badges: [
+      ...(t.requires_signature ? ["Requires signature"] : []),
+      `${t.merge_field_count} merge field${t.merge_field_count === 1 ? "" : "s"}`,
+    ],
+  }));
 
   async function createTemplate(e: React.FormEvent) {
     e.preventDefault();
@@ -53,73 +51,20 @@ export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceI
       setError(error?.message ?? "Could not create engagement letter.");
       return;
     }
-    router.push(`/settings/templates/engagement-letters/${data.id}`);
+    router.push(`/templates/engagement-letters/${data.id}`);
   }
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search engagement letters..."
-          className="w-64 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          {STATUS_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-        >
-          + New engagement letter
-        </button>
-      </div>
-
-      <div className="mt-4">
-        {filtered.length === 0 ? (
-          <EmptyState message="No engagement letters match." />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((t) => (
-              <div key={t.id} className="flex flex-col rounded-xl border border-border bg-surface p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-ink">{t.name}</h3>
-                  {!t.workspace_id && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {t.workspace_id ? (
-                    <TemplateStatusCycle table="engagement_letter_templates" id={t.id} status={t.status} />
-                  ) : (
-                    <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium capitalize text-muted">{t.status}</span>
-                  )}
-                  {t.requires_signature && (
-                    <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Requires signature</span>
-                  )}
-                  <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
-                    {t.merge_field_count} merge field{t.merge_field_count === 1 ? "" : "s"}
-                  </span>
-                </div>
-                <Link
-                  href={`/settings/templates/engagement-letters/${t.id}`}
-                  className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-ink"
-                >
-                  {t.workspace_id ? "Edit" : "View"}
-                </Link>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <TemplateGallery
+        cards={cards}
+        icon={FileSignature}
+        statusTable="engagement_letter_templates"
+        searchPlaceholder="Search engagement letters..."
+        emptyMessage="No engagement letters match."
+        createTileLabel="Create new engagement letter"
+        onCreateClick={() => setCreating(true)}
+      />
 
       {creating && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4">

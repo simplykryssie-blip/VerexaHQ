@@ -1,0 +1,64 @@
+.sidebar {
+  --rail-bg: #071729;
+  --rail-bg-2: #0b2643;
+  --rail-ink: #f4f4f6;
+  --rail-muted: #a9b7c6;
+  --blue-bright: #0da9f9;
+
+  background: linear-gradient(165deg, var(--rail-bg) 0%, var(--rail-bg-2) 100%);
+  color: var(--rail-ink);
+  border-right: none;
+}
+
+.header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.workspaceName {
+  color: var(--rail-muted);
+}
+
+.badge {
+  background: rgba(13, 169, 249, 0.14);
+  color: var(--blue-bright);
+}
+
+.navItem {
+  color: var(--rail-muted);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.navItem:hover {
+  color: var(--rail-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.navItemActive {
+  color: var(--blue-bright);
+  background: rgba(13, 169, 249, 0.14);
+}
+
+.subNav {
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.signOut {
+  color: var(--rail-muted);
+}
+
+.signOut:hover {
+  color: var(--rail-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mobileToggle {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+}
