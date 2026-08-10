@@ -27,6 +27,11 @@ export type DocumentRow = {
   visibility: string;
   created_at: string;
   uploaded_by: StaffRef;
+  // Present when the row comes from a cross-entity list (the workspace-wide
+  // Document Center) rather than a single client/engagement's Files tab,
+  // where entity_type/entity_id are already fixed context.
+  entity_type?: EntityType;
+  entity_id?: string;
 };
 
 export type RequestItemRow = {

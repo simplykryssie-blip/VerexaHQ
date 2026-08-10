@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Star, Archive, ArchiveRestore, Trash2, Pencil, RotateCw, Lock, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -22,13 +23,18 @@ export function DocumentList({
   workspaceId,
   entityType,
   entityId,
+  entityLabels,
 }: {
   documents: DocumentRow[];
   folders: DocumentFolderRow[];
   onPreview: (doc: DocumentRow) => void;
   workspaceId: string;
-  entityType: "client" | "engagement";
-  entityId: string;
+  // Fixed for a single entity's Files tab. Omit both when `documents` already
+  // carries its own entity_type/entity_id per row (the workspace-wide list).
+  entityType?: "client" | "engagement";
+  entityId?: string;
+  // Workspace-wide list only: which client/engagement each row belongs to.
+  entityLabels?: Map<string, { label: string; href: string }>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -95,10 +101,14 @@ export function DocumentList({
   }
 
   async function replaceVersion(doc: DocumentRow, file: File) {
+    const docEntityType = doc.entity_type ?? entityType;
+    const docEntityId = doc.entity_id ?? entityId;
+    if (!docEntityType || !docEntityId) return;
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const path = `${workspaceId}/${entityId}/${Date.now()}-${file.name}`;
+    const path = `${workspaceId}/${docEntityId}/${Date.now()}-${file.name}`;
     const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
     if (uploadErr) {
       toast.show(uploadErr.message, "error");
@@ -106,8 +116,8 @@ export function DocumentList({
     }
     const { error: insertErr } = await supabase.from("attachments").insert({
       workspace_id: workspaceId,
-      entity_type: entityType,
-      entity_id: entityId,
+      entity_type: docEntityType,
+      entity_id: docEntityId,
       folder_id: doc.folder_id,
       category: doc.category,
       file_name: file.name,
@@ -176,25 +186,27 @@ export function DocumentList({
               <Archive size={14} />
             </button>
           )}
-          <select
-            aria-label="Move selected to folder"
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value === "") return;
-              bulkUpdate({ folder_id: e.target.value === "__root__" ? null : e.target.value }, "Moved");
-            }}
-            className="rounded-lg border border-border px-2 py-1 text-xs"
-          >
-            <option value="" disabled>
-              Move to...
-            </option>
-            <option value="__root__">No folder</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
+          {folders.length > 0 && (
+            <select
+              aria-label="Move selected to folder"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value === "") return;
+                bulkUpdate({ folder_id: e.target.value === "__root__" ? null : e.target.value }, "Moved");
+              }}
+              className="rounded-lg border border-border px-2 py-1 text-xs"
+            >
+              <option value="" disabled>
+                Move to...
               </option>
-            ))}
-          </select>
+              <option value="__root__">No folder</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          )}
           <button type="button" onClick={bulkDelete} aria-label="Delete selected" className="ml-auto rounded p-1.5 text-danger hover:bg-red-50">
             <Trash2 size={14} />
           </button>
@@ -231,6 +243,11 @@ export function DocumentList({
                   </button>
                 )}
                 <div className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+                  {entityLabels && doc.entity_type && doc.entity_id && (
+                    <Link href={entityLabels.get(`${doc.entity_type}:${doc.entity_id}`)?.href ?? "#"} className="font-medium text-accent hover:underline">
+                      {entityLabels.get(`${doc.entity_type}:${doc.entity_id}`)?.label ?? "--"}
+                    </Link>
+                  )}
                   {doc.category && <span className="rounded bg-surfaceMuted px-1.5 py-0.5 text-slate">{doc.category}</span>}
                   {(doc.version ?? 1) > 1 && <span>v{doc.version}</span>}
                   <span>{formatSize(doc.file_size_bytes)}</span>
