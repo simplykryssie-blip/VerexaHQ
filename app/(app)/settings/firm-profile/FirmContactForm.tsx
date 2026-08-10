@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { formatPhone } from "@/lib/phone";
 
 type Contact = {
   phone: string | null;
@@ -58,8 +59,9 @@ export function FirmContactForm({ workspaceId, contact }: { workspaceId: string;
         <div>
           <label className="block text-sm font-medium text-slate">Phone</label>
           <input
+            type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhone(e.target.value))}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
@@ -69,6 +71,7 @@ export function FirmContactForm({ workspaceId, contact }: { workspaceId: string;
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            onBlur={(e) => setEmail(e.target.value.trim().toLowerCase())}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>

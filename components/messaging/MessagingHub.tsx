@@ -318,12 +318,12 @@ export function MessagingHub({
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                       e.preventDefault();
                       send();
                     }
                   }}
-                  placeholder="Type a message..."
+                  placeholder="Type a message... (Enter for a new line, Cmd/Ctrl+Enter to send)"
                   rows={2}
                   className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />

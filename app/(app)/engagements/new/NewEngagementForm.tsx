@@ -7,6 +7,7 @@ import { UserPlus } from "lucide-react";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { renderEmail } from "@/lib/email/template";
+import { formatPhone } from "@/lib/phone";
 
 const DRAFT_KEY = "new-engagement-inline";
 
@@ -247,13 +248,14 @@ function ClientSearchField({
               placeholder="Email (optional)"
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
+              onBlur={(e) => setNewEmail(e.target.value.trim().toLowerCase())}
               className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <input
               type="tel"
               placeholder="Phone (optional)"
               value={newPhone}
-              onChange={(e) => setNewPhone(e.target.value)}
+              onChange={(e) => setNewPhone(formatPhone(e.target.value))}
               className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </div>

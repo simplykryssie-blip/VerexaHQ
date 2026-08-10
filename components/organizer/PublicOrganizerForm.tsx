@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
+import { formatPhone } from "@/lib/phone";
 
 type FieldRow = {
   id: string;
@@ -134,14 +135,16 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={(e) => setEmail(e.target.value.trim().toLowerCase())}
                 className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-ink">Phone</label>
               <input
+                type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
                 className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>

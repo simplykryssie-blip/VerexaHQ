@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { formatPhone } from "@/lib/phone";
 
 export type FieldDef = {
   name: string;
@@ -69,10 +70,10 @@ export function InlineAddForm({
               key={f.name}
               required={f.required}
               placeholder={f.label}
-              rows={4}
+              rows={7}
               value={values[f.name] ?? ""}
               onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
-              className="col-span-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="col-span-2 max-h-64 resize-y overflow-y-auto rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           ) : f.type === "select" ? (
             <select
@@ -98,7 +99,15 @@ export function InlineAddForm({
               required={f.required}
               placeholder={f.label}
               value={values[f.name] ?? ""}
-              onChange={(e) => setValues((v) => ({ ...v, [f.name]: e.target.value }))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setValues((v) => ({ ...v, [f.name]: f.type === "tel" ? formatPhone(raw) : raw }));
+              }}
+              onBlur={(e) => {
+                if (f.type !== "email") return;
+                const trimmed = e.target.value.trim().toLowerCase();
+                setValues((v) => ({ ...v, [f.name]: trimmed }));
+              }}
               className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           )

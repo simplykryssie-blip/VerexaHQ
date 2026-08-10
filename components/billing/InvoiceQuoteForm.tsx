@@ -6,6 +6,18 @@ import { Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InvoicePreview, type PreviewLineItem } from "./InvoicePreview";
 
+export type EditingInvoiceQuote = {
+  id: string;
+  title?: string;
+  line_items: PreviewLineItem[];
+  discount_amount: number;
+  tax_amount: number;
+  subtotal: number;
+  due_date?: string | null;
+  valid_until?: string | null;
+  notes: string | null;
+};
+
 export function InvoiceQuoteForm({
   kind,
   workspaceId,
@@ -13,6 +25,7 @@ export function InvoiceQuoteForm({
   engagementId,
   firmName,
   clientName,
+  editing,
   onDone,
 }: {
   kind: "invoice" | "quote";
@@ -21,16 +34,23 @@ export function InvoiceQuoteForm({
   engagementId?: string;
   firmName: string;
   clientName: string;
+  editing?: EditingInvoiceQuote;
   onDone: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [title, setTitle] = useState("");
-  const [lineItems, setLineItems] = useState<PreviewLineItem[]>([{ description: "", quantity: 1, unit_price: 0 }]);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [taxRate, setTaxRate] = useState(0);
-  const [dueDate, setDueDate] = useState("");
-  const [notes, setNotes] = useState("");
+  const [title, setTitle] = useState(editing?.title ?? "");
+  const [lineItems, setLineItems] = useState<PreviewLineItem[]>(
+    editing?.line_items && editing.line_items.length > 0 ? editing.line_items : [{ description: "", quantity: 1, unit_price: 0 }]
+  );
+  const [discountAmount, setDiscountAmount] = useState(editing?.discount_amount ?? 0);
+  const [taxRate, setTaxRate] = useState(() => {
+    if (!editing) return 0;
+    const base = Math.max(editing.subtotal - editing.discount_amount, 0);
+    return base > 0 ? Math.round((editing.tax_amount / base) * 10000) / 100 : 0;
+  });
+  const [dueDate, setDueDate] = useState((editing?.due_date ?? editing?.valid_until ?? "")?.slice(0, 10) ?? "");
+  const [notes, setNotes] = useState(editing?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -63,6 +83,30 @@ export function InvoiceQuoteForm({
       return;
     }
     setSaving(true);
+
+    if (editing) {
+      const updatePayload = {
+        line_items: cleanItems,
+        subtotal,
+        discount_amount: discountAmount,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        notes: notes || null,
+        ...(kind === "invoice" ? { due_date: dueDate || null } : { title: title.trim(), valid_until: dueDate || null }),
+      };
+      const { error: updateError } = await supabase
+        .from(kind === "invoice" ? "invoices" : "quotes")
+        .update(updatePayload)
+        .eq("id", editing.id);
+      setSaving(false);
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+      onDone();
+      router.refresh();
+      return;
+    }
 
     const {
       data: { user },
@@ -117,16 +161,24 @@ export function InvoiceQuoteForm({
               <Plus size={12} /> Add line
             </button>
           </div>
+          <div className="mb-1 flex gap-2 text-[11px] font-medium uppercase tracking-wide text-muted">
+            <span className="flex-1">Description</span>
+            <span className="w-16">Qty</span>
+            <span className="w-24">Price ($)</span>
+            <span className="w-[26px]" />
+          </div>
           <div className="space-y-2">
             {lineItems.map((li, i) => (
               <div key={i} className="flex items-end gap-2">
                 <input
+                  aria-label="Line item description"
                   placeholder="Description"
                   value={li.description}
                   onChange={(e) => updateItem(i, { description: e.target.value })}
                   className="flex-1 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <input
+                  aria-label="Quantity"
                   type="number"
                   min={0}
                   step="1"
@@ -135,6 +187,7 @@ export function InvoiceQuoteForm({
                   className="w-16 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <input
+                  aria-label="Price per unit"
                   type="number"
                   min={0}
                   step="0.01"
@@ -211,7 +264,15 @@ export function InvoiceQuoteForm({
             disabled={saving}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
           >
-            {saving ? "Creating..." : kind === "invoice" ? "Create invoice" : "Create quote"}
+            {saving
+              ? editing
+                ? "Saving..."
+                : "Creating..."
+              : editing
+                ? "Save changes"
+                : kind === "invoice"
+                  ? "Create invoice"
+                  : "Create quote"}
           </button>
         </div>
       </div>

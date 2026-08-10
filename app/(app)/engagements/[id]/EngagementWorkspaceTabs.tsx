@@ -14,7 +14,7 @@ import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
 import { StatusSelect } from "./StatusSelect";
 import { DueDateInput } from "./DueDateInput";
 import { TaskRow } from "./TaskRow";
-import { AddEngagementNoteForm } from "./AddEngagementNoteForm";
+import { AddEngagementNoteForm, EditEngagementNoteForm } from "./AddEngagementNoteForm";
 import { AddTaskForm } from "./AddTaskForm";
 import { StageReviewActions } from "./StageReviewActions";
 import { AssignmentForm } from "./AssignmentForm";
@@ -547,12 +547,12 @@ export function MessagesTab({
               value={body}
               onChange={(e) => setBody(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
                   send();
                 }
               }}
-              placeholder="Type a message..."
+              placeholder="Type a message... (Enter for a new line, Cmd/Ctrl+Enter to send)"
               rows={2}
               className="flex-1 resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
@@ -649,6 +649,8 @@ export function BillingTab({
   payments: PaymentRow[];
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
+  const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null);
 
   return (
     <div className="space-y-6">
@@ -685,6 +687,53 @@ export function BillingTab({
         </Modal>
       )}
 
+      {editingQuote && (
+        <Modal title="Edit quote" onClose={() => setEditingQuote(null)} size="xl">
+          <InvoiceQuoteForm
+            kind="quote"
+            workspaceId={workspaceId}
+            clientId={clientId}
+            engagementId={engagementId}
+            firmName={workspaceName}
+            clientName={clientName}
+            editing={{
+              id: editingQuote.id,
+              title: editingQuote.title,
+              line_items: editingQuote.line_items ?? [],
+              discount_amount: editingQuote.discount_amount,
+              tax_amount: editingQuote.tax_amount,
+              subtotal: editingQuote.subtotal,
+              valid_until: editingQuote.valid_until,
+              notes: editingQuote.notes,
+            }}
+            onDone={() => setEditingQuote(null)}
+          />
+        </Modal>
+      )}
+
+      {editingInvoice && (
+        <Modal title="Edit invoice" onClose={() => setEditingInvoice(null)} size="xl">
+          <InvoiceQuoteForm
+            kind="invoice"
+            workspaceId={workspaceId}
+            clientId={clientId}
+            engagementId={engagementId}
+            firmName={workspaceName}
+            clientName={clientName}
+            editing={{
+              id: editingInvoice.id,
+              line_items: editingInvoice.line_items ?? [],
+              discount_amount: editingInvoice.discount_amount,
+              tax_amount: editingInvoice.tax_amount,
+              subtotal: editingInvoice.subtotal,
+              due_date: editingInvoice.due_date,
+              notes: editingInvoice.notes,
+            }}
+            onDone={() => setEditingInvoice(null)}
+          />
+        </Modal>
+      )}
+
       <Section title="Quotes">
         {quotes.length === 0 ? (
           <EmptyState message="No quotes yet." />
@@ -699,6 +748,15 @@ export function BillingTab({
                   <span className="capitalize text-muted">
                     {q.status} -- {money(q.total_amount)}
                   </span>
+                  {canManageBilling && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuote(q)}
+                      className="text-xs font-medium text-accent hover:underline"
+                    >
+                      Edit
+                    </button>
+                  )}
                   <PreviewButton
                     kind="quote"
                     firmName={workspaceName}
@@ -736,6 +794,15 @@ export function BillingTab({
                       <span className="capitalize text-muted">
                         {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
                       </span>
+                      {canManageBilling && i.status !== "paid" && i.status !== "void" && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingInvoice(i)}
+                          className="text-xs font-medium text-accent hover:underline"
+                        >
+                          Edit
+                        </button>
+                      )}
                       <PreviewButton
                         kind="invoice"
                         firmName={workspaceName}
@@ -825,10 +892,15 @@ export function NotesTab({ engagementId, workspaceId, notes }: { engagementId: s
         <ul className="space-y-3">
           {[...pinned, ...rest].map((n) => (
             <li key={n.id} className="rounded-lg bg-surfaceMuted p-3 text-sm text-slate">
-              {n.is_pinned && <span className="mr-2 text-xs font-medium text-accent">Pinned</span>}
-              {n.is_internal && <span className="mr-2 text-xs font-medium text-muted">Internal</span>}
-              {n.subject && <p className="font-semibold text-ink">{n.subject}</p>}
-              <p>{n.body}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  {n.is_pinned && <span className="mr-2 text-xs font-medium text-accent">Pinned</span>}
+                  {n.is_internal && <span className="mr-2 text-xs font-medium text-muted">Internal</span>}
+                  {n.subject && <p className="font-semibold text-ink">{n.subject}</p>}
+                </div>
+                <EditEngagementNoteForm note={n} />
+              </div>
+              <p className="whitespace-pre-wrap">{n.body}</p>
               <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
             </li>
           ))}

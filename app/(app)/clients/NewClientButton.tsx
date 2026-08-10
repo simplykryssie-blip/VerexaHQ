@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
+import { formatPhone } from "@/lib/phone";
 
 const DRAFT_KEY = "new-client-button";
 
@@ -25,7 +26,6 @@ type Draft = {
   state: string;
   zip: string;
   serviceIds: string[];
-  priority: "Low" | "Medium" | "High" | "Urgent";
   ssn: string;
   itin: string;
   ein: string;
@@ -72,7 +72,6 @@ export function NewClientButton({
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
   const [serviceIds, setServiceIds] = useState<string[]>([]);
-  const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [ssn, setSsn] = useState("");
   const [itin, setItin] = useState("");
   const [ein, setEin] = useState("");
@@ -109,7 +108,6 @@ export function NewClientButton({
     setState(draft.state);
     setZip(draft.zip);
     setServiceIds(draft.serviceIds);
-    setPriority(draft.priority);
     setSsn(draft.ssn);
     setItin(draft.itin);
     setEin(draft.ein);
@@ -131,7 +129,6 @@ export function NewClientButton({
       state,
       zip,
       serviceIds,
-      priority,
       ssn,
       itin,
       ein,
@@ -251,7 +248,6 @@ export function NewClientButton({
         p_workspace_id: workspaceId,
         p_client_id: result.client_id,
         p_service_id: serviceId,
-        p_priority: priority,
       });
       if (engagementError) {
         setLoading(false);
@@ -397,6 +393,7 @@ export function NewClientButton({
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={(e) => setEmail(e.target.value.trim().toLowerCase())}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <input
@@ -404,7 +401,7 @@ export function NewClientButton({
                 required
                 placeholder="Phone"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
 
@@ -490,22 +487,6 @@ export function NewClientButton({
                 )}
               </div>
 
-              {serviceIds.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium uppercase tracking-wide text-muted">Priority</label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as "Low" | "Medium" | "High" | "Urgent")}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                    <option value="Urgent">Urgent</option>
-                  </select>
-                  <p className="mt-1 text-xs text-muted">Applies to every engagement created for this client.</p>
-                </div>
-              )}
 
               <div className="border-t border-border pt-4">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate">
@@ -514,8 +495,9 @@ export function NewClientButton({
                 </label>
                 {inviteToPortal && (
                   <p className="mt-2 text-xs text-muted">
-                    The client will receive your firm&apos;s Client Portal Invite email with a secure activation link.
-                    Edit the message in Settings &gt; Templates.
+                    We&apos;ll email {email || "the client"} a secure link to set up their portal login and password.
+                    To change the wording of that email, go to Templates in the sidebar and edit &quot;Client Portal
+                    Invite.&quot;
                   </p>
                 )}
               </div>

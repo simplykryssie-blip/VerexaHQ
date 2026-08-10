@@ -271,7 +271,7 @@ export function AddNoteForm({
       label="New Note"
       fields={[
         { name: "subject", label: "Subject" },
-        { name: "body", label: "Note", required: true },
+        { name: "body", label: "Note", type: "textarea", required: true },
       ]}
       onSubmit={async (v) => {
         const {
@@ -285,6 +285,35 @@ export function AddNoteForm({
           subject: v.subject || null,
           body: v.body,
         });
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+export function EditNoteForm({ note }: { note: { id: string; subject: string | null; body: string } }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Edit"
+      submitLabel="Save changes"
+      initialValues={{ subject: note.subject ?? "", body: note.body }}
+      fields={[
+        { name: "subject", label: "Subject" },
+        { name: "body", label: "Note", type: "textarea", required: true },
+      ]}
+      trigger={(openForm) => (
+        <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit note">
+          <Pencil size={13} />
+        </button>
+      )}
+      onSubmit={async (v) => {
+        const { error } = await supabase
+          .from("notes")
+          .update({ subject: v.subject || null, body: v.body })
+          .eq("id", note.id);
         if (error) return error.message;
         router.refresh();
       }}

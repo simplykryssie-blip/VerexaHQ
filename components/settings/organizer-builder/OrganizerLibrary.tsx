@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
+import { slugify } from "@/lib/roleSlug";
 
 export type OrganizerCard = {
   id: string;
@@ -21,7 +22,6 @@ export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: stri
   const supabase = createClient();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,17 +44,27 @@ export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: stri
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const { data, error } = await supabase
-      .from("organizer_templates")
-      .insert({ workspace_id: workspaceId, name, slug, description: description || null, status: "draft" })
-      .select("id")
-      .single();
-    setSaving(false);
-    if (error || !data) {
-      setError(error?.message ?? "Could not create organizer.");
-      return;
+    const base = slugify(name);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
+      const { data, error } = await supabase
+        .from("organizer_templates")
+        .insert({ workspace_id: workspaceId, name, slug, description: description || null, status: "draft" })
+        .select("id")
+        .single();
+      if (!error && data) {
+        setSaving(false);
+        router.push(`/templates/organizers/${data.id}`);
+        return;
+      }
+      if (error?.code !== "23505") {
+        setSaving(false);
+        setError(error?.message ?? "Could not create organizer.");
+        return;
+      }
     }
-    router.push(`/templates/organizers/${data.id}`);
+    setSaving(false);
+    setError("Could not create organizer -- try a slightly different name.");
   }
 
   return (
@@ -83,13 +93,6 @@ export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: stri
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Name"
-                required
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-              <input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                placeholder="Slug (unique key)"
                 required
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />

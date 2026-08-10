@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
+import { ConvertLeadButton } from "./ConvertLeadButton";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -184,7 +185,8 @@ export function ClientWorkspace({
         }
       />
 
-      <div className="border-b border-border bg-surface px-8 py-3">
+      <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
+        <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}
