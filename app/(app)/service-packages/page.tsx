@@ -68,7 +68,7 @@ export default async function ServicePackagesPage() {
     <div className="max-w-6xl">
       <SettingsSectionHeader
         icon={Workflow}
-        title="Workflow Setup"
+        title="Services"
         description="The offerings clients can be sold -- each ties together pricing, billing, organizer, document request, folder, and engagement letter templates for engagements created against it."
       />
 

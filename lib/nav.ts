@@ -52,7 +52,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Form Templates", href: "/templates" },
     ],
   },
-  { label: "Workflow Setup", href: "/service-packages", icon: Workflow },
+  { label: "Services", href: "/service-packages", icon: Workflow },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
