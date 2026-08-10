@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Plus, Trash2, Users } from "lucide-react";
+import { Copy, KeyRound, Plus, Trash2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
 import { CreateRoleForm } from "@/components/settings/CreateRoleForm";
+import { slugify, uniqueSlug } from "@/lib/roleSlug";
 
 export type PermissionRow = { id: string; key: string; category: string; description: string };
 
@@ -48,6 +49,7 @@ export function RolesManager({
   const [savingMeta, setSavingMeta] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [forking, setForking] = useState(false);
 
   const selected = roles.find((r) => r.id === selectedId) ?? null;
 
@@ -154,6 +156,46 @@ export function RolesManager({
     router.refresh();
   }
 
+  // System roles are shared platform-wide (workspace_id null) and RLS
+  // blocks editing them directly -- changing "Staff" here would change it
+  // for every workspace. "Editable" for the user's purposes means: make a
+  // workspace-owned copy with the same name and permissions, then edit that.
+  async function forkRole(role: RoleRow) {
+    setForking(true);
+    const takenSlugs = new Set(roles.filter((r) => r.workspace_id === workspaceId).map((r) => r.slug));
+    const slug = uniqueSlug(slugify(role.name), takenSlugs);
+
+    const { data: newRole, error } = await supabase
+      .from("roles")
+      .insert({ workspace_id: workspaceId, name: role.name, slug, description: role.description })
+      .select("id, name, slug, description, workspace_id, is_system_role")
+      .single();
+
+    if (error || !newRole) {
+      setForking(false);
+      toast.show(error?.message ?? "Could not customize this role.", "error");
+      return;
+    }
+
+    let permissionIds: string[] = [];
+    if (role.permissionIds.length > 0) {
+      const { error: copyError } = await supabase
+        .from("role_permissions")
+        .insert(role.permissionIds.map((permissionId) => ({ role_id: newRole.id, permission_id: permissionId })));
+      if (copyError) {
+        toast.show(`Copy created, but couldn't copy permissions: ${copyError.message}`, "error");
+      } else {
+        permissionIds = role.permissionIds;
+      }
+    }
+
+    setForking(false);
+    setRoles((prev) => [...prev, { ...newRole, permissionIds, memberCount: 0 }]);
+    setSelectedId(newRole.id);
+    toast.show(`Created your own copy of ${role.name} -- edit it here. The System role is unchanged.`, "success");
+    router.refresh();
+  }
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
       <div className="rounded-xl border border-border bg-surface">
@@ -181,7 +223,6 @@ export function RolesManager({
                     {r.is_system_role ? "System" : "Custom"}
                   </span>
                 </span>
-                <span className="shrink-0 text-xs text-muted">{r.permissionIds.length}</span>
               </button>
             </li>
           ))}
@@ -249,26 +290,39 @@ export function RolesManager({
                 )}
               </div>
 
-              {!editingMeta && isAdmin && !selected.is_system_role && (
+              {!editingMeta && isAdmin && (
                 <div className="flex shrink-0 items-center gap-3">
-                  <button type="button" onClick={() => startEditingMeta(selected)} className="text-xs font-medium text-accent hover:underline">
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteRole(selected)}
-                    disabled={deleting}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-danger hover:underline disabled:opacity-60"
-                  >
-                    <Trash2 size={12} /> Delete
-                  </button>
+                  {selected.is_system_role ? (
+                    <button
+                      type="button"
+                      onClick={() => forkRole(selected)}
+                      disabled={forking}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-60"
+                    >
+                      <Copy size={12} /> {forking ? "Copying..." : "Customize"}
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => startEditingMeta(selected)} className="text-xs font-medium text-accent hover:underline">
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteRole(selected)}
+                        disabled={deleting}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-danger hover:underline disabled:opacity-60"
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
 
             {selected.is_system_role && (
               <p className="border-b border-border bg-surfaceMuted px-5 py-2 text-xs text-muted">
-                System roles are shared across every workspace and can&apos;t be edited. Create a custom role to customize permissions.
+                This is a shared System role -- click Customize to make your own editable copy for this workspace.
               </p>
             )}
 
