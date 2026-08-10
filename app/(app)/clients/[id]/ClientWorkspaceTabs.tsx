@@ -1,13 +1,22 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
+import { Modal } from "@/components/Modal";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import { TaxIdReveal } from "./TaxIdReveal";
 import { DateOfBirthInput } from "./DateOfBirthInput";
 import { InviteContactToPortalButton } from "./InviteContactToPortalButton";
+import { PortalInviteStatus } from "./PortalInviteStatus";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
 import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanForm";
 import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
 import { PreviewButton } from "@/components/billing/PreviewButton";
+import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
 import { AddRelationshipForm, LinkExistingClientForm, RelationshipsList } from "./RelationshipsSection";
 import { ClientAssignmentForm } from "./ClientAssignmentForm";
 import { AddAppointmentForm } from "./AddAppointmentForm";
@@ -22,6 +31,7 @@ import {
   AddNoteForm,
 } from "./AddForms";
 import { EditClientProfileForm } from "./EditClientProfileForm";
+import type { ActionPermissions } from "@/lib/actionPermissions";
 
 function Section({
   title,
@@ -159,7 +169,21 @@ export function OverviewTab({
         </div>
       </div>
 
-      <Section title="Identifying info" action={<EditClientProfileForm client={client} />}>
+      <Section
+        title="Identifying info"
+        action={
+          <div className="flex items-center gap-3">
+            <PortalInviteStatus
+              clientId={client.id}
+              workspaceId={workspaceId}
+              name={clientDisplayName(client)}
+              email={client.primary_email}
+              portalUsers={portalUsers}
+            />
+            <EditClientProfileForm client={client} />
+          </div>
+        }
+      >
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
@@ -450,51 +474,234 @@ export function OverviewTab({
 
 // ----------------------------------------------------------------- Messages
 
+// One continuous conversation across all of this client's threads (portal,
+// email, SMS, document-request threads, internal notes), GHL-style: a
+// single scrollable stream with an inline composer, instead of a list of
+// separate threads each requiring a modal to reply to. Threads still exist
+// underneath (channel is a thread-level column) -- sending picks up the
+// existing non-document-request thread for the chosen channel if there is
+// one, or creates it on first use, so the conversation stays continuous
+// without any change to the underlying data model.
 export function MessagesTab({
+  workspaceId,
+  clientId,
+  primaryEmail,
+  primaryPhone,
+  permissions,
   threads,
   messages,
   onViewDocumentRequests,
 }: {
+  workspaceId: string;
+  clientId: string;
+  primaryEmail: string | null;
+  primaryPhone: string | null;
+  permissions: Pick<ActionPermissions, "messagesSend" | "messagesInternalNote">;
   threads: MessageThreadRow[];
   messages: MessageRow[];
   onViewDocumentRequests?: () => void;
 }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const channelOptions = [
+    ...(permissions.messagesSend
+      ? [
+          { value: "portal", label: "Portal" },
+          { value: "email", label: primaryEmail ? `Email (${primaryEmail})` : "Email -- no email on file" },
+          { value: "sms", label: primaryPhone ? `SMS (${primaryPhone})` : "SMS -- no phone on file" },
+        ]
+      : []),
+    ...(permissions.messagesInternalNote ? [{ value: "internal", label: "Internal note" }] : []),
+  ];
+
+  const [channel, setChannel] = useState(channelOptions[0]?.value ?? "");
+  const [body, setBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const threadsById = new Map(threads.map((t) => [t.id, t]));
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
+
+  async function send() {
+    setError(null);
+    const isInternal = channel === "internal";
+    if (channel === "email" && !primaryEmail) {
+      setError("No email on file -- add one in Contacts first.");
+      return;
+    }
+    if (channel === "sms" && !primaryPhone) {
+      setError("No phone number on file -- add one in Contacts first.");
+      return;
+    }
+    if (!body.trim()) return;
+    setSending(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let threadId = threads.find((t) => t.channel === channel && !t.subject?.startsWith("Document request:"))?.id;
+
+    if (!threadId) {
+      const { data: thread, error: threadError } = await supabase
+        .from("message_threads")
+        .insert({
+          workspace_id: workspaceId,
+          entity_type: "client",
+          entity_id: clientId,
+          channel,
+          subject: isInternal ? "Internal note" : "Message",
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
+      if (threadError || !thread) {
+        setSending(false);
+        setError(threadError?.message ?? "Could not create thread.");
+        return;
+      }
+      threadId = thread.id;
+    }
+
+    const { error: messageError } = await supabase.from("messages").insert({
+      workspace_id: workspaceId,
+      thread_id: threadId,
+      sender_type: "staff",
+      sender_id: user?.id,
+      body,
+      is_internal: isInternal,
+    });
+    if (messageError) {
+      setSending(false);
+      setError(messageError.message);
+      return;
+    }
+
+    if (channel === "email" && primaryEmail) {
+      try {
+        const res = await fetch("/api/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: primaryEmail, subject: "Message", html: `<p>${body}</p>` }),
+        });
+        const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
+        if (!data.sent) toast.show(`Message saved, but the email wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
+      } catch {
+        toast.show("Message saved, but the email wasn't delivered.", "error");
+      }
+    } else if (channel === "sms" && primaryPhone) {
+      try {
+        const res = await fetch("/api/sms/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: primaryPhone, body }),
+        });
+        const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
+        if (!data.sent) toast.show(`Message saved, but the SMS wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
+      } catch {
+        toast.show("Message saved, but the SMS wasn't delivered.", "error");
+      }
+    }
+
+    setBody("");
+    setSending(false);
+    router.refresh();
+  }
+
   return (
-    <Section title="Message threads">
-      {threads.length === 0 ? (
-        <EmptyState message="No messages yet -- use Send Message or Request Documents to start a thread." />
-      ) : (
-        <ul className="space-y-4">
-          {threads.map((t) => {
-            const threadMessages = messages.filter((m) => m.thread_id === t.id);
-            const isDocumentRequest = t.subject?.startsWith("Document request:");
+    <div className="flex h-[calc(100vh-260px)] flex-col rounded-xl border border-border bg-surface">
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {messages.length === 0 ? (
+          <EmptyState message="No messages yet -- send one below to start the conversation." />
+        ) : (
+          messages.map((m) => {
+            const thread = threadsById.get(m.thread_id);
+            const isDocumentRequest = thread?.subject?.startsWith("Document request:");
+
+            if (m.is_internal) {
+              return (
+                <div key={m.id} className="mx-auto max-w-lg rounded-lg bg-warning/10 px-3 py-2 text-center">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-warning">Internal note</span>
+                  <p className="mt-1 text-sm text-slate">{m.body}</p>
+                  <span className="mt-1 block text-[11px] text-muted">{new Date(m.created_at).toLocaleString()}</span>
+                </div>
+              );
+            }
+
+            const fromStaff = m.sender_type === "staff";
             return (
-              <li key={t.id} className="rounded-lg border border-border p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-ink">{t.subject ?? "Message"}</span>
-                  <div className="flex items-center gap-2">
+              <div key={m.id} className={`flex ${fromStaff ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[70%] rounded-2xl px-3.5 py-2 text-sm ${fromStaff ? "bg-accent text-white" : "bg-surfaceMuted text-slate"}`}>
+                  <p className="whitespace-pre-wrap">{m.body}</p>
+                  <div className={`mt-1 flex flex-wrap items-center gap-2 text-[11px] ${fromStaff ? "text-white/70" : "text-muted"}`}>
+                    <span className="uppercase tracking-wide">{thread?.channel ?? "portal"}</span>
+                    <span>{new Date(m.created_at).toLocaleString()}</span>
                     {isDocumentRequest && onViewDocumentRequests && (
-                      <button type="button" onClick={onViewDocumentRequests} className="text-xs font-medium text-accent hover:underline">
+                      <button
+                        type="button"
+                        onClick={onViewDocumentRequests}
+                        className={`font-medium underline ${fromStaff ? "text-white" : "text-accent"}`}
+                      >
                         View request
                       </button>
                     )}
-                    <span className="text-xs uppercase tracking-wide text-muted">{t.channel}</span>
                   </div>
                 </div>
-                <ul className="mt-2 space-y-1.5">
-                  {threadMessages.map((m) => (
-                    <li key={m.id} className="text-sm text-slate">
-                      <span className={m.is_internal ? "italic text-muted" : ""}>{m.body}</span>
-                      <span className="ml-2 text-xs text-muted">{new Date(m.created_at).toLocaleString()}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
+              </div>
             );
-          })}
-        </ul>
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {channelOptions.length > 0 && (
+        <div className="border-t border-border p-3">
+          <div className="flex items-center justify-between gap-2">
+            <select
+              value={channel}
+              onChange={(e) => setChannel(e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {channelOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            {error && <p className="text-xs text-danger">{error}</p>}
+          </div>
+          <div className="mt-2 flex items-end gap-2">
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Type a message..."
+              rows={2}
+              className="flex-1 resize-none rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <button
+              type="button"
+              disabled={sending || !body.trim()}
+              onClick={send}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
+            >
+              {sending ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </div>
       )}
-    </Section>
+    </div>
   );
 }
 
@@ -523,12 +730,47 @@ export function BillingTab({
   paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
   canManageBilling: boolean;
 }) {
+  const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
+
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-surface p-4">
-        <p className="text-xs uppercase tracking-wide text-muted">Outstanding balance</p>
-        <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
+      <div className="flex items-center justify-between rounded-xl border border-border bg-surface p-4">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-muted">Outstanding balance</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
+        </div>
+        {canManageBilling && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setModal("quote")}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+            >
+              + Create Quote
+            </button>
+            <button
+              type="button"
+              onClick={() => setModal("invoice")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+            >
+              + Create Invoice
+            </button>
+          </div>
+        )}
       </div>
+
+      {modal && (
+        <Modal title={modal === "invoice" ? "Create invoice" : "Create quote"} onClose={() => setModal(null)} size="xl">
+          <InvoiceQuoteForm
+            kind={modal}
+            workspaceId={workspaceId}
+            clientId={clientId}
+            firmName={workspaceName}
+            clientName={clientName}
+            onDone={() => setModal(null)}
+          />
+        </Modal>
+      )}
 
       <Section title="Quotes">
         {quotes.length === 0 ? (
@@ -734,7 +976,14 @@ export type InvoiceRow = {
 };
 export type PaymentRow = { id: string; status: string; amount: number; payment_date: string };
 export type MessageThreadRow = { id: string; subject: string | null; channel: string };
-export type MessageRow = { id: string; thread_id: string; body: string; is_internal: boolean; created_at: string };
+export type MessageRow = {
+  id: string;
+  thread_id: string;
+  body: string;
+  is_internal: boolean;
+  sender_type: string;
+  created_at: string;
+};
 type StaffRef = { id: string; display_name: string | null } | null;
 export type StaffOption = { id: string; display_name: string | null };
 export type EngagementRow = {
