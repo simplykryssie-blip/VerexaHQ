@@ -3,8 +3,23 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
 export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path
+        d="M7 1L12 3v4c0 3.5-2.2 5.7-5 6.5C4.2 12.7 2 10.5 2 7V3l5-2Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+    <span>Verified in seconds, every sign-in.</span>
+  </>
+);
 
 export default function MfaChallengePage() {
   const router = useRouter();
@@ -56,47 +71,47 @@ export default function MfaChallengePage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">Verify it&apos;s you</h1>
-        <p className="mt-1 text-sm text-muted">Enter the 6-digit code from your authenticator app.</p>
+    <AuthShell
+      eyebrow="Two-factor verification"
+      railHeading="One more step to protect your workspace."
+      railSub="We use time-based codes to keep every firm's data locked to its own team."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>Verify it&apos;s you</h1>
+      <p className={styles.lede}>Enter the 6-digit code from your authenticator app.</p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="code">
-              Authentication code
-            </label>
-            <input
-              id="code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              inputMode="numeric"
-              maxLength={6}
-              autoFocus
-              required
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-center text-lg tracking-widest focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="code">Authentication code</label>
+          <input
+            id="code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            inputMode="numeric"
+            maxLength={6}
+            autoFocus
+            required
+            className={styles.input}
+            style={{ textAlign: "center", fontSize: 18, letterSpacing: "0.3em" }}
+          />
+        </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </p>
-          )}
+        {error && <AuthError>{error}</AuthError>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-          >
-            {loading ? "Verifying..." : "Verify"}
-          </button>
-        </form>
-
-        <button type="button" onClick={signOut} className="mt-4 w-full text-center text-sm text-accent hover:underline">
-          Sign in as someone else
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Verifying…" : "Verify"}
         </button>
-      </div>
-    </div>
+      </form>
+
+      <button
+        type="button"
+        onClick={signOut}
+        className={styles.link}
+        style={{ marginTop: 16, display: "block", textAlign: "center", width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+      >
+        Sign in as someone else
+      </button>
+    </AuthShell>
   );
 }

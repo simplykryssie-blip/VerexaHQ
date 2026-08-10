@@ -3,8 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
 export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+    <span>Streamline. Automate. Grow.</span>
+  </>
+);
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -37,58 +48,52 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-ink">Choose a new password</h1>
-        <p className="mt-1 text-sm text-muted">You&apos;ll be signed in automatically once it&apos;s set.</p>
+    <AuthShell
+      eyebrow="Account recovery"
+      railHeading="Choose a new password."
+      railSub="Pick something secure -- you'll be signed in right away once it's set."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>Choose a new password</h1>
+      <p className={styles.lede}>You&apos;ll be signed in automatically once it&apos;s set.</p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="password">
-              New password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete="new-password"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate" htmlFor="confirm_password">
-              Confirm new password
-            </label>
-            <input
-              id="confirm_password"
-              type="password"
-              required
-              minLength={6}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              autoComplete="new-password"
-            />
-          </div>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="password">New password</label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Create a password"
+            className={styles.input}
+            autoComplete="new-password"
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="confirm_password">Confirm new password</label>
+          <input
+            id="confirm_password"
+            type="password"
+            required
+            minLength={6}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm your password"
+            className={styles.input}
+            autoComplete="new-password"
+          />
+        </div>
 
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-danger" role="alert">
-              {error}
-            </p>
-          )}
+        {error && <AuthError>{error}</AuthError>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-          >
-            {loading ? "Saving..." : "Set new password"}
-          </button>
-        </form>
-      </div>
-    </div>
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Saving…" : "Set new password"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

@@ -4,10 +4,38 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
 export const dynamic = "force-dynamic";
 
 type Preview = { invited_email: string; invited_name: string | null; status: string; token_expires_at: string; client_label: string };
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path
+        d="M7 1L12 3v4c0 3.5-2.2 5.7-5 6.5C4.2 12.7 2 10.5 2 7V3l5-2Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+    <span>Encrypted &amp; audit-logged, firm-side</span>
+  </>
+);
+
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthShell
+      eyebrow="Client portal"
+      railHeading="You've been invited to your portal."
+      railSub="Accept below to view your documents, messages, and billing in one secure place."
+      railFoot={RAIL_FOOT}
+    >
+      {children}
+    </AuthShell>
+  );
+}
 
 export default function PortalAcceptInvitationPage() {
   const router = useRouter();
@@ -101,162 +129,173 @@ export default function PortalAcceptInvitationPage() {
 
   if (previewError) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">Invitation not found</h1>
-        <p className="mt-3 text-sm text-muted">{previewError}</p>
-        <Link href="/portal/login" className="mt-6 inline-block text-sm text-accent hover:underline">
+      <Shell>
+        <h1 className={styles.cardTitle}>Invitation not found</h1>
+        <p className={styles.lede}>{previewError}</p>
+        <Link href="/portal/login" className={styles.link}>
           Back to sign in
         </Link>
-      </Centered>
+      </Shell>
     );
   }
 
   if (!preview || currentUserEmail === undefined) {
     return (
-      <Centered center>
-        <p className="text-sm text-muted">Loading invitation...</p>
-      </Centered>
+      <Shell>
+        <p className={styles.lede} style={{ marginBottom: 0 }}>
+          Loading invitation...
+        </p>
+      </Shell>
     );
   }
 
   if (preview.status !== "invited") {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">
-          {preview.status === "active" ? "Already accepted" : "Invitation no longer valid"}
-        </h1>
-        <p className="mt-3 text-sm text-muted">
+      <Shell>
+        <h1 className={styles.cardTitle}>{preview.status === "active" ? "Already accepted" : "Invitation no longer valid"}</h1>
+        <p className={styles.lede}>
           This invitation to access {preview.client_label}&apos;s portal is {preview.status === "active" ? "already active" : preview.status}.
         </p>
-        <Link href="/portal/login" className="mt-6 inline-block text-sm text-accent hover:underline">
+        <Link href="/portal/login" className={styles.link}>
           Back to sign in
         </Link>
-      </Centered>
+      </Shell>
     );
   }
 
   if (new Date(preview.token_expires_at) < new Date()) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">Invitation expired</h1>
-        <p className="mt-3 text-sm text-muted">
+      <Shell>
+        <h1 className={styles.cardTitle}>Invitation expired</h1>
+        <p className={styles.lede} style={{ marginBottom: 0 }}>
           This invitation link has expired. Ask your firm to send a new one.
         </p>
-      </Centered>
+      </Shell>
     );
   }
 
   if (checkEmail) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">Check your email</h1>
-        <p className="mt-3 text-sm text-muted">
-          Confirm your account via the link sent to <span className="font-medium text-slate">{preview.invited_email}</span> to
-          finish setting up your portal access.
+      <Shell>
+        <h1 className={styles.cardTitle}>Check your email</h1>
+        <p className={styles.lede} style={{ marginBottom: 0 }}>
+          Confirm your account via the link sent to <strong>{preview.invited_email}</strong> to finish setting up your portal
+          access.
         </p>
-      </Centered>
+      </Shell>
     );
   }
 
   if (currentUserEmail && currentUserEmail.toLowerCase() !== preview.invited_email.toLowerCase()) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">Wrong account</h1>
-        <p className="mt-3 text-sm text-muted">
-          This invitation was sent to <span className="font-medium text-slate">{preview.invited_email}</span>, but
-          you&apos;re signed in as {currentUserEmail}.
+      <Shell>
+        <h1 className={styles.cardTitle}>Wrong account</h1>
+        <p className={styles.lede}>
+          This invitation was sent to <strong>{preview.invited_email}</strong>, but you&apos;re signed in as{" "}
+          {currentUserEmail}.
         </p>
-        <form action="/api/auth/sign-out" method="post" className="mt-6">
-          <button type="submit" className="text-sm text-accent hover:underline">
+        <form action="/api/auth/sign-out" method="post">
+          <button type="submit" className={styles.link} style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }}>
             Sign out and try again
           </button>
         </form>
-      </Centered>
+      </Shell>
     );
   }
 
   if (currentUserEmail) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">Access {preview.client_label}&apos;s portal</h1>
-        <p className="mt-3 text-sm text-muted">Accept to view your documents, messages, and billing.</p>
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-        <button
-          type="button"
-          disabled={loading || accepted}
-          onClick={acceptNow}
-          className="mt-6 w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-        >
-          {loading ? "Joining..." : "Accept invitation"}
+      <Shell>
+        <h1 className={styles.cardTitle}>Access {preview.client_label}&apos;s portal</h1>
+        <p className={styles.lede}>Accept to view your documents, messages, and billing.</p>
+        {error && <AuthError>{error}</AuthError>}
+        <button type="button" disabled={loading || accepted} onClick={acceptNow} className={styles.submit} style={{ marginTop: 8 }}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Joining…" : "Accept invitation"}
         </button>
-      </Centered>
+      </Shell>
     );
   }
 
   return (
-    <Centered>
-      <h1 className="text-xl font-semibold text-ink">Access {preview.client_label}&apos;s portal</h1>
-      <p className="mt-1 text-sm text-muted">
-        Create an account or sign in with <span className="font-medium text-slate">{preview.invited_email}</span> to accept.
+    <Shell>
+      <h1 className={styles.cardTitle}>Access {preview.client_label}&apos;s portal</h1>
+      <p className={styles.lede}>
+        Create an account or sign in with <strong>{preview.invited_email}</strong> to accept.
       </p>
 
-      <form onSubmit={handleAuthSubmit} className="mt-6 space-y-4">
+      <form onSubmit={handleAuthSubmit} className={styles.form}>
         {mode === "sign-up" && (
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className={styles.field}>
+              <label htmlFor="first_name">First name</label>
+              <input
+                id="first_name"
+                required
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className={styles.input}
+                autoComplete="given-name"
+              />
+            </div>
+            <div className={styles.field}>
+              <label htmlFor="last_name">Last name</label>
+              <input
+                id="last_name"
+                required
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className={styles.input}
+                autoComplete="family-name"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className={styles.field}>
+          <label htmlFor="invited_email">Email</label>
+          <input id="invited_email" type="email" value={preview.invited_email} disabled className={styles.input} style={{ opacity: 0.7 }} />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="password">{mode === "sign-up" ? "Choose a password" : "Password"}</label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={6}
+            placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={styles.input}
+            autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
+          />
+        </div>
+
+        {mode === "sign-up" && (
+          <div className={styles.field}>
+            <label htmlFor="confirm_password">Confirm password</label>
             <input
+              id="confirm_password"
+              type="password"
               required
-              placeholder="First name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <input
-              required
-              placeholder="Last name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              minLength={6}
+              placeholder="Confirm password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={styles.input}
+              autoComplete="new-password"
             />
           </div>
         )}
 
-        <input
-          type="email"
-          value={preview.invited_email}
-          disabled
-          className="w-full rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted"
-        />
+        {error && <AuthError>{error}</AuthError>}
 
-        <input
-          type="password"
-          required
-          minLength={6}
-          placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-
-        {mode === "sign-up" && (
-          <input
-            type="password"
-            required
-            minLength={6}
-            placeholder="Confirm password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        )}
-
-        {error && <p className="text-sm text-danger">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-        >
-          {loading ? "Please wait..." : mode === "sign-up" ? "Create account & continue" : "Sign in & continue"}
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Please wait…" : mode === "sign-up" ? "Create account & continue" : "Sign in & continue"}
         </button>
       </form>
 
@@ -266,20 +305,11 @@ export default function PortalAcceptInvitationPage() {
           setError(null);
           setMode(mode === "sign-up" ? "sign-in" : "sign-up");
         }}
-        className="mt-4 w-full text-center text-sm text-accent hover:underline"
+        className={styles.link}
+        style={{ marginTop: 16, display: "block", textAlign: "center", width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
       >
         {mode === "sign-up" ? "Already have an account? Sign in" : "Need to create an account?"}
       </button>
-    </Centered>
-  );
-}
-
-function Centered({ children, center = false }: { children: React.ReactNode; center?: boolean }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className={`w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm ${center ? "text-center" : ""}`}>
-        {children}
-      </div>
-    </div>
+    </Shell>
   );
 }
