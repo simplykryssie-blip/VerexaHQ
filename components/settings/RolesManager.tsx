@@ -69,7 +69,11 @@ export function RolesManager({
   }
 
   async function togglePermission(role: RoleRow, permissionId: string) {
-    if (!isAdmin || role.is_system_role) return;
+    if (!isAdmin) return;
+    if (role.is_system_role) {
+      await forkRole(role, permissionId);
+      return;
+    }
     const has = role.permissionIds.includes(permissionId);
     setTogglingId(permissionId);
     setRoles((prev) =>
@@ -160,10 +164,20 @@ export function RolesManager({
   // blocks editing them directly -- changing "Staff" here would change it
   // for every workspace. "Editable" for the user's purposes means: make a
   // workspace-owned copy with the same name and permissions, then edit that.
-  async function forkRole(role: RoleRow) {
+  // toggledPermissionId lets a click on a (previously grayed-out) permission
+  // switch on a system role fork it AND apply that exact change in one step,
+  // instead of requiring a separate "Customize" click first.
+  async function forkRole(role: RoleRow, toggledPermissionId?: string) {
+    if (toggledPermissionId) setTogglingId(toggledPermissionId);
     setForking(true);
     const takenSlugs = new Set(roles.filter((r) => r.workspace_id === workspaceId).map((r) => r.slug));
     const slug = uniqueSlug(slugify(role.name), takenSlugs);
+
+    const targetPermissionIds = toggledPermissionId
+      ? role.permissionIds.includes(toggledPermissionId)
+        ? role.permissionIds.filter((id) => id !== toggledPermissionId)
+        : [...role.permissionIds, toggledPermissionId]
+      : role.permissionIds;
 
     const { data: newRole, error } = await supabase
       .from("roles")
@@ -173,26 +187,33 @@ export function RolesManager({
 
     if (error || !newRole) {
       setForking(false);
+      setTogglingId(null);
       toast.show(error?.message ?? "Could not customize this role.", "error");
       return;
     }
 
     let permissionIds: string[] = [];
-    if (role.permissionIds.length > 0) {
+    if (targetPermissionIds.length > 0) {
       const { error: copyError } = await supabase
         .from("role_permissions")
-        .insert(role.permissionIds.map((permissionId) => ({ role_id: newRole.id, permission_id: permissionId })));
+        .insert(targetPermissionIds.map((permissionId) => ({ role_id: newRole.id, permission_id: permissionId })));
       if (copyError) {
         toast.show(`Copy created, but couldn't copy permissions: ${copyError.message}`, "error");
       } else {
-        permissionIds = role.permissionIds;
+        permissionIds = targetPermissionIds;
       }
     }
 
     setForking(false);
+    setTogglingId(null);
     setRoles((prev) => [...prev, { ...newRole, permissionIds, memberCount: 0 }]);
     setSelectedId(newRole.id);
-    toast.show(`Created your own copy of ${role.name} -- edit it here. The System role is unchanged.`, "success");
+    toast.show(
+      toggledPermissionId
+        ? `Created your own copy of ${role.name} with that change applied. The System role is unchanged.`
+        : `Created your own copy of ${role.name} -- edit it here. The System role is unchanged.`,
+      "success"
+    );
     router.refresh();
   }
 
@@ -322,7 +343,8 @@ export function RolesManager({
 
             {selected.is_system_role && (
               <p className="border-b border-border bg-surfaceMuted px-5 py-2 text-xs text-muted">
-                This is a shared System role -- click Customize to make your own editable copy for this workspace.
+                This is a shared System role. Toggling a permission below (or clicking Customize) creates your own
+                editable copy for this workspace -- the original stays unchanged.
               </p>
             )}
 
@@ -333,7 +355,6 @@ export function RolesManager({
                   <ul className="mt-2 space-y-2">
                     {perms.map((p) => {
                       const checked = selected.permissionIds.includes(p.id);
-                      const editable = isAdmin && !selected.is_system_role;
                       return (
                         <li key={p.id} className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
@@ -345,7 +366,8 @@ export function RolesManager({
                             role="switch"
                             aria-checked={checked}
                             onClick={() => togglePermission(selected, p.id)}
-                            disabled={!editable || togglingId === p.id}
+                            disabled={!isAdmin || togglingId === p.id || forking}
+                            title={selected.is_system_role ? `Creates your own editable copy of ${selected.name}` : undefined}
                             className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${checked ? "bg-accent" : "bg-surfaceMuted"}`}
                           >
                             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${checked ? "left-[22px]" : "left-0.5"}`} />
