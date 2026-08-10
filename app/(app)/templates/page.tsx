@@ -16,8 +16,8 @@ export default async function TemplatesPage({ searchParams }: { searchParams: { 
         { key: "engagement-letter", label: "Engagement Letters" },
         { key: "organizers", label: "Organizers" },
       ]}
-      heading="Templates"
-      description="Engagement letter and organizer templates. Email and SMS templates moved to Settings > Automations."
+      heading="Form Templates"
+      description="Engagement letter and organizer templates. See Email & SMS in the Templates menu for message templates."
       icon={LayoutTemplate}
       activeTabParam={searchParams.tab}
     />

@@ -17,18 +17,25 @@ import {
   ShieldCheck,
   Plug,
   Bell,
-  Zap,
   Workflow,
   Flag,
   SlidersHorizontal,
   ScrollText,
 } from "lucide-react";
 
-export type NavItem = {
+export type NavLeaf = {
   label: string;
   href: string;
   icon: LucideIcon;
 };
+
+export type NavGroup = {
+  label: string;
+  icon: LucideIcon;
+  children: { label: string; href: string }[];
+};
+
+export type NavItem = NavLeaf | NavGroup;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -39,8 +46,14 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Tax Office", href: "/tax", icon: Landmark },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
-  { label: "Templates", href: "/templates", icon: LayoutTemplate },
-  { label: "Automations", href: "/automations", icon: Zap },
+  {
+    label: "Templates",
+    icon: LayoutTemplate,
+    children: [
+      { label: "Email & SMS", href: "/automations" },
+      { label: "Form Templates", href: "/templates" },
+    ],
+  },
   { label: "Workflow Setup", href: "/service-packages", icon: Workflow },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

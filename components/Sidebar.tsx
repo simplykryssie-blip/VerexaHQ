@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ChevronDown } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { archivo, publicSans, plexMono } from "@/lib/authFonts";
 import styles from "./Sidebar.module.css";
@@ -13,12 +13,26 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // If a future nav href is a prefix of another (e.g. "/settings" and
-  // "/settings/security"), pick the longest match rather than highlighting
-  // every ancestor at once.
-  const activeNavHref = NAV_ITEMS.filter(
-    (candidate) => pathname === candidate.href || pathname.startsWith(candidate.href + "/")
-  ).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  // Flatten every navigable href (top-level items + group children) so the
+  // longest-prefix-match logic works regardless of nesting, and a group's
+  // children can be matched the same way leaf items always were.
+  const allHrefs = NAV_ITEMS.flatMap((item) => ("children" in item ? item.children.map((c) => c.href) : [item.href]));
+  const activeNavHref = allHrefs
+    .filter((href) => pathname === href || pathname.startsWith(href + "/"))
+    .sort((a, b) => b.length - a.length)[0];
+
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(NAV_ITEMS.filter((item) => "children" in item && item.children.some((c) => c.href === activeNavHref)).map((item) => item.label))
+  );
+
+  function toggleExpanded(label: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }
 
   useEffect(() => {
     setOpen(false);
@@ -68,8 +82,44 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {NAV_ITEMS.map((item) => {
-            const active = item.href === activeNavHref;
             const Icon = item.icon;
+
+            if ("children" in item) {
+              const isOpen = expanded.has(item.label);
+              const hasActiveChild = item.children.some((c) => c.href === activeNavHref);
+              return (
+                <div key={item.label}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(item.label)}
+                    aria-expanded={isOpen}
+                    className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                  >
+                    <Icon size={18} strokeWidth={2} className="shrink-0" />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {isOpen && (
+                    <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
+                      {item.children.map((child) => {
+                        const active = child.href === activeNavHref;
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={`${active ? styles.navItemActive : styles.navItem} block rounded-lg px-3 py-2 text-sm font-medium`}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            const active = item.href === activeNavHref;
             return (
               <Link
                 key={item.href}
