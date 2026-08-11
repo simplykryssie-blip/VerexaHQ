@@ -211,6 +211,49 @@ export async function updateSubscriptionItemPrice({
   return { ok: true, data };
 }
 
+// Connected-PTIN seat sync doesn't have a cached subscription-item id lying
+// around (unlike the webhook-driven price-change path above, which reads it
+// straight off the webhook payload), so this fetches it fresh each time --
+// simpler than adding a column to keep in sync.
+export async function getSubscriptionPrimaryItemId(stripeSubscriptionId: string): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions/${stripeSubscriptionId}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { items: { data: { id: string }[] } };
+  const itemId = data.items.data[0]?.id;
+  if (!itemId) {
+    return { ok: false, reason: "This subscription has no items." };
+  }
+  return { ok: true, data: { id: itemId } };
+}
+
+export async function updateSubscriptionItemQuantity({
+  subscriptionItemId,
+  quantity,
+}: {
+  subscriptionItemId: string;
+  quantity: number;
+}): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({ quantity, proration_behavior: "none" });
+  const res = await fetch(`${STRIPE_API}/subscription_items/${subscriptionItemId}`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string };
+  return { ok: true, data };
+}
+
 /**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.

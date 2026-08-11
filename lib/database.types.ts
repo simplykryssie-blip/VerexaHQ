@@ -1437,6 +1437,7 @@ export type Database = {
           primary_phone: string | null
           relationship_manager_id: string | null
           search_vector: unknown
+          source_workspace_id: string | null
           ssn_encrypted: string | null
           ssn_hash: string | null
           ssn_last4: string | null
@@ -1479,6 +1480,7 @@ export type Database = {
           primary_phone?: string | null
           relationship_manager_id?: string | null
           search_vector?: unknown
+          source_workspace_id?: string | null
           ssn_encrypted?: string | null
           ssn_hash?: string | null
           ssn_last4?: string | null
@@ -1521,6 +1523,7 @@ export type Database = {
           primary_phone?: string | null
           relationship_manager_id?: string | null
           search_vector?: unknown
+          source_workspace_id?: string | null
           ssn_encrypted?: string | null
           ssn_hash?: string | null
           ssn_last4?: string | null
@@ -3053,6 +3056,7 @@ export type Database = {
           search_vector: unknown
           service_id: string | null
           shared_status: string | null
+          source_engagement_share_id: string | null
           status: string
           updated_at: string
           workflow_id: string | null
@@ -3080,6 +3084,7 @@ export type Database = {
           search_vector?: unknown
           service_id?: string | null
           shared_status?: string | null
+          source_engagement_share_id?: string | null
           status?: string
           updated_at?: string
           workflow_id?: string | null
@@ -3107,6 +3112,7 @@ export type Database = {
           search_vector?: unknown
           service_id?: string | null
           shared_status?: string | null
+          source_engagement_share_id?: string | null
           status?: string
           updated_at?: string
           workflow_id?: string | null
@@ -3220,38 +3226,50 @@ export type Database = {
       }
       firm_connections: {
         Row: {
-          child_workspace_id: string
+          billing_responsibility: string
+          child_workspace_id: string | null
           created_at: string
           id: string
+          invite_expires_at: string | null
+          invite_token: string | null
           invited_by: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          shares_communications_identity: boolean
           status: string
           updated_at: string
         }
         Insert: {
-          child_workspace_id: string
+          billing_responsibility?: string
+          child_workspace_id?: string | null
           created_at?: string
           id?: string
+          invite_expires_at?: string | null
+          invite_token?: string | null
           invited_by?: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at?: string | null
           responded_by?: string | null
+          shares_communications_identity?: boolean
           status?: string
           updated_at?: string
         }
         Update: {
-          child_workspace_id?: string
+          billing_responsibility?: string
+          child_workspace_id?: string | null
           created_at?: string
           id?: string
+          invite_expires_at?: string | null
+          invite_token?: string | null
           invited_by?: string | null
           parent_workspace_id?: string
           relationship_type?: string
           responded_at?: string | null
           responded_by?: string | null
+          shares_communications_identity?: boolean
           status?: string
           updated_at?: string
         }
@@ -7155,6 +7173,125 @@ export type Database = {
       }
     }
     Functions: {
+      accept_firm_connection_billing: {
+        Args: { p_connection_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+      }
+      release_firm_connection_billing: {
+        Args: { p_connection_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+      }
+      disconnect_firm_connection: {
+        Args: { p_connection_id: string }
+        Returns: undefined
+      }
+      create_firm_connection_invite: {
+        Args: { p_relationship_type?: string; p_workspace_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+      }
+      get_firm_connection_invite_preview: {
+        Args: { p_token: string }
+        Returns: {
+          ero_name: string
+          expires_at: string | null
+          relationship_type: string
+          status: string
+        }[]
+      }
+      redeem_firm_connection_invite: {
+        Args: { p_token: string; p_workspace_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+      }
+      create_engagement_share: {
+        Args: { p_engagement_id: string }
+        Returns: {
+          created_at: string
+          decision_notes: string | null
+          engagement_id: string
+          expires_at: string | null
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shared_by: string | null
+          shared_items: Json
+          shared_with_workspace_id: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+      }
+      resubmit_engagement_share: {
+        Args: { p_engagement_share_id: string }
+        Returns: undefined
+      }
+      copy_shared_engagement: {
+        Args: { p_engagement_share_id: string }
+        Returns: Json
+      }
+      has_pending_engagement_share_access: {
+        Args: { p_engagement_id: string }
+        Returns: boolean
+      }
       accept_config_object_share: {
         Args: { p_share_id: string }
         Returns: string
