@@ -14,7 +14,7 @@ export default async function OrganizerBuilderPage({ params }: { params: { id: s
   const [{ data: template }, { data: fields }] = await Promise.all([
     supabase
       .from("organizer_templates")
-      .select("id, name, slug, description, status, workspace_id, public_token, is_public")
+      .select("id, name, slug, description, status, workspace_id, public_token, is_public, requires_portal_signup")
       .eq("id", params.id)
       .maybeSingle(),
     supabase

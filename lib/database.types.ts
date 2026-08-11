@@ -2527,6 +2527,7 @@ export type Database = {
           merge_fields: Json
           name: string
           public_token: string
+          requires_portal_signup: boolean
           requires_signature: boolean
           slug: string
           status: string
@@ -2542,6 +2543,7 @@ export type Database = {
           merge_fields?: Json
           name: string
           public_token?: string
+          requires_portal_signup?: boolean
           requires_signature?: boolean
           slug: string
           status?: string
@@ -2557,6 +2559,7 @@ export type Database = {
           merge_fields?: Json
           name?: string
           public_token?: string
+          requires_portal_signup?: boolean
           requires_signature?: boolean
           slug?: string
           status?: string
@@ -4257,6 +4260,7 @@ export type Database = {
           is_public: boolean
           name: string
           public_token: string
+          requires_portal_signup: boolean
           slug: string
           status: string
           updated_at: string
@@ -4270,6 +4274,7 @@ export type Database = {
           is_public?: boolean
           name: string
           public_token?: string
+          requires_portal_signup?: boolean
           slug: string
           status?: string
           updated_at?: string
@@ -4283,6 +4288,7 @@ export type Database = {
           is_public?: boolean
           name?: string
           public_token?: string
+          requires_portal_signup?: boolean
           slug?: string
           status?: string
           updated_at?: string
@@ -7908,6 +7914,18 @@ export type Database = {
         }
         Returns: Json
       }
+      sign_public_engagement_letter_with_signup: {
+        Args: {
+          p_auth_user_id: string
+          p_email: string
+          p_first_name: string
+          p_last_name: string | null
+          p_phone: string | null
+          p_token: string
+          p_typed_name: string
+        }
+        Returns: Json
+      }
       start_engagement_workflow: {
         Args: { p_engagement_id: string; p_process_id: string }
         Returns: string
@@ -7923,6 +7941,18 @@ export type Database = {
       submit_public_organizer_response: {
         Args: {
           p_answers: Json
+          p_email: string
+          p_first_name: string
+          p_last_name: string | null
+          p_phone: string | null
+          p_token: string
+        }
+        Returns: Json
+      }
+      submit_public_organizer_response_with_signup: {
+        Args: {
+          p_answers: Json
+          p_auth_user_id: string
           p_email: string
           p_first_name: string
           p_last_name: string | null

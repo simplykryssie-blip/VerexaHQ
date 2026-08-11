@@ -22,4 +22,5 @@ export type BuilderTemplate = {
   workspace_id: string | null;
   public_token: string;
   is_public: boolean;
+  requires_portal_signup: boolean;
 };

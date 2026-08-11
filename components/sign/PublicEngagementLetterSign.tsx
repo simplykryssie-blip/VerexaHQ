@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import { renderTemplate } from "@/lib/templates/render";
 import { formatPhone } from "@/lib/phone";
+import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
 
 type TemplateData = {
   template: { id: string; name: string; body_html: string; requires_signature: boolean };
@@ -12,6 +13,7 @@ type TemplateData = {
   firm_name: string | null;
   firm_address: string | null;
   firm_phone: string | null;
+  requires_portal_signup: boolean;
 };
 
 // Client-side render here is a preview only -- what actually gets stored as
@@ -20,16 +22,19 @@ type TemplateData = {
 // can't change what was legally signed.
 export function PublicEngagementLetterSign({ token, data }: { token: string; data: TemplateData }) {
   const supabase = createClient();
-  const { template, workspace_name, firm_name, firm_address, firm_phone } = data;
+  const { template, workspace_name, firm_name, firm_address, firm_phone, requires_portal_signup } = data;
 
   const [step, setStep] = useState<"contact" | "review" | "done">("contact");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [typedName, setTypedName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accountCreated, setAccountCreated] = useState(false);
 
   const clientName = `${firstName} ${lastName}`.trim();
   const preview = renderTemplate(template.body_html, {
@@ -44,6 +49,17 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       setError("Name and email are required.");
       return;
     }
+    if (requires_portal_signup) {
+      const strengthError = validatePasswordStrength(password);
+      if (strengthError) {
+        setError(strengthError);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
     setError(null);
     setTypedName(clientName);
     setStep("review");
@@ -53,6 +69,49 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
     if (!typedName.trim()) return;
     setSubmitting(true);
     setError(null);
+
+    if (requires_portal_signup) {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent("/portal/dashboard")}`,
+          data: { first_name: firstName.trim(), last_name: lastName.trim() || null },
+        },
+      });
+      if (signUpError || !signUpData.user) {
+        setSubmitting(false);
+        setError(signUpError?.message ?? "Could not create your account.");
+        return;
+      }
+
+      const { data, error: rpcError } = await supabase.rpc("sign_public_engagement_letter_with_signup", {
+        p_token: token,
+        p_first_name: firstName.trim(),
+        p_last_name: lastName.trim() || null,
+        p_email: email.trim(),
+        p_phone: phone.trim() || null,
+        p_typed_name: typedName.trim(),
+        p_auth_user_id: signUpData.user.id,
+      });
+      setSubmitting(false);
+      if (rpcError) {
+        setError(rpcError.message);
+        return;
+      }
+      const signatureId = (data as { signature_id?: string } | null)?.signature_id;
+      if (signatureId) {
+        fetch("/api/documents/file-signed-engagement-letter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ signatureId }),
+        }).catch(() => {});
+      }
+      setAccountCreated(true);
+      setStep("done");
+      return;
+    }
+
     const { data, error: rpcError } = await supabase.rpc("sign_public_engagement_letter", {
       p_token: token,
       p_first_name: firstName.trim(),
@@ -84,9 +143,16 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
     return (
       <div className="mx-auto max-w-md p-8 text-center">
         <h1 className="text-lg font-semibold text-ink">Signed -- thank you</h1>
-        <p className="mt-2 text-sm text-muted">
-          {template.name} was signed and sent to {workspace_name}. They&apos;ll be in touch soon.
-        </p>
+        {accountCreated ? (
+          <p className="mt-2 text-sm text-muted">
+            {template.name} was signed and sent to {workspace_name}. Check your email at {email} to confirm your new client portal account, then
+            log in to see your progress.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            {template.name} was signed and sent to {workspace_name}. They&apos;ll be in touch soon.
+          </p>
+        )}
       </div>
     );
   }
@@ -136,7 +202,36 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
                 className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
+            {requires_portal_signup && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-ink">Create a password *</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                  <p className="mt-1 text-xs text-muted">{PASSWORD_REQUIREMENTS_HINT}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink">Confirm password *</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  />
+                </div>
+              </>
+            )}
           </div>
+          {requires_portal_signup && (
+            <p className="mt-2 text-xs text-muted">
+              This letter requires a free client portal account so you can track your progress -- it&apos;s created automatically when you
+              continue.
+            </p>
+          )}
           {error && <p className="mt-2 text-sm text-danger">{error}</p>}
           <button
             type="button"

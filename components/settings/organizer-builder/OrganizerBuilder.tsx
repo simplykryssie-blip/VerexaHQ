@@ -152,6 +152,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
               path="o"
               publicToken={template.public_token}
               initialIsPublic={template.is_public}
+              initialRequiresPortalSignup={template.requires_portal_signup}
             />
           )}
           <button

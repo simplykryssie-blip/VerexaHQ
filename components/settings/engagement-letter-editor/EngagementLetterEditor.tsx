@@ -24,6 +24,7 @@ export type EngagementLetterTemplateRow = {
   merge_fields: unknown;
   public_token: string;
   is_public: boolean;
+  requires_portal_signup: boolean;
 };
 
 export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
@@ -81,6 +82,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               path="e"
               publicToken={template.public_token}
               initialIsPublic={template.is_public}
+              initialRequiresPortalSignup={template.requires_portal_signup}
             />
           )}
           {!readOnly && <TemplateStatusCycle table="engagement_letter_templates" id={template.id} status={template.status} />}
