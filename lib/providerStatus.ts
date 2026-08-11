@@ -4,7 +4,7 @@
 // manual/tracking-only behavior.
 
 export function isEmailConfigured() {
-  return !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM_ADDRESS;
+  return !!process.env.RESEND_API_KEY;
 }
 
 export function isSmsConfigured() {
