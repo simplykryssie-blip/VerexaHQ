@@ -62,7 +62,7 @@ type ClientRow = {
 type LedgerEntry = { id: string; balance_after: number; created_at: string };
 
 const TABS = [
-  "Overview",
+  "Details",
   "Documents",
   "Messages",
   "Billing",
@@ -141,7 +141,7 @@ export function ClientWorkspace({
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
 }) {
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = workspace.workspace_type !== "independent_ptin";
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
@@ -216,7 +216,7 @@ export function ClientWorkspace({
           </nav>
 
           <div className="px-8 py-6">
-            {tab === "Overview" && (
+            {tab === "Details" && (
               <OverviewTab
                 client={client}
                 workspaceId={workspace.id}

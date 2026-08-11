@@ -282,7 +282,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const { data: organizerResponses } = await supabase
     .from("organizer_responses")
-    .select("id, status, submitted_at, organizer_template_id, organizer_templates(name)")
+    .select("id, status, submitted_at, organizer_template_id, filed_as_attachment, organizer_templates(name)")
     .eq("engagement_id", engagement.id)
     .order("created_at", { ascending: false });
 
@@ -299,7 +299,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
   // masked ssn/ein values never reach the client bundle: only a precomputed
   // last-4 display string is sent, and the real value is fetched later via
   // reveal_organizer_answer() on demand.
-  const submittedResponses = (organizerResponses ?? []).filter((r) => r.status === "submitted");
+  const submittedResponses = (organizerResponses ?? []).filter((r) => r.status === "submitted" || r.status === "reviewed");
   const submittedResponseIds = submittedResponses.map((r) => r.id);
   const submittedTemplateIds = Array.from(new Set(submittedResponses.map((r) => r.organizer_template_id)));
 
@@ -321,7 +321,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
   ]);
 
   const organizerResponsesWithDetail = (organizerResponses ?? []).map((r) => {
-    if (r.status !== "submitted") return { ...r, topLevel: undefined, repeaters: undefined };
+    if (r.status !== "submitted" && r.status !== "reviewed") return { ...r, topLevel: undefined, repeaters: undefined };
     const { topLevel, repeaters } = buildOrganizerResponseDetail(r.id, r.organizer_template_id, organizerAnswerRows ?? [], organizerFieldRows ?? []);
     return { ...r, topLevel, repeaters };
   });
@@ -399,6 +399,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
         status: o.status,
         submitted_at: o.submitted_at,
         template_name: o.organizer_templates?.name ?? "Organizer",
+        filed_as_attachment: o.filed_as_attachment,
         topLevel: o.topLevel,
         repeaters: o.repeaters,
       }))}

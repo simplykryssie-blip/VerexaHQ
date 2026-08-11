@@ -8,6 +8,7 @@ import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TaxIdReveal } from "./TaxIdReveal";
+import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import { DateOfBirthInput } from "./DateOfBirthInput";
 import { InviteContactToPortalButton } from "./InviteContactToPortalButton";
 import { PortalInviteStatus } from "./PortalInviteStatus";
@@ -396,17 +397,11 @@ export function OverviewTab({
 
       {organizerResponses.length > 0 && (
         <Section title="Organizers">
-          <ul className="divide-y divide-border">
+          <div className="space-y-3">
             {organizerResponses.map((o) => (
-              <li key={o.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{o.template_name}</span>
-                <span className="capitalize text-muted">
-                  {o.status.replace("_", " ")}
-                  {o.submitted_at && ` -- submitted ${new Date(o.submitted_at).toLocaleDateString()}`}
-                </span>
-              </li>
+              <OrganizerResponseCard key={o.id} response={o} />
             ))}
-          </ul>
+          </div>
         </Section>
       )}
 
@@ -1097,5 +1092,6 @@ function engagementTaxYear(e: EngagementRow): number | null {
   return detail?.tax_year ?? null;
 }
 export type ClientHeaderInfo = { relationship_manager: StaffRef; default_reviewer: StaffRef; default_compliance_officer: StaffRef };
-export type OrganizerResponseRow = { id: string; status: string; submitted_at: string | null; template_name: string };
+import type { OrganizerResponseDetail as OrganizerResponseRow } from "@/components/organizer/OrganizerResponseCard";
+export type { OrganizerResponseRow };
 export type AppointmentRow = { id: string; title: string; start_at: string; location: string | null };

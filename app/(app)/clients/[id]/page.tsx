@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
+import { buildOrganizerResponseDetail, hasOrganizerAnswers } from "@/lib/organizer/buildResponseDetail";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -152,9 +153,34 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: organizerResponses } = await supabase
     .from("organizer_responses")
-    .select("id, status, submitted_at, organizer_templates(name)")
+    .select("id, status, submitted_at, organizer_template_id, filed_as_attachment, organizer_templates(name)")
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
+
+  const submittedOrganizerResponses = (organizerResponses ?? []).filter((r) => hasOrganizerAnswers(r.status));
+  const submittedOrganizerResponseIds = submittedOrganizerResponses.map((r) => r.id);
+  const submittedOrganizerTemplateIds = Array.from(new Set(submittedOrganizerResponses.map((r) => r.organizer_template_id)));
+
+  const [{ data: organizerAnswerRows }, { data: organizerFieldRows }] = await Promise.all([
+    submittedOrganizerResponseIds.length > 0
+      ? supabase
+          .from("organizer_response_answers")
+          .select("id, organizer_response_id, organizer_field_id, value, instance_index")
+          .in("organizer_response_id", submittedOrganizerResponseIds)
+      : Promise.resolve({ data: [] as { id: string; organizer_response_id: string; organizer_field_id: string; value: unknown; instance_index: number }[] }),
+    submittedOrganizerTemplateIds.length > 0
+      ? supabase
+          .from("organizer_fields")
+          .select("id, organizer_template_id, label, field_type, parent_field_id, display_order")
+          .in("organizer_template_id", submittedOrganizerTemplateIds)
+      : Promise.resolve({ data: [] as { id: string; organizer_template_id: string; label: string; field_type: string; parent_field_id: string | null; display_order: number }[] }),
+  ]);
+
+  const organizerResponsesWithDetail = (organizerResponses ?? []).map((r) => {
+    if (!hasOrganizerAnswers(r.status)) return { ...r, topLevel: undefined, repeaters: undefined };
+    const { topLevel, repeaters } = buildOrganizerResponseDetail(r.id, r.organizer_template_id, organizerAnswerRows ?? [], organizerFieldRows ?? []);
+    return { ...r, topLevel, repeaters };
+  });
 
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
@@ -313,11 +339,14 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       tasks={tasks}
       requestedDocumentCount={requestedDocumentCount}
       organizerTemplates={organizerTemplates ?? []}
-      organizerResponses={(organizerResponses ?? []).map((o: any) => ({
+      organizerResponses={organizerResponsesWithDetail.map((o: any) => ({
         id: o.id,
         status: o.status,
         submitted_at: o.submitted_at,
         template_name: o.organizer_templates?.name ?? "Organizer",
+        filed_as_attachment: o.filed_as_attachment,
+        topLevel: o.topLevel,
+        repeaters: o.repeaters,
       }))}
       documentRequestTemplates={documentRequestTemplates ?? []}
       engagementLetterTemplates={engagementLetterTemplates ?? []}
