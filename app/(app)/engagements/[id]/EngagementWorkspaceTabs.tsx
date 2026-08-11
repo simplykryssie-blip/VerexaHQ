@@ -109,7 +109,7 @@ export function OverviewTab({
           <Field label="Review status" value={engagement.review_status} />
           <Field label="Open date" value={engagement.open_date ? new Date(engagement.open_date).toLocaleDateString() : null} />
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted">Engagement due date</p>
+            <p className="text-xs uppercase tracking-wide text-muted">IRS due date / deadline</p>
             <div className="mt-1">
               <DueDateInput engagementId={engagement.id} currentDueDate={engagement.due_date} />
             </div>

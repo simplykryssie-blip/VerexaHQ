@@ -108,7 +108,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
                   <th className="px-5 py-3 font-medium">Client</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">Priority</th>
-                  <th className="px-5 py-3 font-medium">Engagement due date</th>
+                  <th className="px-5 py-3 font-medium">IRS due date / deadline</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
