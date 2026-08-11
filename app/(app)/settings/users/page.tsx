@@ -6,6 +6,7 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
+import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
 export const dynamic = 'force-dynamic';
 
@@ -78,7 +79,7 @@ export default async function UsersPage() {
         )}
       </div>
 
-      {workspace.is_owner && workspace.workspace_type === "independent_ptin" && (
+      {workspace.is_owner && !canInviteStaff(workspace) && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
           <div className="mt-3 rounded-xl border border-border bg-surface">
@@ -90,7 +91,7 @@ export default async function UsersPage() {
         </div>
       )}
 
-      {workspace.is_owner && workspace.workspace_type !== "independent_ptin" && (
+      {workspace.is_owner && canInviteStaff(workspace) && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
           <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>

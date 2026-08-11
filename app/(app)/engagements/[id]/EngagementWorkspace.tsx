@@ -9,6 +9,7 @@ import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
+import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import {
   OverviewTab,
   WorkflowTab,
@@ -125,7 +126,7 @@ export function EngagementWorkspace({
   taxYears: number[];
 }) {
   const [tab, setTab] = useState<Tab>("Details");
-  const showStaffRoles = workspace.workspace_type !== "independent_ptin";
+  const showStaffRoles = !isIndependentTier(workspace);
 
   const client = engagement.clients;
   const reviewCount = stages.filter((s) => s.status === "Waiting" || s.status === "In Progress").length;

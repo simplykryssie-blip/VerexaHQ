@@ -8,6 +8,7 @@ import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
+import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import {
   OverviewTab,
   MessagesTab,
@@ -146,7 +147,7 @@ export function ClientWorkspace({
   accountHolder: { id: string; display_name: string | null } | null;
 }) {
   const [tab, setTab] = useState<Tab>("Details");
-  const showStaffRoles = workspace.workspace_type !== "independent_ptin";
+  const showStaffRoles = !isIndependentTier(workspace);
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
   const primaryService = openEngagement

@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
 export async function POST(request: Request) {
   const appUrl = new URL(request.url).origin;
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  if (workspace.workspace_type === "independent_ptin") {
+  if (!canInviteStaff(workspace)) {
     return NextResponse.json(
       { error: "Independent PTIN workspaces can't add staff. Upgrade to an ERO Office or Service Bureau to invite team members." },
       { status: 403 }

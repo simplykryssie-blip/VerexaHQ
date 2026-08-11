@@ -4,6 +4,7 @@ import { getDashboardData } from "@/lib/dashboard/data";
 import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
 import { DashboardShell } from "./DashboardShell";
 import type { OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
+import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function DashboardPage() {
   const onboardingDismissed = Boolean(onboardingRow?.onboarding_dismissed_at);
   let onboardingSteps: OnboardingStep[] = [];
   if (!onboardingDismissed) {
-    const showInviteStep = workspace.workspace_type !== "independent_ptin";
+    const showInviteStep = canInviteStaff(workspace);
     const [{ count: serviceCount }, { count: organizerCount }, { count: clientCount }, { count: staffCount }] = await Promise.all([
       supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),

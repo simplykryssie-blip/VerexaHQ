@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { NewEngagementForm } from "./NewEngagementForm";
+import { isIndependentTier } from "@/lib/workspaceCapabilities";
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export default async function NewEngagementPage({
             defaultClient={defaultClient ?? null}
             services={services ?? []}
             billingRules={billingRules ?? []}
-            autoAssignToSelf={workspace.workspace_type === "independent_ptin"}
+            autoAssignToSelf={isIndependentTier(workspace)}
           />
         </div>
       </div>
