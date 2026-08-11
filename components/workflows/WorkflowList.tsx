@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 import { EmptyState } from "@/components/EmptyState";
+import { TriggerFields, defaultTriggerConfig, triggerSummary, type PipelineOption, type TemplateOption } from "@/components/workflows/TriggerFields";
 
 export type WorkflowRow = {
   id: string;
@@ -20,13 +20,6 @@ export type WorkflowRow = {
   run_count: number;
 };
 
-function triggerLabel(row: Pick<WorkflowRow, "trigger_type" | "trigger_config">) {
-  if (row.trigger_type === "engagement.status_changed") {
-    return `When engagement status changes to "${row.trigger_config.to_status ?? "?"}"`;
-  }
-  return row.trigger_type;
-}
-
 function slugify(name: string) {
   const base = name
     .toLowerCase()
@@ -36,12 +29,25 @@ function slugify(name: string) {
   return `${base || "workflow"}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function WorkflowList({ workspaceId, workflows, canManage }: { workspaceId: string; workflows: WorkflowRow[]; canManage: boolean }) {
+export function WorkflowList({
+  workspaceId,
+  workflows,
+  canManage,
+  pipelines,
+  organizerTemplates,
+}: {
+  workspaceId: string;
+  workflows: WorkflowRow[];
+  canManage: boolean;
+  pipelines: PipelineOption[];
+  organizerTemplates: TemplateOption[];
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [toStatus, setToStatus] = useState(ENGAGEMENT_STATUS_OPTIONS[0]);
+  const [triggerType, setTriggerType] = useState("engagement.status_changed");
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed", pipelines));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,8 +65,8 @@ export function WorkflowList({ workspaceId, workflows, canManage }: { workspaceI
         workspace_id: workspaceId,
         name: name.trim(),
         slug: slugify(name),
-        trigger_type: "engagement.status_changed",
-        trigger_config: { to_status: toStatus },
+        trigger_type: triggerType,
+        trigger_config: triggerConfig as never,
       })
       .select("id")
       .single();
@@ -99,32 +105,24 @@ export function WorkflowList({ workspaceId, workflows, canManage }: { workspaceI
 
       {open && (
         <form onSubmit={create} className="space-y-3 rounded-xl border border-border bg-surface p-4">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Name
-              <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Notify client when review is done"
-                className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              When engagement status changes to
-              <select
-                value={toStatus}
-                onChange={(e) => setToStatus(e.target.value)}
-                className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              >
-                {ENGAGEMENT_STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Name
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Notify client when review is done"
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </label>
+          <TriggerFields
+            triggerType={triggerType}
+            onTriggerTypeChange={setTriggerType}
+            config={triggerConfig}
+            onConfigChange={setTriggerConfig}
+            pipelines={pipelines}
+            organizerTemplates={organizerTemplates}
+          />
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted">
@@ -138,7 +136,7 @@ export function WorkflowList({ workspaceId, workflows, canManage }: { workspaceI
       )}
 
       {workflows.length === 0 ? (
-        <EmptyState message="No workflows yet. Create one to automate what happens on an engagement status change." />
+        <EmptyState message="No workflows yet. Create one to automate what happens on an engagement." />
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
           {workflows.map((w) => (
@@ -148,7 +146,8 @@ export function WorkflowList({ workspaceId, workflows, canManage }: { workspaceI
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{w.name}</p>
                   <p className="truncate text-xs text-muted">
-                    {triggerLabel(w)} &middot; {w.step_count} step{w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
+                    {triggerSummary(w.trigger_type, w.trigger_config, pipelines, organizerTemplates)} &middot; {w.step_count} step
+                    {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
                   </p>
                 </div>
               </Link>

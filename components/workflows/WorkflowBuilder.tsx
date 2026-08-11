@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 import { EmptyState } from "@/components/EmptyState";
+import { TriggerFields, triggerSummary, type PipelineOption, type TemplateOption } from "@/components/workflows/TriggerFields";
 
 export type WorkflowStepRow = {
   id: string;
@@ -21,6 +21,7 @@ export type WorkflowRunRow = {
   started_at: string;
   completed_at: string | null;
   engagement_number: string | null;
+  client_name: string | null;
 };
 
 type WorkflowLogRow = {
@@ -31,7 +32,7 @@ type WorkflowLogRow = {
   error_message: string | null;
 };
 
-type TemplateOption = { id: string; name: string; slug: string };
+type MessageTemplateOption = { id: string; name: string; slug: string };
 
 const ACTION_TYPES = [
   { value: "send_email", label: "Send an email" },
@@ -59,8 +60,8 @@ function StepCard({
   step: WorkflowStepRow;
   index: number;
   total: number;
-  emailTemplates: TemplateOption[];
-  smsTemplates: TemplateOption[];
+  emailTemplates: MessageTemplateOption[];
+  smsTemplates: MessageTemplateOption[];
   canManage: boolean;
   onSaved: () => void;
 }) {
@@ -285,6 +286,8 @@ export function WorkflowBuilder({
   emailTemplates,
   smsTemplates,
   canManage,
+  pipelines,
+  organizerTemplates,
 }: {
   workspaceId: string;
   automationId: string;
@@ -294,17 +297,20 @@ export function WorkflowBuilder({
   steps: WorkflowStepRow[];
   runs: WorkflowRunRow[];
   logs: WorkflowLogRow[];
-  emailTemplates: TemplateOption[];
-  smsTemplates: TemplateOption[];
+  emailTemplates: MessageTemplateOption[];
+  smsTemplates: MessageTemplateOption[];
   canManage: boolean;
+  pipelines: PipelineOption[];
+  organizerTemplates: TemplateOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [toStatus, setToStatus] = useState((triggerConfig.to_status as string) ?? ENGAGEMENT_STATUS_OPTIONS[0]);
+  const [currentTriggerType, setCurrentTriggerType] = useState(triggerType);
+  const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
 
   async function saveTrigger() {
-    await supabase.from("automations").update({ trigger_config: { to_status: toStatus } }).eq("id", automationId);
+    await supabase.from("automations").update({ trigger_type: currentTriggerType, trigger_config: config as never }).eq("id", automationId);
     router.refresh();
   }
 
@@ -342,32 +348,24 @@ export function WorkflowBuilder({
             </button>
           )}
         </div>
-        {triggerType === "engagement.status_changed" ? (
-          <div className="mt-3 flex items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              When an engagement&apos;s status changes to
-              <select
-                disabled={!canManage}
-                value={toStatus}
-                onChange={(e) => setToStatus(e.target.value)}
-                className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                {ENGAGEMENT_STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {canManage && (
+        <div className="mt-3">
+          <TriggerFields
+            triggerType={currentTriggerType}
+            onTriggerTypeChange={setCurrentTriggerType}
+            config={config}
+            onConfigChange={setConfig}
+            pipelines={pipelines}
+            organizerTemplates={organizerTemplates}
+            disabled={!canManage}
+          />
+          {canManage && (
+            <div className="mt-3 flex justify-end">
               <button type="button" onClick={saveTrigger} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
-                Save
+                Save trigger
               </button>
-            )}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm text-muted">Trigger: {triggerType}</p>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div>
@@ -408,7 +406,7 @@ export function WorkflowBuilder({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-4 py-2 font-medium">Engagement</th>
+                  <th className="px-4 py-2 font-medium">Engagement / client</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Started</th>
                   <th className="px-4 py-2 font-medium">Completed</th>
@@ -417,7 +415,7 @@ export function WorkflowBuilder({
               <tbody className="divide-y divide-border">
                 {runs.map((r) => (
                   <tr key={r.id}>
-                    <td className="px-4 py-2 text-slate">{r.engagement_number ?? "--"}</td>
+                    <td className="px-4 py-2 text-slate">{r.engagement_number ?? r.client_name ?? "--"}</td>
                     <td className="px-4 py-2 capitalize text-slate">{r.status}</td>
                     <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
                     <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>

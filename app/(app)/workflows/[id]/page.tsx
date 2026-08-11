@@ -21,38 +21,57 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   if (!automation) notFound();
 
-  const [{ data: steps }, { data: runs }, { data: logs }, { data: emailTemplates }, { data: smsTemplates }, { data: canManage }] = await Promise.all([
-    supabase
-      .from("automation_steps")
-      .select("id, display_order, action_type, action_config, delay_minutes")
-      .eq("automation_id", automation.id)
-      .order("display_order"),
-    supabase
-      .from("automation_runs")
-      .select("id, status, started_at, completed_at, engagements(engagement_number)")
-      .eq("automation_id", automation.id)
-      .order("started_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("automation_execution_logs")
-      .select("id, status, executed_at, execution_data, error_message")
-      .eq("automation_id", automation.id)
-      .order("executed_at", { ascending: false })
-      .limit(30),
-    supabase
-      .from("email_templates")
-      .select("id, name, slug")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
-      .eq("status", "published")
-      .order("name"),
-    supabase
-      .from("sms_templates")
-      .select("id, name, slug")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
-      .eq("status", "published")
-      .order("name"),
-    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
-  ]);
+  const [{ data: steps }, { data: runs }, { data: logs }, { data: emailTemplates }, { data: smsTemplates }, { data: canManage }, { data: pipelines }, { data: organizerTemplates }] =
+    await Promise.all([
+      supabase
+        .from("automation_steps")
+        .select("id, display_order, action_type, action_config, delay_minutes")
+        .eq("automation_id", automation.id)
+        .order("display_order"),
+      supabase
+        .from("automation_runs")
+        .select("id, status, started_at, completed_at, engagements(engagement_number), clients(first_name, last_name, business_name)")
+        .eq("automation_id", automation.id)
+        .order("started_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("automation_execution_logs")
+        .select("id, status, executed_at, execution_data, error_message")
+        .eq("automation_id", automation.id)
+        .order("executed_at", { ascending: false })
+        .limit(30),
+      supabase
+        .from("email_templates")
+        .select("id, name, slug")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("status", "published")
+        .order("name"),
+      supabase
+        .from("sms_templates")
+        .select("id, name, slug")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("status", "published")
+        .order("name"),
+      supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+      supabase
+        .from("pipelines")
+        .select("id, name, pipeline_stages(id, name, display_order)")
+        .eq("workspace_id", workspace.id)
+        .neq("status", "archived")
+        .order("created_at"),
+      supabase
+        .from("organizer_templates")
+        .select("id, name")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("status", "published")
+        .order("name"),
+    ]);
+
+  const pipelineOptions = (pipelines ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    stages: (p.pipeline_stages as unknown as { id: string; name: string; display_order: number }[]).slice().sort((a, b) => a.display_order - b.display_order),
+  }));
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
     id: s.id,
@@ -62,12 +81,18 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     delay_minutes: s.delay_minutes,
   }));
 
+  function clientLabelFor(c: { first_name: string | null; last_name: string | null; business_name: string | null } | null) {
+    if (!c) return null;
+    return c.business_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || null;
+  }
+
   const runRows: WorkflowRunRow[] = (runs ?? []).map((r) => ({
     id: r.id,
     status: r.status,
     started_at: r.started_at,
     completed_at: r.completed_at,
     engagement_number: (r.engagements as unknown as { engagement_number: string | null } | null)?.engagement_number ?? null,
+    client_name: clientLabelFor(r.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
   }));
 
   return (
@@ -86,6 +111,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           emailTemplates={emailTemplates ?? []}
           smsTemplates={smsTemplates ?? []}
           canManage={Boolean(canManage)}
+          pipelines={pipelineOptions}
+          organizerTemplates={organizerTemplates ?? []}
         />
       </div>
     </>

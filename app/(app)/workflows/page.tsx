@@ -11,14 +11,32 @@ export default async function WorkflowsPage() {
 
   const supabase = createClient();
 
-  const [{ data: automations }, { data: canManage }] = await Promise.all([
+  const [{ data: automations }, { data: canManage }, { data: pipelines }, { data: organizerTemplates }] = await Promise.all([
     supabase
       .from("automations")
       .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, created_at, automation_steps(id), automation_runs(id)")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false }),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    supabase
+      .from("pipelines")
+      .select("id, name, pipeline_stages(id, name, display_order)")
+      .eq("workspace_id", workspace.id)
+      .neq("status", "archived")
+      .order("created_at"),
+    supabase
+      .from("organizer_templates")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("status", "published")
+      .order("name"),
   ]);
+
+  const pipelineOptions = (pipelines ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    stages: (p.pipeline_stages as unknown as { id: string; name: string; display_order: number }[]).slice().sort((a, b) => a.display_order - b.display_order),
+  }));
 
   const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
     id: a.id,
@@ -39,7 +57,13 @@ export default async function WorkflowsPage() {
         description="Automate what happens when something changes on an engagement -- send an email or text, create a task, after a status change."
       />
       <div className="flex-1 px-8 py-6">
-        <WorkflowList workspaceId={workspace.id} workflows={rows} canManage={Boolean(canManage)} />
+        <WorkflowList
+          workspaceId={workspace.id}
+          workflows={rows}
+          canManage={Boolean(canManage)}
+          pipelines={pipelineOptions}
+          organizerTemplates={organizerTemplates ?? []}
+        />
       </div>
     </>
   );

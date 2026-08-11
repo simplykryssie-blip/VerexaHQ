@@ -453,6 +453,7 @@ export type Database = {
       automation_runs: {
         Row: {
           automation_id: string
+          client_id: string | null
           completed_at: string | null
           engagement_id: string | null
           id: string
@@ -463,6 +464,7 @@ export type Database = {
         }
         Insert: {
           automation_id: string
+          client_id?: string | null
           completed_at?: string | null
           engagement_id?: string | null
           id?: string
@@ -473,6 +475,7 @@ export type Database = {
         }
         Update: {
           automation_id?: string
+          client_id?: string | null
           completed_at?: string | null
           engagement_id?: string | null
           id?: string
@@ -487,6 +490,13 @@ export type Database = {
             columns: ["automation_id"]
             isOneToOne: false
             referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {
