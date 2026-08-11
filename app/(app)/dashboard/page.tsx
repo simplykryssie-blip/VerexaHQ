@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { getDashboardData } from "@/lib/dashboard/data";
 import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
 import { DashboardShell } from "./DashboardShell";
+import type { OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 
 export const dynamic = "force-dynamic";
 
@@ -16,22 +17,31 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: widgets }, data, { data: clientsCreate }, { data: engagementsManage }, { data: billingManage }, { data: documentsRequest }, { data: appointmentsManage }] =
-    await Promise.all([
-      dashboardId
-        ? supabase
-            .from("dashboard_widgets")
-            .select("id, widget_type, title, display_order, is_visible")
-            .eq("dashboard_id", dashboardId)
-            .order("display_order")
-        : Promise.resolve({ data: [] }),
-      getDashboardData(workspace.id),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.request" }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
-    ]);
+  const [
+    { data: widgets },
+    data,
+    { data: clientsCreate },
+    { data: engagementsManage },
+    { data: billingManage },
+    { data: documentsRequest },
+    { data: appointmentsManage },
+    { data: onboardingRow },
+  ] = await Promise.all([
+    dashboardId
+      ? supabase
+          .from("dashboard_widgets")
+          .select("id, widget_type, title, display_order, is_visible")
+          .eq("dashboard_id", dashboardId)
+          .order("display_order")
+      : Promise.resolve({ data: [] }),
+    getDashboardData(workspace.id),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.request" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
+    supabase.from("workspaces").select("onboarding_dismissed_at").eq("id", workspace.id).maybeSingle(),
+  ]);
 
   const quickActionPermissions = {
     clientsCreate: Boolean(clientsCreate),
@@ -63,6 +73,55 @@ export default async function DashboardPage() {
 
   const priorities = computeTodaysPriorities(data);
 
+  const onboardingDismissed = Boolean(onboardingRow?.onboarding_dismissed_at);
+  let onboardingSteps: OnboardingStep[] = [];
+  if (!onboardingDismissed) {
+    const showInviteStep = workspace.workspace_type !== "independent_ptin";
+    const [{ count: serviceCount }, { count: organizerCount }, { count: clientCount }, { count: staffCount }] = await Promise.all([
+      supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      showInviteStep
+        ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
+        : Promise.resolve({ count: null }),
+    ]);
+
+    onboardingSteps = [
+      {
+        key: "service",
+        label: "Create your first service package",
+        description: "Define what you offer -- pricing, stages, and forms -- so you can attach it to a client.",
+        href: "/service-packages",
+        complete: (serviceCount ?? 0) > 0,
+      },
+      {
+        key: "organizer",
+        label: "Add a client intake form",
+        description: "Build the questions clients answer before you start their work.",
+        href: "/templates",
+        complete: (organizerCount ?? 0) > 0,
+      },
+      {
+        key: "client",
+        label: "Add your first client",
+        description: "Bring in a real or test client to see the workflow end to end.",
+        href: "/clients",
+        complete: (clientCount ?? 0) > 0,
+      },
+      ...(showInviteStep
+        ? [
+            {
+              key: "invite",
+              label: "Invite your team",
+              description: "Add staff so they can share the workload.",
+              href: "/settings/users",
+              complete: (staffCount ?? 0) > 1,
+            },
+          ]
+        : []),
+    ];
+  }
+
   return (
     <DashboardShell
       workspaceName={workspace.name}
@@ -71,6 +130,8 @@ export default async function DashboardPage() {
       data={data}
       priorities={priorities}
       quickActionPermissions={quickActionPermissions}
+      workspaceId={workspace.id}
+      onboardingSteps={onboardingDismissed ? null : onboardingSteps}
     />
   );
 }

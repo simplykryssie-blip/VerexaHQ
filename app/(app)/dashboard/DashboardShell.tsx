@@ -13,6 +13,7 @@ import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget"
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
 import { useToast } from "@/components/Toast";
+import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
 import { isWidgetType, type WidgetType } from "@/lib/dashboard/widgets";
@@ -30,6 +31,8 @@ export function DashboardShell({
   data,
   priorities,
   quickActionPermissions,
+  workspaceId,
+  onboardingSteps,
 }: {
   workspaceName: string;
   /** Only gates the "Invite Staff" quick action (see quickActionPermissions
@@ -40,6 +43,9 @@ export function DashboardShell({
   data: DashboardData;
   priorities: PriorityItem[];
   quickActionPermissions: Omit<QuickActionPermissions, "isAdmin">;
+  workspaceId: string;
+  /** null once dismissed or already computed away -- render nothing. */
+  onboardingSteps: OnboardingStep[] | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -173,6 +179,10 @@ export function DashboardShell({
       />
 
       <div className="flex-1 px-8 py-6">
+        {onboardingSteps && onboardingSteps.length > 0 && (
+          <OnboardingChecklist workspaceId={workspaceId} steps={onboardingSteps} canDismiss={isAdmin} />
+        )}
+
         {customizing && (
           <div className="mb-4 rounded-xl border border-border bg-surfaceMuted p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout</h2>

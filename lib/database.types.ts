@@ -6646,6 +6646,7 @@ export type Database = {
           is_service_bureau: boolean
           mailing_address: string | null
           name: string
+          onboarding_dismissed_at: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string
@@ -6672,6 +6673,7 @@ export type Database = {
           is_service_bureau?: boolean
           mailing_address?: string | null
           name: string
+          onboarding_dismissed_at?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug: string
@@ -6698,6 +6700,7 @@ export type Database = {
           is_service_bureau?: boolean
           mailing_address?: string | null
           name?: string
+          onboarding_dismissed_at?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug?: string
