@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,11 @@ export default function PortalAcceptInvitationPage() {
     if (mode === "sign-up") {
       if (password !== confirmPassword) {
         setError("Passwords do not match.");
+        return;
+      }
+      const strengthError = validatePasswordStrength(password);
+      if (strengthError) {
+        setError(strengthError);
         return;
       }
       setLoading(true);
@@ -265,13 +271,14 @@ export default function PortalAcceptInvitationPage() {
             id="password"
             type="password"
             required
-            minLength={6}
+            minLength={mode === "sign-up" ? 8 : undefined}
             placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={styles.input}
             autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
           />
+          {mode === "sign-up" && <p className={styles.hint}>{PASSWORD_REQUIREMENTS_HINT}</p>}
         </div>
 
         {mode === "sign-up" && (
@@ -281,7 +288,7 @@ export default function PortalAcceptInvitationPage() {
               id="confirm_password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
               placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

@@ -28,7 +28,7 @@ export function PortalSidebar({ clientLabel, pendingCount }: { clientLabel: stri
       {open && <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-64 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -67,7 +67,7 @@ export function PortalSidebar({ clientLabel, pendingCount }: { clientLabel: stri
           })}
         </nav>
 
-        <div className="border-t border-border px-3 py-4">
+        <div className="border-t border-border px-3 py-4" style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
           <form action="/api/auth/sign-out" method="post">
             <input type="hidden" name="audience" value="portal" />
             <button

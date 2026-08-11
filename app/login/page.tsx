@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,11 @@ export default function LoginPage() {
     if (mode === "sign-up") {
       if (password !== confirmPassword) {
         setError("Passwords do not match.");
+        return;
+      }
+      const strengthError = validatePasswordStrength(password);
+      if (strengthError) {
+        setError(strengthError);
         return;
       }
 
@@ -210,13 +216,14 @@ export default function LoginPage() {
             id="password"
             type="password"
             required
-            minLength={6}
+            minLength={mode === "sign-up" ? 8 : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={mode === "sign-in" ? "Enter your password" : "Create a password"}
             className={styles.input}
             autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
           />
+          {mode === "sign-up" && <p className={styles.hint}>{PASSWORD_REQUIREMENTS_HINT}</p>}
         </div>
 
         {mode === "sign-up" && (
@@ -226,7 +233,7 @@ export default function LoginPage() {
               id="confirm_password"
               type="password"
               required
-              minLength={6}
+              minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={styles.input}

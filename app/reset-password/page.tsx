@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,11 @@ export default function ResetPasswordPage() {
 
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+    const strengthError = validatePasswordStrength(password);
+    if (strengthError) {
+      setError(strengthError);
       return;
     }
 
@@ -64,13 +70,14 @@ export default function ResetPasswordPage() {
             id="password"
             type="password"
             required
-            minLength={6}
+            minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Create a password"
             className={styles.input}
             autoComplete="new-password"
           />
+          <p className={styles.hint}>{PASSWORD_REQUIREMENTS_HINT}</p>
         </div>
         <div className={styles.field}>
           <label htmlFor="confirm_password">Confirm new password</label>

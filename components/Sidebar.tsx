@@ -54,7 +54,7 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
       )}
 
       <aside
-        className={`${styles.sidebar} ${archivo.variable} ${publicSans.variable} ${plexMono.variable} fixed inset-y-0 left-0 z-40 flex h-screen w-64 shrink-0 flex-col transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`${styles.sidebar} ${archivo.variable} ${publicSans.variable} ${plexMono.variable} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ fontFamily: "var(--font-public-sans), system-ui, sans-serif" }}
@@ -133,7 +133,7 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
           })}
         </nav>
 
-        <div className={`${styles.footer} px-3 py-4`}>
+        <div className={`${styles.footer} px-3 py-4`} style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
           <form action="/api/auth/sign-out" method="post">
             <button type="submit" className={`${styles.signOut} w-full rounded-lg px-3 py-2 text-left text-sm font-medium`}>
               Sign out
