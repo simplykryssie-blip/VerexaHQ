@@ -184,6 +184,12 @@ export function OverviewTab({
               email={client.primary_email}
               portalUsers={portalUsers}
             />
+            <Link
+              href={`/clients/${client.id}/portal-preview`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+            >
+              View portal
+            </Link>
             <EditClientProfileForm client={client} />
           </div>
         }
