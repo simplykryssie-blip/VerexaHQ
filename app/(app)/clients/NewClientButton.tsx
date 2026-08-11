@@ -21,6 +21,8 @@ type Draft = {
   phone: string;
   contactFirstName: string;
   contactLastName: string;
+  contactTitle: string;
+  contactCustomTitle: string;
   street: string;
   city: string;
   state: string;
@@ -30,7 +32,19 @@ type Draft = {
   itin: string;
   ein: string;
   inviteToPortal: boolean;
+  linkContactAsClient: boolean;
+  contactEmail: string;
+  contactPhone: string;
+  contactInviteToPortal: boolean;
 };
+
+const CONTACT_TITLE_OPTIONS = [
+  { value: "owner", label: "Owner" },
+  { value: "partner", label: "Partner" },
+  { value: "attorney", label: "Attorney" },
+  { value: "officer", label: "Officer" },
+  { value: "other", label: "Other" },
+];
 
 function digitsOnly(value: string) {
   return value.replace(/\D/g, "").slice(0, 9);
@@ -67,6 +81,12 @@ export function NewClientButton({
   const [phone, setPhone] = useState("");
   const [contactFirstName, setContactFirstName] = useState("");
   const [contactLastName, setContactLastName] = useState("");
+  const [contactTitle, setContactTitle] = useState(CONTACT_TITLE_OPTIONS[0].value);
+  const [contactCustomTitle, setContactCustomTitle] = useState("");
+  const [linkContactAsClient, setLinkContactAsClient] = useState(false);
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactInviteToPortal, setContactInviteToPortal] = useState(false);
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -103,6 +123,12 @@ export function NewClientButton({
     setPhone(draft.phone);
     setContactFirstName(draft.contactFirstName);
     setContactLastName(draft.contactLastName);
+    setContactTitle(draft.contactTitle);
+    setContactCustomTitle(draft.contactCustomTitle);
+    setLinkContactAsClient(draft.linkContactAsClient);
+    setContactEmail(draft.contactEmail);
+    setContactPhone(draft.contactPhone);
+    setContactInviteToPortal(draft.contactInviteToPortal);
     setStreet(draft.street);
     setCity(draft.city);
     setState(draft.state);
@@ -124,6 +150,8 @@ export function NewClientButton({
       phone,
       contactFirstName,
       contactLastName,
+      contactTitle,
+      contactCustomTitle,
       street,
       city,
       state,
@@ -133,6 +161,10 @@ export function NewClientButton({
       itin,
       ein,
       inviteToPortal,
+      linkContactAsClient,
+      contactEmail,
+      contactPhone,
+      contactInviteToPortal,
     };
   }
 
@@ -154,6 +186,18 @@ export function NewClientButton({
     }
     if (isBusiness && (!contactFirstName || !contactLastName)) {
       setError("Contact person's first and last name are required.");
+      return;
+    }
+    if (isBusiness && contactTitle === "other" && !contactCustomTitle.trim()) {
+      setError("Enter a title for this contact.");
+      return;
+    }
+    if (isBusiness && linkContactAsClient && !contactEmail) {
+      setError("An email for the contact is required to give them their own client profile.");
+      return;
+    }
+    if (isBusiness && contactInviteToPortal && !contactEmail) {
+      setError("An email for the contact is required to invite them to the portal.");
       return;
     }
     if (inviteToPortal && !email) {
@@ -223,20 +267,86 @@ export function NewClientButton({
       return;
     }
 
+    const contactTitleLabel = contactTitle === "other" ? contactCustomTitle.trim() || "Other" : CONTACT_TITLE_OPTIONS.find((o) => o.value === contactTitle)?.label ?? contactTitle;
+
     if (isBusiness) {
       const { error: contactError } = await supabase.from("client_contacts").insert({
         client_id: result.client_id,
         workspace_id: workspaceId,
         first_name: contactFirstName,
         last_name: contactLastName,
-        email: email || null,
-        phone: phone || null,
+        title: contactTitleLabel,
+        email: contactEmail || email || null,
+        phone: contactPhone || phone || null,
         is_primary: true,
       });
       if (contactError) {
         setLoading(false);
         setError(contactError.message);
         return;
+      }
+
+      if (linkContactAsClient) {
+        const { data: contactClientData, error: contactClientError } = await supabase.rpc("create_client", {
+          p_workspace_id: workspaceId,
+          p_client_type: "individual",
+          p_first_name: contactFirstName,
+          p_last_name: contactLastName,
+          p_primary_email: contactEmail || undefined,
+          p_primary_phone: contactPhone || phone || undefined,
+        });
+        if (contactClientError) {
+          setLoading(false);
+          setError(contactClientError.message);
+          return;
+        }
+        const contactResult = contactClientData as { client_id: string; is_new: boolean };
+
+        const { error: relationshipError } = await supabase.rpc("create_client_relationship", {
+          p_client_id: result.client_id,
+          p_workspace_id: workspaceId,
+          p_relationship_type: contactTitle,
+          p_custom_relationship_title: contactTitle === "other" ? contactCustomTitle.trim() : undefined,
+          p_related_name: `${contactFirstName} ${contactLastName}`,
+          p_related_client_id: contactResult.client_id,
+        });
+        if (relationshipError) {
+          setLoading(false);
+          setError(relationshipError.message);
+          return;
+        }
+
+        if (contactInviteToPortal) {
+          const { data: contactInvite, error: contactInviteError } = await supabase
+            .from("client_portal_users")
+            .insert({
+              client_id: contactResult.client_id,
+              workspace_id: workspaceId,
+              invited_name: `${contactFirstName} ${contactLastName}`,
+              invited_email: contactEmail,
+            })
+            .select("invitation_token")
+            .single();
+          if (contactInviteError) {
+            setLoading(false);
+            setError(contactInviteError.message);
+            return;
+          }
+
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+          const contactAcceptUrl = `${appUrl}/portal/accept-invitation?token=${contactInvite.invitation_token}`;
+
+          await fetch("/api/portal-invitations/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clientId: contactResult.client_id,
+              invitedEmail: contactEmail,
+              invitedName: `${contactFirstName} ${contactLastName}`,
+              acceptUrl: contactAcceptUrl,
+            }),
+          });
+        }
       }
     }
 
@@ -459,7 +569,70 @@ export function NewClientButton({
                       onChange={(e) => setContactLastName(e.target.value)}
                       className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
+                    <select
+                      value={contactTitle}
+                      onChange={(e) => setContactTitle(e.target.value)}
+                      className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      {CONTACT_TITLE_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    {contactTitle === "other" && (
+                      <input
+                        placeholder="Custom title"
+                        value={contactCustomTitle}
+                        onChange={(e) => setContactCustomTitle(e.target.value)}
+                        className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    )}
                   </div>
+
+                  <label className="mt-3 flex items-center gap-2 text-sm font-medium text-slate">
+                    <input
+                      type="checkbox"
+                      checked={linkContactAsClient}
+                      onChange={(e) => setLinkContactAsClient(e.target.checked)}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    Give this contact their own client profile
+                  </label>
+                  {linkContactAsClient && (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-xs text-muted">
+                        They&apos;ll get a separate client record with their own client ID, kept apart from {businessName || "this business"}&apos;s.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="email"
+                          required
+                          placeholder="Contact's email"
+                          value={contactEmail}
+                          onChange={(e) => setContactEmail(e.target.value)}
+                          onBlur={(e) => setContactEmail(e.target.value.trim().toLowerCase())}
+                          className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                        <input
+                          type="tel"
+                          placeholder="Contact's phone (optional)"
+                          value={contactPhone}
+                          onChange={(e) => setContactPhone(formatPhone(e.target.value))}
+                          className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate">
+                        <input
+                          type="checkbox"
+                          checked={contactInviteToPortal}
+                          onChange={(e) => setContactInviteToPortal(e.target.checked)}
+                          className="h-4 w-4 rounded border-border"
+                        />
+                        Invite this contact to the client portal (separate login)
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
 
