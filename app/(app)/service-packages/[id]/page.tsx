@@ -22,8 +22,17 @@ export default async function ServiceStagesPage({ params }: { params: { id: stri
   if (!service) notFound();
 
   const isSystemDefault = !service.workspace_id;
+  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [{ data: canEdit }, { data: isWorkspaceAdmin }, { data: process }, { data: folderTemplate }] = await Promise.all([
+  const [
+    { data: canEdit },
+    { data: isWorkspaceAdmin },
+    { data: process },
+    { data: folderTemplate },
+    { data: organizerTemplates },
+    { data: documentRequestTemplates },
+    { data: engagementLetterTemplates },
+  ] = await Promise.all([
     isSystemDefault ? Promise.resolve({ data: false }) : supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     service.process_id
@@ -32,6 +41,9 @@ export default async function ServiceStagesPage({ params }: { params: { id: stri
     service.document_folder_template_id
       ? supabase.from("document_folder_templates").select("id, name, workspace_id").eq("id", service.document_folder_template_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
+    supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
+    supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
   ]);
 
   const { data: folderItems } = folderTemplate
@@ -87,6 +99,9 @@ export default async function ServiceStagesPage({ params }: { params: { id: stri
           stages={stages ?? []}
           tasks={(tasks ?? []) as never}
           engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
+          organizerTemplates={organizerTemplates ?? []}
+          documentRequestTemplates={documentRequestTemplates ?? []}
+          engagementLetterTemplates={engagementLetterTemplates ?? []}
         />
       </div>
 

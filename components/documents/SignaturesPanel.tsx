@@ -6,7 +6,7 @@ import { PenLine, X, Link as LinkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
-import { renderTemplate } from "@/lib/templates/render";
+import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignatureRequestFromTemplate";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
@@ -57,52 +57,6 @@ export function SignaturesPanel({
   const [signingId, setSigningId] = useState<string | null>(null);
   const [typedName, setTypedName] = useState("");
 
-  async function resolveAttachmentId(): Promise<string | null> {
-    if (source === "upload") return attachmentId || null;
-
-    const template = templates.find((t) => t.id === templateId);
-    if (!template || !entityType || !entityId) return null;
-
-    const html = renderTemplate(template.body_html, {
-      client_name: clientName ?? "",
-      firm_name: firmName ?? "",
-      firm_address: "",
-      firm_phone: "",
-    });
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    const fileName = `${template.name}.html`;
-    const path = `${workspaceId}/${entityId}/${Date.now()}-${fileName}`;
-    const blob = new Blob([html], { type: "text/html" });
-    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "text/html" });
-    if (uploadErr) {
-      setError(uploadErr.message);
-      return null;
-    }
-    const { data: attachment, error: insertErr } = await supabase
-      .from("attachments")
-      .insert({
-        workspace_id: workspaceId,
-        entity_type: entityType,
-        entity_id: entityId,
-        file_name: fileName,
-        storage_path: path,
-        mime_type: "text/html",
-        file_size_bytes: blob.size,
-        uploaded_by: user?.id,
-        visibility: "internal",
-        category: "Engagement Letter",
-      })
-      .select("id")
-      .single();
-    if (insertErr || !attachment) {
-      setError(insertErr?.message ?? "Could not prepare the template for signing.");
-      return null;
-    }
-    return attachment.id;
-  }
-
   async function createRequest(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -120,28 +74,46 @@ export function SignaturesPanel({
       return;
     }
 
-    const resolvedAttachmentId = await resolveAttachmentId();
-    if (!resolvedAttachmentId) {
-      setError((prev) => prev ?? "Could not prepare the document to sign.");
-      return;
-    }
+    if (source === "template") {
+      const template = templates.find((t) => t.id === templateId);
+      if (!template || !entityType || !entityId) {
+        setError("Could not prepare the document to sign.");
+        return;
+      }
+      const result = await createSignatureRequestFromTemplate({
+        supabase,
+        workspaceId,
+        entityType,
+        entityId,
+        template,
+        clientName,
+        firmName,
+        signers,
+        title,
+        dueDate,
+      });
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+    } else {
+      const { data: request, error: reqError } = await supabase
+        .from("signature_requests")
+        .insert({ workspace_id: workspaceId, attachment_id: attachmentId, title, due_date: dueDate || null })
+        .select("id")
+        .single();
+      if (reqError || !request) {
+        setError(reqError?.message ?? "Could not create signature request.");
+        return;
+      }
 
-    const { data: request, error: reqError } = await supabase
-      .from("signature_requests")
-      .insert({ workspace_id: workspaceId, attachment_id: resolvedAttachmentId, title, due_date: dueDate || null })
-      .select("id")
-      .single();
-    if (reqError || !request) {
-      setError(reqError?.message ?? "Could not create signature request.");
-      return;
-    }
-
-    const { error: signersError } = await supabase.from("signature_request_signers").insert(
-      signers.map((s, i) => ({ signature_request_id: request.id, signer_name: s.signer_name, signer_email: s.signer_email, sign_order: i + 1 }))
-    );
-    if (signersError) {
-      setError(signersError.message);
-      return;
+      const { error: signersError } = await supabase.from("signature_request_signers").insert(
+        signers.map((s, i) => ({ signature_request_id: request.id, signer_name: s.signer_name, signer_email: s.signer_email, sign_order: i + 1 }))
+      );
+      if (signersError) {
+        setError(signersError.message);
+        return;
+      }
     }
 
     toast.show("Signature request created", "success");

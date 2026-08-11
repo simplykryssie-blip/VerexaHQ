@@ -6,7 +6,7 @@ import { BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Modal } from "@/components/Modal";
-import { renderEmail } from "@/lib/email/template";
+import { sendOrganizerToEngagement } from "@/lib/organizer/sendOrganizerToEngagement";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 type Props = {
@@ -77,32 +77,17 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
                   return "This organizer is already sent and still pending for this client.";
                 }
                 const template = organizerTemplates.find((t) => t.id === v.organizer_template_id);
-                const { error } = await supabase.from("organizer_responses").insert({
-                  workspace_id: workspaceId,
-                  client_id: clientId,
-                  engagement_id: engagementId,
-                  organizer_template_id: v.organizer_template_id,
+                if (!template) return "Select an organizer.";
+                const errorMessage = await sendOrganizerToEngagement({
+                  supabase,
+                  workspaceId,
+                  clientId,
+                  engagementId,
+                  template,
+                  primaryEmail,
+                  appUrl: process.env.NEXT_PUBLIC_APP_URL || window.location.origin,
                 });
-                if (error) return error.message;
-
-                if (primaryEmail) {
-                  const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-                  await fetch("/api/email/send", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      to: primaryEmail,
-                      sender: "notifications",
-                      subject: `New organizer to complete: ${template?.name ?? ""}`,
-                      html: renderEmail({
-                        heading: "An organizer is ready for you",
-                        bodyHtml: `<p>Please log in to your client portal and complete the <strong>${template?.name ?? "organizer"}</strong> when you have a chance.</p>`,
-                        ctaLabel: "Go to portal",
-                        ctaUrl: `${appUrl}/portal/organizer`,
-                      }),
-                    }),
-                  });
-                }
+                if (errorMessage) return errorMessage;
 
                 setOpen(false);
                 router.refresh();

@@ -17,6 +17,7 @@ import { TaskRow } from "./TaskRow";
 import { AddEngagementNoteForm, EditEngagementNoteForm } from "./AddEngagementNoteForm";
 import { AddTaskForm } from "./AddTaskForm";
 import { StageReviewActions } from "./StageReviewActions";
+import { StageTemplateActionButton } from "@/components/engagements/StageTemplateActionButton";
 import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
@@ -219,7 +220,23 @@ function clientLabel(c: { client_type: string; first_name: string | null; last_n
 
 // -------------------------------------------------------------------- Workflow
 
-export function WorkflowTab({ stages }: { stages: StageRow[] }) {
+export function WorkflowTab({
+  stages,
+  engagementId,
+  clientId,
+  workspaceId,
+  primaryEmail,
+  firmName,
+  clientName,
+}: {
+  stages: StageRow[];
+  engagementId: string;
+  clientId: string;
+  workspaceId: string;
+  primaryEmail: string | null;
+  firmName?: string;
+  clientName?: string;
+}) {
   return (
     <Section title="Workflow stages">
       {stages.length === 0 ? (
@@ -234,24 +251,55 @@ export function WorkflowTab({ stages }: { stages: StageRow[] }) {
                 <th className="px-4 py-2 font-medium">SLA</th>
                 <th className="px-4 py-2 font-medium">Reviewer</th>
                 <th className="px-4 py-2 font-medium">Due date</th>
+                <th className="px-4 py-2 font-medium">Next action</th>
                 <th className="px-4 py-2 font-medium"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {stages.map((s) => (
-                <tr key={s.id} className="hover:bg-surfaceMuted">
-                  <td className="px-4 py-2 font-medium text-ink">{s.stage_name}</td>
-                  <td className="px-4 py-2 text-slate">{s.status}</td>
-                  <td className="px-4 py-2">
-                    {s.sla_category && <SlaBadge category={s.sla_category} />}
-                  </td>
-                  <td className="px-4 py-2 text-slate">{staffName(s.reviewer)}</td>
-                  <td className="px-4 py-2 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
-                  <td className="px-4 py-2">
-                    {s.status !== "Completed" && s.status !== "Skipped" && <StageReviewActions stageId={s.id} />}
-                  </td>
-                </tr>
-              ))}
+              {stages.map((s) => {
+                const attached = [s.attachedTemplates?.organizer, s.attachedTemplates?.documentRequest, s.attachedTemplates?.engagementLetter].filter(
+                  (t): t is NonNullable<typeof t> => Boolean(t)
+                );
+                const kinds: Array<"organizer" | "documentRequest" | "engagementLetter"> = ["organizer", "documentRequest", "engagementLetter"];
+                return (
+                  <tr key={s.id} className="hover:bg-surfaceMuted">
+                    <td className="px-4 py-2 font-medium text-ink">{s.stage_name}</td>
+                    <td className="px-4 py-2 text-slate">{s.status}</td>
+                    <td className="px-4 py-2">
+                      {s.sla_category && <SlaBadge category={s.sla_category} />}
+                    </td>
+                    <td className="px-4 py-2 text-slate">{staffName(s.reviewer)}</td>
+                    <td className="px-4 py-2 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
+                    <td className="px-4 py-2">
+                      {attached.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {kinds.map((kind) => {
+                            const template = s.attachedTemplates?.[kind];
+                            if (!template) return null;
+                            return (
+                              <StageTemplateActionButton
+                                key={kind}
+                                kind={kind}
+                                template={template}
+                                sentStatus={template.sentStatus}
+                                engagementId={engagementId}
+                                clientId={clientId}
+                                workspaceId={workspaceId}
+                                primaryEmail={primaryEmail}
+                                firmName={firmName}
+                                clientName={clientName}
+                              />
+                            );
+                          })}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {s.status !== "Completed" && s.status !== "Skipped" && <StageReviewActions stageId={s.id} />}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1036,6 +1084,7 @@ export type EngagementRow = {
   compliance_officer: StaffRef;
 };
 export type ProgressRow = { task_progress_pct: number; document_progress_pct: number; overall_progress_pct: number; workflow_status: string | null };
+export type AttachedStageTemplate = { id: string; name: string; body_html?: string; sentStatus: string | null } | null;
 export type StageRow = {
   id: string;
   stage_name: string;
@@ -1045,6 +1094,11 @@ export type StageRow = {
   completed_at: string | null;
   reviewer: StaffRef;
   sla_category: string | null;
+  attachedTemplates?: {
+    organizer: AttachedStageTemplate;
+    documentRequest: AttachedStageTemplate;
+    engagementLetter: AttachedStageTemplate;
+  };
 };
 export type TaskDependency = { id: string; depends_on_task_id: string; depends_on_title: string };
 export type TaskRow = {

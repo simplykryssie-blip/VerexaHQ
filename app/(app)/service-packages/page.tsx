@@ -16,33 +16,22 @@ export default async function ServicePackagesPage() {
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [
-    { data: services },
-    { data: categories },
-    { data: pricingRules },
-    { data: billingRules },
-    { data: organizerTemplates },
-    { data: documentRequestTemplates },
-    { data: documentFolderTemplates },
-    { data: engagementLetterTemplates },
-  ] = await Promise.all([
-    supabase
-      .from("services")
-      .select(
-        `id, name, slug, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
-        service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_request_template_id,
-        document_folder_template_id, engagement_letter_template_id`
-      )
-      .or(orFilter)
-      .order("name"),
-    supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
-    supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
-    supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
-    supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
-  ]);
+  const [{ data: services }, { data: categories }, { data: pricingRules }, { data: billingRules }, { data: organizerTemplates }, { data: documentFolderTemplates }] =
+    await Promise.all([
+      supabase
+        .from("services")
+        .select(
+          `id, name, slug, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
+        service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_folder_template_id`
+        )
+        .or(orFilter)
+        .order("name"),
+      supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
+      supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
+      supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
+      supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
+      supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
+    ]);
 
   const serviceCards: ServiceCard[] = (services ?? []).map((s) => ({
     id: s.id,
@@ -59,9 +48,7 @@ export default async function ServicePackagesPage() {
     pricing_rule_id: s.pricing_rule_id,
     billing_rule_id: s.billing_rule_id,
     organizer_template_id: s.organizer_template_id,
-    document_request_template_id: s.document_request_template_id,
     document_folder_template_id: s.document_folder_template_id,
-    engagement_letter_template_id: s.engagement_letter_template_id,
   }));
 
   return (
@@ -69,50 +56,51 @@ export default async function ServicePackagesPage() {
       <SettingsSectionHeader
         icon={Workflow}
         title="Services"
-        description="The offerings clients can be sold -- each ties together pricing, billing, organizer, document request, folder, and engagement letter templates for engagements created against it."
+        description="Each service is a pipeline -- the ordered stages an engagement moves through, with the right form or letter attached at the step that needs it."
       />
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <h3 className="text-sm font-semibold text-ink">Pricing rules</h3>
-          <div className="mt-2 space-y-2">
-            {(pricingRules ?? []).map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-                <PricingRuleEditRow rule={r} />
-                <TemplateStatusCycle table="pricing_rules" id={r.id} status={r.status} />
-              </div>
-            ))}
-            <CreatePricingRuleForm workspaceId={workspace.id} />
-          </div>
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-ink">Billing rules</h3>
-          <div className="mt-2 space-y-2">
-            {(billingRules ?? []).map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
-                <BillingRuleEditRow rule={r} />
-                <TemplateStatusCycle table="billing_rules" id={r.id} status={r.status} />
-              </div>
-            ))}
-            <CreateBillingRuleForm workspaceId={workspace.id} />
-          </div>
-        </div>
+      <div className="mt-6">
+        <ServiceGallery
+          workspaceId={workspace.id}
+          services={serviceCards}
+          categories={categories ?? []}
+          pricingRules={pricingRules ?? []}
+          billingRules={billingRules ?? []}
+          organizerTemplates={organizerTemplates ?? []}
+          documentFolderTemplates={documentFolderTemplates ?? []}
+        />
       </div>
 
-      <div className="mt-8">
-        <h3 className="text-sm font-semibold text-ink">Service packages</h3>
-        <div className="mt-2">
-          <ServiceGallery
-            workspaceId={workspace.id}
-            services={serviceCards}
-            categories={categories ?? []}
-            pricingRules={pricingRules ?? []}
-            billingRules={billingRules ?? []}
-            organizerTemplates={organizerTemplates ?? []}
-            documentRequestTemplates={documentRequestTemplates ?? []}
-            documentFolderTemplates={documentFolderTemplates ?? []}
-            engagementLetterTemplates={engagementLetterTemplates ?? []}
-          />
+      <div className="mt-10 border-t border-border pt-6">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Pricing &amp; billing (advanced)</h3>
+        <p className="mt-1 text-xs text-muted">
+          The rule library a service&apos;s default price and billing terms are picked from. Attach these from a service&apos;s Edit screen.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Pricing rules</h4>
+            <div className="mt-2 space-y-2">
+              {(pricingRules ?? []).map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                  <PricingRuleEditRow rule={r} />
+                  <TemplateStatusCycle table="pricing_rules" id={r.id} status={r.status} />
+                </div>
+              ))}
+              <CreatePricingRuleForm workspaceId={workspace.id} />
+            </div>
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Billing rules</h4>
+            <div className="mt-2 space-y-2">
+              {(billingRules ?? []).map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+                  <BillingRuleEditRow rule={r} />
+                  <TemplateStatusCycle table="billing_rules" id={r.id} status={r.status} />
+                </div>
+              ))}
+              <CreateBillingRuleForm workspaceId={workspace.id} />
+            </div>
+          </div>
         </div>
       </div>
     </div>

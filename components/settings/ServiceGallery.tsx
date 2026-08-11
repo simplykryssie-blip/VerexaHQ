@@ -30,9 +30,7 @@ export type ServiceCard = {
   pricing_rule_id: string | null;
   billing_rule_id: string | null;
   organizer_template_id: string | null;
-  document_request_template_id: string | null;
   document_folder_template_id: string | null;
-  engagement_letter_template_id: string | null;
 };
 
 const STATUS_FILTERS = [
@@ -54,9 +52,7 @@ export function ServiceGallery({
   pricingRules,
   billingRules,
   organizerTemplates,
-  documentRequestTemplates,
   documentFolderTemplates,
-  engagementLetterTemplates,
 }: {
   workspaceId: string;
   services: ServiceCard[];
@@ -64,9 +60,7 @@ export function ServiceGallery({
   pricingRules: PricingRuleOption[];
   billingRules: Option[];
   organizerTemplates: Option[];
-  documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
-  engagementLetterTemplates: Option[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -83,7 +77,7 @@ export function ServiceGallery({
   );
 
   const editing = services.find((s) => s.id === editingId) ?? null;
-  const editorProps = { workspaceId, categories, pricingRules, billingRules, organizerTemplates, documentRequestTemplates, documentFolderTemplates, engagementLetterTemplates };
+  const editorProps = { workspaceId, categories, pricingRules, billingRules, organizerTemplates, documentFolderTemplates };
   const hasNoOwnedServices = services.length > 0 && services.every((s) => !s.workspace_id);
 
   async function duplicateService(id: string, name: string) {
@@ -223,7 +217,13 @@ export function ServiceGallery({
                       </>
                     ) : (
                       <>
-                        <div className="mt-3 flex items-center gap-2">
+                        <Link
+                          href={`/service-packages/${s.id}`}
+                          className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+                        >
+                          <Workflow size={13} /> Build pipeline
+                        </Link>
+                        <div className="mt-2 flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => setEditingId(s.id)}
@@ -242,11 +242,6 @@ export function ServiceGallery({
                             <Copy size={13} />
                           </button>
                         </div>
-                        <div className="mt-2">
-                          <Link href={`/service-packages/${s.id}`} className="text-xs font-medium text-accent hover:underline">
-                            Manage stages
-                          </Link>
-                        </div>
                       </>
                     )}
                   </div>
@@ -261,7 +256,12 @@ export function ServiceGallery({
 
       {creating && (
         <Modal title="New service package" onClose={() => setCreating(false)} size="xl">
-          <CreateServiceForm defaultOpen onSuccess={() => setCreating(false)} {...editorProps} />
+          <CreateServiceForm
+            workspaceId={workspaceId}
+            categories={categories}
+            defaultOpen
+            onSuccess={(id) => router.push(`/service-packages/${id}`)}
+          />
         </Modal>
       )}
     </div>

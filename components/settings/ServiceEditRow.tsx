@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronDown, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
+import { TemplateSelect } from "@/components/settings/TemplateSelect";
 import { OrganizerServiceRouting } from "@/components/settings/OrganizerServiceRouting";
 
 type Option = { id: string; name: string };
@@ -26,37 +28,8 @@ type ServiceRow = {
   pricing_rule_id: string | null;
   billing_rule_id: string | null;
   organizer_template_id: string | null;
-  document_request_template_id: string | null;
   document_folder_template_id: string | null;
-  engagement_letter_template_id: string | null;
 };
-
-function Select({
-  value,
-  onChange,
-  options,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: Option[];
-  placeholder: string;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-    >
-      <option value="">{placeholder}</option>
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.name}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 export function ServiceEditRow({
   service,
@@ -65,9 +38,7 @@ export function ServiceEditRow({
   pricingRules,
   billingRules,
   organizerTemplates,
-  documentRequestTemplates,
   documentFolderTemplates,
-  engagementLetterTemplates,
   onClose,
 }: {
   service: ServiceRow;
@@ -76,9 +47,7 @@ export function ServiceEditRow({
   pricingRules: PricingRuleOption[];
   billingRules: Option[];
   organizerTemplates: Option[];
-  documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
-  engagementLetterTemplates: Option[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -97,9 +66,8 @@ export function ServiceEditRow({
   const [pricingRuleId, setPricingRuleId] = useState(service.pricing_rule_id ?? "");
   const [billingRuleId, setBillingRuleId] = useState(service.billing_rule_id ?? "");
   const [organizerTemplateId, setOrganizerTemplateId] = useState(service.organizer_template_id ?? "");
-  const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
-  const [engagementLetterTemplateId, setEngagementLetterTemplateId] = useState(service.engagement_letter_template_id ?? "");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const selectedPricingRule = pricingRules.find((r) => r.id === pricingRuleId);
   const isVariablePricing = Boolean(selectedPricingRule && VARIABLE_PRICING_METHODS.includes(selectedPricingRule.pricing_method));
@@ -120,9 +88,7 @@ export function ServiceEditRow({
         pricing_rule_id: pricingRuleId || null,
         billing_rule_id: billingRuleId || null,
         organizer_template_id: organizerTemplateId || null,
-        document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
-        engagement_letter_template_id: engagementLetterTemplateId || null,
       })
       .eq("id", service.id);
     setSaving(false);
@@ -153,24 +119,7 @@ export function ServiceEditRow({
             rows={2}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <Select value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
-            <Select value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />
-          </div>
-          {isVariablePricing ? (
-            <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-              &quot;{selectedPricingRule?.name}&quot; is a variable pricing method -- no default price is set here. The quote gets worked out per
-              engagement instead.
-            </p>
-          ) : (
-            <input
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="Default price"
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          )}
+          <TemplateSelect value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
           <input
             type="number"
             min="5"
@@ -179,33 +128,6 @@ export function ServiceEditRow({
             onChange={(e) => setDurationMinutes(e.target.value)}
             placeholder="Duration in minutes (used for self-booking)"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-          <Select value={organizerTemplateId} onChange={setOrganizerTemplateId} options={organizerTemplates} placeholder="Organizer template" />
-          {organizerTemplateId && <OrganizerServiceRouting workspaceId={workspaceId} organizerTemplateId={organizerTemplateId} />}
-          <Select
-            value={documentRequestTemplateId}
-            onChange={setDocumentRequestTemplateId}
-            options={documentRequestTemplates}
-            placeholder="Document request template"
-          />
-          <div>
-            <Select
-              value={documentFolderTemplateId}
-              onChange={setDocumentFolderTemplateId}
-              options={documentFolderTemplates}
-              placeholder="Document folder template"
-            />
-            {documentFolderTemplateId && (
-              <Link href={`/service-packages/${service.id}`} className="mt-1 inline-block text-xs font-medium text-accent hover:underline">
-                Manage folders
-              </Link>
-            )}
-          </div>
-          <Select
-            value={engagementLetterTemplateId}
-            onChange={setEngagementLetterTemplateId}
-            options={engagementLetterTemplates}
-            placeholder="Engagement letter template"
           />
           <div className="flex gap-4">
             <label className="flex items-center gap-2 text-sm text-slate">
@@ -222,6 +144,61 @@ export function ServiceEditRow({
               Portal visible
             </label>
           </div>
+
+          <Link
+            href={`/service-packages/${service.id}`}
+            className="mt-2 flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            <Workflow size={14} /> Manage pipeline
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="mt-3 flex w-full items-center justify-between text-xs font-medium text-muted hover:text-ink"
+          >
+            Pricing, billing &amp; routing
+            <ChevronDown size={14} className={`transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+          </button>
+          {advancedOpen && (
+            <div className="space-y-2 rounded-lg border border-border bg-surfaceMuted p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <TemplateSelect value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
+                <TemplateSelect value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />
+              </div>
+              {isVariablePricing ? (
+                <p className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
+                  &quot;{selectedPricingRule?.name}&quot; is a variable pricing method -- no default price is set here. The quote gets worked out
+                  per engagement instead.
+                </p>
+              ) : (
+                <input
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="Default price"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              )}
+              <TemplateSelect
+                value={documentFolderTemplateId}
+                onChange={setDocumentFolderTemplateId}
+                options={documentFolderTemplates}
+                placeholder="Document folder template"
+              />
+              {documentFolderTemplateId && (
+                <Link href={`/service-packages/${service.id}`} className="inline-block text-xs font-medium text-accent hover:underline">
+                  Manage folders
+                </Link>
+              )}
+              <TemplateSelect value={organizerTemplateId} onChange={setOrganizerTemplateId} options={organizerTemplates} placeholder="Organizer template" />
+              <p className="text-xs text-muted">
+                This is which service an incoming organizer submission auto-attaches to -- not which form gets sent to a client. Attach a form to
+                send from the pipeline stage that needs it instead.
+              </p>
+              {organizerTemplateId && <OrganizerServiceRouting workspaceId={workspaceId} organizerTemplateId={organizerTemplateId} />}
+            </div>
+          )}
+
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
