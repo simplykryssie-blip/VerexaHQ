@@ -21,7 +21,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   if (!automation) notFound();
 
-  const [{ data: steps }, { data: runs }, { data: logs }, { data: emailTemplates }, { data: smsTemplates }, { data: canManage }, { data: pipelines }, { data: organizerTemplates }] =
+  const [{ data: steps }, { data: runs }, { data: logs }, { data: emailTemplates }, { data: smsTemplates }, { data: canManage }, { data: organizerTemplates }] =
     await Promise.all([
       supabase
         .from("automation_steps")
@@ -54,24 +54,12 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .order("name"),
       supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
       supabase
-        .from("pipelines")
-        .select("id, name, pipeline_stages(id, name, display_order)")
-        .eq("workspace_id", workspace.id)
-        .neq("status", "archived")
-        .order("created_at"),
-      supabase
         .from("organizer_templates")
         .select("id, name")
         .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
         .eq("status", "published")
         .order("name"),
     ]);
-
-  const pipelineOptions = (pipelines ?? []).map((p) => ({
-    id: p.id,
-    name: p.name,
-    stages: (p.pipeline_stages as unknown as { id: string; name: string; display_order: number }[]).slice().sort((a, b) => a.display_order - b.display_order),
-  }));
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
     id: s.id,
@@ -111,7 +99,6 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           emailTemplates={emailTemplates ?? []}
           smsTemplates={smsTemplates ?? []}
           canManage={Boolean(canManage)}
-          pipelines={pipelineOptions}
           organizerTemplates={organizerTemplates ?? []}
         />
       </div>

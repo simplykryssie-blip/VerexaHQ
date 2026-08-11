@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
 
 type Option = { id: string; name: string };
+type PricingRuleOption = { id: string; name: string; pricing_method: string };
+
+const VARIABLE_PRICING_METHODS = ["custom_quote", "tax_form_based", "complexity_based"];
 
 type ServiceRow = {
   id: string;
@@ -67,7 +70,7 @@ export function ServiceEditRow({
 }: {
   service: ServiceRow;
   categories: Option[];
-  pricingRules: Option[];
+  pricingRules: PricingRuleOption[];
   billingRules: Option[];
   organizerTemplates: Option[];
   documentRequestTemplates: Option[];
@@ -95,6 +98,9 @@ export function ServiceEditRow({
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
   const [engagementLetterTemplateId, setEngagementLetterTemplateId] = useState(service.engagement_letter_template_id ?? "");
 
+  const selectedPricingRule = pricingRules.find((r) => r.id === pricingRuleId);
+  const isVariablePricing = Boolean(selectedPricingRule && VARIABLE_PRICING_METHODS.includes(selectedPricingRule.pricing_method));
+
   async function save() {
     setSaving(true);
     setError(null);
@@ -102,7 +108,7 @@ export function ServiceEditRow({
       .from("services")
       .update({
         name,
-        default_price: price ? Number(price) : null,
+        default_price: isVariablePricing ? null : price ? Number(price) : null,
         description: description.trim() || null,
         estimated_duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         is_bookable: isBookable,
@@ -144,15 +150,24 @@ export function ServiceEditRow({
             rows={2}
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          <Select value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
           <div className="grid grid-cols-2 gap-2">
-            <Select value={categoryId} onChange={setCategoryId} options={categories} placeholder="Category" />
+            <Select value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
+            <Select value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />
+          </div>
+          {isVariablePricing ? (
+            <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+              &quot;{selectedPricingRule?.name}&quot; is a variable pricing method -- no default price is set here. The quote gets worked out per
+              engagement instead.
+            </p>
+          ) : (
             <input
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="Default price"
-              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
-          </div>
+          )}
           <input
             type="number"
             min="5"
@@ -162,10 +177,6 @@ export function ServiceEditRow({
             placeholder="Duration in minutes (used for self-booking)"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <div className="grid grid-cols-2 gap-2">
-            <Select value={pricingRuleId} onChange={setPricingRuleId} options={pricingRules} placeholder="Pricing rule" />
-            <Select value={billingRuleId} onChange={setBillingRuleId} options={billingRules} placeholder="Billing rule" />
-          </div>
           <Select value={organizerTemplateId} onChange={setOrganizerTemplateId} options={organizerTemplates} placeholder="Organizer template" />
           <Select
             value={documentRequestTemplateId}

@@ -3046,8 +3046,6 @@ export type Database = {
           internal_reference: string | null
           open_date: string | null
           owner_workspace_id: string | null
-          pipeline_id: string | null
-          pipeline_stage_id: string | null
           priority: Database["public"]["Enums"]["engagement_priority"] | null
           review_status: Database["public"]["Enums"]["review_status"] | null
           reviewer_id: string | null
@@ -3074,8 +3072,6 @@ export type Database = {
           internal_reference?: string | null
           open_date?: string | null
           owner_workspace_id?: string | null
-          pipeline_id?: string | null
-          pipeline_stage_id?: string | null
           priority?: Database["public"]["Enums"]["engagement_priority"] | null
           review_status?: Database["public"]["Enums"]["review_status"] | null
           reviewer_id?: string | null
@@ -3102,8 +3098,6 @@ export type Database = {
           internal_reference?: string | null
           open_date?: string | null
           owner_workspace_id?: string | null
-          pipeline_id?: string | null
-          pipeline_stage_id?: string | null
           priority?: Database["public"]["Enums"]["engagement_priority"] | null
           review_status?: Database["public"]["Enums"]["review_status"] | null
           reviewer_id?: string | null
@@ -4448,91 +4442,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pipeline_stages: {
-        Row: {
-          color: string | null
-          created_at: string
-          display_order: number
-          id: string
-          is_terminal: boolean
-          name: string
-          pipeline_id: string
-          updated_at: string
-        }
-        Insert: {
-          color?: string | null
-          created_at?: string
-          display_order?: number
-          id?: string
-          is_terminal?: boolean
-          name: string
-          pipeline_id: string
-          updated_at?: string
-        }
-        Update: {
-          color?: string | null
-          created_at?: string
-          display_order?: number
-          id?: string
-          is_terminal?: boolean
-          name?: string
-          pipeline_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pipeline_stages_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "pipelines"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pipelines: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          name: string
-          slug: string
-          status: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          slug: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          slug?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pipelines_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       platform_subscription_plans: {
         Row: {
           base_price_cents: number
@@ -5215,7 +5124,6 @@ export type Database = {
           is_portal_visible: boolean
           name: string
           organizer_template_id: string | null
-          pipeline_id: string | null
           pricing_rule_id: string | null
           process_id: string | null
           requires_documents: boolean
@@ -5248,7 +5156,6 @@ export type Database = {
           is_portal_visible?: boolean
           name: string
           organizer_template_id?: string | null
-          pipeline_id?: string | null
           pricing_rule_id?: string | null
           process_id?: string | null
           requires_documents?: boolean
@@ -5281,7 +5188,6 @@ export type Database = {
           is_portal_visible?: boolean
           name?: string
           organizer_template_id?: string | null
-          pipeline_id?: string | null
           pricing_rule_id?: string | null
           process_id?: string | null
           requires_documents?: boolean
@@ -5332,13 +5238,6 @@ export type Database = {
             columns: ["organizer_template_id"]
             isOneToOne: false
             referencedRelation: "organizer_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "services_pipeline_id_fkey"
-            columns: ["pipeline_id"]
-            isOneToOne: false
-            referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
           {
@@ -7393,10 +7292,6 @@ export type Database = {
         Returns: string
       }
       ensure_next_tax_year: { Args: never; Returns: number }
-      ensure_default_pipeline: {
-        Args: { p_workspace_id: string }
-        Returns: undefined
-      }
       ensure_workspace_security_policy: {
         Args: { p_workspace_id: string }
         Returns: undefined

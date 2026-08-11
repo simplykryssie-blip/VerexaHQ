@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function StageReviewActions({ stageId }: { stageId: string }) {
+export function StageReviewActions({ stageId, label = "Approve" }: { stageId: string; label?: string }) {
   const router = useRouter();
   const supabase = createClient();
   const [pending, setPending] = useState(false);
@@ -33,7 +33,7 @@ export function StageReviewActions({ stageId }: { stageId: string }) {
         onClick={approve}
         className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
       >
-        {pending ? "Saving..." : "Approve"}
+        {pending ? "Saving..." : label}
       </button>
       {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>

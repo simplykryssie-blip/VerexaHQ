@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
-import { TriggerFields, triggerSummary, type PipelineOption, type TemplateOption } from "@/components/workflows/TriggerFields";
+import { TriggerFields, triggerSummary, type TemplateOption } from "@/components/workflows/TriggerFields";
 
 export type WorkflowStepRow = {
   id: string;
@@ -286,7 +286,6 @@ export function WorkflowBuilder({
   emailTemplates,
   smsTemplates,
   canManage,
-  pipelines,
   organizerTemplates,
 }: {
   workspaceId: string;
@@ -300,7 +299,6 @@ export function WorkflowBuilder({
   emailTemplates: MessageTemplateOption[];
   smsTemplates: MessageTemplateOption[];
   canManage: boolean;
-  pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
 }) {
   const router = useRouter();
@@ -354,7 +352,6 @@ export function WorkflowBuilder({
             onTriggerTypeChange={setCurrentTriggerType}
             config={config}
             onConfigChange={setConfig}
-            pipelines={pipelines}
             organizerTemplates={organizerTemplates}
             disabled={!canManage}
           />

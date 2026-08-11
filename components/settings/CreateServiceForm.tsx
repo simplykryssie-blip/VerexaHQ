@@ -6,6 +6,9 @@ import { InlineAddForm } from "@/components/InlineAddForm";
 import { slugify } from "@/lib/roleSlug";
 
 type Option = { id: string; name: string };
+type PricingRuleOption = { id: string; name: string; pricing_method: string };
+
+const VARIABLE_PRICING_METHODS = ["custom_quote", "tax_form_based", "complexity_based"];
 
 export function CreateServiceForm({
   workspaceId,
@@ -21,7 +24,7 @@ export function CreateServiceForm({
 }: {
   workspaceId: string;
   categories: Option[];
-  pricingRules: Option[];
+  pricingRules: PricingRuleOption[];
   billingRules: Option[];
   organizerTemplates: Option[];
   documentRequestTemplates: Option[];
@@ -42,8 +45,15 @@ export function CreateServiceForm({
       fields={[
         { name: "name", label: "Name", required: true },
         { name: "service_category_id", label: "Category", type: "select", options: toOptions(categories) },
-        { name: "default_price", label: "Default price" },
         { name: "pricing_rule_id", label: "Pricing rule", type: "select", options: toOptions(pricingRules) },
+        {
+          name: "default_price",
+          label: "Default price",
+          showIf: (v) => {
+            const rule = pricingRules.find((r) => r.id === v.pricing_rule_id);
+            return !rule || !VARIABLE_PRICING_METHODS.includes(rule.pricing_method);
+          },
+        },
         { name: "billing_rule_id", label: "Billing rule", type: "select", options: toOptions(billingRules) },
         { name: "organizer_template_id", label: "Organizer template", type: "select", options: toOptions(organizerTemplates) },
         { name: "document_request_template_id", label: "Document request template", type: "select", options: toOptions(documentRequestTemplates) },

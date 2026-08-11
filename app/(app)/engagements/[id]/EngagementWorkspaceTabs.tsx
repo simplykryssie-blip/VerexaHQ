@@ -234,6 +234,7 @@ export function WorkflowTab({ stages }: { stages: StageRow[] }) {
                 <th className="px-4 py-2 font-medium">SLA</th>
                 <th className="px-4 py-2 font-medium">Reviewer</th>
                 <th className="px-4 py-2 font-medium">Due date</th>
+                <th className="px-4 py-2 font-medium"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -246,6 +247,9 @@ export function WorkflowTab({ stages }: { stages: StageRow[] }) {
                   </td>
                   <td className="px-4 py-2 text-slate">{staffName(s.reviewer)}</td>
                   <td className="px-4 py-2 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
+                  <td className="px-4 py-2">
+                    {s.status !== "Completed" && s.status !== "Skipped" && <StageReviewActions stageId={s.id} />}
+                  </td>
                 </tr>
               ))}
             </tbody>

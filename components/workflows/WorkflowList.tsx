@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
-import { TriggerFields, defaultTriggerConfig, triggerSummary, type PipelineOption, type TemplateOption } from "@/components/workflows/TriggerFields";
+import { TriggerFields, defaultTriggerConfig, triggerSummary, type TemplateOption } from "@/components/workflows/TriggerFields";
 
 export type WorkflowRow = {
   id: string;
@@ -33,13 +33,11 @@ export function WorkflowList({
   workspaceId,
   workflows,
   canManage,
-  pipelines,
   organizerTemplates,
 }: {
   workspaceId: string;
   workflows: WorkflowRow[];
   canManage: boolean;
-  pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
 }) {
   const router = useRouter();
@@ -47,7 +45,7 @@ export function WorkflowList({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState("engagement.status_changed");
-  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed", pipelines));
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed"));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -120,7 +118,6 @@ export function WorkflowList({
             onTriggerTypeChange={setTriggerType}
             config={triggerConfig}
             onConfigChange={setTriggerConfig}
-            pipelines={pipelines}
             organizerTemplates={organizerTemplates}
           />
           {error && <p className="text-sm text-danger">{error}</p>}
@@ -146,7 +143,7 @@ export function WorkflowList({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{w.name}</p>
                   <p className="truncate text-xs text-muted">
-                    {triggerSummary(w.trigger_type, w.trigger_config, pipelines, organizerTemplates)} &middot; {w.step_count} step
+                    {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates)} &middot; {w.step_count} step
                     {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
                   </p>
                 </div>

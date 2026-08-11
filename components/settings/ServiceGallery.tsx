@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 
 type Option = { id: string; name: string };
+type PricingRuleOption = { id: string; name: string; pricing_method: string };
 
 export type ServiceCard = {
   id: string;
@@ -60,7 +61,7 @@ export function ServiceGallery({
   workspaceId: string;
   services: ServiceCard[];
   categories: Option[];
-  pricingRules: Option[];
+  pricingRules: PricingRuleOption[];
   billingRules: Option[];
   organizerTemplates: Option[];
   documentRequestTemplates: Option[];
@@ -74,6 +75,7 @@ export function ServiceGallery({
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [cloningAll, setCloningAll] = useState(false);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () => services.filter((s) => (!query || s.name.toLowerCase().includes(query.toLowerCase())) && (status === "all" || s.status === status)),
@@ -83,6 +85,13 @@ export function ServiceGallery({
   const editing = services.find((s) => s.id === editingId) ?? null;
   const editorProps = { categories, pricingRules, billingRules, organizerTemplates, documentRequestTemplates, documentFolderTemplates, engagementLetterTemplates };
   const hasNoOwnedServices = services.length > 0 && services.every((s) => !s.workspace_id);
+
+  async function duplicateService(id: string, name: string) {
+    setDuplicatingId(id);
+    await supabase.rpc("duplicate_config_object", { p_table: "services", p_id: id, p_target_workspace_id: workspaceId, p_new_name: `${name} (copy)` });
+    setDuplicatingId(null);
+    router.refresh();
+  }
 
   async function cloneAllStarters() {
     setCloningAll(true);
@@ -156,6 +165,8 @@ export function ServiceGallery({
             {filtered.map((s) => {
               const isSystem = !s.workspace_id;
               const price = money(s.default_price);
+              const pricingRule = pricingRules.find((r) => r.id === s.pricing_rule_id);
+              const isVariablePricing = Boolean(pricingRule && ["custom_quote", "tax_form_based", "complexity_based"].includes(pricingRule.pricing_method));
               return (
                 <div key={s.id} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:shadow-md">
                   <div className="relative flex h-20 items-center justify-center bg-gradient-to-br from-accent to-accent/70">
@@ -184,7 +195,11 @@ export function ServiceGallery({
                       ) : (
                         <TemplateStatusCycle table="services" id={s.id} status={s.status} />
                       )}
-                      {price && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">{price}</span>}
+                      {isVariablePricing ? (
+                        <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Custom quote</span>
+                      ) : (
+                        price && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">{price}</span>
+                      )}
                       {s.is_bookable && (
                         <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
                           Bookable{s.estimated_duration_minutes ? ` -- ${s.estimated_duration_minutes} min` : ""}
@@ -215,6 +230,16 @@ export function ServiceGallery({
                             className="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
                           >
                             Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => duplicateService(s.id, s.name)}
+                            disabled={duplicatingId === s.id}
+                            aria-label="Duplicate service package"
+                            title="Duplicate"
+                            className="inline-flex items-center justify-center rounded-lg border border-border px-2.5 py-1.5 text-slate transition hover:border-accent hover:text-accent disabled:opacity-60"
+                          >
+                            <Copy size={13} />
                           </button>
                         </div>
                         <div className="mt-2">
