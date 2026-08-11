@@ -33,6 +33,7 @@ export function DashboardShell({
   quickActionPermissions,
   workspaceId,
   onboardingSteps,
+  seenOnboardingSteps,
 }: {
   workspaceName: string;
   /** Only gates the "Invite Staff" quick action (see quickActionPermissions
@@ -46,6 +47,7 @@ export function DashboardShell({
   workspaceId: string;
   /** null once dismissed or already computed away -- render nothing. */
   onboardingSteps: OnboardingStep[] | null;
+  seenOnboardingSteps: string[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -180,7 +182,12 @@ export function DashboardShell({
 
       <div className="flex-1 px-8 py-6">
         {onboardingSteps && onboardingSteps.length > 0 && (
-          <OnboardingChecklist workspaceId={workspaceId} steps={onboardingSteps} canDismiss={isAdmin} />
+          <OnboardingChecklist
+            workspaceId={workspaceId}
+            steps={onboardingSteps}
+            canDismiss={isAdmin}
+            seenSteps={seenOnboardingSteps}
+          />
         )}
 
         {customizing && (

@@ -5850,6 +5850,7 @@ export type Database = {
           mfa_enabled: boolean
           mfa_enrolled_at: string | null
           phone: string | null
+          seen_onboarding_steps: string[]
           updated_at: string
         }
         Insert: {
@@ -5867,6 +5868,7 @@ export type Database = {
           mfa_enabled?: boolean
           mfa_enrolled_at?: string | null
           phone?: string | null
+          seen_onboarding_steps?: string[]
           updated_at?: string
         }
         Update: {
@@ -5884,6 +5886,7 @@ export type Database = {
           mfa_enabled?: boolean
           mfa_enrolled_at?: string | null
           phone?: string | null
+          seen_onboarding_steps?: string[]
           updated_at?: string
         }
         Relationships: [

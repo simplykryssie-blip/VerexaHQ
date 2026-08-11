@@ -27,6 +27,7 @@ export default async function DashboardPage() {
     { data: documentsRequest },
     { data: appointmentsManage },
     { data: onboardingRow },
+    { data: profileRow },
   ] = await Promise.all([
     dashboardId
       ? supabase
@@ -42,6 +43,9 @@ export default async function DashboardPage() {
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.request" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
     supabase.from("workspaces").select("onboarding_dismissed_at").eq("id", workspace.id).maybeSingle(),
+    user
+      ? supabase.from("user_profiles").select("seen_onboarding_steps").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const quickActionPermissions = {
@@ -133,6 +137,7 @@ export default async function DashboardPage() {
       quickActionPermissions={quickActionPermissions}
       workspaceId={workspace.id}
       onboardingSteps={onboardingDismissed ? null : onboardingSteps}
+      seenOnboardingSteps={profileRow?.seen_onboarding_steps ?? []}
     />
   );
 }
