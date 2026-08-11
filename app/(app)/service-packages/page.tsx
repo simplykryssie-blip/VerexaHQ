@@ -6,6 +6,7 @@ import { CreatePricingRuleForm, CreateBillingRuleForm } from "@/components/setti
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { PricingRuleEditRow, BillingRuleEditRow } from "@/components/settings/RuleEditRow";
 import { ServiceGallery, type ServiceCard } from "@/components/settings/ServiceGallery";
+import { DefaultServiceSettings } from "@/components/settings/DefaultServiceSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,12 @@ export default async function ServicePackagesPage() {
     supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
   ]);
 
+  const { data: workspaceDefaults } = await supabase
+    .from("workspaces")
+    .select("default_individual_service_id, default_business_service_id")
+    .eq("id", workspace.id)
+    .single();
+
   const serviceCards: ServiceCard[] = (services ?? []).map((s) => ({
     id: s.id,
     name: s.name,
@@ -70,6 +77,13 @@ export default async function ServicePackagesPage() {
         icon={Workflow}
         title="Services"
         description="The offerings clients can be sold -- each ties together pricing, billing, organizer, document request, folder, and engagement letter templates for engagements created against it."
+      />
+
+      <DefaultServiceSettings
+        workspaceId={workspace.id}
+        services={(services ?? []).filter((s) => s.status === "published").map((s) => ({ id: s.id, name: s.name }))}
+        defaultIndividualServiceId={workspaceDefaults?.default_individual_service_id ?? null}
+        defaultBusinessServiceId={workspaceDefaults?.default_business_service_id ?? null}
       />
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

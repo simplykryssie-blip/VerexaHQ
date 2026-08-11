@@ -6659,6 +6659,8 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          default_business_service_id: string | null
+          default_individual_service_id: string | null
           id: string
           is_ero: boolean
           is_ptin_preparer: boolean
@@ -6685,6 +6687,8 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          default_business_service_id?: string | null
+          default_individual_service_id?: string | null
           id?: string
           is_ero?: boolean
           is_ptin_preparer?: boolean
@@ -6711,6 +6715,8 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          default_business_service_id?: string | null
+          default_individual_service_id?: string | null
           id?: string
           is_ero?: boolean
           is_ptin_preparer?: boolean
@@ -6734,7 +6740,22 @@ export type Database = {
           website?: string | null
           workspace_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_default_business_service_id_fkey"
+            columns: ["default_business_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_default_individual_service_id_fkey"
+            columns: ["default_individual_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

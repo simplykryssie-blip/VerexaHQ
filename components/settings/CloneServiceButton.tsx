@@ -42,7 +42,7 @@ export function CloneServiceButton({ serviceId, workspaceId }: { serviceId: stri
         type="button"
         onClick={handleClone}
         disabled={cloning}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
       >
         <Copy size={12} /> {cloning ? "Cloning..." : "Clone to customize"}
       </button>

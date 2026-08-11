@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Workflow } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Copy, Plus, Search, Workflow } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { ServiceEditRow } from "@/components/settings/ServiceEditRow";
 import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
@@ -65,10 +67,13 @@ export function ServiceGallery({
   documentFolderTemplates: Option[];
   engagementLetterTemplates: Option[];
 }) {
+  const router = useRouter();
+  const supabase = createClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [cloningAll, setCloningAll] = useState(false);
 
   const filtered = useMemo(
     () => services.filter((s) => (!query || s.name.toLowerCase().includes(query.toLowerCase())) && (status === "all" || s.status === status)),
@@ -77,9 +82,35 @@ export function ServiceGallery({
 
   const editing = services.find((s) => s.id === editingId) ?? null;
   const editorProps = { categories, pricingRules, billingRules, organizerTemplates, documentRequestTemplates, documentFolderTemplates, engagementLetterTemplates };
+  const hasNoOwnedServices = services.length > 0 && services.every((s) => !s.workspace_id);
+
+  async function cloneAllStarters() {
+    setCloningAll(true);
+    for (const s of services.filter((s) => !s.workspace_id)) {
+      await supabase.rpc("duplicate_config_object", { p_table: "services", p_id: s.id, p_target_workspace_id: workspaceId });
+    }
+    setCloningAll(false);
+    router.refresh();
+  }
 
   return (
     <div>
+      {hasNoOwnedServices && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-accent/30 bg-accentSoft px-4 py-3">
+          <p className="text-sm text-accent">
+            Every service package below is one of Verexa&apos;s starter templates, shared across every workspace -- that&apos;s why they only show
+            &quot;View.&quot; Clone one to get your own editable copy with your own pricing, checklist stages, and documents.
+          </p>
+          <button
+            type="button"
+            onClick={cloneAllStarters}
+            disabled={cloningAll}
+            className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+          >
+            {cloningAll ? "Cloning..." : "Clone all to get started"}
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
@@ -162,24 +193,37 @@ export function ServiceGallery({
                       {s.is_portal_visible && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Portal visible</span>}
                     </div>
 
-                    <div className="mt-3 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(s.id)}
-                        className="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
-                      >
-                        {isSystem ? "View" : "Edit"}
-                      </button>
-                    </div>
-                    <div className="mt-2">
-                      {isSystem ? (
-                        <CloneServiceButton serviceId={s.id} workspaceId={workspaceId} />
-                      ) : (
-                        <Link href={`/service-packages/${s.id}`} className="text-xs font-medium text-accent hover:underline">
-                          Manage stages
-                        </Link>
-                      )}
-                    </div>
+                    {isSystem ? (
+                      <>
+                        <div className="mt-3">
+                          <CloneServiceButton serviceId={s.id} workspaceId={workspaceId} />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(s.id)}
+                          className="mt-2 text-xs font-medium text-muted hover:text-ink"
+                        >
+                          View starter template
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingId(s.id)}
+                            className="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                        <div className="mt-2">
+                          <Link href={`/service-packages/${s.id}`} className="text-xs font-medium text-accent hover:underline">
+                            Manage stages
+                          </Link>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
