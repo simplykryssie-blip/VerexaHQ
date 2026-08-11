@@ -1207,6 +1207,7 @@ export type Database = {
         Row: {
           client_id: string
           created_at: string
+          custom_relationship_title: string | null
           display_order: number
           id: string
           notes: string | null
@@ -1222,6 +1223,7 @@ export type Database = {
         Insert: {
           client_id: string
           created_at?: string
+          custom_relationship_title?: string | null
           display_order?: number
           id?: string
           notes?: string | null
@@ -1237,6 +1239,7 @@ export type Database = {
         Update: {
           client_id?: string
           created_at?: string
+          custom_relationship_title?: string | null
           display_order?: number
           id?: string
           notes?: string | null
@@ -7096,6 +7099,7 @@ export type Database = {
       create_client_relationship: {
         Args: {
           p_client_id: string
+          p_custom_relationship_title?: string
           p_related_client_id?: string
           p_related_dob?: string
           p_related_name: string

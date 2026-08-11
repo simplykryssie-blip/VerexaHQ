@@ -233,7 +233,7 @@ export function OverviewTab({
           {relationships.length > 0 && (
             <div className="mb-3">
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Linked clients</p>
-              <RelationshipsList relationships={relationships} />
+              <RelationshipsList relationships={relationships} clientType={client.client_type} />
             </div>
           )}
           {contacts.length === 0 ? (
@@ -323,7 +323,7 @@ export function OverviewTab({
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Relationships</h3>
             <AddRelationshipForm clientId={client.id} workspaceId={workspaceId} />
           </div>
-          <RelationshipsList relationships={relationships} />
+          <RelationshipsList relationships={relationships} clientType={client.client_type} />
         </div>
         )}
       </Section>
@@ -355,8 +355,10 @@ export function OverviewTab({
               </thead>
               <tbody className="divide-y divide-border">
                 {engagements.map((e) => {
-                  const staffDiffers = e.assigned_staff?.id && e.assigned_staff.id !== client.relationship_manager?.id;
-                  const reviewerDiffers = e.reviewer?.id && e.reviewer.id !== client.default_reviewer?.id;
+                  const staffDiffers =
+                    showStaffRoles && e.assigned_staff?.id && e.assigned_staff.id !== client.relationship_manager?.id;
+                  const reviewerDiffers =
+                    showStaffRoles && e.reviewer?.id && e.reviewer.id !== client.default_reviewer?.id;
                   const taxYear = engagementTaxYear(e);
                   return (
                     <tr key={e.id} className="hover:bg-surfaceMuted">
@@ -1026,6 +1028,7 @@ export type PortalUserRow = { id: string; invited_name: string | null; invited_e
 export type RelationshipRow = {
   id: string;
   relationship_type: string;
+  custom_relationship_title: string | null;
   related_name: string | null;
   related_client_id: string | null;
   related_dob: string | null;

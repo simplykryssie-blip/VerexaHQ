@@ -8,7 +8,12 @@ import { InlineAddForm } from "@/components/InlineAddForm";
 import { Pencil, Trash2 } from "lucide-react";
 import type { RelationshipRow } from "./ClientWorkspaceTabs";
 
-const RELATIONSHIP_TYPES = ["spouse", "dependent", "parent", "child", "business", "trust", "estate", "partner", "owner", "officer", "other"];
+const INDIVIDUAL_RELATIONSHIP_TYPES = ["spouse", "dependent", "parent", "child", "other"];
+const BUSINESS_RELATIONSHIP_TYPES = ["owner", "partner", "attorney", "officer", "other"];
+
+function relationshipTypeLabel(t: string) {
+  return t[0].toUpperCase() + t.slice(1);
+}
 
 type ClientSearchResult = { id: string; label: string };
 
@@ -52,7 +57,8 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const [relationshipType, setRelationshipType] = useState(RELATIONSHIP_TYPES[0]);
+  const [relationshipType, setRelationshipType] = useState(BUSINESS_RELATIONSHIP_TYPES[0]);
+  const [customType, setCustomType] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ClientSearchResult[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSearchResult | null>(null);
@@ -89,11 +95,16 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
       setError("Search for and select an existing client.");
       return;
     }
+    if (relationshipType === "other" && !customType.trim()) {
+      setError("Enter a title for this relationship.");
+      return;
+    }
     setSaving(true);
     const { error: rpcError } = await supabase.rpc("create_client_relationship", {
       p_client_id: clientId,
       p_workspace_id: workspaceId,
       p_relationship_type: relationshipType,
+      p_custom_relationship_title: relationshipType === "other" ? customType.trim() : undefined,
       p_related_name: selectedClient.label,
       p_related_client_id: selectedClient.id,
     });
@@ -105,6 +116,7 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
     setOpen(false);
     setQuery("");
     setSelectedClient(null);
+    setCustomType("");
     router.refresh();
   }
 
@@ -126,13 +138,24 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
             onChange={(e) => setRelationshipType(e.target.value)}
             className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           >
-            {RELATIONSHIP_TYPES.map((t) => (
+            {BUSINESS_RELATIONSHIP_TYPES.map((t) => (
               <option key={t} value={t}>
-                {t[0].toUpperCase() + t.slice(1)}
+                {relationshipTypeLabel(t)}
               </option>
             ))}
           </select>
         </label>
+        {relationshipType === "other" && (
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Title
+            <input
+              value={customType}
+              onChange={(e) => setCustomType(e.target.value)}
+              placeholder="e.g. Accountant"
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </label>
+        )}
         <label className="relative flex flex-col gap-1 text-xs text-muted">
           Search existing clients
           <input
@@ -188,7 +211,8 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const [relationshipType, setRelationshipType] = useState(RELATIONSHIP_TYPES[0]);
+  const [relationshipType, setRelationshipType] = useState(INDIVIDUAL_RELATIONSHIP_TYPES[0]);
+  const [customType, setCustomType] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ClientSearchResult[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSearchResult | null>(null);
@@ -236,11 +260,16 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
       setError("Enter a name or pick an existing client.");
       return;
     }
+    if (relationshipType === "other" && !customType.trim()) {
+      setError("Enter a title for this relationship.");
+      return;
+    }
     setSaving(true);
     const { error: rpcError } = await supabase.rpc("create_client_relationship", {
       p_client_id: clientId,
       p_workspace_id: workspaceId,
       p_relationship_type: relationshipType,
+      p_custom_relationship_title: relationshipType === "other" ? customType.trim() : undefined,
       p_related_name: finalName,
       p_related_client_id: selectedClient?.id ?? undefined,
       p_related_dob: dob || undefined,
@@ -257,6 +286,7 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
     setDob("");
     setSsn("");
     setSelectedClient(null);
+    setCustomType("");
     router.refresh();
   }
 
@@ -278,13 +308,24 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
             onChange={(e) => setRelationshipType(e.target.value)}
             className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           >
-            {RELATIONSHIP_TYPES.map((t) => (
+            {INDIVIDUAL_RELATIONSHIP_TYPES.map((t) => (
               <option key={t} value={t}>
-                {t[0].toUpperCase() + t.slice(1)}
+                {relationshipTypeLabel(t)}
               </option>
             ))}
           </select>
         </label>
+        {relationshipType === "other" && (
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Title
+            <input
+              value={customType}
+              onChange={(e) => setCustomType(e.target.value)}
+              placeholder="e.g. Guardian"
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </label>
+        )}
         <label className="relative flex flex-col gap-1 text-xs text-muted">
           Name (search clients or type new)
           <input
@@ -348,15 +389,18 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
   );
 }
 
-function EditRelationshipForm({ relationship }: { relationship: RelationshipRow }) {
+function EditRelationshipForm({ relationship, clientType }: { relationship: RelationshipRow; clientType: string }) {
   const router = useRouter();
   const supabase = createClient();
+  const types = clientType === "business" ? BUSINESS_RELATIONSHIP_TYPES : INDIVIDUAL_RELATIONSHIP_TYPES;
+  const knownType = types.includes(relationship.relationship_type);
   return (
     <InlineAddForm
       label="Edit"
       submitLabel="Save changes"
       initialValues={{
-        relationship_type: relationship.relationship_type,
+        relationship_type: knownType ? relationship.relationship_type : "other",
+        custom_relationship_type: knownType ? "" : relationship.relationship_type,
         related_name: relationship.related_name ?? "",
         related_dob: relationship.related_dob ?? "",
       }}
@@ -366,7 +410,12 @@ function EditRelationshipForm({ relationship }: { relationship: RelationshipRow 
           label: "Type",
           type: "select",
           required: true,
-          options: RELATIONSHIP_TYPES.map((t) => ({ value: t, label: t[0].toUpperCase() + t.slice(1) })),
+          options: types.map((t) => ({ value: t, label: relationshipTypeLabel(t) })),
+        },
+        {
+          name: "custom_relationship_type",
+          label: "Custom title",
+          showIf: (v) => v.relationship_type === "other",
         },
         // related_name is disabled when the relationship is linked to a real client record,
         // since that name should stay in sync with the linked client rather than diverge.
@@ -383,6 +432,7 @@ function EditRelationshipForm({ relationship }: { relationship: RelationshipRow 
           .from("client_relationships")
           .update({
             relationship_type: v.relationship_type,
+            custom_relationship_title: v.relationship_type === "other" ? v.custom_relationship_type?.trim() || null : null,
             ...(relationship.related_client_id ? {} : { related_name: v.related_name }),
             related_dob: v.related_dob || null,
           })
@@ -413,14 +463,16 @@ function DeleteRelationshipButton({ relationshipId }: { relationshipId: string }
   );
 }
 
-export function RelationshipsList({ relationships }: { relationships: RelationshipRow[] }) {
+export function RelationshipsList({ relationships, clientType }: { relationships: RelationshipRow[]; clientType: string }) {
   if (relationships.length === 0) return <EmptyState message="No relationships recorded." />;
   return (
     <ul className="divide-y divide-border">
       {relationships.map((r) => (
         <li key={r.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
           <div>
-            <span className="mr-2 capitalize text-muted">{r.relationship_type}:</span>
+            <span className="mr-2 capitalize text-muted">
+              {r.relationship_type === "other" && r.custom_relationship_title ? r.custom_relationship_title : r.relationship_type}:
+            </span>
             {r.related_client_id ? (
               <a href={`/clients/${r.related_client_id}`} className="text-accent hover:underline">
                 {r.related_name}
@@ -436,7 +488,7 @@ export function RelationshipsList({ relationships }: { relationships: Relationsh
             )}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <EditRelationshipForm relationship={r} />
+            <EditRelationshipForm relationship={r} clientType={clientType} />
             <DeleteRelationshipButton relationshipId={r.id} />
           </div>
         </li>

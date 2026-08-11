@@ -8,6 +8,18 @@ import type { ContactRow, AddressRow } from "./ClientWorkspaceTabs";
 
 type Ids = { clientId: string; workspaceId: string };
 
+const CONTACT_TITLE_OPTIONS = [
+  { value: "Owner", label: "Owner" },
+  { value: "Partner", label: "Partner" },
+  { value: "Attorney", label: "Attorney" },
+  { value: "Officer", label: "Officer" },
+  { value: "other", label: "Other" },
+];
+
+function resolveContactTitle(v: Record<string, string>) {
+  return v.title === "other" ? v.custom_title?.trim() || "Other" : v.title || null;
+}
+
 export function AddContactForm({ clientId, workspaceId }: Ids) {
   const router = useRouter();
   const supabase = createClient();
@@ -17,7 +29,8 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
       fields={[
         { name: "first_name", label: "First name", required: true },
         { name: "last_name", label: "Last name", required: true },
-        { name: "title", label: "Title (optional)" },
+        { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
+        { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
         { name: "email", label: "Email" },
         { name: "phone", label: "Phone" },
       ]}
@@ -27,7 +40,7 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
           workspace_id: workspaceId,
           first_name: v.first_name,
           last_name: v.last_name,
-          title: v.title || null,
+          title: resolveContactTitle(v),
           email: v.email || null,
           phone: v.phone || null,
         });
@@ -41,6 +54,7 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
 export function EditContactForm({ contact }: { contact: ContactRow }) {
   const router = useRouter();
   const supabase = createClient();
+  const knownTitle = CONTACT_TITLE_OPTIONS.some((o) => o.value === contact.title);
   return (
     <InlineAddForm
       label="Edit"
@@ -48,14 +62,16 @@ export function EditContactForm({ contact }: { contact: ContactRow }) {
       initialValues={{
         first_name: contact.first_name ?? "",
         last_name: contact.last_name ?? "",
-        title: contact.title ?? "",
+        title: contact.title ? (knownTitle ? contact.title : "other") : "",
+        custom_title: contact.title && !knownTitle ? contact.title : "",
         email: contact.email ?? "",
         phone: contact.phone ?? "",
       }}
       fields={[
         { name: "first_name", label: "First name", required: true },
         { name: "last_name", label: "Last name", required: true },
-        { name: "title", label: "Title (optional)" },
+        { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
+        { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
         { name: "email", label: "Email" },
         { name: "phone", label: "Phone" },
       ]}
@@ -70,7 +86,7 @@ export function EditContactForm({ contact }: { contact: ContactRow }) {
           .update({
             first_name: v.first_name,
             last_name: v.last_name,
-            title: v.title || null,
+            title: resolveContactTitle(v),
             email: v.email || null,
             phone: v.phone || null,
           })

@@ -10,6 +10,7 @@ export type FieldDef = {
   type?: "text" | "email" | "tel" | "date" | "select" | "textarea";
   required?: boolean;
   options?: { value: string; label: string }[];
+  showIf?: (values: Record<string, string>) => boolean;
 };
 
 export function InlineAddForm({
@@ -64,7 +65,7 @@ export function InlineAddForm({
   return (
     <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surfaceMuted p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {fields.map((f) =>
+        {fields.filter((f) => !f.showIf || f.showIf(values)).map((f) =>
           f.type === "textarea" ? (
             <textarea
               key={f.name}
