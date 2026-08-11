@@ -6,6 +6,7 @@ import { renderEmail } from "@/lib/email/template";
 import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
+  const appUrl = new URL(request.url).origin;
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -39,7 +40,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error?.message ?? "Could not create invitation" }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const acceptUrl = `${appUrl}/accept-invitation?token=${invitation.token}`;
 
   const emailResult = await sendEmailViaResend({
