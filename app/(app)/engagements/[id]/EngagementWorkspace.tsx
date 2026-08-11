@@ -70,6 +70,7 @@ export function EngagementWorkspace({
   documentRequests,
   documentRequestTemplates,
   organizerTemplates,
+  pendingOrganizerTemplateIds,
   organizerResponses,
   engagementLetterTemplates,
   signatureRequests,
@@ -100,6 +101,7 @@ export function EngagementWorkspace({
   documentRequests: DocumentRequestRow[];
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
+  pendingOrganizerTemplateIds: string[];
   organizerResponses: OrganizerResponseRow[];
   engagementLetterTemplates: { id: string; name: string; body_html: string }[];
   signatureRequests: SignatureRequestRow[];
@@ -157,6 +159,7 @@ export function EngagementWorkspace({
           clientId={client?.id ?? ""}
           workspaceId={workspace.id}
           organizerTemplates={organizerTemplates}
+          pendingOrganizerTemplateIds={pendingOrganizerTemplateIds}
           primaryEmail={client?.primary_email ?? null}
           permissions={permissions}
         />

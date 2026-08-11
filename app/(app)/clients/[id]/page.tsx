@@ -157,6 +157,14 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
 
+  const pendingOrganizerTemplateIds = Array.from(
+    new Set(
+      (organizerResponses ?? [])
+        .filter((r) => r.status === "not_started" || r.status === "in_progress")
+        .map((r) => r.organizer_template_id)
+    )
+  );
+
   const submittedOrganizerResponses = (organizerResponses ?? []).filter((r) => hasOrganizerAnswers(r.status));
   const submittedOrganizerResponseIds = submittedOrganizerResponses.map((r) => r.id);
   const submittedOrganizerTemplateIds = Array.from(new Set(submittedOrganizerResponses.map((r) => r.organizer_template_id)));
@@ -339,6 +347,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       tasks={tasks}
       requestedDocumentCount={requestedDocumentCount}
       organizerTemplates={organizerTemplates ?? []}
+      pendingOrganizerTemplateIds={pendingOrganizerTemplateIds}
       organizerResponses={organizerResponsesWithDetail.map((o: any) => ({
         id: o.id,
         status: o.status,

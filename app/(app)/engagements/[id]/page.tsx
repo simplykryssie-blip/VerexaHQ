@@ -286,6 +286,19 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .eq("engagement_id", engagement.id)
     .order("created_at", { ascending: false });
 
+  // Scoped to the client, not just this engagement -- an organizer already
+  // pending on a different engagement (or sent from the client card) still
+  // shows up in the same client portal, so re-sending it here would create
+  // a duplicate for the client to see.
+  const { data: clientPendingOrganizerResponses } = await supabase
+    .from("organizer_responses")
+    .select("organizer_template_id")
+    .eq("client_id", engagement.client_id)
+    .in("status", ["not_started", "in_progress"]);
+  const pendingOrganizerTemplateIds = Array.from(
+    new Set((clientPendingOrganizerResponses ?? []).map((r) => r.organizer_template_id))
+  );
+
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
     .select("id, name, body_html")
@@ -394,6 +407,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       documentRequests={documentRequests}
       documentRequestTemplates={documentRequestTemplates ?? []}
       organizerTemplates={organizerTemplates ?? []}
+      pendingOrganizerTemplateIds={pendingOrganizerTemplateIds}
       organizerResponses={organizerResponsesWithDetail.map((o: any) => ({
         id: o.id,
         status: o.status,

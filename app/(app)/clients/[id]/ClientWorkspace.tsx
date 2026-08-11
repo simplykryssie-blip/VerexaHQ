@@ -101,6 +101,7 @@ export function ClientWorkspace({
   requestedDocumentCount,
   documentRequestTemplates,
   organizerTemplates,
+  pendingOrganizerTemplateIds,
   organizerResponses,
   engagementLetterTemplates,
   permissions,
@@ -135,6 +136,7 @@ export function ClientWorkspace({
   requestedDocumentCount: number;
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
+  pendingOrganizerTemplateIds: string[];
   organizerResponses: OrganizerResponseRow[];
   engagementLetterTemplates: { id: string; name: string; body_html: string }[];
   appointments: AppointmentRow[];
@@ -193,6 +195,7 @@ export function ClientWorkspace({
           clientId={client.id}
           workspaceId={workspace.id}
           organizerTemplates={organizerTemplates}
+          pendingOrganizerTemplateIds={pendingOrganizerTemplateIds}
           primaryEmail={client.primary_email}
           permissions={permissions}
         />
