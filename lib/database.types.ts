@@ -389,6 +389,122 @@ export type Database = {
           },
         ]
       }
+      automation_pending_steps: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          automation_step_id: string
+          created_at: string
+          id: string
+          rejected_reason: string | null
+          run_id: string
+          scheduled_for: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          automation_step_id: string
+          created_at?: string
+          id?: string
+          rejected_reason?: string | null
+          run_id: string
+          scheduled_for?: string | null
+          status: string
+          workspace_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          automation_step_id?: string
+          created_at?: string
+          id?: string
+          rejected_reason?: string | null
+          run_id?: string
+          scheduled_for?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_pending_steps_automation_step_id_fkey"
+            columns: ["automation_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_pending_steps_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_pending_steps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      automation_runs: {
+        Row: {
+          automation_id: string
+          completed_at: string | null
+          engagement_id: string | null
+          id: string
+          started_at: string
+          status: string
+          trigger_snapshot: Json
+          workspace_id: string
+        }
+        Insert: {
+          automation_id: string
+          completed_at?: string | null
+          engagement_id?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          trigger_snapshot?: Json
+          workspace_id: string
+        }
+        Update: {
+          automation_id?: string
+          completed_at?: string | null
+          engagement_id?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          trigger_snapshot?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_runs_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_steps: {
         Row: {
           action_config: Json
@@ -7221,6 +7337,14 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      evaluate_automation_conditions: {
+        Args: { p_conditions: Json; p_context: Json }
+        Returns: boolean
+      }
+      execute_automation_step: {
+        Args: { p_run_id: string; p_step_id: string }
+        Returns: undefined
+      }
       expire_stale_engagement_shares: { Args: never; Returns: number }
       fulfill_document_request_item: {
         Args: { p_attachment_id: string; p_item_status_id: string }
@@ -7448,6 +7572,10 @@ export type Database = {
         Args: { p_field_ids: string[]; p_template_id: string }
         Returns: undefined
       }
+      reorder_automation_step: {
+        Args: { p_step_id: string; p_direction: string }
+        Returns: undefined
+      }
       respond_to_engagement_share: {
         Args: {
           p_approve: boolean
@@ -7563,6 +7691,10 @@ export type Database = {
       start_engagement_workflow: {
         Args: { p_engagement_id: string; p_process_id: string }
         Returns: string
+      }
+      start_next_automation_step: {
+        Args: { p_run_id: string }
+        Returns: undefined
       }
       submit_organizer_response: {
         Args: { p_response_id: string }
