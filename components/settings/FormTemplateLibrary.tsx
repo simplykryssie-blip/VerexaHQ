@@ -53,6 +53,8 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     };
   });
 
+  const { data: jotformConnected } = isOrganizers ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId }) : { data: false };
+
   const tabs: { key: FormTemplateTabKey; label: string }[] = [
     { key: "engagement-letter", label: "Engagement Letters" },
     { key: "organizers", label: "Organizers" },
@@ -84,7 +86,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
 
       <div className="mt-4">
         {isOrganizers ? (
-          <OrganizerLibrary workspaceId={workspaceId} templates={organizerCards} />
+          <OrganizerLibrary workspaceId={workspaceId} templates={organizerCards} isJotformConnected={Boolean(jotformConnected)} />
         ) : (
           <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} />
         )}

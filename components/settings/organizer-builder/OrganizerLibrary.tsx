@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Import } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
+import { JotFormImportModal } from "@/components/settings/organizer-builder/JotFormImportModal";
 import { slugify } from "@/lib/roleSlug";
 
 export type OrganizerCard = {
@@ -17,10 +18,19 @@ export type OrganizerCard = {
   totalFieldCount: number;
 };
 
-export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: string; templates: OrganizerCard[] }) {
+export function OrganizerLibrary({
+  workspaceId,
+  templates,
+  isJotformConnected,
+}: {
+  workspaceId: string;
+  templates: OrganizerCard[];
+  isJotformConnected: boolean;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
@@ -69,6 +79,18 @@ export function OrganizerLibrary({ workspaceId, templates }: { workspaceId: stri
 
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setImporting(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted"
+        >
+          <Import size={14} /> Import from JotForm
+        </button>
+      </div>
+
+      {importing && <JotFormImportModal workspaceId={workspaceId} isConnected={isJotformConnected} onClose={() => setImporting(false)} />}
+
       <TemplateGallery
         cards={cards}
         icon={ClipboardList}

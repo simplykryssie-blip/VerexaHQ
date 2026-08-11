@@ -6559,6 +6559,35 @@ export type Database = {
           },
         ]
       }
+      workspace_jotform_connections: {
+        Row: {
+          api_key_encrypted: string
+          connected_at: string
+          connected_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          connected_at?: string
+          connected_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          connected_at?: string
+          connected_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_jotform_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_users: {
         Row: {
           created_at: string
@@ -7311,6 +7340,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      disconnect_workspace_jotform: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       duplicate_config_object: {
         Args: {
           p_id: string
@@ -7435,6 +7468,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_workspace_jotform_api_key: {
+        Args: { p_workspace_id: string }
+        Returns: string
+      }
       has_config_object_share_access: {
         Args: { p_id: string; p_table: string }
         Returns: boolean
@@ -7499,6 +7536,10 @@ export type Database = {
       }
       is_valid_config_table: { Args: { p_table: string }; Returns: boolean }
       is_workspace_admin: { Args: { p_workspace_id: string }; Returns: boolean }
+      is_workspace_jotform_connected: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       is_workspace_member: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -7657,6 +7698,10 @@ export type Database = {
           p_is_service_bureau: boolean
           p_workspace_id: string
         }
+        Returns: undefined
+      }
+      set_workspace_jotform_api_key: {
+        Args: { p_api_key: string; p_workspace_id: string }
         Returns: undefined
       }
       share_config_object: {
