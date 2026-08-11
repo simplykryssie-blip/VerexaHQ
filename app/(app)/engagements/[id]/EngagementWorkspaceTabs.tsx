@@ -549,8 +549,51 @@ export function MessagesTab({
 
 // ---------------------------------------------------------------- Review
 
-export function ReviewTab({ stages, shares, reviewActions, staffOptions }: { stages: StageRow[]; shares: ShareRow[]; reviewActions: ReviewActionRow[]; staffOptions: StaffOption[] }) {
+export function ReviewTab({
+  engagementId,
+  stages,
+  shares,
+  reviewActions,
+  staffOptions,
+  canShare,
+}: {
+  engagementId: string;
+  stages: StageRow[];
+  shares: ShareRow[];
+  reviewActions: ReviewActionRow[];
+  staffOptions: StaffOption[];
+  canShare: boolean;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
   const pendingStages = stages.filter((s) => s.status === "Waiting" || s.status === "In Progress");
+  const activeShare = shares.find((s) => s.status === "pending" || s.status === "corrections_requested");
+
+  async function shareWithEro() {
+    setBusy(true);
+    const { error } = await supabase.rpc("create_engagement_share", { p_engagement_id: engagementId });
+    setBusy(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Shared with your ERO for review.", "success");
+    router.refresh();
+  }
+
+  async function resubmit(shareId: string) {
+    setBusy(true);
+    const { error } = await supabase.rpc("resubmit_engagement_share", { p_engagement_share_id: shareId });
+    setBusy(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Resubmitted for review.", "success");
+    router.refresh();
+  }
 
   return (
     <div className="space-y-6">
@@ -572,6 +615,40 @@ export function ReviewTab({ stages, shares, reviewActions, staffOptions }: { sta
         )}
       </Section>
 
+      {canShare && (
+        <Section title="Share with your ERO">
+          {activeShare ? (
+            <div className="flex items-center justify-between rounded-lg bg-surfaceMuted p-3 text-sm">
+              <span className="text-slate">
+                {activeShare.status === "corrections_requested" ? "Your ERO requested corrections." : "Waiting on your ERO's review."}
+              </span>
+              {activeShare.status === "corrections_requested" && (
+                <button
+                  type="button"
+                  onClick={() => resubmit(activeShare.id)}
+                  disabled={busy}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
+                >
+                  Resubmit
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-lg bg-surfaceMuted p-3 text-sm">
+              <span className="text-slate">Once this engagement is ready for filing, share it with your ERO for approval.</span>
+              <button
+                type="button"
+                onClick={shareWithEro}
+                disabled={busy}
+                className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
+              >
+                {busy ? "Sharing..." : "Share with ERO"}
+              </button>
+            </div>
+          )}
+        </Section>
+      )}
+
       {shares.length > 0 && (
         <Section title="Shared with other workspaces">
           <ul className="divide-y divide-border">
@@ -579,7 +656,7 @@ export function ReviewTab({ stages, shares, reviewActions, staffOptions }: { sta
               <li key={s.id} className="py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-slate">{s.shared_with?.name ?? "Workspace"}</span>
-                  <span className="capitalize text-muted">{s.status}</span>
+                  <span className="capitalize text-muted">{s.status.replace(/_/g, " ")}</span>
                 </div>
                 {reviewActions
                   .filter((r) => r.engagement_share_id === s.id)

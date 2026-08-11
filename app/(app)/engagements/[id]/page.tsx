@@ -128,6 +128,8 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     { data: progressRows },
     { data: staffMembers },
     { data: documentFolders },
+    { data: canShare },
+    { data: activeEroConnection },
   ] = await Promise.all([
     supabase.from("workflow_runs").select("id, status, started_at, completed_at").eq("engagement_id", engagement.id),
     supabase
@@ -195,6 +197,14 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .eq("entity_type", "engagement")
       .eq("entity_id", engagement.id)
       .order("display_order"),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.share" }),
+    supabase
+      .from("firm_connections")
+      .select("id")
+      .eq("child_workspace_id", workspace.id)
+      .eq("relationship_type", "ero_ptin")
+      .eq("status", "active")
+      .maybeSingle(),
   ]);
 
   const workflowRunIds = (workflowRuns ?? []).map((r) => r.id);
@@ -424,6 +434,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       messages={(messages ?? []) as never}
       shares={(shares ?? []) as never}
       reviewActions={(reviewActions ?? []) as never}
+      canShare={Boolean(canShare) && Boolean(activeEroConnection)}
       assignmentHistory={(assignmentHistory ?? []) as never}
       statusHistory={statusHistory ?? []}
       quotes={(quotes ?? []) as never}

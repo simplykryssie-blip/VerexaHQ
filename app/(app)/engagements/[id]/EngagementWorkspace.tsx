@@ -79,6 +79,7 @@ export function EngagementWorkspace({
   messages,
   shares,
   reviewActions,
+  canShare,
   assignmentHistory,
   statusHistory,
   quotes,
@@ -110,6 +111,7 @@ export function EngagementWorkspace({
   messages: MessageRow[];
   shares: ShareRow[];
   reviewActions: ReviewActionRow[];
+  canShare: boolean;
   assignmentHistory: AssignmentHistoryRow[];
   statusHistory: StatusHistoryRow[];
   quotes: QuoteRow[];
@@ -238,7 +240,14 @@ export function EngagementWorkspace({
               />
             )}
             {tab === "Review" && (
-              <ReviewTab stages={stages} shares={shares} reviewActions={reviewActions} staffOptions={staffOptions} />
+              <ReviewTab
+                engagementId={engagement.id}
+                stages={stages}
+                shares={shares}
+                reviewActions={reviewActions}
+                staffOptions={staffOptions}
+                canShare={canShare}
+              />
             )}
             {tab === "Billing" && (
               <BillingTab
