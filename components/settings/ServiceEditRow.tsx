@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
+import { OrganizerServiceRouting } from "@/components/settings/OrganizerServiceRouting";
 
 type Option = { id: string; name: string };
 type PricingRuleOption = { id: string; name: string; pricing_method: string };
@@ -59,6 +60,7 @@ function Select({
 
 export function ServiceEditRow({
   service,
+  workspaceId,
   categories,
   pricingRules,
   billingRules,
@@ -69,6 +71,7 @@ export function ServiceEditRow({
   onClose,
 }: {
   service: ServiceRow;
+  workspaceId: string;
   categories: Option[];
   pricingRules: PricingRuleOption[];
   billingRules: Option[];
@@ -178,6 +181,7 @@ export function ServiceEditRow({
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
           <Select value={organizerTemplateId} onChange={setOrganizerTemplateId} options={organizerTemplates} placeholder="Organizer template" />
+          {organizerTemplateId && <OrganizerServiceRouting workspaceId={workspaceId} organizerTemplateId={organizerTemplateId} />}
           <Select
             value={documentRequestTemplateId}
             onChange={setDocumentRequestTemplateId}

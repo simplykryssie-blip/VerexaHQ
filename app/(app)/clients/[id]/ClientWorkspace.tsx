@@ -103,6 +103,7 @@ export function ClientWorkspace({
   organizerTemplates,
   pendingOrganizerTemplateIds,
   organizerResponses,
+  workspaceServices,
   engagementLetterTemplates,
   permissions,
   paymentPlansByInvoice,
@@ -138,6 +139,7 @@ export function ClientWorkspace({
   organizerTemplates: { id: string; name: string }[];
   pendingOrganizerTemplateIds: string[];
   organizerResponses: OrganizerResponseRow[];
+  workspaceServices: { id: string; name: string }[];
   engagementLetterTemplates: { id: string; name: string; body_html: string }[];
   appointments: AppointmentRow[];
   staffOptions: StaffOption[];
@@ -238,6 +240,7 @@ export function ClientWorkspace({
                 notes={notes}
                 outstandingBalance={outstandingBalance}
                 organizerResponses={organizerResponses}
+                workspaceServices={workspaceServices}
                 onCreateInvoice={() => setTab("Billing")}
                 onShowNotes={() => setTab("Notes")}
                 onCreateNote={() => setTab("Notes")}

@@ -30,7 +30,7 @@ export default async function NewEngagementPage({
     );
   }
 
-  const [{ data: defaultClient }, { data: services }, { count: clientCount }] = await Promise.all([
+  const [{ data: defaultClient }, { data: services }, { count: clientCount }, { data: billingRules }] = await Promise.all([
     searchParams.clientId
       ? supabase
           .from("clients")
@@ -40,11 +40,17 @@ export default async function NewEngagementPage({
       : Promise.resolve({ data: null }),
     supabase
       .from("services")
-      .select("id, name, organizer_template_id, organizer_templates(name)")
+      .select("id, name, organizer_template_id, billing_rule_id, organizer_templates(name)")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),
     supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).is("merged_into_client_id", null),
+    supabase
+      .from("billing_rules")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("status", "published")
+      .order("name"),
   ]);
 
   return (
@@ -57,6 +63,7 @@ export default async function NewEngagementPage({
             hasAnyClients={(clientCount ?? 0) > 0}
             defaultClient={defaultClient ?? null}
             services={services ?? []}
+            billingRules={billingRules ?? []}
             autoAssignToSelf={workspace.workspace_type === "independent_ptin"}
           />
         </div>

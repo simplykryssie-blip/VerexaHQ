@@ -153,9 +153,18 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: organizerResponses } = await supabase
     .from("organizer_responses")
-    .select("id, status, submitted_at, organizer_template_id, filed_as_attachment, organizer_templates(name)")
+    .select(
+      "id, status, submitted_at, organizer_template_id, filed_as_attachment, engagement_id, resolved_service_id, needs_service_review, organizer_templates(name), services(name)"
+    )
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
+
+  const { data: workspaceServices } = await supabase
+    .from("services")
+    .select("id, name")
+    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("status", "published")
+    .order("name");
 
   const pendingOrganizerTemplateIds = Array.from(
     new Set(
@@ -356,7 +365,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         filed_as_attachment: o.filed_as_attachment,
         topLevel: o.topLevel,
         repeaters: o.repeaters,
+        engagement_id: o.engagement_id,
+        resolved_service_id: o.resolved_service_id,
+        needs_service_review: o.needs_service_review,
+        resolved_service_name: o.services?.name ?? null,
       }))}
+      workspaceServices={workspaceServices ?? []}
       documentRequestTemplates={documentRequestTemplates ?? []}
       engagementLetterTemplates={engagementLetterTemplates ?? []}
       paymentPlansByInvoice={paymentPlansByInvoice}

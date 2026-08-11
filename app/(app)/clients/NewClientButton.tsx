@@ -64,21 +64,16 @@ export function NewClientButton({
   workspaceId,
   workspaceName,
   services,
-  defaultIndividualServiceId,
-  defaultBusinessServiceId,
 }: {
   workspaceId: string;
   workspaceName: string;
   services: ServiceOption[];
-  defaultIndividualServiceId: string | null;
-  defaultBusinessServiceId: string | null;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [clientType, setClientType] = useState<"individual" | "business">("individual");
-  const [servicesTouched, setServicesTouched] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -96,7 +91,7 @@ export function NewClientButton({
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
-  const [serviceIds, setServiceIds] = useState<string[]>(defaultIndividualServiceId ? [defaultIndividualServiceId] : []);
+  const [serviceIds, setServiceIds] = useState<string[]>([]);
   const [ssn, setSsn] = useState("");
   const [itin, setItin] = useState("");
   const [ein, setEin] = useState("");
@@ -174,19 +169,7 @@ export function NewClientButton({
   }
 
   function toggleService(id: string) {
-    setServicesTouched(true);
     setServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
-  }
-
-  function selectClientType(t: "individual" | "business") {
-    setClientType(t);
-    // Until staff manually touches the service picker, keep it synced to
-    // this workspace's default service for whichever type is selected --
-    // once they've picked something themselves, stop overriding it.
-    if (!servicesTouched) {
-      const defaultId = t === "individual" ? defaultIndividualServiceId : defaultBusinessServiceId;
-      setServiceIds(defaultId ? [defaultId] : []);
-    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -444,7 +427,7 @@ export function NewClientButton({
                   <button
                     key={t}
                     type="button"
-                    onClick={() => selectClientType(t)}
+                    onClick={() => setClientType(t)}
                     className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium capitalize transition ${
                       clientType === t
                         ? "border-accent bg-accentSoft text-accent"

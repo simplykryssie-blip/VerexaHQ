@@ -93,6 +93,7 @@ export function OverviewTab({
   notes,
   outstandingBalance,
   organizerResponses,
+  workspaceServices,
   onCreateInvoice,
   onShowNotes,
   onCreateNote,
@@ -132,6 +133,7 @@ export function OverviewTab({
   notes: NoteRow[];
   outstandingBalance: number;
   organizerResponses: OrganizerResponseRow[];
+  workspaceServices: { id: string; name: string }[];
   onCreateInvoice: () => void;
   onShowNotes: () => void;
   onCreateNote: () => void;
@@ -401,7 +403,7 @@ export function OverviewTab({
         <Section title="Organizers">
           <div className="space-y-3">
             {organizerResponses.map((o) => (
-              <OrganizerResponseCard key={o.id} response={o} />
+              <OrganizerResponseCard key={o.id} response={o} workspaceServices={workspaceServices} />
             ))}
           </div>
         </Section>

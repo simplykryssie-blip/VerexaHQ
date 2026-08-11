@@ -3034,6 +3034,7 @@ export type Database = {
         Row: {
           archived_date: string | null
           assigned_staff_id: string | null
+          billing_rule_id: string | null
           blueprint_id: string | null
           client_id: string
           completed_date: string | null
@@ -3060,6 +3061,7 @@ export type Database = {
         Insert: {
           archived_date?: string | null
           assigned_staff_id?: string | null
+          billing_rule_id?: string | null
           blueprint_id?: string | null
           client_id: string
           completed_date?: string | null
@@ -3086,6 +3088,7 @@ export type Database = {
         Update: {
           archived_date?: string | null
           assigned_staff_id?: string | null
+          billing_rule_id?: string | null
           blueprint_id?: string | null
           client_id?: string
           completed_date?: string | null
@@ -3115,6 +3118,13 @@ export type Database = {
             columns: ["assigned_staff_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_billing_rule_id_fkey"
+            columns: ["billing_rule_id"]
+            isOneToOne: false
+            referencedRelation: "billing_rules"
             referencedColumns: ["id"]
           },
           {
@@ -4065,7 +4075,9 @@ export type Database = {
           filed_as_attachment: boolean
           id: string
           is_public_submission: boolean
+          needs_service_review: boolean
           organizer_template_id: string
+          resolved_service_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
@@ -4080,7 +4092,9 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           is_public_submission?: boolean
+          needs_service_review?: boolean
           organizer_template_id: string
+          resolved_service_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -4095,7 +4109,9 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           is_public_submission?: boolean
+          needs_service_review?: boolean
           organizer_template_id?: string
+          resolved_service_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -4140,7 +4156,73 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "organizer_responses_resolved_service_id_fkey"
+            columns: ["resolved_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "organizer_responses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizer_service_routes: {
+        Row: {
+          answer_value: string
+          created_at: string
+          id: string
+          organizer_template_id: string
+          routing_field_id: string
+          service_id: string
+          workspace_id: string
+        }
+        Insert: {
+          answer_value: string
+          created_at?: string
+          id?: string
+          organizer_template_id: string
+          routing_field_id: string
+          service_id: string
+          workspace_id: string
+        }
+        Update: {
+          answer_value?: string
+          created_at?: string
+          id?: string
+          organizer_template_id?: string
+          routing_field_id?: string
+          service_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizer_service_routes_organizer_template_id_fkey"
+            columns: ["organizer_template_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_service_routes_routing_field_id_fkey"
+            columns: ["routing_field_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_service_routes_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_service_routes_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -6558,8 +6640,6 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          default_business_service_id: string | null
-          default_individual_service_id: string | null
           id: string
           is_ero: boolean
           is_ptin_preparer: boolean
@@ -6586,8 +6666,6 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          default_business_service_id?: string | null
-          default_individual_service_id?: string | null
           id?: string
           is_ero?: boolean
           is_ptin_preparer?: boolean
@@ -6614,8 +6692,6 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
-          default_business_service_id?: string | null
-          default_individual_service_id?: string | null
           id?: string
           is_ero?: boolean
           is_ptin_preparer?: boolean
@@ -6639,22 +6715,7 @@ export type Database = {
           website?: string | null
           workspace_type?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "workspaces_default_business_service_id_fkey"
-            columns: ["default_business_service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workspaces_default_individual_service_id_fkey"
-            columns: ["default_individual_service_id"]
-            isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -7198,6 +7259,7 @@ export type Database = {
       create_engagement: {
         Args: {
           p_assigned_staff_id?: string
+          p_billing_rule_id?: string
           p_client_id: string
           p_priority?: Database["public"]["Enums"]["engagement_priority"]
           p_service_id: string
@@ -7541,6 +7603,10 @@ export type Database = {
       }
       reorder_automation_step: {
         Args: { p_step_id: string; p_direction: string }
+        Returns: undefined
+      }
+      resolve_organizer_response_service: {
+        Args: { p_response_id: string }
         Returns: undefined
       }
       respond_to_engagement_share: {

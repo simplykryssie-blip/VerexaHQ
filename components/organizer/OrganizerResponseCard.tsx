@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, FileCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
 
@@ -15,15 +17,41 @@ export type OrganizerResponseDetail = {
   filed_as_attachment?: boolean;
   topLevel?: OrganizerFieldAnswer[];
   repeaters?: OrganizerRepeaterGroup[];
+  engagement_id?: string | null;
+  resolved_service_id?: string | null;
+  resolved_service_name?: string | null;
+  needs_service_review?: boolean;
 };
 
 // Clicking anywhere on the row expands/collapses the answers -- the
 // content was previously only rendered inline with no way to open/close
 // it, which read as "nothing happens when I click this."
-export function OrganizerResponseCard({ response }: { response: OrganizerResponseDetail }) {
+export function OrganizerResponseCard({
+  response,
+  workspaceServices,
+}: {
+  response: OrganizerResponseDetail;
+  workspaceServices?: { id: string; name: string }[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [filing, setFiling] = useState(false);
+  const [pickingService, setPickingService] = useState(false);
+
+  async function pickService(serviceId: string) {
+    if (!serviceId) return;
+    const { error } = await supabase
+      .from("organizer_responses")
+      .update({ resolved_service_id: serviceId, needs_service_review: false })
+      .eq("id", response.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
 
   const hasAnswers = response.status === "submitted" || response.status === "reviewed";
 
@@ -80,6 +108,48 @@ export function OrganizerResponseCard({ response }: { response: OrganizerRespons
           </span>
         </span>
       </button>
+
+      {!response.engagement_id && response.resolved_service_id && response.resolved_service_name && (
+        <div className="border-t border-border px-3 py-2 text-xs text-success">
+          Suggested service: <strong>{response.resolved_service_name}</strong> -- it&apos;ll be pre-filled when this engagement is created.
+        </div>
+      )}
+
+      {!response.engagement_id && response.needs_service_review && (
+        <div className="border-t border-border px-3 py-2 text-xs text-warning">
+          {pickingService && workspaceServices ? (
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <span>Which service is this for?</span>
+              <select
+                onChange={(e) => pickService(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                defaultValue=""
+                className="rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="" disabled>
+                  Select a service
+                </option>
+                {workspaceServices.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPickingService(true);
+              }}
+              className="font-medium underline"
+            >
+              This form is used by more than one service -- pick which one this is for
+            </button>
+          )}
+        </div>
+      )}
 
       {open && hasAnswers && (
         <div className="space-y-3 border-t border-border p-3">

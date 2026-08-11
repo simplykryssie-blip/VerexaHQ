@@ -299,17 +299,21 @@ function ClientSearchField({
   );
 }
 
+type PendingOrganizerResponse = { id: string; resolved_service_id: string };
+
 export function NewEngagementForm({
   workspaceId,
   hasAnyClients,
   defaultClient,
   services,
+  billingRules,
   autoAssignToSelf,
 }: {
   workspaceId: string;
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
-  services: { id: string; name: string; organizer_template_id: string | null; organizer_templates: { name: string } | null }[];
+  services: { id: string; name: string; organizer_template_id: string | null; billing_rule_id: string | null; organizer_templates: { name: string } | null }[];
+  billingRules: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -319,9 +323,13 @@ export function NewEngagementForm({
   const supabase = createClient();
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
   const [serviceId, setServiceId] = useState("");
+  const [serviceTouched, setServiceTouched] = useState(false);
+  const [billingRuleId, setBillingRuleId] = useState("");
+  const [billingRuleTouched, setBillingRuleTouched] = useState(false);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingResponse, setPendingResponse] = useState<PendingOrganizerResponse | null>(null);
   const [organizerPrompt, setOrganizerPrompt] = useState<{
     engagementId: string;
     organizerTemplateId: string;
@@ -329,6 +337,50 @@ export function NewEngagementForm({
   } | null>(null);
   const [sendingOrganizer, setSendingOrganizer] = useState(false);
   const [organizerError, setOrganizerError] = useState<string | null>(null);
+
+  // The client already completed an organizer that points to a specific
+  // service -- that's what should drive the service picker here, not a
+  // blind default. Only take over the field while the user hasn't touched
+  // it themselves.
+  useEffect(() => {
+    if (!selectedClient) {
+      setPendingResponse(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("organizer_responses")
+        .select("id, resolved_service_id")
+        .eq("client_id", selectedClient.id)
+        .is("engagement_id", null)
+        .in("status", ["submitted", "reviewed"])
+        .not("resolved_service_id", "is", null)
+        .order("submitted_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      if (data?.resolved_service_id) {
+        setPendingResponse({ id: data.id, resolved_service_id: data.resolved_service_id });
+        if (!serviceTouched) setServiceId(data.resolved_service_id);
+      } else {
+        setPendingResponse(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClient?.id]);
+
+  function selectService(id: string) {
+    setServiceTouched(true);
+    setServiceId(id);
+    if (!billingRuleTouched) {
+      const service = services.find((s) => s.id === id);
+      setBillingRuleId(service?.billing_rule_id ?? "");
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -363,16 +415,36 @@ export function NewEngagementForm({
       p_service_id: serviceId,
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
+      p_billing_rule_id: billingRuleId || undefined,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
 
     const engagementId = data as string;
+
+    // They already completed the organizer that led to this exact service --
+    // link that response to the new engagement instead of asking them to
+    // fill out (or the client to resend) the same thing a second time.
+    if (pendingResponse && pendingResponse.resolved_service_id === serviceId) {
+      const { error: linkError } = await supabase
+        .from("organizer_responses")
+        .update({ engagement_id: engagementId })
+        .eq("id", pendingResponse.id);
+      setLoading(false);
+      if (linkError) {
+        setError(linkError.message);
+        return;
+      }
+      router.push(`/engagements/${engagementId}`);
+      router.refresh();
+      return;
+    }
+
+    setLoading(false);
     const selectedService = services.find((s) => s.id === serviceId);
     if (selectedService?.organizer_template_id) {
       setOrganizerPrompt({
@@ -493,7 +565,7 @@ export function NewEngagementForm({
         <select
           required
           value={serviceId}
-          onChange={(e) => setServiceId(e.target.value)}
+          onChange={(e) => selectService(e.target.value)}
           className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         >
           <option value="" disabled>
@@ -505,7 +577,33 @@ export function NewEngagementForm({
             </option>
           ))}
         </select>
-        <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
+        {pendingResponse && pendingResponse.resolved_service_id === serviceId ? (
+          <p className="mt-1 text-xs text-success">
+            Suggested from the organizer they already completed -- their answers will be attached to this engagement instead of asking again.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate">Payment method</label>
+        <select
+          value={billingRuleId}
+          onChange={(e) => {
+            setBillingRuleTouched(true);
+            setBillingRuleId(e.target.value);
+          }}
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          <option value="">None set</option>
+          {billingRules.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-muted">Defaults from the service, but this client may pay differently -- change it here if so.</p>
       </div>
 
       <div>

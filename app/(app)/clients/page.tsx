@@ -71,7 +71,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .order("created_at", { ascending: false })
     .range(from, to);
 
-  const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: workspaceDefaults }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: canCreate }] = await Promise.all([
     clientsQuery,
     supabase
       .from("services")
@@ -80,7 +80,6 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       .eq("status", "published")
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
-    supabase.from("workspaces").select("default_individual_service_id, default_business_service_id").eq("id", workspace.id).single(),
   ]);
 
   const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : ""].filter(Boolean).join("&");
@@ -92,13 +91,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         description={tab === "leads" ? "Prospects who haven't engaged yet." : "Every client in your workspace."}
         actions={
           canCreate ? (
-            <NewClientButton
-              workspaceId={workspace.id}
-              workspaceName={workspace.name}
-              services={services ?? []}
-              defaultIndividualServiceId={workspaceDefaults?.default_individual_service_id ?? null}
-              defaultBusinessServiceId={workspaceDefaults?.default_business_service_id ?? null}
-            />
+            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
           ) : null
         }
       />
@@ -142,13 +135,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
               }
               action={
                 !status && canCreate ? (
-                  <NewClientButton
-                    workspaceId={workspace.id}
-                    workspaceName={workspace.name}
-                    services={services ?? []}
-                    defaultIndividualServiceId={workspaceDefaults?.default_individual_service_id ?? null}
-                    defaultBusinessServiceId={workspaceDefaults?.default_business_service_id ?? null}
-                  />
+                  <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
                 ) : undefined
               }
             />

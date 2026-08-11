@@ -83,7 +83,7 @@ export function ServiceGallery({
   );
 
   const editing = services.find((s) => s.id === editingId) ?? null;
-  const editorProps = { categories, pricingRules, billingRules, organizerTemplates, documentRequestTemplates, documentFolderTemplates, engagementLetterTemplates };
+  const editorProps = { workspaceId, categories, pricingRules, billingRules, organizerTemplates, documentRequestTemplates, documentFolderTemplates, engagementLetterTemplates };
   const hasNoOwnedServices = services.length > 0 && services.every((s) => !s.workspace_id);
 
   async function duplicateService(id: string, name: string) {
@@ -261,7 +261,7 @@ export function ServiceGallery({
 
       {creating && (
         <Modal title="New service package" onClose={() => setCreating(false)} size="xl">
-          <CreateServiceForm workspaceId={workspaceId} defaultOpen onSuccess={() => setCreating(false)} {...editorProps} />
+          <CreateServiceForm defaultOpen onSuccess={() => setCreating(false)} {...editorProps} />
         </Modal>
       )}
     </div>
