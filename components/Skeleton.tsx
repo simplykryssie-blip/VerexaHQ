@@ -17,6 +17,25 @@ export function DashboardSkeleton() {
   );
 }
 
+/** Generic loading shape for any list page (table or card grid) -- a filter-bar-height bar plus N row placeholders. */
+export function ListSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div className="flex-1 px-8 py-6">
+      <Skeleton className="mb-4 h-9 w-full max-w-xs" />
+      <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex items-center gap-4 border-b border-border px-5 py-4 last:border-b-0">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="ml-auto h-5 w-16 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ReportSkeleton() {
   return (
     <div className="flex-1 space-y-4 px-8 py-6">

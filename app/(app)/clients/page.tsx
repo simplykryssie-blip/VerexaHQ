@@ -2,8 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
-import { EmptyState } from "@/components/EmptyState";
 import { Pager } from "@/components/Pager";
+import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { NewClientButton } from "./NewClientButton";
 
 export const dynamic = 'force-dynamic';
@@ -47,6 +47,41 @@ function clientDisplayName(c: {
   if (c.client_type === "business" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
+
+type ClientRow = {
+  id: string;
+  client_type: string;
+  first_name: string | null;
+  last_name: string | null;
+  business_name: string | null;
+  primary_email: string | null;
+  primary_phone: string | null;
+  lifecycle_status: string;
+};
+
+const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
+  {
+    key: "name",
+    header: "Name",
+    render: (c) => (
+      <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+        {clientDisplayName(c)}
+      </Link>
+    ),
+  },
+  { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
+  { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
+  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ?? "--"}</span> },
+  {
+    key: "status",
+    header: "Status",
+    render: (c) => (
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(c.lifecycle_status)}`}>
+        {c.lifecycle_status === "lead" ? "Lead" : c.lifecycle_status.replace("_", " ")}
+      </span>
+    ),
+  },
+];
 
 export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string } }) {
   const workspace = await getCurrentWorkspace();
@@ -123,58 +158,27 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             </Link>
           ))}
         </div>
-        {!clients || clients.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface">
-            <EmptyState
-              message={
-                status
-                  ? `No ${tab} with status "${statusFilters.find((f) => f.value === status)?.label}".`
-                  : tab === "leads"
-                    ? "No leads yet."
-                    : "No clients yet. Add your first client to get started."
-              }
-              action={
-                !status && canCreate ? (
-                  <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
-                ) : undefined
-              }
-            />
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-5 py-3 font-medium">Name</th>
-                  <th className="px-5 py-3 font-medium">Type</th>
-                  <th className="px-5 py-3 font-medium">Email</th>
-                  <th className="px-5 py-3 font-medium">Phone</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {clients.map((c) => (
-                  <tr key={c.id} className="hover:bg-surfaceMuted">
-                    <td className="px-5 py-3">
-                      <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-                        {clientDisplayName(c)}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3 capitalize text-slate">{c.client_type}</td>
-                    <td className="px-5 py-3 text-slate">{c.primary_email ?? "--"}</td>
-                    <td className="px-5 py-3 text-slate">{c.primary_phone ?? "--"}</td>
-                    <td className="px-5 py-3">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(c.lifecycle_status)}`}>
-                        {c.lifecycle_status === "lead" ? "Lead" : c.lifecycle_status.replace("_", " ")}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <DataTable
+            columns={CLIENT_COLUMNS}
+            rows={clients ?? []}
+            emptyMessage={
+              status
+                ? `No ${tab} with status "${statusFilters.find((f) => f.value === status)?.label}".`
+                : tab === "leads"
+                  ? "No leads yet."
+                  : "No clients yet. Add your first client to get started."
+            }
+            emptyAction={
+              !status && canCreate ? (
+                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
+              ) : undefined
+            }
+          />
+          {clients && clients.length > 0 && (
             <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/clients" extraQuery={extraQuery} />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </>
   );

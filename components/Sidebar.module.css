@@ -23,6 +23,10 @@
   color: var(--blue-bright);
 }
 
+.sectionLabel {
+  color: rgba(169, 183, 198, 0.55);
+}
+
 .navItem {
   color: var(--rail-muted);
   transition:

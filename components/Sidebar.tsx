@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
-import { NAV_ITEMS } from "@/lib/nav";
+import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
 import { archivo, publicSans, plexMono } from "@/lib/authFonts";
 import { darkenHex } from "@/lib/color";
 import styles from "./Sidebar.module.css";
@@ -109,57 +109,64 @@ export function Sidebar({
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
+          {NAV_SECTIONS.map((section) => (
+            <div key={section.label}>
+              <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
 
-            if ("children" in item) {
-              const isOpen = expanded.has(item.label);
-              const hasActiveChild = item.children.some((c) => c.href === activeNavHref);
-              return (
-                <div key={item.label}>
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(item.label)}
-                    aria-expanded={isOpen}
-                    className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
-                  >
-                    <Icon size={18} strokeWidth={2} className="shrink-0" />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                  </button>
-                  {isOpen && (
-                    <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
-                      {item.children.map((child) => {
-                        const active = child.href === activeNavHref;
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className={`${active ? styles.navItemActive : styles.navItem} block rounded-lg px-3 py-2 text-sm font-medium`}
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }
+                  if ("children" in item) {
+                    const isOpen = expanded.has(item.label);
+                    const hasActiveChild = item.children.some((c) => c.href === activeNavHref);
+                    return (
+                      <div key={item.label}>
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(item.label)}
+                          aria-expanded={isOpen}
+                          className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                        >
+                          <Icon size={18} strokeWidth={2} className="shrink-0" />
+                          <span className="flex-1 text-left">{item.label}</span>
+                          <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        </button>
+                        {isOpen && (
+                          <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
+                            {item.children.map((child) => {
+                              const active = child.href === activeNavHref;
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  className={`${active ? styles.navItemActive : styles.navItem} block rounded-lg px-3 py-2 text-sm font-medium`}
+                                >
+                                  {child.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
 
-            const active = item.href === activeNavHref;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
-              >
-                <Icon size={18} strokeWidth={2} className="shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
+                  const active = item.href === activeNavHref;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                    >
+                      <Icon size={18} strokeWidth={2} className="shrink-0" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {isPlatformAdmin && (

@@ -65,6 +65,24 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
+export type NavSection = { label: string; items: NavItem[] };
+
+/**
+ * Groups by how often staff actually open each destination, not a generic SaaS taxonomy --
+ * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
+ */
+const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
+  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Pipelines", "Messages"] },
+  { label: "Build", itemLabels: ["Services", "Workflows", "Templates"] },
+  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports"] },
+  { label: "Admin", itemLabels: ["Support", "Settings"] },
+];
+
+export const NAV_SECTIONS: NavSection[] = NAV_SECTION_MEMBERS.map((section) => ({
+  label: section.label,
+  items: section.itemLabels.map((label) => NAV_ITEMS.find((item) => item.label === label)).filter((item): item is NavItem => Boolean(item)),
+}));
+
 export type SettingsNavItem = {
   label: string;
   href: string;
@@ -83,3 +101,16 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
   { label: "Audit Logs", href: "/settings/audit-logs", icon: ScrollText },
 ];
+
+export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
+
+const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
+  { label: "Personal", itemLabels: ["My Account", "Security", "Notifications"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Connections"] },
+  { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
+];
+
+export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = SETTINGS_SECTION_MEMBERS.map((section) => ({
+  label: section.label,
+  items: section.itemLabels.map((label) => SETTINGS_NAV_ITEMS.find((item) => item.label === label)).filter((item): item is SettingsNavItem => Boolean(item)),
+}));
