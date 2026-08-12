@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Phone, X, ArrowRight, CalendarPlus, BookOpen } from "lucide-react";
+import { Mail, Phone, X, CalendarPlus, BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { ensurePortalInvite } from "@/lib/portal/ensurePortalInvite";
@@ -31,16 +31,12 @@ function leadName(l: LeadRow) {
 }
 
 /**
- * A lead is a card you move through stages without leaving the board -- clicking one opens
- * a side panel instead of navigating to a full profile page. The board stays put; you act,
- * then move to the next card.
- *
- * Stages come from the workspace's own configured lead_stages list (Settings > Lead Stages),
- * not a fixed set -- different firms run different lead processes. Accepting as a client is
- * the one action that always changes lifecycle_status; scheduling and sending a template are
- * things staff can do with a lead at any stage on the way there. All three ensure a portal
- * invite exists, since a client can't complete a template or see a booked appointment without
- * portal access, and staff shouldn't have to remember to invite them separately.
+ * A lead is just a name in a list -- no stages to move it through. Clicking one opens a
+ * side panel with two things staff can do: schedule an appointment or accept them as a
+ * client. Scheduling doesn't change anything about their status; accepting is the one
+ * action that does. Both ensure a portal invite exists, since a client can't see a booked
+ * appointment or complete a template without portal access, and staff shouldn't have to
+ * remember to invite them separately.
  */
 export function LeadsBoard({
   leads,
@@ -56,11 +52,12 @@ export function LeadsBoard({
   const router = useRouter();
   const supabase = createClient();
   const [selected, setSelected] = useState<LeadRow | null>(null);
-  const [moving, setMoving] = useState(false);
   const [booking, setBooking] = useState(false);
   const [sendingOrganizer, setSendingOrganizer] = useState(false);
   const [organizerTemplateId, setOrganizerTemplateId] = useState("");
   const [organizerSent, setOrganizerSent] = useState(false);
+
+  const stageLabelByKey = new Map(stages.map((s) => [s.key, s.label]));
 
   useEffect(() => {
     setBooking(false);
@@ -68,18 +65,6 @@ export function LeadsBoard({
     setOrganizerSent(false);
     setOrganizerTemplateId("");
   }, [selected?.id]);
-
-  async function moveStage(lead: LeadRow, stage: string) {
-    setMoving(true);
-    const { error } = await supabase.from("clients").update({ lifecycle_status: stage }).eq("id", lead.id);
-    setMoving(false);
-    if (error) {
-      window.alert(error.message);
-      return;
-    }
-    setSelected((prev) => (prev ? { ...prev, lifecycle_status: stage } : prev));
-    router.refresh();
-  }
 
   async function afterConsultBooked(lead: LeadRow) {
     await ensurePortalInvite(supabase, { clientId: lead.id, workspaceId, name: leadName(lead), email: lead.primary_email });
@@ -128,30 +113,25 @@ export function LeadsBoard({
 
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {stages.map((stage) => {
-          const items = leads.filter((l) => l.lifecycle_status === stage.key);
-          return (
-            <div key={stage.key} className="w-72 shrink-0">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{stage.label}</h3>
-                <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">{items.length}</span>
-              </div>
-              <div className="space-y-2">
-                {items.length === 0 && <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted">Nothing here.</p>}
-                {items.map((lead) => (
-                  <button key={lead.id} type="button" onClick={() => setSelected(lead)} className="block w-full text-left">
-                    <Card className="p-3 transition hover:border-accent hover:shadow-sm">
-                      <p className="truncate text-sm font-medium text-ink">{leadName(lead)}</p>
-                      <p className="mt-0.5 truncate text-xs text-muted">{lead.primary_email ?? lead.primary_phone ?? "No contact info"}</p>
-                    </Card>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {leads.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted">No leads yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {leads.map((lead) => (
+            <button key={lead.id} type="button" onClick={() => setSelected(lead)} className="block w-full text-left">
+              <Card className="flex items-center justify-between gap-3 p-3 transition hover:border-accent hover:shadow-sm">
+                <div>
+                  <p className="truncate text-sm font-medium text-ink">{leadName(lead)}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted">{lead.primary_email ?? lead.primary_phone ?? "No contact info"}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
+                  {stageLabelByKey.get(lead.lifecycle_status) ?? "Lead"}
+                </span>
+              </Card>
+            </button>
+          ))}
+        </div>
+      )}
 
       {selected && (
         <div className="fixed inset-0 z-40 flex justify-end">
@@ -249,23 +229,6 @@ export function LeadsBoard({
                     )}
                     <p className="mt-1.5 text-xs text-muted">Stays a lead. Sends a portal invite if they don&apos;t have one yet.</p>
                   </div>
-                </div>
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Move to</p>
-                <div className="flex flex-wrap gap-2">
-                  {stages.filter((s) => s.key !== selected.lifecycle_status).map((s) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      onClick={() => moveStage(selected, s.key)}
-                      disabled={moving}
-                      className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-60"
-                    >
-                      {s.label} <ArrowRight size={12} />
-                    </button>
-                  ))}
                 </div>
               </div>
 
