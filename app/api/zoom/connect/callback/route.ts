@@ -7,7 +7,7 @@ import { getAppUrl } from "@/lib/appUrl";
 
 export async function GET(request: Request) {
   const appUrl = getAppUrl(request);
-  const settingsUrl = new URL("/settings/my-account", appUrl);
+  const settingsUrl = new URL("/settings/integrations", appUrl);
 
   const supabase = createClient();
   const {

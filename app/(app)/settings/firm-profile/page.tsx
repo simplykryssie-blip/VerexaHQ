@@ -9,17 +9,12 @@ import { FirmContactForm } from "./FirmContactForm";
 import { BrandCenterForm } from "../brand-center/BrandCenterForm";
 import { getEffectiveBranding } from "@/lib/branding";
 import { MyProfileForm } from "@/components/settings/MyProfileForm";
-import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
 
 export const dynamic = 'force-dynamic';
 
 const BOOKING_KEYS = new Set(["business_hours", "booking_slot_minutes"]);
 
-export default async function FirmProfilePage({
-  searchParams,
-}: {
-  searchParams: { zoom_error?: string; zoom_connected?: string };
-}) {
+export default async function FirmProfilePage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -28,7 +23,7 @@ export default async function FirmProfilePage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }, { data: zoomConnection }] =
+  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }] =
     await Promise.all([
       supabase
         .from("firm_tax_profile")
@@ -50,7 +45,6 @@ export default async function FirmProfilePage({
       user
         ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
-      user ? supabase.from("user_zoom_connections").select("status, zoom_email").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
     ]);
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
@@ -76,13 +70,6 @@ export default async function FirmProfilePage({
               lastName={myProfile?.last_name ?? null}
               displayName={myProfile?.display_name ?? null}
               avatarUrl={myProfile?.avatar_url ?? null}
-            />
-          </div>
-          <div className="mt-4">
-            <ZoomConnectionCard
-              status={(zoomConnection?.status as "connected" | "disconnected" | "revoked" | undefined) ?? "not_connected"}
-              zoomEmail={zoomConnection?.zoom_email ?? null}
-              error={searchParams.zoom_error ?? null}
             />
           </div>
         </div>
