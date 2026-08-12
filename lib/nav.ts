@@ -22,6 +22,8 @@ import {
   Link2,
   ClipboardCheck,
   LifeBuoy,
+  Hammer,
+  BookOpen,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -62,21 +64,23 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export type NavSection = { label: string; items: NavItem[] };
+export type NavSection = { label: string; icon: LucideIcon; items: NavItem[] };
 
 /**
  * Groups by how often staff actually open each destination, not a generic SaaS taxonomy --
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
+ * Each section also carries its own icon -- used as the rail icon in the icon-rail shell.
  */
-const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
-  { label: "Build", itemLabels: ["Services", "Workflows", "Templates"] },
-  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports"] },
-  { label: "Admin", itemLabels: ["Support", "Settings"] },
+const NAV_SECTION_MEMBERS: { label: string; icon: LucideIcon; itemLabels: string[] }[] = [
+  { label: "Daily", icon: LayoutDashboard, itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
+  { label: "Build", icon: Hammer, itemLabels: ["Services", "Workflows", "Templates"] },
+  { label: "Reference", icon: BookOpen, itemLabels: ["Calendar", "Documents", "Tax Office", "Reports"] },
+  { label: "Admin", icon: Settings, itemLabels: ["Support", "Settings"] },
 ];
 
 export const NAV_SECTIONS: NavSection[] = NAV_SECTION_MEMBERS.map((section) => ({
   label: section.label,
+  icon: section.icon,
   items: section.itemLabels.map((label) => NAV_ITEMS.find((item) => item.label === label)).filter((item): item is NavItem => Boolean(item)),
 }));
 

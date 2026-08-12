@@ -1,0 +1,74 @@
+.rail {
+  --rail-bg: #071729;
+  --rail-bg-2: #0b2643;
+  --rail-ink: #f4f4f6;
+  --rail-muted: #a9b7c6;
+  --blue-bright: #0da9f9;
+
+  background: linear-gradient(165deg, var(--rail-bg) 0%, var(--rail-bg-2) 100%);
+  color: var(--rail-ink);
+}
+
+.header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.railIcon {
+  color: var(--rail-muted);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.railIcon:hover {
+  color: var(--rail-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.railIconActive {
+  color: var(--blue-bright);
+  background: rgba(13, 169, 249, 0.14);
+}
+
+.railIconOpen {
+  color: var(--rail-ink);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.signOut {
+  color: var(--rail-muted);
+}
+
+.signOut:hover {
+  color: var(--rail-ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mobileToggle {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+}
+
+.flyout {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.25);
+}
+
+.flyoutItem {
+  color: #1e293b;
+}
+
+.flyoutItem:hover {
+  background: #f8fafc;
+}
+
+.flyoutItemActive {
+  color: #2563eb;
+  background: #eff6ff;
+}
