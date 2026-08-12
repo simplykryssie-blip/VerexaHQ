@@ -7678,9 +7678,48 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_platform_admin: {
+        Args: { p_is_platform_admin: boolean; p_user_email: string }
+        Returns: undefined
+      }
+      set_platform_admin_by_id: {
+        Args: { p_is_platform_admin: boolean; p_user_id: string }
+        Returns: undefined
+      }
       set_workspace_jotform_api_key: {
         Args: { p_api_key: string; p_workspace_id: string }
         Returns: undefined
+      }
+      set_workspace_status: {
+        Args: {
+          p_status: string
+          p_suspension_reason?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          mailing_address: string | null
+          name: string
+          onboarding_dismissed_at: string | null
+          phone: string | null
+          primary_contact_email: string | null
+          slug: string
+          status: string
+          stripe_charges_enabled: boolean
+          stripe_connect_account_type: string | null
+          stripe_connect_status: string
+          stripe_connect_updated_at: string | null
+          stripe_connected_account_id: string | null
+          stripe_details_submitted: boolean
+          stripe_payouts_enabled: boolean
+          suspension_reason: string | null
+          timezone: string
+          updated_at: string
+          website: string | null
+          workspace_type: string
+        }
       }
       share_config_object: {
         Args: {
@@ -7757,6 +7796,32 @@ export type Database = {
           p_token: string
         }
         Returns: Json
+      }
+      upsert_workspace_subscription: {
+        Args: {
+          p_plan_id: string
+          p_seat_count?: number
+          p_stripe_status?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          card_funding_type: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          locked_plan_snapshot: Json | null
+          plan_id: string
+          price_change_effective_date: string | null
+          price_change_notice_sent_at: string | null
+          seat_count: number
+          stripe_customer_id: string | null
+          stripe_status: string
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          updated_at: string
+          workspace_id: string
+        }
       }
       withdraw_engagement_share: {
         Args: { p_engagement_share_id: string }

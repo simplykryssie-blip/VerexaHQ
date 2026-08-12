@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ShieldEllipsis, Lock } from "lucide-react";
+import { ShieldEllipsis, Lock, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { PlatformAdminsManager } from "./PlatformAdminsManager";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +38,16 @@ export default async function PlatformAdminPage() {
     );
   }
 
-  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }] = await Promise.all([
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
+
+  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }] = await Promise.all([
     supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
     supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
     supabase.from("platform_subscription_plans").select("id, name"),
     supabase.from("workspace_users").select("workspace_id, status"),
+    supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
   ]);
 
   const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
@@ -63,6 +69,14 @@ export default async function PlatformAdminPage() {
       <PageHeader
         title="Platform Admin"
         description="Every workspace on Verexa -- subscription status, roster size, and connections, across all tenants."
+        actions={
+          <Link
+            href="/platform-admin/plans"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:border-accent hover:text-accent"
+          >
+            <Receipt size={14} /> Manage plans
+          </Link>
+        }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -124,6 +138,16 @@ export default async function PlatformAdminPage() {
             </table>
           </div>
         )}
+
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Platform admins</h3>
+          <p className="mt-1 text-xs text-muted">
+            Anyone here can see every workspace on Verexa and manage subscriptions, status, and other admins. Grant this carefully.
+          </p>
+          <div className="mt-3">
+            <PlatformAdminsManager admins={admins ?? []} currentUserId={currentUser?.id ?? ""} />
+          </div>
+        </div>
       </div>
     </>
   );

@@ -4,6 +4,7 @@ import { Lock } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
+import { WorkspaceStatusActions, AssignSubscriptionForm } from "./WorkspaceAdminActions";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
 
   if (!workspace) notFound();
 
-  const [{ data: subscription }, { data: invoices }, { data: billingAdmin }, { data: staff }, { data: asParent }, { data: asChild }] =
+  const [{ data: subscription }, { data: invoices }, { data: billingAdmin }, { data: staff }, { data: asParent }, { data: asChild }, { data: plans }] =
     await Promise.all([
       supabase
         .from("workspace_subscriptions")
@@ -76,6 +77,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         .select("id, status, relationship_type, workspaces:parent_workspace_id(id, name)")
         .eq("child_workspace_id", workspace.id)
         .eq("relationship_type", "ero_ptin"),
+      supabase.from("platform_subscription_plans").select("id, name").eq("is_active", true).order("name"),
     ]);
 
   const plan = subscription?.platform_subscription_plans as unknown as {
@@ -90,7 +92,10 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
       <PageHeader backHref="/platform-admin" backLabel="Back to all workspaces" title={workspace.name} description={WORKSPACE_TYPE_LABELS[workspace.workspace_type] ?? workspace.workspace_type} />
       <div className="flex-1 space-y-8 px-8 py-6">
         <div>
-          <h3 className="text-sm font-semibold text-ink">Workspace</h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-ink">Workspace</h3>
+            <WorkspaceStatusActions workspaceId={workspace.id} status={workspace.status} />
+          </div>
           <dl className="mt-3 grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Status</dt>
@@ -151,6 +156,18 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
               </div>
             </dl>
           )}
+          <div className="mt-3 rounded-xl border border-border bg-surface p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+              {subscription ? "Change plan" : "Assign a plan"}
+            </p>
+            <AssignSubscriptionForm
+              workspaceId={workspace.id}
+              plans={plans ?? []}
+              currentPlanId={subscription?.plan_id ?? null}
+              currentStatus={subscription?.stripe_status ?? null}
+              currentSeatCount={subscription?.seat_count ?? null}
+            />
+          </div>
         </div>
 
         <div>
