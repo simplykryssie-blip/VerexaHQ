@@ -14,7 +14,7 @@ export default async function RolesPage() {
   const [{ data: roles }, { data: permissions }, { data: rolePermissions }, { data: members }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("roles")
-      .select("id, name, slug, description, workspace_id, is_system_role")
+      .select("id, name, slug, description, workspace_id, is_system_role, forked_from_role_id")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .order("is_system_role", { ascending: false })
       .order("name"),
@@ -36,16 +36,24 @@ export default async function RolesPage() {
     permissionIdsByRole.set(rp.role_id, list);
   }
 
-  const roleRows = (roles ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    slug: r.slug,
-    description: r.description,
-    workspace_id: r.workspace_id,
-    is_system_role: r.is_system_role,
-    permissionIds: permissionIdsByRole.get(r.id) ?? [],
-    memberCount: memberCountByRole.get(r.id) ?? 0,
-  }));
+  // Once this workspace has its own copy of a System role, the System original is
+  // superseded -- hide it so editing that role reads as "in place," not as two roles.
+  const supersededSystemRoleIds = new Set(
+    (roles ?? []).filter((r) => r.workspace_id === workspace.id && r.forked_from_role_id).map((r) => r.forked_from_role_id as string)
+  );
+
+  const roleRows = (roles ?? [])
+    .filter((r) => !supersededSystemRoleIds.has(r.id))
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      slug: r.slug,
+      description: r.description,
+      workspace_id: r.workspace_id,
+      is_system_role: r.is_system_role,
+      permissionIds: permissionIdsByRole.get(r.id) ?? [],
+      memberCount: memberCountByRole.get(r.id) ?? 0,
+    }));
 
   return (
     <div className="max-w-6xl">

@@ -5009,6 +5009,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          forked_from_role_id: string | null
           id: string
           is_system_role: boolean
           name: string
@@ -5019,6 +5020,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          forked_from_role_id?: string | null
           id?: string
           is_system_role?: boolean
           name: string
@@ -5029,6 +5031,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          forked_from_role_id?: string | null
           id?: string
           is_system_role?: boolean
           name?: string
@@ -5037,6 +5040,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "roles_forked_from_role_id_fkey"
+            columns: ["forked_from_role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "roles_workspace_id_fkey"
             columns: ["workspace_id"]

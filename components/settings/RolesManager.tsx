@@ -160,19 +160,18 @@ export function RolesManager({
     router.refresh();
   }
 
-  // System roles are shared platform-wide (workspace_id null) and RLS
-  // blocks editing them directly -- changing "Staff" here would change it
-  // for every workspace. "Editable" for the user's purposes means: make a
-  // workspace-owned copy with the same name and permissions, then edit that.
-  // toggledPermissionId lets a click on a (previously grayed-out) permission
-  // switch on a system role fork it AND apply that exact change in one step,
-  // instead of requiring a separate "Customize" click first.
+  // System roles are shared platform-wide (workspace_id null) and RLS blocks editing them
+  // directly -- changing "PTIN Preparer" here would change it for every workspace on Verexa,
+  // not just this one. So the first edit makes a workspace-owned copy under the hood, linked
+  // back via forked_from_role_id -- and the page that lists roles hides the System original
+  // once that link exists, so from here it reads as "I edited it," not "I made a new one."
+  // Same name, same slug, no second row. toggledPermissionId lets a click on a (previously
+  // grayed-out) permission fork the role AND apply that exact change in one step.
   async function forkRole(role: RoleRow, toggledPermissionId?: string) {
     if (toggledPermissionId) setTogglingId(toggledPermissionId);
     setForking(true);
-    const copyName = `${role.name} (Custom)`;
     const takenSlugs = new Set(roles.filter((r) => r.workspace_id === workspaceId).map((r) => r.slug));
-    const slug = uniqueSlug(slugify(copyName), takenSlugs);
+    const slug = uniqueSlug(slugify(role.name), takenSlugs);
 
     const targetPermissionIds = toggledPermissionId
       ? role.permissionIds.includes(toggledPermissionId)
@@ -182,14 +181,14 @@ export function RolesManager({
 
     const { data: newRole, error } = await supabase
       .from("roles")
-      .insert({ workspace_id: workspaceId, name: copyName, slug, description: role.description })
+      .insert({ workspace_id: workspaceId, name: role.name, slug, description: role.description, forked_from_role_id: role.id })
       .select("id, name, slug, description, workspace_id, is_system_role")
       .single();
 
     if (error || !newRole) {
       setForking(false);
       setTogglingId(null);
-      toast.show(error?.message ?? "Could not customize this role.", "error");
+      toast.show(error?.message ?? "Could not update this role.", "error");
       return;
     }
 
@@ -199,7 +198,7 @@ export function RolesManager({
         .from("role_permissions")
         .insert(targetPermissionIds.map((permissionId) => ({ role_id: newRole.id, permission_id: permissionId })));
       if (copyError) {
-        toast.show(`Copy created, but couldn't copy permissions: ${copyError.message}`, "error");
+        toast.show(`Role updated, but couldn't copy its permissions: ${copyError.message}`, "error");
       } else {
         permissionIds = targetPermissionIds;
       }
@@ -207,14 +206,11 @@ export function RolesManager({
 
     setForking(false);
     setTogglingId(null);
-    setRoles((prev) => [...prev, { ...newRole, permissionIds, memberCount: 0 }]);
+    // Replace the System row with the new workspace-owned one in place, rather than
+    // appending it -- there should only ever be one "PTIN Preparer" row in this list.
+    setRoles((prev) => prev.map((r) => (r.id === role.id ? { ...newRole, permissionIds, memberCount: 0 } : r)));
     setSelectedId(newRole.id);
-    toast.show(
-      toggledPermissionId
-        ? `Created "${copyName}" with that change applied -- the System "${role.name}" role is unchanged.`
-        : `Created "${copyName}" for you to edit -- the System "${role.name}" role is unchanged.`,
-      "success"
-    );
+    toast.show("Role updated for your workspace.", "success");
     router.refresh();
   }
 
