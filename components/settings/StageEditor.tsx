@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Plus, Trash2, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { DeleteStageDialog } from "@/components/settings/DeleteStageDialog";
 import { TemplateSelect } from "@/components/settings/TemplateSelect";
+import { DocumentRequestTemplatePreview } from "@/components/settings/DocumentRequestTemplatePreview";
 
 type Option = { id: string; name: string };
 
@@ -47,37 +49,68 @@ function StageTemplateAttachments({
     router.refresh();
   }
 
+  const documentRequestName = documentRequestTemplates.find((t) => t.id === documentRequestId)?.name;
+
   return (
     <div className="mt-3 border-t border-border pt-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted">When an engagement reaches this stage</p>
       <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <TemplateSelect
-          value={organizerId}
-          onChange={(v) => {
-            setOrganizerId(v);
-            update("organizer_template_id", v);
-          }}
-          options={organizerTemplates}
-          placeholder="Send organizer..."
-        />
-        <TemplateSelect
-          value={documentRequestId}
-          onChange={(v) => {
-            setDocumentRequestId(v);
-            update("document_request_template_id", v);
-          }}
-          options={documentRequestTemplates}
-          placeholder="Request documents..."
-        />
-        <TemplateSelect
-          value={engagementLetterId}
-          onChange={(v) => {
-            setEngagementLetterId(v);
-            update("engagement_letter_template_id", v);
-          }}
-          options={engagementLetterTemplates}
-          placeholder="Send for signature..."
-        />
+        <div>
+          <TemplateSelect
+            value={organizerId}
+            onChange={(v) => {
+              setOrganizerId(v);
+              update("organizer_template_id", v);
+            }}
+            options={organizerTemplates}
+            placeholder="Send organizer..."
+          />
+          {organizerId && (
+            <Link
+              href={`/templates/organizers/${organizerId}`}
+              target="_blank"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+            >
+              <Eye size={12} /> Preview
+            </Link>
+          )}
+        </div>
+        <div>
+          <TemplateSelect
+            value={documentRequestId}
+            onChange={(v) => {
+              setDocumentRequestId(v);
+              update("document_request_template_id", v);
+            }}
+            options={documentRequestTemplates}
+            placeholder="Request documents..."
+          />
+          {documentRequestId && documentRequestName && (
+            <div className="mt-1">
+              <DocumentRequestTemplatePreview templateId={documentRequestId} templateName={documentRequestName} />
+            </div>
+          )}
+        </div>
+        <div>
+          <TemplateSelect
+            value={engagementLetterId}
+            onChange={(v) => {
+              setEngagementLetterId(v);
+              update("engagement_letter_template_id", v);
+            }}
+            options={engagementLetterTemplates}
+            placeholder="Send for signature..."
+          />
+          {engagementLetterId && (
+            <Link
+              href={`/templates/engagement-letters/${engagementLetterId}`}
+              target="_blank"
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+            >
+              <Eye size={12} /> Preview
+            </Link>
+          )}
+        </div>
       </div>
       <p className="mt-1.5 text-xs text-muted">
         Attaching a template here doesn&apos;t send anything automatically -- it just pre-selects the right one when staff use the manual send
@@ -532,11 +565,10 @@ function StageListReadOnly({
   return (
     <div className="mt-4 space-y-3">
       {stages.map((stage) => {
-        const attached = [
-          stage.organizer_template_id && organizerTemplates.find((t) => t.id === stage.organizer_template_id),
-          stage.document_request_template_id && documentRequestTemplates.find((t) => t.id === stage.document_request_template_id),
-          stage.engagement_letter_template_id && engagementLetterTemplates.find((t) => t.id === stage.engagement_letter_template_id),
-        ].filter((t): t is Option => Boolean(t));
+        const organizer = stage.organizer_template_id && organizerTemplates.find((t) => t.id === stage.organizer_template_id);
+        const documentRequest = stage.document_request_template_id && documentRequestTemplates.find((t) => t.id === stage.document_request_template_id);
+        const engagementLetter = stage.engagement_letter_template_id && engagementLetterTemplates.find((t) => t.id === stage.engagement_letter_template_id);
+        const hasAttachments = Boolean(organizer || documentRequest || engagementLetter);
         return (
           <div key={stage.id} className="rounded-xl border border-border bg-surface p-4">
             <h4 className="text-sm font-semibold text-ink">{stage.name}</h4>
@@ -550,8 +582,36 @@ function StageListReadOnly({
                   </li>
                 ))}
             </ul>
-            {attached.length > 0 && (
-              <p className="mt-2 text-xs text-muted">Attached: {attached.map((t) => t.name).join(", ")}</p>
+            {hasAttachments && (
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
+                {organizer && (
+                  <span className="flex items-center gap-1">
+                    Organizer: {organizer.name}
+                    <Link href={`/templates/organizers/${organizer.id}`} target="_blank" className="text-accent hover:underline" aria-label="Preview organizer">
+                      <Eye size={12} />
+                    </Link>
+                  </span>
+                )}
+                {documentRequest && (
+                  <span className="flex items-center gap-1">
+                    Documents: {documentRequest.name}
+                    <DocumentRequestTemplatePreview templateId={documentRequest.id} templateName={documentRequest.name} />
+                  </span>
+                )}
+                {engagementLetter && (
+                  <span className="flex items-center gap-1">
+                    Engagement letter: {engagementLetter.name}
+                    <Link
+                      href={`/templates/engagement-letters/${engagementLetter.id}`}
+                      target="_blank"
+                      className="text-accent hover:underline"
+                      aria-label="Preview engagement letter"
+                    >
+                      <Eye size={12} />
+                    </Link>
+                  </span>
+                )}
+              </div>
             )}
           </div>
         );
