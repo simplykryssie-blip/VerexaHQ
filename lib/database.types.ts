@@ -705,101 +705,6 @@ export type Database = {
           },
         ]
       }
-      blueprint_components: {
-        Row: {
-          blueprint_id: string
-          component_id: string
-          component_type: string
-          created_at: string
-          id: string
-          is_primary: boolean
-        }
-        Insert: {
-          blueprint_id: string
-          component_id: string
-          component_type: string
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-        }
-        Update: {
-          blueprint_id?: string
-          component_id?: string
-          component_type?: string
-          created_at?: string
-          id?: string
-          is_primary?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "blueprint_components_blueprint_id_fkey"
-            columns: ["blueprint_id"]
-            isOneToOne: false
-            referencedRelation: "blueprints"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      blueprints: {
-        Row: {
-          category: string | null
-          created_at: string
-          created_by: string | null
-          description: string | null
-          estimated_setup_minutes: number | null
-          id: string
-          name: string
-          slug: string
-          source_blueprint_id: string | null
-          status: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          estimated_setup_minutes?: number | null
-          id?: string
-          name: string
-          slug: string
-          source_blueprint_id?: string | null
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          category?: string | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          estimated_setup_minutes?: number | null
-          id?: string
-          name?: string
-          slug?: string
-          source_blueprint_id?: string | null
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "blueprints_source_blueprint_id_fkey"
-            columns: ["source_blueprint_id"]
-            isOneToOne: false
-            referencedRelation: "blueprints"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "blueprints_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       branding: {
         Row: {
           accent_color: string
@@ -3041,7 +2946,6 @@ export type Database = {
           archived_date: string | null
           assigned_staff_id: string | null
           billing_rule_id: string | null
-          blueprint_id: string | null
           client_id: string
           completed_date: string | null
           compliance_officer_id: string | null
@@ -3069,7 +2973,6 @@ export type Database = {
           archived_date?: string | null
           assigned_staff_id?: string | null
           billing_rule_id?: string | null
-          blueprint_id?: string | null
           client_id: string
           completed_date?: string | null
           compliance_officer_id?: string | null
@@ -3097,7 +3000,6 @@ export type Database = {
           archived_date?: string | null
           assigned_staff_id?: string | null
           billing_rule_id?: string | null
-          blueprint_id?: string | null
           client_id?: string
           completed_date?: string | null
           compliance_officer_id?: string | null
@@ -3134,13 +3036,6 @@ export type Database = {
             columns: ["billing_rule_id"]
             isOneToOne: false
             referencedRelation: "billing_rules"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagements_blueprint_id_fkey"
-            columns: ["blueprint_id"]
-            isOneToOne: false
-            referencedRelation: "blueprints"
             referencedColumns: ["id"]
           },
           {
@@ -3288,63 +3183,6 @@ export type Database = {
             foreignKeyName: "firm_connections_parent_workspace_id_fkey"
             columns: ["parent_workspace_id"]
             isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      firm_onboarding: {
-        Row: {
-          branding_completed: boolean
-          business_info_completed: boolean
-          completed_at: string | null
-          created_at: string
-          current_step: number
-          selected_blueprint_id: string | null
-          staff_invited: boolean
-          startup_method: string | null
-          tax_info_completed: boolean
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          branding_completed?: boolean
-          business_info_completed?: boolean
-          completed_at?: string | null
-          created_at?: string
-          current_step?: number
-          selected_blueprint_id?: string | null
-          staff_invited?: boolean
-          startup_method?: string | null
-          tax_info_completed?: boolean
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          branding_completed?: boolean
-          business_info_completed?: boolean
-          completed_at?: string | null
-          created_at?: string
-          current_step?: number
-          selected_blueprint_id?: string | null
-          staff_invited?: boolean
-          startup_method?: string | null
-          tax_info_completed?: boolean
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "firm_onboarding_selected_blueprint_id_fkey"
-            columns: ["selected_blueprint_id"]
-            isOneToOne: false
-            referencedRelation: "blueprints"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "firm_onboarding_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -5253,7 +5091,6 @@ export type Database = {
           display_order: number
           document_folder_template_id: string | null
           document_request_template_id: string | null
-          engagement_letter_template_id: string | null
           estimated_duration_minutes: number | null
           id: string
           is_bookable: boolean
@@ -5285,7 +5122,6 @@ export type Database = {
           display_order?: number
           document_folder_template_id?: string | null
           document_request_template_id?: string | null
-          engagement_letter_template_id?: string | null
           estimated_duration_minutes?: number | null
           id?: string
           is_bookable?: boolean
@@ -5317,7 +5153,6 @@ export type Database = {
           display_order?: number
           document_folder_template_id?: string | null
           document_request_template_id?: string | null
-          engagement_letter_template_id?: string | null
           estimated_duration_minutes?: number | null
           id?: string
           is_bookable?: boolean
@@ -5360,13 +5195,6 @@ export type Database = {
             columns: ["document_request_template_id"]
             isOneToOne: false
             referencedRelation: "document_request_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "services_engagement_letter_template_id_fkey"
-            columns: ["engagement_letter_template_id"]
-            isOneToOne: false
-            referencedRelation: "engagement_letter_templates"
             referencedColumns: ["id"]
           },
           {
@@ -6708,9 +6536,6 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          is_ero: boolean
-          is_ptin_preparer: boolean
-          is_service_bureau: boolean
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
@@ -6735,9 +6560,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          is_ero?: boolean
-          is_ptin_preparer?: boolean
-          is_service_bureau?: boolean
           mailing_address?: string | null
           name: string
           onboarding_dismissed_at?: string | null
@@ -6762,9 +6584,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          is_ero?: boolean
-          is_ptin_preparer?: boolean
-          is_service_bureau?: boolean
           mailing_address?: string | null
           name?: string
           onboarding_dismissed_at?: string | null
@@ -7358,19 +7177,6 @@ export type Database = {
         Args: { p_service_id: string; p_stage_name: string }
         Returns: string
       }
-      advance_onboarding_step: {
-        Args: {
-          p_selected_blueprint_id?: string
-          p_startup_method?: string
-          p_step: number
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
-      apply_blueprint: {
-        Args: { p_blueprint_id: string; p_workspace_id: string }
-        Returns: string
-      }
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -7868,15 +7674,6 @@ export type Database = {
           p_regular_office_hours?: Json
           p_supported_filing_states?: string[]
           p_tax_season_hours?: Json
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
-      set_workspace_capabilities: {
-        Args: {
-          p_is_ero: boolean
-          p_is_ptin_preparer: boolean
-          p_is_service_bureau: boolean
           p_workspace_id: string
         }
         Returns: undefined
