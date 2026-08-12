@@ -21,8 +21,16 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   if (!automation) notFound();
 
-  const [{ data: steps }, { data: runs }, { data: logs }, { data: emailTemplates }, { data: smsTemplates }, { data: canManage }, { data: organizerTemplates }] =
-    await Promise.all([
+  const [
+    { data: steps },
+    { data: runs },
+    { data: logs },
+    { data: emailTemplates },
+    { data: smsTemplates },
+    { data: canManage },
+    { data: organizerTemplates },
+    { data: services },
+  ] = await Promise.all([
       supabase
         .from("automation_steps")
         .select("id, display_order, action_type, action_config, delay_minutes")
@@ -55,6 +63,12 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
       supabase
         .from("organizer_templates")
+        .select("id, name")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("status", "published")
+        .order("name"),
+      supabase
+        .from("services")
         .select("id, name")
         .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
         .eq("status", "published")
@@ -100,6 +114,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           smsTemplates={smsTemplates ?? []}
           canManage={Boolean(canManage)}
           organizerTemplates={organizerTemplates ?? []}
+          services={services ?? []}
         />
       </div>
     </>

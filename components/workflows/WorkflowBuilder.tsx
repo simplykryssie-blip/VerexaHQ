@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare } from "lucide-react";
+import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare, BookOpen, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { TriggerFields, triggerSummary, type TemplateOption } from "@/components/workflows/TriggerFields";
@@ -38,6 +38,8 @@ const ACTION_TYPES = [
   { value: "send_email", label: "Send an email" },
   { value: "send_sms", label: "Send a text" },
   { value: "create_task", label: "Create a task" },
+  { value: "send_organizer_template", label: "Push an organizer to the client's portal" },
+  { value: "create_engagement", label: "Create the engagement and start its pipeline" },
 ];
 
 const TASK_PRIORITIES = ["low", "medium", "high"];
@@ -45,6 +47,8 @@ const TASK_PRIORITIES = ["low", "medium", "high"];
 function actionIcon(type: string) {
   if (type === "send_email") return <Mail size={15} />;
   if (type === "send_sms") return <MessageSquare size={15} />;
+  if (type === "send_organizer_template") return <BookOpen size={15} />;
+  if (type === "create_engagement") return <Workflow size={15} />;
   return <CheckSquare size={15} />;
 }
 
@@ -54,6 +58,7 @@ function StepCard({
   total,
   emailTemplates,
   smsTemplates,
+  organizerTemplates,
   canManage,
   onSaved,
 }: {
@@ -62,6 +67,7 @@ function StepCard({
   total: number;
   emailTemplates: MessageTemplateOption[];
   smsTemplates: MessageTemplateOption[];
+  organizerTemplates: TemplateOption[];
   canManage: boolean;
   onSaved: () => void;
 }) {
@@ -259,6 +265,34 @@ function StepCard({
             </label>
           </>
         )}
+
+        {actionType === "send_organizer_template" && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Organizer
+            <select
+              disabled={!canManage}
+              value={(config.organizer_template_id as string) ?? ""}
+              onChange={(e) => setField("organizer_template_id", e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="" disabled>
+                Choose an organizer template
+              </option>
+              {organizerTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {actionType === "create_engagement" && (
+          <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+            Creates an engagement from the service already resolved on the organizer submission that triggered this run, and starts its
+            pipeline. Only works when this step follows an &quot;An organizer is submitted&quot; trigger.
+          </p>
+        )}
       </div>
 
       {canManage && (
@@ -287,6 +321,7 @@ export function WorkflowBuilder({
   smsTemplates,
   canManage,
   organizerTemplates,
+  services = [],
 }: {
   workspaceId: string;
   automationId: string;
@@ -300,6 +335,7 @@ export function WorkflowBuilder({
   smsTemplates: MessageTemplateOption[];
   canManage: boolean;
   organizerTemplates: TemplateOption[];
+  services?: TemplateOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -353,6 +389,7 @@ export function WorkflowBuilder({
             config={config}
             onConfigChange={setConfig}
             organizerTemplates={organizerTemplates}
+            services={services}
             disabled={!canManage}
           />
           {canManage && (
@@ -386,6 +423,7 @@ export function WorkflowBuilder({
                 total={steps.length}
                 emailTemplates={emailTemplates}
                 smsTemplates={smsTemplates}
+                organizerTemplates={organizerTemplates}
                 canManage={canManage}
                 onSaved={() => router.refresh()}
               />

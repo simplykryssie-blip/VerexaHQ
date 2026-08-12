@@ -11,7 +11,7 @@ export default async function WorkflowsPage() {
 
   const supabase = createClient();
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }] = await Promise.all([
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }] = await Promise.all([
     supabase
       .from("automations")
       .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, created_at, automation_steps(id), automation_runs(id)")
@@ -20,6 +20,12 @@ export default async function WorkflowsPage() {
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     supabase
       .from("organizer_templates")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("status", "published")
+      .order("name"),
+    supabase
+      .from("services")
       .select("id, name")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
@@ -50,6 +56,7 @@ export default async function WorkflowsPage() {
           workflows={rows}
           canManage={Boolean(canManage)}
           organizerTemplates={organizerTemplates ?? []}
+          services={services ?? []}
         />
       </div>
     </>
