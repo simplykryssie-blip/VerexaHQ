@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex h-screen overflow-hidden bg-surfaceMuted">
           <Sidebar
             workspaceName={branding.displayName ?? workspace.name}
-            logoUrl={branding.logoUrl}
+            logoUrl={branding.sidebarLogoUrl}
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
             isPlatformAdmin={Boolean(isPlatformAdmin)}

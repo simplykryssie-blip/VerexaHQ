@@ -6,7 +6,17 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { PORTAL_NAV_ITEMS } from "@/lib/portalNav";
 
-export function PortalSidebar({ clientLabel, pendingCount }: { clientLabel: string; pendingCount: number }) {
+export function PortalSidebar({
+  clientLabel,
+  pendingCount,
+  logoUrl,
+  firmName,
+}: {
+  clientLabel: string;
+  pendingCount: number;
+  logoUrl?: string | null;
+  firmName?: string | null;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -34,7 +44,12 @@ export function PortalSidebar({ clientLabel, pendingCount }: { clientLabel: stri
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-5">
           <div>
-            <p className="text-sm font-semibold text-ink">VerexaHQ</p>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "24px", maxWidth: "160px", objectFit: "contain" }} />
+            ) : (
+              <p className="text-sm font-semibold text-ink">{firmName || "VerexaHQ"}</p>
+            )}
             <p className="mt-0.5 truncate text-xs text-muted">{clientLabel}</p>
             <span className="mt-2 inline-flex items-center rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
               Client Portal

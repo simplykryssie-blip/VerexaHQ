@@ -9,6 +9,7 @@ type Branding = {
   display_name: string | null;
   dba: string | null;
   sidebar_logo_url?: string | null;
+  portal_logo_url?: string | null;
   primary_color: string;
   secondary_color: string;
   accent_color: string;
@@ -16,35 +17,43 @@ type Branding = {
   support_phone: string | null;
 } | null;
 
-export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string; branding: Branding }) {
+function LogoUploadField({
+  workspaceId,
+  column,
+  pathPrefix,
+  label,
+  helpText,
+  initialUrl,
+}: {
+  workspaceId: string;
+  column: "sidebar_logo_url" | "portal_logo_url";
+  pathPrefix: string;
+  label: string;
+  helpText: string;
+  initialUrl: string | null;
+}) {
   const router = useRouter();
   const supabase = createClient();
-  const [displayName, setDisplayName] = useState(branding?.display_name ?? "");
-  const [supportEmail, setSupportEmail] = useState(branding?.support_email ?? "");
-  const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? "#0F172A");
-  const [secondaryColor, setSecondaryColor] = useState(branding?.secondary_color ?? "#2563EB");
-  const [logoUrl, setLogoUrl] = useState(branding?.sidebar_logo_url ?? null);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(initialUrl);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   async function uploadLogo(file: File) {
-    setUploadingLogo(true);
+    setUploading(true);
     setError(null);
-    const path = `${workspaceId}/sidebar-logo-${Date.now()}-${file.name}`;
+    const path = `${workspaceId}/${pathPrefix}-${Date.now()}-${file.name}`;
     const { error: uploadErr } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
     if (uploadErr) {
-      setUploadingLogo(false);
+      setUploading(false);
       setError(uploadErr.message);
       return;
     }
     const { data } = supabase.storage.from("branding").getPublicUrl(path);
     const { error: updateErr } = await supabase
       .from("branding")
-      .update({ sidebar_logo_url: data.publicUrl })
+      .update({ [column]: data.publicUrl } as Record<typeof column, string>)
       .eq("workspace_id", workspaceId);
-    setUploadingLogo(false);
+    setUploading(false);
     if (updateErr) {
       setError(updateErr.message);
       return;
@@ -54,9 +63,12 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
   }
 
   async function removeLogo() {
-    setUploadingLogo(true);
-    const { error: updateErr } = await supabase.from("branding").update({ sidebar_logo_url: null }).eq("workspace_id", workspaceId);
-    setUploadingLogo(false);
+    setUploading(true);
+    const { error: updateErr } = await supabase
+      .from("branding")
+      .update({ [column]: null } as Record<typeof column, null>)
+      .eq("workspace_id", workspaceId);
+    setUploading(false);
     if (updateErr) {
       setError(updateErr.message);
       return;
@@ -64,6 +76,48 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
     setLogoUrl(null);
     router.refresh();
   }
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate">{label}</label>
+      <p className="mt-0.5 text-xs text-muted">{helpText}</p>
+      <div className="mt-2 flex items-center gap-3">
+        {logoUrl && (
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Current logo" style={{ maxHeight: "28px", maxWidth: "140px", objectFit: "contain" }} />
+            <button type="button" onClick={removeLogo} disabled={uploading} className="text-muted hover:text-danger" aria-label={`Remove ${label.toLowerCase()}`}>
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
+          <UploadCloud size={13} />
+          {uploading ? "Uploading..." : logoUrl ? "Replace logo" : "Upload logo"}
+          <input
+            type="file"
+            accept="image/*"
+            disabled={uploading}
+            onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
+            className="sr-only"
+          />
+        </label>
+      </div>
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string; branding: Branding }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [displayName, setDisplayName] = useState(branding?.display_name ?? "");
+  const [supportEmail, setSupportEmail] = useState(branding?.support_email ?? "");
+  const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? "#0F172A");
+  const [secondaryColor, setSecondaryColor] = useState(branding?.secondary_color ?? "#2563EB");
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,32 +148,22 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate">Sidebar logo</label>
-        <p className="mt-0.5 text-xs text-muted">Shown at the top of your staff dashboard&apos;s navigation bar.</p>
-        <div className="mt-2 flex items-center gap-3">
-          {logoUrl && (
-            <div className="flex items-center gap-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="Current logo" style={{ maxHeight: "28px", maxWidth: "140px", objectFit: "contain" }} />
-              <button type="button" onClick={removeLogo} disabled={uploadingLogo} className="text-muted hover:text-danger" aria-label="Remove logo">
-                <X size={14} />
-              </button>
-            </div>
-          )}
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
-            <UploadCloud size={13} />
-            {uploadingLogo ? "Uploading..." : logoUrl ? "Replace logo" : "Upload logo"}
-            <input
-              type="file"
-              accept="image/*"
-              disabled={uploadingLogo}
-              onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
-              className="sr-only"
-            />
-          </label>
-        </div>
-      </div>
+      <LogoUploadField
+        workspaceId={workspaceId}
+        column="sidebar_logo_url"
+        pathPrefix="sidebar-logo"
+        label="Sidebar logo"
+        helpText="Shown at the top of your staff dashboard's navigation bar."
+        initialUrl={branding?.sidebar_logo_url ?? null}
+      />
+      <LogoUploadField
+        workspaceId={workspaceId}
+        column="portal_logo_url"
+        pathPrefix="portal-logo"
+        label="Client portal logo"
+        helpText="Shown to your clients in their portal. Leave blank to reuse the sidebar logo."
+        initialUrl={branding?.portal_logo_url ?? null}
+      />
 
       <div>
         <label className="block text-sm font-medium text-slate">Display name</label>
@@ -164,6 +208,7 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
           </div>
         </div>
       </div>
+      <p className="text-xs text-muted">Nav bar color and button color apply across both your staff dashboard and your client portal.</p>
 
       {error && <p className="text-sm text-danger">{error}</p>}
       {saved && !error && <p className="text-sm text-success">Saved.</p>}

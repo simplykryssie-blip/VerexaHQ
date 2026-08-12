@@ -31,7 +31,7 @@ export default async function FirmProfilePage() {
       .single(),
     supabase
       .from("branding")
-      .select("display_name, dba, sidebar_logo_url, primary_color, secondary_color, accent_color, support_email, support_phone")
+      .select("display_name, dba, sidebar_logo_url, portal_logo_url, primary_color, secondary_color, accent_color, support_email, support_phone")
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
     supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
@@ -107,7 +107,8 @@ export default async function FirmProfilePage() {
         {effectiveBranding.isWhitelabeledByEro ? (
           <>
             <p className="mt-1 text-xs text-muted">
-              Your branding is managed by {effectiveBranding.eroName ?? "your ERO"} -- your staff dashboard shows their logo and colors.
+              Your branding is managed by {effectiveBranding.eroName ?? "your ERO"} -- your staff dashboard and your clients&apos; portal both
+              show their logo and colors.
             </p>
             <div className="mt-3 rounded-xl border border-border bg-surface p-5 text-sm text-slate">
               Connected PTINs don&apos;t have their own Brand Center. If something looks wrong, contact{" "}
@@ -116,7 +117,7 @@ export default async function FirmProfilePage() {
           </>
         ) : (
           <>
-            <p className="mt-1 text-xs text-muted">How your firm appears across the staff dashboard.</p>
+            <p className="mt-1 text-xs text-muted">How your firm appears across your staff dashboard and your clients&apos; portal.</p>
             <div className="mt-3 rounded-xl border border-border bg-surface p-5">
               <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />
             </div>
