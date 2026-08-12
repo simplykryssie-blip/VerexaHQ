@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { LeadsBoard } from "@/components/clients/LeadsBoard";
 import { NewClientButton } from "./NewClientButton";
 
 export const dynamic = 'force-dynamic';
@@ -103,8 +104,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .eq("workspace_id", workspace.id)
     .is("merged_into_client_id", null)
     .in("lifecycle_status", status ? [status] : lifecycleScope)
-    .order("created_at", { ascending: false })
-    .range(from, to);
+    .order("created_at", { ascending: false });
+
+  if (tab === "leads") {
+    // The board shows every stage as its own column at once -- no pagination, no status filter.
+    clientsQuery.limit(300);
+  } else {
+    clientsQuery.range(from, to);
+  }
 
   const [{ data: clients, count }, { data: services }, { data: canCreate }] = await Promise.all([
     clientsQuery,
@@ -145,40 +152,55 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           ))}
         </nav>
 
-        <div className="mb-4 flex flex-wrap gap-2">
-          {statusFilters.map((f) => (
-            <Link
-              key={f.value}
-              href={f.value ? `/clients?tab=${tab}&status=${f.value}` : `/clients?tab=${tab}`}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-              }`}
-            >
-              {f.label}
-            </Link>
-          ))}
-        </div>
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
-          <DataTable
-            columns={CLIENT_COLUMNS}
-            rows={clients ?? []}
-            emptyMessage={
-              status
-                ? `No ${tab} with status "${statusFilters.find((f) => f.value === status)?.label}".`
-                : tab === "leads"
-                  ? "No leads yet."
-                  : "No clients yet. Add your first client to get started."
-            }
-            emptyAction={
-              !status && canCreate ? (
-                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
-              ) : undefined
-            }
-          />
-          {clients && clients.length > 0 && (
-            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/clients" extraQuery={extraQuery} />
-          )}
-        </div>
+        {tab === "leads" ? (
+          !clients || clients.length === 0 ? (
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              <DataTable
+                columns={CLIENT_COLUMNS}
+                rows={[]}
+                emptyMessage="No leads yet."
+                emptyAction={canCreate ? <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} /> : undefined}
+              />
+            </div>
+          ) : (
+            <LeadsBoard leads={clients} />
+          )
+        ) : (
+          <>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {statusFilters.map((f) => (
+                <Link
+                  key={f.value}
+                  href={f.value ? `/clients?tab=${tab}&status=${f.value}` : `/clients?tab=${tab}`}
+                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                    status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+                  }`}
+                >
+                  {f.label}
+                </Link>
+              ))}
+            </div>
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              <DataTable
+                columns={CLIENT_COLUMNS}
+                rows={clients ?? []}
+                emptyMessage={
+                  status
+                    ? `No clients with status "${statusFilters.find((f) => f.value === status)?.label}".`
+                    : "No clients yet. Add your first client to get started."
+                }
+                emptyAction={
+                  !status && canCreate ? (
+                    <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
+                  ) : undefined
+                }
+              />
+              {clients && clients.length > 0 && (
+                <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/clients" extraQuery={extraQuery} />
+              )}
+            </div>
+          </>
+        )}
       </div>
     </>
   );
