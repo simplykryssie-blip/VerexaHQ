@@ -57,7 +57,6 @@ export const NAV_ITEMS: NavItem[] = [
       { label: "Form Templates", href: "/templates" },
     ],
   },
-  { label: "Services", href: "/service-packages", icon: Workflow },
   { label: "Support", href: "/support", icon: LifeBuoy },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -70,7 +69,7 @@ export type NavSection = { label: string; items: NavItem[] };
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
-  { label: "Build", itemLabels: ["Services", "Workflows", "Templates"] },
+  { label: "Build", itemLabels: ["Workflows", "Templates"] },
   { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
@@ -88,6 +87,7 @@ export type SettingsNavItem = {
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "Services", href: "/settings/services", icon: Workflow },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
@@ -102,7 +102,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Services", "Users & Staff", "Roles & Permissions", "Connections"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 

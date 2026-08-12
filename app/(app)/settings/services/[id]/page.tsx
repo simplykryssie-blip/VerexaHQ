@@ -4,8 +4,10 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { clientLabel } from "@/lib/documentEntityLabels";
-import { ServiceDetailTabs } from "@/components/settings/ServiceDetailTabs";
-import type { BoardCard } from "@/components/pipelines/ServiceBoard";
+import { ServiceSettingsPanel } from "@/components/settings/ServiceSettingsPanel";
+import { StageEditor } from "@/components/settings/StageEditor";
+import { FolderTemplateEditor } from "@/components/settings/FolderTemplateEditor";
+import { ServiceBoard, type BoardCard } from "@/components/pipelines/ServiceBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +19,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
 
   const { data: service } = await supabase
     .from("services")
-    .select(
-      "id, name, workspace_id, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_folder_template_id, process_id"
-    )
+    .select("id, name, workspace_id, status, description, estimated_duration_minutes, is_bookable, is_portal_visible, organizer_template_id, document_folder_template_id, process_id")
     .eq("id", params.id)
     .maybeSingle();
   if (!service) notFound();
@@ -29,24 +29,16 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
 
   const [
     { data: isWorkspaceAdmin },
-    { data: categories },
-    { data: pricingRules },
-    { data: billingRules },
     { data: organizerTemplates },
     { data: documentRequestTemplates },
     { data: engagementLetterTemplates },
-    { data: documentFolderTemplates },
     { data: process },
     { data: folderTemplate },
   ] = await Promise.all([
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
-    supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
-    supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
-    supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
     supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
     service.process_id
       ? supabase.from("processes").select("id, name, workspace_id").eq("id", service.process_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -138,35 +130,74 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
 
   return (
     <div>
-      <Link href="/service-packages" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+      <Link href="/settings/services" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Services
       </Link>
       <h2 className="mb-4 text-base font-semibold text-ink">{service.name}</h2>
 
-      <ServiceDetailTabs
-        service={service}
-        workspaceId={workspace.id}
-        isSystemDefault={isSystemDefault}
-        canEdit={canEdit}
-        categories={categories ?? []}
-        pricingRules={pricingRules ?? []}
-        billingRules={billingRules ?? []}
-        organizerTemplates={organizerTemplates ?? []}
-        documentRequestTemplates={documentRequestTemplates ?? []}
-        engagementLetterTemplates={engagementLetterTemplates ?? []}
-        documentFolderTemplates={documentFolderTemplates ?? []}
-        process={process ?? null}
-        stages={stages ?? []}
-        tasks={(tasks ?? []) as never}
-        engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
-        boardStages={stages ?? []}
-        boardCards={boardCards}
-        folderTemplateId={folderTemplate?.id ?? null}
-        folderTemplateName={folderTemplate?.name ?? null}
-        folderTemplateIsSystemDefault={folderTemplateIsSystemDefault}
-        canEditFolders={canEditFolders}
-        folderItems={folderItems ?? []}
-      />
+      {isSystemDefault ? (
+        <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
+          This is a system default and can&apos;t be edited here -- turn it on from Services to get your own editable copy.
+        </p>
+      ) : (
+        <ServiceSettingsPanel
+          service={service}
+          workspaceId={workspace.id}
+          organizerTemplates={organizerTemplates ?? []}
+        />
+      )}
+
+      <div className="mt-10 max-w-3xl">
+        <h3 className="text-sm font-semibold text-ink">Pipeline</h3>
+        <p className="mt-1 text-sm text-muted">
+          The ordered steps this service&apos;s engagements move through, with the right form or letter attached at the stage that
+          needs it. Changes here are global -- they apply to every engagement using this service, not just one client&apos;s.
+        </p>
+        <div className="mt-6">
+          <StageEditor
+            serviceId={service.id}
+            isSystemDefault={isSystemDefault}
+            canEdit={canEdit}
+            process={process ?? null}
+            stages={stages ?? []}
+            tasks={(tasks ?? []) as never}
+            engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
+            organizerTemplates={organizerTemplates ?? []}
+            documentRequestTemplates={documentRequestTemplates ?? []}
+            engagementLetterTemplates={engagementLetterTemplates ?? []}
+          />
+        </div>
+
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-ink">Document folders</h3>
+          <p className="mt-1 text-sm text-muted">
+            The folder structure auto-created in every new engagement using this service. Renaming or deleting a folder here only
+            affects future engagements -- it never touches folders already created for existing ones.
+          </p>
+          <div className="mt-3">
+            <FolderTemplateEditor
+              serviceId={service.id}
+              workspaceId={workspace.id}
+              templateId={folderTemplate?.id ?? null}
+              templateName={folderTemplate?.name ?? null}
+              isSystemDefault={folderTemplateIsSystemDefault}
+              canEdit={canEditFolders}
+              items={folderItems ?? []}
+            />
+          </div>
+        </div>
+      </div>
+
+      {!isSystemDefault && (
+        <div className="mt-10 max-w-3xl">
+          <h3 className="text-sm font-semibold text-ink">Board</h3>
+          <p className="mb-4 mt-1 text-sm text-muted">
+            Every active engagement using this service, grouped by which stage it&apos;s currently sitting in. This is a live view --
+            nothing here is configured, it just reflects what&apos;s already happening.
+          </p>
+          <ServiceBoard stages={stages ?? []} cards={boardCards} />
+        </div>
+      )}
     </div>
   );
 }

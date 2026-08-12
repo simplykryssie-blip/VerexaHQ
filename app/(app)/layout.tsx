@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             textColor={branding.sidebarTextColor}
             isPlatformAdmin={Boolean(isPlatformAdmin)}
           />
-          <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
+          <main id="main-content" className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
             <GlobalClientDraftBanner />
             {children}

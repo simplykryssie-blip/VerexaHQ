@@ -63,10 +63,10 @@ export const ENTITY_RESOLVERS: Record<string, EntityResolver> = {
       return [clientName, service?.name].filter(Boolean).join(" — ") || "Engagement";
     },
   },
-  "service-packages": {
+  services: {
     table: "services",
     select: "id, name",
-    label: (row) => (row.name as string | undefined) || "Service Package",
+    label: (row) => (row.name as string | undefined) || "Service",
   },
   workflows: {
     table: "automations",

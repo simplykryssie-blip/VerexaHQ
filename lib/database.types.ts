@@ -5133,6 +5133,7 @@ export type Database = {
       services: {
         Row: {
           billing_rule_id: string | null
+          cloned_from_service_id: string | null
           created_at: string
           created_by: string | null
           default_price: number | null
@@ -5164,6 +5165,7 @@ export type Database = {
         }
         Insert: {
           billing_rule_id?: string | null
+          cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
           default_price?: number | null
@@ -5195,6 +5197,7 @@ export type Database = {
         }
         Update: {
           billing_rule_id?: string | null
+          cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
           default_price?: number | null
@@ -5230,6 +5233,13 @@ export type Database = {
             columns: ["billing_rule_id"]
             isOneToOne: false
             referencedRelation: "billing_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_cloned_from_service_id_fkey"
+            columns: ["cloned_from_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
             referencedColumns: ["id"]
           },
           {
