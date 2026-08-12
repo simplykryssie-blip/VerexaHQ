@@ -4,8 +4,9 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { createAccountLink, createConnectedAccount } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getAppUrl } from "@/lib/appUrl";
 
-export async function POST() {
+export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -57,7 +58,7 @@ export async function POST() {
       .eq("id", workspace.id);
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl(request);
   const link = await createAccountLink({
     accountId,
     refreshUrl: `${appUrl}/api/stripe/connect/refresh`,

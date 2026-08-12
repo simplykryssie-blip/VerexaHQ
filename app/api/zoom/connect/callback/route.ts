@@ -3,9 +3,10 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { exchangeCodeForTokens, getZoomProfile } from "@/lib/zoom/client";
+import { getAppUrl } from "@/lib/appUrl";
 
 export async function GET(request: Request) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl(request);
   const settingsUrl = new URL("/settings/my-account", appUrl);
 
   const supabase = createClient();

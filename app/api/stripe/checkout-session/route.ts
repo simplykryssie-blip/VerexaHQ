@@ -5,6 +5,7 @@ import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getWorkspaceConnectAccount } from "@/lib/stripe/workspaceConnect";
+import { getAppUrl } from "@/lib/appUrl";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invoiceId or paymentPlanId is required" }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl(request);
 
   if (!isStripeConfigured()) {
     return NextResponse.json({ configured: false, reason: "Stripe is not configured for this environment." }, { status: 200 });

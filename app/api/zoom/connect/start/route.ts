@@ -3,8 +3,9 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthorizationUrl } from "@/lib/zoom/client";
 import { isZoomConfigured } from "@/lib/providerStatus";
+import { getAppUrl } from "@/lib/appUrl";
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = createClient();
   const {
     data: { user },
@@ -13,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = getAppUrl(request);
   const settingsUrl = new URL("/settings/my-account", appUrl);
 
   if (!isZoomConfigured()) {
