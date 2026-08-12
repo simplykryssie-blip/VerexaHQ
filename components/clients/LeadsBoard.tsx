@@ -210,6 +210,7 @@ export function LeadsBoard({
                         clientId={selected.id}
                         workspaceId={workspaceId}
                         onCreated={() => afterConsultBooked(selected)}
+                        defaultOpen
                       />
                     )}
                     <p className="mt-1.5 text-xs text-muted">Doesn&apos;t change their stage. Sends a portal invite if they don&apos;t have one yet.</p>

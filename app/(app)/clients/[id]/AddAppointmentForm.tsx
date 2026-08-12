@@ -8,15 +8,19 @@ export function AddAppointmentForm({
   clientId,
   workspaceId,
   onCreated,
+  defaultOpen,
 }: {
   clientId: string;
   workspaceId: string;
   /** Fires after a successful save, before the router refresh. */
   onCreated?: () => void;
+  /** Skip the "+ Schedule" toggle and show the form immediately -- for
+   *  callers that already have their own toggle before rendering this. */
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen ?? false);
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState("");
   const [location, setLocation] = useState("");
