@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
-import { NotificationBell } from "@/components/NotificationBell";
+import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { createClient } from "@/lib/supabase/server";
@@ -58,11 +58,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             isPlatformAdmin={Boolean(isPlatformAdmin)}
           />
           <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
+            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
             <GlobalClientDraftBanner />
             {children}
           </main>
         </div>
-        {user && <NotificationBell workspaceId={workspace.id} userId={user.id} />}
       </ToastProvider>
     </div>
   );

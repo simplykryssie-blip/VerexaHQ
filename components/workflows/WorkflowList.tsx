@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { TriggerFields, defaultTriggerConfig, triggerSummary, type TemplateOption } from "@/components/workflows/TriggerFields";
 
@@ -93,13 +94,9 @@ export function WorkflowList({
     <div className="space-y-4">
       {canManage && (
         <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-accent/90"
-          >
+          <Button size="sm" onClick={() => setOpen((v) => !v)}>
             <Plus size={14} /> New workflow
-          </button>
+          </Button>
         </div>
       )}
 
@@ -125,12 +122,12 @@ export function WorkflowList({
           />
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted">
+            <Button type="button" variant="tertiary" size="sm" onClick={() => setOpen(false)}>
               Cancel
-            </button>
-            <button type="submit" disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60">
+            </Button>
+            <Button type="submit" size="sm" disabled={saving}>
               {saving ? "Creating..." : "Create workflow"}
-            </button>
+            </Button>
           </div>
         </form>
       )}

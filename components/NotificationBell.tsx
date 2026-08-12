@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
+import { IconButton } from "@/components/ui/IconButton";
+import { Card } from "@/components/ui/Card";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -60,23 +62,18 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
   }
 
   return (
-    <div ref={containerRef} className="fixed right-4 top-4 z-40">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
-        className="relative flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-slate shadow-sm hover:bg-surfaceMuted"
-      >
+    <div ref={containerRef} className="relative">
+      <IconButton variant="default" onClick={() => setOpen((v) => !v)} aria-label="Notifications" className="relative rounded-full">
         <Bell size={18} />
         {unreadCount > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-      </button>
+      </IconButton>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-xl border border-border bg-surface shadow-lg">
+        <Card padded={false} className="absolute right-0 top-full z-30 mt-2 w-80 shadow-lg">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <p className="text-sm font-semibold text-ink">Notifications</p>
             {unreadCount > 0 && (
@@ -110,7 +107,7 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
               </ul>
             )}
           </div>
-        </div>
+        </Card>
       )}
     </div>
   );

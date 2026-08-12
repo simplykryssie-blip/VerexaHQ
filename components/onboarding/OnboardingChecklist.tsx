@@ -55,7 +55,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   client: {
     whatItDoes: "This is your client record -- the person or business you do work for. Everything else (engagements, documents, invoices, messages) lives underneath a client.",
     howItWorks: "Once a client exists, you can start an engagement for them using one of your service packages, and the whole workflow (forms, documents, billing) runs from there.",
-    howToSetUp: "Go to Contacts, click Add Client, and fill in their basic info. You can add a real client or a test one just to see how the workflow feels end to end.",
+    howToSetUp: "Go to Contacts, click New Client, and fill in their basic info. You can add a real client or a test one just to see how the workflow feels end to end.",
   },
   invite: {
     whatItDoes: "Inviting your team gives staff their own login to this workspace, with a role that controls what they can see and do.",

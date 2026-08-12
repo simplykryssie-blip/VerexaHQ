@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/Button";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
@@ -408,13 +409,9 @@ export function NewClientButton({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent/90"
-      >
+      <Button onClick={() => setOpen(true)}>
         <Plus size={16} /> New Client
-      </button>
+      </Button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/30 px-4 py-8">
@@ -682,20 +679,12 @@ export function NewClientButton({
               )}
 
               <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate hover:bg-surfaceMuted"
-                >
+                <Button type="button" variant="tertiary" onClick={() => setOpen(false)}>
                   Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-                >
+                </Button>
+                <Button type="submit" disabled={loading}>
                   {loading ? "Creating..." : "Create client"}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

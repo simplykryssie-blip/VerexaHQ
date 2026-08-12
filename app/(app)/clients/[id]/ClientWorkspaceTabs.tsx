@@ -340,7 +340,7 @@ export function OverviewTab({
         title="Engagements"
         action={
           <Link href={`/engagements/new?clientId=${client.id}`} className="text-xs font-medium text-accent hover:underline">
-            + Add Engagement
+            + New Engagement
           </Link>
         }
       >
