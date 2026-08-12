@@ -101,7 +101,7 @@ export function SidebarRail({
           </button>
         </div>
 
-        <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto py-3">
+        <nav className="flex flex-1 flex-col items-center gap-1 py-3">
           {NAV_SECTIONS.map((section) => {
             const Icon = section.icon;
             const isOpen = openSection === section.label;
