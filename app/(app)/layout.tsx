@@ -21,13 +21,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: securityPolicy }, branding] = await Promise.all([
+  const [{ data: securityPolicy }, branding, { data: isPlatformAdmin }] = await Promise.all([
     supabase
       .from("workspace_security_policies")
       .select("session_timeout_minutes")
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
     getEffectiveBranding(workspace.id),
+    supabase.rpc("is_platform_admin"),
   ]);
 
   const brandVars: React.CSSProperties = {};
@@ -54,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logoUrl={branding.logoUrl}
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
+            isPlatformAdmin={Boolean(isPlatformAdmin)}
           />
           <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
             <GlobalClientDraftBanner />

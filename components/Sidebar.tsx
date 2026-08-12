@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { archivo, publicSans, plexMono } from "@/lib/authFonts";
 import { darkenHex } from "@/lib/color";
@@ -15,11 +15,13 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
+  isPlatformAdmin,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  isPlatformAdmin?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -159,6 +161,20 @@ export function Sidebar({
             );
           })}
         </nav>
+
+        {isPlatformAdmin && (
+          <div className="px-3 pb-1">
+            <Link
+              href="/platform-admin"
+              className={`${
+                pathname === "/platform-admin" || pathname.startsWith("/platform-admin/") ? styles.navItemActive : styles.navItem
+              } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+            >
+              <ShieldEllipsis size={18} strokeWidth={2} className="shrink-0" />
+              Platform Admin
+            </Link>
+          </div>
+        )}
 
         <div className={`${styles.footer} px-3 py-4`} style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
           <form action="/api/auth/sign-out" method="post">
