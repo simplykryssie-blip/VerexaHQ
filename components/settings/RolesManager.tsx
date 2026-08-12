@@ -170,8 +170,9 @@ export function RolesManager({
   async function forkRole(role: RoleRow, toggledPermissionId?: string) {
     if (toggledPermissionId) setTogglingId(toggledPermissionId);
     setForking(true);
+    const copyName = `${role.name} (Custom)`;
     const takenSlugs = new Set(roles.filter((r) => r.workspace_id === workspaceId).map((r) => r.slug));
-    const slug = uniqueSlug(slugify(role.name), takenSlugs);
+    const slug = uniqueSlug(slugify(copyName), takenSlugs);
 
     const targetPermissionIds = toggledPermissionId
       ? role.permissionIds.includes(toggledPermissionId)
@@ -181,7 +182,7 @@ export function RolesManager({
 
     const { data: newRole, error } = await supabase
       .from("roles")
-      .insert({ workspace_id: workspaceId, name: role.name, slug, description: role.description })
+      .insert({ workspace_id: workspaceId, name: copyName, slug, description: role.description })
       .select("id, name, slug, description, workspace_id, is_system_role")
       .single();
 
@@ -210,8 +211,8 @@ export function RolesManager({
     setSelectedId(newRole.id);
     toast.show(
       toggledPermissionId
-        ? `Created your own copy of ${role.name} with that change applied. The System role is unchanged.`
-        : `Created your own copy of ${role.name} -- edit it here. The System role is unchanged.`,
+        ? `Created "${copyName}" with that change applied -- the System "${role.name}" role is unchanged.`
+        : `Created "${copyName}" for you to edit -- the System "${role.name}" role is unchanged.`,
       "success"
     );
     router.refresh();

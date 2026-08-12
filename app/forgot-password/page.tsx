@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
@@ -20,7 +21,8 @@ const RAIL_FOOT = (
 
 export default function ForgotPasswordPage() {
   const supabase = createClient();
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);

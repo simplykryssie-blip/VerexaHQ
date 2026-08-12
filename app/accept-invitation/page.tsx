@@ -257,6 +257,13 @@ export default function AcceptInvitationPage() {
           className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
         {mode === "sign-up" && <p className="text-xs text-muted">{PASSWORD_REQUIREMENTS_HINT}</p>}
+        {mode === "sign-in" && (
+          <p className="text-right text-xs">
+            <Link href={`/forgot-password?email=${encodeURIComponent(preview.email)}`} className="text-accent hover:underline">
+              Forgot your password?
+            </Link>
+          </p>
+        )}
 
         {mode === "sign-up" && (
           <input
