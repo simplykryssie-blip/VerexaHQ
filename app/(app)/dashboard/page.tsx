@@ -42,9 +42,9 @@ export default async function DashboardPage() {
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.request" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
-    supabase.from("workspaces").select("onboarding_dismissed_at").eq("id", workspace.id).maybeSingle(),
+    supabase.from("workspaces").select("onboarding_dismissed_at, stripe_connected_account_id").eq("id", workspace.id).maybeSingle(),
     user
-      ? supabase.from("user_profiles").select("seen_onboarding_steps").eq("id", user.id).maybeSingle()
+      ? supabase.from("user_profiles").select("seen_onboarding_steps, display_name, avatar_url").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -81,19 +81,73 @@ export default async function DashboardPage() {
   const onboardingDismissed = Boolean(onboardingRow?.onboarding_dismissed_at);
   let onboardingSteps: OnboardingStep[] = [];
   if (!onboardingDismissed) {
-    const showInviteStep = canInviteStaff(workspace);
-    const [{ count: serviceCount }, { count: organizerCount }, { count: clientCount }, { count: staffCount }, { count: automationCount }] =
-      await Promise.all([
-        supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-        supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-        supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-        showInviteStep
-          ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
-          : Promise.resolve({ count: null }),
-        supabase.from("automations").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-      ]);
+    const showEroSteps = canInviteStaff(workspace);
+    const [
+      { count: serviceCount },
+      { count: organizerCount },
+      { count: clientCount },
+      { count: staffCount },
+      { count: automationCount },
+      { count: customRoleCount },
+      { count: connectionCount },
+    ] = await Promise.all([
+      supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      showEroSteps
+        ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
+        : Promise.resolve({ count: null }),
+      supabase.from("automations").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      showEroSteps
+        ? supabase.from("roles").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("is_system_role", false)
+        : Promise.resolve({ count: null }),
+      showEroSteps
+        ? supabase.from("firm_connections").select("id", { count: "exact", head: true }).eq("parent_workspace_id", workspace.id)
+        : Promise.resolve({ count: null }),
+    ]);
+
+    const profileComplete = Boolean(profileRow?.display_name && profileRow?.avatar_url);
 
     onboardingSteps = [
+      {
+        key: "profile",
+        label: "Complete your profile",
+        description: "Add your name and a photo so colleagues recognize you in messages.",
+        href: "/settings/my-account",
+        complete: profileComplete,
+      },
+      ...(showEroSteps
+        ? [
+            {
+              key: "invite",
+              label: "Add users",
+              description: "Add staff so they can share the workload.",
+              href: "/settings/users",
+              complete: (staffCount ?? 0) > 1,
+            },
+            {
+              key: "roles",
+              label: "Set roles & permissions",
+              description: "Control what each role on your team can see and do.",
+              href: "/settings/roles",
+              complete: (customRoleCount ?? 0) > 0,
+            },
+            {
+              key: "connections",
+              label: "Send connections",
+              description: "Invite the PTINs you work with to connect to your ERO.",
+              href: "/settings/connections",
+              complete: (connectionCount ?? 0) > 0,
+            },
+          ]
+        : []),
+      {
+        key: "integrations",
+        label: "Set up integrations",
+        description: "Connect Stripe to get paid and Zoom for client meetings.",
+        href: "/settings/integrations",
+        complete: Boolean(onboardingRow?.stripe_connected_account_id),
+      },
       {
         key: "service",
         label: "Create your first service package",
@@ -115,17 +169,6 @@ export default async function DashboardPage() {
         href: "/clients",
         complete: (clientCount ?? 0) > 0,
       },
-      ...(showInviteStep
-        ? [
-            {
-              key: "invite",
-              label: "Invite your team",
-              description: "Add staff so they can share the workload.",
-              href: "/settings/users",
-              complete: (staffCount ?? 0) > 1,
-            },
-          ]
-        : []),
       {
         key: "automations",
         label: "Set up your automations",

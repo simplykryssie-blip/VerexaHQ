@@ -22,6 +22,26 @@ type StepExplainer = {
 };
 
 const STEP_EXPLAINERS: Record<string, StepExplainer> = {
+  profile: {
+    whatItDoes: "Your name and photo are how colleagues recognize you across the app -- on internal messages, the staff directory, and anywhere else your activity shows up.",
+    howItWorks: "Once set, your photo and name show up automatically next to anything you do -- no separate setup needed per feature.",
+    howToSetUp: "Go to My Account, upload a photo, and fill in your name if it's not already there.",
+  },
+  roles: {
+    whatItDoes: "Roles control what each person on your team can see and do -- e.g. a preparer might not need access to billing, while a reviewer needs to approve returns.",
+    howItWorks: "Every staff member is assigned a role, and that role's permissions decide which pages and actions they can access. You start with a few default roles (owner, admin, staff) and can create your own.",
+    howToSetUp: "Go to Settings > Roles & Permissions to review the defaults or create a custom role, then assign it to a staff member from Settings > Users & Staff.",
+  },
+  connections: {
+    whatItDoes: "If PTINs work with your firm for e-filing, connecting them to your ERO lets them share a client's file with you for review before it goes to e-file.",
+    howItWorks: "You send a connection invite; once a PTIN accepts it, they can share engagements with you and you can see their connection status and billing arrangement.",
+    howToSetUp: "Go to Settings > Connections and use the invite generator to create a link or code to send to the PTIN you work with.",
+  },
+  integrations: {
+    whatItDoes: "Integrations connect Verexa to the tools you already use -- Stripe to accept client payments, Zoom for client meetings.",
+    howItWorks: "Once connected, the rest of the app can use them automatically -- e.g. invoices get a real \"Pay now\" link, and appointments can include a Zoom meeting link.",
+    howToSetUp: "Go to Settings > Integrations and connect Stripe and/or Zoom. Both are optional and can be set up whenever you're ready.",
+  },
   service: {
     whatItDoes: "A service package is what you're selling -- e.g. \"Individual Tax Return\" or \"Bookkeeping.\" It's the container that ties together pricing, the forms a client fills out, and the stages their work moves through.",
     howItWorks: "Every engagement you create is built from a service package, so the package's settings (price, intake form, document requests, workflow stages) get applied automatically instead of you configuring each one by hand.",

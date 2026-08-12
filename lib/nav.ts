@@ -23,6 +23,7 @@ import {
   Zap,
   Link2,
   ClipboardCheck,
+  LifeBuoy,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -60,6 +61,7 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: "Services", href: "/service-packages", icon: Workflow },
+  { label: "Support", href: "/support", icon: LifeBuoy },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
