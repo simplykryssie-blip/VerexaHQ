@@ -12,24 +12,19 @@ import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 
 type Option = { id: string; name: string };
-type PricingRuleOption = { id: string; name: string; pricing_method: string };
 
 export type ServiceCard = {
   id: string;
   name: string;
   status: string;
   workspace_id: string | null;
-  default_price: number | null;
   description: string | null;
   estimated_duration_minutes: number | null;
   is_bookable: boolean;
   is_portal_visible: boolean;
   categoryName: string | null;
   service_category_id: string | null;
-  pricing_rule_id: string | null;
-  billing_rule_id: string | null;
   organizer_template_id: string | null;
-  document_folder_template_id: string | null;
 };
 
 const STATUS_FILTERS = [
@@ -39,21 +34,14 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
-function money(n: number | null) {
-  if (n === null) return null;
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 export function ServiceGallery({
   workspaceId,
   services,
   categories,
-  pricingRules,
 }: {
   workspaceId: string;
   services: ServiceCard[];
   categories: Option[];
-  pricingRules: PricingRuleOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -148,9 +136,6 @@ export function ServiceGallery({
 
             {filtered.map((s) => {
               const isSystem = !s.workspace_id;
-              const price = money(s.default_price);
-              const pricingRule = pricingRules.find((r) => r.id === s.pricing_rule_id);
-              const isVariablePricing = Boolean(pricingRule && ["custom_quote", "tax_form_based", "complexity_based"].includes(pricingRule.pricing_method));
               return (
                 <div key={s.id} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:shadow-md">
                   <div className="relative flex h-20 items-center justify-center bg-gradient-to-br from-accent to-accent/70">
@@ -177,11 +162,6 @@ export function ServiceGallery({
                         <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium capitalize text-muted">{s.status}</span>
                       ) : (
                         <TemplateStatusCycle table="services" id={s.id} status={s.status} />
-                      )}
-                      {isVariablePricing ? (
-                        <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Custom quote</span>
-                      ) : (
-                        price && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">{price}</span>
                       )}
                       {s.is_bookable && (
                         <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">

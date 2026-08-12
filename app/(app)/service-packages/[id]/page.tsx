@@ -9,7 +9,13 @@ import type { BoardCard } from "@/components/pipelines/ServiceBoard";
 
 export const dynamic = "force-dynamic";
 
-export default async function ServiceDetailPage({ params }: { params: { id: string } }) {
+export default async function ServiceDetailPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string };
+  searchParams: { tab?: string };
+}) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -17,67 +23,24 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
 
   const { data: service } = await supabase
     .from("services")
-    .select(
-      "id, name, workspace_id, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_folder_template_id, process_id"
-    )
+    .select("id, name, workspace_id, status, description, estimated_duration_minutes, is_bookable, is_portal_visible, service_category_id, organizer_template_id, process_id")
     .eq("id", params.id)
     .maybeSingle();
   if (!service) notFound();
 
-  const isSystemDefault = !service.workspace_id;
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [
-    { data: isWorkspaceAdmin },
-    { data: categories },
-    { data: pricingRules },
-    { data: billingRules },
-    { data: organizerTemplates },
-    { data: documentRequestTemplates },
-    { data: engagementLetterTemplates },
-    { data: documentFolderTemplates },
-    { data: process },
-    { data: folderTemplate },
-  ] = await Promise.all([
-    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+  const [{ data: categories }, { data: organizerTemplates }, { data: process }] = await Promise.all([
     supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
-    supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
-    supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
     supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
     service.process_id
       ? supabase.from("processes").select("id, name, workspace_id").eq("id", service.process_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    service.document_folder_template_id
-      ? supabase.from("document_folder_templates").select("id, name, workspace_id").eq("id", service.document_folder_template_id).maybeSingle()
-      : Promise.resolve({ data: null }),
   ]);
 
-  const canEdit = !isSystemDefault && Boolean(isWorkspaceAdmin);
-
-  const { data: folderItems } = folderTemplate
-    ? await supabase
-        .from("document_folder_template_items")
-        .select("id, parent_item_id, name, display_order")
-        .eq("document_folder_template_id", folderTemplate.id)
-        .order("display_order")
-    : { data: [] as { id: string; parent_item_id: string | null; name: string; display_order: number }[] };
-
-  const folderTemplateIsSystemDefault = folderTemplate ? !folderTemplate.workspace_id : false;
-  const canEditFolders = Boolean(isWorkspaceAdmin) && !folderTemplateIsSystemDefault;
-
-  const [{ data: stages }, { data: tasks }, { data: stageCounts }, { data: engagements }] = await Promise.all([
+  const [{ data: stages }, { data: stageCounts }, { data: engagements }] = await Promise.all([
     process
       ? supabase.from("process_stages").select("*").eq("process_id", process.id).order("display_order")
-      : Promise.resolve({ data: [] as never[] }),
-    process
-      ? supabase
-          .from("process_tasks")
-          .select("*, process_stages!inner(process_id)")
-          .eq("process_stages.process_id", process.id)
-          .order("display_order")
       : Promise.resolve({ data: [] as never[] }),
     process
       ? supabase.from("engagements").select("current_stage").eq("workflow_id", process.id).not("current_stage", "is", null)
@@ -136,6 +99,8 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     ];
   });
 
+  const defaultTab = searchParams.tab === "board" ? "board" : "details";
+
   return (
     <div>
       <Link href="/service-packages" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
@@ -146,26 +111,12 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
       <ServiceDetailTabs
         service={service}
         workspaceId={workspace.id}
-        isSystemDefault={isSystemDefault}
-        canEdit={canEdit}
         categories={categories ?? []}
-        pricingRules={pricingRules ?? []}
-        billingRules={billingRules ?? []}
         organizerTemplates={organizerTemplates ?? []}
-        documentRequestTemplates={documentRequestTemplates ?? []}
-        engagementLetterTemplates={engagementLetterTemplates ?? []}
-        documentFolderTemplates={documentFolderTemplates ?? []}
-        process={process ?? null}
-        stages={stages ?? []}
-        tasks={(tasks ?? []) as never}
-        engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
+        hasPipeline={Boolean(process)}
         boardStages={stages ?? []}
         boardCards={boardCards}
-        folderTemplateId={folderTemplate?.id ?? null}
-        folderTemplateName={folderTemplate?.name ?? null}
-        folderTemplateIsSystemDefault={folderTemplateIsSystemDefault}
-        canEditFolders={canEditFolders}
-        folderItems={folderItems ?? []}
+        defaultTab={defaultTab}
       />
     </div>
   );

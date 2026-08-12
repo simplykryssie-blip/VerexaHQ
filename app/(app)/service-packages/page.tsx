@@ -20,8 +20,8 @@ export default async function ServicePackagesPage() {
     supabase
       .from("services")
       .select(
-        `id, name, slug, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
-        service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_folder_template_id`
+        `id, name, slug, status, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
+        service_category_id, organizer_template_id`
       )
       .or(orFilter)
       .order("name"),
@@ -35,17 +35,13 @@ export default async function ServicePackagesPage() {
     name: s.name,
     status: s.status,
     workspace_id: s.workspace_id,
-    default_price: s.default_price,
     description: s.description,
     estimated_duration_minutes: s.estimated_duration_minutes,
     is_bookable: s.is_bookable,
     is_portal_visible: s.is_portal_visible,
     categoryName: (s.service_categories as unknown as { name?: string } | null)?.name ?? null,
     service_category_id: s.service_category_id,
-    pricing_rule_id: s.pricing_rule_id,
-    billing_rule_id: s.billing_rule_id,
     organizer_template_id: s.organizer_template_id,
-    document_folder_template_id: s.document_folder_template_id,
   }));
 
   return (
@@ -53,17 +49,17 @@ export default async function ServicePackagesPage() {
       <SettingsSectionHeader
         icon={Workflow}
         title="Services"
-        description="Each service is a pipeline -- the ordered stages an engagement moves through, with the right form or letter attached at the step that needs it."
+        description="How you categorize clients and engagements. Pipelines, pricing, and billing are set up in their own sections -- this is just the list."
       />
 
       <div className="mt-6">
-        <ServiceGallery workspaceId={workspace.id} services={serviceCards} categories={categories ?? []} pricingRules={pricingRules ?? []} />
+        <ServiceGallery workspaceId={workspace.id} services={serviceCards} categories={categories ?? []} />
       </div>
 
       <div className="mt-10 border-t border-border pt-6">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Pricing &amp; billing (advanced)</h3>
         <p className="mt-1 text-xs text-muted">
-          The rule library a service&apos;s default price and billing terms are picked from. Attach these from a service&apos;s Edit screen.
+          The rule library available when setting a price or billing terms on an engagement.
         </p>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
