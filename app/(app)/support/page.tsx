@@ -16,8 +16,8 @@ const HOW_IT_WORKS: Entry[] = [
     body: "An engagement is one specific piece of work for one client -- e.g. their 2025 tax return. It's created from a Service Package, which is why creating the service first matters: the engagement inherits that service's pipeline (stages), pricing/billing rules, and any templates attached to its stages. An engagement's Workflow tab shows its current stage and lets staff mark stages complete to move it forward.",
   },
   {
-    title: "Service Packages (pipelines)",
-    body: "A service package is what you sell (\"Individual Tax Return,\" \"Bookkeeping\") and doubles as a pipeline builder: it has stages (Organizer, Prep, Review, Filed, etc.), and each stage can have an organizer, document request, or engagement-letter template attached. Attaching a template to a stage never sends anything automatically -- it just pre-selects the right template when staff use the manual \"Send Organizer\" / \"Request Documents\" / \"Send for Signature\" buttons on an engagement at that stage. To actually automate sending, use Workflows.",
+    title: "Services",
+    body: "A service is what you sell (\"Individual Tax Return,\" \"Bookkeeping\"). Opening one has three tabs: Details (name, price, category), Stages (the ordered steps its engagements move through, each optionally with an organizer, document request, or engagement-letter template attached), and Board (a live view of which of your clients are currently sitting in which stage -- nothing to configure there, it just reflects what's already happening). Attaching a template to a stage never sends anything automatically -- it just pre-selects the right template when staff use the manual \"Send Organizer\" / \"Request Documents\" / \"Send for Signature\" buttons on an engagement at that stage. To actually automate sending, use Workflows instead -- that's a separate, optional engine, not part of a service.",
   },
   {
     title: "Workflows (automations)",

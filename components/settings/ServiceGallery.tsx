@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Copy, Plus, Search, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
-import { ServiceEditRow } from "@/components/settings/ServiceEditRow";
 import { CreateServiceForm } from "@/components/settings/CreateServiceForm";
 import { CloneServiceButton } from "@/components/settings/CloneServiceButton";
 import { EmptyState } from "@/components/EmptyState";
@@ -50,24 +49,17 @@ export function ServiceGallery({
   services,
   categories,
   pricingRules,
-  billingRules,
-  organizerTemplates,
-  documentFolderTemplates,
 }: {
   workspaceId: string;
   services: ServiceCard[];
   categories: Option[];
   pricingRules: PricingRuleOption[];
-  billingRules: Option[];
-  organizerTemplates: Option[];
-  documentFolderTemplates: Option[];
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [cloningAll, setCloningAll] = useState(false);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
@@ -76,8 +68,6 @@ export function ServiceGallery({
     [services, query, status]
   );
 
-  const editing = services.find((s) => s.id === editingId) ?? null;
-  const editorProps = { workspaceId, categories, pricingRules, billingRules, organizerTemplates, documentFolderTemplates };
   const hasNoOwnedServices = services.length > 0 && services.every((s) => !s.workspace_id);
 
   async function duplicateService(id: string, name: string) {
@@ -166,13 +156,12 @@ export function ServiceGallery({
                   <div className="relative flex h-20 items-center justify-center bg-gradient-to-br from-accent to-accent/70">
                     <Workflow size={30} className="text-white/90" aria-hidden="true" />
                     <div className="absolute inset-0 flex items-center justify-center bg-ink/50 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(s.id)}
+                      <Link
+                        href={`/service-packages/${s.id}`}
                         className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-white/90"
                       >
-                        {isSystem ? "View" : "Edit"}
-                      </button>
+                        {isSystem ? "View" : "Open"}
+                      </Link>
                     </div>
                   </div>
 
@@ -207,13 +196,9 @@ export function ServiceGallery({
                         <div className="mt-3">
                           <CloneServiceButton serviceId={s.id} workspaceId={workspaceId} />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setEditingId(s.id)}
-                          className="mt-2 text-xs font-medium text-muted hover:text-ink"
-                        >
+                        <Link href={`/service-packages/${s.id}`} className="mt-2 text-xs font-medium text-muted hover:text-ink">
                           View starter template
-                        </button>
+                        </Link>
                       </>
                     ) : (
                       <>
@@ -221,27 +206,16 @@ export function ServiceGallery({
                           href={`/service-packages/${s.id}`}
                           className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
                         >
-                          <Workflow size={13} /> Build pipeline
+                          <Workflow size={13} /> Manage service
                         </Link>
-                        <div className="mt-2 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingId(s.id)}
-                            className="inline-flex flex-1 items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => duplicateService(s.id, s.name)}
-                            disabled={duplicatingId === s.id}
-                            aria-label="Duplicate service package"
-                            title="Duplicate"
-                            className="inline-flex items-center justify-center rounded-lg border border-border px-2.5 py-1.5 text-slate transition hover:border-accent hover:text-accent disabled:opacity-60"
-                          >
-                            <Copy size={13} />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => duplicateService(s.id, s.name)}
+                          disabled={duplicatingId === s.id}
+                          className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-60"
+                        >
+                          <Copy size={13} /> Duplicate
+                        </button>
                       </>
                     )}
                   </div>
@@ -251,8 +225,6 @@ export function ServiceGallery({
           </div>
         )}
       </div>
-
-      {editing && <ServiceEditRow service={editing} onClose={() => setEditingId(null)} {...editorProps} />}
 
       {creating && (
         <Modal title="New service package" onClose={() => setCreating(false)} size="xl">

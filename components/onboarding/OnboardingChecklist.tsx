@@ -45,12 +45,12 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   service: {
     whatItDoes: "A service package is what you're selling -- e.g. \"Individual Tax Return\" or \"Bookkeeping.\" It's the container that ties together pricing, the forms a client fills out, and the stages their work moves through.",
     howItWorks: "Every engagement you create is built from a service package, so the package's settings (price, intake form, document requests, workflow stages) get applied automatically instead of you configuring each one by hand.",
-    howToSetUp: "Go to Service Packages, clone a starter template or create your own, give it a name and price, then attach an intake form and a workflow. You can always come back and add pricing rules or billing rules later.",
+    howToSetUp: "Go to Services, clone a starter template or create your own, set its name and price under Details, then build its steps under Stages. You can always come back and add pricing rules or billing rules later.",
   },
   organizer: {
     whatItDoes: "An intake form (organizer) is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
     howItWorks: "Once a client submits it, their answers show up on their engagement automatically, and you can route different forms to different services if one form covers more than one type of work.",
-    howToSetUp: "Go to Templates, create a new organizer, add the questions you need, then attach it to a service package so it gets sent automatically when that service is used.",
+    howToSetUp: "Go to Templates, create a new organizer, add the questions you need, then attach it to a service's stage so it's pre-selected when staff send it from an engagement at that stage.",
   },
   client: {
     whatItDoes: "This is your client record -- the person or business you do work for. Everything else (engagements, documents, invoices, messages) lives underneath a client.",

@@ -18,7 +18,6 @@ import {
   Workflow,
   Flag,
   ScrollText,
-  Kanban,
   Zap,
   Link2,
   ClipboardCheck,
@@ -44,7 +43,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Contacts", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
-  { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
@@ -71,7 +69,7 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Pipelines", "Messages"] },
+  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
   { label: "Build", itemLabels: ["Services", "Workflows", "Templates"] },
   { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },

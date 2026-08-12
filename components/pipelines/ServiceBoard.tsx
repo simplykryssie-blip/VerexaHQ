@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { StageReviewActions } from "@/app/(app)/engagements/[id]/StageReviewActions";
 
-export type ServiceOption = { id: string; name: string; process_id: string };
 export type StageColumn = { id: string; name: string; display_order: number };
 export type BoardCard = {
   id: string;
@@ -23,37 +22,9 @@ const PRIORITY_STYLE: Record<string, string> = {
   Urgent: "bg-danger/10 text-danger",
 };
 
-export function ServiceBoard({
-  services,
-  selectedServiceId,
-  stages,
-  cards,
-}: {
-  services: ServiceOption[];
-  selectedServiceId: string | null;
-  stages: StageColumn[];
-  cards: BoardCard[];
-}) {
-  if (services.length === 0) {
-    return <p className="text-sm text-muted">No published services with a workflow yet -- set one up under Services.</p>;
-  }
-
+export function ServiceBoard({ stages, cards }: { stages: StageColumn[]; cards: BoardCard[] }) {
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {services.map((s) => (
-          <Link
-            key={s.id}
-            href={`/pipelines?service=${s.id}`}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-              s.id === selectedServiceId ? "bg-accent text-white" : "bg-surfaceMuted text-muted hover:text-ink"
-            }`}
-          >
-            {s.name}
-          </Link>
-        ))}
-      </div>
-
       {stages.length === 0 ? (
         <p className="text-sm text-muted">This service has no workflow stages configured yet.</p>
       ) : (

@@ -16,22 +16,19 @@ export default async function ServicePackagesPage() {
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [{ data: services }, { data: categories }, { data: pricingRules }, { data: billingRules }, { data: organizerTemplates }, { data: documentFolderTemplates }] =
-    await Promise.all([
-      supabase
-        .from("services")
-        .select(
-          `id, name, slug, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
+  const [{ data: services }, { data: categories }, { data: pricingRules }, { data: billingRules }] = await Promise.all([
+    supabase
+      .from("services")
+      .select(
+        `id, name, slug, status, default_price, description, estimated_duration_minutes, is_bookable, is_portal_visible, workspace_id, service_categories(name),
         service_category_id, pricing_rule_id, billing_rule_id, organizer_template_id, document_folder_template_id`
-        )
-        .or(orFilter)
-        .order("name"),
-      supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
-      supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
-      supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
-      supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
-      supabase.from("document_folder_templates").select("id, name").or(orFilter).order("name"),
-    ]);
+      )
+      .or(orFilter)
+      .order("name"),
+    supabase.from("service_categories").select("id, name").or(orFilter).order("name"),
+    supabase.from("pricing_rules").select("id, name, status, pricing_method, base_amount, hourly_rate, workspace_id").or(orFilter).order("name"),
+    supabase.from("billing_rules").select("id, name, status, invoice_timing, workspace_id").or(orFilter).order("name"),
+  ]);
 
   const serviceCards: ServiceCard[] = (services ?? []).map((s) => ({
     id: s.id,
@@ -60,15 +57,7 @@ export default async function ServicePackagesPage() {
       />
 
       <div className="mt-6">
-        <ServiceGallery
-          workspaceId={workspace.id}
-          services={serviceCards}
-          categories={categories ?? []}
-          pricingRules={pricingRules ?? []}
-          billingRules={billingRules ?? []}
-          organizerTemplates={organizerTemplates ?? []}
-          documentFolderTemplates={documentFolderTemplates ?? []}
-        />
+        <ServiceGallery workspaceId={workspace.id} services={serviceCards} categories={categories ?? []} pricingRules={pricingRules ?? []} />
       </div>
 
       <div className="mt-10 border-t border-border pt-6">
