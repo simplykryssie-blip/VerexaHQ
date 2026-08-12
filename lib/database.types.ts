@@ -5009,7 +5009,6 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
-          forked_from_role_id: string | null
           id: string
           is_system_role: boolean
           name: string
@@ -5020,7 +5019,6 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
-          forked_from_role_id?: string | null
           id?: string
           is_system_role?: boolean
           name: string
@@ -5031,7 +5029,6 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
-          forked_from_role_id?: string | null
           id?: string
           is_system_role?: boolean
           name?: string
@@ -5041,17 +5038,56 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "roles_forked_from_role_id_fkey"
-            columns: ["forked_from_role_id"]
+            foreignKeyName: "roles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permission_overrides: {
+        Row: {
+          role_id: string
+          workspace_id: string
+          permission_id: string
+          granted: boolean
+          updated_at: string
+        }
+        Insert: {
+          role_id: string
+          workspace_id: string
+          permission_id: string
+          granted: boolean
+          updated_at?: string
+        }
+        Update: {
+          role_id?: string
+          workspace_id?: string
+          permission_id?: string
+          granted?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permission_overrides_role_id_fkey"
+            columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "roles_workspace_id_fkey"
+            foreignKeyName: "role_permission_overrides_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permission_overrides_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
             referencedColumns: ["id"]
           },
         ]

@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, KeyRound, Plus, Trash2, Users } from "lucide-react";
+import { KeyRound, Plus, Trash2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
 import { CreateRoleForm } from "@/components/settings/CreateRoleForm";
-import { slugify, uniqueSlug } from "@/lib/roleSlug";
 
 export type PermissionRow = { id: string; key: string; category: string; description: string };
 
@@ -49,7 +48,6 @@ export function RolesManager({
   const [savingMeta, setSavingMeta] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [forking, setForking] = useState(false);
 
   const selected = roles.find((r) => r.id === selectedId) ?? null;
 
@@ -70,10 +68,6 @@ export function RolesManager({
 
   async function togglePermission(role: RoleRow, permissionId: string) {
     if (!isAdmin) return;
-    if (role.is_system_role) {
-      await forkRole(role, permissionId);
-      return;
-    }
     const has = role.permissionIds.includes(permissionId);
     setTogglingId(permissionId);
     setRoles((prev) =>
@@ -84,9 +78,18 @@ export function RolesManager({
       )
     );
 
-    const { error } = has
-      ? await supabase.from("role_permissions").delete().eq("role_id", role.id).eq("permission_id", permissionId)
-      : await supabase.from("role_permissions").insert({ role_id: role.id, permission_id: permissionId });
+    // System roles are shared platform-wide -- writing straight to role_permissions would
+    // change this permission for every workspace using it. Instead this workspace's toggle
+    // is recorded as an override on top of the role's global default set; custom roles (this
+    // workspace's own) have no default to override, so those still write role_permissions
+    // directly.
+    const { error } = role.is_system_role
+      ? await supabase
+          .from("role_permission_overrides")
+          .upsert({ role_id: role.id, workspace_id: workspaceId, permission_id: permissionId, granted: !has })
+      : has
+        ? await supabase.from("role_permissions").delete().eq("role_id", role.id).eq("permission_id", permissionId)
+        : await supabase.from("role_permissions").insert({ role_id: role.id, permission_id: permissionId });
 
     setTogglingId(null);
     if (error) {
@@ -157,60 +160,6 @@ export function RolesManager({
     setRoles((prev) => [...prev, role]);
     setSelectedId(role.id);
     setCreating(false);
-    router.refresh();
-  }
-
-  // System roles are shared platform-wide (workspace_id null) and RLS blocks editing them
-  // directly -- changing "PTIN Preparer" here would change it for every workspace on Verexa,
-  // not just this one. So the first edit makes a workspace-owned copy under the hood, linked
-  // back via forked_from_role_id -- and the page that lists roles hides the System original
-  // once that link exists, so from here it reads as "I edited it," not "I made a new one."
-  // Same name, same slug, no second row. toggledPermissionId lets a click on a (previously
-  // grayed-out) permission fork the role AND apply that exact change in one step.
-  async function forkRole(role: RoleRow, toggledPermissionId?: string) {
-    if (toggledPermissionId) setTogglingId(toggledPermissionId);
-    setForking(true);
-    const takenSlugs = new Set(roles.filter((r) => r.workspace_id === workspaceId).map((r) => r.slug));
-    const slug = uniqueSlug(slugify(role.name), takenSlugs);
-
-    const targetPermissionIds = toggledPermissionId
-      ? role.permissionIds.includes(toggledPermissionId)
-        ? role.permissionIds.filter((id) => id !== toggledPermissionId)
-        : [...role.permissionIds, toggledPermissionId]
-      : role.permissionIds;
-
-    const { data: newRole, error } = await supabase
-      .from("roles")
-      .insert({ workspace_id: workspaceId, name: role.name, slug, description: role.description, forked_from_role_id: role.id })
-      .select("id, name, slug, description, workspace_id, is_system_role")
-      .single();
-
-    if (error || !newRole) {
-      setForking(false);
-      setTogglingId(null);
-      toast.show(error?.message ?? "Could not update this role.", "error");
-      return;
-    }
-
-    let permissionIds: string[] = [];
-    if (targetPermissionIds.length > 0) {
-      const { error: copyError } = await supabase
-        .from("role_permissions")
-        .insert(targetPermissionIds.map((permissionId) => ({ role_id: newRole.id, permission_id: permissionId })));
-      if (copyError) {
-        toast.show(`Role updated, but couldn't copy its permissions: ${copyError.message}`, "error");
-      } else {
-        permissionIds = targetPermissionIds;
-      }
-    }
-
-    setForking(false);
-    setTogglingId(null);
-    // Replace the System row with the new workspace-owned one in place, rather than
-    // appending it -- there should only ever be one "PTIN Preparer" row in this list.
-    setRoles((prev) => prev.map((r) => (r.id === role.id ? { ...newRole, permissionIds, memberCount: 0 } : r)));
-    setSelectedId(newRole.id);
-    toast.show("Role updated for your workspace.", "success");
     router.refresh();
   }
 
@@ -308,40 +257,27 @@ export function RolesManager({
                 )}
               </div>
 
-              {!editingMeta && isAdmin && (
+              {!editingMeta && isAdmin && !selected.is_system_role && (
                 <div className="flex shrink-0 items-center gap-3">
-                  {selected.is_system_role ? (
-                    <button
-                      type="button"
-                      onClick={() => forkRole(selected)}
-                      disabled={forking}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline disabled:opacity-60"
-                    >
-                      <Copy size={12} /> {forking ? "Copying..." : "Customize"}
-                    </button>
-                  ) : (
-                    <>
-                      <button type="button" onClick={() => startEditingMeta(selected)} className="text-xs font-medium text-accent hover:underline">
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteRole(selected)}
-                        disabled={deleting}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-danger hover:underline disabled:opacity-60"
-                      >
-                        <Trash2 size={12} /> Delete
-                      </button>
-                    </>
-                  )}
+                  <button type="button" onClick={() => startEditingMeta(selected)} className="text-xs font-medium text-accent hover:underline">
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteRole(selected)}
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-danger hover:underline disabled:opacity-60"
+                  >
+                    <Trash2 size={12} /> Delete
+                  </button>
                 </div>
               )}
             </div>
 
             {selected.is_system_role && (
               <p className="border-b border-border bg-surfaceMuted px-5 py-2 text-xs text-muted">
-                This is a shared System role. Toggling a permission below (or clicking Customize) creates your own
-                editable copy for this workspace -- the original stays unchanged.
+                This is a shared System role -- toggling a permission below only changes it for your workspace. Every other firm
+                using {selected.name} keeps their own settings.
               </p>
             )}
 
@@ -363,8 +299,8 @@ export function RolesManager({
                             role="switch"
                             aria-checked={checked}
                             onClick={() => togglePermission(selected, p.id)}
-                            disabled={!isAdmin || togglingId === p.id || forking}
-                            title={selected.is_system_role ? `Creates your own editable copy of ${selected.name}` : undefined}
+                            disabled={!isAdmin || togglingId === p.id}
+                            title={selected.is_system_role ? "Applies only to your workspace" : undefined}
                             className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${checked ? "bg-accent" : "bg-surfaceMuted"}`}
                           >
                             <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${checked ? "left-[22px]" : "left-0.5"}`} />
