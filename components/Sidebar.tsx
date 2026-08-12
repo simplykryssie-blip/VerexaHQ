@@ -109,7 +109,7 @@ export function Sidebar({
             )}
             <p className={`${styles.workspaceName} mt-1.5 truncate text-xs`}>{workspaceName}</p>
             <span className={`${styles.badge} mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide`}>
-              Tax Office module
+              Practice Management
             </span>
           </div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Close navigation menu" className={`${styles.workspaceName} lg:hidden`}>

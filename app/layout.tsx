@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: "VerexaHQ",
-  description: "VerexaHQ business operating platform -- Tax Office module",
+  description: "VerexaHQ business operating platform for tax, payroll, bookkeeping, and compliance firms",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

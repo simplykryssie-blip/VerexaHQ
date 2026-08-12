@@ -189,7 +189,7 @@ export default function LoginPage() {
                 required
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Acme Tax Advisors"
+                placeholder="Acme Financial Group"
                 className={styles.input}
                 autoComplete="organization"
               />
