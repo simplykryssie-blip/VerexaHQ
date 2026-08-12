@@ -7,6 +7,7 @@ import { BusinessHoursForm } from "@/components/settings/BusinessHoursForm";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmContactForm } from "./FirmContactForm";
 import { BrandCenterForm } from "../brand-center/BrandCenterForm";
+import { getEffectiveBranding } from "@/lib/branding";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function FirmProfilePage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }] = await Promise.all([
+  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding] = await Promise.all([
     supabase
       .from("firm_tax_profile")
       .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
@@ -30,10 +31,11 @@ export default async function FirmProfilePage() {
       .single(),
     supabase
       .from("branding")
-      .select("display_name, dba, primary_color, secondary_color, accent_color, support_email, support_phone")
+      .select("display_name, dba, sidebar_logo_url, primary_color, secondary_color, accent_color, support_email, support_phone")
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
     supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
+    getEffectiveBranding(workspace.id),
   ]);
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
@@ -102,10 +104,24 @@ export default async function FirmProfilePage() {
 
       <div className="mt-8">
         <h3 className="text-sm font-semibold text-ink">Branding</h3>
-        <p className="mt-1 text-xs text-muted">How your firm appears across the app and client portal.</p>
-        <div className="mt-3 rounded-xl border border-border bg-surface p-5">
-          <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />
-        </div>
+        {effectiveBranding.isWhitelabeledByEro ? (
+          <>
+            <p className="mt-1 text-xs text-muted">
+              Your branding is managed by {effectiveBranding.eroName ?? "your ERO"} -- your staff dashboard shows their logo and colors.
+            </p>
+            <div className="mt-3 rounded-xl border border-border bg-surface p-5 text-sm text-slate">
+              Connected PTINs don&apos;t have their own Brand Center. If something looks wrong, contact{" "}
+              {effectiveBranding.eroName ?? "your ERO"} to have it updated.
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-muted">How your firm appears across the staff dashboard.</p>
+            <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+              <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="mt-8">

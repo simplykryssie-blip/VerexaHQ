@@ -7,11 +7,31 @@ import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav";
 import { archivo, publicSans, plexMono } from "@/lib/authFonts";
+import { darkenHex } from "@/lib/color";
 import styles from "./Sidebar.module.css";
 
-export function Sidebar({ workspaceName }: { workspaceName: string }) {
+export function Sidebar({
+  workspaceName,
+  logoUrl,
+  primaryColor,
+  secondaryColor,
+}: {
+  workspaceName: string;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+
+  const sidebarStyle: React.CSSProperties = {};
+  if (primaryColor) {
+    (sidebarStyle as Record<string, string>)["--rail-bg"] = primaryColor;
+    (sidebarStyle as Record<string, string>)["--rail-bg-2"] = darkenHex(primaryColor, 0.25);
+  }
+  if (secondaryColor) {
+    (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
+  }
 
   // Flatten every navigable href (top-level items + group children) so the
   // longest-prefix-match logic works regardless of nesting, and a group's
@@ -57,19 +77,26 @@ export function Sidebar({ workspaceName }: { workspaceName: string }) {
         className={`${styles.sidebar} ${archivo.variable} ${publicSans.variable} ${plexMono.variable} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ fontFamily: "var(--font-public-sans), system-ui, sans-serif" }}
+        style={{ fontFamily: "var(--font-public-sans), system-ui, sans-serif", ...sidebarStyle }}
       >
         <div className={`${styles.header} flex items-center justify-between px-5 py-5`}>
           <div>
-            <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
-            <Image
-              src="/brand/wordmark.png"
-              alt="VerexaHQ"
-              width={112}
-              height={19}
-              priority
-              style={{ display: "block", height: "19px", width: "auto" }}
-            />
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "28px", maxWidth: "160px", objectFit: "contain" }} />
+            ) : (
+              <>
+                <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
+                <Image
+                  src="/brand/wordmark.png"
+                  alt="VerexaHQ"
+                  width={112}
+                  height={19}
+                  priority
+                  style={{ display: "block", height: "19px", width: "auto" }}
+                />
+              </>
+            )}
             <p className={`${styles.workspaceName} mt-1.5 truncate text-xs`}>{workspaceName}</p>
             <span className={`${styles.badge} mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide`}>
               Tax Office module

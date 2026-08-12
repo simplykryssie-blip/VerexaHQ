@@ -7,8 +7,8 @@ const config: Config = {
       colors: {
         ink: "#0F172A",
         slate: "#1E293B",
-        accent: "#2563EB",
-        accentSoft: "#DBEAFE",
+        accent: "rgb(var(--brand-accent-rgb, 37 99 235) / <alpha-value>)",
+        accentSoft: "rgb(var(--brand-accent-soft-rgb, 219 234 254) / <alpha-value>)",
         surface: "#FFFFFF",
         surfaceMuted: "#F8FAFC",
         border: "#E2E8F0",

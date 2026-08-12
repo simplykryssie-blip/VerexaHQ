@@ -6,6 +6,8 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { createClient } from "@/lib/supabase/server";
+import { getEffectiveBranding } from "@/lib/branding";
+import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const workspace = await getCurrentWorkspace();
@@ -19,29 +21,47 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: securityPolicy } = await supabase
-    .from("workspace_security_policies")
-    .select("session_timeout_minutes")
-    .eq("workspace_id", workspace.id)
-    .maybeSingle();
+  const [{ data: securityPolicy }, branding] = await Promise.all([
+    supabase
+      .from("workspace_security_policies")
+      .select("session_timeout_minutes")
+      .eq("workspace_id", workspace.id)
+      .maybeSingle(),
+    getEffectiveBranding(workspace.id),
+  ]);
+
+  const brandVars: React.CSSProperties = {};
+  if (branding.secondaryColor) {
+    const accentRgb = hexToRgbTriplet(branding.secondaryColor);
+    const accentSoftRgb = lightenHexToRgbTriplet(branding.secondaryColor, 0.85);
+    if (accentRgb) (brandVars as Record<string, string>)["--brand-accent-rgb"] = accentRgb;
+    if (accentSoftRgb) (brandVars as Record<string, string>)["--brand-accent-soft-rgb"] = accentSoftRgb;
+  }
 
   return (
-    <ToastProvider>
-      <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 15} loginPath="/login" />
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
-      >
-        Skip to main content
-      </a>
-      <div className="flex h-screen overflow-hidden bg-surfaceMuted">
-        <Sidebar workspaceName={workspace.name} />
-        <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
-          <GlobalClientDraftBanner />
-          {children}
-        </main>
-      </div>
-      {user && <NotificationBell workspaceId={workspace.id} userId={user.id} />}
-    </ToastProvider>
+    <div style={brandVars}>
+      <ToastProvider>
+        <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 15} loginPath="/login" />
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
+        >
+          Skip to main content
+        </a>
+        <div className="flex h-screen overflow-hidden bg-surfaceMuted">
+          <Sidebar
+            workspaceName={branding.displayName ?? workspace.name}
+            logoUrl={branding.logoUrl}
+            primaryColor={branding.primaryColor}
+            secondaryColor={branding.secondaryColor}
+          />
+          <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
+            <GlobalClientDraftBanner />
+            {children}
+          </main>
+        </div>
+        {user && <NotificationBell workspaceId={workspace.id} userId={user.id} />}
+      </ToastProvider>
+    </div>
   );
 }
