@@ -151,7 +151,7 @@ export function DashboardShell({
       case "review_queue":
         return <ReviewQueueWidget items={data.reviewItems} />;
       case "quick_actions":
-        return <QuickActionsWidget permissions={{ ...quickActionPermissions, isAdmin }} />;
+        return <QuickActionsWidget permissions={{ ...quickActionPermissions, isAdmin }} workspaceId={workspaceId} />;
       case "calendar":
         return <CalendarWidget items={data.calendarItems} />;
       case "recent_activity":

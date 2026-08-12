@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
@@ -146,7 +147,9 @@ export function ClientWorkspace({
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
 }) {
-  const [tab, setTab] = useState<Tab>("Details");
+  const searchParams = useSearchParams();
+  const requestedTab = TABS.find((t) => t.toLowerCase() === searchParams.get("tab")?.toLowerCase());
+  const [tab, setTab] = useState<Tab>(requestedTab ?? "Details");
   const showStaffRoles = !isIndependentTier(workspace);
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
