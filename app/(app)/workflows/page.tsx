@@ -17,7 +17,7 @@ export default async function WorkflowsPage() {
       .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, created_at, automation_steps(id), automation_runs(id)")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false }),
-    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
     supabase
       .from("organizer_templates")
       .select("id, name")
