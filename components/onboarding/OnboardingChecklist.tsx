@@ -42,6 +42,11 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
     howItWorks: "Each teammate gets their own account under your workspace -- not a shared login -- so you can track who did what and control access by role (e.g. preparer vs reviewer vs admin).",
     howToSetUp: "Go to Settings > Users & Staff, click Invite, enter their email and pick a role. They'll get an email to set up their own password.",
   },
+  automations: {
+    whatItDoes: "Automations let you decide what should happen automatically instead of a staff member remembering to do it -- e.g. when a client creates a portal account, send them a welcome email and load their intake form. Every office runs differently, so the trigger and the actions are both yours to pick.",
+    howItWorks: "You choose a trigger (a client signs up, an organizer is submitted, an engagement is created, an appointment's status changes) and then one or more actions to run when it fires (send an email or text, create a task, push an intake form, start the engagement's pipeline). Nothing sends unless you build it -- there's no automation running until you create one.",
+    howToSetUp: "Go to Workflows, click New workflow, pick a trigger, then add the steps you want to happen. You can pause or edit it any time, and each run shows up in that workflow's history so you can see it actually fired.",
+  },
 };
 
 export function OnboardingChecklist({

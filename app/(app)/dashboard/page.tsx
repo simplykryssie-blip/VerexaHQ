@@ -82,14 +82,16 @@ export default async function DashboardPage() {
   let onboardingSteps: OnboardingStep[] = [];
   if (!onboardingDismissed) {
     const showInviteStep = canInviteStaff(workspace);
-    const [{ count: serviceCount }, { count: organizerCount }, { count: clientCount }, { count: staffCount }] = await Promise.all([
-      supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-      supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-      supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-      showInviteStep
-        ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
-        : Promise.resolve({ count: null }),
-    ]);
+    const [{ count: serviceCount }, { count: organizerCount }, { count: clientCount }, { count: staffCount }, { count: automationCount }] =
+      await Promise.all([
+        supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+        supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+        supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+        showInviteStep
+          ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
+          : Promise.resolve({ count: null }),
+        supabase.from("automations").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      ]);
 
     onboardingSteps = [
       {
@@ -124,6 +126,13 @@ export default async function DashboardPage() {
             },
           ]
         : []),
+      {
+        key: "automations",
+        label: "Set up your automations",
+        description: "Decide what happens automatically -- welcome emails, sending an organizer, moving a client into a pipeline.",
+        href: "/workflows",
+        complete: (automationCount ?? 0) > 0,
+      },
     ];
   }
 
