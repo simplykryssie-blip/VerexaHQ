@@ -3421,6 +3421,44 @@ export type Database = {
           },
         ]
       }
+      lead_stages: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_entry_stage: boolean
+          key: string
+          label: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_entry_stage?: boolean
+          key: string
+          label: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_entry_stage?: boolean
+          key?: string
+          label?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_stages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_history: {
         Row: {
           created_at: string

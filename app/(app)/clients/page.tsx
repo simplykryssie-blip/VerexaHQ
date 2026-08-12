@@ -18,7 +18,6 @@ const CONTACT_TABS = [
 type ContactTab = (typeof CONTACT_TABS)[number]["key"];
 
 const CLIENT_LIFECYCLE_STATUSES = ["active", "inactive", "archived"];
-const LEAD_LIFECYCLE_STATUSES = ["lead", "consult_scheduled", "proposal_sent"];
 
 const CLIENT_STATUS_FILTERS = [
   { value: "", label: "All" },
@@ -26,15 +25,9 @@ const CLIENT_STATUS_FILTERS = [
   { value: "inactive", label: "Inactive" },
   { value: "archived", label: "Archived" },
 ];
-const LEAD_STATUS_FILTERS = [
-  { value: "", label: "All" },
-  { value: "lead", label: "Lead" },
-  { value: "consult_scheduled", label: "Consult Scheduled" },
-  { value: "proposal_sent", label: "Proposal Sent" },
-];
 
-function statusBadgeClass(status: string) {
-  if (status === "lead") return "bg-warning/10 text-warning";
+function statusBadgeClass(status: string, isEntryStage: boolean) {
+  if (isEntryStage) return "bg-warning/10 text-warning";
   if (status === "active") return "bg-accentSoft text-accent";
   return "bg-surfaceMuted text-muted";
 }
@@ -60,44 +53,58 @@ type ClientRow = {
   lifecycle_status: string;
 };
 
-const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
-  {
-    key: "name",
-    header: "Name",
-    render: (c) => (
-      <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-        {clientDisplayName(c)}
-      </Link>
-    ),
-  },
-  { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
-  { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
-  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ?? "--"}</span> },
-  {
-    key: "status",
-    header: "Status",
-    render: (c) => (
-      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(c.lifecycle_status)}`}>
-        {c.lifecycle_status === "lead" ? "Lead" : c.lifecycle_status.replace("_", " ")}
-      </span>
-    ),
-  },
-];
+function buildClientColumns(stageLabelByKey: Map<string, string>, entryKey: string): DataTableColumn<ClientRow>[] {
+  return [
+    {
+      key: "name",
+      header: "Name",
+      render: (c) => (
+        <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+          {clientDisplayName(c)}
+        </Link>
+      ),
+    },
+    { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
+    { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
+    { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ?? "--"}</span> },
+    {
+      key: "status",
+      header: "Status",
+      render: (c) => (
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(c.lifecycle_status, c.lifecycle_status === entryKey)}`}>
+          {stageLabelByKey.get(c.lifecycle_status) ?? c.lifecycle_status.replace("_", " ")}
+        </span>
+      ),
+    },
+  ];
+}
 
 export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
-  const lifecycleScope = tab === "leads" ? LEAD_LIFECYCLE_STATUSES : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters = tab === "leads" ? LEAD_STATUS_FILTERS : CLIENT_STATUS_FILTERS;
+
+  const supabase = createClient();
+  const { data: leadStages } = await supabase
+    .from("lead_stages")
+    .select("key, label, display_order, is_entry_stage")
+    .eq("workspace_id", workspace.id)
+    .order("display_order");
+  const stages = leadStages ?? [];
+  const entryStage = stages.find((s) => s.is_entry_stage) ?? stages[0];
+  const leadLifecycleStatuses = stages.map((s) => s.key);
+  const leadStatusFilters = [{ value: "", label: "All" }, ...stages.map((s) => ({ value: s.key, label: s.label }))];
+  const stageLabelByKey = new Map(stages.map((s) => [s.key, s.label]));
+
+  const lifecycleScope = tab === "leads" ? leadLifecycleStatuses : CLIENT_LIFECYCLE_STATUSES;
+  const statusFilters = tab === "leads" ? leadStatusFilters : CLIENT_STATUS_FILTERS;
   const status = searchParams.status && lifecycleScope.includes(searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const supabase = createClient();
   const clientsQuery = supabase
     .from("clients")
     .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", { count: "exact" })
@@ -113,7 +120,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     clientsQuery.range(from, to);
   }
 
-  const [{ data: clients, count }, { data: services }, { data: canCreate }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: organizerTemplates }] = await Promise.all([
     clientsQuery,
     supabase
       .from("services")
@@ -122,9 +129,16 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       .eq("status", "published")
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    supabase
+      .from("organizer_templates")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("status", "published")
+      .order("name"),
   ]);
 
   const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : ""].filter(Boolean).join("&");
+  const clientColumns = buildClientColumns(stageLabelByKey, entryStage?.key ?? "lead");
 
   return (
     <>
@@ -156,14 +170,19 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           !clients || clients.length === 0 ? (
             <div className="overflow-hidden rounded-xl border border-border bg-surface">
               <DataTable
-                columns={CLIENT_COLUMNS}
+                columns={clientColumns}
                 rows={[]}
                 emptyMessage="No leads yet."
                 emptyAction={canCreate ? <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} /> : undefined}
               />
             </div>
           ) : (
-            <LeadsBoard leads={clients} />
+            <LeadsBoard
+              leads={clients}
+              organizerTemplates={organizerTemplates ?? []}
+              workspaceId={workspace.id}
+              stages={stages.map((s) => ({ key: s.key, label: s.label }))}
+            />
           )
         ) : (
           <>
@@ -182,7 +201,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-surface">
               <DataTable
-                columns={CLIENT_COLUMNS}
+                columns={clientColumns}
                 rows={clients ?? []}
                 emptyMessage={
                   status

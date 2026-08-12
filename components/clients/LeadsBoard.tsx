@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, Phone, X, ArrowRight } from "lucide-react";
+import { Mail, Phone, X, ArrowRight, CalendarPlus, BookOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
+import { ensurePortalInvite } from "@/lib/portal/ensurePortalInvite";
+import { renderEmail } from "@/lib/email/template";
 import { ConvertLeadButton } from "@/app/(app)/clients/[id]/ConvertLeadButton";
+import { AddAppointmentForm } from "@/app/(app)/clients/[id]/AddAppointmentForm";
 
 export type LeadRow = {
   id: string;
@@ -19,11 +22,8 @@ export type LeadRow = {
   lifecycle_status: string;
 };
 
-const STAGES = [
-  { key: "lead", label: "Lead" },
-  { key: "consult_scheduled", label: "Consult Scheduled" },
-  { key: "proposal_sent", label: "Proposal Sent" },
-] as const;
+type OrganizerTemplate = { id: string; name: string };
+export type LeadStage = { key: string; label: string };
 
 function leadName(l: LeadRow) {
   if (l.client_type === "business" && l.business_name) return l.business_name;
@@ -33,13 +33,41 @@ function leadName(l: LeadRow) {
 /**
  * A lead is a card you move through stages without leaving the board -- clicking one opens
  * a side panel instead of navigating to a full profile page. The board stays put; you act,
- * then move to the next card. That's the flow gap the old list+full-page-profile pattern had.
+ * then move to the next card.
+ *
+ * Stages come from the workspace's own configured lead_stages list (Settings > Lead Stages),
+ * not a fixed set -- different firms run different lead processes. Accepting as a client is
+ * the one action that always changes lifecycle_status; scheduling and sending a template are
+ * things staff can do with a lead at any stage on the way there. All three ensure a portal
+ * invite exists, since a client can't complete a template or see a booked appointment without
+ * portal access, and staff shouldn't have to remember to invite them separately.
  */
-export function LeadsBoard({ leads }: { leads: LeadRow[] }) {
+export function LeadsBoard({
+  leads,
+  organizerTemplates,
+  workspaceId,
+  stages,
+}: {
+  leads: LeadRow[];
+  organizerTemplates: OrganizerTemplate[];
+  workspaceId: string;
+  stages: LeadStage[];
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [selected, setSelected] = useState<LeadRow | null>(null);
   const [moving, setMoving] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const [sendingOrganizer, setSendingOrganizer] = useState(false);
+  const [organizerTemplateId, setOrganizerTemplateId] = useState("");
+  const [organizerSent, setOrganizerSent] = useState(false);
+
+  useEffect(() => {
+    setBooking(false);
+    setSendingOrganizer(false);
+    setOrganizerSent(false);
+    setOrganizerTemplateId("");
+  }, [selected?.id]);
 
   async function moveStage(lead: LeadRow, stage: string) {
     setMoving(true);
@@ -53,10 +81,55 @@ export function LeadsBoard({ leads }: { leads: LeadRow[] }) {
     router.refresh();
   }
 
+  async function afterConsultBooked(lead: LeadRow) {
+    await ensurePortalInvite(supabase, { clientId: lead.id, workspaceId, name: leadName(lead), email: lead.primary_email });
+  }
+
+  async function sendOrganizer(lead: LeadRow) {
+    if (!organizerTemplateId) return;
+    setSendingOrganizer(true);
+    const template = organizerTemplates.find((t) => t.id === organizerTemplateId);
+    const { error } = await supabase.from("organizer_responses").insert({
+      workspace_id: workspaceId,
+      client_id: lead.id,
+      organizer_template_id: organizerTemplateId,
+    });
+    if (error) {
+      setSendingOrganizer(false);
+      window.alert(error.message);
+      return;
+    }
+
+    await ensurePortalInvite(supabase, { clientId: lead.id, workspaceId, name: leadName(lead), email: lead.primary_email });
+
+    if (lead.primary_email) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      await fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: lead.primary_email,
+          sender: "notifications",
+          subject: `New organizer to complete: ${template?.name ?? ""}`,
+          html: renderEmail({
+            heading: "An organizer is ready for you",
+            bodyHtml: `<p>Please log in to your client portal and complete the <strong>${template?.name ?? "organizer"}</strong> when you have a chance.</p>`,
+            ctaLabel: "Go to portal",
+            ctaUrl: `${appUrl}/portal/organizer`,
+          }),
+        }),
+      });
+    }
+
+    setSendingOrganizer(false);
+    setOrganizerSent(true);
+    router.refresh();
+  }
+
   return (
     <>
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {STAGES.map((stage) => {
+        {stages.map((stage) => {
           const items = leads.filter((l) => l.lifecycle_status === stage.key);
           return (
             <div key={stage.key} className="w-72 shrink-0">
@@ -110,9 +183,78 @@ export function LeadsBoard({ leads }: { leads: LeadRow[] }) {
               </div>
 
               <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Choose next step</p>
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-border p-3">
+                    <ConvertLeadButton
+                      clientId={selected.id}
+                      workspaceId={workspaceId}
+                      lifecycleStatus={selected.lifecycle_status}
+                      name={leadName(selected)}
+                      email={selected.primary_email}
+                    />
+                    <p className="mt-1.5 text-xs text-muted">Moves them from lead to client. Sends a portal invite if they don&apos;t have one yet.</p>
+                  </div>
+
+                  <div className="rounded-xl border border-border p-3">
+                    {!booking ? (
+                      <button
+                        type="button"
+                        onClick={() => setBooking(true)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-accent px-3 py-1.5 text-xs font-medium text-accent hover:bg-accentSoft"
+                      >
+                        <CalendarPlus size={14} /> Schedule an Appointment
+                      </button>
+                    ) : (
+                      <AddAppointmentForm
+                        clientId={selected.id}
+                        workspaceId={workspaceId}
+                        onCreated={() => afterConsultBooked(selected)}
+                      />
+                    )}
+                    <p className="mt-1.5 text-xs text-muted">Doesn&apos;t change their stage. Sends a portal invite if they don&apos;t have one yet.</p>
+                  </div>
+
+                  <div className="rounded-xl border border-border p-3">
+                    {organizerTemplates.length === 0 ? (
+                      <p className="text-xs text-muted">No organizer templates published yet -- add one in Templates first.</p>
+                    ) : organizerSent ? (
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-success">
+                        <BookOpen size={14} /> Organizer sent.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={organizerTemplateId}
+                          onChange={(e) => setOrganizerTemplateId(e.target.value)}
+                          className="rounded-lg border border-border px-2 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        >
+                          <option value="">Choose an organizer...</option>
+                          {organizerTemplates.map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => sendOrganizer(selected)}
+                          disabled={!organizerTemplateId || sendingOrganizer}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                        >
+                          <BookOpen size={14} /> {sendingOrganizer ? "Sending..." : "Send Organizer"}
+                        </button>
+                      </div>
+                    )}
+                    <p className="mt-1.5 text-xs text-muted">Stays a lead. Sends a portal invite if they don&apos;t have one yet.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Move to</p>
                 <div className="flex flex-wrap gap-2">
-                  {STAGES.filter((s) => s.key !== selected.lifecycle_status).map((s) => (
+                  {stages.filter((s) => s.key !== selected.lifecycle_status).map((s) => (
                     <button
                       key={s.key}
                       type="button"
@@ -126,21 +268,13 @@ export function LeadsBoard({ leads }: { leads: LeadRow[] }) {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-surfaceMuted p-4">
-                <p className="text-sm font-medium text-ink">Ready to move forward?</p>
-                <p className="mt-1 text-xs text-muted">Accepting turns this lead into a client. Starting an engagement does that automatically too.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <ConvertLeadButton clientId={selected.id} lifecycleStatus={selected.lifecycle_status} />
-                  <Link
-                    href={`/engagements/new?clientId=${selected.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
-                  >
-                    Start an engagement
-                  </Link>
-                </div>
-              </div>
-
-              <Link href={`/clients/${selected.id}`} className="text-xs font-medium text-muted hover:text-ink">
+              <Link
+                href={`/engagements/new?clientId=${selected.id}`}
+                className="text-xs font-medium text-muted hover:text-ink"
+              >
+                Ready for real work? Start an engagement &rarr;
+              </Link>
+              <Link href={`/clients/${selected.id}`} className="block text-xs font-medium text-muted hover:text-ink">
                 Open full profile &rarr;
               </Link>
             </div>

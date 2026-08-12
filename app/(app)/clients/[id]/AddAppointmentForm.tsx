@@ -4,7 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function AddAppointmentForm({ clientId, workspaceId }: { clientId: string; workspaceId: string }) {
+export function AddAppointmentForm({
+  clientId,
+  workspaceId,
+  onCreated,
+}: {
+  clientId: string;
+  workspaceId: string;
+  /** Fires after a successful save, before the router refresh. */
+  onCreated?: () => void;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
@@ -45,6 +54,7 @@ export function AddAppointmentForm({ clientId, workspaceId }: { clientId: string
     setStartAt("");
     setLocation("");
     setOpen(false);
+    onCreated?.();
     router.refresh();
   }
 

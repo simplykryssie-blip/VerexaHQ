@@ -24,6 +24,7 @@ import {
   LifeBuoy,
   Hammer,
   BookOpen,
+  ListOrdered,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -92,6 +93,7 @@ export type SettingsNavItem = {
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "Lead Stages", href: "/settings/lead-stages", icon: ListOrdered },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
@@ -106,7 +108,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Lead Stages", "Users & Staff", "Roles & Permissions", "Connections"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
