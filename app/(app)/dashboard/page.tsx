@@ -87,6 +87,7 @@ export default async function DashboardPage() {
       { count: organizerCount },
       { count: clientCount },
       { count: staffCount },
+      { count: pendingInviteCount },
       { count: automationCount },
       { count: customRoleCount },
       { count: connectionCount },
@@ -97,6 +98,13 @@ export default async function DashboardPage() {
       showEroSteps
         ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
         : Promise.resolve({ count: null }),
+      showEroSteps
+        ? supabase
+            .from("workspace_invitations")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", workspace.id)
+            .eq("status", "pending")
+        : Promise.resolve({ count: null }),
       supabase.from("automations").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       showEroSteps
         ? supabase.from("roles").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("is_system_role", false)
@@ -106,14 +114,15 @@ export default async function DashboardPage() {
         : Promise.resolve({ count: null }),
     ]);
 
-    const profileComplete = Boolean(profileRow?.display_name && profileRow?.avatar_url);
+    // A photo is nice-to-have, not a gate -- a name is enough to call the profile "done".
+    const profileComplete = Boolean(profileRow?.display_name);
 
     onboardingSteps = [
       {
         key: "profile",
         label: "Complete your profile",
         description: "Add your name and a photo so colleagues recognize you in messages.",
-        href: "/settings/my-account",
+        href: "/settings/firm-profile",
         complete: profileComplete,
       },
       ...(showEroSteps
@@ -123,7 +132,7 @@ export default async function DashboardPage() {
               label: "Add users",
               description: "Add staff so they can share the workload.",
               href: "/settings/users",
-              complete: (staffCount ?? 0) > 1,
+              complete: (staffCount ?? 0) > 1 || (pendingInviteCount ?? 0) > 0,
             },
             {
               key: "roles",

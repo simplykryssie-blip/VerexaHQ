@@ -25,3 +25,9 @@ export function darkenHex(hex: string, amount: number): string {
     .map((c) => Math.round(c * (1 - amount)).toString(16).padStart(2, "0"))
     .join("")}`;
 }
+
+/** "#2563EB" + 0.7 -> "rgba(37, 99, 235, 0.7)", for a muted/secondary variant of a solid text color. */
+export function hexToRgba(hex: string, alpha: number): string | null {
+  const rgb = parseHex(hex);
+  return rgb ? `rgba(${rgb.join(", ")}, ${alpha})` : null;
+}

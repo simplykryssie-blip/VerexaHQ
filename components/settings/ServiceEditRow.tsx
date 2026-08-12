@@ -53,6 +53,7 @@ export function ServiceEditRow({
   const router = useRouter();
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isSystem = !service.workspace_id;
 
@@ -94,6 +95,31 @@ export function ServiceEditRow({
     setSaving(false);
     if (updateError) {
       setError(updateError.message);
+      return;
+    }
+    router.refresh();
+    onClose();
+  }
+
+  async function deleteService() {
+    setDeleting(true);
+    setError(null);
+    const { count } = await supabase.from("engagements").select("id", { count: "exact", head: true }).eq("service_id", service.id);
+    if ((count ?? 0) > 0) {
+      setDeleting(false);
+      setError(
+        `This service has ${count} existing engagement${count === 1 ? "" : "s"} and can't be deleted -- click its status badge to cycle it to Archived instead.`
+      );
+      return;
+    }
+    if (!window.confirm(`Delete "${service.name}"? This can't be undone.`)) {
+      setDeleting(false);
+      return;
+    }
+    const { error: deleteError } = await supabase.from("services").delete().eq("id", service.id);
+    setDeleting(false);
+    if (deleteError) {
+      setError(deleteError.message);
       return;
     }
     router.refresh();
@@ -200,18 +226,28 @@ export function ServiceEditRow({
           )}
 
           {error && <p className="text-sm text-danger">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
-              Cancel
-            </button>
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
-              onClick={save}
-              disabled={saving}
-              className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              onClick={deleteService}
+              disabled={deleting || saving}
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-danger hover:bg-danger/10 disabled:opacity-60"
             >
-              {saving ? "Saving..." : "Save"}
+              {deleting ? "Deleting..." : "Delete"}
             </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
           </div>
         </div>
       )}

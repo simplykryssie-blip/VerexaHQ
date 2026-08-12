@@ -8,7 +8,7 @@ import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/pass
 
 export const dynamic = "force-dynamic";
 
-type Preview = { email: string; status: string; expires_at: string; workspace_name: string; role_name: string };
+type Preview = { email: string; status: string; expires_at: string; workspace_name: string; role_name: string; account_exists: boolean };
 
 export default function AcceptInvitationPage() {
   const router = useRouter();
@@ -40,6 +40,9 @@ export default function AcceptInvitationPage() {
         return;
       }
       setPreview(data[0]);
+      // An invitee who already has a Verexa account (from a different workspace) needs to
+      // sign in, not sign up -- signUp() on an existing confirmed email silently does nothing.
+      if (data[0].account_exists) setMode("sign-in");
     });
     supabase.auth.getUser().then(({ data }) => setCurrentUserEmail(data.user?.email ?? null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,7 +79,7 @@ export default function AcceptInvitationPage() {
         return;
       }
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: preview.email,
         password,
         options: {
@@ -89,6 +92,14 @@ export default function AcceptInvitationPage() {
       setLoading(false);
       if (error) {
         setError(error.message);
+        return;
+      }
+      // Supabase signals "this email already has an account" by returning an empty
+      // identities array instead of an error -- no confirmation email gets sent in that
+      // case, which otherwise looks exactly like broken email delivery.
+      if (data.user && data.user.identities?.length === 0) {
+        setError("An account with this email already exists. Sign in instead to accept this invitation.");
+        setMode("sign-in");
         return;
       }
       setCheckEmail(true);

@@ -4,19 +4,39 @@ import { Users, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Avatar } from "@/components/Avatar";
+import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
+import { ResendInvitationButton } from "./ResendInvitationButton";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
 export const dynamic = 'force-dynamic';
+
+type MemberRow = {
+  id: string;
+  status: string;
+  is_owner: boolean;
+  role_id: string;
+  user_profiles: { display_name: string | null; avatar_url: string | null } | null;
+  roles: { name: string } | null;
+};
+
+type InvitationRow = {
+  id: string;
+  email: string;
+  role_id: string;
+  status: string;
+  expires_at: string;
+  roles: { name: string } | null;
+};
 
 export default async function UsersPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: members }, { data: roles }, { data: invitations }, { data: isAdmin }] = await Promise.all([
+  const [{ data: membersRaw }, { data: roles }, { data: invitationsRaw }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("workspace_users")
       .select("id, status, is_owner, role_id, user_profiles(display_name, avatar_url), roles(name)")
@@ -29,58 +49,66 @@ export default async function UsersPage() {
       .order("name"),
     supabase
       .from("workspace_invitations")
-      .select("id, email, status, expires_at, roles(name)")
+      .select("id, email, role_id, status, expires_at, roles(name)")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false }),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
   ]);
 
-  const pendingInvitations = (invitations ?? []).filter((i) => i.status === "pending");
+  const members = (membersRaw ?? []) as unknown as MemberRow[];
+  const invitations = (invitationsRaw ?? []) as unknown as InvitationRow[];
+  const pendingInvitations = invitations.filter((i) => i.status === "pending");
+
+  const memberColumns: DataTableColumn<MemberRow>[] = [
+    {
+      key: "name",
+      header: "Name",
+      render: (m) => (
+        <div className="flex items-center gap-2">
+          <Avatar name={m.user_profiles?.display_name} url={m.user_profiles?.avatar_url} size="sm" />
+          <span className="text-slate">{m.user_profiles?.display_name ?? "--"}</span>
+          {m.is_owner && <span className="text-xs text-accent">Owner</span>}
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      header: "Role",
+      render: (m) => {
+        const canChangeRole = isAdmin && !m.is_owner && m.status === "active";
+        return canChangeRole ? (
+          <ChangeMemberRoleSelect memberId={m.id} currentRoleId={m.role_id} roles={roles ?? []} />
+        ) : (
+          <span className="text-slate">{m.roles?.name ?? "--"}</span>
+        );
+      },
+    },
+    { key: "status", header: "Status", render: (m) => <span className="capitalize text-slate">{m.status}</span> },
+  ];
+
+  const invitationColumns: DataTableColumn<InvitationRow>[] = [
+    { key: "email", header: "Email", render: (i) => <span className="text-slate">{i.email}</span> },
+    { key: "role", header: "Role", render: (i) => <span className="text-slate">{i.roles?.name ?? "--"}</span> },
+    { key: "expires", header: "Expires", render: (i) => <span className="text-slate">{new Date(i.expires_at).toLocaleDateString()}</span> },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (i) => (
+        <div className="flex justify-end gap-2">
+          <ResendInvitationButton email={i.email} roleId={i.role_id} />
+          <RevokeInvitationButton invitationId={i.id} />
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="max-w-3xl">
       <SettingsSectionHeader icon={Users} title="Users & Staff" description="Everyone with access to this workspace." />
 
-      <div className="mt-6 rounded-xl border border-border bg-surface">
-        {!members || members.length === 0 ? (
-          <EmptyState icon={Users} message="No workspace members found." />
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                <th className="px-5 py-3 font-medium">Name</th>
-                <th className="px-5 py-3 font-medium">Role</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {members.map((m) => {
-                const profile = m.user_profiles as unknown as { display_name: string | null; avatar_url: string | null } | null;
-                const role = m.roles as unknown as { name: string } | null;
-                const canChangeRole = isAdmin && !m.is_owner && m.status === "active";
-                return (
-                  <tr key={m.id}>
-                    <td className="px-5 py-3 text-slate">
-                      <div className="flex items-center gap-2">
-                        <Avatar name={profile?.display_name} url={profile?.avatar_url} size="sm" />
-                        {profile?.display_name ?? "--"}
-                        {m.is_owner && <span className="ml-2 text-xs text-accent">Owner</span>}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-slate">
-                      {canChangeRole ? (
-                        <ChangeMemberRoleSelect memberId={m.id} currentRoleId={m.role_id} roles={roles ?? []} />
-                      ) : (
-                        role?.name ?? "--"
-                      )}
-                    </td>
-                    <td className="px-5 py-3 capitalize text-slate">{m.status}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+      <div className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
+        <DataTable columns={memberColumns} rows={members} emptyMessage="No workspace members found." />
       </div>
 
       {workspace.is_owner && !canInviteStaff(workspace) && (
@@ -109,31 +137,7 @@ export default async function UsersPage() {
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Pending invitations</h3>
           <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-5 py-3 font-medium">Email</th>
-                  <th className="px-5 py-3 font-medium">Role</th>
-                  <th className="px-5 py-3 font-medium">Expires</th>
-                  <th className="px-5 py-3 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {pendingInvitations.map((i) => {
-                  const role = i.roles as unknown as { name: string } | null;
-                  return (
-                    <tr key={i.id}>
-                      <td className="px-5 py-3 text-slate">{i.email}</td>
-                      <td className="px-5 py-3 text-slate">{role?.name ?? "--"}</td>
-                      <td className="px-5 py-3 text-slate">{new Date(i.expires_at).toLocaleDateString()}</td>
-                      <td className="px-5 py-3 text-right">
-                        <RevokeInvitationButton invitationId={i.id} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <DataTable columns={invitationColumns} rows={pendingInvitations} emptyMessage="No pending invitations." />
           </div>
         </div>
       )}

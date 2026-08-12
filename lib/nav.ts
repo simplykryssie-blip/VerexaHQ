@@ -10,7 +10,6 @@ import {
   BarChart3,
   Settings,
   LayoutTemplate,
-  UserCircle,
   Building2,
   KeyRound,
   ShieldCheck,
@@ -90,7 +89,6 @@ export type SettingsNavItem = {
 };
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
-  { label: "My Account", href: "/settings/my-account", icon: UserCircle },
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
@@ -105,7 +103,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Personal", itemLabels: ["My Account", "Security", "Notifications"] },
+  { label: "Personal", itemLabels: ["Security", "Notifications"] },
   { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Connections"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];

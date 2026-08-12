@@ -13,6 +13,7 @@ type Branding = {
   primary_color: string;
   secondary_color: string;
   accent_color: string;
+  sidebar_text_color?: string | null;
   support_email: string | null;
   support_phone: string | null;
 } | null;
@@ -51,8 +52,9 @@ function LogoUploadField({
     const { data } = supabase.storage.from("branding").getPublicUrl(path);
     const { error: updateErr } = await supabase
       .from("branding")
-      .update({ [column]: data.publicUrl } as Record<typeof column, string>)
-      .eq("workspace_id", workspaceId);
+      .upsert({ workspace_id: workspaceId, [column]: data.publicUrl } as Record<"workspace_id" | typeof column, string>, {
+        onConflict: "workspace_id",
+      });
     setUploading(false);
     if (updateErr) {
       setError(updateErr.message);
@@ -66,8 +68,9 @@ function LogoUploadField({
     setUploading(true);
     const { error: updateErr } = await supabase
       .from("branding")
-      .update({ [column]: null } as Record<typeof column, null>)
-      .eq("workspace_id", workspaceId);
+      .upsert({ workspace_id: workspaceId, [column]: null } as { workspace_id: string } & Record<typeof column, null>, {
+        onConflict: "workspace_id",
+      });
     setUploading(false);
     if (updateErr) {
       setError(updateErr.message);
@@ -115,6 +118,7 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
   const [supportEmail, setSupportEmail] = useState(branding?.support_email ?? "");
   const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? "#0F172A");
   const [secondaryColor, setSecondaryColor] = useState(branding?.secondary_color ?? "#2563EB");
+  const [textColor, setTextColor] = useState(branding?.sidebar_text_color ?? "");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -125,15 +129,17 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
     setError(null);
     setSaved(false);
 
-    const { error } = await supabase
-      .from("branding")
-      .update({
+    const { error } = await supabase.from("branding").upsert(
+      {
+        workspace_id: workspaceId,
         display_name: displayName || null,
         support_email: supportEmail || null,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
-      })
-      .eq("workspace_id", workspaceId);
+        sidebar_text_color: textColor || null,
+      },
+      { onConflict: "workspace_id" }
+    );
 
     setSaving(false);
 
@@ -209,6 +215,33 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
         </div>
       </div>
       <p className="text-xs text-muted">Nav bar color and button color apply across both your staff dashboard and your client portal.</p>
+
+      <div>
+        <label className="flex items-center gap-2 text-sm font-medium text-slate">
+          <input
+            type="checkbox"
+            checked={textColor !== ""}
+            onChange={(e) => setTextColor(e.target.checked ? "#F4F4F6" : "")}
+            className="h-4 w-4 rounded border-border"
+          />
+          Override nav text color
+        </label>
+        <p className="mt-0.5 text-xs text-muted">
+          Turn this on if a light nav bar color makes the menu text hard to read. Only affects the staff sidebar&apos;s text -- not buttons or
+          the rest of the app.
+        </p>
+        {textColor !== "" && (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="color"
+              value={textColor}
+              onChange={(e) => setTextColor(e.target.value)}
+              className="h-9 w-14 rounded border border-border"
+            />
+            <span className="text-sm text-muted">{textColor}</span>
+          </div>
+        )}
+      </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
       {saved && !error && <p className="text-sm text-success">Saved.</p>}

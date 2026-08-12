@@ -55,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logoUrl={branding.sidebarLogoUrl}
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
+            textColor={branding.sidebarTextColor}
             isPlatformAdmin={Boolean(isPlatformAdmin)}
           />
           <main id="main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">

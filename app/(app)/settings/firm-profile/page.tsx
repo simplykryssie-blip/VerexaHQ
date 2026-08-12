@@ -8,35 +8,50 @@ import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from
 import { FirmContactForm } from "./FirmContactForm";
 import { BrandCenterForm } from "../brand-center/BrandCenterForm";
 import { getEffectiveBranding } from "@/lib/branding";
+import { MyProfileForm } from "@/components/settings/MyProfileForm";
+import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
 
 export const dynamic = 'force-dynamic';
 
 const BOOKING_KEYS = new Set(["business_hours", "booking_slot_minutes"]);
 
-export default async function FirmProfilePage() {
+export default async function FirmProfilePage({
+  searchParams,
+}: {
+  searchParams: { zoom_error?: string; zoom_connected?: string };
+}) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding] = await Promise.all([
-    supabase
-      .from("firm_tax_profile")
-      .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
-      .eq("workspace_id", workspace.id)
-      .maybeSingle(),
-    supabase
-      .from("workspaces")
-      .select("phone, website, mailing_address, primary_contact_email")
-      .eq("id", workspace.id)
-      .single(),
-    supabase
-      .from("branding")
-      .select("display_name, dba, sidebar_logo_url, portal_logo_url, primary_color, secondary_color, accent_color, support_email, support_phone")
-      .eq("workspace_id", workspace.id)
-      .maybeSingle(),
-    supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
-    getEffectiveBranding(workspace.id),
-  ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }, { data: zoomConnection }] =
+    await Promise.all([
+      supabase
+        .from("firm_tax_profile")
+        .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
+        .eq("workspace_id", workspace.id)
+        .maybeSingle(),
+      supabase
+        .from("workspaces")
+        .select("phone, website, mailing_address, primary_contact_email")
+        .eq("id", workspace.id)
+        .single(),
+      supabase
+        .from("branding")
+        .select("display_name, dba, sidebar_logo_url, portal_logo_url, sidebar_text_color, primary_color, secondary_color, accent_color, support_email, support_phone")
+        .eq("workspace_id", workspace.id)
+        .maybeSingle(),
+      supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
+      getEffectiveBranding(workspace.id),
+      user
+        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url").eq("id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      user ? supabase.from("user_zoom_connections").select("status, zoom_email").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+    ]);
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
@@ -47,10 +62,33 @@ export default async function FirmProfilePage() {
       <SettingsSectionHeader
         icon={Building2}
         title="Firm Profile"
-        description="Your firm's identity, branding, and workspace preferences -- tax identifiers, contact info, colors, and booking availability."
+        description="Your own profile, plus your firm's identity, branding, and workspace preferences -- tax identifiers, contact info, colors, and booking availability."
       />
 
-      <div className="mt-6 rounded-xl border border-border bg-surface p-5">
+      {user && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold text-ink">Your profile</h3>
+          <p className="mt-1 text-xs text-muted">Personal to you -- not shared with the rest of your workspace.</p>
+          <div className="mt-3">
+            <MyProfileForm
+              userId={user.id}
+              firstName={myProfile?.first_name ?? null}
+              lastName={myProfile?.last_name ?? null}
+              displayName={myProfile?.display_name ?? null}
+              avatarUrl={myProfile?.avatar_url ?? null}
+            />
+          </div>
+          <div className="mt-4">
+            <ZoomConnectionCard
+              status={(zoomConnection?.status as "connected" | "disconnected" | "revoked" | undefined) ?? "not_connected"}
+              zoomEmail={zoomConnection?.zoom_email ?? null}
+              error={searchParams.zoom_error ?? null}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8 rounded-xl border border-border bg-surface p-5">
         {!profile ? (
           <EmptyState icon={FileText} message="No firm tax profile set up yet." />
         ) : (
@@ -102,28 +140,30 @@ export default async function FirmProfilePage() {
         </div>
       )}
 
-      <div className="mt-8">
-        <h3 className="text-sm font-semibold text-ink">Branding</h3>
-        {effectiveBranding.isWhitelabeledByEro ? (
-          <>
-            <p className="mt-1 text-xs text-muted">
-              Your branding is managed by {effectiveBranding.eroName ?? "your ERO"} -- your staff dashboard and your clients&apos; portal both
-              show their logo and colors.
-            </p>
-            <div className="mt-3 rounded-xl border border-border bg-surface p-5 text-sm text-slate">
-              Connected PTINs don&apos;t have their own Brand Center. If something looks wrong, contact{" "}
-              {effectiveBranding.eroName ?? "your ERO"} to have it updated.
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="mt-1 text-xs text-muted">How your firm appears across your staff dashboard and your clients&apos; portal.</p>
-            <div className="mt-3 rounded-xl border border-border bg-surface p-5">
-              <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />
-            </div>
-          </>
-        )}
-      </div>
+      {workspace.is_owner && (
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-ink">Branding</h3>
+          {effectiveBranding.isWhitelabeledByEro ? (
+            <>
+              <p className="mt-1 text-xs text-muted">
+                Your branding is managed by {effectiveBranding.eroName ?? "your ERO"} -- your staff dashboard and your clients&apos; portal both
+                show their logo and colors.
+              </p>
+              <div className="mt-3 rounded-xl border border-border bg-surface p-5 text-sm text-slate">
+                Connected PTINs don&apos;t have their own Brand Center. If something looks wrong, contact{" "}
+                {effectiveBranding.eroName ?? "your ERO"} to have it updated.
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-xs text-muted">How your firm appears across your staff dashboard and your clients&apos; portal.</p>
+              <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+                <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="mt-8">
         <h3 className="text-sm font-semibold text-ink">Booking availability</h3>

@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
 import { archivo, publicSans, plexMono } from "@/lib/authFonts";
-import { darkenHex } from "@/lib/color";
+import { darkenHex, hexToRgba } from "@/lib/color";
 import styles from "./Sidebar.module.css";
 
 export function Sidebar({
@@ -15,12 +15,15 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
+  textColor,
   isPlatformAdmin,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** Overrides the sidebar's text color -- for firms whose nav bar color is light enough that the default light text would blend in. */
+  textColor?: string | null;
   isPlatformAdmin?: boolean;
 }) {
   const pathname = usePathname();
@@ -33,6 +36,11 @@ export function Sidebar({
   }
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
+  }
+  if (textColor) {
+    (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;
+    (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(textColor, 0.7) ?? textColor;
+    (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(textColor, 0.5) ?? textColor;
   }
 
   // Flatten every navigable href (top-level items + group children) so the
