@@ -6,9 +6,11 @@ import { Search, Send, Lock, Inbox, MessageSquare } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
+import { Avatar } from "@/components/Avatar";
 import type { MessageRow, MessageThreadRow } from "./types";
 
 type Audience = "staff" | "portal";
+type SenderProfile = { display_name: string | null; avatar_url: string | null };
 
 export function MessagingHub({
   workspaceId,
@@ -17,6 +19,7 @@ export function MessagingHub({
   currentUserId,
   audience,
   newThreadEntity,
+  senderProfiles = {},
 }: {
   workspaceId: string;
   threads: MessageThreadRow[];
@@ -25,6 +28,8 @@ export function MessagingHub({
   audience: Audience;
   /** Portal only: lets the client open a brand-new conversation with the firm. */
   newThreadEntity?: { entityType: "client"; entityId: string };
+  /** Staff sender_id -> profile, so colleagues can tell each other apart in a shared thread. */
+  senderProfiles?: Record<string, SenderProfile>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -280,26 +285,38 @@ export function MessagingHub({
               ) : (
                 threadMessages.map((m) => {
                   const mine = m.sender_type === (audience === "staff" ? "staff" : "client");
+                  const showSenderIdentity = audience === "staff" && m.sender_type === "staff";
+                  const senderProfile = showSenderIdentity ? senderProfiles[m.sender_id ?? ""] : undefined;
                   return (
                     <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[75%] rounded-2xl px-3 py-2 text-sm ${
-                          m.is_internal
-                            ? "border border-dashed border-warning/50 bg-warning/10 text-slate"
-                            : mine
-                              ? "bg-accent text-white"
-                              : "bg-surfaceMuted text-slate"
-                        }`}
-                      >
-                        {m.is_internal && (
-                          <span className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-warning">
-                            <Lock size={10} aria-hidden="true" /> Internal note
-                          </span>
-                        )}
-                        <p className="whitespace-pre-wrap">{m.body}</p>
-                        <p className={`mt-1 text-[10px] ${mine && !m.is_internal ? "text-white/70" : "text-muted"}`}>
-                          {new Date(m.created_at).toLocaleString()}
-                        </p>
+                      <div className={`flex max-w-[75%] items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+                        {showSenderIdentity && <Avatar name={senderProfile?.display_name} url={senderProfile?.avatar_url} size="xs" />}
+                        <div className="flex flex-col">
+                          {showSenderIdentity && senderProfile?.display_name && (
+                            <span className={`mb-0.5 px-1 text-[10px] font-medium text-muted ${mine ? "text-right" : "text-left"}`}>
+                              {senderProfile.display_name}
+                            </span>
+                          )}
+                          <div
+                            className={`rounded-2xl px-3 py-2 text-sm ${
+                              m.is_internal
+                                ? "border border-dashed border-warning/50 bg-warning/10 text-slate"
+                                : mine
+                                  ? "bg-accent text-white"
+                                  : "bg-surfaceMuted text-slate"
+                            }`}
+                          >
+                            {m.is_internal && (
+                              <span className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-warning">
+                                <Lock size={10} aria-hidden="true" /> Internal note
+                              </span>
+                            )}
+                            <p className="whitespace-pre-wrap">{m.body}</p>
+                            <p className={`mt-1 text-[10px] ${mine && !m.is_internal ? "text-white/70" : "text-muted"}`}>
+                              {new Date(m.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );

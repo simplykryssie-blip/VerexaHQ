@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { Users, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Avatar } from "@/components/Avatar";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
@@ -18,7 +19,7 @@ export default async function UsersPage() {
   const [{ data: members }, { data: roles }, { data: invitations }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("workspace_users")
-      .select("id, status, is_owner, role_id, user_profiles(display_name), roles(name)")
+      .select("id, status, is_owner, role_id, user_profiles(display_name, avatar_url), roles(name)")
       .eq("workspace_id", workspace.id)
       .order("created_at" as never, { ascending: true }),
     supabase
@@ -54,14 +55,17 @@ export default async function UsersPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {members.map((m) => {
-                const profile = m.user_profiles as unknown as { display_name: string | null } | null;
+                const profile = m.user_profiles as unknown as { display_name: string | null; avatar_url: string | null } | null;
                 const role = m.roles as unknown as { name: string } | null;
                 const canChangeRole = isAdmin && !m.is_owner && m.status === "active";
                 return (
                   <tr key={m.id}>
                     <td className="px-5 py-3 text-slate">
-                      {profile?.display_name ?? "--"}
-                      {m.is_owner && <span className="ml-2 text-xs text-accent">Owner</span>}
+                      <div className="flex items-center gap-2">
+                        <Avatar name={profile?.display_name} url={profile?.avatar_url} size="sm" />
+                        {profile?.display_name ?? "--"}
+                        {m.is_owner && <span className="ml-2 text-xs text-accent">Owner</span>}
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-slate">
                       {canChangeRole ? (
