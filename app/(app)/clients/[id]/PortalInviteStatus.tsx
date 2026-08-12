@@ -60,14 +60,19 @@ export function PortalInviteStatus({
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
     const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
 
-    await fetch("/api/portal-invitations/send-email", {
+    const emailRes = await fetch("/api/portal-invitations/send-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientId, invitedEmail: email, invitedName: name, acceptUrl }),
     });
+    const emailResult = await emailRes.json().catch(() => null);
 
     setInviting(false);
-    toast.show("Portal invitation sent", "success");
+    if (!emailRes.ok || !emailResult?.sent) {
+      toast.show(`Invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`, "error");
+    } else {
+      toast.show("Portal invitation sent", "success");
+    }
     router.refresh();
   }
 

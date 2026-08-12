@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
+import { useToast } from "@/components/Toast";
 
 const DRAFT_KEY = "new-client-button";
 
@@ -73,6 +74,7 @@ export function NewClientButton({
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [clientType, setClientType] = useState<"individual" | "business">("individual");
   const [firstName, setFirstName] = useState("");
@@ -337,7 +339,7 @@ export function NewClientButton({
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
           const contactAcceptUrl = `${appUrl}/portal/accept-invitation?token=${contactInvite.invitation_token}`;
 
-          await fetch("/api/portal-invitations/send-email", {
+          const contactEmailRes = await fetch("/api/portal-invitations/send-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -347,6 +349,10 @@ export function NewClientButton({
               acceptUrl: contactAcceptUrl,
             }),
           });
+          const contactEmailResult = await contactEmailRes.json().catch(() => null);
+          if (!contactEmailRes.ok || !contactEmailResult?.sent) {
+            toast.show(`Contact's invite created, but the email couldn't be sent. Share this link with them directly: ${contactAcceptUrl}`, "error");
+          }
         }
       }
     }
@@ -388,7 +394,7 @@ export function NewClientButton({
       const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
       const invitedName = clientType === "individual" ? [firstName, lastName].filter(Boolean).join(" ") : `${contactFirstName} ${contactLastName}`;
 
-      await fetch("/api/portal-invitations/send-email", {
+      const emailRes = await fetch("/api/portal-invitations/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -398,6 +404,10 @@ export function NewClientButton({
           acceptUrl,
         }),
       });
+      const emailResult = await emailRes.json().catch(() => null);
+      if (!emailRes.ok || !emailResult?.sent) {
+        toast.show(`Invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`, "error");
+      }
     }
 
     setLoading(false);

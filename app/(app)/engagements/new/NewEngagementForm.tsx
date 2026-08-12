@@ -507,15 +507,21 @@ export function NewEngagementForm({
       }
       if (primaryEmail) {
         const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
-        await fetch("/api/portal-invitations/send-email", {
+        const emailRes = await fetch("/api/portal-invitations/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ clientId: selectedClient.id, invitedEmail: primaryEmail, invitedName: clientLabel(selectedClient), acceptUrl }),
         });
+        const emailResult = await emailRes.json().catch(() => null);
+        if (!emailRes.ok || !emailResult?.sent) {
+          setSendingOrganizer(false);
+          setOrganizerError(`Organizer and invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`);
+          return;
+        }
       }
     } else if (primaryEmail) {
       // Already has portal access -- just notify them the organizer is ready.
-      await fetch("/api/email/send", {
+      const emailRes = await fetch("/api/email/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -530,6 +536,12 @@ export function NewEngagementForm({
           }),
         }),
       });
+      const emailResult = await emailRes.json().catch(() => null);
+      if (!emailRes.ok || !emailResult?.sent) {
+        setSendingOrganizer(false);
+        setOrganizerError("Organizer created, but the notification email couldn't be sent. The client won't know it's waiting for them until you tell them directly.");
+        return;
+      }
     }
 
     setSendingOrganizer(false);

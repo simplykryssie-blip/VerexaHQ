@@ -85,7 +85,7 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
 
                 if (primaryEmail) {
                   const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-                  await fetch("/api/email/send", {
+                  const emailRes = await fetch("/api/email/send", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -100,6 +100,11 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
                       }),
                     }),
                   });
+                  const emailResult = await emailRes.json().catch(() => null);
+                  router.refresh();
+                  if (!emailRes.ok || !emailResult?.sent) {
+                    return "Organizer created, but the notification email couldn't be sent. The client won't know it's waiting for them until you tell them directly.";
+                  }
                 }
 
                 setOpen(false);

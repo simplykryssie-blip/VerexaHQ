@@ -254,7 +254,7 @@ export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
         const acceptUrl = `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}`;
 
-        await fetch("/api/portal-invitations/send-email", {
+        const emailRes = await fetch("/api/portal-invitations/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -264,8 +264,13 @@ export function AddPortalUserForm({ clientId, workspaceId }: Ids) {
             acceptUrl,
           }),
         });
+        const emailResult = await emailRes.json().catch(() => null);
 
         router.refresh();
+
+        if (!emailRes.ok || !emailResult?.sent) {
+          return `Invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`;
+        }
       }}
     />
   );
