@@ -100,7 +100,7 @@ export function ServiceDetailsTab({
       setError(deleteError.message);
       return;
     }
-    router.push("/service-packages");
+    router.push("/settings/services");
   }
 
   if (isSystem) {

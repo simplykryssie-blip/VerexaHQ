@@ -43,9 +43,9 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
     howToSetUp: "Go to Settings > Integrations and connect Stripe and/or Zoom. Both are optional and can be set up whenever you're ready.",
   },
   service: {
-    whatItDoes: "A service package is what you're selling -- e.g. \"Individual Tax Return\" or \"Bookkeeping.\" It's the container that ties together pricing, the forms a client fills out, and the stages their work moves through.",
-    howItWorks: "Every engagement you create is built from a service package, so the package's settings (price, intake form, document requests, workflow stages) get applied automatically instead of you configuring each one by hand.",
-    howToSetUp: "Go to Services, clone a starter template or create your own, set its name and price under Details, then build its steps under Stages. You can always come back and add pricing rules or billing rules later.",
+    whatItDoes: "A service is what you're selling -- e.g. \"Individual Tax Return\" or \"Bookkeeping.\" It's just a name, a category, and a description, so you can categorize your clients and engagements by what they're here for.",
+    howItWorks: "When you start an engagement for a client, you pick which service it's for. Pricing and billing are set directly on that engagement, and a service's pipeline (the stages its work moves through) is built separately, under Pipelines.",
+    howToSetUp: "Go to Settings > Services, clone a starter template or create your own, and give it a name, category, and description.",
   },
   organizer: {
     whatItDoes: "An intake form (organizer) is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",

@@ -142,7 +142,7 @@ export function ServiceGallery({
                     <Workflow size={30} className="text-white/90" aria-hidden="true" />
                     <div className="absolute inset-0 flex items-center justify-center bg-ink/50 opacity-0 transition group-hover:opacity-100">
                       <Link
-                        href={`/service-packages/${s.id}`}
+                        href={`/settings/services/${s.id}`}
                         className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-white/90"
                       >
                         {isSystem ? "View" : "Open"}
@@ -176,14 +176,14 @@ export function ServiceGallery({
                         <div className="mt-3">
                           <CloneServiceButton serviceId={s.id} workspaceId={workspaceId} />
                         </div>
-                        <Link href={`/service-packages/${s.id}`} className="mt-2 text-xs font-medium text-muted hover:text-ink">
+                        <Link href={`/settings/services/${s.id}`} className="mt-2 text-xs font-medium text-muted hover:text-ink">
                           View starter template
                         </Link>
                       </>
                     ) : (
                       <>
                         <Link
-                          href={`/service-packages/${s.id}`}
+                          href={`/settings/services/${s.id}`}
                           className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
                         >
                           <Workflow size={13} /> Manage service
@@ -212,7 +212,7 @@ export function ServiceGallery({
             workspaceId={workspaceId}
             categories={categories}
             defaultOpen
-            onSuccess={(id) => router.push(`/service-packages/${id}`)}
+            onSuccess={(id) => router.push(`/settings/services/${id}`)}
           />
         </Modal>
       )}

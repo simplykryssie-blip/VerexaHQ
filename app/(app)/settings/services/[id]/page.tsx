@@ -103,7 +103,7 @@ export default async function ServiceDetailPage({
 
   return (
     <div>
-      <Link href="/service-packages" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+      <Link href="/settings/services" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Services
       </Link>
       <h2 className="mb-4 text-base font-semibold text-ink">{service.name}</h2>

@@ -41,7 +41,7 @@ export default async function PipelinesPage() {
 
       <div className="mt-6">
         {!services || services.length === 0 ? (
-          <EmptyState message="No services yet -- add one under Services first, then build its pipeline here." />
+          <EmptyState message="No services yet -- add one under Settings > Services first, then build its pipeline here." />
         ) : (
           <div className="space-y-2">
             {services.map((s) => {

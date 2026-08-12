@@ -159,9 +159,9 @@ export default async function DashboardPage() {
       },
       {
         key: "service",
-        label: "Create your first service package",
-        description: "Define what you offer -- pricing, stages, and forms -- so you can attach it to a client.",
-        href: "/service-packages",
+        label: "Create your first service",
+        description: "Name it, give it a category and a description, so you can categorize clients by what they're here for.",
+        href: "/settings/services",
         complete: (serviceCount ?? 0) > 0,
       },
       {

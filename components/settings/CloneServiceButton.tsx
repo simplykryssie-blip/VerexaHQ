@@ -32,7 +32,7 @@ export function CloneServiceButton({ serviceId, workspaceId }: { serviceId: stri
       setError(error.message);
       return;
     }
-    router.push(`/service-packages/${data as string}`);
+    router.push(`/settings/services/${data as string}`);
     router.refresh();
   }
 
