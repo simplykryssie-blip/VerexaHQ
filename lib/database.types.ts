@@ -5783,6 +5783,9 @@ export type Database = {
           mfa_enabled: boolean
           mfa_enrolled_at: string | null
           phone: string | null
+          ptin_encrypted: string | null
+          ptin_hash: string | null
+          ptin_last4: string | null
           seen_onboarding_steps: string[]
           updated_at: string
         }
@@ -5801,6 +5804,9 @@ export type Database = {
           mfa_enabled?: boolean
           mfa_enrolled_at?: string | null
           phone?: string | null
+          ptin_encrypted?: string | null
+          ptin_hash?: string | null
+          ptin_last4?: string | null
           seen_onboarding_steps?: string[]
           updated_at?: string
         }
@@ -5819,6 +5825,9 @@ export type Database = {
           mfa_enabled?: boolean
           mfa_enrolled_at?: string | null
           phone?: string | null
+          ptin_encrypted?: string | null
+          ptin_hash?: string | null
+          ptin_last4?: string | null
           seen_onboarding_steps?: string[]
           updated_at?: string
         }
@@ -7694,6 +7703,7 @@ export type Database = {
       reveal_firm_efin: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ein: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ptin: { Args: { p_workspace_id: string }; Returns: string }
+      reveal_my_ptin: { Args: never; Returns: string }
       reveal_organizer_answer: {
         Args: { p_answer_id: string }
         Returns: string
@@ -7744,6 +7754,10 @@ export type Database = {
           p_tax_season_hours?: Json
           p_workspace_id: string
         }
+        Returns: undefined
+      }
+      set_my_ptin: {
+        Args: { p_clear?: boolean; p_ptin?: string }
         Returns: undefined
       }
       set_platform_admin: {

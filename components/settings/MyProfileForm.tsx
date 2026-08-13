@@ -6,6 +6,7 @@ import { UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Avatar } from "@/components/Avatar";
+import { MaskedSecretField } from "@/components/settings/MaskedSecretField";
 
 export function MyProfileForm({
   userId,
@@ -14,6 +15,8 @@ export function MyProfileForm({
   displayName,
   avatarUrl,
   phone,
+  showPtin,
+  ptinLast4,
 }: {
   userId: string;
   firstName: string | null;
@@ -21,6 +24,8 @@ export function MyProfileForm({
   displayName: string | null;
   avatarUrl: string | null;
   phone: string | null;
+  showPtin?: boolean;
+  ptinLast4?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -29,6 +34,8 @@ export function MyProfileForm({
   const [last, setLast] = useState(lastName ?? "");
   const [display, setDisplay] = useState(displayName ?? "");
   const [phoneValue, setPhoneValue] = useState(phone ?? "");
+  const [ptin, setPtin] = useState("");
+  const [clearPtin, setClearPtin] = useState(false);
   const [avatar, setAvatar] = useState(avatarUrl);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -69,15 +76,32 @@ export function MyProfileForm({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
+
     const { error } = await supabase
       .from("user_profiles")
       .update({ first_name: first || null, last_name: last || null, display_name: display || null, phone: phoneValue || null })
       .eq("id", userId);
-    setSaving(false);
     if (error) {
+      setSaving(false);
       toast.show(error.message, "error");
       return;
     }
+
+    if (showPtin && (ptin.trim() || clearPtin)) {
+      const { error: ptinError } = await supabase.rpc("set_my_ptin", {
+        p_ptin: clearPtin ? undefined : ptin.trim(),
+        p_clear: clearPtin,
+      });
+      if (ptinError) {
+        setSaving(false);
+        toast.show(ptinError.message, "error");
+        return;
+      }
+      setPtin("");
+      setClearPtin(false);
+    }
+
+    setSaving(false);
     toast.show("Profile updated", "success");
     router.refresh();
   }
@@ -160,6 +184,18 @@ export function MyProfileForm({
           />
           <p className="mt-1 text-xs text-muted">Shown to clients you&apos;re the point of contact for, in their portal.</p>
         </div>
+        {showPtin && (
+          <MaskedSecretField
+            label="PTIN"
+            last4={ptinLast4 ?? null}
+            onReveal={() => supabase.rpc("reveal_my_ptin")}
+            newValue={ptin}
+            onNewValueChange={setPtin}
+            clear={clearPtin}
+            onClearChange={setClearPtin}
+            helpText="Your own PTIN -- encrypted, only you can reveal it."
+          />
+        )}
         <button
           type="submit"
           disabled={saving}

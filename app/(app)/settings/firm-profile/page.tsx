@@ -44,13 +44,18 @@ export default async function FirmProfilePage() {
       supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
       getEffectiveBranding(workspace.id),
       user
-        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone").eq("id", user.id).maybeSingle()
+        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     ]);
 
   const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
-  const showPtin = workspace.workspace_type === "independent_ptin";
+  // PTIN belongs to whichever entity the workspace actually represents: for a
+  // solo preparer the workspace IS them, so it's a firm-level field; for an
+  // ERO/SB, each individual staff member holds their own PTIN, so it's a
+  // personal field on their own profile instead.
+  const showFirmPtin = workspace.workspace_type === "independent_ptin";
+  const showStaffPtin = !showFirmPtin;
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
@@ -75,6 +80,8 @@ export default async function FirmProfilePage() {
               displayName={myProfile?.display_name ?? null}
               avatarUrl={myProfile?.avatar_url ?? null}
               phone={myProfile?.phone ?? null}
+              showPtin={showStaffPtin}
+              ptinLast4={myProfile?.ptin_last4 ?? null}
             />
           </div>
         </div>
@@ -88,7 +95,7 @@ export default async function FirmProfilePage() {
         </p>
         <div className="mt-3 rounded-xl border border-border bg-surface p-5">
           {isAdmin ? (
-            <FirmTaxProfileForm workspaceId={workspace.id} profile={profile ?? null} showEin showEfin={showEfin} showPtin={showPtin} />
+            <FirmTaxProfileForm workspaceId={workspace.id} profile={profile ?? null} showEin showEfin={showEfin} showPtin={showFirmPtin} />
           ) : !profile ? (
             <EmptyState icon={FileText} message="No firm tax profile set up yet." />
           ) : (
@@ -103,7 +110,7 @@ export default async function FirmProfilePage() {
                   <dd className="mt-0.5 text-slate">{profile.efin_last4 ? `••••${profile.efin_last4}` : "Not set"}</dd>
                 </div>
               )}
-              {showPtin && (
+              {showFirmPtin && (
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-muted">PTIN</dt>
                   <dd className="mt-0.5 text-slate">{profile.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
