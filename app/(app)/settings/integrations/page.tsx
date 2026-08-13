@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEmailConfigured, isSmsConfigured, isStripeConfigured, isZoomConfigured } from "@/lib/providerStatus";
+import { isStripeConfigured, isZoomConfigured } from "@/lib/providerStatus";
 import { Plug, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
@@ -10,8 +10,6 @@ import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
 export const dynamic = "force-dynamic";
 
 const PROVIDERS = [
-  { key: "email", label: "Resend (Email)", configured: isEmailConfigured },
-  { key: "sms", label: "Twilio (SMS)", configured: isSmsConfigured },
   { key: "stripe", label: "Stripe (Payments)", configured: isStripeConfigured },
   { key: "zoom", label: "Zoom (Meetings)", configured: isZoomConfigured },
 ] as const;
