@@ -69,13 +69,17 @@ function FixedServiceRow({
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
       <div>
         {enabled && owned ? (
-          <Link href={`/settings/services/${owned.id}`} className="text-sm font-medium text-accent hover:underline">
-            {fixed.name}
-          </Link>
+          <>
+            <Link href={`/settings/services/${owned.id}`} className="text-sm font-medium text-accent hover:underline">
+              {fixed.name}
+            </Link>
+            <Link href={`/settings/services/${owned.id}`} className="block text-xs text-muted hover:text-accent hover:underline">
+              Manage its pipeline
+            </Link>
+          </>
         ) : (
           <span className="text-sm font-medium text-ink">{fixed.name}</span>
         )}
-        {enabled && <p className="text-xs text-muted">Manage its pipeline</p>}
       </div>
       <button
         type="button"
