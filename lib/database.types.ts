@@ -7879,6 +7879,10 @@ export type Database = {
         }
         Returns: Json
       }
+      turn_on_service: {
+        Args: { p_new_name?: string; p_service_id: string; p_workspace_id: string }
+        Returns: string
+      }
       upsert_workspace_subscription: {
         Args: {
           p_plan_id: string

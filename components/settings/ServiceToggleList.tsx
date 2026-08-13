@@ -28,10 +28,9 @@ function FixedServiceRow({
 
   async function turnOn() {
     setBusy(true);
-    const { error } = await supabase.rpc("duplicate_config_object", {
-      p_table: "services",
-      p_id: fixed.id,
-      p_target_workspace_id: workspaceId,
+    const { error } = await supabase.rpc("turn_on_service", {
+      p_service_id: fixed.id,
+      p_workspace_id: workspaceId,
     });
     setBusy(false);
     if (error) {
@@ -183,10 +182,9 @@ export function ServiceToggleList({
               fields={[{ name: "name", label: "Name", required: true }]}
               onSubmit={async (v) => {
                 if (!templateServiceId) return "No starter pipeline is available to base this on -- try again shortly.";
-                const { data, error } = await supabase.rpc("duplicate_config_object", {
-                  p_table: "services",
-                  p_id: templateServiceId,
-                  p_target_workspace_id: workspaceId,
+                const { data, error } = await supabase.rpc("turn_on_service", {
+                  p_service_id: templateServiceId,
+                  p_workspace_id: workspaceId,
                   p_new_name: v.name,
                 });
                 if (error) return error.message;
