@@ -158,8 +158,8 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
         workspaceId={workspaceId}
         column="sidebar_logo_url"
         pathPrefix="sidebar-logo"
-        label="Sidebar logo"
-        helpText="Shown at the top of your staff dashboard's navigation bar."
+        label="Brand logo"
+        helpText="Shown at the top of your staff dashboard's navigation bar, and to clients in their portal unless you set a separate portal logo below. Leave blank to use your profile photo instead."
         initialUrl={branding?.sidebar_logo_url ?? null}
       />
       <LogoUploadField
@@ -167,7 +167,7 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
         column="portal_logo_url"
         pathPrefix="portal-logo"
         label="Client portal logo"
-        helpText="Shown to your clients in their portal. Leave blank to reuse the sidebar logo."
+        helpText="Only needed if you want clients to see a different logo than your staff dashboard. Leave blank to reuse the brand logo above."
         initialUrl={branding?.portal_logo_url ?? null}
       />
 

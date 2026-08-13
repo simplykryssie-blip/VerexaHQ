@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { Building2, FileText, SlidersHorizontal } from "lucide-react";
+import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { BusinessHoursForm } from "@/components/settings/BusinessHoursForm";
@@ -11,8 +11,6 @@ import { getEffectiveBranding } from "@/lib/branding";
 import { MyProfileForm } from "@/components/settings/MyProfileForm";
 
 export const dynamic = 'force-dynamic';
-
-const BOOKING_KEYS = new Set(["business_hours", "booking_slot_minutes"]);
 
 export default async function FirmProfilePage() {
   const workspace = await getCurrentWorkspace();
@@ -49,7 +47,6 @@ export default async function FirmProfilePage() {
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const otherSettings = (settings ?? []).filter((s) => !BOOKING_KEYS.has(s.key));
 
   return (
     <div className="max-w-2xl">
@@ -158,29 +155,6 @@ export default async function FirmProfilePage() {
         <p className="mt-1 text-xs text-muted">When clients can self-book a bookable service from their portal.</p>
         <div className="mt-3">
           <BusinessHoursForm workspaceId={workspace.id} initialHours={businessHours} initialSlotMinutes={slotMinutes} />
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal size={14} className="text-muted" aria-hidden="true" />
-          <h3 className="text-sm font-semibold text-ink">Other preferences</h3>
-        </div>
-        <div className="mt-3 rounded-xl border border-border bg-surface">
-          {otherSettings.length === 0 ? (
-            <EmptyState icon={SlidersHorizontal} message="No other workspace preferences have been set yet." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {otherSettings.map((s) => (
-                <li key={s.key} className="px-5 py-3 text-sm">
-                  <p className="font-medium text-slate">{s.key}</p>
-                  <pre className="mt-1 overflow-x-auto rounded bg-surfaceMuted p-2 text-xs text-muted">
-                    {JSON.stringify(s.value, null, 2)}
-                  </pre>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </div>
     </div>

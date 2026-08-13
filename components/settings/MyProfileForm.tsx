@@ -158,7 +158,7 @@ export function MyProfileForm({
             placeholder="(555) 123-4567"
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p className="mt-1 text-xs text-muted">Shown to clients you're the point of contact for, in their portal.</p>
+          <p className="mt-1 text-xs text-muted">Shown to clients you&apos;re the point of contact for, in their portal.</p>
         </div>
         <button
           type="submit"

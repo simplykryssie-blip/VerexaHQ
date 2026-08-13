@@ -45,13 +45,32 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     .eq("workspace_id", brandingWorkspaceId)
     .maybeSingle();
 
+  // No brand logo uploaded at all -- fall back to the workspace owner's avatar
+  // photo rather than showing nothing. Common for solo PTINs whose "brand" is
+  // just themselves.
+  let ownerAvatarUrl: string | null = null;
+  if (!branding?.sidebar_logo_url && !branding?.portal_logo_url && !branding?.logo_url) {
+    const { data: owner } = await supabase
+      .from("workspace_users")
+      .select("user_profiles(avatar_url)")
+      .eq("workspace_id", brandingWorkspaceId)
+      .eq("is_owner", true)
+      .maybeSingle();
+    ownerAvatarUrl = (owner?.user_profiles as unknown as { avatar_url: string | null } | null)?.avatar_url ?? null;
+  }
+
+  const sidebarLogoUrl = branding?.sidebar_logo_url ?? branding?.logo_url ?? ownerAvatarUrl;
+
   return {
     brandingWorkspaceId,
     isWhitelabeledByEro,
     eroName,
     displayName: branding?.display_name ?? null,
-    sidebarLogoUrl: branding?.sidebar_logo_url ?? branding?.logo_url ?? null,
-    portalLogoUrl: branding?.portal_logo_url ?? branding?.logo_url ?? null,
+    sidebarLogoUrl,
+    // Explicit portal logo, else the same brand logo shown on the staff sidebar
+    // (including its own owner-avatar fallback), matching the Brand Logo
+    // field's "leave blank to reuse" copy.
+    portalLogoUrl: branding?.portal_logo_url ?? sidebarLogoUrl,
     primaryColor: branding?.primary_color ?? null,
     secondaryColor: branding?.secondary_color ?? null,
     sidebarTextColor: branding?.sidebar_text_color ?? null,
