@@ -141,6 +141,24 @@ un-promoted previews.
   clicking through Clients, Engagements, the Client/Engagement workspace
   tabs, Settings, and the Client Portal specifically (that one's actually
   used on phones by real clients, unlike most of the staff-facing app).
+- **Fixed live in the DB, no deploy needed**: `create_engagement` had two
+  overloaded versions in Postgres (a stale 5-param one from before
+  `p_billing_rule_id` existed, never dropped when the 6-param version
+  replaced it). Any call using fewer than all 6 named params -- which is
+  exactly what `NewClientButton.tsx`'s minimal call does -- was ambiguous
+  and failed with "could not choose the best candidate function." Dropped
+  the stale 5-param overload directly in the database (migration
+  `drop_stale_create_engagement_overload`). If a similar "could not choose
+  the best candidate function" error ever resurfaces on a different RPC,
+  it's the same root cause: check `pg_proc` for duplicate overloads of that
+  function name and drop whichever one predates the current call sites.
+- **Requested, not yet built**: a way to bypass the duplicate email/phone
+  check when creating a new lead/contact -- some people legitimately share
+  a phone or email (spouses, business partners). She still wants to be
+  warned it's a duplicate, but needs a "use anyway" override instead of a
+  hard block. Find the current duplicate-check logic (likely in the new
+  client/lead creation flow, `NewClientButton.tsx` or similar) before
+  building this.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
