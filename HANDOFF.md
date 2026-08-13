@@ -159,6 +159,31 @@ un-promoted previews.
   hard block. Find the current duplicate-check logic (likely in the new
   client/lead creation flow, `NewClientButton.tsx` or similar) before
   building this.
+- **"DELETE requires a WHERE clause" error, reported on both creating a
+  service (toggle-on/clone) and toggling one off, under Settings >
+  Services — root cause not found yet.** Investigated and ruled out: no
+  `safeupdate`-style Postgres extension is installed on this project
+  (checked `pg_extension`); the `services` table's `audit_services`
+  trigger (`audit_trigger_fn()`) only ever INSERTs into `audit_log`, never
+  deletes; the one bare `delete from tmp_stage_map;` inside
+  `duplicate_config_object()` operates on a temp table that's always freshly
+  created moments earlier (`on commit drop`), so it's empty and harmless,
+  and being plain SQL inside a `SECURITY DEFINER` function it wouldn't
+  surface as a client-visible PostgREST error anyway. Could not reproduce
+  directly via SQL editor since `is_workspace_admin()`/`has_permission()`
+  need a real `auth.uid()`, which the SQL editor doesn't have. **Next
+  step: get the literal error text or a browser console screenshot from
+  the user** (same technique that cracked the Zoom 403) rather than
+  guessing further from the backend alone.
+- **RM/Reviewer/Compliance Officer requested changes, not yet built**:
+  should only show on ERO and SB (sub-business/connected) workspace tiers,
+  not on independent solo-PTIN workspaces (a similar fix was done in an
+  earlier now-deleted-branch session — verify current production behavior
+  before assuming it's broken, it may have simply never been ported, same
+  pattern as the automations.manage fix earlier this session). New ask: an
+  ERO/SB-tier workspace should be able to preset these as defaults for
+  their staff accounts and connected accounts. Also these fields currently
+  show by email and should show by staff display name instead.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
