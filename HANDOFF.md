@@ -215,17 +215,40 @@ un-promoted previews.
   (confirmed correct, already built): land them back on
   `/portal/accept-invitation`, which should show their pre-added CRM info
   to verify if they already exist as a client, or otherwise create their
-  CRM record from what they enter. **Checked the code and could not find
-  the bug** — `app/portal/accept-invitation/page.tsx`'s sign-up call
-  already sets `emailRedirectTo` to
-  `/auth/confirm?next=/portal/accept-invitation?token=...`, and
-  `app/auth/confirm/route.ts` correctly honors whatever `next` says with
-  no global "redirect to onboarding" logic in `middleware.ts` that could
-  override it. On paper this should already work. Didn't chase further
-  given session credit limits — **first ask whether she tested this on
-  verexahq.com directly** (today's dominant recurring cause of "bugs" that
-  turned out to be stale/un-promoted deployments) before assuming the code
-  is actually wrong.
+  CRM record from what they enter.
+  - Confirmed she tested this on verexahq.com directly (not a stale
+    deployment).
+  - Ruled out: app code wiring is correct —
+    `app/portal/accept-invitation/page.tsx`'s sign-up call sets
+    `emailRedirectTo` to `/auth/confirm?next=/portal/accept-invitation?token=...`;
+    `app/auth/confirm/route.ts` correctly honors whatever `next` says;
+    `middleware.ts` has no global "redirect to onboarding" logic that
+    could override it.
+  - Ruled out: Supabase Auth's dashboard-level Redirect URLs allow-list
+    (Authentication → URL Configuration) — confirmed via screenshot it
+    already contains both `https://verexahq.com/` and
+    `https://verexahq.com/auth/confirm` (Site URL is
+    `https://verexahq.com/`), so the confirmation link isn't being
+    rejected/falling back for that reason.
+  - **Current leading theory, not yet confirmed**: `(app)/layout.tsx`
+    redirects any authenticated user with no `workspace_members` row to
+    `/onboarding`. A brand-new portal client has no such row (only a
+    `client_portal_users` row) — so if the confirmation link ever lands
+    them on the fallback `/dashboard` instead of the intended `next`
+    value, `(app)/layout.tsx` would send them straight to `/onboarding`.
+    That matches the reported symptom exactly. The one place `next` could
+    still be silently getting dropped despite the app code being correct
+    is the **Supabase Auth email template** for "Confirm signup"
+    (Authentication → Email Templates in the dashboard) — if that
+    template was customized and doesn't use the default
+    `{{ .ConfirmationURL }}` variable (which carries the `redirect_to`/
+    `next` value through automatically), the link it sends could point
+    somewhere that loses the `next` param even though our own code sets
+    it correctly.
+  - **Next step**: check Authentication → Email Templates → "Confirm
+    signup" in the Supabase dashboard and confirm whether it uses
+    `{{ .ConfirmationURL }}` untouched, or a custom-built link. Screenshot
+    it the same way the URL Configuration page was checked.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
