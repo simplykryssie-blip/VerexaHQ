@@ -148,28 +148,73 @@ reference. This file is just "what happened recently and what's still open."
 11. **Sidebar/portal logo enlarged** — was too small to read. Both
     `Sidebar.tsx` (staff) and `PortalSidebar.tsx` (client portal) bumped
     from `maxHeight: 28px/24px` to `44px`.
-12. **RESOLVED (this session): the "DELETE requires a WHERE clause" bug
-    from the previous session's Services rebuild (see old entry below,
-    kept for the investigation record) — worked around, not root-caused.**
-    Shipped a brand-new dedicated function, `public.turn_on_service(
-    p_service_id, p_workspace_id, p_new_name default null)`, that clones a
-    service + its process/stages/tasks the same way
-    `duplicate_config_object` was supposed to, but through its own
-    independent code path. Both frontend call sites in
-    `ServiceToggleList.tsx` (turning a fixed service on, and "Add custom
-    service") were switched from `duplicate_config_object` to
-    `turn_on_service`. Verified directly against the DB with the real
-    user's `auth.uid()` simulated (rollback-wrapped) before shipping.
-    **`duplicate_config_object` itself was left completely unchanged** —
-    its actual bug for the `services` case was never found (see the full
-    investigation log below), and it's still what backs cloning for every
-    *other* config type (`pipelines`, `document_request_templates`,
-    `document_folder_templates`, `automations`, `dashboards`,
-    `organizer_templates`, `processes`). None of those have been reported
-    broken, but if one ever throws the same "DELETE requires a WHERE
-    clause" error, the fix pattern here (bypass with a dedicated function
-    for that specific use case, don't keep chasing the generic function)
-    is the precedent to follow.
+12. **NOT RESOLVED — attempted workaround also failed. Reopening task
+    #186.** Shipped a brand-new dedicated function, `public.turn_on_service(
+    p_service_id, p_workspace_id, p_new_name default null)` (commit
+    `07a1f11`), that clones a service + its process/stages/tasks the same
+    way `duplicate_config_object` was supposed to, through its own
+    independent code path, and switched both frontend call sites in
+    `ServiceToggleList.tsx` to it. **The user tested this on the exact
+    correct preview deployment
+    (`verexa-tax-office-v2-git-claude-verexa-tax-44c2a5-verexa-hq-crm.vercel.app`,
+    confirmed commit `07a1f11`, confirmed she used that exact URL) and got
+    the identical "DELETE requires a WHERE clause" error.** This is a
+    major finding: it rules out anything specific to
+    `duplicate_config_object`'s function body being the cause, since a
+    completely separate, newly-written function with different logic
+    fails the exact same way through the real request path. The two
+    functions' only meaningful shared trait is an unfiltered
+    `delete from tmp_*;` statement on a `create temporary table` (no
+    `WHERE` clause, by design — clearing a reusable per-transaction temp
+    table). Investigation this round, after the workaround failed:
+    - Re-ran the *direct* DB reproduction, this time actually switching to
+      the real `authenticated` Postgres role via `set local role
+      authenticated;` (previous rounds only faked the JWT claim while
+      staying on a superuser/service connection — this closes that gap).
+      **Still succeeded with no error.** So even executing as the real
+      role, in the same database, the bug does not reproduce directly.
+    - Checked for `session_preload_libraries` (a `safeupdate`-style
+      extension would explain "DELETE requires a WHERE clause" exactly,
+      and wouldn't show up in `pg_extension` if it's a preload-only
+      library rather than a `CREATE EXTENSION`). Found:
+      `session_preload_libraries = 'supautils'` (Supabase's own
+      role/privilege-management preload library),
+      `shared_preload_libraries = 'pg_stat_statements, pgaudit, plpgsql,
+      plpgsql_check, pg_cron, pg_net, pgsodium, auto_explain, pg_tle,
+      plan_filter, supabase_vault'`. No `safeupdate` or similar literal
+      match. **`supautils` itself is worth investigating directly as the
+      source** — it's a Supabase-authored extension specifically for
+      restricting/policing what happens over PostgREST-style connections
+      that a superuser SQL-editor session doesn't go through the same way;
+      it plausibly has a role- or connection-path-scoped safety check that
+      only activates for genuine pooler-routed requests, which would
+      explain every single direct-reproduction attempt succeeding
+      (including the `set local role authenticated` one) while the real
+      app path fails every time. Nobody has yet read `supautils`'
+      actual config/docs in this investigation — that's the most promising
+      unexplored lead.
+    - `query_logs` (would show the literal Postgres/PostgREST error from
+      server logs and probably settle this in one query) is **still
+      blocked** ("MCP tool call requires approval", no way to grant it
+      from this session) — tried again this round, same result. If a
+      future session/account has this tool actually available, run:
+      `select timestamp, event_message from logs where source =
+      'postgres_logs' and event_message ilike '%WHERE clause%' order by
+      timestamp desc limit 20` — this should immediately show which
+      statement, and from which context, is actually raising the error.
+    - **Do not re-attempt the "ship a different bypass function" pattern
+      again without new evidence** — it was tried once (this session) on
+      the reasonable theory that the bug was specific to
+      `duplicate_config_object`, and that theory is now disproven. Get the
+      actual error text (via `query_logs`, or a real Supabase dashboard
+      Logs page — see the "Supabase dashboard access" blocker below) before
+      writing any more code.
+    - `duplicate_config_object` and `turn_on_service` are **both still
+      broken** — `ServiceToggleList.tsx` currently calls `turn_on_service`,
+      not `duplicate_config_object`, but that was not a fix, just a swap
+      to an equally-broken function. Turning on a service and creating a
+      custom service are both still non-functional in production and on
+      every preview as of this writing.
 
 Everything above is committed and pushed to
 `claude/verexa-tax-office-v2-mhd9mo`. **Confirm with the user whether the
@@ -222,12 +267,13 @@ un-promoted previews.
   hard block. Find the current duplicate-check logic (likely in the new
   client/lead creation flow, `NewClientButton.tsx` or similar) before
   building this.
-- **"DELETE requires a WHERE clause" — WORKED AROUND, see item #12 above
-  in "What changed this session." Root cause was never found; this entry
-  is kept only as the investigation record in case `duplicate_config_object`
-  ever breaks the same way for a different config type (pipelines,
-  document request/folder templates, automations, dashboards, organizer
-  templates, processes).** Originally reported on both creating a
+- **"DELETE requires a WHERE clause" — STILL BROKEN. See item #12 above in
+  "What changed this session" for the full current-state writeup,
+  including the disproven `turn_on_service` workaround, the
+  `supautils`/`session_preload_libraries` lead, and the exact
+  `query_logs` command to run the moment that tool is available. Do not
+  re-attempt a "new bypass function" fix without new evidence — that was
+  tried and failed.** Originally reported on both creating a
   service (toggle-on/clone) and toggling one off, under Settings >
   Services. Confirmed the failing call is the `duplicate_config_object`
   RPC returning HTTP 400 (seen directly in the browser Network/Console
