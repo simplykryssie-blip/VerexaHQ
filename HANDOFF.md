@@ -195,6 +195,23 @@ un-promoted previews.
   Reviewer) — worded slightly differently the two times she said it, so
   confirm the exact intended list and whether "PTIN receptionist" is one
   role or two before building. Full detail in task #187.
+- **Reported: a client accepting a portal invite gets sent to `/onboarding`
+  ("set up your firm," the staff flow) after confirming their email,
+  instead of back to finishing their portal setup.** Intended design
+  (confirmed correct, already built): land them back on
+  `/portal/accept-invitation`, which should show their pre-added CRM info
+  to verify if they already exist as a client, or otherwise create their
+  CRM record from what they enter. **Checked the code and could not find
+  the bug** — `app/portal/accept-invitation/page.tsx`'s sign-up call
+  already sets `emailRedirectTo` to
+  `/auth/confirm?next=/portal/accept-invitation?token=...`, and
+  `app/auth/confirm/route.ts` correctly honors whatever `next` says with
+  no global "redirect to onboarding" logic in `middleware.ts` that could
+  override it. On paper this should already work. Didn't chase further
+  given session credit limits — **first ask whether she tested this on
+  verexahq.com directly** (today's dominant recurring cause of "bugs" that
+  turned out to be stale/un-promoted deployments) before assuming the code
+  is actually wrong.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
