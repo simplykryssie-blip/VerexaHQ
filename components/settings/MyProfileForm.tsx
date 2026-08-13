@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Avatar } from "@/components/Avatar";
 import { MaskedSecretField } from "@/components/settings/MaskedSecretField";
+import { formatPtin } from "@/lib/taxIds";
 
 export function MyProfileForm({
   userId,
@@ -190,7 +191,7 @@ export function MyProfileForm({
             last4={ptinLast4 ?? null}
             onReveal={() => supabase.rpc("reveal_my_ptin")}
             newValue={ptin}
-            onNewValueChange={setPtin}
+            onNewValueChange={(v) => setPtin(formatPtin(v))}
             clear={clearPtin}
             onClearChange={setClearPtin}
             helpText="Your own PTIN -- encrypted, only you can reveal it."

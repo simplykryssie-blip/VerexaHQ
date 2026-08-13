@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { MaskedSecretField } from "@/components/settings/MaskedSecretField";
+import { formatEin, formatEfin, formatPtin } from "@/lib/taxIds";
+import { US_STATES, SPECIAL_CERTIFICATION_STATE_CODES } from "@/lib/usStates";
 
 type Profile = {
   ein_last4: string | null;
@@ -11,6 +13,13 @@ type Profile = {
   ptin_last4: string | null;
   supported_filing_states: string[];
 } | null;
+
+function defaultStates(profile: Profile): Set<string> {
+  if (profile?.supported_filing_states && profile.supported_filing_states.length > 0) {
+    return new Set(profile.supported_filing_states);
+  }
+  return new Set(US_STATES.map((s) => s.code).filter((c) => !SPECIAL_CERTIFICATION_STATE_CODES.has(c)));
+}
 
 export function FirmTaxProfileForm({
   workspaceId,
@@ -34,7 +43,7 @@ export function FirmTaxProfileForm({
   const [clearEin, setClearEin] = useState(false);
   const [clearEfin, setClearEfin] = useState(false);
   const [clearPtin, setClearPtin] = useState(false);
-  const [states, setStates] = useState((profile?.supported_filing_states ?? []).join(", "));
+  const [states, setStates] = useState<Set<string>>(() => defaultStates(profile));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -45,10 +54,7 @@ export function FirmTaxProfileForm({
     setError(null);
     setSaved(false);
 
-    const parsedStates = states
-      .split(",")
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean);
+    const parsedStates = Array.from(states);
 
     const { error } = await supabase.rpc("set_firm_tax_profile", {
       p_workspace_id: workspaceId,
@@ -84,7 +90,7 @@ export function FirmTaxProfileForm({
           last4={profile?.ein_last4 ?? null}
           onReveal={() => supabase.rpc("reveal_firm_ein", { p_workspace_id: workspaceId })}
           newValue={ein}
-          onNewValueChange={setEin}
+          onNewValueChange={(v) => setEin(formatEin(v))}
           clear={clearEin}
           onClearChange={setClearEin}
         />
@@ -95,7 +101,7 @@ export function FirmTaxProfileForm({
           last4={profile?.efin_last4 ?? null}
           onReveal={() => supabase.rpc("reveal_firm_efin", { p_workspace_id: workspaceId })}
           newValue={efin}
-          onNewValueChange={setEfin}
+          onNewValueChange={(v) => setEfin(formatEfin(v))}
           clear={clearEfin}
           onClearChange={setClearEfin}
         />
@@ -106,21 +112,48 @@ export function FirmTaxProfileForm({
           last4={profile?.ptin_last4 ?? null}
           onReveal={() => supabase.rpc("reveal_firm_ptin", { p_workspace_id: workspaceId })}
           newValue={ptin}
-          onNewValueChange={setPtin}
+          onNewValueChange={(v) => setPtin(formatPtin(v))}
           clear={clearPtin}
           onClearChange={setClearPtin}
         />
       )}
 
       <div>
-        <label className="block text-sm font-medium text-slate">Supported filing states</label>
-        <input
-          value={states}
-          onChange={(e) => setStates(e.target.value)}
-          placeholder="e.g. CA, NY, TX"
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-        <p className="mt-1 text-xs text-muted">Comma-separated state abbreviations.</p>
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-slate">Supported filing states</label>
+          <div className="flex items-center gap-2 text-xs">
+            <button type="button" onClick={() => setStates(new Set(US_STATES.map((s) => s.code)))} className="font-medium text-accent hover:underline">
+              Select all
+            </button>
+            <span className="text-muted">·</span>
+            <button type="button" onClick={() => setStates(new Set())} className="font-medium text-accent hover:underline">
+              Clear all
+            </button>
+          </div>
+        </div>
+        <p className="mt-0.5 text-xs text-muted">
+          States requiring their own preparer license (
+          {Array.from(SPECIAL_CERTIFICATION_STATE_CODES).join(", ")}) start unchecked -- adjust as needed.
+        </p>
+        <div className="mt-2 grid max-h-64 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto rounded-lg border border-border p-3 sm:grid-cols-3">
+          {US_STATES.map((s) => (
+            <label key={s.code} className="flex items-center gap-1.5 text-xs text-slate">
+              <input
+                type="checkbox"
+                checked={states.has(s.code)}
+                onChange={(e) => {
+                  const next = new Set(states);
+                  if (e.target.checked) next.add(s.code);
+                  else next.delete(s.code);
+                  setStates(next);
+                }}
+                className="h-3.5 w-3.5 rounded border-border"
+              />
+              {s.name}
+              {SPECIAL_CERTIFICATION_STATE_CODES.has(s.code) && <span className="text-muted">*</span>}
+            </label>
+          ))}
+        </div>
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
