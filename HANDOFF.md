@@ -15,6 +15,20 @@ reference. This file is just "what happened recently and what's still open."
 - Supabase project: `daxpavvsotvsyqqntddc`. One live database shared by
   every branch/deployment — a DB migration applies everywhere immediately;
   a code change does not go live until deployed.
+- **⚠️ Known access problem: the user cannot reach this project's own
+  Supabase dashboard.** Her `simplykryssie-blip` login only shows one
+  project, `mkbfinancialgroup-next` — not "Verexa Tax Office v2"
+  (`daxpavvsotvsyqqntddc`), and she has no other organization under that
+  login. The Supabase MCP tools reach `daxpavvsotvsyqqntddc` through an
+  existing API connection that is independent of her personal dashboard
+  login — so database reads/writes/migrations all work fine through
+  Claude, but nothing that requires the actual Supabase dashboard
+  (Authentication → URL Configuration, billing, storage UI, project
+  settings, logs UI) is currently reachable by her. She was checking her
+  email for which account might own it, unresolved as of this session.
+  Until this is sorted out, don't tell her to "go check X in the Supabase
+  dashboard" without first confirming she can actually get into this
+  specific project — she cannot right now.
 - Vercel project: `verexa-tax-office-v2` (team `verexa-hq-crm`), live domain
   `verexahq.com`.
 - **Deploy gotcha, read this twice**: pushing to the branch only builds a
