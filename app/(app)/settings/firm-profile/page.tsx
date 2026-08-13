@@ -7,10 +7,13 @@ import { BusinessHoursForm } from "@/components/settings/BusinessHoursForm";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmContactForm } from "./FirmContactForm";
 import { BrandCenterForm } from "../brand-center/BrandCenterForm";
+import { FirmTaxProfileForm } from "./FirmTaxProfileForm";
 import { getEffectiveBranding } from "@/lib/branding";
 import { MyProfileForm } from "@/components/settings/MyProfileForm";
 
 export const dynamic = 'force-dynamic';
+
+const EFIN_WORKSPACE_TYPES = new Set(["ero_office", "service_bureau", "multi_office_firm"]);
 
 export default async function FirmProfilePage() {
   const workspace = await getCurrentWorkspace();
@@ -21,7 +24,7 @@ export default async function FirmProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }] =
+  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }, { data: isAdmin }] =
     await Promise.all([
       supabase
         .from("firm_tax_profile")
@@ -43,7 +46,11 @@ export default async function FirmProfilePage() {
       user
         ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
+      supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     ]);
+
+  const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
+  const showPtin = workspace.workspace_type === "independent_ptin";
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
@@ -73,43 +80,47 @@ export default async function FirmProfilePage() {
         </div>
       )}
 
-      <div className="mt-8 rounded-xl border border-border bg-surface p-5">
-        {!profile ? (
-          <EmptyState icon={FileText} message="No firm tax profile set up yet." />
-        ) : (
-          <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted">Workspace name</dt>
-              <dd className="mt-0.5 text-slate">{workspace.name}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted">EIN</dt>
-              <dd className="mt-0.5 text-slate">{profile.ein_last4 ? `••••${profile.ein_last4}` : "Not set"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted">EFIN</dt>
-              <dd className="mt-0.5 text-slate">{profile.efin_last4 ? `••••${profile.efin_last4}` : "Not set"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted">PTIN</dt>
-              <dd className="mt-0.5 text-slate">{profile.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
-            </div>
-            <div className="col-span-2">
-              <dt className="text-xs uppercase tracking-wide text-muted">Supported filing states</dt>
-              <dd className="mt-0.5 text-slate">
-                {profile.supported_filing_states && profile.supported_filing_states.length > 0
-                  ? profile.supported_filing_states.join(", ")
-                  : "None set"}
-              </dd>
-            </div>
-          </dl>
-        )}
+      <div className="mt-8">
+        <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
+        <p className="mt-1 text-xs text-muted">
+          EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and
+          revealing the full value is audit-logged.
+        </p>
+        <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+          {isAdmin ? (
+            <FirmTaxProfileForm workspaceId={workspace.id} profile={profile ?? null} showEin showEfin={showEfin} showPtin={showPtin} />
+          ) : !profile ? (
+            <EmptyState icon={FileText} message="No firm tax profile set up yet." />
+          ) : (
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-muted">EIN</dt>
+                <dd className="mt-0.5 text-slate">{profile.ein_last4 ? `••••${profile.ein_last4}` : "Not set"}</dd>
+              </div>
+              {showEfin && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted">EFIN</dt>
+                  <dd className="mt-0.5 text-slate">{profile.efin_last4 ? `••••${profile.efin_last4}` : "Not set"}</dd>
+                </div>
+              )}
+              {showPtin && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted">PTIN</dt>
+                  <dd className="mt-0.5 text-slate">{profile.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
+                </div>
+              )}
+              <div className="col-span-2">
+                <dt className="text-xs uppercase tracking-wide text-muted">Supported filing states</dt>
+                <dd className="mt-0.5 text-slate">
+                  {profile.supported_filing_states && profile.supported_filing_states.length > 0
+                    ? profile.supported_filing_states.join(", ")
+                    : "None set"}
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
       </div>
-
-      <p className="mt-4 text-xs text-muted">
-        Editing EIN/EFIN/PTIN requires the audit-logged reveal/update flow and isn&apos;t available in this
-        view yet.
-      </p>
 
       {workspace.is_owner && (
         <div className="mt-8">

@@ -46,7 +46,7 @@ export function PortalSidebar({
           <div>
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "24px", maxWidth: "160px", objectFit: "contain" }} />
+              <img src={logoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
             ) : (
               <p className="text-sm font-semibold text-ink">{firmName || "VerexaHQ"}</p>
             )}

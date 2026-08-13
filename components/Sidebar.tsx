@@ -93,7 +93,7 @@ export function Sidebar({
           <div>
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "28px", maxWidth: "160px", objectFit: "contain" }} />
+              <img src={logoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
             ) : (
               <>
                 <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
