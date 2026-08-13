@@ -175,20 +175,58 @@ un-promoted previews.
   building this.
 - **"DELETE requires a WHERE clause" error, reported on both creating a
   service (toggle-on/clone) and toggling one off, under Settings >
-  Services — root cause not found yet.** Investigated and ruled out: no
-  `safeupdate`-style Postgres extension is installed on this project
-  (checked `pg_extension`); the `services` table's `audit_services`
-  trigger (`audit_trigger_fn()`) only ever INSERTs into `audit_log`, never
-  deletes; the one bare `delete from tmp_stage_map;` inside
-  `duplicate_config_object()` operates on a temp table that's always freshly
-  created moments earlier (`on commit drop`), so it's empty and harmless,
-  and being plain SQL inside a `SECURITY DEFINER` function it wouldn't
-  surface as a client-visible PostgREST error anyway. Could not reproduce
-  directly via SQL editor since `is_workspace_admin()`/`has_permission()`
-  need a real `auth.uid()`, which the SQL editor doesn't have. **Next
-  step: get the literal error text or a browser console screenshot from
-  the user** (same technique that cracked the Zoom 403) rather than
-  guessing further from the backend alone.
+  Services — root cause STILL not found, despite a much deeper pass this
+  session.** Confirmed the failing call is the `duplicate_config_object`
+  RPC returning HTTP 400 (seen directly in the browser Network/Console
+  tabs — the "turn on" and "create custom service" flows both hit it).
+  Ruled out, this round:
+  - No `safeupdate`-style Postgres extension installed (`pg_extension`).
+  - No function anywhere in the database contains the literal string
+    "WHERE clause" (searched every function body).
+  - A real unfiltered `DELETE` on the live `services` table, run directly
+    (wrapped in `begin`/`rollback`), does not error at the raw Postgres
+    level at all.
+  - The exact temp-table create+delete pattern used inside
+    `duplicate_config_object()` (`tmp_stage_map`, `tmp_field_map`,
+    `tmp_folder_item_map`), reproduced directly, does not error either.
+  - **Called `duplicate_config_object` directly against the DB with the
+    user's real `auth.uid()` simulated via
+    `set_config('request.jwt.claim.sub', ...)`, wrapped in a rollback —
+    it succeeded cleanly**, returning a new service id with no error. This
+    strongly suggests the SQL function itself is not the problem, or the
+    problem is something specific to how the request reaches it via
+    PostgREST that a direct DB call doesn't reproduce.
+  - Only one overload of `duplicate_config_object` exists (ruled out the
+    ambiguous-overload class of bug that hit `create_engagement` earlier
+    this session).
+  - Confirmed she is testing on the correct/current deployment (the
+    Vercel preview URL she was on matched the very latest commit at the
+    time) — not a stale-deployment artifact.
+  - Attempted to get the literal PostgREST response body via the user's
+    browser (DevTools Network tab response, "Copy as fetch" replay) —
+    every attempt surfaced a different confounding issue (Chrome's paste
+    guard, session not stored where a generic script expects, "Copy as
+    fetch" defaulting to `credentials: "include"` which triggers an
+    unrelated CORS block that isn't how the app's real client makes the
+    call) rather than the actual message. None of these got the literal
+    response body.
+  - `query_logs` (Supabase MCP tool, which would read the real server-side
+    error straight from Postgres/PostgREST logs and settle this
+    immediately) is blocked in this environment — every call returns
+    "MCP tool call requires approval" with no way to grant it from here.
+    This is the same class of restriction as several other Supabase MCP
+    tools denied all session (`get_organization`, `list_organizations`,
+    `list_projects`, `generate_typescript_types`) — not something to keep
+    retrying.
+  - **Next step, if picked up again**: either get `query_logs` access (if
+    a future session has it, `select event_message from postgres_logs
+    where event_message ilike '%WHERE clause%'` would likely answer this
+    in one query), or get the literal Network-tab **Response** body text
+    (not just the Console's generic "status 400" line, not a "Copy as
+    fetch" replay) — e.g. by asking a session with real Supabase dashboard
+    access to check the Logs section directly instead of going through
+    the user's browser DevTools, which has proven very difficult to
+    extract this specific detail from over many attempts.
 - **RM/Reviewer/Compliance Officer requested changes, not yet built**:
   should only show on ERO and SB (sub-business/connected) workspace tiers,
   not on independent solo-PTIN workspaces (a similar fix was done in an
