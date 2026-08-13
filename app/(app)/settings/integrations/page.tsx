@@ -1,25 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isStripeConfigured, isZoomConfigured } from "@/lib/providerStatus";
-import { Plug, Lock } from "lucide-react";
-import { EmptyState } from "@/components/EmptyState";
+import { Plug } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
 
 export const dynamic = "force-dynamic";
-
-const PROVIDERS = [
-  { key: "stripe", label: "Stripe (Payments)", configured: isStripeConfigured },
-  { key: "zoom", label: "Zoom (Meetings)", configured: isZoomConfigured },
-] as const;
-
-const STATUS_STYLE: Record<string, string> = {
-  healthy: "bg-green-100 text-green-700",
-  degraded: "bg-amber-100 text-amber-700",
-  down: "bg-danger/10 text-danger",
-  unknown: "bg-surfaceMuted text-muted",
-};
 
 export default async function IntegrationsPage({
   searchParams,
@@ -56,19 +42,11 @@ export default async function IntegrationsPage({
   if (!isAdmin) {
     return (
       <div className="max-w-2xl">
-        <SettingsSectionHeader icon={Plug} title="Integrations" />
-        <div className="mt-6 rounded-xl border border-border bg-surface">
-          <EmptyState icon={Lock} message="Only workspace admins can view integration status." />
-        </div>
+        <SettingsSectionHeader icon={Plug} title="Integrations" description="Connect the accounts you use personally -- everyone sees their own." />
         {zoomSection}
       </div>
     );
   }
-
-  const { data: health } = await supabase
-    .from("provider_status")
-    .select("provider, status, consecutive_failures, last_check_at, last_success_at, last_error");
-  const byProvider = new Map((health ?? []).map((h) => [h.provider, h]));
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connect_status").eq("id", workspace!.id).single();
 
@@ -77,35 +55,10 @@ export default async function IntegrationsPage({
       <SettingsSectionHeader
         icon={Plug}
         title="Integrations"
-        description={
-          <>
-            Live status of the third-party providers Verexa sends through. &quot;Configured&quot; means credentials are set in the environment;
-            the status badge reflects actual send/webhook health once something has gone through.
-          </>
-        }
+        description="Accounts your firm or you personally connect to Verexa. Email and SMS sending are configured platform-wide and aren't shown here."
       />
-      <div className="mt-6 divide-y divide-border rounded-xl border border-border bg-surface">
-        {PROVIDERS.map((p) => {
-          const h = byProvider.get(p.key);
-          const configured = p.configured();
-          const status = h?.status ?? "unknown";
-          return (
-            <div key={p.key} className="flex items-center justify-between px-5 py-4">
-              <div>
-                <p className="text-sm font-medium text-ink">{p.label}</p>
-                <p className="text-xs text-muted">
-                  {configured ? "Credentials configured" : "Not configured -- set the required environment variables"}
-                  {h?.last_success_at && ` -- last success ${new Date(h.last_success_at).toLocaleString()}`}
-                  {h?.last_error && status !== "healthy" && ` -- ${h.last_error}`}
-                </p>
-              </div>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_STYLE[status]}`}>{status}</span>
-            </div>
-          );
-        })}
-      </div>
 
-      <h2 className="mt-8 text-base font-semibold text-ink">Stripe Connect</h2>
+      <h2 className="mt-2 text-base font-semibold text-ink">Stripe Connect</h2>
       <p className="mt-1 text-sm text-muted">
         Connect your firm&apos;s own Stripe account to accept client payments. Funds go straight to your account -- Verexa charges no
         platform fee on transactions.
