@@ -24,7 +24,8 @@ export function TemplateStatusCycle({
     | "services"
     | "pricing_rules"
     | "billing_rules"
-    | "organizer_templates";
+    | "organizer_templates"
+    | "processes";
   id: string;
   status: string;
 }) {

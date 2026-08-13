@@ -7245,6 +7245,10 @@ export type Database = {
         Args: { p_service_id: string; p_stage_name: string }
         Returns: string
       }
+      add_process_stage_to_pipeline: {
+        Args: { p_process_id: string; p_stage_name: string }
+        Returns: string
+      }
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -7342,6 +7346,10 @@ export type Database = {
           p_template_key: string
           p_workspace_id: string
         }
+        Returns: string
+      }
+      create_workflow_pipeline: {
+        Args: { p_name: string; p_workspace_id: string }
         Returns: string
       }
       create_workspace: {

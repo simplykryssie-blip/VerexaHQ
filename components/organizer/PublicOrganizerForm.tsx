@@ -97,9 +97,9 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       const { data: rpcData, error: rpcError } = await supabase.rpc("submit_public_organizer_response_with_signup", {
         p_token: token,
         p_first_name: firstName.trim(),
-        p_last_name: lastName.trim() || null,
+        p_last_name: lastName.trim(),
         p_email: email.trim(),
-        p_phone: phone.trim() || null,
+        p_phone: phone.trim(),
         p_answers: rows,
         p_auth_user_id: signUpData.user.id,
       });
@@ -124,9 +124,9 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     const { data: rpcData, error: rpcError } = await supabase.rpc("submit_public_organizer_response", {
       p_token: token,
       p_first_name: firstName.trim(),
-      p_last_name: lastName.trim() || null,
+      p_last_name: lastName.trim(),
       p_email: email.trim(),
-      p_phone: phone.trim() || null,
+      p_phone: phone.trim(),
       p_answers: rows,
     });
 

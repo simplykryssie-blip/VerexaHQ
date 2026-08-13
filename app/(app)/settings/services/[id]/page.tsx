@@ -155,7 +155,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
         </p>
         <div className="mt-6">
           <StageEditor
-            serviceId={service.id}
+            source={{ kind: "service", serviceId: service.id }}
             isSystemDefault={isSystemDefault}
             canEdit={canEdit}
             process={process ?? null}

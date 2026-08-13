@@ -263,7 +263,7 @@ function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: Pro
 }
 
 export function StageEditor({
-  serviceId,
+  source,
   isSystemDefault,
   canEdit,
   process,
@@ -274,7 +274,12 @@ export function StageEditor({
   documentRequestTemplates,
   engagementLetterTemplates,
 }: {
-  serviceId: string;
+  /** A stage editor either bootstraps its process from a Service (the
+   *  original flow) or operates on an already-standalone Pipeline created
+   *  directly under /pipelines -- the two "add first/next stage" RPCs
+   *  differ, everything else (rename/delete/attach) is process-native
+   *  either way and doesn't care which mode created the process. */
+  source: { kind: "service"; serviceId: string } | { kind: "pipeline"; processId: string };
   isSystemDefault: boolean;
   canEdit: boolean;
   process: ProcessInfo;
@@ -296,12 +301,16 @@ export function StageEditor({
   const [deleteTarget, setDeleteTarget] = useState<ProcessStage | null>(null);
 
   const readOnly = isSystemDefault || !canEdit;
+  const noun = source.kind === "service" ? "service" : "pipeline";
 
   async function addFirstStage() {
     if (!newStageName.trim()) return;
     setBusy(true);
     setError(null);
-    const { error } = await supabase.rpc("add_process_stage", { p_service_id: serviceId, p_stage_name: newStageName.trim() });
+    const { error } =
+      source.kind === "service"
+        ? await supabase.rpc("add_process_stage", { p_service_id: source.serviceId, p_stage_name: newStageName.trim() })
+        : await supabase.rpc("add_process_stage_to_pipeline", { p_process_id: source.processId, p_stage_name: newStageName.trim() });
     setBusy(false);
     if (error) {
       setError(error.message);
@@ -373,8 +382,7 @@ export function StageEditor({
     return (
       <div>
         <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
-          This is a system default service. Its workflow can&apos;t be edited here -- use &quot;Clone to customize&quot; from Service
-          Packages to create your own editable copy.
+          This is a system default {noun}. Its workflow can&apos;t be edited here -- clone it to create your own editable copy.
         </p>
         <StageListReadOnly
           stages={stages}
@@ -391,7 +399,7 @@ export function StageEditor({
     return (
       <div>
         <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
-          Only workspace admins can edit this service&apos;s workflow.
+          Only workspace admins can edit this {noun}&apos;s workflow.
         </p>
         <StageListReadOnly
           stages={stages}
@@ -407,7 +415,7 @@ export function StageEditor({
   if (!process || stages.length === 0) {
     return (
       <div>
-        <EmptyState message="This service has no workflow yet." />
+        <EmptyState message={source.kind === "service" ? "This service has no workflow yet." : "This pipeline has no stages yet."} />
         <div className="mt-3">
           {addingStage ? (
             <div className="flex items-center gap-2">
