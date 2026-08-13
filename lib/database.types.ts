@@ -7468,6 +7468,14 @@ export type Database = {
           workspace_type: string
         }[]
       }
+      get_portal_client_contact: {
+        Args: never
+        Returns: {
+          email: string | null
+          name: string | null
+          phone: string | null
+        }[]
+      }
       get_portal_invitation_preview: {
         Args: { p_token: string }
         Returns: {

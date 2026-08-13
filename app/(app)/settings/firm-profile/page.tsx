@@ -43,7 +43,7 @@ export default async function FirmProfilePage() {
       supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
       getEffectiveBranding(workspace.id),
       user
-        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url").eq("id", user.id).maybeSingle()
+        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
 
@@ -70,6 +70,7 @@ export default async function FirmProfilePage() {
               lastName={myProfile?.last_name ?? null}
               displayName={myProfile?.display_name ?? null}
               avatarUrl={myProfile?.avatar_url ?? null}
+              phone={myProfile?.phone ?? null}
             />
           </div>
         </div>

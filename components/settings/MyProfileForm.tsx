@@ -13,12 +13,14 @@ export function MyProfileForm({
   lastName,
   displayName,
   avatarUrl,
+  phone,
 }: {
   userId: string;
   firstName: string | null;
   lastName: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  phone: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -26,6 +28,7 @@ export function MyProfileForm({
   const [first, setFirst] = useState(firstName ?? "");
   const [last, setLast] = useState(lastName ?? "");
   const [display, setDisplay] = useState(displayName ?? "");
+  const [phoneValue, setPhoneValue] = useState(phone ?? "");
   const [avatar, setAvatar] = useState(avatarUrl);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,7 +71,7 @@ export function MyProfileForm({
     setSaving(true);
     const { error } = await supabase
       .from("user_profiles")
-      .update({ first_name: first || null, last_name: last || null, display_name: display || null })
+      .update({ first_name: first || null, last_name: last || null, display_name: display || null, phone: phoneValue || null })
       .eq("id", userId);
     setSaving(false);
     if (error) {
@@ -142,6 +145,20 @@ export function MyProfileForm({
             onChange={(e) => setDisplay(e.target.value)}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+        </div>
+        <div>
+          <label htmlFor="phone" className="block text-sm font-medium text-slate">
+            Phone
+          </label>
+          <input
+            id="phone"
+            type="tel"
+            value={phoneValue}
+            onChange={(e) => setPhoneValue(e.target.value)}
+            placeholder="(555) 123-4567"
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <p className="mt-1 text-xs text-muted">Shown to clients you're the point of contact for, in their portal.</p>
         </div>
         <button
           type="submit"

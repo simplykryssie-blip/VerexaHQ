@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FileText, AlertTriangle, PenLine, Receipt } from "lucide-react";
+import { FileText, AlertTriangle, PenLine, Receipt, Phone, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
@@ -14,7 +14,7 @@ export default async function PortalDashboardPage() {
 
   const supabase = createClient();
 
-  const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: activity }] =
+  const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: activity }, { data: contactRows }] =
     await Promise.all([
       supabase
         .from("engagements")
@@ -35,7 +35,10 @@ export default async function PortalDashboardPage() {
         .select("id, description, created_at")
         .order("created_at", { ascending: false })
         .limit(8),
+      supabase.rpc("get_portal_client_contact"),
     ]);
+
+  const contact = contactRows?.[0] ?? null;
 
   const missingDocuments = (openRequests ?? []).reduce(
     (sum, r) => sum + (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length,
@@ -48,6 +51,24 @@ export default async function PortalDashboardPage() {
     <>
       <PageHeader title={`Welcome, ${identity.clientLabel}`} description="Here's what's happening with your account." />
       <div className="flex-1 space-y-6 px-8 py-6">
+        {contact && (
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+            <span className="font-medium text-slate">Your contact: {contact.name}</span>
+            {contact.phone && (
+              <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1.5 text-muted hover:text-accent">
+                <Phone size={13} aria-hidden="true" />
+                {contact.phone}
+              </a>
+            )}
+            {contact.email && (
+              <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1.5 text-muted hover:text-accent">
+                <Mail size={13} aria-hidden="true" />
+                {contact.email}
+              </a>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard icon={FileText} label="Active engagements" value={activeEngagements.length} href="/portal/engagements" />
           <StatCard icon={AlertTriangle} label="Missing documents" value={missingDocuments} href="/portal/documents" />
