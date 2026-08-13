@@ -532,7 +532,7 @@ export function NewClientButton({
                     onChange={(e) => setStreet(e.target.value)}
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <input
                       required
                       placeholder="City"

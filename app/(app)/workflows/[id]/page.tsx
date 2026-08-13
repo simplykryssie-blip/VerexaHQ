@@ -60,7 +60,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
         .eq("status", "published")
         .order("name"),
-      supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
       supabase
         .from("organizer_templates")
         .select("id, name")

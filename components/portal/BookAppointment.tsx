@@ -157,7 +157,7 @@ export function BookAppointment({ services }: { services: BookableService[] }) {
               ) : !slots || slots.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted">No times available this day. Try another date.</p>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {slots.map((slot) => (
                     <button
                       key={slot}
