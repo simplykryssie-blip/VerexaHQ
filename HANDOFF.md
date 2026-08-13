@@ -184,6 +184,17 @@ un-promoted previews.
   ERO/SB-tier workspace should be able to preset these as defaults for
   their staff accounts and connected accounts. Also these fields currently
   show by email and should show by staff display name instead.
+- **Requested, not yet investigated**: when an ERO/Service Bureau invites
+  someone and that person signs up via the invite link, the signup screen
+  should not ask them to choose an account type (Service Bureau / ERO /
+  Independent PTIN) — that's only relevant when creating a brand-new
+  workspace, not joining an existing one. Start from
+  `app/accept-invitation/page.tsx` and `app/onboarding/page.tsx`. She also
+  described a specific role list for ERO/Service Bureau accounts (Admin,
+  Staff, Compliance Officer, Manager, Receptionist, PTIN preparer,
+  Reviewer) — worded slightly differently the two times she said it, so
+  confirm the exact intended list and whether "PTIN receptionist" is one
+  role or two before building. Full detail in task #187.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
