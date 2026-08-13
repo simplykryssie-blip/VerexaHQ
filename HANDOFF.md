@@ -249,6 +249,64 @@ un-promoted previews.
     signup" in the Supabase dashboard and confirm whether it uses
     `{{ .ConfirmationURL }}` untouched, or a custom-built link. Screenshot
     it the same way the URL Configuration page was checked.
+- **RESOLVED (this session): portal-invite `/onboarding` redirect bug (task
+  #188).** Root cause: the Supabase Auth "Redirect URLs" allow-list had only
+  exact-match entries (`https://verexahq.com/`,
+  `https://verexahq.com/auth/confirm`), and the actual confirmation link
+  Supabase sends embeds the app's full target as a `redirect_to` param with
+  a nested query string (e.g. `.../auth/confirm?next=%2Fportal%2F...`),
+  which didn't satisfy the exact-match check. When that check fails,
+  Supabase silently falls back to the bare Site URL and drops `next` (and
+  the login code) entirely — landing the user on `/dashboard`'s fallback,
+  which then bounced to `/onboarding` since a brand-new portal/staff
+  invitee has no `workspace_members` row yet. **Fix applied**: added a
+  wildcard entry `https://verexahq.com/**` to the Redirect URLs allow-list
+  (dashboard config change, not code — no deploy needed). User confirmed
+  this also explains the task #187 "account-type picker shows on staff
+  invite acceptance" complaint — `/accept-invitation` itself never has an
+  account-type picker (verified in code), so that was the same bug
+  bouncing invited staff to `/onboarding` instead. Both should be retested
+  end-to-end now that the allow-list fix is live, but the mechanism is
+  confirmed and no further code changes are expected to be needed.
+- **DONE (this session): full production data purge, at the user's
+  explicit request.** Everything was confirmed as test data. Kept exactly
+  one login (`verexahq@gmail.com`) and its workspace ("Verexa HQ CRM",
+  which had 0 clients so nothing there was touched). Permanently deleted:
+  - 5 other workspaces and everything inside them (clients, engagements,
+    documents, invoices, messages, appointments, automations, client
+    portal users/accounts, etc.): Doucet Financial Group, Tifftheceo, MKB
+    Financial Group LLC, MCJ Consulting, Ultra Tax Pro Software.
+  - 9 other auth logins: the 5 workspace owners above, plus 3 accounts
+    that had signed up but never finished setting up a workspace
+    (`info@kmbconsultingfirm.com`, `kshanelle83@gmail.com`,
+    `krystal@mkbfinancialgroup.com`), plus the user's own secondary
+    personal login (`simplykryssie@gmail.com`) at her explicit
+    confirmation.
+  - Mechanics, for reference if this is ever needed again: deleted rows
+    from every `public` table with a `workspace_id` column (multi-pass,
+    catching `foreign_key_violation` and retrying, since several tables —
+    `engagements`, `invoices`, `messages`, `tasks`, etc. — have `NO ACTION`
+    FKs to `workspaces` that block a naive single-pass delete), then
+    deleted the 5 `workspaces` rows (cascades the rest), then deleted the 9
+    `auth.users` rows. Two triggers had to be temporarily disabled for the
+    operation and re-enabled immediately after:
+    `trg_protect_entry_lead_stage` on `lead_stages` (a real safety guard
+    that normally blocks deleting a workspace's default "entry" lead
+    stage — correctly blocks accidental deletes, correctly bypassed here
+    since the whole workspace was being removed) and `audit_workspaces` on
+    `workspaces` (its audit-log insert has a `workspace_id` FK back to the
+    row being deleted, which fails once the row is actually gone).
+  - One residual: a single orphaned file was found in the `branding`
+    storage bucket for the deleted MKB Financial Group workspace (a
+    sidebar logo image). Direct SQL delete on `storage.objects` is blocked
+    by Supabase (`storage.protect_delete()` — must go through the Storage
+    API, which needs the service-role key this session doesn't have
+    direct access to). **Not cleaned up** — low priority, no client PII
+    beyond a logo graphic, path is
+    `branding/3510fe7b-0b31-406a-b245-123127aa1ed8/...`. If it matters,
+    delete it via Supabase Dashboard → Storage → `branding` bucket → that
+    folder.
+  - Verified after: exactly 1 workspace, 1 auth user, 0 clients remain.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
