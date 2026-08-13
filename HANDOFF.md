@@ -122,6 +122,55 @@ reference. This file is just "what happened recently and what's still open."
    [3-9]`, not an exhaustive page-by-page audit — a fuller pass would mean
    actually clicking through the app at a narrow viewport.
 
+9. **EIN/EFIN/PTIN input formatting + supported-filing-states multi-select**
+   (`lib/taxIds.ts`, `lib/usStates.ts` — new files). EIN auto-formats as
+   `12-3456789`, PTIN as `P12345678`, EFIN as a plain 6-digit string, live
+   as the user types. "Supported filing states" changed from a free-text
+   comma list to a checkbox grid of all 50 states + DC
+   (`FirmTaxProfileForm.tsx`), defaulting to all-selected except states
+   flagged as requiring their own preparer license/certification
+   (currently just CA and OR in `SPECIAL_CERTIFICATION_STATE_CODES` — this
+   is a starting assumption, not verified against real licensing
+   requirements, flag to the user if it matters).
+10. **Personal PTIN field for ERO/SB staff.** Previously PTIN only existed
+    at the firm level (`firm_tax_profile`, independent-PTIN workspaces
+    only). Added `user_profiles.ptin_encrypted`/`ptin_hash`/`ptin_last4` +
+    `set_my_ptin`/`reveal_my_ptin` RPCs, surfaced on `MyProfileForm.tsx`
+    for ERO/SB staff (`showPtin = workspace_type !== "independent_ptin"`
+    in `app/(app)/settings/firm-profile/page.tsx`). Duplicate-PTIN
+    detection is cross-domain: both `set_firm_tax_profile` and
+    `set_my_ptin` check a new deterministic `hash_firm_secret()`-derived
+    `*_hash` column on *both* `firm_tax_profile` and `user_profiles`
+    before writing, since the same PTIN must not be reusable across either
+    storage location. Extracted the reveal/hide/edit UI out of
+    `FirmTaxProfileForm.tsx` into a shared `components/settings/
+    MaskedSecretField.tsx` so both forms use the same component.
+11. **Sidebar/portal logo enlarged** — was too small to read. Both
+    `Sidebar.tsx` (staff) and `PortalSidebar.tsx` (client portal) bumped
+    from `maxHeight: 28px/24px` to `44px`.
+12. **RESOLVED (this session): the "DELETE requires a WHERE clause" bug
+    from the previous session's Services rebuild (see old entry below,
+    kept for the investigation record) — worked around, not root-caused.**
+    Shipped a brand-new dedicated function, `public.turn_on_service(
+    p_service_id, p_workspace_id, p_new_name default null)`, that clones a
+    service + its process/stages/tasks the same way
+    `duplicate_config_object` was supposed to, but through its own
+    independent code path. Both frontend call sites in
+    `ServiceToggleList.tsx` (turning a fixed service on, and "Add custom
+    service") were switched from `duplicate_config_object` to
+    `turn_on_service`. Verified directly against the DB with the real
+    user's `auth.uid()` simulated (rollback-wrapped) before shipping.
+    **`duplicate_config_object` itself was left completely unchanged** —
+    its actual bug for the `services` case was never found (see the full
+    investigation log below), and it's still what backs cloning for every
+    *other* config type (`pipelines`, `document_request_templates`,
+    `document_folder_templates`, `automations`, `dashboards`,
+    `organizer_templates`, `processes`). None of those have been reported
+    broken, but if one ever throws the same "DELETE requires a WHERE
+    clause" error, the fix pattern here (bypass with a dedicated function
+    for that specific use case, don't keep chasing the generic function)
+    is the precedent to follow.
+
 Everything above is committed and pushed to
 `claude/verexa-tax-office-v2-mhd9mo`. **Confirm with the user whether the
 latest commit has been promoted to production before assuming any of this
@@ -173,10 +222,14 @@ un-promoted previews.
   hard block. Find the current duplicate-check logic (likely in the new
   client/lead creation flow, `NewClientButton.tsx` or similar) before
   building this.
-- **"DELETE requires a WHERE clause" error, reported on both creating a
+- **"DELETE requires a WHERE clause" — WORKED AROUND, see item #12 above
+  in "What changed this session." Root cause was never found; this entry
+  is kept only as the investigation record in case `duplicate_config_object`
+  ever breaks the same way for a different config type (pipelines,
+  document request/folder templates, automations, dashboards, organizer
+  templates, processes).** Originally reported on both creating a
   service (toggle-on/clone) and toggling one off, under Settings >
-  Services — root cause STILL not found, despite a much deeper pass this
-  session.** Confirmed the failing call is the `duplicate_config_object`
+  Services. Confirmed the failing call is the `duplicate_config_object`
   RPC returning HTTP 400 (seen directly in the browser Network/Console
   tabs — the "turn on" and "create custom service" flows both hit it).
   Ruled out, this round:
