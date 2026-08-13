@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, type LucideIcon } from "lucide-react";
+import { Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -37,6 +37,7 @@ export function TemplateGallery({
   emptyMessage,
   createTileLabel,
   onCreateClick,
+  onDeleteClick,
 }: {
   cards: GalleryCard[];
   icon: LucideIcon;
@@ -45,6 +46,8 @@ export function TemplateGallery({
   emptyMessage: string;
   createTileLabel: string;
   onCreateClick: () => void;
+  /** Workspace-owned templates only -- system defaults never show a delete button. */
+  onDeleteClick?: (card: GalleryCard) => void;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -115,7 +118,20 @@ export function TemplateGallery({
                 <div className="flex flex-1 flex-col p-4">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold text-ink">{c.name}</h3>
-                    {c.isSystem && <span className="shrink-0 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
+                    {c.isSystem ? (
+                      <span className="shrink-0 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
+                    ) : (
+                      onDeleteClick && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteClick(c)}
+                          aria-label={`Delete ${c.name}`}
+                          className="shrink-0 rounded-md p-1 text-muted opacity-0 transition hover:bg-red-50 hover:text-danger group-hover:opacity-100"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )
+                    )}
                   </div>
                   {c.description && <p className="mt-1 text-xs text-muted">{c.description}</p>}
 

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { JotFormImportModal } from "@/components/settings/organizer-builder/JotFormImportModal";
 import { slugify } from "@/lib/roleSlug";
+import { useToast } from "@/components/Toast";
 
 export type OrganizerCard = {
   id: string;
@@ -29,6 +30,7 @@ export function OrganizerLibrary({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [name, setName] = useState("");
@@ -77,6 +79,25 @@ export function OrganizerLibrary({
     setError("Could not create organizer -- try a slightly different name.");
   }
 
+  async function deleteTemplate(card: GalleryCard) {
+    if (!window.confirm(`Delete "${card.name}"? This can't be undone.`)) return;
+    const { error } = await supabase.from("organizer_templates").delete().eq("id", card.id);
+    if (error) {
+      // organizer_responses.organizer_template_id is a NO ACTION foreign key --
+      // the database itself refuses this delete if a client has ever answered
+      // this organizer, rather than silently orphaning their real answers.
+      toast.show(
+        error.code === "23503"
+          ? "Can't delete -- a client has already submitted answers for this organizer. Archive it instead."
+          : error.message,
+        "error"
+      );
+      return;
+    }
+    toast.show("Organizer deleted", "success");
+    router.refresh();
+  }
+
   return (
     <div>
       <div className="mb-3 flex justify-end">
@@ -99,6 +120,7 @@ export function OrganizerLibrary({
         emptyMessage="No organizer templates match."
         createTileLabel="Create new organizer"
         onCreateClick={() => setCreating(true)}
+        onDeleteClick={deleteTemplate}
       />
 
       {creating && (

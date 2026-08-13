@@ -6,6 +6,7 @@ import { FileSignature } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { slugify } from "@/lib/roleSlug";
+import { useToast } from "@/components/Toast";
 
 export type EngagementLetterCard = {
   id: string;
@@ -19,6 +20,7 @@ export type EngagementLetterCard = {
 export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceId: string; templates: EngagementLetterCard[] }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -64,6 +66,30 @@ export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceI
     setError("Could not create engagement letter -- try a slightly different name.");
   }
 
+  async function deleteTemplate(card: GalleryCard) {
+    // Unlike organizer responses, signatures already on file for this
+    // template aren't protected by the database itself -- deleting the
+    // template would cascade-delete them. Check first so we never touch a
+    // real client's signature.
+    const { count } = await supabase
+      .from("engagement_letter_public_signatures")
+      .select("id", { count: "exact", head: true })
+      .eq("engagement_letter_template_id", card.id);
+    if (count && count > 0) {
+      toast.show(`Can't delete -- ${count} client signature${count === 1 ? "" : "s"} are on file for this letter.`, "error");
+      return;
+    }
+
+    if (!window.confirm(`Delete "${card.name}"? This can't be undone.`)) return;
+    const { error } = await supabase.from("engagement_letter_templates").delete().eq("id", card.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Engagement letter deleted", "success");
+    router.refresh();
+  }
+
   return (
     <div>
       <TemplateGallery
@@ -74,6 +100,7 @@ export function EngagementLetterLibrary({ workspaceId, templates }: { workspaceI
         emptyMessage="No engagement letters match."
         createTileLabel="Create new engagement letter"
         onCreateClick={() => setCreating(true)}
+        onDeleteClick={deleteTemplate}
       />
 
       {creating && (
