@@ -19,24 +19,27 @@ function ToolbarButton({ active, onClick, label, children }: { active: boolean; 
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, extra }: { editor: Editor; extra?: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-1 border-b border-border bg-surfaceMuted px-2 py-1.5">
-      <ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} label="Bold">
-        <Bold size={14} />
-      </ToolbarButton>
-      <ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} label="Italic">
-        <Italic size={14} />
-      </ToolbarButton>
-      <ToolbarButton active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="Heading">
-        <Heading2 size={14} />
-      </ToolbarButton>
-      <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} label="Bullet list">
-        <List size={14} />
-      </ToolbarButton>
-      <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} label="Numbered list">
-        <ListOrdered size={14} />
-      </ToolbarButton>
+    <div className="flex items-center justify-between gap-1 border-b border-border bg-surfaceMuted px-2 py-1.5">
+      <div className="flex items-center gap-1">
+        <ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} label="Bold">
+          <Bold size={14} />
+        </ToolbarButton>
+        <ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} label="Italic">
+          <Italic size={14} />
+        </ToolbarButton>
+        <ToolbarButton active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="Heading">
+          <Heading2 size={14} />
+        </ToolbarButton>
+        <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} label="Bullet list">
+          <List size={14} />
+        </ToolbarButton>
+        <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} label="Numbered list">
+          <ListOrdered size={14} />
+        </ToolbarButton>
+      </div>
+      {extra}
     </div>
   );
 }
@@ -54,6 +57,7 @@ export function RichTextEditor({
   onEditorReady,
   documentStyle = false,
   bare = false,
+  toolbarExtra,
 }: {
   content: string;
   onChange?: (html: string) => void;
@@ -61,6 +65,8 @@ export function RichTextEditor({
   onEditorReady?: (editor: Editor) => void;
   documentStyle?: boolean;
   bare?: boolean;
+  /** Rendered right-aligned inside the formatting toolbar -- e.g. a merge-field picker, so it sits where staff are actually typing instead of somewhere they have to scroll to find. */
+  toolbarExtra?: React.ReactNode;
 }) {
   const editor = useEditor({
     extensions: [StarterKit],
@@ -100,7 +106,7 @@ export function RichTextEditor({
 
   return (
     <div className={wrapperClass}>
-      {editable && <Toolbar editor={editor} />}
+      {editable && <Toolbar editor={editor} extra={toolbarExtra} />}
       <EditorContent editor={editor} />
     </div>
   );

@@ -31,11 +31,10 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
-// A visual card gallery (search, status pills, a blank "create new" tile as
-// the first grid item, hover-to-reveal actions) shared by the Organizer and
-// Engagement Letter libraries, which were otherwise duplicating the same
-// search/filter/grid/create-modal structure with only their card content
-// and create-form fields differing.
+// A dense, bordered list (search, status filters, a slim create button in
+// the toolbar) shared by the Organizer and Engagement Letter libraries,
+// which were otherwise duplicating the same search/filter/list/create-modal
+// structure with only their row content and create-form fields differing.
 export function TemplateGallery({
   cards,
   icon: Icon,
@@ -66,103 +65,86 @@ export function TemplateGallery({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={searchPlaceholder}
-            className="w-72 rounded-lg border border-border py-2 pl-9 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="w-72 rounded-lg border border-border py-2 pl-9 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setStatus(f.value)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  status === f.value ? "bg-accentSoft text-accent" : "text-muted hover:text-ink"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setStatus(f.value)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                status === f.value ? "bg-accentSoft text-accent" : "text-muted hover:text-ink"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={onCreateClick}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+        >
+          <Plus size={14} /> {createTileLabel}
+        </button>
       </div>
 
       <div className="mt-4">
-        {cards.length > 0 && filtered.length === 0 ? (
-          <EmptyState icon={Search} message={emptyMessage} />
+        {filtered.length === 0 ? (
+          <EmptyState icon={Search} message={cards.length > 0 ? emptyMessage : "No templates yet -- create one to get started."} />
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              type="button"
-              onClick={onCreateClick}
-              className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border text-muted transition hover:border-accent hover:text-accent"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surfaceMuted">
-                <Plus size={20} />
-              </span>
-              <span className="text-sm font-medium">{createTileLabel}</span>
-            </button>
-
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {filtered.map((c) => (
-              <div key={c.id} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:shadow-md">
-                <div className="relative flex h-20 items-center justify-center bg-gradient-to-br from-accent to-accent/70">
-                  <Icon size={30} className="text-white/90" aria-hidden="true" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-ink/50 opacity-0 transition group-hover:opacity-100">
-                    <Link
-                      href={c.href}
-                      className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-white/90"
-                    >
-                      {c.actionLabel}
-                    </Link>
+              <div key={c.id} className="group flex items-center gap-3 px-4 py-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
+                  <Icon size={14} aria-hidden="true" />
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-sm font-medium text-ink">{c.name}</h3>
+                    {c.isSystem && <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">System</span>}
                   </div>
+                  {c.description && <p className="truncate text-xs text-muted">{c.description}</p>}
                 </div>
 
-                <div className="flex flex-1 flex-col p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-ink">{c.name}</h3>
-                    {c.isSystem ? (
-                      <span className="shrink-0 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
-                    ) : (
-                      onDeleteClick && (
-                        <button
-                          type="button"
-                          onClick={() => onDeleteClick(c)}
-                          aria-label={`Delete ${c.name}`}
-                          className="shrink-0 rounded-md p-1 text-muted opacity-0 transition hover:bg-red-50 hover:text-danger group-hover:opacity-100"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )
-                    )}
-                  </div>
-                  {c.description && <p className="mt-1 text-xs text-muted">{c.description}</p>}
-
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    {c.isSystem ? (
-                      <Badge tone={TEMPLATE_STATUS_TONE[c.status] ?? "neutral"} className="capitalize">
-                        {c.status}
-                      </Badge>
-                    ) : (
-                      <TemplateStatusCycle table={statusTable} id={c.id} status={c.status} />
-                    )}
-                    {c.badges.map((b) => (
-                      <span key={b} className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
-                        {b}
-                      </span>
-                    ))}
-                  </div>
-
-                  <Link
-                    href={c.href}
-                    className="mt-3 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
-                  >
+                <div className="flex shrink-0 items-center gap-3">
+                  {c.isSystem ? (
+                    <Badge tone={TEMPLATE_STATUS_TONE[c.status] ?? "neutral"} className="capitalize">
+                      {c.status}
+                    </Badge>
+                  ) : (
+                    <TemplateStatusCycle table={statusTable} id={c.id} status={c.status} />
+                  )}
+                  {c.badges.map((b) => (
+                    <span key={b} className="hidden text-xs text-muted sm:inline">
+                      {b}
+                    </span>
+                  ))}
+                  <Link href={c.href} className="text-xs font-medium text-accent hover:underline">
                     {c.actionLabel}
                   </Link>
+                  {!c.isSystem && onDeleteClick && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteClick(c)}
+                      aria-label={`Delete ${c.name}`}
+                      className="rounded p-1 text-muted opacity-0 transition hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

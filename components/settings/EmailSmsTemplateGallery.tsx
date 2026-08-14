@@ -37,9 +37,10 @@ function mergeFieldCount(text: string) {
   return new Set(matches).size;
 }
 
-// Email/SMS templates have no dedicated edit page (unlike Organizers/
-// Engagement Letters), so this mirrors TemplateGallery's card-grid look but
-// opens a Modal for editing/creating instead of navigating to a route.
+// A dense, bordered list (search, status filters, a slim create button in
+// the toolbar) rather than a grid of oversized cards. Email/SMS templates
+// have no dedicated edit page (unlike Organizers/Engagement Letters), so
+// this opens a Modal for editing/creating instead of navigating to a route.
 export function EmailSmsTemplateGallery({
   kind,
   workspaceId,
@@ -53,9 +54,10 @@ export function EmailSmsTemplateGallery({
   const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // A just-created template won't be in `templates` until the server
-  // component re-fetches after router.refresh() -- this stub keeps the edit
-  // modal showing something in that gap so create -> compose feels instant.
+  // A just-created (or just-duplicated) template won't be in `templates`
+  // until the server component re-fetches after router.refresh() -- this
+  // stub keeps the edit modal showing something in that gap so create/
+  // duplicate -> compose feels instant.
   const [pendingTemplate, setPendingTemplate] = useState<TemplateRow | null>(null);
 
   const Icon = kind === "email" ? Mail : MessageSquare;
@@ -70,93 +72,73 @@ export function EmailSmsTemplateGallery({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={`Search ${kindLabel} templates...`}
-            className="w-72 rounded-lg border border-border py-2 pl-9 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${kindLabel} templates...`}
+              className="w-72 rounded-lg border border-border py-2 pl-9 pr-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                onClick={() => setStatus(f.value)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  status === f.value ? "bg-accentSoft text-accent" : "text-muted hover:text-ink"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              onClick={() => setStatus(f.value)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                status === f.value ? "bg-accentSoft text-accent" : "text-muted hover:text-ink"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+        >
+          <Plus size={14} /> New {kindLabel} template
+        </button>
       </div>
 
       <div className="mt-4">
-        {templates.length > 0 && filtered.length === 0 ? (
-          <EmptyState icon={Search} message={`No ${kindLabel} templates match.`} />
+        {filtered.length === 0 ? (
+          <EmptyState icon={Search} message={templates.length > 0 ? `No ${kindLabel} templates match.` : `No ${kindLabel} templates yet -- create one to get started.`} />
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border text-muted transition hover:border-accent hover:text-accent"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-surfaceMuted">
-                <Plus size={20} />
-              </span>
-              <span className="text-sm font-medium">Create new {kindLabel} template</span>
-            </button>
-
+          <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {filtered.map((t) => {
               const isSystem = !t.workspace_id;
               const tokenCount = mergeFieldCount(`${t.subject ?? ""} ${kind === "email" ? t.body_html ?? "" : t.body ?? ""}`);
               return (
-                <div key={t.id} className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition hover:shadow-md">
-                  <div className="relative flex h-20 items-center justify-center bg-gradient-to-br from-accent to-accent/70">
-                    <Icon size={30} className="text-white/90" aria-hidden="true" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-ink/50 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(t.id)}
-                        className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-white/90"
-                      >
-                        {isSystem ? "View" : "Edit"}
-                      </button>
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
+                    <Icon size={14} aria-hidden="true" />
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate text-sm font-medium text-ink">{t.name}</h3>
+                      {isSystem && <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted">System</span>}
                     </div>
+                    {kind === "email" && t.subject && <p className="truncate text-xs text-muted">{t.subject}</p>}
                   </div>
 
-                  <div className="flex flex-1 flex-col p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-ink">{t.name}</h3>
-                      {isSystem && <span className="shrink-0 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
-                    </div>
-                    {kind === "email" && t.subject && <p className="mt-1 truncate text-xs text-muted">{t.subject}</p>}
-
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      {isSystem ? (
-                        <Badge tone={TEMPLATE_STATUS_TONE[t.status] ?? "neutral"} className="capitalize">
-                          {t.status}
-                        </Badge>
-                      ) : (
-                        <TemplateStatusCycle table={kind === "email" ? "email_templates" : "sms_templates"} id={t.id} status={t.status} />
-                      )}
-                      {tokenCount > 0 && (
-                        <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
-                          {tokenCount} merge field{tokenCount === 1 ? "" : "s"}
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(t.id)}
-                      className="mt-3 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
-                    >
+                  <div className="flex shrink-0 items-center gap-3">
+                    {isSystem ? (
+                      <Badge tone={TEMPLATE_STATUS_TONE[t.status] ?? "neutral"} className="capitalize">
+                        {t.status}
+                      </Badge>
+                    ) : (
+                      <TemplateStatusCycle table={kind === "email" ? "email_templates" : "sms_templates"} id={t.id} status={t.status} />
+                    )}
+                    {tokenCount > 0 && <span className="hidden text-xs text-muted sm:inline">{tokenCount} field{tokenCount === 1 ? "" : "s"}</span>}
+                    <button type="button" onClick={() => setEditingId(t.id)} className="text-xs font-medium text-accent hover:underline">
                       {isSystem ? "View" : "Edit"}
                     </button>
                   </div>
@@ -171,9 +153,14 @@ export function EmailSmsTemplateGallery({
         <TemplateEditRow
           kind={kind}
           template={editing}
+          workspaceId={workspaceId}
           onClose={() => {
             setEditingId(null);
             setPendingTemplate(null);
+          }}
+          onDuplicated={(row) => {
+            setPendingTemplate(row);
+            setEditingId(row.id);
           }}
         />
       )}

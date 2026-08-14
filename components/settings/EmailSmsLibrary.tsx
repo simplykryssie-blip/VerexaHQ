@@ -27,7 +27,8 @@ export async function EmailSmsLibrary({ workspaceId, activeTabParam }: { workspa
         icon={Mail}
         title="Email & SMS"
         description={
-          "Email and SMS templates used across the app. Use {{merge_field}} tokens -- they're substituted automatically when a message sends. " +
+          "Email and SMS templates used across the app. While editing, click \"Insert client detail\" to drop in a client's name, due date, etc. -- " +
+          "no need to type anything by hand, it fills in automatically when the message sends. " +
           "Trigger/condition/action rules are not built yet -- templates are managed here for now."
         }
       />

@@ -25,7 +25,8 @@ export const MERGE_FIELD_GROUPS: { group: string; fields: MergeFieldDef[] }[] = 
   {
     group: "Client",
     fields: [
-      { token: "client_name", label: "Client name", kind: "auto", source: "clients.first_name/last_name", sample: "Jordan Blake" },
+      { token: "client_name", label: "Client full name", kind: "auto", source: "clients.first_name/last_name", sample: "Jordan Blake" },
+      { token: "client_first_name", label: "Client first name", kind: "auto", source: "clients.first_name", sample: "Jordan" },
       { token: "business_name", label: "Business name", kind: "auto", source: "clients.business_name", sample: "Blake Consulting LLC" },
       {
         token: "client_address",

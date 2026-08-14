@@ -146,12 +146,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               </label>
             </div>
 
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
-              {!readOnly && (
-                <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
-              )}
-            </div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
             <RichTextEditor
               content={bodyHtml}
               editable={!readOnly}
@@ -161,6 +156,9 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
                 setBodyHtml(html);
                 setDirty(true);
               }}
+              toolbarExtra={
+                !readOnly && <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
+              }
             />
 
             {usedTokens.length > 0 && (
