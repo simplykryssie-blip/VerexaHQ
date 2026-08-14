@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+
+const PIPELINE_STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  published: "success",
+  archived: "neutral",
+};
 
 export type PipelineCard = {
   id: string;
@@ -94,7 +101,9 @@ export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: strin
                   {p.workspace_id ? (
                     <TemplateStatusCycle table="processes" id={p.id} status={p.status} />
                   ) : (
-                    <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium capitalize text-muted">{p.status}</span>
+                    <Badge tone={PIPELINE_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
+                      {p.status}
+                    </Badge>
                   )}
                   <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
                     {p.stage_count} stage{p.stage_count === 1 ? "" : "s"}

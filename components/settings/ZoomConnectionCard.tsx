@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
-const STATUS_STYLE: Record<string, string> = {
-  disconnected: "bg-surfaceMuted text-muted",
-  revoked: "bg-danger/10 text-danger",
-  connected: "bg-green-100 text-green-700",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  disconnected: "neutral",
+  revoked: "danger",
+  connected: "success",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -55,7 +56,7 @@ export function ZoomConnectionCard({
             {isConnected && zoomEmail ? `Connected as ${zoomEmail}` : "Connect your own Zoom account to create meetings for your appointments."}
           </p>
         </div>
-        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[displayStatus]}`}>{STATUS_LABEL[displayStatus]}</span>
+        <Badge tone={STATUS_TONE[displayStatus]}>{STATUS_LABEL[displayStatus]}</Badge>
       </div>
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
       <div className="mt-3">

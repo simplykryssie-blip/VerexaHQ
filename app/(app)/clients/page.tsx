@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NewClientButton } from "./NewClientButton";
 
 export const dynamic = 'force-dynamic';
@@ -30,10 +31,10 @@ const LEAD_STATUS_FILTERS = [
   { value: "lead", label: "Lead" },
 ];
 
-function statusBadgeClass(status: string) {
-  if (status === "lead") return "bg-warning/10 text-warning";
-  if (status === "active") return "bg-accentSoft text-accent";
-  return "bg-surfaceMuted text-muted";
+function statusTone(status: string): BadgeTone {
+  if (status === "lead") return "warning";
+  if (status === "active") return "success";
+  return "neutral";
 }
 
 function clientDisplayName(c: {
@@ -74,9 +75,9 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
     key: "status",
     header: "Status",
     render: (c) => (
-      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(c.lifecycle_status)}`}>
+      <Badge tone={statusTone(c.lifecycle_status)} className="capitalize">
         {c.lifecycle_status === "lead" ? "Lead" : c.lifecycle_status.replace("_", " ")}
-      </span>
+      </Badge>
     ),
   },
 ];

@@ -4,15 +4,16 @@ import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { NotificationPreferenceToggle } from "@/components/settings/NotificationPreferenceToggle";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_STYLE: Record<string, string> = {
-  pending: "text-accent",
-  sent: "text-muted",
-  failed: "text-danger",
-  cancelled: "text-muted",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "accent",
+  sent: "neutral",
+  failed: "danger",
+  cancelled: "neutral",
 };
 
 // Every (event_type, channel) pair actually gated by is_notification_enabled()
@@ -87,7 +88,9 @@ export default async function PortalNotificationsPage() {
                     <p className="font-medium text-slate">{title}</p>
                     <p className="text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
                   </div>
-                  <span className={`text-xs capitalize ${STATUS_STYLE[n.status] ?? "text-muted"}`}>{n.status}</span>
+                  <Badge tone={STATUS_TONE[n.status] ?? "neutral"} className="capitalize">
+                    {n.status}
+                  </Badge>
                 </li>
               );
             })}

@@ -1,6 +1,7 @@
 import { Eye } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/Badge";
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -104,7 +105,9 @@ export function ClientPortalPreview({
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted">
                     {e.due_date && <span>Due {new Date(e.due_date).toLocaleDateString()}</span>}
-                    <span className="rounded-full bg-surfaceMuted px-2 py-0.5 capitalize text-slate">{e.status}</span>
+                    <Badge tone="neutral" className="capitalize">
+                      {e.status}
+                    </Badge>
                   </div>
                 </li>
               ))}

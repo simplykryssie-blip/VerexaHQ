@@ -6,6 +6,7 @@ import { BookOpen, FileText, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
+import { Badge } from "@/components/ui/Badge";
 import { sendOrganizerToEngagement } from "@/lib/organizer/sendOrganizerToEngagement";
 import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignatureRequestFromTemplate";
 
@@ -54,9 +55,9 @@ export function StageTemplateActionButton({
 
   if (sentStatus) {
     return (
-      <span className="inline-flex items-center rounded-full bg-surfaceMuted px-2 py-0.5 text-xs capitalize text-muted">
+      <Badge tone="neutral" className="capitalize">
         {template.name}: {sentStatus.replace(/_/g, " ")}
-      </span>
+      </Badge>
     );
   }
 

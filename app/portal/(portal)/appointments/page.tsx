@@ -5,15 +5,16 @@ import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { BookAppointment } from "@/components/portal/BookAppointment";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_STYLE: Record<string, string> = {
-  scheduled: "text-accent",
-  confirmed: "text-green-700",
-  completed: "text-muted",
-  cancelled: "text-danger",
-  no_show: "text-danger",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  scheduled: "accent",
+  confirmed: "success",
+  completed: "neutral",
+  cancelled: "danger",
+  no_show: "danger",
 };
 
 export default async function PortalAppointmentsPage() {
@@ -69,7 +70,9 @@ export default async function PortalAppointmentsPage() {
                       </a>
                     )}
                   </div>
-                  <span className={`text-xs font-medium capitalize ${STATUS_STYLE[a.status] ?? "text-muted"}`}>{a.status.replace("_", "-")}</span>
+                  <Badge tone={STATUS_TONE[a.status] ?? "neutral"} className="capitalize">
+                    {a.status.replace("_", "-")}
+                  </Badge>
                 </div>
               </li>
             ))}

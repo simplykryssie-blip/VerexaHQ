@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { renderEmail } from "@/lib/email/template";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import type { AppointmentRow } from "./types";
 import type { AppointmentFilter } from "./AppointmentsToolbar";
 
@@ -18,12 +19,23 @@ const STATUS_LABEL: Record<string, string> = {
   no_show: "No-show",
 };
 
+// Colors the editable <select> itself (the control needs to keep native
+// select styling, so it isn't a Badge candidate) -- kept separate from the
+// read-only display tone below.
 const STATUS_STYLE: Record<string, string> = {
   scheduled: "text-accent",
   confirmed: "text-green-700",
   completed: "text-muted",
   cancelled: "text-danger",
   no_show: "text-danger",
+};
+
+const STATUS_TONE: Record<string, BadgeTone> = {
+  scheduled: "accent",
+  confirmed: "success",
+  completed: "neutral",
+  cancelled: "danger",
+  no_show: "danger",
 };
 
 export function AppointmentsList({
@@ -163,7 +175,7 @@ export function AppointmentsList({
                   ))}
                 </select>
               ) : (
-                <span className={`text-xs font-medium capitalize ${STATUS_STYLE[a.status]}`}>{STATUS_LABEL[a.status]}</span>
+                <Badge tone={STATUS_TONE[a.status] ?? "neutral"}>{STATUS_LABEL[a.status]}</Badge>
               )}
               {canManage && (
                 <button type="button" onClick={() => remove(a.id)} aria-label="Delete appointment" className="text-muted hover:text-danger">

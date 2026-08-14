@@ -5,6 +5,13 @@ import Link from "next/link";
 import { Plus, Search, Trash2, type LucideIcon } from "lucide-react";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { EmptyState } from "@/components/EmptyState";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+
+const TEMPLATE_STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  published: "success",
+  archived: "neutral",
+};
 
 export type GalleryCard = {
   id: string;
@@ -137,7 +144,9 @@ export function TemplateGallery({
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
                     {c.isSystem ? (
-                      <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium capitalize text-muted">{c.status}</span>
+                      <Badge tone={TEMPLATE_STATUS_TONE[c.status] ?? "neutral"} className="capitalize">
+                        {c.status}
+                      </Badge>
                     ) : (
                       <TemplateStatusCycle table={statusTable} id={c.id} status={c.status} />
                     )}

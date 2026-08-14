@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { StageReviewActions } from "@/app/(app)/engagements/[id]/StageReviewActions";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
 export type StageColumn = { id: string; name: string; display_order: number };
 export type BoardCard = {
@@ -15,11 +16,11 @@ export type BoardCard = {
   workflowStageId: string;
 };
 
-const PRIORITY_STYLE: Record<string, string> = {
-  Low: "bg-surfaceMuted text-muted",
-  Medium: "bg-accentSoft text-accent",
-  High: "bg-warning/15 text-warning",
-  Urgent: "bg-danger/10 text-danger",
+const PRIORITY_TONE: Record<string, BadgeTone> = {
+  Low: "neutral",
+  Medium: "accent",
+  High: "warning",
+  Urgent: "danger",
 };
 
 export function ServiceBoard({ stages, cards }: { stages: StageColumn[]; cards: BoardCard[] }) {
@@ -52,11 +53,7 @@ export function ServiceBoard({ stages, cards }: { stages: StageColumn[]; cards: 
                           </Link>
                         </p>
                         <div className="mt-2 flex items-center justify-between gap-2">
-                          {c.priority && (
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${PRIORITY_STYLE[c.priority] ?? "bg-surfaceMuted text-muted"}`}>
-                              {c.priority}
-                            </span>
-                          )}
+                          {c.priority && <Badge tone={PRIORITY_TONE[c.priority] ?? "neutral"}>{c.priority}</Badge>}
                           {c.due_date && (
                             <span className={`text-[11px] ${overdue ? "font-medium text-danger" : "text-muted"}`}>
                               {new Date(c.due_date).toLocaleDateString()}

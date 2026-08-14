@@ -7,6 +7,13 @@ import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+
+const TEMPLATE_STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  published: "success",
+  archived: "neutral",
+};
 
 type TemplateRow = {
   id: string;
@@ -132,7 +139,9 @@ export function EmailSmsTemplateGallery({
 
                     <div className="mt-3 flex flex-wrap items-center gap-1.5">
                       {isSystem ? (
-                        <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium capitalize text-muted">{t.status}</span>
+                        <Badge tone={TEMPLATE_STATUS_TONE[t.status] ?? "neutral"} className="capitalize">
+                          {t.status}
+                        </Badge>
                       ) : (
                         <TemplateStatusCycle table={kind === "email" ? "email_templates" : "sms_templates"} id={t.id} status={t.status} />
                       )}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
 export type BoardEngagement = {
   id: string;
@@ -17,11 +18,11 @@ export type BoardEngagement = {
   clientHref: string;
 };
 
-const PRIORITY_STYLE: Record<string, string> = {
-  Low: "bg-surfaceMuted text-muted",
-  Medium: "bg-accentSoft text-accent",
-  High: "bg-warning/15 text-warning",
-  Urgent: "bg-danger/10 text-danger",
+const PRIORITY_TONE: Record<string, BadgeTone> = {
+  Low: "neutral",
+  Medium: "accent",
+  High: "warning",
+  Urgent: "danger",
 };
 
 export function EngagementBoard({ engagements: initial }: { engagements: BoardEngagement[] }) {
@@ -103,11 +104,7 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
                       </Link>
                     </p>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      {e.priority && (
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${PRIORITY_STYLE[e.priority] ?? "bg-surfaceMuted text-muted"}`}>
-                          {e.priority}
-                        </span>
-                      )}
+                      {e.priority && <Badge tone={PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge>}
                       {e.due_date && (
                         <span className={`text-[11px] ${overdue ? "font-medium text-danger" : "text-muted"}`}>
                           {new Date(e.due_date).toLocaleDateString()}

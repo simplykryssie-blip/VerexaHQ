@@ -6,6 +6,7 @@ import { Plus, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/Badge";
 
 type Plan = {
   id: string;
@@ -243,7 +244,7 @@ export function PlansManager({ plans }: { plans: Plan[] }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-ink">{p.name}</p>
-                    {!p.is_active && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium uppercase text-muted">Inactive</span>}
+                    {!p.is_active && <Badge tone="neutral">Inactive</Badge>}
                   </div>
                   <p className="mt-0.5 text-xs text-muted">
                     ${centsToDollars(p.base_price_cents)}/mo -- {p.included_seats} seat{p.included_seats === 1 ? "" : "s"} included, then $

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ShieldEllipsis, Lock, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { PlatformAdminsManager } from "./PlatformAdminsManager";
 
 export const dynamic = "force-dynamic";
@@ -15,10 +16,10 @@ const WORKSPACE_TYPE_LABELS: Record<string, string> = {
   platform_admin: "Platform Admin",
 };
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "text-success",
-  suspended: "text-danger",
-  archived: "text-muted",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  active: "success",
+  suspended: "danger",
+  archived: "neutral",
 };
 
 export default async function PlatformAdminPage() {
@@ -123,7 +124,9 @@ export default async function PlatformAdminPage() {
                       </td>
                       <td className="px-5 py-3 text-slate">{WORKSPACE_TYPE_LABELS[w.workspace_type] ?? w.workspace_type}</td>
                       <td className="px-5 py-3">
-                        <span className={`font-medium capitalize ${STATUS_STYLES[w.status] ?? "text-slate"}`}>{w.status}</span>
+                        <Badge tone={STATUS_TONE[w.status] ?? "neutral"} className="capitalize">
+                          {w.status}
+                        </Badge>
                         {w.suspension_reason && <span className="ml-1.5 text-xs text-muted">({w.suspension_reason.replace(/_/g, " ")})</span>}
                       </td>
                       <td className="px-5 py-3 text-slate">

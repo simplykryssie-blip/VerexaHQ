@@ -18,6 +18,7 @@ import { AddEngagementNoteForm, EditEngagementNoteForm } from "./AddEngagementNo
 import { AddTaskForm } from "./AddTaskForm";
 import { StageReviewActions } from "./StageReviewActions";
 import { StageTemplateActionButton } from "@/components/engagements/StageTemplateActionButton";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
@@ -308,18 +309,15 @@ export function WorkflowTab({
   );
 }
 
+const SLA_TONE: Record<string, BadgeTone> = {
+  "On Track": "success",
+  Completed: "neutral",
+  Overdue: "danger",
+  Exceeded: "warning",
+};
+
 function SlaBadge({ category }: { category: string }) {
-  const styles: Record<string, string> = {
-    "On Track": "bg-green-50 text-green-700",
-    Completed: "bg-surfaceMuted text-muted",
-    Overdue: "bg-red-50 text-danger",
-    Exceeded: "bg-amber-50 text-amber-700",
-  };
-  return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${styles[category] ?? "bg-surfaceMuted text-muted"}`}>
-      {category}
-    </span>
-  );
+  return <Badge tone={SLA_TONE[category] ?? "neutral"}>{category}</Badge>;
 }
 
 // ----------------------------------------------------------------- Tasks
