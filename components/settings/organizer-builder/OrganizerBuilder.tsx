@@ -172,7 +172,12 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
       )}
 
       {view === "preview" ? (
-        <OrganizerPreviewPanel templateName={template.name} topLevelFields={topLevelFields} childrenByParent={childrenByParent} />
+        <OrganizerPreviewPanel
+          templateName={template.name}
+          templateDescription={template.description}
+          topLevelFields={topLevelFields}
+          childrenByParent={childrenByParent}
+        />
       ) : (
         <div className="flex flex-1 overflow-hidden">
           {!readOnly && <FieldPalette onAdd={(type) => addField(type, null, topLevelFields.length)} onDragType={setDraggedType} />}

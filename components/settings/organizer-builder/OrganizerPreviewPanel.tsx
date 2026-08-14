@@ -15,10 +15,12 @@ import type { BuilderField } from "./types";
  */
 export function OrganizerPreviewPanel({
   templateName,
+  templateDescription,
   topLevelFields,
   childrenByParent,
 }: {
   templateName: string;
+  templateDescription: string | null;
   topLevelFields: BuilderField[];
   childrenByParent: Map<string, BuilderField[]>;
 }) {
@@ -37,6 +39,7 @@ export function OrganizerPreviewPanel({
       <div className="mx-auto max-w-2xl rounded-xl border border-border bg-surface p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">{templateName}</h2>
+        {templateDescription && <p className="mt-1 whitespace-pre-line text-sm text-muted">{templateDescription}</p>}
         <p className="mt-1 text-sm text-muted">This is a sandbox -- nothing typed here is saved.</p>
         {pages.length > 1 && (
           <p className="mt-2 text-xs font-medium text-muted">

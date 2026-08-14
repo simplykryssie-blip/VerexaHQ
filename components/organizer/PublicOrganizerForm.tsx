@@ -178,7 +178,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">{workspace_name}</p>
         <h1 className="text-lg font-semibold text-ink">{template.name}</h1>
-        {template.description && <p className="mt-1 text-sm text-muted">{template.description}</p>}
+        {template.description && <p className="mt-1 whitespace-pre-line text-sm text-muted">{template.description}</p>}
       </div>
 
       {step === "contact" && (
