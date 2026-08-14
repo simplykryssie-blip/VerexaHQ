@@ -46,7 +46,7 @@ export function NotificationPreferenceToggle({
       aria-checked={isEnabled}
       onClick={toggle}
       disabled={saving}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${isEnabled ? "bg-accent" : "bg-surfaceMuted"}`}
+      className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${isEnabled ? "border-accent bg-accent" : "border-border bg-border"}`}
     >
       <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${isEnabled ? "left-[22px]" : "left-0.5"}`} />
     </button>

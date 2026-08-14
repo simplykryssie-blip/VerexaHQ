@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { useToast } from "@/components/Toast";
 
-export type FixedService = { id: string; name: string };
+export type FixedService = { id: string; name: string; description: string | null };
 export type OwnedService = { id: string; name: string; status: string; cloned_from_service_id: string | null };
 
 function FixedServiceRow({
@@ -67,18 +67,22 @@ function FixedServiceRow({
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-      <div>
+      <div className="min-w-0">
         {enabled && owned ? (
           <>
             <Link href={`/settings/services/${owned.id}`} className="text-sm font-medium text-accent hover:underline">
               {fixed.name}
             </Link>
-            <Link href={`/settings/services/${owned.id}`} className="block text-xs text-muted hover:text-accent hover:underline">
+            {fixed.description && <p className="mt-0.5 text-xs text-muted">{fixed.description}</p>}
+            <Link href={`/settings/services/${owned.id}`} className="mt-0.5 block text-xs text-muted hover:text-accent hover:underline">
               Manage its pipeline
             </Link>
           </>
         ) : (
-          <span className="text-sm font-medium text-ink">{fixed.name}</span>
+          <>
+            <span className="text-sm font-medium text-ink">{fixed.name}</span>
+            {fixed.description && <p className="mt-0.5 text-xs text-muted">{fixed.description}</p>}
+          </>
         )}
       </div>
       <button
@@ -87,7 +91,7 @@ function FixedServiceRow({
         aria-checked={enabled}
         onClick={enabled ? turnOff : turnOn}
         disabled={busy}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${enabled ? "bg-accent" : "bg-surfaceMuted"}`}
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${enabled ? "border-accent bg-accent" : "border-border bg-border"}`}
       >
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${enabled ? "left-[22px]" : "left-0.5"}`} />
       </button>

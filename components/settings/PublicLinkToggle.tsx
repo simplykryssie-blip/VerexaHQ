@@ -78,7 +78,7 @@ export function PublicLinkToggle({
         aria-checked={isPublic}
         onClick={toggle}
         disabled={saving}
-        className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:opacity-60 ${isPublic ? "bg-accent" : "bg-surfaceMuted"}`}
+        className={`relative h-5 w-9 shrink-0 rounded-full border transition disabled:opacity-60 ${isPublic ? "border-accent bg-accent" : "border-border bg-border"}`}
       >
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${isPublic ? "left-[18px]" : "left-0.5"}`} />
       </button>
@@ -104,7 +104,7 @@ export function PublicLinkToggle({
             onClick={toggleSignup}
             disabled={saving}
             title="When on, the visitor creates a real client portal account right in the same form -- no staff invite, no waiting."
-            className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:opacity-60 ${requiresSignup ? "bg-accent" : "bg-surfaceMuted"}`}
+            className={`relative h-5 w-9 shrink-0 rounded-full border transition disabled:opacity-60 ${requiresSignup ? "border-accent bg-accent" : "border-border bg-border"}`}
           >
             <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${requiresSignup ? "left-[18px]" : "left-0.5"}`} />
           </button>

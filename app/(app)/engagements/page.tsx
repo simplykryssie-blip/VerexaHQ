@@ -61,7 +61,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title="Engagements"
-        description="Every engagement in your workspace."
+        description="The actual work you're doing for clients -- one engagement per service per client, each moving through its own pipeline."
         actions={
           canCreate ? (
             <Link

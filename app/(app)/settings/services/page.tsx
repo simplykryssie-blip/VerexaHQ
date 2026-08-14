@@ -13,7 +13,7 @@ export default async function ServicesPage() {
   const supabase = createClient();
 
   const [{ data: fixedServices }, { data: ownedServices }] = await Promise.all([
-    supabase.from("services").select("id, name").is("workspace_id", null).order("name"),
+    supabase.from("services").select("id, name, description").is("workspace_id", null).order("name"),
     supabase.from("services").select("id, name, status, cloned_from_service_id").eq("workspace_id", workspace.id).order("name"),
   ]);
 
@@ -22,7 +22,7 @@ export default async function ServicesPage() {
       <SettingsSectionHeader
         icon={Workflow}
         title="Services"
-        description="Turn on the services your firm offers. Each one comes with its own editable pipeline -- use it as-is, edit the stages, or delete them."
+        description="A service is a type of work your firm offers, not a specific client's work -- turn on the ones you do here, each with its own editable pipeline. When you start that work for an actual client, you open an engagement for it."
       />
 
       <div className="mt-6">
