@@ -3,8 +3,19 @@
 import { useState } from "react";
 import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS } from "@/lib/organizer/fieldTypes";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
-import { parseConditionalLogic, type ShowIfRule } from "@/lib/organizer/conditionalLogic";
+import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import type { BuilderField } from "./types";
+
+const OPERATOR_LABELS: Record<LogicOperator, string> = {
+  equals: "is",
+  not_equals: "is not",
+  includes: "includes",
+  not_includes: "doesn't include",
+  is_answered: "is answered",
+  is_blank: "is blank",
+};
+
+const VALUE_LESS_OPERATORS = new Set<LogicOperator>(["is_answered", "is_blank"]);
 
 export function FieldPropertiesPanel({
   field,
@@ -47,14 +58,33 @@ function PropertiesForm({
   const [label, setLabel] = useState(field.label);
   const [helpText, setHelpText] = useState(field.help_text ?? "");
   const options = normalizeOptions(field.options);
-  const rule = parseConditionalLogic(field.conditional_logic).show_if ?? null;
+  const showIf = parseConditionalLogic(field.conditional_logic).show_if ?? null;
 
   function commitOptions(next: { label: string; value: string }[]) {
     onUpdate(field.id, { options: next });
   }
 
-  function setRule(next: ShowIfRule | null) {
+  function setShowIf(next: ShowIf | null) {
     onUpdate(field.id, { conditional_logic: next ? { show_if: next } : {} });
+  }
+
+  function updateCondition(index: number, patch: Partial<Rule>) {
+    if (!showIf) return;
+    const conditions = showIf.conditions.map((c, i) => (i === index ? { ...c, ...patch } : c));
+    setShowIf({ ...showIf, conditions });
+  }
+
+  function removeCondition(index: number) {
+    if (!showIf) return;
+    const conditions = showIf.conditions.filter((_, i) => i !== index);
+    setShowIf(conditions.length > 0 ? { ...showIf, conditions } : null);
+  }
+
+  function addCondition() {
+    const firstField = otherTopLevelFields[0];
+    if (!firstField) return;
+    const newRule: Rule = { field_id: firstField.id, operator: "equals", value: "" };
+    setShowIf(showIf ? { ...showIf, conditions: [...showIf.conditions, newRule] } : { match: "all", conditions: [newRule] });
   }
 
   return (
@@ -144,46 +174,111 @@ function PropertiesForm({
         <label className="flex items-center gap-2 text-sm text-slate">
           <input
             type="checkbox"
-            checked={rule !== null}
+            checked={showIf !== null}
             disabled={readOnly || otherTopLevelFields.length === 0}
             onChange={(e) =>
-              setRule(e.target.checked ? { field_id: otherTopLevelFields[0]?.id ?? "", operator: "equals", value: "" } : null)
+              setShowIf(
+                e.target.checked
+                  ? { match: "all", conditions: [{ field_id: otherTopLevelFields[0]?.id ?? "", operator: "equals", value: "" }] }
+                  : null
+              )
             }
             className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
           />
           Only show this field conditionally
         </label>
+        <p className="mt-1 text-xs text-muted">Skipping a question is the same as hiding it -- if it doesn&apos;t show, it isn&apos;t asked.</p>
 
-        {rule && (
-          <div className="mt-2 space-y-2">
-            <select
-              value={rule.field_id}
-              disabled={readOnly}
-              onChange={(e) => setRule({ ...rule, field_id: e.target.value })}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            >
-              {otherTopLevelFields.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={rule.operator}
-              disabled={readOnly}
-              onChange={(e) => setRule({ ...rule, operator: e.target.value as ShowIfRule["operator"] })}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            >
-              <option value="equals">is</option>
-              <option value="not_equals">is not</option>
-            </select>
-            <input
-              value={rule.value}
-              disabled={readOnly}
-              onChange={(e) => setRule({ ...rule, value: e.target.value })}
-              placeholder="Value to compare against"
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+        {showIf && (
+          <div className="mt-3 space-y-3">
+            {showIf.conditions.length > 1 && (
+              <div className="flex items-center gap-2 text-xs text-slate">
+                <span>Match</span>
+                <select
+                  value={showIf.match}
+                  disabled={readOnly}
+                  onChange={(e) => setShowIf({ ...showIf, match: e.target.value as "all" | "any" })}
+                  className="rounded-lg border border-border px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="all">all conditions (AND)</option>
+                  <option value="any">any condition (OR)</option>
+                </select>
+              </div>
+            )}
+
+            {showIf.conditions.map((rule, i) => {
+              const targetField = otherTopLevelFields.find((f) => f.id === rule.field_id);
+              const targetOptions = targetField ? normalizeOptions(targetField.options) : [];
+              const usesOptionPicker = targetField && CHOICE_FIELD_TYPES.has(targetField.field_type) && targetOptions.length > 0;
+              const needsValue = !VALUE_LESS_OPERATORS.has(rule.operator);
+
+              return (
+                <div key={i} className="space-y-1.5 rounded-lg border border-border p-2">
+                  {i > 0 && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{showIf.match === "any" ? "or" : "and"}</p>}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={rule.field_id}
+                      disabled={readOnly}
+                      onChange={(e) => updateCondition(i, { field_id: e.target.value, value: "" })}
+                      className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      {otherTopLevelFields.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.label}
+                        </option>
+                      ))}
+                    </select>
+                    {!readOnly && showIf.conditions.length > 1 && (
+                      <button type="button" onClick={() => removeCondition(i)} className="shrink-0 text-xs text-danger" aria-label="Remove condition">
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={rule.operator}
+                    disabled={readOnly}
+                    onChange={(e) => updateCondition(i, { operator: e.target.value as LogicOperator })}
+                    className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  >
+                    {Object.entries(OPERATOR_LABELS).map(([op, opLabel]) => (
+                      <option key={op} value={op}>
+                        {opLabel}
+                      </option>
+                    ))}
+                  </select>
+                  {needsValue &&
+                    (usesOptionPicker ? (
+                      <select
+                        value={rule.value}
+                        disabled={readOnly}
+                        onChange={(e) => updateCondition(i, { value: e.target.value })}
+                        className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        <option value="">Select a value...</option>
+                        {targetOptions.map((o, oi) => (
+                          <option key={oi} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={rule.value}
+                        disabled={readOnly}
+                        onChange={(e) => updateCondition(i, { value: e.target.value })}
+                        placeholder="Value to compare against"
+                        className="w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                    ))}
+                </div>
+              );
+            })}
+
+            {!readOnly && (
+              <button type="button" onClick={addCondition} className="text-xs font-medium text-accent hover:underline">
+                + Add condition
+              </button>
+            )}
           </div>
         )}
         {otherTopLevelFields.length === 0 && (
