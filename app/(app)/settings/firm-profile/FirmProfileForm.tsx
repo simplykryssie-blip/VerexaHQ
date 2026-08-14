@@ -329,7 +329,7 @@ export function FirmProfileForm({
         </div>
 
         {showPtin && (
-          <div className="mt-3">
+          <div className="mt-3 overflow-hidden rounded-lg border border-border">
             <MaskedSecretField
               label="PTIN"
               last4={ptinLast4}
@@ -338,7 +338,7 @@ export function FirmProfileForm({
               onNewValueChange={(v) => setPtin(formatPtin(v))}
               clear={clearPtin}
               onClearChange={setClearPtin}
-              helpText="Your own PTIN -- encrypted, only you can reveal it."
+              helpText="Encrypted -- only you can reveal it."
             />
           </div>
         )}
@@ -437,40 +437,42 @@ export function FirmProfileForm({
             EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged.
           </p>
 
-          <div className="mt-4 space-y-3">
-            {showEin && (
-              <MaskedSecretField
-                label="EIN"
-                last4={einLast4}
-                onReveal={() => supabase.rpc("reveal_firm_ein", { p_workspace_id: workspaceId })}
-                newValue={ein}
-                onNewValueChange={(v) => setEin(formatEin(v))}
-                clear={clearEin}
-                onClearChange={setClearEin}
-              />
-            )}
-            {showEfin && (
-              <MaskedSecretField
-                label="EFIN"
-                last4={efinLast4}
-                onReveal={() => supabase.rpc("reveal_firm_efin", { p_workspace_id: workspaceId })}
-                newValue={efin}
-                onNewValueChange={(v) => setEfin(formatEfin(v))}
-                clear={clearEfin}
-                onClearChange={setClearEfin}
-              />
-            )}
-            {showFirmPtin && (
-              <MaskedSecretField
-                label="PTIN"
-                last4={firmPtinLast4}
-                onReveal={() => supabase.rpc("reveal_firm_ptin", { p_workspace_id: workspaceId })}
-                newValue={firmPtin}
-                onNewValueChange={(v) => setFirmPtin(formatPtin(v))}
-                clear={clearFirmPtin}
-                onClearChange={setClearFirmPtin}
-              />
-            )}
+          <div className="mt-4 overflow-hidden rounded-lg border border-border">
+            <div className="divide-y divide-border">
+              {showEin && (
+                <MaskedSecretField
+                  label="EIN"
+                  last4={einLast4}
+                  onReveal={() => supabase.rpc("reveal_firm_ein", { p_workspace_id: workspaceId })}
+                  newValue={ein}
+                  onNewValueChange={(v) => setEin(formatEin(v))}
+                  clear={clearEin}
+                  onClearChange={setClearEin}
+                />
+              )}
+              {showEfin && (
+                <MaskedSecretField
+                  label="EFIN"
+                  last4={efinLast4}
+                  onReveal={() => supabase.rpc("reveal_firm_efin", { p_workspace_id: workspaceId })}
+                  newValue={efin}
+                  onNewValueChange={(v) => setEfin(formatEfin(v))}
+                  clear={clearEfin}
+                  onClearChange={setClearEfin}
+                />
+              )}
+              {showFirmPtin && (
+                <MaskedSecretField
+                  label="PTIN"
+                  last4={firmPtinLast4}
+                  onReveal={() => supabase.rpc("reveal_firm_ptin", { p_workspace_id: workspaceId })}
+                  newValue={firmPtin}
+                  onNewValueChange={(v) => setFirmPtin(formatPtin(v))}
+                  clear={clearFirmPtin}
+                  onClearChange={setClearFirmPtin}
+                />
+              )}
+            </div>
           </div>
 
           <div className="mt-4">

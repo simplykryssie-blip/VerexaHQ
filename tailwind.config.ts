@@ -20,6 +20,16 @@ const config: Config = {
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      // Sitewide corner-sharpening pass: rounded-lg/xl/2xl read as "bubbly" at
+      // Tailwind's default sizes. Tightening just these three keys pulls every
+      // card, input, button, and modal in the app toward the denser, more
+      // structured look from the Settings redesign, without touching `full`
+      // (avatars, status dots, toggle switches -- legitimately circular).
+      borderRadius: {
+        lg: "4px",
+        xl: "6px",
+        "2xl": "8px",
+      },
     },
   },
   plugins: [],
