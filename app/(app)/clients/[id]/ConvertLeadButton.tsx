@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-const LEAD_STATUSES = ["lead", "consult_scheduled", "proposal_sent"];
+const LEAD_STATUSES = ["lead"];
 
 export function ConvertLeadButton({ clientId, lifecycleStatus }: { clientId: string; lifecycleStatus: string }) {
   const router = useRouter();

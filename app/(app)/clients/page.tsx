@@ -17,7 +17,7 @@ const CONTACT_TABS = [
 type ContactTab = (typeof CONTACT_TABS)[number]["key"];
 
 const CLIENT_LIFECYCLE_STATUSES = ["active", "inactive", "archived"];
-const LEAD_LIFECYCLE_STATUSES = ["lead", "consult_scheduled", "proposal_sent"];
+const LEAD_LIFECYCLE_STATUSES = ["lead"];
 
 const CLIENT_STATUS_FILTERS = [
   { value: "", label: "All" },
@@ -28,8 +28,6 @@ const CLIENT_STATUS_FILTERS = [
 const LEAD_STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "lead", label: "Lead" },
-  { value: "consult_scheduled", label: "Consult Scheduled" },
-  { value: "proposal_sent", label: "Proposal Sent" },
 ];
 
 function statusBadgeClass(status: string) {
