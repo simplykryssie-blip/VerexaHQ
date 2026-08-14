@@ -19,6 +19,11 @@ export function isStripeConfigured() {
   return !!process.env.STRIPE_SECRET_KEY;
 }
 
+/** Connect (linking a workspace's own Stripe account) additionally needs the platform's OAuth client ID. */
+export function isStripeConnectConfigured() {
+  return isStripeConfigured() && !!process.env.STRIPE_CONNECT_CLIENT_ID;
+}
+
 export function isZoomConfigured() {
   return !!process.env.ZOOM_CLIENT_ID && !!process.env.ZOOM_CLIENT_SECRET;
 }

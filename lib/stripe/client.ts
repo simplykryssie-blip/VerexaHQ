@@ -94,63 +94,45 @@ export async function createRefund({
 }
 
 /**
- * Creates a new Standard Connect account for a workspace. The platform's own
- * key is used here (no Stripe-Account header) since account creation is a
- * platform-level operation, not one scoped to a connected account.
+ * Exchanges a Standard Connect OAuth authorization code for the connected
+ * account's ID. Used when a workspace links its own already-existing Stripe
+ * account (as opposed to createConnectedAccount, which creates a brand-new
+ * one) -- this is the flow Stripe's OAuth "Connect with Stripe" button uses.
  */
-export async function createConnectedAccount({
-  email,
-  workspaceId,
-}: {
-  email?: string;
-  workspaceId: string;
-}): Promise<StripeResult<{ id: string }>> {
+export async function exchangeOAuthCode(code: string): Promise<StripeResult<{ stripeUserId: string }>> {
   if (!isStripeConfigured()) {
     return { ok: false, reason: "Stripe is not configured for this environment." };
   }
 
-  const body = toFormBody({
-    type: "standard",
-    email,
-    "metadata[workspace_id]": workspaceId,
+  const body = toFormBody({ grant_type: "authorization_code", code, client_secret: process.env.STRIPE_SECRET_KEY });
+  const res = await fetch("https://connect.stripe.com/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
   });
-
-  const res = await fetch(`${STRIPE_API}/accounts`, { method: "POST", headers: authHeaders(), body });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  const data = (await res.json().catch(() => ({}))) as { stripe_user_id?: string; error_description?: string };
+  if (!res.ok || !data.stripe_user_id) {
+    return { ok: false, reason: data.error_description ?? `Stripe responded with ${res.status}` };
   }
-  const data = (await res.json()) as { id: string };
-  return { ok: true, data };
+  return { ok: true, data: { stripeUserId: data.stripe_user_id } };
 }
 
-export async function createAccountLink({
-  accountId,
-  refreshUrl,
-  returnUrl,
-}: {
-  accountId: string;
-  refreshUrl: string;
-  returnUrl: string;
-}): Promise<StripeResult<{ url: string }>> {
+/** Revokes the platform's OAuth access to a connected account -- the counterpart to exchangeOAuthCode. */
+export async function deauthorizeOAuthAccount(stripeUserId: string): Promise<StripeResult<true>> {
   if (!isStripeConfigured()) {
     return { ok: false, reason: "Stripe is not configured for this environment." };
   }
+  if (!process.env.STRIPE_CONNECT_CLIENT_ID) {
+    return { ok: false, reason: "Stripe Connect is not configured for this environment." };
+  }
 
-  const body = toFormBody({
-    account: accountId,
-    refresh_url: refreshUrl,
-    return_url: returnUrl,
-    type: "account_onboarding",
-  });
-
-  const res = await fetch(`${STRIPE_API}/account_links`, { method: "POST", headers: authHeaders(), body });
+  const body = toFormBody({ client_id: process.env.STRIPE_CONNECT_CLIENT_ID, stripe_user_id: stripeUserId });
+  const res = await fetch("https://connect.stripe.com/oauth/deauthorize", { method: "POST", headers: authHeaders(), body });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
   }
-  const data = (await res.json()) as { url: string };
-  return { ok: true, data };
+  return { ok: true, data: true };
 }
 
 export async function fetchAccount(

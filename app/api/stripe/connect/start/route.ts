@@ -1,72 +1,50 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { createAccountLink, createConnectedAccount } from "@/lib/stripe/client";
-import { isStripeConfigured } from "@/lib/providerStatus";
+import { isStripeConnectConfigured } from "@/lib/providerStatus";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getAppUrl } from "@/lib/appUrl";
 
-export async function POST(request: Request) {
+// Standard Connect OAuth: sends the admin to Stripe's own "Connect with
+// Stripe" page, where they can link an already-existing Stripe account or
+// create a new one from scratch.
+export async function GET(request: Request) {
+  const appUrl = getAppUrl(request);
+  const settingsUrl = new URL("/settings/integrations", appUrl);
+
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    return NextResponse.redirect(new URL("/login", appUrl), 307);
   }
 
   const allowed = await checkRateLimit(`stripe-connect-start:${workspace.id}`, 10, 60);
   if (!allowed) {
-    return NextResponse.json({ error: "Too many requests. Try again shortly." }, { status: 429 });
+    settingsUrl.searchParams.set("stripe_error", "Too many requests. Try again shortly.");
+    return NextResponse.redirect(settingsUrl, 307);
   }
 
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { data: isAdmin } = await supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id });
   if (!isAdmin) {
-    return NextResponse.json({ error: "Only workspace admins can connect Stripe." }, { status: 403 });
+    settingsUrl.searchParams.set("stripe_error", "Only workspace admins can connect Stripe.");
+    return NextResponse.redirect(settingsUrl, 307);
   }
 
-  if (!isStripeConfigured()) {
-    return NextResponse.json({ configured: false, reason: "Stripe is not configured for this environment." }, { status: 200 });
+  if (!isStripeConnectConfigured()) {
+    settingsUrl.searchParams.set("stripe_error", "Stripe is not configured for this environment.");
+    return NextResponse.redirect(settingsUrl, 307);
   }
 
-  const { data: workspaceRow, error: workspaceError } = await supabase
-    .from("workspaces")
-    .select("stripe_connected_account_id")
-    .eq("id", workspace.id)
-    .single();
-  if (workspaceError || !workspaceRow) {
-    return NextResponse.json({ error: workspaceError?.message ?? "Workspace not found" }, { status: 404 });
-  }
+  const state = `${crypto.randomUUID()}:${workspace.id}`;
+  cookies().set("stripe_oauth_state", state, { httpOnly: true, secure: true, sameSite: "lax", maxAge: 600, path: "/" });
 
-  let accountId = workspaceRow.stripe_connected_account_id;
-  if (!accountId) {
-    const created = await createConnectedAccount({ email: user?.email, workspaceId: workspace.id });
-    if (!created.ok) {
-      return NextResponse.json({ configured: false, reason: created.reason }, { status: 200 });
-    }
-    accountId = created.data.id;
-    await supabase
-      .from("workspaces")
-      .update({
-        stripe_connected_account_id: accountId,
-        stripe_connect_account_type: "standard",
-        stripe_connect_status: "pending",
-        stripe_connect_updated_at: new Date().toISOString(),
-      })
-      .eq("id", workspace.id);
-  }
+  const authorizeUrl = new URL("https://connect.stripe.com/oauth/authorize");
+  authorizeUrl.searchParams.set("response_type", "code");
+  authorizeUrl.searchParams.set("client_id", process.env.STRIPE_CONNECT_CLIENT_ID!);
+  authorizeUrl.searchParams.set("scope", "read_write");
+  authorizeUrl.searchParams.set("redirect_uri", `${appUrl}/api/stripe/connect/callback`);
+  authorizeUrl.searchParams.set("state", state);
 
-  const appUrl = getAppUrl(request);
-  const link = await createAccountLink({
-    accountId,
-    refreshUrl: `${appUrl}/api/stripe/connect/refresh`,
-    returnUrl: `${appUrl}/api/stripe/connect/return`,
-  });
-  if (!link.ok) {
-    return NextResponse.json({ configured: false, reason: link.reason }, { status: 200 });
-  }
-
-  return NextResponse.json({ configured: true, url: link.data.url });
+  return NextResponse.redirect(authorizeUrl, 307);
 }

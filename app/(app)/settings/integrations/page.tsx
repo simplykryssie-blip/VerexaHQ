@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function IntegrationsPage({
   searchParams,
 }: {
-  searchParams: { zoom_error?: string; zoom_connected?: string };
+  searchParams: { zoom_error?: string; zoom_connected?: string; stripe_error?: string; stripe_connected?: string };
 }) {
   const workspace = await getCurrentWorkspace();
   const supabase = createClient();
@@ -63,8 +63,12 @@ export default async function IntegrationsPage({
         Connect your firm&apos;s own Stripe account to accept client payments. Funds go straight to your account -- Verexa charges no
         platform fee on transactions.
       </p>
+      {searchParams.stripe_connected && <p className="mt-2 text-sm text-success">Stripe connected.</p>}
       <div className="mt-6 rounded-xl border border-border bg-surface">
-        <ConnectStripeButton connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"} />
+        <ConnectStripeButton
+          connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"}
+          error={searchParams.stripe_error ?? null}
+        />
       </div>
 
       {zoomSection}
