@@ -3,10 +3,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
-import { BusinessHoursForm } from "@/components/settings/BusinessHoursForm";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmProfileForm } from "./FirmProfileForm";
-import { FirmTaxProfileForm } from "./FirmTaxProfileForm";
 import { getEffectiveBranding } from "@/lib/branding";
 
 export const dynamic = 'force-dynamic';
@@ -63,7 +61,7 @@ export default async function FirmProfilePage() {
       <SettingsSectionHeader
         icon={Building2}
         title="Firm Profile"
-        description="Your profile, your firm's identity, and your workspace preferences."
+        description="Your profile, your firm's identity, and your workspace preferences -- all in one place, one Save."
       />
 
       {user && (
@@ -89,59 +87,61 @@ export default async function FirmProfilePage() {
             isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
             eroName={effectiveBranding.eroName ?? null}
             isOwner={workspace.is_owner}
+            isAdmin={Boolean(isAdmin)}
+            showEin
+            showEfin={showEfin}
+            showFirmPtin={showFirmPtin}
+            einLast4={profile?.ein_last4 ?? null}
+            efinLast4={profile?.efin_last4 ?? null}
+            firmPtinLast4={profile?.ptin_last4 ?? null}
+            supportedFilingStates={profile?.supported_filing_states ?? []}
+            initialHours={businessHours}
+            initialSlotMinutes={slotMinutes}
           />
         </div>
       )}
 
-      <div className="mt-8 border-t border-border pt-8">
-        <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
-        <p className="mt-1 text-xs text-muted">
-          EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and
-          revealing the full value is audit-logged.
-        </p>
-        <div className="mt-3">
-          {isAdmin ? (
-            <FirmTaxProfileForm workspaceId={workspace.id} profile={profile ?? null} showEin showEfin={showEfin} showPtin={showFirmPtin} />
-          ) : !profile ? (
-            <EmptyState icon={FileText} message="No firm tax profile set up yet." />
-          ) : (
-            <dl className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-muted">EIN</dt>
-                <dd className="mt-0.5 text-slate">{profile.ein_last4 ? `••••${profile.ein_last4}` : "Not set"}</dd>
-              </div>
-              {showEfin && (
+      {!isAdmin && (
+        <div className="mt-8 border-t border-border pt-8">
+          <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
+          <p className="mt-1 text-xs text-muted">
+            EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and
+            revealing the full value is audit-logged. Only a workspace admin can edit these.
+          </p>
+          <div className="mt-3">
+            {!profile ? (
+              <EmptyState icon={FileText} message="No firm tax profile set up yet." />
+            ) : (
+              <dl className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted">EFIN</dt>
-                  <dd className="mt-0.5 text-slate">{profile.efin_last4 ? `••••${profile.efin_last4}` : "Not set"}</dd>
+                  <dt className="text-xs uppercase tracking-wide text-muted">EIN</dt>
+                  <dd className="mt-0.5 text-slate">{profile.ein_last4 ? `••••${profile.ein_last4}` : "Not set"}</dd>
                 </div>
-              )}
-              {showFirmPtin && (
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted">PTIN</dt>
-                  <dd className="mt-0.5 text-slate">{profile.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
+                {showEfin && (
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted">EFIN</dt>
+                    <dd className="mt-0.5 text-slate">{profile.efin_last4 ? `••••${profile.efin_last4}` : "Not set"}</dd>
+                  </div>
+                )}
+                {showFirmPtin && (
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-muted">PTIN</dt>
+                    <dd className="mt-0.5 text-slate">{profile.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
+                  </div>
+                )}
+                <div className="col-span-2">
+                  <dt className="text-xs uppercase tracking-wide text-muted">Supported filing states</dt>
+                  <dd className="mt-0.5 text-slate">
+                    {profile.supported_filing_states && profile.supported_filing_states.length > 0
+                      ? profile.supported_filing_states.join(", ")
+                      : "None set"}
+                  </dd>
                 </div>
-              )}
-              <div className="col-span-2">
-                <dt className="text-xs uppercase tracking-wide text-muted">Supported filing states</dt>
-                <dd className="mt-0.5 text-slate">
-                  {profile.supported_filing_states && profile.supported_filing_states.length > 0
-                    ? profile.supported_filing_states.join(", ")
-                    : "None set"}
-                </dd>
-              </div>
-            </dl>
-          )}
+              </dl>
+            )}
+          </div>
         </div>
-      </div>
-
-      <div className="mt-8 border-t border-border pt-8">
-        <h3 className="text-sm font-semibold text-ink">Booking availability</h3>
-        <p className="mt-1 text-xs text-muted">When clients can self-book a bookable service from their portal.</p>
-        <div className="mt-3">
-          <BusinessHoursForm workspaceId={workspace.id} initialHours={businessHours} initialSlotMinutes={slotMinutes} />
-        </div>
-      </div>
+      )}
     </div>
   );
 }
