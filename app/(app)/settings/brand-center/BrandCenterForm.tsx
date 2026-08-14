@@ -117,6 +117,7 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
   const [displayName, setDisplayName] = useState(branding?.display_name ?? "");
   const [supportEmail, setSupportEmail] = useState(branding?.support_email ?? "");
   const [supportPhone, setSupportPhone] = useState(branding?.support_phone ?? "");
+  const [showPortalLogoOverride, setShowPortalLogoOverride] = useState(Boolean(branding?.portal_logo_url));
   const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? "#0F172A");
   const [secondaryColor, setSecondaryColor] = useState(branding?.secondary_color ?? "#2563EB");
   const [textColor, setTextColor] = useState(branding?.sidebar_text_color ?? "");
@@ -160,18 +161,28 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
         workspaceId={workspaceId}
         column="sidebar_logo_url"
         pathPrefix="sidebar-logo"
-        label="Brand logo"
-        helpText="Shown at the top of your staff dashboard's navigation bar, and to clients in their portal unless you set a separate portal logo below. Leave blank to use your profile photo instead."
+        label="Logo"
+        helpText="Used everywhere: your staff dashboard, your client portal, and public forms like your intake organizer."
         initialUrl={branding?.sidebar_logo_url ?? null}
       />
-      <LogoUploadField
-        workspaceId={workspaceId}
-        column="portal_logo_url"
-        pathPrefix="portal-logo"
-        label="Client portal logo"
-        helpText="Only needed if you want clients to see a different logo than your staff dashboard. Leave blank to reuse the brand logo above."
-        initialUrl={branding?.portal_logo_url ?? null}
-      />
+      {showPortalLogoOverride ? (
+        <LogoUploadField
+          workspaceId={workspaceId}
+          column="portal_logo_url"
+          pathPrefix="portal-logo"
+          label="Client portal logo (override)"
+          helpText="Only clients see this instead of the logo above. Leave blank and remove this section if you don't need a separate one."
+          initialUrl={branding?.portal_logo_url ?? null}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowPortalLogoOverride(true)}
+          className="text-xs font-medium text-accent hover:underline"
+        >
+          + Use a different logo for clients specifically
+        </button>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-slate">Display name</label>
