@@ -1,16 +1,73 @@
+export type AddressParts = { street: string; street2: string; city: string; state: string; zip: string };
+
+const EMPTY_ADDRESS: AddressParts = { street: "", street2: "", city: "", state: "", zip: "" };
+
+/** The address field's answer is stored as a JSON-stringified {street, street2, city, state, zip} object. */
+export function parseAddressValue(value: string): AddressParts {
+  if (!value) return { ...EMPTY_ADDRESS };
+  try {
+    const obj = JSON.parse(value);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      const addr = obj as Record<string, unknown>;
+      return {
+        street: addr.street ? String(addr.street) : "",
+        street2: addr.street2 ? String(addr.street2) : "",
+        city: addr.city ? String(addr.city) : "",
+        state: addr.state ? String(addr.state) : "",
+        zip: addr.zip ? String(addr.zip) : "",
+      };
+    }
+  } catch {
+    // Not JSON -- an older plain-text address typed before structured entry existed.
+  }
+  return { ...EMPTY_ADDRESS, street: value };
+}
+
+export function stringifyAddressValue(parts: AddressParts): string {
+  return JSON.stringify(parts);
+}
+
 /**
- * Address answers can be a structured {street, city, state, zip} object
- * (e.g. prefilled from an on-file address) or a plain string typed into the
- * organizer's free-text address field -- this normalizes either into a
- * single display/edit string instead of the raw object.
+ * Normalizes a raw address answer -- a real {street, ...} object (e.g.
+ * prefilled from an on-file address) or a JSON/plain string already in this
+ * field's stored shape -- into the JSON string parseAddressValue expects, so
+ * editable form state never loses structure on load.
+ */
+export function coerceAddressAnswerToString(value: unknown): string {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const addr = value as Record<string, unknown>;
+    return stringifyAddressValue({
+      street: addr.street ? String(addr.street) : "",
+      street2: addr.street2 ? String(addr.street2) : "",
+      city: addr.city ? String(addr.city) : "",
+      state: addr.state ? String(addr.state) : "",
+      zip: addr.zip ? String(addr.zip) : "",
+    });
+  }
+  return value === null || value === undefined ? "" : String(value);
+}
+
+/**
+ * Address answers can be the structured {street, street2, city, state, zip}
+ * object this field now stores (as a JSON string, or already-parsed JSONB
+ * from the database), or a plain string from before structured entry existed
+ * -- this normalizes any of those into a single display/edit string.
  */
 export function formatAddressValue(value: unknown): string {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const addr = value as Record<string, unknown>;
-    const street = addr.street ? String(addr.street) : "";
+    const street = [addr.street, addr.street2].filter(Boolean).join(", ");
     const cityState = [addr.city, addr.state].filter(Boolean).join(", ");
     const cityStateZip = [cityState, addr.zip].filter(Boolean).join(" ");
     return [street, cityStateZip].filter(Boolean).join(", ");
+  }
+  if (typeof value === "string" && value.trim().startsWith("{")) {
+    try {
+      const obj = JSON.parse(value);
+      if (obj && typeof obj === "object") return formatAddressValue(obj);
+    } catch {
+      // Fall through to plain-string handling below.
+    }
   }
   return value === null || value === undefined ? "" : String(value);
 }

@@ -1,3 +1,5 @@
+import { formatAddressValue } from "./formatValue";
+
 export type OrganizerFieldRow = { id: string; organizer_template_id: string; label: string; field_type: string; parent_field_id: string | null; display_order: number };
 export type OrganizerAnswerRow = { id: string; organizer_response_id: string; organizer_field_id: string; value: unknown; instance_index: number };
 
@@ -9,6 +11,7 @@ function maskLast4(value: unknown): string {
 
 function formatOrganizerValue(fieldType: string, value: unknown): string {
   if (value === undefined || value === null || value === "") return "--";
+  if (fieldType === "address") return formatAddressValue(value) || "--";
   if (fieldType === "signature" && typeof value === "object") {
     try {
       const sig = value as { typed_name?: string };

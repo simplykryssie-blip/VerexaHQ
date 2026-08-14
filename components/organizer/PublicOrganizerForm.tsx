@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeOptions } from "@/lib/organizer/formatValue";
+import { normalizeOptions, parseAddressValue, stringifyAddressValue } from "@/lib/organizer/formatValue";
+import { US_STATES } from "@/lib/usStates";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
@@ -513,15 +514,45 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
             className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+        ) : field.field_type === "address" ? (
+          <AddressInput value={value} onChange={(v) => onChange(field.id, v)} />
         ) : (
           <textarea
             id={`field-${field.id}`}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            rows={field.field_type === "address" ? 3 : 2}
+            rows={2}
             className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+function AddressInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const parts = parseAddressValue(value);
+  const inputClass = "w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
+
+  function set(patch: Partial<typeof parts>) {
+    onChange(stringifyAddressValue({ ...parts, ...patch }));
+  }
+
+  return (
+    <div className="space-y-2">
+      <input value={parts.street} onChange={(e) => set({ street: e.target.value })} placeholder="Street address" className={inputClass} />
+      <input value={parts.street2} onChange={(e) => set({ street2: e.target.value })} placeholder="Street address line 2" className={inputClass} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <input value={parts.city} onChange={(e) => set({ city: e.target.value })} placeholder="City" className={`${inputClass} sm:col-span-2`} />
+        <select value={parts.state} onChange={(e) => set({ state: e.target.value })} className={inputClass}>
+          <option value="">State</option>
+          {US_STATES.map((s) => (
+            <option key={s.code} value={s.code}>
+              {s.code}
+            </option>
+          ))}
+        </select>
+        <input value={parts.zip} onChange={(e) => set({ zip: e.target.value })} placeholder="Zip code" className={inputClass} />
       </div>
     </div>
   );
