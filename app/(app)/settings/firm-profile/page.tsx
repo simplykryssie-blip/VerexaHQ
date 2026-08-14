@@ -5,11 +5,9 @@ import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { BusinessHoursForm } from "@/components/settings/BusinessHoursForm";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
-import { FirmContactForm } from "./FirmContactForm";
-import { BrandCenterForm } from "../brand-center/BrandCenterForm";
+import { FirmProfileForm } from "./FirmProfileForm";
 import { FirmTaxProfileForm } from "./FirmTaxProfileForm";
 import { getEffectiveBranding } from "@/lib/branding";
-import { MyProfileForm } from "@/components/settings/MyProfileForm";
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +36,7 @@ export default async function FirmProfilePage() {
         .single(),
       supabase
         .from("branding")
-        .select("display_name, dba, sidebar_logo_url, portal_logo_url, sidebar_text_color, primary_color, secondary_color, accent_color, support_email, support_phone")
+        .select("display_name, sidebar_logo_url, primary_color, secondary_color, support_email, support_phone")
         .eq("workspace_id", workspace.id)
         .maybeSingle(),
       supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
@@ -65,35 +63,43 @@ export default async function FirmProfilePage() {
       <SettingsSectionHeader
         icon={Building2}
         title="Firm Profile"
-        description="Your own profile, plus your firm's identity, branding, and workspace preferences -- tax identifiers, contact info, colors, and booking availability."
+        description="Your profile, your firm's identity, and your workspace preferences."
       />
 
       {user && (
         <div className="mt-6">
-          <h3 className="text-sm font-semibold text-ink">Your profile</h3>
-          <p className="mt-1 text-xs text-muted">Personal to you -- not shared with the rest of your workspace.</p>
-          <div className="mt-3">
-            <MyProfileForm
-              userId={user.id}
-              firstName={myProfile?.first_name ?? null}
-              lastName={myProfile?.last_name ?? null}
-              displayName={myProfile?.display_name ?? null}
-              avatarUrl={myProfile?.avatar_url ?? null}
-              phone={myProfile?.phone ?? null}
-              showPtin={showStaffPtin}
-              ptinLast4={myProfile?.ptin_last4 ?? null}
-            />
-          </div>
+          <FirmProfileForm
+            userId={user.id}
+            workspaceId={workspace.id}
+            firstName={myProfile?.first_name ?? null}
+            lastName={myProfile?.last_name ?? null}
+            displayName={myProfile?.display_name ?? null}
+            avatarUrl={myProfile?.avatar_url ?? null}
+            personalPhone={myProfile?.phone ?? null}
+            showPtin={showStaffPtin}
+            ptinLast4={myProfile?.ptin_last4 ?? null}
+            businessName={branding?.display_name ?? null}
+            website={contact?.website ?? null}
+            mailingAddress={contact?.mailing_address ?? null}
+            businessPhone={branding?.support_phone ?? contact?.phone ?? null}
+            businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
+            logoUrl={branding?.sidebar_logo_url ?? null}
+            primaryColor={branding?.primary_color ?? "#0F172A"}
+            secondaryColor={branding?.secondary_color ?? "#2563EB"}
+            isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
+            eroName={effectiveBranding.eroName ?? null}
+            isOwner={workspace.is_owner}
+          />
         </div>
       )}
 
-      <div className="mt-8">
+      <div className="mt-8 border-t border-border pt-8">
         <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
         <p className="mt-1 text-xs text-muted">
           EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and
           revealing the full value is audit-logged.
         </p>
-        <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+        <div className="mt-3">
           {isAdmin ? (
             <FirmTaxProfileForm workspaceId={workspace.id} profile={profile ?? null} showEin showEfin={showEfin} showPtin={showFirmPtin} />
           ) : !profile ? (
@@ -129,46 +135,7 @@ export default async function FirmProfilePage() {
         </div>
       </div>
 
-      {workspace.is_owner && (
-        <div className="mt-8">
-          <h3 className="text-sm font-semibold text-ink">Contact information</h3>
-          <div className="mt-3 rounded-xl border border-border bg-surface p-5">
-            <FirmContactForm
-              workspaceId={workspace.id}
-              contact={
-                contact ?? { phone: null, website: null, mailing_address: null, primary_contact_email: null }
-              }
-            />
-          </div>
-        </div>
-      )}
-
-      {workspace.is_owner && (
-        <div className="mt-8">
-          <h3 className="text-sm font-semibold text-ink">Branding</h3>
-          {effectiveBranding.isWhitelabeledByEro ? (
-            <>
-              <p className="mt-1 text-xs text-muted">
-                Your branding is managed by {effectiveBranding.eroName ?? "your ERO"} -- your staff dashboard and your clients&apos; portal both
-                show their logo and colors.
-              </p>
-              <div className="mt-3 rounded-xl border border-border bg-surface p-5 text-sm text-slate">
-                Connected PTINs don&apos;t have their own Brand Center. If something looks wrong, contact{" "}
-                {effectiveBranding.eroName ?? "your ERO"} to have it updated.
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-xs text-muted">How your firm appears across your staff dashboard and your clients&apos; portal.</p>
-              <div className="mt-3 rounded-xl border border-border bg-surface p-5">
-                <BrandCenterForm workspaceId={workspace.id} branding={branding ?? null} />
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      <div className="mt-8">
+      <div className="mt-8 border-t border-border pt-8">
         <h3 className="text-sm font-semibold text-ink">Booking availability</h3>
         <p className="mt-1 text-xs text-muted">When clients can self-book a bookable service from their portal.</p>
         <div className="mt-3">
