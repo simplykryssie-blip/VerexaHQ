@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search, Mail, MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Search, Mail, MessageSquare, Trash2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
@@ -50,10 +53,14 @@ export function EmailSmsTemplateGallery({
   workspaceId: string;
   templates: TemplateRow[];
 }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   // A just-created (or just-duplicated) template won't be in `templates`
   // until the server component re-fetches after router.refresh() -- this
   // stub keeps the edit modal showing something in that gap so create/
@@ -69,6 +76,19 @@ export function EmailSmsTemplateGallery({
   );
 
   const editing = templates.find((t) => t.id === editingId) ?? (pendingTemplate?.id === editingId ? pendingTemplate : null);
+
+  async function deleteTemplate(t: TemplateRow) {
+    if (!window.confirm(`Delete "${t.name}"? This can't be undone.`)) return;
+    setDeletingId(t.id);
+    const table = kind === "email" ? "email_templates" : "sms_templates";
+    const { error } = await supabase.from(table).delete().eq("id", t.id);
+    setDeletingId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
 
   return (
     <div>
@@ -141,6 +161,17 @@ export function EmailSmsTemplateGallery({
                     <button type="button" onClick={() => setEditingId(t.id)} className="text-xs font-medium text-accent hover:underline">
                       {isSystem ? "View" : "Edit"}
                     </button>
+                    {!isSystem && (
+                      <button
+                        type="button"
+                        onClick={() => deleteTemplate(t)}
+                        disabled={deletingId === t.id}
+                        aria-label={`Delete ${t.name}`}
+                        className="text-muted hover:text-danger disabled:opacity-60"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               );

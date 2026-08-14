@@ -14,7 +14,21 @@ export async function EmailSmsLibrary({ workspaceId, activeTabParam }: { workspa
 
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
-  const { data: templates } = await supabase.from(table).select("*").or(orFilter).order("name");
+  const { data: rows } = await supabase.from(table).select("*").or(orFilter).order("name");
+
+  // Every workspace gets its own copy of each preloaded template at creation
+  // (see copy_preloaded_templates_to_workspace), so the shared workspace_id
+  // IS NULL master and this workspace's copy normally coexist under the same
+  // slug -- prefer the workspace's own row so it doesn't show up twice. The
+  // master still surfaces here (as a "System" row with "Duplicate & edit")
+  // for the edge case where a new preloaded template is added after this
+  // workspace already exists and hasn't been backfilled yet.
+  const bySlug = new Map<string, NonNullable<typeof rows>[number]>();
+  for (const row of rows ?? []) {
+    const existing = bySlug.get(row.slug);
+    if (!existing || (row.workspace_id && !existing.workspace_id)) bySlug.set(row.slug, row);
+  }
+  const templates = Array.from(bySlug.values());
 
   const tabs: { key: EmailSmsTabKey; label: string }[] = [
     { key: "email", label: "Email" },
