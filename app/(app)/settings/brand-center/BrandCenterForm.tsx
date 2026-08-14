@@ -116,6 +116,7 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
   const supabase = createClient();
   const [displayName, setDisplayName] = useState(branding?.display_name ?? "");
   const [supportEmail, setSupportEmail] = useState(branding?.support_email ?? "");
+  const [supportPhone, setSupportPhone] = useState(branding?.support_phone ?? "");
   const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? "#0F172A");
   const [secondaryColor, setSecondaryColor] = useState(branding?.secondary_color ?? "#2563EB");
   const [textColor, setTextColor] = useState(branding?.sidebar_text_color ?? "");
@@ -134,6 +135,7 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
         workspace_id: workspaceId,
         display_name: displayName || null,
         support_email: supportEmail || null,
+        support_phone: supportPhone || null,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
         sidebar_text_color: textColor || null,
@@ -179,14 +181,26 @@ export function BrandCenterForm({ workspaceId, branding }: { workspaceId: string
           className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
-      <div>
-        <label className="block text-sm font-medium text-slate">Support email</label>
-        <input
-          type="email"
-          value={supportEmail}
-          onChange={(e) => setSupportEmail(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-slate">Support email</label>
+          <input
+            type="email"
+            value={supportEmail}
+            onChange={(e) => setSupportEmail(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate">Support phone</label>
+          <input
+            type="tel"
+            value={supportPhone}
+            onChange={(e) => setSupportPhone(e.target.value)}
+            placeholder="(555) 555-5555"
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeOptions, parseAddressValue, stringifyAddressValue } from "@/lib/organizer/formatValue";
 import { US_STATES } from "@/lib/usStates";
@@ -20,10 +21,19 @@ type FieldRow = {
   conditional_logic?: unknown;
 };
 
+type Branding = {
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+  support_email: string | null;
+  support_phone: string | null;
+} | null;
+
 type TemplateData = {
   template: { id: string; name: string; description: string | null };
   workspace_name: string;
   requires_portal_signup: boolean;
+  branding?: Branding;
   fields: FieldRow[];
 };
 
@@ -36,7 +46,8 @@ type TemplateData = {
 // "is this the public flow?" branches through it instead.
 export function PublicOrganizerForm({ token, data }: { token: string; data: TemplateData }) {
   const supabase = createClient();
-  const { template, workspace_name, requires_portal_signup, fields } = data;
+  const { template, workspace_name, requires_portal_signup, branding, fields } = data;
+  const accentColor = branding?.secondary_color || branding?.primary_color || undefined;
 
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
@@ -177,9 +188,29 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-8">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-muted">{workspace_name}</p>
+        {branding?.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
+          <img src={branding.logo_url} alt={workspace_name} className="mb-3 h-12 w-auto object-contain" />
+        ) : (
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">{workspace_name}</p>
+        )}
         <h1 className="text-lg font-semibold text-ink">{template.name}</h1>
-        {template.description && <p className="mt-1 whitespace-pre-line text-sm text-muted">{template.description}</p>}
+        <div className="mt-1 h-0.5 w-10 rounded-full" style={{ backgroundColor: accentColor || "currentColor" }} />
+        {template.description && <p className="mt-2 whitespace-pre-line text-sm text-muted">{template.description}</p>}
+        {(branding?.support_phone || branding?.support_email) && (
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate">
+            {branding.support_phone && (
+              <a href={`tel:${branding.support_phone}`} className="inline-flex items-center gap-1.5 hover:text-accent">
+                <Phone size={13} aria-hidden="true" /> {branding.support_phone}
+              </a>
+            )}
+            {branding.support_email && (
+              <a href={`mailto:${branding.support_email}`} className="inline-flex items-center gap-1.5 hover:text-accent">
+                <Mail size={13} aria-hidden="true" /> {branding.support_email}
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {step === "contact" && (
