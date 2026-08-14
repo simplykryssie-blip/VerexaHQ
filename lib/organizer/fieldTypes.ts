@@ -16,7 +16,8 @@ export type OrganizerFieldType =
   | "ein"
   | "file_upload"
   | "signature"
-  | "repeating_section";
+  | "repeating_section"
+  | "page_break";
 
 export const FIELD_TYPE_GROUPS: { group: string; types: { type: OrganizerFieldType; label: string }[] }[] = [
   {
@@ -53,7 +54,10 @@ export const FIELD_TYPE_GROUPS: { group: string; types: { type: OrganizerFieldTy
   },
   {
     group: "Structure",
-    types: [{ type: "repeating_section", label: "Repeating section" }],
+    types: [
+      { type: "repeating_section", label: "Repeating section" },
+      { type: "page_break", label: "Page break" },
+    ],
   },
 ];
 

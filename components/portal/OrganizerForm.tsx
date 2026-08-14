@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { formatAddressValue, normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
+import { splitIntoPages } from "@/lib/organizer/pages";
 
 type FieldRow = {
   id: string;
@@ -80,6 +81,7 @@ export function OrganizerForm({
   });
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
 
   async function saveAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
@@ -158,10 +160,20 @@ export function OrganizerForm({
   const topLevelFields = fields
     .filter((f) => !f.parent_field_id)
     .filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+  const pages = splitIntoPages(topLevelFields);
+  const currentIndex = Math.min(pageIndex, pages.length - 1);
+  const currentPage = pages[currentIndex];
+  const isLastPage = currentIndex === pages.length - 1;
 
   return (
     <div className="space-y-4">
-      {topLevelFields.map((field) =>
+      {pages.length > 1 && (
+        <p className="text-xs font-medium text-muted">
+          Page {currentIndex + 1} of {pages.length}
+          {currentPage.title ? ` -- ${currentPage.title}` : ""}
+        </p>
+      )}
+      {currentPage.fields.map((field) =>
         field.field_type === "repeating_section" ? (
           <RepeatingSectionInput
             key={field.id}
@@ -190,6 +202,25 @@ export function OrganizerForm({
 
       {!readOnly && (
         <div className="flex items-center gap-2 pt-2">
+          {pages.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+              disabled={currentIndex === 0}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent disabled:opacity-40"
+            >
+              Back
+            </button>
+          )}
+          {pages.length > 1 && !isLastPage && (
+            <button
+              type="button"
+              onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
+            >
+              Next
+            </button>
+          )}
           <button
             type="button"
             onClick={saveAll}
@@ -198,14 +229,16 @@ export function OrganizerForm({
           >
             {saving ? "Saving..." : "Save progress"}
           </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={saving || submitting}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {submitting ? "Submitting..." : "Submit organizer"}
-          </button>
+          {(pages.length === 1 || isLastPage) && (
+            <button
+              type="button"
+              onClick={submit}
+              disabled={saving || submitting}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {submitting ? "Submitting..." : "Submit organizer"}
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -188,7 +188,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
           />
           <FieldPropertiesPanel
             field={selectedField}
-            otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId)}
+            otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
             onUpdate={updateField}
             onDelete={deleteField}
             readOnly={readOnly}

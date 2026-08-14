@@ -39,7 +39,53 @@ export function FieldPropertiesPanel({
     );
   }
 
+  if (field.field_type === "page_break") {
+    return <PageBreakForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+  }
+
   return <PropertiesForm key={field.id} field={field} otherTopLevelFields={otherTopLevelFields} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+}
+
+function PageBreakForm({
+  field,
+  onUpdate,
+  onDelete,
+  readOnly,
+}: {
+  field: BuilderField;
+  onUpdate: (fieldId: string, patch: Partial<Pick<BuilderField, "label">>) => void;
+  onDelete: (fieldId: string) => void;
+  readOnly: boolean;
+}) {
+  const [label, setLabel] = useState(field.label);
+
+  return (
+    <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-ink">Page break</p>
+        {!readOnly && (
+          <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
+            Delete
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        Everything above this splits into its own page; everything below starts a new one. Not a question -- nothing is asked here.
+      </p>
+
+      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+        Next page&apos;s title (optional)
+        <input
+          value={label}
+          disabled={readOnly}
+          onChange={(e) => setLabel(e.target.value)}
+          onBlur={() => label !== field.label && onUpdate(field.id, { label })}
+          placeholder="e.g. Income"
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+        />
+      </label>
+    </aside>
+  );
 }
 
 function PropertiesForm({

@@ -39,7 +39,7 @@ export function buildOrganizerResponseDetail(responseId: string, templateId: str
   const responseAnswers = allAnswers.filter((a) => a.organizer_response_id === responseId);
 
   const topLevel = templateFields
-    .filter((f) => !f.parent_field_id && f.field_type !== "repeating_section")
+    .filter((f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break")
     .sort((a, b) => a.display_order - b.display_order)
     .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id)));
 

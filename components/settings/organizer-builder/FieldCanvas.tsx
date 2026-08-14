@@ -23,6 +23,27 @@ function FieldBlock({
   onDrop: () => void;
   isDragging: boolean;
 }) {
+  if (field.field_type === "page_break") {
+    return (
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onClick={onSelect}
+        className={`flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-2 transition ${
+          selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent" : "border-muted/60 hover:border-accent/50"
+        }`}
+      >
+        <span className="h-px flex-1 border-t border-dashed border-current text-muted" aria-hidden="true" />
+        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">
+          ✂ Page break{field.label && field.label !== "New question" ? ` -- ${field.label}` : ""}
+        </span>
+        <span className="h-px flex-1 border-t border-dashed border-current text-muted" aria-hidden="true" />
+      </div>
+    );
+  }
+
   return (
     <div
       draggable

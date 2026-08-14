@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
+import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
 
@@ -41,6 +42,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   const topLevelFields = fields.filter((f) => !f.parent_field_id);
 
   const [step, setStep] = useState<"contact" | "form" | "done">("contact");
+  const [pageIndex, setPageIndex] = useState(0);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -54,6 +56,10 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   const [accountCreated, setAccountCreated] = useState(false);
 
   const visibleTopLevelFields = topLevelFields.filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+  const pages = splitIntoPages(visibleTopLevelFields);
+  const currentIndex = Math.min(pageIndex, pages.length - 1);
+  const currentPage = pages[currentIndex];
+  const isLastPage = currentIndex === pages.length - 1;
 
   function setAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
@@ -273,7 +279,13 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 
       {step === "form" && (
         <div className="space-y-4">
-          {visibleTopLevelFields.map((field) =>
+          {pages.length > 1 && (
+            <p className="text-xs font-medium text-muted">
+              Page {currentIndex + 1} of {pages.length}
+              {currentPage.title ? ` -- ${currentPage.title}` : ""}
+            </p>
+          )}
+          {currentPage.fields.map((field) =>
             field.field_type === "repeating_section" ? (
               <PublicRepeatingSection
                 key={field.id}
@@ -291,19 +303,29 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setStep("contact")}
+              onClick={() => (currentIndex === 0 ? setStep("contact") : setPageIndex((i) => i - 1))}
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
             >
               Back
             </button>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={submitting}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-            >
-              {submitting ? "Submitting..." : "Submit"}
-            </button>
+            {isLastPage ? (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={submitting}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              >
+                {submitting ? "Submitting..." : "Submit"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPageIndex((i) => i + 1)}
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+              >
+                Next
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
+import { splitIntoPages } from "@/lib/organizer/pages";
 import type { BuilderField } from "./types";
 
 /**
@@ -23,8 +24,13 @@ export function OrganizerPreviewPanel({
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
+  const [pageIndex, setPageIndex] = useState(0);
 
   const visibleFields = topLevelFields.filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+  const pages = splitIntoPages(visibleFields);
+  const currentIndex = Math.min(pageIndex, pages.length - 1);
+  const currentPage = pages[currentIndex];
+  const isLastPage = currentIndex === pages.length - 1;
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
@@ -32,10 +38,16 @@ export function OrganizerPreviewPanel({
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">{templateName}</h2>
         <p className="mt-1 text-sm text-muted">This is a sandbox -- nothing typed here is saved.</p>
+        {pages.length > 1 && (
+          <p className="mt-2 text-xs font-medium text-muted">
+            Page {currentIndex + 1} of {pages.length}
+            {currentPage.title ? ` -- ${currentPage.title}` : ""}
+          </p>
+        )}
 
         <div className="mt-5 space-y-4">
-          {visibleFields.length === 0 && <p className="text-sm text-muted">No fields to show yet.</p>}
-          {visibleFields.map((field) =>
+          {currentPage.fields.length === 0 && <p className="text-sm text-muted">No fields to show yet.</p>}
+          {currentPage.fields.map((field) =>
             field.field_type === "repeating_section" ? (
               <PreviewRepeatingSection
                 key={field.id}
@@ -51,12 +63,27 @@ export function OrganizerPreviewPanel({
         </div>
 
         <div className="mt-6 flex justify-between border-t border-border pt-4">
-          <button type="button" disabled className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted">
-            Save &amp; exit
+          <button
+            type="button"
+            disabled={currentIndex === 0}
+            onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate disabled:opacity-40"
+          >
+            ← Back
           </button>
-          <button type="button" disabled className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white opacity-60">
-            Continue →
-          </button>
+          {isLastPage ? (
+            <button type="button" disabled className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white opacity-60">
+              Submit
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            >
+              Continue →
+            </button>
+          )}
         </div>
       </div>
     </main>
