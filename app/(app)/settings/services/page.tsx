@@ -22,7 +22,7 @@ export default async function ServicesPage() {
       <SettingsSectionHeader
         icon={Workflow}
         title="Services"
-        description="A service is a type of work your firm offers, not a specific client's work -- turn on the ones you do here, each with its own editable pipeline. When you start that work for an actual client, you open an engagement for it."
+        description="A service is a type of work your firm offers, not a specific client's work -- turn on the ones you do here, each with its own editable pipeline plus billing and intake defaults. Optional: an engagement can be opened for a client with just a bare pipeline, or no workflow at all, without a service in front of it."
       />
 
       <div className="mt-6">

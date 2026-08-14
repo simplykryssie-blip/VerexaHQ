@@ -31,7 +31,7 @@ export default async function NewEngagementPage({
     );
   }
 
-  const [{ data: defaultClient }, { data: services }, { count: clientCount }, { data: billingRules }] = await Promise.all([
+  const [{ data: defaultClient }, { data: services }, { data: pipelines }, { count: clientCount }, { data: billingRules }] = await Promise.all([
     searchParams.clientId
       ? supabase
           .from("clients")
@@ -45,6 +45,12 @@ export default async function NewEngagementPage({
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),
+    supabase
+      .from("processes")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("status", "published")
+      .order("name"),
     supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).is("merged_into_client_id", null),
     supabase
       .from("billing_rules")
@@ -64,6 +70,7 @@ export default async function NewEngagementPage({
             hasAnyClients={(clientCount ?? 0) > 0}
             defaultClient={defaultClient ?? null}
             services={services ?? []}
+            pipelines={pipelines ?? []}
             billingRules={billingRules ?? []}
             autoAssignToSelf={isIndependentTier(workspace)}
           />

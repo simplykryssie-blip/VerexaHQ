@@ -84,6 +84,7 @@ export default async function DashboardPage() {
     const showEroSteps = canInviteStaff(workspace);
     const [
       { count: serviceCount },
+      { count: pipelineCount },
       { count: organizerCount },
       { count: clientCount },
       { count: staffCount },
@@ -93,6 +94,7 @@ export default async function DashboardPage() {
       { count: connectionCount },
     ] = await Promise.all([
       supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("processes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       showEroSteps
@@ -162,10 +164,10 @@ export default async function DashboardPage() {
       },
       {
         key: "service",
-        label: "Turn on your first service",
-        description: "Choose which services your firm offers and customize the pipeline for each one.",
-        href: "/settings/services",
-        complete: (serviceCount ?? 0) > 0,
+        label: "Build your first pipeline",
+        description: "Set up the stages work moves through -- as a standalone pipeline, or bundled with a service if you bill by service line.",
+        href: "/pipelines",
+        complete: (serviceCount ?? 0) > 0 || (pipelineCount ?? 0) > 0,
       },
       {
         key: "organizer",

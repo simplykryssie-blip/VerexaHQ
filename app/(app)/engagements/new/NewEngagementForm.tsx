@@ -8,6 +8,7 @@ import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { renderEmail } from "@/lib/email/template";
 import { formatPhone } from "@/lib/phone";
+import { CASE_TYPES } from "@/lib/caseTypes";
 
 const DRAFT_KEY = "new-engagement-inline";
 
@@ -306,6 +307,7 @@ export function NewEngagementForm({
   hasAnyClients,
   defaultClient,
   services,
+  pipelines,
   billingRules,
   autoAssignToSelf,
 }: {
@@ -313,6 +315,7 @@ export function NewEngagementForm({
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
   services: { id: string; name: string; organizer_template_id: string | null; billing_rule_id: string | null; organizer_templates: { name: string } | null }[];
+  pipelines: { id: string; name: string }[];
   billingRules: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
@@ -322,8 +325,16 @@ export function NewEngagementForm({
   const router = useRouter();
   const supabase = createClient();
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
+  const [caseType, setCaseType] = useState<string>("other");
+  const [dueDate, setDueDate] = useState("");
+  // A case doesn't need a workflow at all -- Service and Pipeline are two
+  // alternate ways to attach one (a service bundles billing/organizer on
+  // top of its pipeline; a bare pipeline is just the stages). "none" is
+  // the default so nothing here is a gate to creating the case.
+  const [workflowKind, setWorkflowKind] = useState<"none" | "service" | "pipeline">("none");
   const [serviceId, setServiceId] = useState("");
   const [serviceTouched, setServiceTouched] = useState(false);
+  const [pipelineId, setPipelineId] = useState("");
   const [billingRuleId, setBillingRuleId] = useState("");
   const [billingRuleTouched, setBillingRuleTouched] = useState(false);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
@@ -362,7 +373,10 @@ export function NewEngagementForm({
       if (cancelled) return;
       if (data?.resolved_service_id) {
         setPendingResponse({ id: data.id, resolved_service_id: data.resolved_service_id });
-        if (!serviceTouched) setServiceId(data.resolved_service_id);
+        if (!serviceTouched) {
+          setWorkflowKind("service");
+          setServiceId(data.resolved_service_id);
+        }
       } else {
         setPendingResponse(null);
       }
@@ -374,12 +388,38 @@ export function NewEngagementForm({
   }, [selectedClient?.id]);
 
   function selectService(id: string) {
+    setWorkflowKind("service");
     setServiceTouched(true);
     setServiceId(id);
+    setPipelineId("");
     if (!billingRuleTouched) {
       const service = services.find((s) => s.id === id);
       setBillingRuleId(service?.billing_rule_id ?? "");
     }
+  }
+
+  function selectPipeline(id: string) {
+    setWorkflowKind("pipeline");
+    setPipelineId(id);
+    setServiceTouched(true);
+    setServiceId("");
+  }
+
+  function clearWorkflow() {
+    setWorkflowKind("none");
+    setServiceTouched(true);
+    setServiceId("");
+    setPipelineId("");
+  }
+
+  function handleWorkflowChange(value: string) {
+    if (!value) {
+      clearWorkflow();
+      return;
+    }
+    const [kind, id] = value.split(":");
+    if (kind === "service") selectService(id);
+    else if (kind === "pipeline") selectPipeline(id);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -388,10 +428,6 @@ export function NewEngagementForm({
 
     if (!selectedClient) {
       setError("Select or create a client.");
-      return;
-    }
-    if (!serviceId) {
-      setError("Select a service.");
       return;
     }
 
@@ -406,16 +442,20 @@ export function NewEngagementForm({
     }
 
     // create_engagement is the single source of truth for deriving
-    // workflow_id/current_stage from a service's process -- this form and
-    // the bundled engagement step in NewClientButton.tsx both call it, so
-    // the derivation can't drift out of sync between the two entry points.
+    // workflow_id/current_stage from a service's (or a bare pipeline's)
+    // process -- this form and the bundled engagement step in
+    // NewClientButton.tsx both call it, so the derivation can't drift out
+    // of sync between the two entry points.
     const { data, error } = await supabase.rpc("create_engagement", {
       p_workspace_id: workspaceId,
       p_client_id: selectedClient.id,
-      p_service_id: serviceId,
+      p_service_id: workflowKind === "service" ? serviceId : undefined,
+      p_process_id: workflowKind === "pipeline" ? pipelineId : undefined,
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
       p_billing_rule_id: billingRuleId || undefined,
+      p_case_type: caseType,
+      p_due_date: dueDate || undefined,
     });
 
     if (error) {
@@ -556,13 +596,7 @@ export function NewEngagementForm({
     );
   }
 
-  if (services.length === 0) {
-    return (
-      <p className="text-sm text-muted">
-        No published services yet -- add one under Services before creating an engagement.
-      </p>
-    );
-  }
+  const workflowValue = workflowKind === "service" ? `service:${serviceId}` : workflowKind === "pipeline" ? `pipeline:${pipelineId}` : "";
 
   return (
     <>
@@ -572,29 +606,67 @@ export function NewEngagementForm({
         <ClientSearchField workspaceId={workspaceId} selected={selectedClient} onSelect={setSelectedClient} />
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-slate">Case type</label>
+          <select
+            value={caseType}
+            onChange={(e) => setCaseType(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {CASE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate">Due date</label>
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+      </div>
+
       <div>
-        <label className="block text-sm font-medium text-slate">Service</label>
+        <label className="block text-sm font-medium text-slate">Workflow</label>
         <select
-          required
-          value={serviceId}
-          onChange={(e) => selectService(e.target.value)}
+          value={workflowValue}
+          onChange={(e) => handleWorkflowChange(e.target.value)}
           className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         >
-          <option value="" disabled>
-            Select a service
-          </option>
-          {services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
+          <option value="">No workflow yet -- set this up later</option>
+          {pipelines.length > 0 && (
+            <optgroup label="Pipelines">
+              {pipelines.map((p) => (
+                <option key={p.id} value={`pipeline:${p.id}`}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
+          {services.length > 0 && (
+            <optgroup label="Services">
+              {services.map((s) => (
+                <option key={s.id} value={`service:${s.id}`}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
-        {pendingResponse && pendingResponse.resolved_service_id === serviceId ? (
+        {pendingResponse && pendingResponse.resolved_service_id === serviceId && workflowKind === "service" ? (
           <p className="mt-1 text-xs text-success">
             Suggested from the organizer they already completed -- their answers will be attached to this engagement instead of asking again.
           </p>
         ) : (
-          <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
+          <p className="mt-1 text-xs text-muted">
+            Optional. A Pipeline is just the stages; a Service also bundles billing and an intake organizer. Attach one now or later.
+          </p>
         )}
       </div>
 

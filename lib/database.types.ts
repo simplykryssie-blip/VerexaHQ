@@ -2949,6 +2949,7 @@ export type Database = {
           archived_date: string | null
           assigned_staff_id: string | null
           billing_rule_id: string | null
+          case_type: string
           client_id: string
           completed_date: string | null
           compliance_officer_id: string | null
@@ -2976,6 +2977,7 @@ export type Database = {
           archived_date?: string | null
           assigned_staff_id?: string | null
           billing_rule_id?: string | null
+          case_type?: string
           client_id: string
           completed_date?: string | null
           compliance_officer_id?: string | null
@@ -3003,6 +3005,7 @@ export type Database = {
           archived_date?: string | null
           assigned_staff_id?: string | null
           billing_rule_id?: string | null
+          case_type?: string
           client_id?: string
           completed_date?: string | null
           compliance_officer_id?: string | null
@@ -7327,9 +7330,12 @@ export type Database = {
         Args: {
           p_assigned_staff_id?: string
           p_billing_rule_id?: string
+          p_case_type?: string
           p_client_id: string
+          p_due_date?: string
           p_priority?: Database["public"]["Enums"]["engagement_priority"]
-          p_service_id: string
+          p_process_id?: string
+          p_service_id?: string
           p_workspace_id: string
         }
         Returns: string
