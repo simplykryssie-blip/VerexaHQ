@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  const explicitNext = searchParams.get("next");
 
   const supabase = createClient();
 
@@ -26,15 +26,41 @@ export async function GET(request: Request) {
     return response;
   }
 
+  // Public-organizer signup asks for "next=/portal/dashboard" explicitly, but
+  // Supabase's own redirect-URL allowlist can strip query params off
+  // emailRedirectTo before this route ever sees them, silently falling back
+  // to "/dashboard" -- the staff app. Since a client_portal_users identity
+  // is never also a workspace_users one, landing on the empty staff
+  // dashboard sends a brand-new client straight to "Set up your firm"
+  // instead of their portal. If no explicit next survived, check which
+  // kind of identity was just confirmed and route accordingly.
+  async function resolveNext() {
+    if (explicitNext) return explicitNext;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const { data: portalUser } = await supabase
+        .from("client_portal_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (portalUser) return "/portal/dashboard";
+    }
+    return "/dashboard";
+  }
+
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return withRememberMarker(NextResponse.redirect(`${origin}${next}`));
+      return withRememberMarker(NextResponse.redirect(`${origin}${await resolveNext()}`));
     }
   } else if (tokenHash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
     if (!error) {
-      return withRememberMarker(NextResponse.redirect(`${origin}${next}`));
+      return withRememberMarker(NextResponse.redirect(`${origin}${await resolveNext()}`));
     }
   }
 

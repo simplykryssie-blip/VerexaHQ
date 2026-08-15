@@ -21,13 +21,31 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const meta = user?.user_metadata as
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+
+      // A client_portal_users identity is never also a workspace_users one
+      // -- a client landing here (e.g. a confirmation link that lost its
+      // redirect target) should never see the staff "set up your firm"
+      // form. Send them to their own portal instead.
+      const { data: portalUser } = await supabase
+        .from("client_portal_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (portalUser) {
+        router.replace("/portal/dashboard");
+        return;
+      }
+
+      const meta = user.user_metadata as
         | { first_name?: string; last_name?: string; company_name?: string }
         | undefined;
       if (meta?.company_name) setName(meta.company_name);
     });
-  }, [supabase]);
+  }, [supabase, router]);
 
   async function signOut() {
     await supabase.auth.signOut();

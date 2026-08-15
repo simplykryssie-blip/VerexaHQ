@@ -5,6 +5,7 @@ import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
@@ -13,7 +14,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const workspace = await getCurrentWorkspace();
 
   if (!workspace) {
-    redirect("/onboarding");
+    // A client_portal_users identity is never also a workspace_users one --
+    // if a client ends up here (e.g. an email confirmation link that lost
+    // its "next" param), send them to their own portal instead of letting
+    // them land on "Set up your firm", which would let a client spin up a
+    // staff workspace for themselves.
+    const portalIdentity = await getPortalIdentity();
+    redirect(portalIdentity ? "/portal/dashboard" : "/onboarding");
   }
 
   const supabase = createClient();
