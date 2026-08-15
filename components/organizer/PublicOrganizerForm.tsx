@@ -19,6 +19,7 @@ type FieldRow = {
   options: unknown;
   parent_field_id: string | null;
   conditional_logic?: unknown;
+  client_profile_field?: string | null;
 };
 
 type Branding = {
@@ -300,6 +301,21 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                 }
               }
               setError(null);
+              // There's no client record yet to prefill from at this point
+              // (find_or_create_public_lead only runs at final submit) --
+              // carry forward what was just typed here instead, into
+              // whichever form fields the builder mapped to it.
+              setAnswers((prev) => {
+                const next = { ...prev };
+                for (const field of topLevelFields) {
+                  if (next[field.id]) continue;
+                  if (field.client_profile_field === "first_name") next[field.id] = firstName.trim();
+                  else if (field.client_profile_field === "last_name") next[field.id] = lastName.trim();
+                  else if (field.client_profile_field === "primary_email") next[field.id] = email.trim();
+                  else if (field.client_profile_field === "primary_phone") next[field.id] = phone.trim();
+                }
+                return next;
+              });
               setStep("form");
             }}
             className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
