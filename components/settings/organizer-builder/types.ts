@@ -11,6 +11,8 @@ export type BuilderField = {
   is_required: boolean;
   options: unknown;
   conditional_logic: unknown;
+  /** Only meaningful for field_type "rich_text" -- the static prose/terms content, merge-field driven the same way engagement_letter_templates.body_html is. */
+  body_html: string | null;
 };
 
 export type BuilderTemplate = {

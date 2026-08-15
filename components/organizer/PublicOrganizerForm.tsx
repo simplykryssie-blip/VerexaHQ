@@ -9,6 +9,7 @@ import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditio
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 
 type FieldRow = {
   id: string;
@@ -19,6 +20,7 @@ type FieldRow = {
   options: unknown;
   parent_field_id: string | null;
   conditional_logic?: unknown;
+  body_html?: string | null;
 };
 
 type Branding = {
@@ -66,6 +68,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountCreated, setAccountCreated] = useState(false);
+  const [signed, setSigned] = useState(false);
 
   const visibleTopLevelFields = topLevelFields.filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
   const pages = splitIntoPages(visibleTopLevelFields);
@@ -77,10 +80,42 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   }
 
+  // rich_text/page_break are display-only -- neither collects an answer, so
+  // neither can ever block advancing. Everything else needs a non-empty
+  // answer (at least one row, for a repeating section) when marked required.
+  // checkbox is special-cased: PublicFieldInput stores "false" for an
+  // unchecked box once touched, which is a non-empty string -- required
+  // there means actually checked ("I agree to the terms"), not merely
+  // interacted with.
+  function isFieldAnswered(field: FieldRow): boolean {
+    if (field.field_type === "repeating_section") {
+      return (repeaterRows[field.id] ?? []).length > 0;
+    }
+    if (field.field_type === "checkbox") {
+      return answers[field.id] === "true";
+    }
+    return Boolean(answers[field.id]?.trim());
+  }
+
+  function validatePage(pageFields: FieldRow[]): string | null {
+    for (const field of pageFields) {
+      if (field.field_type === "rich_text" || field.field_type === "page_break") continue;
+      if (field.is_required && !isFieldAnswered(field)) {
+        return `"${field.label}" is required.`;
+      }
+    }
+    return null;
+  }
+
   async function submit() {
     if (!firstName.trim() || !email.trim()) {
       setError("Name and email are required.");
       setStep("contact");
+      return;
+    }
+    const validationError = validatePage(currentPage.fields);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     setSubmitting(true);
@@ -134,6 +169,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
           body: JSON.stringify({ responseId }),
         }).catch(() => {});
       }
+      setSigned(Boolean((rpcData as { signature_request_id?: string } | null)?.signature_request_id));
       setAccountCreated(true);
       setStep("done");
       return;
@@ -164,21 +200,23 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         // it into Documents can be retried later if this fails.
       });
     }
+    setSigned(Boolean((rpcData as { signature_request_id?: string } | null)?.signature_request_id));
     setStep("done");
   }
 
   if (step === "done") {
     return (
       <div className="mx-auto max-w-md p-8 text-center">
-        <h1 className="text-lg font-semibold text-ink">Thank you</h1>
+        <h1 className="text-lg font-semibold text-ink">{signed ? "Signed -- thank you" : "Thank you"}</h1>
         {accountCreated ? (
           <p className="mt-2 text-sm text-muted">
-            Your information was submitted to {workspace_name}. Check your email at {email} to confirm your new client portal account, then log
-            in to see your progress.
+            {signed ? "Your responses were signed and submitted" : "Your information was submitted"} to {workspace_name}. Check your email at{" "}
+            {email} to confirm your new client portal account, then log in to see your progress.
           </p>
         ) : (
           <p className="mt-2 text-sm text-muted">
-            Your information was submitted to {workspace_name}. They&apos;ll be in touch soon.
+            {signed ? "Your responses were signed and submitted" : "Your information was submitted"} to {workspace_name}. They&apos;ll be in
+            touch soon.
           </p>
         )}
       </div>
@@ -318,7 +356,9 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             </p>
           )}
           {currentPage.fields.map((field) =>
-            field.field_type === "repeating_section" ? (
+            field.field_type === "rich_text" ? (
+              <RichTextEditor key={field.id} content={field.body_html ?? ""} editable={false} />
+            ) : field.field_type === "repeating_section" ? (
               <PublicRepeatingSection
                 key={field.id}
                 field={field}
@@ -352,7 +392,15 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             ) : (
               <button
                 type="button"
-                onClick={() => setPageIndex((i) => i + 1)}
+                onClick={() => {
+                  const validationError = validatePage(currentPage.fields);
+                  if (validationError) {
+                    setError(validationError);
+                    return;
+                  }
+                  setError(null);
+                  setPageIndex((i) => i + 1);
+                }}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
               >
                 Next

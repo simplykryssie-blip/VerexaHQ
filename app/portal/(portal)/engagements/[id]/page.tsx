@@ -42,7 +42,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
 
   const documentIds = new Set((documents ?? []).map((d) => d.id));
   const signatureRequests = (signatureRequestRows ?? [])
-    .filter((r) => documentIds.has(r.attachment_id))
+    .filter((r) => documentIds.has(r.attachment_id ?? ""))
     .map((r) => ({
       id: r.id,
       title: r.title,

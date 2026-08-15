@@ -17,7 +17,8 @@ export type OrganizerFieldType =
   | "file_upload"
   | "signature"
   | "repeating_section"
-  | "page_break";
+  | "page_break"
+  | "rich_text";
 
 export const FIELD_TYPE_GROUPS: { group: string; types: { type: OrganizerFieldType; label: string }[] }[] = [
   {
@@ -51,6 +52,10 @@ export const FIELD_TYPE_GROUPS: { group: string; types: { type: OrganizerFieldTy
   {
     group: "Upload",
     types: [{ type: "file_upload", label: "Document upload" }],
+  },
+  {
+    group: "Content",
+    types: [{ type: "rich_text", label: "Text / terms" }],
   },
   {
     group: "Structure",

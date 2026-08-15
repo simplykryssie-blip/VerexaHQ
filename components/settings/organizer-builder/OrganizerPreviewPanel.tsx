@@ -5,6 +5,8 @@ import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
+import { interpolateSample } from "@/lib/mergeFields";
 import type { BuilderField } from "./types";
 
 /**
@@ -52,7 +54,9 @@ export function OrganizerPreviewPanel({
         <div className="mt-5 space-y-4">
           {currentPage.fields.length === 0 && <p className="text-sm text-muted">No fields to show yet.</p>}
           {currentPage.fields.map((field) =>
-            field.field_type === "repeating_section" ? (
+            field.field_type === "rich_text" ? (
+              <RichTextEditor key={field.id} content={interpolateSample(field.body_html ?? "")} editable={false} />
+            ) : field.field_type === "repeating_section" ? (
               <PreviewRepeatingSection
                 key={field.id}
                 field={field}

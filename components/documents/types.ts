@@ -64,7 +64,13 @@ export type SignatureRequestRow = {
   title: string;
   status: "pending" | "completed" | "declined" | "cancelled";
   due_date: string | null;
-  attachment_id: string;
+  /** Null for a signature produced by a combined organizer+letter template
+   *  sign-off, which has no pre-existing document to attach -- the signed
+   *  snapshot lives in signature_request_signers.resolved_document_html
+   *  instead. Every row shown in this list today still comes from an
+   *  attachment join, so this stays non-null in practice here; it's typed
+   *  loosely to match the underlying column. */
+  attachment_id: string | null;
   attachment_file_name: string;
   created_at: string;
   signers: SignerRow[];

@@ -3826,6 +3826,7 @@ export type Database = {
       }
       organizer_fields: {
         Row: {
+          body_html: string | null
           conditional_logic: Json
           created_at: string
           display_order: number
@@ -3841,6 +3842,7 @@ export type Database = {
           validation: Json
         }
         Insert: {
+          body_html?: string | null
           conditional_logic?: Json
           created_at?: string
           display_order?: number
@@ -3856,6 +3858,7 @@ export type Database = {
           validation?: Json
         }
         Update: {
+          body_html?: string | null
           conditional_logic?: Json
           created_at?: string
           display_order?: number
@@ -3942,6 +3945,7 @@ export type Database = {
           resolved_service_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          signature_request_id: string | null
           status: string
           submitted_at: string | null
           updated_at: string
@@ -3959,6 +3963,7 @@ export type Database = {
           resolved_service_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          signature_request_id?: string | null
           status?: string
           submitted_at?: string | null
           updated_at?: string
@@ -3976,6 +3981,7 @@ export type Database = {
           resolved_service_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          signature_request_id?: string | null
           status?: string
           submitted_at?: string | null
           updated_at?: string
@@ -5300,6 +5306,7 @@ export type Database = {
           decline_reason: string | null
           declined_at: string | null
           id: string
+          resolved_document_html: string | null
           sign_order: number
           signature_image_path: string | null
           signature_request_id: string
@@ -5317,6 +5324,7 @@ export type Database = {
           decline_reason?: string | null
           declined_at?: string | null
           id?: string
+          resolved_document_html?: string | null
           sign_order?: number
           signature_image_path?: string | null
           signature_request_id: string
@@ -5334,6 +5342,7 @@ export type Database = {
           decline_reason?: string | null
           declined_at?: string | null
           id?: string
+          resolved_document_html?: string | null
           sign_order?: number
           signature_image_path?: string | null
           signature_request_id?: string
@@ -5357,36 +5366,39 @@ export type Database = {
       }
       signature_requests: {
         Row: {
-          attachment_id: string
+          attachment_id: string | null
           created_at: string
           created_by: string | null
           due_date: string | null
           engagement_letter_template_id: string | null
           id: string
+          organizer_template_id: string | null
           status: string
           title: string
           updated_at: string
           workspace_id: string
         }
         Insert: {
-          attachment_id: string
+          attachment_id?: string | null
           created_at?: string
           created_by?: string | null
           due_date?: string | null
           engagement_letter_template_id?: string | null
           id?: string
+          organizer_template_id?: string | null
           status?: string
           title: string
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          attachment_id?: string
+          attachment_id?: string | null
           created_at?: string
           created_by?: string | null
           due_date?: string | null
           engagement_letter_template_id?: string | null
           id?: string
+          organizer_template_id?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -5412,6 +5424,13 @@ export type Database = {
             columns: ["engagement_letter_template_id"]
             isOneToOne: false
             referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_requests_organizer_template_id_fkey"
+            columns: ["organizer_template_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_templates"
             referencedColumns: ["id"]
           },
           {

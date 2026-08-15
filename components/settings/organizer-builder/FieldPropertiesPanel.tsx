@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
 import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS } from "@/lib/organizer/fieldTypes";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
+import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -26,7 +29,7 @@ export function FieldPropertiesPanel({
 }: {
   field: BuilderField | null;
   otherTopLevelFields: BuilderField[];
-  onUpdate: (fieldId: string, patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic">>) => void;
+  onUpdate: (fieldId: string, patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "body_html">>) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
 }) {
@@ -41,6 +44,10 @@ export function FieldPropertiesPanel({
 
   if (field.field_type === "page_break") {
     return <PageBreakForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+  }
+
+  if (field.field_type === "rich_text") {
+    return <RichTextForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
   }
 
   return <PropertiesForm key={field.id} field={field} otherTopLevelFields={otherTopLevelFields} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
@@ -84,6 +91,88 @@ function PageBreakForm({
           className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
         />
       </label>
+    </aside>
+  );
+}
+
+function RichTextForm({
+  field,
+  onUpdate,
+  onDelete,
+  readOnly,
+}: {
+  field: BuilderField;
+  onUpdate: (fieldId: string, patch: Partial<Pick<BuilderField, "label" | "body_html">>) => void;
+  onDelete: (fieldId: string) => void;
+  readOnly: boolean;
+}) {
+  const [label, setLabel] = useState(field.label === "New question" ? "" : field.label);
+  const [bodyHtml, setBodyHtml] = useState(field.body_html ?? "");
+  const [dirty, setDirty] = useState(false);
+  const editorRef = useRef<Editor | null>(null);
+
+  function save() {
+    onUpdate(field.id, { label: label || "New question", body_html: bodyHtml });
+    setDirty(false);
+  }
+
+  return (
+    <aside className="w-96 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-ink">Text / terms</p>
+        {!readOnly && (
+          <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
+            Delete
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        Static content -- legal language, instructions, terms. Not a question, nothing is collected here. Merge fields resolve the same way they do
+        in engagement letters.
+      </p>
+
+      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+        Internal label (staff only, not shown to the client)
+        <input
+          value={label}
+          disabled={readOnly}
+          onChange={(e) => setLabel(e.target.value)}
+          onBlur={() => {
+            if (label !== field.label) {
+              onUpdate(field.id, { label: label || "New question" });
+            }
+          }}
+          placeholder="e.g. Engagement terms"
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+        />
+      </label>
+
+      <div className="mt-4 flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">Content</p>
+        {!readOnly && <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />}
+      </div>
+      <div className="mt-1.5">
+        <RichTextEditor
+          content={bodyHtml}
+          editable={!readOnly}
+          onEditorReady={(editor) => (editorRef.current = editor)}
+          onChange={(html) => {
+            setBodyHtml(html);
+            setDirty(true);
+          }}
+        />
+      </div>
+
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={save}
+          disabled={!dirty}
+          className="mt-3 w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          Save
+        </button>
+      )}
     </aside>
   );
 }

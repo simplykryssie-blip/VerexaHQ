@@ -44,6 +44,28 @@ function FieldBlock({
     );
   }
 
+  if (field.field_type === "rich_text") {
+    const plainText = (field.body_html ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return (
+      <div
+        draggable
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+        onClick={onSelect}
+        className={`cursor-pointer rounded-lg border p-3 transition ${
+          selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent border-dashed" : "border-border bg-surface hover:border-accent/50"
+        }`}
+      >
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium text-ink">📄 {field.label || "Text / terms"}</span>
+          <span className="text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
+        </div>
+        <p className="mt-1 line-clamp-2 text-xs text-muted">{plainText || "No content yet -- select to add text."}</p>
+      </div>
+    );
+  }
+
   return (
     <div
       draggable
