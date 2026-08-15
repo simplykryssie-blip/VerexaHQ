@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeOptions, stringifyNameValue } from "@/lib/organizer/formatValue";
+import { normalizeOptions, parseAddressValue, parseNameValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
 import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
@@ -64,10 +64,10 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 
   const [step, setStep] = useState<"contact" | "form" | "done">("contact");
   const [pageIndex, setPageIndex] = useState(0);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
@@ -111,7 +111,14 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   // the organizer after this point still leaves the firm a real lead to
   // follow up with, and the requested service is captured right away.
   async function continueFromContact() {
-    if (!firstName.trim() || !email.trim()) {
+    const nameParts = parseNameValue(name);
+    const firstName = nameParts.first.trim();
+    const lastName = nameParts.last.trim();
+    const middleName = nameParts.middle.trim();
+    const suffix = nameParts.suffix.trim();
+    const addressParts = parseAddressValue(address);
+
+    if (!firstName || !email.trim()) {
       setError("Name and email are required.");
       return;
     }
@@ -140,7 +147,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent("/portal/dashboard")}`,
-          data: { first_name: firstName.trim(), last_name: lastName.trim() || null },
+          data: { first_name: firstName, last_name: lastName || null },
         },
       });
       if (signUpError || !signUpData.user) {
@@ -154,13 +161,19 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 
     const { data: leadData, error: leadError } = await supabase.rpc("capture_public_lead_from_contact_step", {
       p_token: token,
-      p_first_name: firstName.trim(),
-      p_last_name: lastName.trim(),
+      p_first_name: firstName,
+      p_last_name: lastName,
       p_email: email.trim(),
       p_phone: phone.trim(),
       p_service_category_id: selectedCategoryId,
       p_service_id: selectedServiceId,
       p_auth_user_id: newAuthUserId ?? undefined,
+      p_middle_name: middleName || undefined,
+      p_suffix: suffix || undefined,
+      p_mailing_street: addressParts.street.trim() || undefined,
+      p_mailing_city: addressParts.city.trim() || undefined,
+      p_mailing_state: addressParts.state.trim() || undefined,
+      p_mailing_zip: addressParts.zip.trim() || undefined,
     });
     setCapturingLead(false);
     if (leadError) {
@@ -176,11 +189,13 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       for (const field of topLevelFields) {
         if (next[field.id]) continue;
         if (field.client_profile_field === "full_name")
-          next[field.id] = stringifyNameValue({ first: firstName.trim(), middle: "", last: lastName.trim(), suffix: "" });
-        else if (field.client_profile_field === "first_name") next[field.id] = firstName.trim();
-        else if (field.client_profile_field === "last_name") next[field.id] = lastName.trim();
+          next[field.id] = stringifyNameValue({ first: firstName, middle: middleName, last: lastName, suffix });
+        else if (field.client_profile_field === "first_name") next[field.id] = firstName;
+        else if (field.client_profile_field === "last_name") next[field.id] = lastName;
         else if (field.client_profile_field === "primary_email") next[field.id] = email.trim();
         else if (field.client_profile_field === "primary_phone") next[field.id] = phone.trim();
+        else if (field.client_profile_field === "mailing_address" && (addressParts.street || addressParts.city || addressParts.state || addressParts.zip))
+          next[field.id] = address;
       }
       return next;
     });
@@ -190,6 +205,10 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   async function submit() {
     setSubmitting(true);
     setError(null);
+
+    const nameParts = parseNameValue(name);
+    const firstName = nameParts.first.trim();
+    const lastName = nameParts.last.trim();
 
     const rows = Object.entries(answers).map(([field_id, value]) => ({ field_id, value, instance_index: 0 }));
     for (const repeater of repeaterFields) {
@@ -205,8 +224,8 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     if (requires_portal_signup) {
       const { data: rpcData, error: rpcError } = await supabase.rpc("submit_public_organizer_response_with_signup", {
         p_token: token,
-        p_first_name: firstName.trim(),
-        p_last_name: lastName.trim(),
+        p_first_name: firstName,
+        p_last_name: lastName,
         p_email: email.trim(),
         p_phone: phone.trim(),
         p_answers: rows,
@@ -233,8 +252,8 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 
     const { data: rpcData, error: rpcError } = await supabase.rpc("submit_public_organizer_response", {
       p_token: token,
-      p_first_name: firstName.trim(),
-      p_last_name: lastName.trim(),
+      p_first_name: firstName,
+      p_last_name: lastName,
       p_email: email.trim(),
       p_phone: phone.trim(),
       p_answers: rows,
@@ -309,21 +328,11 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       {step === "contact" && (
         <div className="rounded-xl border border-border bg-surface p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-ink">First name *</label>
-              <input
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink">Last name</label>
-              <input
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-ink">Name *</label>
+              <div className="mt-1">
+                <NameInput value={name} onChange={setName} />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-ink">Email *</label>
@@ -343,6 +352,12 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                 onChange={(e) => setPhone(formatPhone(e.target.value))}
                 className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-ink">Mailing address</label>
+              <div className="mt-1">
+                <AddressInput value={address} onChange={setAddress} />
+              </div>
             </div>
             {requires_portal_signup && (
               <>

@@ -1516,6 +1516,7 @@ export type Database = {
           last_name: string | null
           lifecycle_status: string
           merged_into_client_id: string | null
+          middle_name: string | null
           normalized_email: string | null
           normalized_phone: string | null
           notes: string | null
@@ -1530,6 +1531,7 @@ export type Database = {
           ssn_hash: string | null
           ssn_last4: string | null
           state: string | null
+          suffix: string | null
           tags: string[]
           updated_at: string
           workspace_id: string
@@ -1560,6 +1562,7 @@ export type Database = {
           last_name?: string | null
           lifecycle_status?: string
           merged_into_client_id?: string | null
+          middle_name?: string | null
           normalized_email?: string | null
           normalized_phone?: string | null
           notes?: string | null
@@ -1574,6 +1577,7 @@ export type Database = {
           ssn_hash?: string | null
           ssn_last4?: string | null
           state?: string | null
+          suffix?: string | null
           tags?: string[]
           updated_at?: string
           workspace_id: string
@@ -1604,6 +1608,7 @@ export type Database = {
           last_name?: string | null
           lifecycle_status?: string
           merged_into_client_id?: string | null
+          middle_name?: string | null
           normalized_email?: string | null
           normalized_phone?: string | null
           notes?: string | null
@@ -1618,6 +1623,7 @@ export type Database = {
           ssn_hash?: string | null
           ssn_last4?: string | null
           state?: string | null
+          suffix?: string | null
           tags?: string[]
           updated_at?: string
           workspace_id?: string
@@ -7492,9 +7498,15 @@ export type Database = {
           p_email: string
           p_first_name: string
           p_last_name: string
+          p_mailing_city?: string
+          p_mailing_state?: string
+          p_mailing_street?: string
+          p_mailing_zip?: string
+          p_middle_name?: string
           p_phone: string
           p_service_category_id: string
           p_service_id: string
+          p_suffix?: string
           p_token: string
         }
         Returns: Json
@@ -8003,8 +8015,10 @@ export type Database = {
         Args: {
           p_first_name: string
           p_last_name: string
+          p_middle_name: string
           p_organizer_field_id?: string
           p_organizer_response_id?: string
+          p_suffix: string
         }
         Returns: undefined
       }
@@ -8351,8 +8365,10 @@ export type Database = {
           p_mailing_state?: string
           p_mailing_street?: string
           p_mailing_zip?: string
+          p_middle_name?: string
           p_primary_email?: string
           p_primary_phone?: string
+          p_suffix?: string
         }
         Returns: undefined
       }

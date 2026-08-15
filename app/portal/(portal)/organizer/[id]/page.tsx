@@ -77,7 +77,12 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 function prefillValueFor(clientProfileField: string, snapshot: BasicInfoSnapshot): string | null {
   if (clientProfileField === "full_name") {
     if (!snapshot.first_name && !snapshot.last_name) return null;
-    return stringifyNameValue({ first: snapshot.first_name ?? "", middle: "", last: snapshot.last_name ?? "", suffix: "" });
+    return stringifyNameValue({
+      first: snapshot.first_name ?? "",
+      middle: snapshot.middle_name ?? "",
+      last: snapshot.last_name ?? "",
+      suffix: snapshot.suffix ?? "",
+    });
   }
   if (clientProfileField === "mailing_address") {
     if (!snapshot.mailing_street && !snapshot.mailing_city && !snapshot.mailing_state && !snapshot.mailing_zip) return null;

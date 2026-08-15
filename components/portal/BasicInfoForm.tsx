@@ -4,13 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhone } from "@/lib/phone";
-import { US_STATES } from "@/lib/usStates";
+import { AddressInput } from "@/components/AddressInput";
+import { NameInput } from "@/components/NameInput";
+import { parseAddressValue, parseNameValue, stringifyAddressValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import { AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
 export type BasicInfoSnapshot = {
   client_type: string | null;
   first_name: string | null;
+  middle_name: string | null;
   last_name: string | null;
+  suffix: string | null;
   business_name: string | null;
   primary_email: string | null;
   primary_phone: string | null;
@@ -21,41 +25,59 @@ export type BasicInfoSnapshot = {
   mailing_zip: string | null;
 };
 
-const inputClass =
-  "w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
-
 export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot; next: string }) {
   const router = useRouter();
   const supabase = createClient();
   const isBusiness = snapshot.client_type === "business";
 
-  const [firstName, setFirstName] = useState(snapshot.first_name ?? "");
-  const [lastName, setLastName] = useState(snapshot.last_name ?? "");
+  const [name, setName] = useState(
+    stringifyNameValue({
+      first: snapshot.first_name ?? "",
+      middle: snapshot.middle_name ?? "",
+      last: snapshot.last_name ?? "",
+      suffix: snapshot.suffix ?? "",
+    })
+  );
   const [businessName, setBusinessName] = useState(snapshot.business_name ?? "");
   const [email, setEmail] = useState(snapshot.primary_email ?? "");
   const [phone, setPhone] = useState(snapshot.primary_phone ?? "");
-  const [street, setStreet] = useState(snapshot.mailing_street ?? "");
-  const [city, setCity] = useState(snapshot.mailing_city ?? "");
-  const [state, setState] = useState(snapshot.mailing_state ?? "");
-  const [zip, setZip] = useState(snapshot.mailing_zip ?? "");
+  const [address, setAddress] = useState(
+    stringifyAddressValue({
+      street: snapshot.mailing_street ?? "",
+      street2: "",
+      city: snapshot.mailing_city ?? "",
+      state: snapshot.mailing_state ?? "",
+      zip: snapshot.mailing_zip ?? "",
+    })
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const nameParts = parseNameValue(name);
+    if (!isBusiness && (!nameParts.first.trim() || !nameParts.last.trim())) {
+      setError("First and last name are required.");
+      return;
+    }
     setLoading(true);
 
+    const addressParts = parseAddressValue(address);
+
     const { error } = await supabase.rpc("submit_portal_basic_info", {
-      p_first_name: isBusiness ? undefined : firstName.trim() || undefined,
-      p_last_name: isBusiness ? undefined : lastName.trim() || undefined,
+      p_first_name: isBusiness ? undefined : nameParts.first.trim() || undefined,
+      p_middle_name: isBusiness ? undefined : nameParts.middle.trim() || undefined,
+      p_last_name: isBusiness ? undefined : nameParts.last.trim() || undefined,
+      p_suffix: isBusiness ? undefined : nameParts.suffix.trim() || undefined,
       p_business_name: isBusiness ? businessName.trim() || undefined : undefined,
       p_primary_email: email.trim() || undefined,
       p_primary_phone: phone.trim() || undefined,
-      p_mailing_street: street.trim() || undefined,
-      p_mailing_city: city.trim() || undefined,
-      p_mailing_state: state.trim() || undefined,
-      p_mailing_zip: zip.trim() || undefined,
+      p_mailing_street: addressParts.street.trim() || undefined,
+      p_mailing_city: addressParts.city.trim() || undefined,
+      p_mailing_state: addressParts.state.trim() || undefined,
+      p_mailing_zip: addressParts.zip.trim() || undefined,
     });
 
     setLoading(false);
@@ -81,15 +103,9 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
           />
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div className={styles.field}>
-            <label htmlFor="first_name">First name</label>
-            <input id="first_name" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className={styles.input} />
-          </div>
-          <div className={styles.field}>
-            <label htmlFor="last_name">Last name</label>
-            <input id="last_name" required value={lastName} onChange={(e) => setLastName(e.target.value)} className={styles.input} />
-          </div>
+        <div className={styles.field}>
+          <label>Name</label>
+          <NameInput value={name} onChange={setName} />
         </div>
       )}
 
@@ -105,21 +121,7 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
 
       <div className={styles.field}>
         <label>Mailing address</label>
-        <div className="space-y-2">
-          <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Street address" className={inputClass} />
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className={`${inputClass} sm:col-span-2`} />
-            <select value={state} onChange={(e) => setState(e.target.value)} className={inputClass}>
-              <option value="">State</option>
-              {US_STATES.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.code}
-                </option>
-              ))}
-            </select>
-            <input value={zip} onChange={(e) => setZip(e.target.value)} placeholder="Zip code" className={inputClass} />
-          </div>
-        </div>
+        <AddressInput value={address} onChange={setAddress} />
       </div>
 
       {error && <AuthError>{error}</AuthError>}

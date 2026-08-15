@@ -172,7 +172,9 @@ export function OrganizerForm({
         const parts = parseNameValue(value);
         await supabase.rpc("propose_client_full_name", {
           p_first_name: parts.first,
+          p_middle_name: parts.middle,
           p_last_name: parts.last,
+          p_suffix: parts.suffix,
           p_organizer_response_id: responseId,
           p_organizer_field_id: field.id,
         });
