@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Link as LinkIcon } from "lucide-react";
+import { AlertTriangle, Check, Copy, Link as LinkIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
@@ -10,6 +10,7 @@ export function PublicLinkToggle({
   id,
   path,
   publicToken,
+  status,
   initialIsPublic,
   initialRequiresPortalSignup,
 }: {
@@ -17,6 +18,7 @@ export function PublicLinkToggle({
   id: string;
   path: "o" | "e";
   publicToken: string;
+  status: string;
   initialIsPublic: boolean;
   initialRequiresPortalSignup: boolean;
 }) {
@@ -27,9 +29,21 @@ export function PublicLinkToggle({
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // The public link RPCs (get_public_organizer_template /
+  // get_public_engagement_letter_template) require status = 'published' in
+  // addition to is_public -- a draft template's link 404s with no
+  // explanation otherwise. Block turning it on from here, and surface it
+  // clearly if it's already on for a template that's since gone back to draft.
+  const isPublishable = status === "published";
+  const isPublic_butNotPublished = isPublic && !isPublishable;
+
   const url = typeof window !== "undefined" ? `${window.location.origin}/${path}/${publicToken}` : "";
 
   async function toggle() {
+    if (!isPublic && !isPublishable) {
+      toast.show("Publish this template before turning on its public link.", "error");
+      return;
+    }
     const next = !isPublic;
     setSaving(true);
     // Turning the public link off also turns off portal-signup -- the check
@@ -77,11 +91,17 @@ export function PublicLinkToggle({
         role="switch"
         aria-checked={isPublic}
         onClick={toggle}
-        disabled={saving}
+        disabled={saving || (!isPublic && !isPublishable)}
+        title={!isPublic && !isPublishable ? "Publish this template first -- a draft's public link won't work." : undefined}
         className={`relative h-5 w-9 shrink-0 rounded-full border transition disabled:opacity-60 ${isPublic ? "border-accent bg-accent" : "border-border bg-border"}`}
       >
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${isPublic ? "left-[18px]" : "left-0.5"}`} />
       </button>
+      {isPublic_butNotPublished && (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-danger" title="This template is a draft, so its public link 404s for visitors. Publish it to make the link work.">
+          <AlertTriangle size={12} /> Link is dead -- still a draft
+        </span>
+      )}
       {isPublic && (
         <>
           <button type="button" onClick={copyLink} className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">

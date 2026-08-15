@@ -81,6 +81,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               id={template.id}
               path="e"
               publicToken={template.public_token}
+              status={template.status}
               initialIsPublic={template.is_public}
               initialRequiresPortalSignup={template.requires_portal_signup}
             />

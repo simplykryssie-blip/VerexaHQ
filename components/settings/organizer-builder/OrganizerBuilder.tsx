@@ -11,6 +11,7 @@ import { FieldCanvas } from "./FieldCanvas";
 import { FieldPropertiesPanel } from "./FieldPropertiesPanel";
 import { OrganizerPreviewPanel } from "./OrganizerPreviewPanel";
 import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
+import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import type { BuilderField, BuilderTemplate } from "./types";
 
 function sortByOrder(fields: BuilderField[]): BuilderField[] {
@@ -151,10 +152,12 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
               id={template.id}
               path="o"
               publicToken={template.public_token}
+              status={template.status}
               initialIsPublic={template.is_public}
               initialRequiresPortalSignup={template.requires_portal_signup}
             />
           )}
+          {!readOnly && <TemplateStatusCycle table="organizer_templates" id={template.id} status={template.status} />}
           <button
             type="button"
             onClick={() => setView((v) => (v === "build" ? "preview" : "build"))}
