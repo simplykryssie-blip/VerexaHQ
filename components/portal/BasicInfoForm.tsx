@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatPhone } from "@/lib/phone";
@@ -23,12 +23,29 @@ export type BasicInfoSnapshot = {
   mailing_city: string | null;
   mailing_state: string | null;
   mailing_zip: string | null;
+  service_category_id: string | null;
+  service_id: string | null;
 };
+
+type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 
 export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot; next: string }) {
   const router = useRouter();
   const supabase = createClient();
   const isBusiness = snapshot.client_type === "business";
+
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(snapshot.service_category_id ?? "");
+  const [selectedServiceId, setSelectedServiceId] = useState(snapshot.service_id ?? "");
+
+  useEffect(() => {
+    supabase.rpc("get_portal_service_options").then(({ data }) => {
+      setServiceCategories((data as unknown as ServiceCategory[] | null) ?? []);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const selectedCategory = serviceCategories.find((c) => c.id === selectedCategoryId) ?? null;
 
   const [name, setName] = useState(
     stringifyNameValue({
@@ -62,6 +79,10 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
       setError("First and last name are required.");
       return;
     }
+    if (!selectedCategoryId || !selectedServiceId) {
+      setError("Let us know what service you're interested in.");
+      return;
+    }
     setLoading(true);
 
     const addressParts = parseAddressValue(address);
@@ -78,6 +99,8 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
       p_mailing_city: addressParts.city.trim() || undefined,
       p_mailing_state: addressParts.state.trim() || undefined,
       p_mailing_zip: addressParts.zip.trim() || undefined,
+      p_service_category_id: selectedCategoryId,
+      p_service_id: selectedServiceId,
     });
 
     setLoading(false);
@@ -122,6 +145,46 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
       <div className={styles.field}>
         <label>Mailing address</label>
         <AddressInput value={address} onChange={setAddress} />
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="service_category">What do you need help with?</label>
+        <select
+          id="service_category"
+          required
+          value={selectedCategoryId}
+          onChange={(e) => {
+            setSelectedCategoryId(e.target.value);
+            setSelectedServiceId("");
+          }}
+          className={styles.input}
+        >
+          <option value="">Select a category...</option>
+          {serviceCategories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="service">Specifically?</label>
+        <select
+          id="service"
+          required
+          value={selectedServiceId}
+          onChange={(e) => setSelectedServiceId(e.target.value)}
+          disabled={!selectedCategory}
+          className={styles.input}
+        >
+          <option value="">{selectedCategory ? "Select a service..." : "Choose a category first"}</option>
+          {(selectedCategory?.services ?? []).map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && <AuthError>{error}</AuthError>}

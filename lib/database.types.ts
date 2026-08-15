@@ -7851,6 +7851,7 @@ export type Database = {
           token_expires_at: string
         }[]
       }
+      get_portal_service_options: { Args: never; Returns: Json }
       get_public_engagement_letter_template: {
         Args: { p_token: string }
         Returns: Json
@@ -8368,6 +8369,8 @@ export type Database = {
           p_middle_name?: string
           p_primary_email?: string
           p_primary_phone?: string
+          p_service_category_id?: string
+          p_service_id?: string
           p_suffix?: string
         }
         Returns: undefined
