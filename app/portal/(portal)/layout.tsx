@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ClipboardList } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
@@ -12,13 +14,19 @@ export default async function PortalLayout({ children }: { children: React.React
   if (!identity) redirect("/portal/login");
 
   const supabase = createClient();
-  const [{ count }, branding] = await Promise.all([
+  const [{ count }, branding, { data: pendingOrganizers }] = await Promise.all([
     supabase
       .from("notification_queue")
       .select("id", { count: "exact", head: true })
       .in("channel", ["In-App", "Portal"])
       .neq("status", "cancelled"),
     getEffectiveBranding(identity.workspaceId),
+    supabase
+      .from("organizer_responses")
+      .select("id, organizer_templates(name)")
+      .eq("client_id", identity.clientId)
+      .in("status", ["not_started", "in_progress"])
+      .order("created_at", { ascending: true }),
   ]);
 
   const brandVars: React.CSSProperties = {};
@@ -28,6 +36,9 @@ export default async function PortalLayout({ children }: { children: React.React
     if (accentRgb) (brandVars as Record<string, string>)["--brand-accent-rgb"] = accentRgb;
     if (accentSoftRgb) (brandVars as Record<string, string>)["--brand-accent-soft-rgb"] = accentSoftRgb;
   }
+
+  const pending = pendingOrganizers ?? [];
+  const firstPendingName = (pending[0]?.organizer_templates as unknown as { name?: string } | null)?.name;
 
   return (
     <div style={brandVars}>
@@ -49,6 +60,17 @@ export default async function PortalLayout({ children }: { children: React.React
             />
           </div>
           <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0 print:overflow-visible print:pt-0">
+            {pending.length > 0 && (
+              <Link
+                href={pending.length === 1 ? `/portal/organizer/${pending[0].id}` : "/portal/organizer"}
+                className="sticky top-0 z-20 flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm font-medium text-ink hover:bg-warning/20 print:hidden"
+              >
+                <ClipboardList size={15} className="shrink-0 text-warning" aria-hidden="true" />
+                {pending.length === 1
+                  ? `You have an organizer to complete: ${firstPendingName ?? "Organizer"} -- start it now`
+                  : `You have ${pending.length} organizers to complete -- start them now`}
+              </Link>
+            )}
             {children}
           </main>
         </div>
