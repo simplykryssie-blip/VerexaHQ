@@ -7999,6 +7999,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      propose_client_full_name: {
+        Args: {
+          p_first_name: string
+          p_last_name: string
+          p_organizer_field_id?: string
+          p_organizer_response_id?: string
+        }
+        Returns: undefined
+      }
       propose_client_mailing_address: {
         Args: {
           p_city: string

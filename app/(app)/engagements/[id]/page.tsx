@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
-import { formatAddressValue } from "@/lib/organizer/formatValue";
+import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,7 @@ function formatOrganizerValue(fieldType: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "--";
   const str = String(value);
   if (fieldType === "checkbox") return str === "true" ? "Yes" : "No";
+  if (fieldType === "yes_no") return str === "yes" ? "Yes" : str === "no" ? "No" : str;
   if (fieldType === "date") {
     const d = new Date(str);
     return isNaN(d.getTime()) ? str : d.toLocaleDateString();
@@ -24,6 +25,9 @@ function formatOrganizerValue(fieldType: string, value: unknown): string {
   }
   if (fieldType === "address") {
     return formatAddressValue(value) || "--";
+  }
+  if (fieldType === "name") {
+    return formatNameValue(value) || "--";
   }
   if (fieldType === "file_upload") {
     try {
@@ -67,7 +71,9 @@ function buildOrganizerResponseDetail(responseId: string, templateId: string, al
   const responseAnswers = allAnswers.filter((a) => a.organizer_response_id === responseId);
 
   const topLevel = templateFields
-    .filter((f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break")
+    .filter(
+      (f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break" && f.field_type !== "section" && f.field_type !== "rich_text"
+    )
     .sort((a, b) => a.display_order - b.display_order)
     .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id)));
 

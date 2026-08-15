@@ -1,4 +1,4 @@
-import { formatAddressValue } from "./formatValue";
+import { formatAddressValue, formatNameValue } from "./formatValue";
 
 export type OrganizerFieldRow = { id: string; organizer_template_id: string; label: string; field_type: string; parent_field_id: string | null; display_order: number };
 export type OrganizerAnswerRow = { id: string; organizer_response_id: string; organizer_field_id: string; value: unknown; instance_index: number };
@@ -12,6 +12,8 @@ function maskLast4(value: unknown): string {
 function formatOrganizerValue(fieldType: string, value: unknown): string {
   if (value === undefined || value === null || value === "") return "--";
   if (fieldType === "address") return formatAddressValue(value) || "--";
+  if (fieldType === "name") return formatNameValue(value) || "--";
+  if (fieldType === "yes_no") return value === "yes" ? "Yes" : value === "no" ? "No" : String(value);
   if (fieldType === "signature" && typeof value === "object") {
     try {
       const sig = value as { typed_name?: string };
@@ -42,7 +44,9 @@ export function buildOrganizerResponseDetail(responseId: string, templateId: str
   const responseAnswers = allAnswers.filter((a) => a.organizer_response_id === responseId);
 
   const topLevel = templateFields
-    .filter((f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break")
+    .filter(
+      (f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break" && f.field_type !== "section" && f.field_type !== "rich_text"
+    )
     .sort((a, b) => a.display_order - b.display_order)
     .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id)));
 

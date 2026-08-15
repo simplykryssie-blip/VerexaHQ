@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS } from "@/lib/organizer/fieldTypes";
+import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS, NON_ANSWERABLE_FIELD_TYPES } from "@/lib/organizer/fieldTypes";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
@@ -17,6 +17,11 @@ const OPERATOR_LABELS: Record<LogicOperator, string> = {
 };
 
 const VALUE_LESS_OPERATORS = new Set<LogicOperator>(["is_answered", "is_blank"]);
+
+const YES_NO_OPTIONS = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+];
 
 export function FieldPropertiesPanel({
   field,
@@ -176,16 +181,18 @@ function PropertiesForm({
         />
       </label>
 
-      <label className="mt-4 flex items-center gap-2 text-sm text-slate">
-        <input
-          type="checkbox"
-          checked={field.is_required}
-          disabled={readOnly}
-          onChange={(e) => onUpdate(field.id, { is_required: e.target.checked })}
-          className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-        />
-        Required
-      </label>
+      {!NON_ANSWERABLE_FIELD_TYPES.has(field.field_type) && (
+        <label className="mt-4 flex items-center gap-2 text-sm text-slate">
+          <input
+            type="checkbox"
+            checked={field.is_required}
+            disabled={readOnly}
+            onChange={(e) => onUpdate(field.id, { is_required: e.target.checked })}
+            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+          />
+          Required
+        </label>
+      )}
 
       {CLIENT_PROFILE_FIELDS_BY_TYPE[field.field_type] && (
         <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
@@ -284,8 +291,15 @@ function PropertiesForm({
 
             {showIf.conditions.map((rule, i) => {
               const targetField = otherTopLevelFields.find((f) => f.id === rule.field_id);
-              const targetOptions = targetField ? normalizeOptions(targetField.options) : [];
-              const usesOptionPicker = targetField && CHOICE_FIELD_TYPES.has(targetField.field_type) && targetOptions.length > 0;
+              const targetOptions = targetField
+                ? targetField.field_type === "yes_no"
+                  ? YES_NO_OPTIONS
+                  : normalizeOptions(targetField.options)
+                : [];
+              const usesOptionPicker =
+                targetField &&
+                (targetField.field_type === "yes_no" || CHOICE_FIELD_TYPES.has(targetField.field_type)) &&
+                targetOptions.length > 0;
               const needsValue = !VALUE_LESS_OPERATORS.has(rule.operator);
 
               return (

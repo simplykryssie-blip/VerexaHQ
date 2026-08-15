@@ -3,9 +3,16 @@
 import { useState } from "react";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
+import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
+import { formatPhone } from "@/lib/phone";
 import type { BuilderField } from "./types";
+
+const YES_NO_OPTIONS = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+];
 
 /**
  * A local-state-only stand-in for the real client-facing OrganizerForm --
@@ -147,6 +154,23 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
   const inputClass =
     "w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 
+  if (field.field_type === "section") {
+    return (
+      <div className="border-b border-border pb-1.5 pt-2">
+        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+        {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+      </div>
+    );
+  }
+  if (field.field_type === "rich_text") {
+    return (
+      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
+        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
+        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      </div>
+    );
+  }
+
   return (
     <div>
       <label className="block text-sm font-medium text-ink">
@@ -154,7 +178,24 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
       <div className="mt-1.5">
-        {field.field_type === "file_upload" ? (
+        {field.field_type === "name" ? (
+          <NameInput value={value} onChange={onChange} />
+        ) : field.field_type === "email" ? (
+          <input type="email" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
+        ) : field.field_type === "phone" ? (
+          <input type="tel" value={value} onChange={(e) => onChange(formatPhone(e.target.value))} className={inputClass} />
+        ) : field.field_type === "website" ? (
+          <input type="url" value={value} placeholder="https://" onChange={(e) => onChange(e.target.value)} className={inputClass} />
+        ) : field.field_type === "yes_no" ? (
+          <div className="flex gap-4">
+            {YES_NO_OPTIONS.map((o) => (
+              <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
+                <input type="radio" name={`preview-${field.id}`} checked={value === o.value} onChange={() => onChange(o.value)} />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : field.field_type === "file_upload" ? (
           <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">Document upload area</div>
         ) : field.field_type === "signature" ? (
           <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">Signature capture area</div>

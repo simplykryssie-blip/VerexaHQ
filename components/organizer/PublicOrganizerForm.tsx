@@ -3,12 +3,18 @@
 import { useEffect, useState } from "react";
 import { Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { normalizeOptions } from "@/lib/organizer/formatValue";
+import { normalizeOptions, stringifyNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
+import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+
+const YES_NO_OPTIONS = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+];
 
 type FieldRow = {
   id: string;
@@ -169,7 +175,9 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       const next = { ...prev };
       for (const field of topLevelFields) {
         if (next[field.id]) continue;
-        if (field.client_profile_field === "first_name") next[field.id] = firstName.trim();
+        if (field.client_profile_field === "full_name")
+          next[field.id] = stringifyNameValue({ first: firstName.trim(), middle: "", last: lastName.trim(), suffix: "" });
+        else if (field.client_profile_field === "first_name") next[field.id] = firstName.trim();
         else if (field.client_profile_field === "last_name") next[field.id] = lastName.trim();
         else if (field.client_profile_field === "primary_email") next[field.id] = email.trim();
         else if (field.client_profile_field === "primary_phone") next[field.id] = phone.trim();
@@ -525,6 +533,23 @@ function PublicRepeatingSection({
 function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: string; onChange: (fieldId: string, value: string) => void }) {
   const options = normalizeOptions(field.options);
 
+  if (field.field_type === "section") {
+    return (
+      <div className="border-b border-border pb-1.5 pt-2">
+        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+        {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+      </div>
+    );
+  }
+  if (field.field_type === "rich_text") {
+    return (
+      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
+        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
+        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
@@ -533,7 +558,49 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
 
       <div className="mt-2">
-        {field.field_type === "file_upload" ? (
+        {field.field_type === "name" ? (
+          <NameInput value={value} onChange={(v) => onChange(field.id, v)} />
+        ) : field.field_type === "email" ? (
+          <input
+            id={`field-${field.id}`}
+            type="email"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : field.field_type === "phone" ? (
+          <input
+            id={`field-${field.id}`}
+            type="tel"
+            value={value}
+            onChange={(e) => onChange(field.id, formatPhone(e.target.value))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : field.field_type === "website" ? (
+          <input
+            id={`field-${field.id}`}
+            type="url"
+            value={value}
+            placeholder="https://"
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        ) : field.field_type === "yes_no" ? (
+          <div className="flex gap-4">
+            {YES_NO_OPTIONS.map((o) => (
+              <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
+                <input
+                  type="radio"
+                  name={`field-${field.id}`}
+                  checked={value === o.value}
+                  onChange={() => onChange(field.id, o.value)}
+                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : field.field_type === "file_upload" ? (
           <p className="text-xs text-muted">File uploads aren&apos;t available before you&apos;re a client -- your preparer will follow up separately.</p>
         ) : field.field_type === "signature" ? (
           value ? (

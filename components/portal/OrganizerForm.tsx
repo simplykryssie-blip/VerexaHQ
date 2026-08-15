@@ -5,11 +5,18 @@ import { useRouter } from "next/navigation";
 import { Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { coerceAddressAnswerToString, normalizeOptions, parseAddressValue } from "@/lib/organizer/formatValue";
+import { coerceAddressAnswerToString, coerceNameAnswerToString, normalizeOptions, parseAddressValue, parseNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
+import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
+import { formatPhone } from "@/lib/phone";
 import { OrganizerPrintSummary } from "@/components/portal/OrganizerPrintSummary";
+
+const YES_NO_OPTIONS = [
+  { label: "Yes", value: "yes" },
+  { label: "No", value: "no" },
+];
 
 type FieldRow = {
   id: string;
@@ -53,8 +60,12 @@ export function OrganizerForm({
   const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
 
   const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
-  const answerToString = (fieldId: string, value: unknown): string =>
-    fieldTypeById.get(fieldId) === "address" ? coerceAddressAnswerToString(value) : String(value);
+  const answerToString = (fieldId: string, value: unknown): string => {
+    const type = fieldTypeById.get(fieldId);
+    if (type === "address") return coerceAddressAnswerToString(value);
+    if (type === "name") return coerceNameAnswerToString(value);
+    return String(value);
+  };
 
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
@@ -154,6 +165,14 @@ export function OrganizerForm({
           p_city: parts.city,
           p_state: parts.state,
           p_zip: parts.zip,
+          p_organizer_response_id: responseId,
+          p_organizer_field_id: field.id,
+        });
+      } else if (field.client_profile_field === "full_name") {
+        const parts = parseNameValue(value);
+        await supabase.rpc("propose_client_full_name", {
+          p_first_name: parts.first,
+          p_last_name: parts.last,
           p_organizer_response_id: responseId,
           p_organizer_field_id: field.id,
         });
@@ -540,6 +559,23 @@ function FieldInput({
 }) {
   const options = normalizeOptions(field.options);
 
+  if (field.field_type === "section") {
+    return (
+      <div className="border-b border-border pb-1.5 pt-2">
+        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+        {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+      </div>
+    );
+  }
+  if (field.field_type === "rich_text") {
+    return (
+      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
+        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
+        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border bg-surface p-4">
       <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
@@ -548,7 +584,53 @@ function FieldInput({
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
 
       <div className="mt-2">
-        {field.field_type === "file_upload" ? (
+        {field.field_type === "name" ? (
+          <NameInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
+        ) : field.field_type === "email" ? (
+          <input
+            id={`field-${field.id}`}
+            type="email"
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          />
+        ) : field.field_type === "phone" ? (
+          <input
+            id={`field-${field.id}`}
+            type="tel"
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onChange(field.id, formatPhone(e.target.value))}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          />
+        ) : field.field_type === "website" ? (
+          <input
+            id={`field-${field.id}`}
+            type="url"
+            value={value}
+            disabled={disabled}
+            placeholder="https://"
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          />
+        ) : field.field_type === "yes_no" ? (
+          <div className="flex gap-4">
+            {YES_NO_OPTIONS.map((o) => (
+              <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
+                <input
+                  type="radio"
+                  name={`field-${field.id}`}
+                  checked={value === o.value}
+                  disabled={disabled}
+                  onChange={() => onChange(field.id, o.value)}
+                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        ) : field.field_type === "file_upload" ? (
           <FileUploadField
             fieldId={field.id}
             value={value}

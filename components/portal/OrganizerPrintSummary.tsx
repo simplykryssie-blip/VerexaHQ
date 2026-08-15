@@ -1,13 +1,15 @@
 "use client";
 
 import { Printer } from "lucide-react";
-import { formatAddressValue, normalizeOptions } from "@/lib/organizer/formatValue";
+import { formatAddressValue, formatNameValue, normalizeOptions } from "@/lib/organizer/formatValue";
 
 type FieldRow = { id: string; field_type: string; label: string; parent_field_id: string | null; options: unknown };
 
 function formatAnswer(field: FieldRow, value: string | undefined): string {
   if (!value) return "--";
   if (field.field_type === "address") return formatAddressValue(value) || "--";
+  if (field.field_type === "name") return formatNameValue(value) || "--";
+  if (field.field_type === "yes_no") return value === "yes" ? "Yes" : value === "no" ? "No" : value;
   if (field.field_type === "file_upload") {
     try {
       const parsed = JSON.parse(value) as { file_name?: string };
@@ -70,14 +72,16 @@ export function OrganizerPrintSummary({
         <h1 className="text-lg font-semibold text-ink">{templateName}</h1>
         <div className="mt-4 space-y-3">
           {topLevelFields
-            .filter((f) => f.field_type !== "page_break")
+            .filter((f) => f.field_type !== "page_break" && f.field_type !== "section" && f.field_type !== "rich_text")
             .map((field) =>
               field.field_type === "repeating_section" ? (
                 <div key={field.id}>
                   <p className="text-sm font-medium text-ink">{field.label}</p>
                   {(repeaterRows[field.id] ?? []).map((row, i) => (
                     <div key={i} className="ml-3 mt-1 space-y-0.5">
-                      {(childrenByParent.get(field.id) ?? []).map((child) => (
+                      {(childrenByParent.get(field.id) ?? [])
+                        .filter((child) => child.field_type !== "section" && child.field_type !== "rich_text")
+                        .map((child) => (
                         <p key={child.id} className="text-sm text-slate">
                           <span className="text-muted">{child.label}:</span> {formatAnswer(child, row[child.id])}
                         </p>

@@ -72,6 +72,76 @@ export function formatAddressValue(value: unknown): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+export type NameParts = { first: string; middle: string; last: string; suffix: string };
+
+const EMPTY_NAME: NameParts = { first: "", middle: "", last: "", suffix: "" };
+
+/** The name field's answer is stored as a JSON-stringified {first, middle, last, suffix} object. */
+export function parseNameValue(value: string): NameParts {
+  if (!value) return { ...EMPTY_NAME };
+  try {
+    const obj = JSON.parse(value);
+    if (obj && typeof obj === "object" && !Array.isArray(obj)) {
+      const name = obj as Record<string, unknown>;
+      return {
+        first: name.first ? String(name.first) : "",
+        middle: name.middle ? String(name.middle) : "",
+        last: name.last ? String(name.last) : "",
+        suffix: name.suffix ? String(name.suffix) : "",
+      };
+    }
+  } catch {
+    // Not JSON -- treat a plain string as a first name, same graceful
+    // fallback formatAddressValue uses for pre-structured answers.
+  }
+  return { ...EMPTY_NAME, first: value };
+}
+
+export function stringifyNameValue(parts: NameParts): string {
+  return JSON.stringify(parts);
+}
+
+/**
+ * Normalizes a raw name answer -- a real {first, ...} object (e.g. prefilled
+ * from the client's record) or a JSON/plain string already in this field's
+ * stored shape -- into the JSON string parseNameValue expects, so editable
+ * form state never loses structure on load.
+ */
+export function coerceNameAnswerToString(value: unknown): string {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const name = value as Record<string, unknown>;
+    return stringifyNameValue({
+      first: name.first ? String(name.first) : "",
+      middle: name.middle ? String(name.middle) : "",
+      last: name.last ? String(name.last) : "",
+      suffix: name.suffix ? String(name.suffix) : "",
+    });
+  }
+  return value === null || value === undefined ? "" : String(value);
+}
+
+/**
+ * Name answers can be the structured {first, middle, last, suffix} object
+ * this field stores (as a JSON string, or already-parsed JSONB from the
+ * database), or a plain string -- normalizes any of those into a single
+ * display string.
+ */
+export function formatNameValue(value: unknown): string {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const name = value as Record<string, unknown>;
+    return [name.first, name.middle, name.last, name.suffix].filter(Boolean).join(" ");
+  }
+  if (typeof value === "string" && value.trim().startsWith("{")) {
+    try {
+      const obj = JSON.parse(value);
+      if (obj && typeof obj === "object") return formatNameValue(obj);
+    } catch {
+      // Fall through to plain-string handling below.
+    }
+  }
+  return value === null || value === undefined ? "" : String(value);
+}
+
 export type OrganizerFieldOption = { label: string; value: string };
 
 /**
