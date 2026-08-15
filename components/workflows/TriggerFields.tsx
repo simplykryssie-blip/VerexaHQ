@@ -11,6 +11,7 @@ export const TRIGGER_TYPES = [
   { value: "organizer.submitted", label: "An organizer is submitted" },
   { value: "client.tag_added", label: "A tag is added to a client" },
   { value: "client.portal_created", label: "A client creates a portal account" },
+  { value: "client.service_interest_selected", label: "A client selects a service" },
   { value: "engagement.created", label: "A new engagement is created for a service" },
   { value: "appointment.status_changed", label: "An appointment's status changes to" },
 ];
@@ -40,6 +41,11 @@ export function triggerSummary(
   }
   if (triggerType === "client.portal_created") {
     return "When a client creates a portal account";
+  }
+  if (triggerType === "client.service_interest_selected") {
+    const serviceId = config.service_id as string | undefined;
+    const service = services.find((s) => s.id === serviceId);
+    return `When a client selects "${service?.name ?? "a service"}"`;
   }
   if (triggerType === "engagement.created") {
     const serviceId = config.service_id as string | undefined;
@@ -143,6 +149,27 @@ export function TriggerFields({
       )}
 
       {triggerType === "engagement.created" && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Service
+          <select
+            disabled={disabled}
+            value={(config.service_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ service_id: e.target.value })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Choose a service
+            </option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {triggerType === "client.service_interest_selected" && (
         <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
           Service
           <select
