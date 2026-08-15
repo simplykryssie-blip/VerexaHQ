@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/run-pending-automation-steps",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-pending-engagement-letters",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

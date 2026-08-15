@@ -14,6 +14,7 @@ export const TRIGGER_TYPES = [
   { value: "client.service_interest_selected", label: "A client selects a service" },
   { value: "engagement.created", label: "A new engagement is created for a service" },
   { value: "appointment.status_changed", label: "An appointment's status changes to" },
+  { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service" },
 ];
 
 export function defaultTriggerConfig(triggerType: string): Record<string, unknown> {
@@ -54,6 +55,11 @@ export function triggerSummary(
   }
   if (triggerType === "appointment.status_changed") {
     return `When an appointment's status changes to "${config.to_status ?? "?"}"`;
+  }
+  if (triggerType === "engagement_letter.signed") {
+    const serviceId = config.service_id as string | undefined;
+    const service = services.find((s) => s.id === serviceId);
+    return `When a client signs their engagement letter for "${service?.name ?? "a service"}"`;
   }
   return triggerType;
 }
@@ -149,6 +155,27 @@ export function TriggerFields({
       )}
 
       {triggerType === "engagement.created" && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Service
+          <select
+            disabled={disabled}
+            value={(config.service_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ service_id: e.target.value })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Choose a service
+            </option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {triggerType === "engagement_letter.signed" && (
         <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
           Service
           <select

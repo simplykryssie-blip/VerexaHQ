@@ -4644,6 +4644,85 @@ export type Database = {
           },
         ]
       }
+      pending_engagement_letter_sends: {
+        Row: {
+          client_id: string
+          created_at: string
+          engagement_id: string
+          engagement_letter_template_id: string
+          error: string | null
+          id: string
+          processed_at: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          engagement_id: string
+          engagement_letter_template_id: string
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          engagement_id?: string
+          engagement_letter_template_id?: string
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_engagement_letter_sen_engagement_letter_template_i_fkey"
+            columns: ["engagement_letter_template_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_engagement_letter_sends_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_engagement_letter_sends_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_engagement_letter_sends_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "pending_engagement_letter_sends_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "pending_engagement_letter_sends_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           category: string

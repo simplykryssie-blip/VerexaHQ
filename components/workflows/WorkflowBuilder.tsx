@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare, BookOpen, Workflow } from "lucide-react";
+import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare, BookOpen, Workflow, FileSignature, FolderInput, ArrowRightCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
@@ -41,6 +41,9 @@ const ACTION_TYPES = [
   { value: "create_task", label: "Create a task" },
   { value: "send_organizer_template", label: "Push an organizer to the client's portal" },
   { value: "create_engagement", label: "Create the engagement and start its pipeline" },
+  { value: "send_engagement_letter", label: "Send the engagement letter for signature" },
+  { value: "change_stage", label: "Advance to the next pipeline stage" },
+  { value: "send_document_request", label: "Send a document request" },
 ];
 
 const TASK_PRIORITIES = ["low", "medium", "high"];
@@ -50,6 +53,9 @@ function actionIcon(type: string) {
   if (type === "send_sms") return <MessageSquare size={15} />;
   if (type === "send_organizer_template") return <BookOpen size={15} />;
   if (type === "create_engagement") return <Workflow size={15} />;
+  if (type === "send_engagement_letter") return <FileSignature size={15} />;
+  if (type === "change_stage") return <ArrowRightCircle size={15} />;
+  if (type === "send_document_request") return <FolderInput size={15} />;
   return <CheckSquare size={15} />;
 }
 
@@ -60,6 +66,8 @@ function StepCard({
   emailTemplates,
   smsTemplates,
   organizerTemplates,
+  engagementLetterTemplates,
+  documentRequestTemplates,
   canManage,
   onSaved,
 }: {
@@ -69,6 +77,8 @@ function StepCard({
   emailTemplates: MessageTemplateOption[];
   smsTemplates: MessageTemplateOption[];
   organizerTemplates: TemplateOption[];
+  engagementLetterTemplates: TemplateOption[];
+  documentRequestTemplates: TemplateOption[];
   canManage: boolean;
   onSaved: () => void;
 }) {
@@ -294,6 +304,78 @@ function StepCard({
             pipeline. Only works when this step follows an &quot;An organizer is submitted&quot; trigger.
           </p>
         )}
+
+        {actionType === "send_engagement_letter" && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Engagement letter
+            <select
+              disabled={!canManage}
+              value={(config.engagement_letter_template_id as string) ?? ""}
+              onChange={(e) => setField("engagement_letter_template_id", e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="" disabled>
+                Choose an engagement letter template
+              </option>
+              {engagementLetterTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {actionType === "change_stage" && (
+          <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+            Marks the engagement&apos;s current pipeline stage complete, moving it into the next stage. Only works on a run with an
+            engagement that has an active pipeline.
+          </p>
+        )}
+
+        {actionType === "send_document_request" && (
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Document request template
+              <select
+                disabled={!canManage}
+                value={(config.document_request_template_id as string) ?? ""}
+                onChange={(e) => setField("document_request_template_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a document request template
+                </option>
+                {documentRequestTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Title
+              <input
+                disabled={!canManage}
+                value={(config.title as string) ?? ""}
+                onChange={(e) => setField("title", e.target.value)}
+                placeholder="Requested documents"
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Due in (days)
+              <input
+                disabled={!canManage}
+                type="number"
+                min={0}
+                value={(config.due_in_days as string) ?? ""}
+                onChange={(e) => setField("due_in_days", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+          </>
+        )}
       </div>
 
       {canManage && (
@@ -321,6 +403,8 @@ export function WorkflowBuilder({
   smsTemplates,
   canManage,
   organizerTemplates,
+  engagementLetterTemplates,
+  documentRequestTemplates,
   services = [],
 }: {
   automationId: string;
@@ -334,6 +418,8 @@ export function WorkflowBuilder({
   smsTemplates: MessageTemplateOption[];
   canManage: boolean;
   organizerTemplates: TemplateOption[];
+  engagementLetterTemplates: TemplateOption[];
+  documentRequestTemplates: TemplateOption[];
   services?: TemplateOption[];
 }) {
   const router = useRouter();
@@ -436,6 +522,8 @@ export function WorkflowBuilder({
                 emailTemplates={emailTemplates}
                 smsTemplates={smsTemplates}
                 organizerTemplates={organizerTemplates}
+                engagementLetterTemplates={engagementLetterTemplates}
+                documentRequestTemplates={documentRequestTemplates}
                 canManage={canManage}
                 onSaved={() => router.refresh()}
               />
