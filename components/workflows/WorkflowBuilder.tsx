@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare, BookOpen, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
+import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption } from "@/components/workflows/TriggerFields";
 
 export type WorkflowStepRow = {
@@ -309,7 +310,6 @@ function StepCard({
 }
 
 export function WorkflowBuilder({
-  workspaceId,
   automationId,
   triggerType,
   triggerConfig,
@@ -323,7 +323,6 @@ export function WorkflowBuilder({
   organizerTemplates,
   services = [],
 }: {
-  workspaceId: string;
   automationId: string;
   triggerType: string;
   triggerConfig: Record<string, unknown>;
@@ -339,31 +338,44 @@ export function WorkflowBuilder({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [currentTriggerType, setCurrentTriggerType] = useState(triggerType);
   const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
 
   async function saveTrigger() {
-    await supabase.from("automations").update({ trigger_type: currentTriggerType, trigger_config: config as never }).eq("id", automationId);
+    const { error } = await supabase.from("automations").update({ trigger_type: currentTriggerType, trigger_config: config as never }).eq("id", automationId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
     router.refresh();
   }
 
   async function toggleEnabled() {
     const next = !enabled;
     setEnabled(next);
-    await supabase.from("automations").update({ is_enabled: next }).eq("id", automationId);
+    const { error } = await supabase.from("automations").update({ is_enabled: next }).eq("id", automationId);
+    if (error) {
+      setEnabled(!next);
+      toast.show(error.message, "error");
+      return;
+    }
     router.refresh();
   }
 
   async function addStep() {
     const nextOrder = steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0;
-    await supabase.from("automation_steps").insert({
+    const { error } = await supabase.from("automation_steps").insert({
       automation_id: automationId,
-      workspace_id: workspaceId,
       display_order: nextOrder,
       action_type: "create_task",
       action_config: {},
     } as never);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
     router.refresh();
   }
 

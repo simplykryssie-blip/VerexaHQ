@@ -102,7 +102,6 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       <PageHeader backHref="/workflows" backLabel="Back to Workflows" title={automation.name} description={automation.description ?? undefined} />
       <div className="flex-1 px-8 py-6">
         <WorkflowBuilder
-          workspaceId={workspace.id}
           automationId={automation.id}
           triggerType={automation.trigger_type}
           triggerConfig={automation.trigger_config as Record<string, unknown>}
