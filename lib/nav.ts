@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   Plug,
   Bell,
-  Workflow,
   Flag,
   ScrollText,
   Zap,
@@ -89,7 +88,6 @@ export type SettingsNavItem = {
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
-  { label: "Services", href: "/settings/services", icon: Workflow },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
@@ -104,7 +102,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Services", "Users & Staff", "Roles & Permissions", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Connections"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
