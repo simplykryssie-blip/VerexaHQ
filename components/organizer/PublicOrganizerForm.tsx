@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
@@ -38,6 +38,8 @@ type TemplateData = {
   fields: FieldRow[];
 };
 
+type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
+
 // Standalone from OrganizerForm.tsx on purpose: that component persists
 // progress incrementally against an already-created organizer_responses row
 // (responseId) and uploads files to authenticated Storage. Here there's no
@@ -62,11 +64,30 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedServiceId, setSelectedServiceId] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [capturingLead, setCapturingLead] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountCreated, setAccountCreated] = useState(false);
+  // Set as soon as the Contact step completes -- the lead (and, if this
+  // template requires one, the portal account) already exist by the time
+  // the client reaches the organizer questions, independent of whether
+  // they ever finish/submit it. See continueFromContact().
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.rpc("get_public_service_options", { p_token: token }).then(({ data }) => {
+      setServiceCategories((data as unknown as ServiceCategory[] | null) ?? []);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  const selectedCategory = serviceCategories.find((c) => c.id === selectedCategoryId) ?? null;
 
   const visibleTopLevelFields = topLevelFields.filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
   const pages = splitIntoPages(visibleTopLevelFields);
@@ -78,12 +99,87 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   }
 
-  async function submit() {
+  // Runs when the Contact step completes -- creates the lead (and the
+  // portal account, if this template requires one) immediately, instead of
+  // waiting for the whole organizer to be submitted. That way abandoning
+  // the organizer after this point still leaves the firm a real lead to
+  // follow up with, and the requested service is captured right away.
+  async function continueFromContact() {
     if (!firstName.trim() || !email.trim()) {
       setError("Name and email are required.");
-      setStep("contact");
       return;
     }
+    if (!selectedCategoryId || !selectedServiceId) {
+      setError("Let us know what you need help with.");
+      return;
+    }
+    if (requires_portal_signup) {
+      const strengthError = validatePasswordStrength(password);
+      if (strengthError) {
+        setError(strengthError);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+    }
+    setError(null);
+    setCapturingLead(true);
+
+    let newAuthUserId: string | null = null;
+    if (requires_portal_signup) {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent("/portal/dashboard")}`,
+          data: { first_name: firstName.trim(), last_name: lastName.trim() || null },
+        },
+      });
+      if (signUpError || !signUpData.user) {
+        setCapturingLead(false);
+        setError(signUpError?.message ?? "Could not create your account.");
+        return;
+      }
+      newAuthUserId = signUpData.user.id;
+      setAuthUserId(newAuthUserId);
+    }
+
+    const { data: leadData, error: leadError } = await supabase.rpc("capture_public_lead_from_contact_step", {
+      p_token: token,
+      p_first_name: firstName.trim(),
+      p_last_name: lastName.trim(),
+      p_email: email.trim(),
+      p_phone: phone.trim(),
+      p_service_category_id: selectedCategoryId,
+      p_service_id: selectedServiceId,
+      p_auth_user_id: newAuthUserId ?? undefined,
+    });
+    setCapturingLead(false);
+    if (leadError) {
+      setError(leadError.message);
+      return;
+    }
+    setClientId((leadData as { client_id?: string } | null)?.client_id ?? null);
+
+    // Carry forward what was just typed into any organizer fields mapped
+    // to the client profile, so it isn't asked for twice.
+    setAnswers((prev) => {
+      const next = { ...prev };
+      for (const field of topLevelFields) {
+        if (next[field.id]) continue;
+        if (field.client_profile_field === "first_name") next[field.id] = firstName.trim();
+        else if (field.client_profile_field === "last_name") next[field.id] = lastName.trim();
+        else if (field.client_profile_field === "primary_email") next[field.id] = email.trim();
+        else if (field.client_profile_field === "primary_phone") next[field.id] = phone.trim();
+      }
+      return next;
+    });
+    setStep("form");
+  }
+
+  async function submit() {
     setSubmitting(true);
     setError(null);
 
@@ -99,20 +195,6 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     }
 
     if (requires_portal_signup) {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent("/portal/dashboard")}`,
-          data: { first_name: firstName.trim(), last_name: lastName.trim() || null },
-        },
-      });
-      if (signUpError || !signUpData.user) {
-        setSubmitting(false);
-        setError(signUpError?.message ?? "Could not create your account.");
-        return;
-      }
-
       const { data: rpcData, error: rpcError } = await supabase.rpc("submit_public_organizer_response_with_signup", {
         p_token: token,
         p_first_name: firstName.trim(),
@@ -120,7 +202,8 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         p_email: email.trim(),
         p_phone: phone.trim(),
         p_answers: rows,
-        p_auth_user_id: signUpData.user.id,
+        p_auth_user_id: authUserId as string,
+        p_client_id: clientId ?? undefined,
       });
       setSubmitting(false);
       if (rpcError) {
@@ -147,6 +230,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       p_email: email.trim(),
       p_phone: phone.trim(),
       p_answers: rows,
+      p_client_id: clientId ?? undefined,
     });
 
     setSubmitting(false);
@@ -275,6 +359,40 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                 </div>
               </>
             )}
+            <div>
+              <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
+              <select
+                value={selectedCategoryId}
+                onChange={(e) => {
+                  setSelectedCategoryId(e.target.value);
+                  setSelectedServiceId("");
+                }}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                <option value="">Select a category...</option>
+                {serviceCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-ink">Specifically? *</label>
+              <select
+                value={selectedServiceId}
+                onChange={(e) => setSelectedServiceId(e.target.value)}
+                disabled={!selectedCategory}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+              >
+                <option value="">{selectedCategory ? "Select a service..." : "Choose a category first"}</option>
+                {(selectedCategory?.services ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           {requires_portal_signup && (
             <p className="mt-2 text-xs text-muted">
@@ -284,43 +402,11 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
           {error && <p className="mt-2 text-sm text-danger">{error}</p>}
           <button
             type="button"
-            onClick={() => {
-              if (!firstName.trim() || !email.trim()) {
-                setError("Name and email are required.");
-                return;
-              }
-              if (requires_portal_signup) {
-                const strengthError = validatePasswordStrength(password);
-                if (strengthError) {
-                  setError(strengthError);
-                  return;
-                }
-                if (password !== confirmPassword) {
-                  setError("Passwords do not match.");
-                  return;
-                }
-              }
-              setError(null);
-              // There's no client record yet to prefill from at this point
-              // (find_or_create_public_lead only runs at final submit) --
-              // carry forward what was just typed here instead, into
-              // whichever form fields the builder mapped to it.
-              setAnswers((prev) => {
-                const next = { ...prev };
-                for (const field of topLevelFields) {
-                  if (next[field.id]) continue;
-                  if (field.client_profile_field === "first_name") next[field.id] = firstName.trim();
-                  else if (field.client_profile_field === "last_name") next[field.id] = lastName.trim();
-                  else if (field.client_profile_field === "primary_email") next[field.id] = email.trim();
-                  else if (field.client_profile_field === "primary_phone") next[field.id] = phone.trim();
-                }
-                return next;
-              });
-              setStep("form");
-            }}
-            className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            onClick={continueFromContact}
+            disabled={capturingLead}
+            className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
           >
-            Continue
+            {capturingLead ? "Please wait..." : "Continue"}
           </button>
         </div>
       )}

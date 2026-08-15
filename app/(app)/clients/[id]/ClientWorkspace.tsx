@@ -111,6 +111,7 @@ export function ClientWorkspace({
   appointments,
   staffOptions,
   accountHolder,
+  requestedService,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -145,6 +146,7 @@ export function ClientWorkspace({
   appointments: AppointmentRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
+  requestedService: string | null;
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -177,6 +179,7 @@ export function ClientWorkspace({
             {client.client_number && <span className="font-medium text-slate">{client.client_number}</span>}
             <span className="capitalize">{client.client_type}</span>
             {primaryService && <span>{primaryService}</span>}
+            {!primaryService && requestedService && <span>Requested: {requestedService}</span>}
             <span className="capitalize">{client.lifecycle_status}</span>
             {showStaffRoles && (
               <>

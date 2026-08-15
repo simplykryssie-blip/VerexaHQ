@@ -1430,6 +1430,65 @@ export type Database = {
           },
         ]
       }
+      client_service_interests: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          service_category_id: string | null
+          service_id: string | null
+          source: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          service_category_id?: string | null
+          service_id?: string | null
+          source: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          service_category_id?: string | null
+          service_id?: string | null
+          source?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_service_interests_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_interests_service_category_id_fkey"
+            columns: ["service_category_id"]
+            isOneToOne: false
+            referencedRelation: "service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_interests_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_service_interests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address_line1: string | null
@@ -7353,6 +7412,10 @@ export type Database = {
         }
         Returns: string
       }
+      _notify_admins_of_new_public_lead: {
+        Args: { p_client_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       _notify_admins_of_pending_client_change: {
         Args: {
           p_batch_id: string
@@ -7422,6 +7485,19 @@ export type Database = {
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
+      }
+      capture_public_lead_from_contact_step: {
+        Args: {
+          p_auth_user_id?: string
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+          p_service_category_id: string
+          p_service_id: string
+          p_token: string
+        }
+        Returns: Json
       }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
@@ -7771,6 +7847,7 @@ export type Database = {
         Args: { p_token: string }
         Returns: Json
       }
+      get_public_service_options: { Args: { p_token: string }; Returns: Json }
       get_signature_request_by_token: {
         Args: { p_token: string }
         Returns: {
@@ -8270,29 +8347,56 @@ export type Database = {
         }
         Returns: undefined
       }
-      submit_public_organizer_response: {
-        Args: {
-          p_answers: Json
-          p_email: string
-          p_first_name: string
-          p_last_name: string
-          p_phone: string
-          p_token: string
-        }
-        Returns: Json
-      }
-      submit_public_organizer_response_with_signup: {
-        Args: {
-          p_answers: Json
-          p_auth_user_id: string
-          p_email: string
-          p_first_name: string
-          p_last_name: string
-          p_phone: string
-          p_token: string
-        }
-        Returns: Json
-      }
+      submit_public_organizer_response:
+        | {
+            Args: {
+              p_answers: Json
+              p_email: string
+              p_first_name: string
+              p_last_name: string
+              p_phone: string
+              p_token: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_answers: Json
+              p_client_id?: string
+              p_email: string
+              p_first_name: string
+              p_last_name: string
+              p_phone: string
+              p_token: string
+            }
+            Returns: Json
+          }
+      submit_public_organizer_response_with_signup:
+        | {
+            Args: {
+              p_answers: Json
+              p_auth_user_id: string
+              p_email: string
+              p_first_name: string
+              p_last_name: string
+              p_phone: string
+              p_token: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_answers: Json
+              p_auth_user_id: string
+              p_client_id?: string
+              p_email: string
+              p_first_name: string
+              p_last_name: string
+              p_phone: string
+              p_token: string
+            }
+            Returns: Json
+          }
       turn_on_service: {
         Args: {
           p_new_name?: string

@@ -56,6 +56,7 @@ type ClientRow = {
   primary_email: string | null;
   primary_phone: string | null;
   lifecycle_status: string;
+  requestedService?: string | null;
 };
 
 const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -63,9 +64,12 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
     key: "name",
     header: "Name",
     render: (c) => (
-      <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-        {clientDisplayName(c)}
-      </Link>
+      <div>
+        <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+          {clientDisplayName(c)}
+        </Link>
+        {c.requestedService && <p className="text-xs text-muted">{c.requestedService}</p>}
+      </div>
     ),
   },
   { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
@@ -116,6 +120,26 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
   ]);
 
+  const clientIds = (clients ?? []).map((c) => c.id);
+  const { data: interests } =
+    clientIds.length > 0
+      ? await supabase
+          .from("client_service_interests")
+          .select("client_id, created_at, service_categories(name), services(name)")
+          .in("client_id", clientIds)
+          .order("created_at", { ascending: false })
+      : { data: [] as never[] };
+
+  const latestInterestByClient = new Map<string, string>();
+  for (const interest of interests ?? []) {
+    if (latestInterestByClient.has(interest.client_id)) continue;
+    const categoryName = (interest.service_categories as unknown as { name?: string } | null)?.name;
+    const serviceName = (interest.services as unknown as { name?: string } | null)?.name;
+    const label = [categoryName, serviceName].filter(Boolean).join(" -- ");
+    if (label) latestInterestByClient.set(interest.client_id, label);
+  }
+  const clientRows: ClientRow[] = (clients ?? []).map((c) => ({ ...c, requestedService: latestInterestByClient.get(c.id) ?? null }));
+
   const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : ""].filter(Boolean).join("&");
 
   return (
@@ -160,7 +184,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <DataTable
             columns={CLIENT_COLUMNS}
-            rows={clients ?? []}
+            rows={clientRows}
             emptyMessage={
               status
                 ? `No ${tab} with status "${statusFilters.find((f) => f.value === status)?.label}".`

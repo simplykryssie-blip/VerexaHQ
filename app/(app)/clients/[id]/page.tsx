@@ -330,6 +330,22 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const outstandingBalance = ledgerEntries && ledgerEntries.length > 0 ? ledgerEntries[0].balance_after : 0;
   const permissions = await loadActionPermissions(supabase, workspace.id);
 
+  const { data: latestInterest } = await supabase
+    .from("client_service_interests")
+    .select("service_categories(name), services(name)")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const requestedService = latestInterest
+    ? [
+        (latestInterest.service_categories as unknown as { name?: string } | null)?.name,
+        (latestInterest.services as unknown as { name?: string } | null)?.name,
+      ]
+        .filter(Boolean)
+        .join(" -- ") || null
+    : null;
+
   return (
     <ClientWorkspace
       workspace={workspace}
@@ -377,6 +393,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       appointments={appointments ?? []}
       staffOptions={staffOptions}
       accountHolder={accountHolder}
+      requestedService={requestedService}
     />
   );
 }
