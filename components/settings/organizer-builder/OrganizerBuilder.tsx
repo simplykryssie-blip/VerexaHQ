@@ -123,6 +123,25 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   }
 
   async function deleteField(fieldId: string) {
+    // organizer_response_answers.organizer_field_id is a CASCADE foreign key.
+    // Unlike deleting a whole template (blocked outright by a NO ACTION FK on
+    // organizer_responses -- see OrganizerLibrary.tsx), nothing in the
+    // database stops a single field from being removed out from under
+    // answers a client already submitted. Check first so routine template
+    // editing never silently destroys real answers.
+    const descendantIds = fields.filter((f) => f.parent_field_id === fieldId).map((f) => f.id);
+    const { count } = await supabase
+      .from("organizer_response_answers")
+      .select("id", { count: "exact", head: true })
+      .in("organizer_field_id", [fieldId, ...descendantIds]);
+    if (count && count > 0) {
+      toast.show(
+        `Can't delete -- ${count} client answer${count === 1 ? "" : "s"} already exist for this question. Archive the template instead if it needs to be retired.`,
+        "error"
+      );
+      return;
+    }
+
     if (!confirm("Remove this field? This can't be undone.")) return;
     const { error } = await supabase.from("organizer_fields").delete().eq("id", fieldId);
     if (error) {
