@@ -43,9 +43,9 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
     howToSetUp: "Go to Settings > Integrations and connect Stripe and/or Zoom. Both are optional and can be set up whenever you're ready.",
   },
   service: {
-    whatItDoes: "A service package is what you're selling -- e.g. \"Individual Tax Return\" or \"Bookkeeping.\" It's the container that ties together pricing, the forms a client fills out, and the stages their work moves through.",
-    howItWorks: "Every engagement you create is built from a service package, so the package's settings (price, intake form, document requests, workflow stages) get applied automatically instead of you configuring each one by hand.",
-    howToSetUp: "Go to Services, clone a starter template or create your own, set its name and price under Details, then build its steps under Stages. You can always come back and add pricing rules or billing rules later.",
+    whatItDoes: "A pipeline is the stages a piece of work moves through -- e.g. \"Info gathered\" -> \"In prep\" -> \"Review\" -> \"Delivered.\" Every engagement you open moves through one.",
+    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or engagement letter to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
+    howToSetUp: "Go to Pipelines, create one, and add its stages. Nothing about opening an engagement requires a service first.",
   },
   organizer: {
     whatItDoes: "An intake form (organizer) is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
@@ -54,7 +54,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   },
   client: {
     whatItDoes: "This is your client record -- the person or business you do work for. Everything else (engagements, documents, invoices, messages) lives underneath a client.",
-    howItWorks: "Once a client exists, you can start an engagement for them using one of your service packages, and the whole workflow (forms, documents, billing) runs from there.",
+    howItWorks: "Once a client exists, you can open an engagement for them right away -- attach a pipeline (or a service, if you want billing bundled in) now or later.",
     howToSetUp: "Go to Contacts, click New Client, and fill in their basic info. You can add a real client or a test one just to see how the workflow feels end to end.",
   },
   invite: {
