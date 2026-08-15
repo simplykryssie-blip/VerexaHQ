@@ -14,6 +14,7 @@ export type BasicInfoSnapshot = {
   business_name: string | null;
   primary_email: string | null;
   primary_phone: string | null;
+  date_of_birth: string | null;
   mailing_street: string | null;
   mailing_city: string | null;
   mailing_state: string | null;

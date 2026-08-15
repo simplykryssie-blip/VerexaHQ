@@ -6,7 +6,14 @@ import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
 // and, if the client edits it, proposes the change back to the client record
 // (via propose_client_contact_field/propose_client_mailing_address) subject to
 // staff approval when it would overwrite an existing value.
-export type ClientProfileField = "first_name" | "last_name" | "business_name" | "primary_email" | "primary_phone" | "mailing_address";
+export type ClientProfileField =
+  | "first_name"
+  | "last_name"
+  | "business_name"
+  | "primary_email"
+  | "primary_phone"
+  | "mailing_address"
+  | "date_of_birth";
 
 export const CLIENT_PROFILE_FIELD_LABELS: Record<ClientProfileField, string> = {
   first_name: "First name",
@@ -15,15 +22,17 @@ export const CLIENT_PROFILE_FIELD_LABELS: Record<ClientProfileField, string> = {
   primary_email: "Email",
   primary_phone: "Phone",
   mailing_address: "Mailing address",
+  date_of_birth: "Date of birth",
 };
 
 // Which client_profile_field options make sense for a given organizer field_type.
 // short_text covers every scalar contact field; address covers the whole
 // mailing address at once (the organizer's address field already stores
-// street/city/state/zip together as one JSON value).
+// street/city/state/zip together as one JSON value); date covers date_of_birth.
 export const CLIENT_PROFILE_FIELDS_BY_TYPE: Partial<Record<OrganizerFieldType, ClientProfileField[]>> = {
   short_text: ["first_name", "last_name", "business_name", "primary_email", "primary_phone"],
   address: ["mailing_address"],
+  date: ["date_of_birth"],
 };
 
 export function isValidClientProfileField(value: string): value is ClientProfileField {

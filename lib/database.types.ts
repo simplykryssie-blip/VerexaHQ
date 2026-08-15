@@ -7914,6 +7914,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      propose_client_date_of_birth: {
+        Args: {
+          p_new_value: string
+          p_organizer_field_id?: string
+          p_organizer_response_id?: string
+        }
+        Returns: undefined
+      }
       propose_client_mailing_address: {
         Args: {
           p_city: string
