@@ -127,6 +127,12 @@ export function EngagementWorkspace({
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
+  // "other" (untyped/legacy engagements) keeps every tab since we can't
+  // tell what kind of work it is -- only a definitively non-tax case_type
+  // hides the tax-specific tab.
+  const showIrsNotices =
+    engagement.case_type !== "bookkeeping" && engagement.case_type !== "payroll" && engagement.case_type !== "business_service";
+  const visibleTabs = TABS.filter((t) => t !== "IRS Notices" || showIrsNotices);
 
   const client = engagement.clients;
   const reviewCount = stages.filter((s) => s.status === "Waiting" || s.status === "In Progress").length;
@@ -171,7 +177,7 @@ export function EngagementWorkspace({
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           <nav className="flex gap-1 overflow-x-auto border-b border-border bg-surface px-8">
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <button
                 key={t}
                 type="button"

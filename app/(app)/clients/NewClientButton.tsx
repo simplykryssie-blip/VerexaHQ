@@ -9,10 +9,11 @@ import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
 import { useToast } from "@/components/Toast";
+import { caseTypeFromCategorySlug } from "@/lib/caseType";
 
 const DRAFT_KEY = "new-client-button";
 
-type ServiceOption = { id: string; name: string };
+type ServiceOption = { id: string; name: string; service_categories?: { slug: string } | null };
 
 type Draft = {
   clientType: "individual" | "business";
@@ -361,10 +362,12 @@ export function NewClientButton({
       // Same shared create_engagement RPC NewEngagementForm.tsx uses --
       // derives workflow_id/current_stage from the service's process so
       // this bundled path can't fall out of sync with the standalone one.
+      const service = services.find((s) => s.id === serviceId);
       const { error: engagementError } = await supabase.rpc("create_engagement", {
         p_workspace_id: workspaceId,
         p_client_id: result.client_id,
         p_service_id: serviceId,
+        p_case_type: caseTypeFromCategorySlug(service?.service_categories?.slug),
       });
       if (engagementError) {
         setLoading(false);

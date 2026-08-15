@@ -94,10 +94,15 @@ export function OverviewTab({
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
   const client = engagement.clients;
+  // "other" (the default for engagements created before case_type existed,
+  // or with no categorized service) still shows tax fields since we can't
+  // tell what kind of work it actually is -- only definitively non-tax
+  // types hide them.
+  const showTaxDetails = engagement.case_type !== "bookkeeping" && engagement.case_type !== "payroll" && engagement.case_type !== "business_service";
 
   return (
     <div className="space-y-6">
-      <TaxDetailsCard engagementId={engagement.id} workspaceId={workspaceId} detail={taxDetail} taxYears={taxYears} />
+      {showTaxDetails && <TaxDetailsCard engagementId={engagement.id} workspaceId={workspaceId} detail={taxDetail} taxYears={taxYears} />}
 
       <Section title="Status & progress">
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
@@ -1075,6 +1080,7 @@ export type EngagementRow = {
   due_date: string | null;
   open_date: string | null;
   completed_date: string | null;
+  case_type: string;
   clients: ClientRef | null;
   services: { name: string } | null;
   assigned_staff: StaffRef;

@@ -41,7 +41,7 @@ export default async function NewEngagementPage({
       : Promise.resolve({ data: null }),
     supabase
       .from("services")
-      .select("id, name, organizer_template_id, billing_rule_id, organizer_templates(name)")
+      .select("id, name, organizer_template_id, billing_rule_id, organizer_templates(name), service_categories(slug)")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),

@@ -8,6 +8,7 @@ import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { renderEmail } from "@/lib/email/template";
 import { formatPhone } from "@/lib/phone";
+import { caseTypeFromCategorySlug } from "@/lib/caseType";
 
 const DRAFT_KEY = "new-engagement-inline";
 
@@ -312,7 +313,14 @@ export function NewEngagementForm({
   workspaceId: string;
   hasAnyClients: boolean;
   defaultClient: ClientOption | null;
-  services: { id: string; name: string; organizer_template_id: string | null; billing_rule_id: string | null; organizer_templates: { name: string } | null }[];
+  services: {
+    id: string;
+    name: string;
+    organizer_template_id: string | null;
+    billing_rule_id: string | null;
+    organizer_templates: { name: string } | null;
+    service_categories: { slug: string } | null;
+  }[];
   billingRules: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
@@ -405,6 +413,8 @@ export function NewEngagementForm({
       assignedStaffId = user?.id ?? null;
     }
 
+    const selectedServiceForCaseType = services.find((s) => s.id === serviceId);
+
     // create_engagement is the single source of truth for deriving
     // workflow_id/current_stage from a service's process -- this form and
     // the bundled engagement step in NewClientButton.tsx both call it, so
@@ -416,6 +426,7 @@ export function NewEngagementForm({
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
       p_billing_rule_id: billingRuleId || undefined,
+      p_case_type: caseTypeFromCategorySlug(selectedServiceForCaseType?.service_categories?.slug),
     });
 
     if (error) {

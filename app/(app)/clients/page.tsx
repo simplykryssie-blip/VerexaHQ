@@ -113,7 +113,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     clientsQuery,
     supabase
       .from("services")
-      .select("id, name")
+      .select("id, name, service_categories(slug)")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
       .order("display_order"),

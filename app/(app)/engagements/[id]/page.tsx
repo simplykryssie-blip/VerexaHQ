@@ -100,7 +100,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
   const { data: engagement } = await supabase
     .from("engagements")
     .select(
-      `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage,
+      `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage, case_type,
       client_id, service_id,
       clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id, primary_email, primary_phone),
       services(name),
