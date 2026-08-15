@@ -8,6 +8,7 @@ import { AddressInput } from "@/components/AddressInput";
 import { NameInput } from "@/components/NameInput";
 import { parseAddressValue, parseNameValue, stringifyAddressValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import { AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { useToast } from "@/components/Toast";
 
 export type BasicInfoSnapshot = {
   client_type: string | null;
@@ -29,16 +30,33 @@ export type BasicInfoSnapshot = {
 
 type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 
-export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot; next: string }) {
+// mode "onboarding" is the one-time gate a client can't get past until it's
+// submitted (portal/basic-info): the service picker is required, and
+// success moves them on to `next`. mode "profile" is the ongoing "review
+// your info" card on the Profile page: no service picker (already asked
+// once, and re-asking on every visit would be noise), success just toasts
+// and refreshes in place.
+export function BasicInfoForm({
+  snapshot,
+  next,
+  mode = "onboarding",
+}: {
+  snapshot: BasicInfoSnapshot;
+  next?: string;
+  mode?: "onboarding" | "profile";
+}) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const isBusiness = snapshot.client_type === "business";
+  const isProfile = mode === "profile";
 
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState(snapshot.service_category_id ?? "");
   const [selectedServiceId, setSelectedServiceId] = useState(snapshot.service_id ?? "");
 
   useEffect(() => {
+    if (isProfile) return;
     supabase.rpc("get_portal_service_options").then(({ data }) => {
       setServiceCategories((data as unknown as ServiceCategory[] | null) ?? []);
     });
@@ -79,7 +97,7 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
       setError("First and last name are required.");
       return;
     }
-    if (!selectedCategoryId || !selectedServiceId) {
+    if (!isProfile && (!selectedCategoryId || !selectedServiceId)) {
       setError("Let us know what service you're interested in.");
       return;
     }
@@ -99,8 +117,8 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
       p_mailing_city: addressParts.city.trim() || undefined,
       p_mailing_state: addressParts.state.trim() || undefined,
       p_mailing_zip: addressParts.zip.trim() || undefined,
-      p_service_category_id: selectedCategoryId,
-      p_service_id: selectedServiceId,
+      p_service_category_id: isProfile ? undefined : selectedCategoryId,
+      p_service_id: isProfile ? undefined : selectedServiceId,
     });
 
     setLoading(false);
@@ -108,7 +126,12 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
       setError(error.message);
       return;
     }
-    router.push(next);
+    if (isProfile) {
+      toast.show("Info updated. Changes to anything already on file will need your firm's approval before they take effect.", "success");
+      router.refresh();
+      return;
+    }
+    router.push(next!);
     router.refresh();
   }
 
@@ -147,51 +170,55 @@ export function BasicInfoForm({ snapshot, next }: { snapshot: BasicInfoSnapshot;
         <AddressInput value={address} onChange={setAddress} />
       </div>
 
-      <div className={styles.field}>
-        <label htmlFor="service_category">What do you need help with?</label>
-        <select
-          id="service_category"
-          required
-          value={selectedCategoryId}
-          onChange={(e) => {
-            setSelectedCategoryId(e.target.value);
-            setSelectedServiceId("");
-          }}
-          className={styles.input}
-        >
-          <option value="">Select a category...</option>
-          {serviceCategories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!isProfile && (
+        <>
+          <div className={styles.field}>
+            <label htmlFor="service_category">What do you need help with?</label>
+            <select
+              id="service_category"
+              required
+              value={selectedCategoryId}
+              onChange={(e) => {
+                setSelectedCategoryId(e.target.value);
+                setSelectedServiceId("");
+              }}
+              className={styles.input}
+            >
+              <option value="">Select a category...</option>
+              {serviceCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      <div className={styles.field}>
-        <label htmlFor="service">Specifically?</label>
-        <select
-          id="service"
-          required
-          value={selectedServiceId}
-          onChange={(e) => setSelectedServiceId(e.target.value)}
-          disabled={!selectedCategory}
-          className={styles.input}
-        >
-          <option value="">{selectedCategory ? "Select a service..." : "Choose a category first"}</option>
-          {(selectedCategory?.services ?? []).map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </div>
+          <div className={styles.field}>
+            <label htmlFor="service">Specifically?</label>
+            <select
+              id="service"
+              required
+              value={selectedServiceId}
+              onChange={(e) => setSelectedServiceId(e.target.value)}
+              disabled={!selectedCategory}
+              className={styles.input}
+            >
+              <option value="">{selectedCategory ? "Select a service..." : "Choose a category first"}</option>
+              {(selectedCategory?.services ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
 
       {error && <AuthError>{error}</AuthError>}
 
       <button type="submit" disabled={loading} className={styles.submit}>
         {loading && <span className={styles.spinner} />}
-        {loading ? "Saving…" : "Continue"}
+        {loading ? "Saving…" : isProfile ? "Save changes" : "Continue"}
       </button>
     </form>
   );
