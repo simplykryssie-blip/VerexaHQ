@@ -64,7 +64,7 @@ export type SignatureRequestRow = {
   title: string;
   status: "pending" | "completed" | "declined" | "cancelled";
   due_date: string | null;
-  attachment_id: string;
+  attachment_id: string | null;
   attachment_file_name: string;
   created_at: string;
   signers: SignerRow[];

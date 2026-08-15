@@ -240,7 +240,10 @@ export function FirmProfileForm({
     }
 
     if (showPtin && (ptin.trim() || clearPtin)) {
-      const { error: ptinError } = await supabase.rpc("set_my_ptin", { p_ptin: clearPtin ? undefined : ptin.trim(), p_clear: clearPtin });
+      const { error: ptinError } = await supabase.rpc("set_my_ptin", {
+        p_ptin: (clearPtin ? null : ptin.trim()) as string,
+        p_clear: clearPtin,
+      });
       if (ptinError) {
         setSaving(false);
         setError(ptinError.message);

@@ -88,9 +88,9 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       const { data, error: rpcError } = await supabase.rpc("sign_public_engagement_letter_with_signup", {
         p_token: token,
         p_first_name: firstName.trim(),
-        p_last_name: lastName.trim() || null,
+        p_last_name: lastName.trim(),
         p_email: email.trim(),
-        p_phone: phone.trim() || null,
+        p_phone: phone.trim(),
         p_typed_name: typedName.trim(),
         p_auth_user_id: signUpData.user.id,
       });
@@ -115,9 +115,9 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
     const { data, error: rpcError } = await supabase.rpc("sign_public_engagement_letter", {
       p_token: token,
       p_first_name: firstName.trim(),
-      p_last_name: lastName.trim() || null,
+      p_last_name: lastName.trim(),
       p_email: email.trim(),
-      p_phone: phone.trim() || null,
+      p_phone: phone.trim(),
       p_typed_name: typedName.trim(),
     });
     setSubmitting(false);
