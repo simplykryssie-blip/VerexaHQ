@@ -7430,6 +7430,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      _notify_admins_of_quote_response: {
+        Args: {
+          p_client_id: string
+          p_quote_id: string
+          p_response: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       accept_config_object_share: {
         Args: { p_share_id: string }
         Returns: string
@@ -7460,6 +7469,7 @@ export type Database = {
         }
       }
       accept_portal_invitation: { Args: { p_token: string }; Returns: string }
+      accept_quote: { Args: { p_quote_id: string }; Returns: undefined }
       accept_workspace_invitation: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -7700,6 +7710,10 @@ export type Database = {
       current_workspace_ids: { Args: never; Returns: string[] }
       decline_config_object_share: {
         Args: { p_share_id: string }
+        Returns: undefined
+      }
+      decline_quote: {
+        Args: { p_quote_id: string; p_reason?: string }
         Returns: undefined
       }
       decline_signature: {
@@ -7953,6 +7967,7 @@ export type Database = {
         Args: { p_entity_id: string }
         Returns: boolean
       }
+      is_portal_member: { Args: { p_workspace_id: string }; Returns: boolean }
       is_portal_user: { Args: { p_client_id: string }; Returns: boolean }
       is_portal_user_for_entity: {
         Args: { p_entity_id: string; p_entity_type: string }
