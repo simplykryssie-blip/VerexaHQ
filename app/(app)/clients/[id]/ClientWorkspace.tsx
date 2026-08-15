@@ -292,6 +292,7 @@ export function ClientWorkspace({
                 workspaceId={workspace.id}
                 paymentPlansByInvoice={paymentPlansByInvoice}
                 canManageBilling={permissions.billingManage}
+                workspaceServices={workspaceServices}
               />
             )}
             {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}

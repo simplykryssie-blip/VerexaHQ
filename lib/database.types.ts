@@ -5037,6 +5037,7 @@ export type Database = {
           notes: string | null
           quote_number: string | null
           sent_at: string | null
+          service_id: string | null
           status: string
           subtotal: number
           tax_amount: number
@@ -5059,6 +5060,7 @@ export type Database = {
           notes?: string | null
           quote_number?: string | null
           sent_at?: string | null
+          service_id?: string | null
           status?: string
           subtotal?: number
           tax_amount?: number
@@ -5081,6 +5083,7 @@ export type Database = {
           notes?: string | null
           quote_number?: string | null
           sent_at?: string | null
+          service_id?: string | null
           status?: string
           subtotal?: number
           tax_amount?: number
@@ -5125,6 +5128,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "quotes_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "quotes_workspace_id_fkey"

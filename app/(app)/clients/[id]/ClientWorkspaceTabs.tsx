@@ -746,6 +746,7 @@ export function BillingTab({
   workspaceId,
   paymentPlansByInvoice,
   canManageBilling,
+  workspaceServices = [],
 }: {
   clientId: string;
   clientName: string;
@@ -757,6 +758,7 @@ export function BillingTab({
   workspaceId: string;
   paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
   canManageBilling: boolean;
+  workspaceServices?: { id: string; name: string }[];
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -797,6 +799,7 @@ export function BillingTab({
             clientId={clientId}
             firmName={workspaceName}
             clientName={clientName}
+            services={workspaceServices}
             onDone={() => setModal(null)}
           />
         </Modal>

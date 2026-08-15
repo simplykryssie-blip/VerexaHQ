@@ -26,6 +26,7 @@ export function InvoiceQuoteForm({
   firmName,
   clientName,
   editing,
+  services = [],
   onDone,
 }: {
   kind: "invoice" | "quote";
@@ -35,10 +36,18 @@ export function InvoiceQuoteForm({
   firmName: string;
   clientName: string;
   editing?: EditingInvoiceQuote;
+  services?: { id: string; name: string }[];
   onDone: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
+  // A new (not-yet-attached-to-an-engagement) quote needs to say which
+  // service it's for -- accepting it creates the engagement for that
+  // service. A quote created from within an existing engagement's own
+  // billing tab doesn't need this (engagementId already set), and neither
+  // does editing an already-created quote (its service is already fixed).
+  const needsService = kind === "quote" && !editing && !engagementId;
+  const [serviceId, setServiceId] = useState("");
   const [title, setTitle] = useState(editing?.title ?? "");
   const [lineItems, setLineItems] = useState<PreviewLineItem[]>(
     editing?.line_items && editing.line_items.length > 0 ? editing.line_items : [{ description: "", quantity: 1, unit_price: 0 }]
@@ -80,6 +89,10 @@ export function InvoiceQuoteForm({
     }
     if (kind === "quote" && !title.trim()) {
       setError("Enter a title.");
+      return;
+    }
+    if (needsService && !serviceId) {
+      setError("Select which service this quote is for.");
       return;
     }
     setSaving(true);
@@ -128,7 +141,9 @@ export function InvoiceQuoteForm({
     const { error: insertError } =
       kind === "invoice"
         ? await supabase.from("invoices").insert({ ...payload, status: "sent", due_date: dueDate || null })
-        : await supabase.from("quotes").insert({ ...payload, title: title.trim(), status: "sent", valid_until: dueDate || null });
+        : await supabase
+            .from("quotes")
+            .insert({ ...payload, title: title.trim(), status: "sent", valid_until: dueDate || null, service_id: needsService ? serviceId : null });
 
     setSaving(false);
     if (insertError) {
@@ -151,6 +166,30 @@ export function InvoiceQuoteForm({
               onChange={(e) => setTitle(e.target.value)}
               className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
+          </label>
+        )}
+
+        {needsService && (
+          <label className="block text-sm font-medium text-slate">
+            Service
+            <select
+              required
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              <option value="" disabled>
+                Select a service...
+              </option>
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-muted">
+              If the client accepts, this creates the engagement for this service and starts its pipeline.
+            </span>
           </label>
         )}
 
