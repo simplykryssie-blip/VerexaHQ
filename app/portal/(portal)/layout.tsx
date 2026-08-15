@@ -39,14 +39,16 @@ export default async function PortalLayout({ children }: { children: React.React
         >
           Skip to main content
         </a>
-        <div className="flex h-screen overflow-hidden bg-surfaceMuted">
-          <PortalSidebar
-            clientLabel={identity.clientLabel}
-            pendingCount={count ?? 0}
-            logoUrl={branding.portalLogoUrl}
-            firmName={branding.displayName}
-          />
-          <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0">
+        <div className="flex h-screen overflow-hidden bg-surfaceMuted print:h-auto print:overflow-visible">
+          <div className="print:hidden">
+            <PortalSidebar
+              clientLabel={identity.clientLabel}
+              pendingCount={count ?? 0}
+              logoUrl={branding.portalLogoUrl}
+              firmName={branding.displayName}
+            />
+          </div>
+          <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0 print:overflow-visible print:pt-0">
             {children}
           </main>
         </div>

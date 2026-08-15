@@ -19,7 +19,9 @@ export default async function OrganizerBuilderPage({ params }: { params: { id: s
       .maybeSingle(),
     supabase
       .from("organizer_fields")
-      .select("id, organizer_template_id, parent_field_id, field_type, label, help_text, display_order, is_required, options, conditional_logic")
+      .select(
+        "id, organizer_template_id, parent_field_id, field_type, label, help_text, display_order, is_required, options, conditional_logic, client_profile_field"
+      )
       .eq("organizer_template_id", params.id)
       .order("display_order"),
   ]);

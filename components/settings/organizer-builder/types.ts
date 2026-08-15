@@ -11,6 +11,7 @@ export type BuilderField = {
   is_required: boolean;
   options: unknown;
   conditional_logic: unknown;
+  client_profile_field: string | null;
 };
 
 export type BuilderTemplate = {

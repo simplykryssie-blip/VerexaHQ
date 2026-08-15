@@ -411,7 +411,7 @@ export type Database = {
           rejected_reason?: string | null
           run_id: string
           scheduled_for?: string | null
-          status: string
+          status?: string
           workspace_id: string
         }
         Update: {
@@ -505,6 +505,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "engagements"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "automation_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
           },
           {
             foreignKeyName: "automation_runs_workspace_id_fkey"
@@ -1120,6 +1134,112 @@ export type Database = {
           },
         ]
       }
+      client_pending_changes: {
+        Row: {
+          batch_id: string
+          client_address_id: string | null
+          client_id: string
+          created_at: string
+          decision_notes: string | null
+          id: string
+          new_value: string
+          old_value: string | null
+          organizer_field_id: string | null
+          organizer_response_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          submitted_by_portal_user_id: string | null
+          target_column: string
+          target_table: string
+          workspace_id: string
+        }
+        Insert: {
+          batch_id?: string
+          client_address_id?: string | null
+          client_id: string
+          created_at?: string
+          decision_notes?: string | null
+          id?: string
+          new_value: string
+          old_value?: string | null
+          organizer_field_id?: string | null
+          organizer_response_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source: string
+          status?: string
+          submitted_by_portal_user_id?: string | null
+          target_column: string
+          target_table: string
+          workspace_id: string
+        }
+        Update: {
+          batch_id?: string
+          client_address_id?: string | null
+          client_id?: string
+          created_at?: string
+          decision_notes?: string | null
+          id?: string
+          new_value?: string
+          old_value?: string | null
+          organizer_field_id?: string | null
+          organizer_response_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          submitted_by_portal_user_id?: string | null
+          target_column?: string
+          target_table?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_pending_changes_client_address_id_fkey"
+            columns: ["client_address_id"]
+            isOneToOne: false
+            referencedRelation: "client_addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pending_changes_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pending_changes_organizer_field_id_fkey"
+            columns: ["organizer_field_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pending_changes_organizer_response_id_fkey"
+            columns: ["organizer_response_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pending_changes_submitted_by_portal_user_id_fkey"
+            columns: ["submitted_by_portal_user_id"]
+            isOneToOne: false
+            referencedRelation: "client_portal_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_pending_changes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_phones: {
         Row: {
           client_id: string
@@ -1340,6 +1460,7 @@ export type Database = {
           normalized_email: string | null
           normalized_phone: string | null
           notes: string | null
+          portal_basic_info_completed_at: string | null
           postal_code: string | null
           primary_email: string | null
           primary_phone: string | null
@@ -1383,6 +1504,7 @@ export type Database = {
           normalized_email?: string | null
           normalized_phone?: string | null
           notes?: string | null
+          portal_basic_info_completed_at?: string | null
           postal_code?: string | null
           primary_email?: string | null
           primary_phone?: string | null
@@ -1426,6 +1548,7 @@ export type Database = {
           normalized_email?: string | null
           normalized_phone?: string | null
           notes?: string | null
+          portal_basic_info_completed_at?: string | null
           postal_code?: string | null
           primary_email?: string | null
           primary_phone?: string | null
@@ -1467,6 +1590,13 @@ export type Database = {
             columns: ["relationship_manager_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_source_workspace_id_fkey"
+            columns: ["source_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
           {
@@ -2425,6 +2555,73 @@ export type Database = {
           },
         ]
       }
+      engagement_letter_public_signatures: {
+        Row: {
+          client_id: string
+          created_at: string
+          engagement_letter_template_id: string
+          filed_as_attachment: boolean
+          id: string
+          resolved_body_html: string
+          signed_at: string
+          signer_email: string
+          signer_name: string
+          signer_phone: string | null
+          typed_name: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          engagement_letter_template_id: string
+          filed_as_attachment?: boolean
+          id?: string
+          resolved_body_html: string
+          signed_at?: string
+          signer_email: string
+          signer_name: string
+          signer_phone?: string | null
+          typed_name: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          engagement_letter_template_id?: string
+          filed_as_attachment?: boolean
+          id?: string
+          resolved_body_html?: string
+          signed_at?: string
+          signer_email?: string
+          signer_name?: string
+          signer_phone?: string | null
+          typed_name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "engagement_letter_public_sign_engagement_letter_template_i_fkey"
+            columns: ["engagement_letter_template_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_letter_public_signatures_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagement_letter_public_signatures_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       engagement_letter_templates: {
         Row: {
           body_html: string
@@ -2477,73 +2674,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "engagement_letter_templates_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      engagement_letter_public_signatures: {
-        Row: {
-          client_id: string
-          created_at: string
-          engagement_letter_template_id: string
-          filed_as_attachment: boolean
-          id: string
-          resolved_body_html: string
-          signed_at: string
-          signer_email: string
-          signer_name: string
-          signer_phone: string | null
-          typed_name: string
-          workspace_id: string
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          engagement_letter_template_id: string
-          filed_as_attachment?: boolean
-          id?: string
-          resolved_body_html: string
-          signed_at?: string
-          signer_email: string
-          signer_name: string
-          signer_phone?: string | null
-          typed_name: string
-          workspace_id: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          engagement_letter_template_id?: string
-          filed_as_attachment?: boolean
-          id?: string
-          resolved_body_html?: string
-          signed_at?: string
-          signer_email?: string
-          signer_name?: string
-          signer_phone?: string | null
-          typed_name?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "engagement_letter_public_signatures_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagement_letter_public_signatures_engagement_letter_templ_fkey"
-            columns: ["engagement_letter_template_id"]
-            isOneToOne: false
-            referencedRelation: "engagement_letter_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagement_letter_public_signatures_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2949,6 +3079,7 @@ export type Database = {
           archived_date: string | null
           assigned_staff_id: string | null
           billing_rule_id: string | null
+          case_type: string
           client_id: string
           completed_date: string | null
           compliance_officer_id: string | null
@@ -2976,6 +3107,7 @@ export type Database = {
           archived_date?: string | null
           assigned_staff_id?: string | null
           billing_rule_id?: string | null
+          case_type?: string
           client_id: string
           completed_date?: string | null
           compliance_officer_id?: string | null
@@ -3003,6 +3135,7 @@ export type Database = {
           archived_date?: string | null
           assigned_staff_id?: string | null
           billing_rule_id?: string | null
+          case_type?: string
           client_id?: string
           completed_date?: string | null
           compliance_officer_id?: string | null
@@ -3074,6 +3207,27 @@ export type Database = {
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_source_engagement_share_id_fkey"
+            columns: ["source_engagement_share_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_pending_reviews_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_source_engagement_share_id_fkey"
+            columns: ["source_engagement_share_id"]
+            isOneToOne: false
+            referencedRelation: "compliance_shared_engagements_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "engagements_source_engagement_share_id_fkey"
+            columns: ["source_engagement_share_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_shares"
             referencedColumns: ["id"]
           },
           {
@@ -3194,10 +3348,12 @@ export type Database = {
       firm_tax_profile: {
         Row: {
           efin_encrypted: string | null
+          efin_hash: string | null
           efin_last4: string | null
           ein_encrypted: string | null
           ein_last4: string | null
           ptin_encrypted: string | null
+          ptin_hash: string | null
           ptin_last4: string | null
           regular_office_hours: Json
           supported_filing_states: string[]
@@ -3208,10 +3364,12 @@ export type Database = {
         }
         Insert: {
           efin_encrypted?: string | null
+          efin_hash?: string | null
           efin_last4?: string | null
           ein_encrypted?: string | null
           ein_last4?: string | null
           ptin_encrypted?: string | null
+          ptin_hash?: string | null
           ptin_last4?: string | null
           regular_office_hours?: Json
           supported_filing_states?: string[]
@@ -3222,10 +3380,12 @@ export type Database = {
         }
         Update: {
           efin_encrypted?: string | null
+          efin_hash?: string | null
           efin_last4?: string | null
           ein_encrypted?: string | null
           ein_last4?: string | null
           ptin_encrypted?: string | null
+          ptin_hash?: string | null
           ptin_last4?: string | null
           regular_office_hours?: Json
           supported_filing_states?: string[]
@@ -3414,6 +3574,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "irs_notices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_stages: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_entry_stage: boolean
+          key: string
+          label: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_entry_stage?: boolean
+          key: string
+          label: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_entry_stage?: boolean
+          key?: string
+          label?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3826,6 +4024,8 @@ export type Database = {
       }
       organizer_fields: {
         Row: {
+          body_html: string | null
+          client_profile_field: string | null
           conditional_logic: Json
           created_at: string
           display_order: number
@@ -3841,6 +4041,8 @@ export type Database = {
           validation: Json
         }
         Insert: {
+          body_html?: string | null
+          client_profile_field?: string | null
           conditional_logic?: Json
           created_at?: string
           display_order?: number
@@ -3856,6 +4058,8 @@ export type Database = {
           validation?: Json
         }
         Update: {
+          body_html?: string | null
+          client_profile_field?: string | null
           conditional_logic?: Json
           created_at?: string
           display_order?: number
@@ -3942,6 +4146,7 @@ export type Database = {
           resolved_service_id: string | null
           reviewed_at: string | null
           reviewed_by: string | null
+          signature_request_id: string | null
           status: string
           submitted_at: string | null
           updated_at: string
@@ -3959,6 +4164,7 @@ export type Database = {
           resolved_service_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          signature_request_id?: string | null
           status?: string
           submitted_at?: string | null
           updated_at?: string
@@ -3976,6 +4182,7 @@ export type Database = {
           resolved_service_id?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
+          signature_request_id?: string | null
           status?: string
           submitted_at?: string | null
           updated_at?: string
@@ -4022,6 +4229,13 @@ export type Database = {
             columns: ["resolved_service_id"]
             isOneToOne: false
             referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_responses_signature_request_id_fkey"
+            columns: ["signature_request_id"]
+            isOneToOne: false
+            referencedRelation: "signature_requests"
             referencedColumns: ["id"]
           },
           {
@@ -4972,6 +5186,52 @@ export type Database = {
           },
         ]
       }
+      role_permission_overrides: {
+        Row: {
+          granted: boolean
+          permission_id: string
+          role_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          granted: boolean
+          permission_id: string
+          role_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          granted?: boolean
+          permission_id?: string
+          role_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permission_overrides_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permission_overrides_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permission_overrides_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           created_at: string
@@ -5042,52 +5302,6 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      role_permission_overrides: {
-        Row: {
-          role_id: string
-          workspace_id: string
-          permission_id: string
-          granted: boolean
-          updated_at: string
-        }
-        Insert: {
-          role_id: string
-          workspace_id: string
-          permission_id: string
-          granted: boolean
-          updated_at?: string
-        }
-        Update: {
-          role_id?: string
-          workspace_id?: string
-          permission_id?: string
-          granted?: boolean
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "role_permission_overrides_role_id_fkey"
-            columns: ["role_id"]
-            isOneToOne: false
-            referencedRelation: "roles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "role_permission_overrides_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "role_permission_overrides_permission_id_fkey"
-            columns: ["permission_id"]
-            isOneToOne: false
-            referencedRelation: "permissions"
             referencedColumns: ["id"]
           },
         ]
@@ -5300,6 +5514,7 @@ export type Database = {
           decline_reason: string | null
           declined_at: string | null
           id: string
+          resolved_document_html: string | null
           sign_order: number
           signature_image_path: string | null
           signature_request_id: string
@@ -5317,6 +5532,7 @@ export type Database = {
           decline_reason?: string | null
           declined_at?: string | null
           id?: string
+          resolved_document_html?: string | null
           sign_order?: number
           signature_image_path?: string | null
           signature_request_id: string
@@ -5334,6 +5550,7 @@ export type Database = {
           decline_reason?: string | null
           declined_at?: string | null
           id?: string
+          resolved_document_html?: string | null
           sign_order?: number
           signature_image_path?: string | null
           signature_request_id?: string
@@ -5357,36 +5574,39 @@ export type Database = {
       }
       signature_requests: {
         Row: {
-          attachment_id: string
+          attachment_id: string | null
           created_at: string
           created_by: string | null
           due_date: string | null
           engagement_letter_template_id: string | null
           id: string
+          organizer_template_id: string | null
           status: string
           title: string
           updated_at: string
           workspace_id: string
         }
         Insert: {
-          attachment_id: string
+          attachment_id?: string | null
           created_at?: string
           created_by?: string | null
           due_date?: string | null
           engagement_letter_template_id?: string | null
           id?: string
+          organizer_template_id?: string | null
           status?: string
           title: string
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          attachment_id?: string
+          attachment_id?: string | null
           created_at?: string
           created_by?: string | null
           due_date?: string | null
           engagement_letter_template_id?: string | null
           id?: string
+          organizer_template_id?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -5412,6 +5632,13 @@ export type Database = {
             columns: ["engagement_letter_template_id"]
             isOneToOne: false
             referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_requests_organizer_template_id_fkey"
+            columns: ["organizer_template_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_templates"
             referencedColumns: ["id"]
           },
           {
@@ -6294,6 +6521,35 @@ export type Database = {
           },
         ]
       }
+      workspace_jotform_connections: {
+        Row: {
+          api_key_encrypted: string
+          connected_at: string
+          connected_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          connected_at?: string
+          connected_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          connected_at?: string
+          connected_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_jotform_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_retention_policies: {
         Row: {
           archived_clients_retention_days: number | null
@@ -6506,35 +6762,6 @@ export type Database = {
           },
           {
             foreignKeyName: "workspace_subscriptions_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: true
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workspace_jotform_connections: {
-        Row: {
-          api_key_encrypted: string
-          connected_at: string
-          connected_by: string | null
-          workspace_id: string
-        }
-        Insert: {
-          api_key_encrypted: string
-          connected_at?: string
-          connected_by?: string | null
-          workspace_id: string
-        }
-        Update: {
-          api_key_encrypted?: string
-          connected_at?: string
-          connected_by?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_jotform_connections_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
             referencedRelation: "workspaces"
@@ -7109,6 +7336,35 @@ export type Database = {
       }
     }
     Functions: {
+      _decide_client_field_change: {
+        Args: {
+          p_batch_id: string
+          p_client_address_id: string
+          p_client_id: string
+          p_current_value: string
+          p_new_value: string
+          p_organizer_field_id: string
+          p_organizer_response_id: string
+          p_portal_user_id: string
+          p_source: string
+          p_target_column: string
+          p_target_table: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      _notify_admins_of_pending_client_change: {
+        Args: {
+          p_batch_id: string
+          p_client_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      accept_config_object_share: {
+        Args: { p_share_id: string }
+        Returns: string
+      }
       accept_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {
@@ -7127,110 +7383,12 @@ export type Database = {
           status: string
           updated_at: string
         }
-      }
-      release_firm_connection_billing: {
-        Args: { p_connection_id: string }
-        Returns: {
-          billing_responsibility: string
-          child_workspace_id: string | null
-          created_at: string
-          id: string
-          invite_expires_at: string | null
-          invite_token: string | null
-          invited_by: string | null
-          parent_workspace_id: string
-          relationship_type: string
-          responded_at: string | null
-          responded_by: string | null
-          shares_communications_identity: boolean
-          status: string
-          updated_at: string
+        SetofOptions: {
+          from: "*"
+          to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
         }
-      }
-      disconnect_firm_connection: {
-        Args: { p_connection_id: string }
-        Returns: undefined
-      }
-      create_firm_connection_invite: {
-        Args: { p_relationship_type?: string; p_workspace_id: string }
-        Returns: {
-          billing_responsibility: string
-          child_workspace_id: string | null
-          created_at: string
-          id: string
-          invite_expires_at: string | null
-          invite_token: string | null
-          invited_by: string | null
-          parent_workspace_id: string
-          relationship_type: string
-          responded_at: string | null
-          responded_by: string | null
-          shares_communications_identity: boolean
-          status: string
-          updated_at: string
-        }
-      }
-      get_firm_connection_invite_preview: {
-        Args: { p_token: string }
-        Returns: {
-          ero_name: string
-          expires_at: string | null
-          relationship_type: string
-          status: string
-        }[]
-      }
-      redeem_firm_connection_invite: {
-        Args: { p_token: string; p_workspace_id: string }
-        Returns: {
-          billing_responsibility: string
-          child_workspace_id: string | null
-          created_at: string
-          id: string
-          invite_expires_at: string | null
-          invite_token: string | null
-          invited_by: string | null
-          parent_workspace_id: string
-          relationship_type: string
-          responded_at: string | null
-          responded_by: string | null
-          shares_communications_identity: boolean
-          status: string
-          updated_at: string
-        }
-      }
-      create_engagement_share: {
-        Args: { p_engagement_id: string }
-        Returns: {
-          created_at: string
-          decision_notes: string | null
-          engagement_id: string
-          expires_at: string | null
-          id: string
-          reviewed_at: string | null
-          reviewed_by: string | null
-          shared_by: string | null
-          shared_items: Json
-          shared_with_workspace_id: string
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
-      }
-      resubmit_engagement_share: {
-        Args: { p_engagement_share_id: string }
-        Returns: undefined
-      }
-      copy_shared_engagement: {
-        Args: { p_engagement_share_id: string }
-        Returns: Json
-      }
-      has_pending_engagement_share_access: {
-        Args: { p_engagement_id: string }
-        Returns: boolean
-      }
-      accept_config_object_share: {
-        Args: { p_share_id: string }
-        Returns: string
       }
       accept_portal_invitation: { Args: { p_token: string }; Returns: string }
       accept_workspace_invitation: {
@@ -7248,6 +7406,18 @@ export type Database = {
       add_process_stage_to_pipeline: {
         Args: { p_process_id: string; p_stage_name: string }
         Returns: string
+      }
+      advance_ready_automation_step: {
+        Args: { p_pending_step_id: string }
+        Returns: undefined
+      }
+      approve_automation_step: {
+        Args: { p_pending_step_id: string }
+        Returns: Json
+      }
+      approve_client_pending_change: {
+        Args: { p_notes?: string; p_pending_change_id: string }
+        Returns: undefined
       }
       archive_config_object_share: {
         Args: { p_share_id: string }
@@ -7282,6 +7452,14 @@ export type Database = {
           user_id: string
           workspace_id: string
         }[]
+      }
+      copy_preloaded_templates_to_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
+      copy_shared_engagement: {
+        Args: { p_engagement_share_id: string }
+        Returns: Json
       }
       create_client: {
         Args: {
@@ -7327,12 +7505,64 @@ export type Database = {
         Args: {
           p_assigned_staff_id?: string
           p_billing_rule_id?: string
+          p_case_type?: string
           p_client_id: string
+          p_due_date?: string
           p_priority?: Database["public"]["Enums"]["engagement_priority"]
-          p_service_id: string
+          p_process_id?: string
+          p_service_id?: string
           p_workspace_id: string
         }
         Returns: string
+      }
+      create_engagement_share: {
+        Args: { p_engagement_id: string }
+        Returns: {
+          created_at: string
+          decision_notes: string | null
+          engagement_id: string
+          expires_at: string | null
+          id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          shared_by: string | null
+          shared_items: Json
+          shared_with_workspace_id: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "engagement_shares"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_firm_connection_invite: {
+        Args: { p_relationship_type?: string; p_workspace_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_notification: {
         Args: {
@@ -7403,6 +7633,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      disconnect_firm_connection: {
+        Args: { p_connection_id: string }
+        Returns: undefined
+      }
       disconnect_workspace_jotform: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -7429,6 +7663,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      escape_html: { Args: { p_text: string }; Returns: string }
       evaluate_automation_conditions: {
         Args: { p_conditions: Json; p_context: Json }
         Returns: boolean
@@ -7438,6 +7673,21 @@ export type Database = {
         Returns: undefined
       }
       expire_stale_engagement_shares: { Args: never; Returns: number }
+      find_or_create_public_lead: {
+        Args: {
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      format_mailing_address: { Args: { p_raw: string }; Returns: string }
+      format_organizer_answer: {
+        Args: { p_field_type: string; p_value: Json }
+        Returns: string
+      }
       fulfill_document_request_item: {
         Args: { p_attachment_id: string; p_item_status_id: string }
         Returns: undefined
@@ -7460,6 +7710,15 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_firm_connection_invite_preview: {
+        Args: { p_token: string }
+        Returns: {
+          ero_name: string
+          expires_at: string
+          relationship_type: string
+          status: string
+        }[]
       }
       get_invitation_preview: {
         Args: { p_token: string }
@@ -7488,11 +7747,12 @@ export type Database = {
       get_portal_client_contact: {
         Args: never
         Returns: {
-          email: string | null
-          name: string | null
-          phone: string | null
+          email: string
+          name: string
+          phone: string
         }[]
       }
+      get_portal_client_snapshot: { Args: never; Returns: Json }
       get_portal_invitation_preview: {
         Args: { p_token: string }
         Returns: {
@@ -7540,14 +7800,20 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      has_completed_portal_basic_info: { Args: never; Returns: boolean }
       has_config_object_share_access: {
         Args: { p_id: string; p_table: string }
+        Returns: boolean
+      }
+      has_pending_engagement_share_access: {
+        Args: { p_engagement_id: string }
         Returns: boolean
       }
       has_permission: {
         Args: { p_permission_key: string; p_workspace_id: string }
         Returns: boolean
       }
+      hash_firm_secret: { Args: { p_plaintext: string }; Returns: string }
       invite_portal_user: {
         Args: {
           p_client_id: string
@@ -7612,6 +7878,16 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      link_public_portal_account: {
+        Args: {
+          p_auth_user_id: string
+          p_client_id: string
+          p_email: string
+          p_name: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       mark_all_notifications_read: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -7629,6 +7905,26 @@ export type Database = {
         Returns: undefined
       }
       portal_client_id: { Args: never; Returns: string }
+      propose_client_contact_field: {
+        Args: {
+          p_field: string
+          p_new_value: string
+          p_organizer_field_id?: string
+          p_organizer_response_id?: string
+        }
+        Returns: undefined
+      }
+      propose_client_mailing_address: {
+        Args: {
+          p_city: string
+          p_organizer_field_id?: string
+          p_organizer_response_id?: string
+          p_state: string
+          p_street: string
+          p_zip: string
+        }
+        Returns: undefined
+      }
       record_consent: {
         Args: {
           p_client_id?: string
@@ -7673,17 +7969,95 @@ export type Database = {
         }
         Returns: undefined
       }
+      redeem_firm_connection_invite: {
+        Args: { p_token: string; p_workspace_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reject_automation_step: {
+        Args: { p_pending_step_id: string; p_reason: string }
+        Returns: Json
+      }
+      reject_client_pending_change: {
+        Args: { p_notes?: string; p_pending_change_id: string }
+        Returns: undefined
+      }
+      release_firm_connection_billing: {
+        Args: { p_connection_id: string }
+        Returns: {
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          parent_workspace_id: string
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          shares_communications_identity: boolean
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       rename_process_stage: {
         Args: { p_new_name: string; p_stage_id: string }
+        Returns: undefined
+      }
+      render_engagement_letter_merge_fields: {
+        Args: {
+          p_body: string
+          p_client_name: string
+          p_firm_address: string
+          p_firm_name: string
+          p_firm_phone: string
+        }
+        Returns: string
+      }
+      reorder_automation_step: {
+        Args: { p_direction: string; p_step_id: string }
         Returns: undefined
       }
       reorder_organizer_fields: {
         Args: { p_field_ids: string[]; p_template_id: string }
         Returns: undefined
       }
-      reorder_automation_step: {
-        Args: { p_step_id: string; p_direction: string }
-        Returns: undefined
+      resolve_and_sign_organizer_response: {
+        Args: {
+          p_client_email: string
+          p_client_name: string
+          p_response_id: string
+          p_template_id: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       resolve_organizer_response_service: {
         Args: { p_response_id: string }
@@ -7699,6 +8073,10 @@ export type Database = {
       }
       respond_to_firm_connection: {
         Args: { p_accept: boolean; p_connection_id: string }
+        Returns: undefined
+      }
+      resubmit_engagement_share: {
+        Args: { p_engagement_share_id: string }
         Returns: undefined
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
@@ -7765,7 +8143,7 @@ export type Database = {
         Returns: undefined
       }
       set_my_ptin: {
-        Args: { p_clear?: boolean; p_ptin?: string }
+        Args: { p_clear?: boolean; p_ptin: string }
         Returns: undefined
       }
       set_platform_admin: {
@@ -7810,6 +8188,12 @@ export type Database = {
           website: string | null
           workspace_type: string
         }
+        SetofOptions: {
+          from: "*"
+          to: "workspaces"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       share_config_object: {
         Args: {
@@ -7833,8 +8217,8 @@ export type Database = {
         Args: {
           p_email: string
           p_first_name: string
-          p_last_name: string | null
-          p_phone: string | null
+          p_last_name: string
+          p_phone: string
           p_token: string
           p_typed_name: string
         }
@@ -7845,8 +8229,8 @@ export type Database = {
           p_auth_user_id: string
           p_email: string
           p_first_name: string
-          p_last_name: string | null
-          p_phone: string | null
+          p_last_name: string
+          p_phone: string
           p_token: string
           p_typed_name: string
         }
@@ -7864,13 +8248,27 @@ export type Database = {
         Args: { p_response_id: string }
         Returns: undefined
       }
+      submit_portal_basic_info: {
+        Args: {
+          p_business_name?: string
+          p_first_name?: string
+          p_last_name?: string
+          p_mailing_city?: string
+          p_mailing_state?: string
+          p_mailing_street?: string
+          p_mailing_zip?: string
+          p_primary_email?: string
+          p_primary_phone?: string
+        }
+        Returns: undefined
+      }
       submit_public_organizer_response: {
         Args: {
           p_answers: Json
           p_email: string
           p_first_name: string
-          p_last_name: string | null
-          p_phone: string | null
+          p_last_name: string
+          p_phone: string
           p_token: string
         }
         Returns: Json
@@ -7881,14 +8279,18 @@ export type Database = {
           p_auth_user_id: string
           p_email: string
           p_first_name: string
-          p_last_name: string | null
-          p_phone: string | null
+          p_last_name: string
+          p_phone: string
           p_token: string
         }
         Returns: Json
       }
       turn_on_service: {
-        Args: { p_new_name?: string; p_service_id: string; p_workspace_id: string }
+        Args: {
+          p_new_name?: string
+          p_service_id: string
+          p_workspace_id: string
+        }
         Returns: string
       }
       upsert_workspace_subscription: {
@@ -7915,6 +8317,12 @@ export type Database = {
           trial_end: string | null
           updated_at: string
           workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       withdraw_engagement_share: {

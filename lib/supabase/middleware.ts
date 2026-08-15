@@ -5,6 +5,7 @@ import type { Database } from "@/lib/database.types";
 const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password", "/sign/", "/o/", "/e/"];
 const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/mfa-challenge"];
 const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
+const PORTAL_BASIC_INFO_EXEMPT_PATHS = ["/portal/login", "/portal/accept-invitation", "/portal/basic-info"];
 const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
 
 export async function updateSession(request: NextRequest) {
@@ -86,6 +87,19 @@ export async function updateSession(request: NextRequest) {
 
       if (user && pathname === loginPath) {
         return NextResponse.redirect(new URL(homePath, request.url));
+      }
+    }
+
+    // Portal basic-info gate: a client can't reach anything else in the
+    // portal until they've submitted name/email/phone/mailing address once
+    // -- that submission is what populates the client tab and what
+    // organizers prefill from. Mirrors the staff MFA gate below.
+    if (user && !isApiPath && isPortalPath && !PORTAL_BASIC_INFO_EXEMPT_PATHS.some((path) => pathname.startsWith(path))) {
+      const { data: completed } = await supabase.rpc("has_completed_portal_basic_info");
+      if (!completed) {
+        const redirectUrl = new URL("/portal/basic-info", request.url);
+        redirectUrl.searchParams.set("next", pathname);
+        return NextResponse.redirect(redirectUrl);
       }
     }
 

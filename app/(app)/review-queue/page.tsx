@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ReviewQueueItem } from "./ReviewQueueItem";
+import { ReviewQueueClientChangeItem } from "./ReviewQueueClientChangeItem";
 
 export const dynamic = "force-dynamic";
 
@@ -42,10 +43,49 @@ export default async function ReviewQueuePage() {
   const openShares = (shares ?? []).filter((s) => s.status === "pending" || s.status === "corrections_requested");
   const resolvedShares = (shares ?? []).filter((s) => !openShares.includes(s));
 
+  const { data: pendingClientChanges } = await supabase
+    .from("client_pending_changes")
+    .select(
+      "id, batch_id, client_id, target_table, target_column, old_value, new_value, created_at, clients(client_type, first_name, last_name, business_name)"
+    )
+    .eq("workspace_id", workspace.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  const clientChangeBatches = new Map<string, typeof pendingClientChanges>();
+  for (const row of pendingClientChanges ?? []) {
+    clientChangeBatches.set(row.batch_id, [...(clientChangeBatches.get(row.batch_id) ?? []), row]);
+  }
+
   return (
     <>
-      <PageHeader title="Review Queue" description="Filings your connected PTINs have shared with you for approval." />
+      <PageHeader title="Review Queue" description="Filings your connected PTINs have shared with you for approval, plus client-submitted info changes awaiting your OK." />
       <div className="flex-1 space-y-8 px-8 py-6">
+        <section>
+          <h2 className="mb-2 text-sm font-semibold text-ink">Client info changes</h2>
+          {clientChangeBatches.size === 0 ? (
+            <EmptyState message="No client-submitted changes waiting on your review." />
+          ) : (
+            <ul className="space-y-3">
+              {Array.from(clientChangeBatches.entries()).map(([batchId, rows]) => (
+                <ReviewQueueClientChangeItem
+                  key={batchId}
+                  batchId={batchId}
+                  clientName={clientLabel((rows?.[0]?.clients as unknown as Parameters<typeof clientLabel>[0]) ?? null)}
+                  clientId={rows?.[0]?.client_id ?? ""}
+                  changes={(rows ?? []).map((r) => ({
+                    id: r.id,
+                    targetTable: r.target_table,
+                    targetColumn: r.target_column,
+                    oldValue: r.old_value,
+                    newValue: r.new_value,
+                  }))}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink">Awaiting your review</h2>
           {openShares.length === 0 ? (

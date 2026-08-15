@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { coerceAddressAnswerToString, normalizeOptions } from "@/lib/organizer/formatValue";
+import { coerceAddressAnswerToString, normalizeOptions, parseAddressValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
+import { OrganizerPrintSummary } from "@/components/portal/OrganizerPrintSummary";
 
 type FieldRow = {
   id: string;
@@ -19,12 +20,14 @@ type FieldRow = {
   options: unknown;
   parent_field_id: string | null;
   conditional_logic?: unknown;
+  client_profile_field?: string | null;
 };
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
 
 export function OrganizerForm({
   responseId,
+  templateName,
   fields,
   initialAnswers,
   readOnly,
@@ -33,6 +36,7 @@ export function OrganizerForm({
   entityId,
 }: {
   responseId: string;
+  templateName: string;
   fields: FieldRow[];
   initialAnswers: AnswerRow[];
   readOnly: boolean;
@@ -132,6 +136,37 @@ export function OrganizerForm({
         return;
       }
     }
+
+    // Fields the builder tagged as "prefill from client profile" propose
+    // their current value back to the client record -- applied immediately
+    // if the client record has nothing there yet, otherwise queued for
+    // staff approval. Repeater children are never mapped (a repeating
+    // section can't correspond to a single client-record field).
+    for (const field of fields) {
+      if (!field.client_profile_field || repeaterChildIds.has(field.id)) continue;
+      const value = answers[field.id];
+      if (!value) continue;
+
+      if (field.client_profile_field === "mailing_address") {
+        const parts = parseAddressValue(value);
+        await supabase.rpc("propose_client_mailing_address", {
+          p_street: parts.street,
+          p_city: parts.city,
+          p_state: parts.state,
+          p_zip: parts.zip,
+          p_organizer_response_id: responseId,
+          p_organizer_field_id: field.id,
+        });
+      } else {
+        await supabase.rpc("propose_client_contact_field", {
+          p_field: field.client_profile_field,
+          p_new_value: value,
+          p_organizer_response_id: responseId,
+          p_organizer_field_id: field.id,
+        });
+      }
+    }
+
     setSaving(false);
     toast.show("Progress saved", "success");
     router.refresh();
@@ -168,38 +203,49 @@ export function OrganizerForm({
 
   return (
     <div className="space-y-4">
-      {pages.length > 1 && (
-        <p className="text-xs font-medium text-muted">
-          Page {currentIndex + 1} of {pages.length}
-          {currentPage.title ? ` -- ${currentPage.title}` : ""}
-        </p>
+      {readOnly && (
+        <OrganizerPrintSummary
+          templateName={templateName}
+          topLevelFields={topLevelFields}
+          childrenByParent={childFieldsByParent}
+          answers={answers}
+          repeaterRows={repeaterRows}
+        />
       )}
-      {currentPage.fields.map((field) =>
-        field.field_type === "repeating_section" ? (
-          <RepeatingSectionInput
-            key={field.id}
-            field={field}
-            childFields={childFieldsByParent.get(field.id) ?? []}
-            rows={repeaterRows[field.id] ?? []}
-            onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
-            disabled={readOnly}
-            workspaceId={workspaceId}
-            entityType={entityType}
-            entityId={entityId}
-          />
-        ) : (
-          <FieldInput
-            key={field.id}
-            field={field}
-            value={answers[field.id] ?? ""}
-            onChange={saveAnswer}
-            disabled={readOnly}
-            workspaceId={workspaceId}
-            entityType={entityType}
-            entityId={entityId}
-          />
-        )
-      )}
+      <div className="print:hidden space-y-4">
+        {pages.length > 1 && (
+          <p className="text-xs font-medium text-muted">
+            Page {currentIndex + 1} of {pages.length}
+            {currentPage.title ? ` -- ${currentPage.title}` : ""}
+          </p>
+        )}
+        {currentPage.fields.map((field) =>
+          field.field_type === "repeating_section" ? (
+            <RepeatingSectionInput
+              key={field.id}
+              field={field}
+              childFields={childFieldsByParent.get(field.id) ?? []}
+              rows={repeaterRows[field.id] ?? []}
+              onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
+              disabled={readOnly}
+              workspaceId={workspaceId}
+              entityType={entityType}
+              entityId={entityId}
+            />
+          ) : (
+            <FieldInput
+              key={field.id}
+              field={field}
+              value={answers[field.id] ?? ""}
+              onChange={saveAnswer}
+              disabled={readOnly}
+              workspaceId={workspaceId}
+              entityType={entityType}
+              entityId={entityId}
+            />
+          )
+        )}
+      </div>
 
       {!readOnly && (
         <div className="flex items-center gap-2 pt-2">
