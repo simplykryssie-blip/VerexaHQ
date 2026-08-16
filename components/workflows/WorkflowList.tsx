@@ -51,6 +51,8 @@ export function WorkflowList({
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed"));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -86,7 +88,14 @@ export function WorkflowList({
 
   async function remove(id: string) {
     if (!window.confirm("Delete this workflow? Its run history will be removed too. This can't be undone.")) return;
-    await supabase.from("automations").delete().eq("id", id);
+    setDeleteError(null);
+    setDeletingId(id);
+    const { error: deleteErr } = await supabase.from("automations").delete().eq("id", id);
+    setDeletingId(null);
+    if (deleteErr) {
+      setDeleteError(deleteErr.message);
+      return;
+    }
     router.refresh();
   }
 
@@ -132,6 +141,8 @@ export function WorkflowList({
         </form>
       )}
 
+      {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
+
       {workflows.length === 0 ? (
         <EmptyState message="No workflows yet. Create one to automate what happens on an engagement." />
       ) : (
@@ -159,7 +170,13 @@ export function WorkflowList({
                     >
                       {w.is_enabled ? "Pause" : "Activate"}
                     </button>
-                    <button type="button" onClick={() => remove(w.id)} className="text-muted hover:text-danger" aria-label="Delete workflow">
+                    <button
+                      type="button"
+                      onClick={() => remove(w.id)}
+                      disabled={deletingId === w.id}
+                      className="text-muted hover:text-danger disabled:opacity-50"
+                      aria-label="Delete workflow"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </>
