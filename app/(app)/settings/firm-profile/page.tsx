@@ -42,7 +42,7 @@ export default async function FirmProfilePage() {
       user
         ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
-      supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
     ]);
 
   const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);

@@ -52,7 +52,7 @@ export default async function UsersPage() {
       .select("id, email, role_id, status, expires_at, roles(name)")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false }),
-    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "users.manage" }),
   ]);
 
   const members = (membersRaw ?? []) as unknown as MemberRow[];

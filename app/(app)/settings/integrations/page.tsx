@@ -18,7 +18,9 @@ export default async function IntegrationsPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: isAdmin } = workspace ? await supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }) : { data: false };
+  const { data: isAdmin } = workspace
+    ? await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" })
+    : { data: false };
   const { data: zoomConnection } = user
     ? await supabase.from("user_zoom_connections").select("status, zoom_email").eq("user_id", user.id).maybeSingle()
     : { data: null };

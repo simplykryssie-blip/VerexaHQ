@@ -23,7 +23,7 @@ export default async function RolesPage() {
       supabase.from("role_permissions").select("role_id, permission_id"),
       supabase.from("role_permission_overrides").select("role_id, permission_id, granted").eq("workspace_id", workspace.id),
       supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("status", "active"),
-      supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "roles.manage" }),
     ]);
 
   const memberCountByRole = new Map<string, number>();

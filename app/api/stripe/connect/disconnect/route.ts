@@ -10,9 +10,9 @@ export async function POST() {
   }
 
   const supabase = createClient();
-  const { data: isAdmin } = await supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id });
-  if (!isAdmin) {
-    return NextResponse.json({ error: "Only workspace admins can disconnect Stripe." }, { status: 403 });
+  const { data: canManageSettings } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" });
+  if (!canManageSettings) {
+    return NextResponse.json({ error: "You don't have permission to disconnect Stripe." }, { status: 403 });
   }
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connected_account_id").eq("id", workspace.id).single();

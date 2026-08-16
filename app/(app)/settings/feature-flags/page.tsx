@@ -15,7 +15,7 @@ export default async function FeatureFlagsPage() {
   const [{ data: flags }, { data: overrides }, { data: isAdmin }] = await Promise.all([
     supabase.from("feature_flags").select("id, key, name, description, module, is_core, default_enabled").order("module").order("name"),
     supabase.from("workspace_feature_flags").select("feature_flag_id, is_enabled").eq("workspace_id", workspace.id),
-    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "feature_flags.manage" }),
   ]);
 
   const overrideByFlag = new Map((overrides ?? []).map((o) => [o.feature_flag_id, o.is_enabled]));

@@ -25,9 +25,9 @@ export async function GET(request: Request) {
   }
 
   const supabase = createClient();
-  const { data: isAdmin } = await supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id });
-  if (!isAdmin) {
-    settingsUrl.searchParams.set("stripe_error", "Only workspace admins can connect Stripe.");
+  const { data: canManageSettings } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" });
+  if (!canManageSettings) {
+    settingsUrl.searchParams.set("stripe_error", "You don't have permission to connect Stripe.");
     return NextResponse.redirect(settingsUrl, 307);
   }
 
