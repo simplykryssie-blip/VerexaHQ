@@ -4,6 +4,7 @@ import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { PortalPayButton } from "@/components/portal/PortalPayButton";
+import { QuoteResponseButtons } from "@/components/portal/QuoteResponseButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,15 @@ export default async function PortalBillingPage() {
   if (!identity) redirect("/portal/login");
 
   const supabase = createClient();
-  const [{ data: invoices }, { data: payments }, { data: ledgerEntries }] = await Promise.all([
+  const [{ data: invoices }, { data: payments }, { data: ledgerEntries }, { data: quotes }] = await Promise.all([
     supabase.from("invoices").select("*").eq("client_id", identity.clientId).order("issue_date", { ascending: false }),
     supabase.from("payments").select("*").eq("client_id", identity.clientId).order("payment_date", { ascending: false }),
     supabase.from("client_ledger").select("balance_after").eq("client_id", identity.clientId).order("created_at", { ascending: false }).limit(1),
+    supabase
+      .from("quotes")
+      .select("id, title, total_amount, status, valid_until, notes, quote_number")
+      .eq("client_id", identity.clientId)
+      .order("created_at", { ascending: false }),
   ]);
 
   type PlanRow = { id: string; invoice_id: string; installment_number: number; amount: number; due_date: string; status: string };
@@ -43,6 +49,35 @@ export default async function PortalBillingPage() {
           <p className="text-xs uppercase tracking-wide text-muted">Balance due</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
         </div>
+
+        {(quotes ?? []).length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Quotes</h2>
+            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+              {(quotes ?? []).map((q) => (
+                <li key={q.id} className="px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-slate">{q.title}</p>
+                      <p className="text-xs text-muted">
+                        {q.quote_number}
+                        {q.valid_until && ` -- valid until ${new Date(q.valid_until).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-ink">{money(q.total_amount)}</span>
+                      {q.status === "sent" ? (
+                        <QuoteResponseButtons quoteId={q.id} />
+                      ) : (
+                        <span className="text-xs capitalize text-muted">{q.status}</span>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink">Invoices</h2>
