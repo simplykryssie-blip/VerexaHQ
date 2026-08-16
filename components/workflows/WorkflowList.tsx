@@ -7,6 +7,7 @@ import { Plus, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/Badge";
 import {
   TriggerFields,
   defaultTriggerConfig,
@@ -165,7 +166,10 @@ export function WorkflowList({
               <Link href={`/workflows/${w.id}`} className="flex min-w-0 items-center gap-3">
                 <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink">{w.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="truncate text-sm font-medium text-ink">{w.name}</p>
+                    {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+                  </div>
                   <p className="truncate text-xs text-muted">
                     {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines, leadStages)} &middot; {w.step_count} step
                     {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
@@ -173,7 +177,9 @@ export function WorkflowList({
                 </div>
               </Link>
               <div className="flex shrink-0 items-center gap-3">
-                <span className={`text-xs font-medium ${w.is_enabled ? "text-success" : "text-muted"}`}>{w.is_enabled ? "Active" : "Paused"}</span>
+                <span className={`text-xs font-medium ${w.is_enabled && w.step_count > 0 ? "text-success" : "text-muted"}`}>
+                  {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
+                </span>
                 {canManage && (
                   <>
                     <button

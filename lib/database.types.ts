@@ -5979,6 +5979,7 @@ export type Database = {
           id: string
           overdue_flagged_at: string | null
           priority: string | null
+          process_task_id: string | null
           status: string
           title: string
           updated_at: string | null
@@ -5995,6 +5996,7 @@ export type Database = {
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
+          process_task_id?: string | null
           status?: string
           title: string
           updated_at?: string | null
@@ -6011,6 +6013,7 @@ export type Database = {
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
+          process_task_id?: string | null
           status?: string
           title?: string
           updated_at?: string | null
@@ -6045,6 +6048,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "tasks_process_task_id_fkey"
+            columns: ["process_task_id"]
+            isOneToOne: false
+            referencedRelation: "process_tasks"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tasks_workflow_stage_id_fkey"
