@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
+import { renderEmail } from "@/lib/email/template";
 import type { Audience, DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "./types";
 
 function ProgressBar({ done, total }: { done: number; total: number }) {
@@ -26,6 +27,7 @@ export function RequestsPanel({
   entityId,
   audience = "staff",
   canCreate = true,
+  clientEmail,
 }: {
   requests: DocumentRequestRow[];
   templates: DocumentRequestTemplateOption[];
@@ -34,6 +36,7 @@ export function RequestsPanel({
   entityId: string;
   audience?: Audience;
   canCreate?: boolean;
+  clientEmail?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -122,6 +125,28 @@ export function RequestsPanel({
                   });
                   if (error) return error.message;
                   toast.show("Document request created", "success");
+
+                  if (clientEmail) {
+                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                    fetch("/api/email/send", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        to: clientEmail,
+                        sender: "notifications",
+                        subject: `Documents requested: ${v.title}`,
+                        html: renderEmail({
+                          heading: "We need a few documents from you",
+                          bodyHtml: `<p>Please log in to your client portal to review and upload what's requested for <strong>${v.title}</strong>.</p>`,
+                          ctaLabel: "Go to portal",
+                          ctaUrl: `${appUrl}/portal/login`,
+                        }),
+                      }),
+                    }).catch(() => {
+                      // Best-effort -- the request itself is already created.
+                    });
+                  }
+
                   router.refresh();
                 }}
               />

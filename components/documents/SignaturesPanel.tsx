@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignatureRequestFromTemplate";
+import { renderEmail } from "@/lib/email/template";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
@@ -27,6 +28,7 @@ export function SignaturesPanel({
   entityType,
   entityId,
   clientName,
+  clientEmail,
   firmName,
   workspaceId,
   audience = "staff",
@@ -38,6 +40,7 @@ export function SignaturesPanel({
   entityType?: EntityType;
   entityId?: string;
   clientName?: string;
+  clientEmail?: string | null;
   firmName?: string;
   workspaceId: string;
   audience?: Audience;
@@ -117,6 +120,28 @@ export function SignaturesPanel({
     }
 
     toast.show("Signature request created", "success");
+
+    if (clientEmail) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: clientEmail,
+          sender: "notifications",
+          subject: `Ready to sign: ${title}`,
+          html: renderEmail({
+            heading: "You have a document to sign",
+            bodyHtml: `<p>Please log in to your client portal to review and sign <strong>${title}</strong>.</p>`,
+            ctaLabel: "Go to portal",
+            ctaUrl: `${appUrl}/portal/login`,
+          }),
+        }),
+      }).catch(() => {
+        // Best-effort -- the request itself is already created.
+      });
+    }
+
     setCreating(false);
     setTitle("");
     setAttachmentId("");

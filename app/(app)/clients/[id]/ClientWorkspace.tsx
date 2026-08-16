@@ -276,6 +276,7 @@ export function ClientWorkspace({
                 signatureRequests={signatureRequests}
                 signatureTemplates={engagementLetterTemplates}
                 clientName={displayName(client)}
+                clientEmail={client.primary_email}
                 firmName={workspace.name}
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}

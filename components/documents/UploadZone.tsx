@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import type { EntityType } from "./types";
+import { renderEmail } from "@/lib/email/template";
+import type { Audience, EntityType } from "./types";
 
 const CATEGORIES = [
   "Tax Return",
@@ -23,13 +24,15 @@ export function UploadZone({
   entityType,
   entityId,
   folderId,
-  visibility = "internal",
+  audience = "staff",
+  clientEmail,
 }: {
   workspaceId: string;
   entityType: EntityType;
   entityId: string;
   folderId: string | null;
-  visibility?: "internal" | "client_visible";
+  audience?: Audience;
+  clientEmail?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -37,12 +40,16 @@ export function UploadZone({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState("");
+  // Staff choose per-upload whether the client can see it; a client uploading
+  // their own file from the portal always shares it with themselves.
+  const [shareWithClient, setShareWithClient] = useState(false);
 
   async function uploadFiles(files: FileList | File[]) {
     setUploading(true);
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    const visibility = audience === "portal" || shareWithClient ? "client_visible" : "internal";
 
     let succeeded = 0;
     let failed = 0;
@@ -74,26 +81,61 @@ export function UploadZone({
     setUploading(false);
     if (succeeded > 0) toast.show(`Uploaded ${succeeded} document${succeeded === 1 ? "" : "s"}`, "success");
     if (failed > 0) toast.show(`${failed} upload${failed === 1 ? "" : "s"} failed`, "error");
+
+    if (succeeded > 0 && audience === "staff" && shareWithClient && clientEmail) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      fetch("/api/email/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: clientEmail,
+          sender: "notifications",
+          subject: "A new document is available in your portal",
+          html: renderEmail({
+            heading: "A new document is ready for you",
+            bodyHtml: `<p>Your tax office has added ${succeeded === 1 ? "a document" : `${succeeded} documents`} to your client portal. Log in to view ${succeeded === 1 ? "it" : "them"}.</p>`,
+            ctaLabel: "Go to portal",
+            ctaUrl: `${appUrl}/portal/login`,
+          }),
+        }),
+      }).catch(() => {
+        // Best-effort -- the upload itself already succeeded.
+      });
+    }
+
     router.refresh();
   }
 
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-2 text-xs text-muted">
-        Category
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border border-border px-2 py-1 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="">Uncategorized</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-muted">
+          Category
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="rounded-lg border border-border px-2 py-1 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">Uncategorized</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        {audience === "staff" && (
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            <input
+              type="checkbox"
+              checked={shareWithClient}
+              onChange={(e) => setShareWithClient(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border text-accent focus:ring-accent"
+            />
+            Visible to client{shareWithClient && !clientEmail ? " (no email on file -- won't be notified)" : ""}
+          </label>
+        )}
+      </div>
       <div
         onDragOver={(e) => {
           e.preventDefault();

@@ -31,6 +31,7 @@ export function DocumentWorkspace({
   signatureRequests,
   signatureTemplates = [],
   clientName,
+  clientEmail,
   firmName,
   activity,
   audience = "staff",
@@ -47,6 +48,7 @@ export function DocumentWorkspace({
   signatureRequests: SignatureRequestRow[];
   signatureTemplates?: EngagementLetterTemplateOption[];
   clientName?: string;
+  clientEmail?: string | null;
   firmName?: string;
   activity: ActivityRow[];
   audience?: Audience;
@@ -96,7 +98,8 @@ export function DocumentWorkspace({
             entityType={entityType}
             entityId={entityId}
             folderId={selectedFolderId}
-            visibility={audience === "portal" ? "client_visible" : "internal"}
+            audience={audience}
+            clientEmail={clientEmail}
           />
         </div>
         <div className="flex flex-col gap-4 sm:flex-row">
@@ -132,6 +135,7 @@ export function DocumentWorkspace({
           entityId={entityId}
           audience={audience}
           canCreate={canRequestDocuments}
+          clientEmail={clientEmail}
         />
       </div>
 
@@ -146,6 +150,7 @@ export function DocumentWorkspace({
           entityType={entityType}
           entityId={entityId}
           clientName={clientName}
+          clientEmail={clientEmail}
           firmName={firmName}
           workspaceId={workspaceId}
           audience={audience}

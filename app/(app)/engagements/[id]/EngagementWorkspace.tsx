@@ -231,6 +231,7 @@ export function EngagementWorkspace({
                 signatureRequests={signatureRequests}
                 signatureTemplates={engagementLetterTemplates}
                 clientName={client ? clientLabel(client) : undefined}
+                clientEmail={client?.primary_email ?? null}
                 firmName={workspace.name}
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
