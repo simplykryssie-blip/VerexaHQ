@@ -14,6 +14,15 @@ export default async function PortalDashboardPage() {
 
   const supabase = createClient();
 
+  const { data: myEngagements } = await supabase.from("engagements").select("id").eq("client_id", identity.clientId);
+  const engagementIds = (myEngagements ?? []).map((e) => e.id);
+  const entityFilter =
+    engagementIds.length > 0
+      ? `and(entity_type.eq.client,entity_id.eq.${identity.clientId}),and(entity_type.eq.engagement,entity_id.in.(${engagementIds.join(",")}))`
+      : `and(entity_type.eq.client,entity_id.eq.${identity.clientId})`;
+  const { data: myAttachments } = await supabase.from("attachments").select("id").or(entityFilter);
+  const attachmentIds = (myAttachments ?? []).map((a) => a.id);
+
   const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: activity }, { data: contactRows }] =
     await Promise.all([
       supabase
@@ -24,15 +33,20 @@ export default async function PortalDashboardPage() {
       supabase
         .from("document_requests")
         .select("id, title, due_date, items:document_request_item_statuses(id, is_required, status)")
-        .eq("status", "open"),
-      supabase
-        .from("signature_requests")
-        .select("id, title, due_date, attachment:attachments!signature_requests_attachment_id_fkey(file_name)")
-        .eq("status", "pending"),
+        .eq("status", "open")
+        .or(entityFilter),
+      attachmentIds.length > 0
+        ? supabase
+            .from("signature_requests")
+            .select("id, title, due_date, attachment:attachments!signature_requests_attachment_id_fkey(file_name)")
+            .eq("status", "pending")
+            .in("attachment_id", attachmentIds)
+        : Promise.resolve({ data: [] as { id: string; title: string; due_date: string | null; attachment: { file_name: string } | null }[] }),
       supabase.from("invoices").select("id, invoice_number, total_amount, amount_paid, status, due_date").eq("client_id", identity.clientId),
       supabase
         .from("activity_log")
         .select("id, description, created_at")
+        .or(entityFilter)
         .order("created_at", { ascending: false })
         .limit(8),
       supabase.rpc("get_portal_client_contact"),

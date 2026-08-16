@@ -11,9 +11,16 @@ export default async function PortalActivityPage() {
   if (!identity) redirect("/portal/login");
 
   const supabase = createClient();
+  const { data: myEngagements } = await supabase.from("engagements").select("id").eq("client_id", identity.clientId);
+  const engagementIds = (myEngagements ?? []).map((e) => e.id);
+  const entityFilter =
+    engagementIds.length > 0
+      ? `and(entity_type.eq.client,entity_id.eq.${identity.clientId}),and(entity_type.eq.engagement,entity_id.in.(${engagementIds.join(",")}))`
+      : `and(entity_type.eq.client,entity_id.eq.${identity.clientId})`;
   const { data: activity } = await supabase
     .from("activity_log")
     .select("id, description, created_at")
+    .or(entityFilter)
     .order("created_at", { ascending: false })
     .limit(100);
 

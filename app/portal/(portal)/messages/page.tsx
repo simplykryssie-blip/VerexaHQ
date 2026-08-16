@@ -15,12 +15,20 @@ export default async function PortalMessagesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: threads }, { data: messages }] = await Promise.all([
-    supabase.from("message_threads").select("*").order("last_message_at", { ascending: false }),
-    supabase.from("messages").select("*").order("created_at", { ascending: true }),
-  ]);
+  const { data: myEngagements } = await supabase.from("engagements").select("id").eq("client_id", identity.clientId);
+  const engagementIds = (myEngagements ?? []).map((e) => e.id);
+  const entityFilter =
+    engagementIds.length > 0
+      ? `and(entity_type.eq.client,entity_id.eq.${identity.clientId}),and(entity_type.eq.engagement,entity_id.in.(${engagementIds.join(",")}))`
+      : `and(entity_type.eq.client,entity_id.eq.${identity.clientId})`;
 
-  const engagementIds = Array.from(new Set((threads ?? []).filter((t) => t.entity_type === "engagement").map((t) => t.entity_id)));
+  const { data: threads } = await supabase.from("message_threads").select("*").or(entityFilter).order("last_message_at", { ascending: false });
+  const threadIds = (threads ?? []).map((t) => t.id);
+  const { data: messages } =
+    threadIds.length > 0
+      ? await supabase.from("messages").select("*").in("thread_id", threadIds).order("created_at", { ascending: true })
+      : { data: [] };
+
   const { data: engagements } =
     engagementIds.length > 0
       ? await supabase.from("engagements").select("id, engagement_number, services(name)").in("id", engagementIds)

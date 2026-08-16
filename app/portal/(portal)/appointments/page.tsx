@@ -25,6 +25,7 @@ export default async function PortalAppointmentsPage() {
   const { data: appointments } = await supabase
     .from("appointments")
     .select("id, title, description, location, meeting_url, start_at, end_at, status")
+    .eq("client_id", identity.clientId)
     .order("start_at", { ascending: true })
     .limit(100);
 
