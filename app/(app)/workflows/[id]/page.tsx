@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
-import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow } from "@/components/workflows/WorkflowBuilder";
+import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow, type StaffOption, type AutomationOption } from "@/components/workflows/WorkflowBuilder";
 import type { PipelineOption, LeadStageOption } from "@/components/workflows/TriggerFields";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +35,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     { data: documentRequestTemplates },
     { data: processes },
     { data: leadStagesRaw },
+    { data: staffMembers },
+    { data: otherAutomations },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -97,6 +99,19 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .eq("status", "published")
         .order("name"),
       supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
+      supabase
+        .from("workspace_users")
+        .select("user_id, user_profiles(id, display_name)")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "active"),
+      supabase
+        .from("automations")
+        .select("id, name")
+        .eq("workspace_id", workspace.id)
+        .eq("is_enabled", true)
+        .eq("status", "published")
+        .neq("id", automation.id)
+        .order("name"),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -132,6 +147,12 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   const leadStages: LeadStageOption[] = leadStagesRaw ?? [];
 
+  const staffOptions: StaffOption[] = (staffMembers ?? [])
+    .map((m) => m.user_profiles as unknown as { id: string; display_name: string | null } | null)
+    .filter((p): p is { id: string; display_name: string | null } => Boolean(p));
+
+  const automationOptions: AutomationOption[] = otherAutomations ?? [];
+
   return (
     <>
       <PageHeader backHref="/workflows" backLabel="Back to Workflows" title={automation.name} description={automation.description ?? undefined} />
@@ -153,6 +174,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           services={services ?? []}
           pipelines={pipelines}
           leadStages={leadStages}
+          staffOptions={staffOptions}
+          automationOptions={automationOptions}
         />
       </div>
     </>
