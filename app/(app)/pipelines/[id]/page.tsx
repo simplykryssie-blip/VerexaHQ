@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { StageEditor } from "@/components/settings/StageEditor";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { PipelineNameEditor } from "@/components/pipelines/PipelineNameEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
         <ArrowLeft size={13} /> Back to Pipelines
       </Link>
       <div className="flex items-center gap-2">
-        <h2 className="text-base font-semibold text-ink">{process.name}</h2>
+        <PipelineNameEditor processId={process.id} name={process.name} canEdit={canEdit} />
         {process.workspace_id ? (
           <TemplateStatusCycle table="processes" id={process.id} status={process.status} />
         ) : (
