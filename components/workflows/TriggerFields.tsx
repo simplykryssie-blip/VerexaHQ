@@ -35,6 +35,7 @@ export const TRIGGER_TYPES = [
   { value: "task.created", label: "A task is created" },
   { value: "task.completed", label: "A task is completed" },
   { value: "client_message.received", label: "A client sends a message" },
+  { value: "task.overdue", label: "A task becomes overdue" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -145,6 +146,9 @@ export function triggerSummary(
   }
   if (triggerType === "client_message.received") {
     return "When a client sends a message";
+  }
+  if (triggerType === "task.overdue") {
+    return "When a task becomes overdue (checked every 6 hours)";
   }
   return triggerType;
 }

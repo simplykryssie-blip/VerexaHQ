@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/check-overdue-tasks",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/dispatch-notifications",
       "schedule": "*/5 * * * *"
     },

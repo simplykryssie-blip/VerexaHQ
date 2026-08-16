@@ -5977,6 +5977,7 @@ export type Database = {
           due_date: string | null
           engagement_id: string
           id: string
+          overdue_flagged_at: string | null
           priority: string | null
           status: string
           title: string
@@ -5992,6 +5993,7 @@ export type Database = {
           due_date?: string | null
           engagement_id: string
           id?: string
+          overdue_flagged_at?: string | null
           priority?: string | null
           status?: string
           title: string
@@ -6007,6 +6009,7 @@ export type Database = {
           due_date?: string | null
           engagement_id?: string
           id?: string
+          overdue_flagged_at?: string | null
           priority?: string | null
           status?: string
           title?: string
@@ -7851,6 +7854,7 @@ export type Database = {
         }
         Returns: string
       }
+      fire_task_overdue_automations: { Args: never; Returns: number }
       format_mailing_address: { Args: { p_raw: string }; Returns: string }
       format_organizer_answer: {
         Args: { p_field_type: string; p_value: Json }
