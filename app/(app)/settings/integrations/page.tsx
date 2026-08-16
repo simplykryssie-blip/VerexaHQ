@@ -4,6 +4,7 @@ import { Plug } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
+import { JotFormConnectionCard } from "@/components/settings/JotFormConnectionCard";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,7 @@ export default async function IntegrationsPage({
   }
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connect_status").eq("id", workspace!.id).single();
+  const { data: isJotformConnected } = await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspace!.id });
 
   return (
     <div className="max-w-2xl">
@@ -71,6 +73,12 @@ export default async function IntegrationsPage({
           connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"}
           error={searchParams.stripe_error ?? null}
         />
+      </div>
+
+      <h2 className="mt-8 text-base font-semibold text-ink">JotForm</h2>
+      <p className="mt-1 text-sm text-muted">Import your firm&apos;s existing JotForm forms as organizer templates.</p>
+      <div className="mt-6">
+        <JotFormConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isJotformConnected)} />
       </div>
 
       {zoomSection}
