@@ -4,11 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 
 export const dynamic = "force-dynamic";
 
-type Preview = { email: string; status: string; expires_at: string; workspace_name: string; role_name: string; account_exists: boolean };
+type Preview = {
+  email: string;
+  status: string;
+  expires_at: string;
+  workspace_name: string;
+  role_name: string;
+  account_exists: boolean;
+  password_min_length: number;
+};
 
 export default function AcceptInvitationPage() {
   const router = useRouter();
@@ -73,7 +81,7 @@ export default function AcceptInvitationPage() {
         setError("Passwords do not match.");
         return;
       }
-      const strengthError = validatePasswordStrength(password);
+      const strengthError = validatePasswordStrength(password, preview.password_min_length);
       if (strengthError) {
         setError(strengthError);
         return;
@@ -250,13 +258,13 @@ export default function AcceptInvitationPage() {
         <input
           type="password"
           required
-          minLength={mode === "sign-up" ? 8 : undefined}
+          minLength={mode === "sign-up" ? preview.password_min_length : undefined}
           placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        {mode === "sign-up" && <p className="text-xs text-muted">{PASSWORD_REQUIREMENTS_HINT}</p>}
+        {mode === "sign-up" && <p className="text-xs text-muted">{passwordRequirementsHint(preview.password_min_length)}</p>}
         {mode === "sign-in" && (
           <p className="text-right text-xs">
             <Link href={`/forgot-password?email=${encodeURIComponent(preview.email)}`} className="text-accent hover:underline">

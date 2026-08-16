@@ -5,11 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
-import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 
 export const dynamic = "force-dynamic";
 
-type Preview = { invited_email: string; invited_name: string | null; status: string; token_expires_at: string; client_label: string };
+type Preview = {
+  invited_email: string;
+  invited_name: string | null;
+  status: string;
+  token_expires_at: string;
+  client_label: string;
+  password_min_length: number;
+};
 
 const RAIL_FOOT = (
   <>
@@ -98,7 +105,7 @@ export default function PortalAcceptInvitationPage() {
         setError("Passwords do not match.");
         return;
       }
-      const strengthError = validatePasswordStrength(password);
+      const strengthError = validatePasswordStrength(password, preview.password_min_length);
       if (strengthError) {
         setError(strengthError);
         return;
@@ -271,14 +278,14 @@ export default function PortalAcceptInvitationPage() {
             id="password"
             type="password"
             required
-            minLength={mode === "sign-up" ? 8 : undefined}
+            minLength={mode === "sign-up" ? preview.password_min_length : undefined}
             placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className={styles.input}
             autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
           />
-          {mode === "sign-up" && <p className={styles.hint}>{PASSWORD_REQUIREMENTS_HINT}</p>}
+          {mode === "sign-up" && <p className={styles.hint}>{passwordRequirementsHint(preview.password_min_length)}</p>}
         </div>
 
         {mode === "sign-up" && (
@@ -288,7 +295,7 @@ export default function PortalAcceptInvitationPage() {
               id="confirm_password"
               type="password"
               required
-              minLength={8}
+              minLength={preview.password_min_length}
               placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}

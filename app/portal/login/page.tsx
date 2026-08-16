@@ -37,7 +37,15 @@ export default function PortalLoginPage() {
     setError(null);
     setLoading(true);
 
+    const { data: lockout } = await supabase.rpc("check_login_lockout", { p_email: email });
+    if ((lockout as { locked?: boolean } | null)?.locked) {
+      setLoading(false);
+      setError("This account is temporarily locked due to too many failed sign-in attempts. Try again later.");
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    await supabase.rpc("record_login_result", { p_email: email, p_success: !error });
     if (error) {
       setLoading(false);
       setError(friendlyAuthError(error.message));

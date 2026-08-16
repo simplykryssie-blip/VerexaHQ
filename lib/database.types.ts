@@ -7586,6 +7586,7 @@ export type Database = {
         }
         Returns: Json
       }
+      check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
         Returns: boolean
@@ -7904,6 +7905,7 @@ export type Database = {
           account_exists: boolean
           email: string
           expires_at: string
+          password_min_length: number
           role_name: string
           status: string
           workspace_name: string
@@ -7937,6 +7939,7 @@ export type Database = {
           client_label: string
           invited_email: string
           invited_name: string
+          password_min_length: number
           status: string
           token_expires_at: string
         }[]
@@ -8145,6 +8148,10 @@ export type Database = {
           p_user_id: string
           p_workspace_id: string
         }
+        Returns: undefined
+      }
+      record_login_result: {
+        Args: { p_email: string; p_success: boolean; p_workspace_id?: string }
         Returns: undefined
       }
       record_provider_check: {

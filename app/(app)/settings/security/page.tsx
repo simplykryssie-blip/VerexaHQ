@@ -37,7 +37,7 @@ export default async function SecurityPage() {
         <h3 className="text-sm font-semibold text-ink">Change your password</h3>
         <p className="mt-1 text-sm text-muted">Update the password for your own account.</p>
         <div className="mt-4">
-          <ChangePasswordForm />
+          <ChangePasswordForm minLength={policy?.password_min_length ?? 8} />
         </div>
       </div>
 

@@ -9,7 +9,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
-import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -40,6 +40,7 @@ type TemplateData = {
   template: { id: string; name: string; description: string | null };
   workspace_name: string;
   requires_portal_signup: boolean;
+  password_min_length?: number;
   branding?: Branding;
   fields: FieldRow[];
 };
@@ -55,7 +56,8 @@ type ServiceCategory = { id: string; name: string; services: { id: string; name:
 // "is this the public flow?" branches through it instead.
 export function PublicOrganizerForm({ token, data }: { token: string; data: TemplateData }) {
   const supabase = createClient();
-  const { template, workspace_name, requires_portal_signup, branding, fields } = data;
+  const { template, workspace_name, requires_portal_signup, password_min_length, branding, fields } = data;
+  const minPasswordLength = password_min_length ?? 8;
   const accentColor = branding?.secondary_color || branding?.primary_color || undefined;
 
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
@@ -127,7 +129,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       return;
     }
     if (requires_portal_signup) {
-      const strengthError = validatePasswordStrength(password);
+      const strengthError = validatePasswordStrength(password, minPasswordLength);
       if (strengthError) {
         setError(strengthError);
         return;
@@ -369,7 +371,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                     onChange={(e) => setPassword(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
-                  <p className="mt-1 text-xs text-muted">{PASSWORD_REQUIREMENTS_HINT}</p>
+                  <p className="mt-1 text-xs text-muted">{passwordRequirementsHint(minPasswordLength)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-ink">Confirm password *</label>

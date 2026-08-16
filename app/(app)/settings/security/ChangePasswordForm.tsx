@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({ minLength = 8 }: { minLength?: number }) {
   const supabase = createClient();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,7 +21,7 @@ export function ChangePasswordForm() {
       setError("Passwords do not match.");
       return;
     }
-    const strengthError = validatePasswordStrength(newPassword);
+    const strengthError = validatePasswordStrength(newPassword, minLength);
     if (strengthError) {
       setError(strengthError);
       return;
@@ -51,7 +51,7 @@ export function ChangePasswordForm() {
           id="new_password"
           type="password"
           required
-          minLength={8}
+          minLength={minLength}
           value={newPassword}
           onChange={(e) => {
             setNewPassword(e.target.value);
@@ -61,7 +61,7 @@ export function ChangePasswordForm() {
           autoComplete="new-password"
           className="mt-1.5 w-full rounded-lg border border-border px-3 py-2.5 text-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
         />
-        <p className="mt-1 text-xs text-muted">{PASSWORD_REQUIREMENTS_HINT}</p>
+        <p className="mt-1 text-xs text-muted">{passwordRequirementsHint(minLength)}</p>
       </div>
       <div>
         <label className="block text-sm font-semibold text-ink" htmlFor="confirm_new_password">
@@ -71,7 +71,7 @@ export function ChangePasswordForm() {
           id="confirm_new_password"
           type="password"
           required
-          minLength={8}
+          minLength={minLength}
           value={confirmPassword}
           onChange={(e) => {
             setConfirmPassword(e.target.value);
