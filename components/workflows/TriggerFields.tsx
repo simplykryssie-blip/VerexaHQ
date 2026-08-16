@@ -30,6 +30,11 @@ export const TRIGGER_TYPES = [
   { value: "quote.sent", label: "A quote is sent" },
   { value: "quote.accepted", label: "A quote is accepted" },
   { value: "quote.declined", label: "A quote is declined" },
+  { value: "document_request.sent", label: "A document request is sent" },
+  { value: "document.uploaded", label: "A document is uploaded" },
+  { value: "task.created", label: "A task is created" },
+  { value: "task.completed", label: "A task is completed" },
+  { value: "client_message.received", label: "A client sends a message" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -125,6 +130,21 @@ export function triggerSummary(
     const serviceId = config.service_id as string | undefined;
     const service = serviceId ? services.find((s) => s.id === serviceId) : undefined;
     return `When a quote ${verb}${service ? ` for "${service.name}"` : ""}`;
+  }
+  if (triggerType === "document_request.sent") {
+    return "When a document request is sent";
+  }
+  if (triggerType === "document.uploaded") {
+    return "When a document is uploaded";
+  }
+  if (triggerType === "task.created") {
+    return "When a task is created";
+  }
+  if (triggerType === "task.completed") {
+    return "When a task is completed";
+  }
+  if (triggerType === "client_message.received") {
+    return "When a client sends a message";
   }
   return triggerType;
 }
