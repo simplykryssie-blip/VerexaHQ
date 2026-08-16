@@ -7824,6 +7824,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      delete_workflow_pipeline: {
+        Args: { p_process_id: string }
+        Returns: undefined
+      }
       disconnect_firm_connection: {
         Args: { p_connection_id: string }
         Returns: undefined

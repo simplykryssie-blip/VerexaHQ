@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -38,6 +39,8 @@ export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: strin
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const filtered = useMemo(
     () => pipelines.filter((p) => (!query || p.name.toLowerCase().includes(query.toLowerCase())) && (status === "all" || p.status === status)),
@@ -55,6 +58,19 @@ export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: strin
       return;
     }
     router.push(`/pipelines/${data}`);
+  }
+
+  async function deletePipeline(id: string, name: string) {
+    if (!window.confirm(`Delete the "${name}" pipeline? This can't be undone.`)) return;
+    setDeleteError(null);
+    setDeletingId(id);
+    const { error } = await supabase.rpc("delete_workflow_pipeline", { p_process_id: id });
+    setDeletingId(null);
+    if (error) {
+      setDeleteError(error.message);
+      return;
+    }
+    router.refresh();
   }
 
   return (
@@ -86,6 +102,8 @@ export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: strin
         </button>
       </div>
 
+      {deleteError && <p className="mt-2 text-sm text-danger">{deleteError}</p>}
+
       <div className="mt-4">
         {filtered.length === 0 ? (
           <EmptyState message="No pipelines match." />
@@ -95,7 +113,19 @@ export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: strin
               <div key={p.id} className="flex flex-col rounded-xl border border-border bg-surface p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
-                  {!p.workspace_id && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
+                  {p.workspace_id ? (
+                    <button
+                      type="button"
+                      onClick={() => deletePipeline(p.id, p.name)}
+                      disabled={deletingId === p.id}
+                      className="shrink-0 text-muted hover:text-danger disabled:opacity-50"
+                      aria-label="Delete pipeline"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  ) : (
+                    <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
+                  )}
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {p.workspace_id ? (
