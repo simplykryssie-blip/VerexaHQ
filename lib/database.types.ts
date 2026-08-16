@@ -7836,7 +7836,13 @@ export type Database = {
       }
       escape_html: { Args: { p_text: string }; Returns: string }
       evaluate_automation_conditions: {
-        Args: { p_conditions: Json; p_context: Json }
+        Args: {
+          p_client_id: string
+          p_conditions: Json
+          p_context: Json
+          p_engagement_id: string
+          p_workspace_id: string
+        }
         Returns: boolean
       }
       execute_automation_step: {
@@ -8460,56 +8466,31 @@ export type Database = {
         }
         Returns: undefined
       }
-      submit_public_organizer_response:
-        | {
-            Args: {
-              p_answers: Json
-              p_email: string
-              p_first_name: string
-              p_last_name: string
-              p_phone: string
-              p_token: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_answers: Json
-              p_client_id?: string
-              p_email: string
-              p_first_name: string
-              p_last_name: string
-              p_phone: string
-              p_token: string
-            }
-            Returns: Json
-          }
-      submit_public_organizer_response_with_signup:
-        | {
-            Args: {
-              p_answers: Json
-              p_auth_user_id: string
-              p_email: string
-              p_first_name: string
-              p_last_name: string
-              p_phone: string
-              p_token: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_answers: Json
-              p_auth_user_id: string
-              p_client_id?: string
-              p_email: string
-              p_first_name: string
-              p_last_name: string
-              p_phone: string
-              p_token: string
-            }
-            Returns: Json
-          }
+      submit_public_organizer_response: {
+        Args: {
+          p_answers: Json
+          p_client_id?: string
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+          p_token: string
+        }
+        Returns: Json
+      }
+      submit_public_organizer_response_with_signup: {
+        Args: {
+          p_answers: Json
+          p_auth_user_id: string
+          p_client_id?: string
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+          p_token: string
+        }
+        Returns: Json
+      }
       turn_on_service: {
         Args: {
           p_new_name?: string
