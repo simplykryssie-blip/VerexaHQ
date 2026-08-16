@@ -13,6 +13,7 @@ import { DateOfBirthInput } from "./DateOfBirthInput";
 import { InviteContactToPortalButton } from "./InviteContactToPortalButton";
 import { PortalInviteStatus } from "./PortalInviteStatus";
 import { PaymentLinkButton } from "@/components/PaymentLinkButton";
+import { RefundButton } from "@/components/billing/RefundButton";
 import { CreatePaymentPlanForm } from "@/components/billing/CreatePaymentPlanForm";
 import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
@@ -967,9 +968,14 @@ export function BillingTab({
             {payments.map((p) => (
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
-                <span className="capitalize text-muted">
-                  {p.status} -- {money(p.amount)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="capitalize text-muted">
+                    {p.status} -- {money(p.amount)}
+                  </span>
+                  {canManageBilling && p.status !== "refunded" && p.stripe_payment_intent_id && (
+                    <RefundButton paymentId={p.id} amount={p.amount} />
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -1076,7 +1082,7 @@ export type InvoiceRow = {
   issue_date: string | null;
   notes: string | null;
 };
-export type PaymentRow = { id: string; status: string; amount: number; payment_date: string };
+export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; stripe_payment_intent_id: string | null };
 export type MessageThreadRow = { id: string; subject: string | null; channel: string };
 export type MessageRow = {
   id: string;
