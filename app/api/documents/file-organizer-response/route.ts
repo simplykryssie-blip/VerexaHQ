@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
+import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
 
 function escapeHtml(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -19,6 +20,8 @@ function displayValue(fieldType: string, raw: unknown): string {
     const sig = raw as { typed_name?: string; signed_at?: string };
     return sig.typed_name ? `Signed by ${sig.typed_name}${sig.signed_at ? ` on ${new Date(sig.signed_at).toLocaleDateString()}` : ""}` : "Signed";
   }
+  if (fieldType === "name") return formatNameValue(raw);
+  if (fieldType === "address") return formatAddressValue(raw);
   if (typeof raw === "object") return JSON.stringify(raw);
   return String(raw);
 }
