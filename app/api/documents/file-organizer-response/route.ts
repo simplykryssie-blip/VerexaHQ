@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 
 function displayValue(fieldType: string, raw: unknown): string {
   if (raw === null || raw === undefined || raw === "") return "--";
@@ -14,7 +11,7 @@ function displayValue(fieldType: string, raw: unknown): string {
   // to read them in cleartext without going through that control.
   if (fieldType === "ssn" || fieldType === "ein") {
     const digits = String(raw).replace(/\D/g, "");
-    return digits.length >= 4 ? `••••${digits.slice(-4)}` : "on file";
+    return digits.length >= 4 ? `****${digits.slice(-4)}` : "on file";
   }
   if (fieldType === "signature" && typeof raw === "object") {
     const sig = raw as { typed_name?: string; signed_at?: string };
@@ -24,6 +21,93 @@ function displayValue(fieldType: string, raw: unknown): string {
   if (fieldType === "address") return formatAddressValue(raw);
   if (typeof raw === "object") return JSON.stringify(raw);
   return String(raw);
+}
+
+// StandardFonts only support WinAnsi-encodable characters -- a client typing
+// an emoji or non-Latin script into a free-text answer would otherwise throw
+// and fail the whole filing step, so anything outside that range is dropped
+// to "?" rather than crashing the request.
+function sanitizeForPdf(text: string): string {
+  return Array.from(text)
+    .map((ch) => {
+      const code = ch.codePointAt(0) ?? 0;
+      return code >= 0x20 && code <= 0xff && code !== 0x7f ? ch : "?";
+    })
+    .join("");
+}
+
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+const PAGE_WIDTH = 612; // US Letter, points
+const PAGE_HEIGHT = 792;
+const MARGIN = 50;
+const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+const LINE_HEIGHT = 13;
+
+async function buildOrganizerPdf(
+  templateName: string,
+  submittedLabel: string,
+  rows: { label: string; value: string }[]
+): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  let page: PDFPage = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  let y = PAGE_HEIGHT - MARGIN;
+
+  function ensureSpace(needed: number) {
+    if (y - needed < MARGIN) {
+      page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      y = PAGE_HEIGHT - MARGIN;
+    }
+  }
+
+  ensureSpace(20);
+  page.drawText(sanitizeForPdf(templateName), { x: MARGIN, y: y - 18, size: 18, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+  y -= 32;
+
+  ensureSpace(LINE_HEIGHT);
+  page.drawText(sanitizeForPdf(`Submitted ${submittedLabel}`), { x: MARGIN, y: y - 10, size: 10, font, color: rgb(0.45, 0.45, 0.45) });
+  y -= LINE_HEIGHT + 14;
+
+  for (const row of rows) {
+    const label = sanitizeForPdf(row.label);
+    const valueLines = wrapText(sanitizeForPdf(row.value), font, 10, CONTENT_WIDTH);
+
+    ensureSpace(LINE_HEIGHT);
+    page.drawText(label, { x: MARGIN, y: y - 10, size: 10, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+    y -= LINE_HEIGHT + 1;
+
+    for (const line of valueLines) {
+      ensureSpace(LINE_HEIGHT);
+      page.drawText(line, { x: MARGIN, y: y - 10, size: 10, font, color: rgb(0.25, 0.25, 0.25) });
+      y -= LINE_HEIGHT;
+    }
+
+    y -= 6;
+    ensureSpace(1);
+    page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_WIDTH - MARGIN, y }, thickness: 0.5, color: rgb(0.9, 0.9, 0.9) });
+    y -= 8;
+  }
+
+  return pdfDoc.save();
 }
 
 // Called right after an organizer response is actually completed (public
@@ -76,39 +160,29 @@ export async function POST(request: Request) {
 
   const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Organizer";
   const submittedLabel = response.submitted_at ? new Date(response.submitted_at).toLocaleDateString() : "";
-  const html = `<!doctype html>
-<html><head><meta charset="utf-8"><title>${escapeHtml(templateName)}</title></head>
-<body style="font-family: -apple-system, sans-serif; max-width: 640px; margin: 2rem auto;">
-<h1>${escapeHtml(templateName)}</h1>
-<p style="color:#666;">Submitted ${escapeHtml(submittedLabel)}</p>
-<table style="width:100%; border-collapse: collapse;">
-${rows
-  .map(
-    (r) =>
-      `<tr><td style="padding:6px 8px; border-bottom:1px solid #eee; font-weight:600;">${escapeHtml(r.label)}</td><td style="padding:6px 8px; border-bottom:1px solid #eee;">${escapeHtml(r.value)}</td></tr>`
-  )
-  .join("\n")}
-</table>
-</body></html>`;
+  const pdfBytes = await buildOrganizerPdf(templateName, submittedLabel, rows);
 
-  const fileName = `${templateName} (completed).html`;
+  const fileName = `${templateName} (completed).pdf`;
   const path = `${response.workspace_id}/${response.client_id}/${Date.now()}-${fileName}`;
-  const blob = new Blob([html], { type: "text/html" });
+  const blob = new Blob([Buffer.from(pdfBytes)], { type: "application/pdf" });
 
-  const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "text/html" });
+  const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "application/pdf" });
   if (uploadErr) {
     return NextResponse.json({ error: uploadErr.message }, { status: 500 });
   }
 
+  // client_visible: the client filled this organizer in themselves, so they
+  // should be able to see and download their own submitted answers, same as
+  // any other document shared with them.
   const { error: insertErr } = await supabase.from("attachments").insert({
     workspace_id: response.workspace_id,
     entity_type: "client",
     entity_id: response.client_id,
     file_name: fileName,
     storage_path: path,
-    mime_type: "text/html",
+    mime_type: "application/pdf",
     file_size_bytes: blob.size,
-    visibility: "internal",
+    visibility: "client_visible",
     category: "Other",
   });
   if (insertErr) {
