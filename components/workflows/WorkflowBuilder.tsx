@@ -6,7 +6,13 @@ import { ArrowDown, ArrowUp, Mail, MessageSquare, Plus, Trash2, CheckSquare, Boo
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
-import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
+import {
+  TriggerFields,
+  triggerSummary,
+  type TemplateOption,
+  type PipelineOption,
+  type LeadStageOption,
+} from "@/components/workflows/TriggerFields";
 
 export type WorkflowStepRow = {
   id: string;
@@ -407,6 +413,7 @@ export function WorkflowBuilder({
   documentRequestTemplates,
   services = [],
   pipelines = [],
+  leadStages = [],
 }: {
   automationId: string;
   triggerType: string;
@@ -423,6 +430,7 @@ export function WorkflowBuilder({
   documentRequestTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
+  leadStages?: LeadStageOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -491,6 +499,7 @@ export function WorkflowBuilder({
             organizerTemplates={organizerTemplates}
             services={services}
             pipelines={pipelines}
+            leadStages={leadStages}
             disabled={!canManage}
           />
           {canManage && (

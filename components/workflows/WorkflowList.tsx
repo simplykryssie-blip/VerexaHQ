@@ -7,7 +7,14 @@ import { Plus, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
-import { TriggerFields, defaultTriggerConfig, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
+import {
+  TriggerFields,
+  defaultTriggerConfig,
+  triggerSummary,
+  type TemplateOption,
+  type PipelineOption,
+  type LeadStageOption,
+} from "@/components/workflows/TriggerFields";
 
 export type WorkflowRow = {
   id: string;
@@ -37,6 +44,7 @@ export function WorkflowList({
   organizerTemplates,
   services = [],
   pipelines = [],
+  leadStages = [],
 }: {
   workspaceId: string;
   workflows: WorkflowRow[];
@@ -44,6 +52,7 @@ export function WorkflowList({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
+  leadStages?: LeadStageOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -131,6 +140,7 @@ export function WorkflowList({
             organizerTemplates={organizerTemplates}
             services={services}
             pipelines={pipelines}
+            leadStages={leadStages}
           />
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -157,7 +167,7 @@ export function WorkflowList({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink">{w.name}</p>
                   <p className="truncate text-xs text-muted">
-                    {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
+                    {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines, leadStages)} &middot; {w.step_count} step
                     {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
                   </p>
                 </div>

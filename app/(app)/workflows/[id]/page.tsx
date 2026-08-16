@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow } from "@/components/workflows/WorkflowBuilder";
-import type { PipelineOption } from "@/components/workflows/TriggerFields";
+import type { PipelineOption, LeadStageOption } from "@/components/workflows/TriggerFields";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +34,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: processes },
+    { data: leadStagesRaw },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -95,6 +96,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
         .eq("status", "published")
         .order("name"),
+      supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -128,6 +130,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
+  const leadStages: LeadStageOption[] = leadStagesRaw ?? [];
+
   return (
     <>
       <PageHeader backHref="/workflows" backLabel="Back to Workflows" title={automation.name} description={automation.description ?? undefined} />
@@ -148,6 +152,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           documentRequestTemplates={documentRequestTemplates ?? []}
           services={services ?? []}
           pipelines={pipelines}
+          leadStages={leadStages}
         />
       </div>
     </>

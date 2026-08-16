@@ -4,6 +4,7 @@ import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 
 export type TemplateOption = { id: string; name: string };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
+export type LeadStageOption = { key: string; label: string };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
@@ -18,6 +19,13 @@ export const TRIGGER_TYPES = [
   { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service" },
   { value: "document_request.completed", label: "All requested documents are received for a service" },
   { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage" },
+  { value: "lead.created", label: "A new lead is created" },
+  { value: "lead.updated", label: "A lead's info is updated" },
+  { value: "lead.assigned", label: "A lead is assigned to staff" },
+  { value: "lead.stage_entered", label: "A lead enters a pipeline stage" },
+  { value: "lead.status_changed", label: "A lead's status changes to" },
+  { value: "lead.converted_to_client", label: "A lead is converted to a client" },
+  { value: "lead.marked_lost", label: "A lead is marked lost" },
 ];
 
 export function defaultTriggerConfig(triggerType: string): Record<string, unknown> {
@@ -31,7 +39,8 @@ export function triggerSummary(
   config: Record<string, unknown>,
   organizerTemplates: TemplateOption[],
   services: TemplateOption[] = [],
-  pipelines: PipelineOption[] = []
+  pipelines: PipelineOption[] = [],
+  leadStages: LeadStageOption[] = []
 ) {
   if (triggerType === "engagement.status_changed") {
     return `When engagement status changes to "${config.to_status ?? "?"}"`;
@@ -77,6 +86,32 @@ export function triggerSummary(
     const stage = pipeline?.stages.find((s) => s.id === stageId);
     return `When an engagement enters "${stage?.name ?? "a stage"}" in "${pipeline?.name ?? "a pipeline"}"`;
   }
+  if (triggerType === "lead.created") {
+    return "When a new lead is created";
+  }
+  if (triggerType === "lead.updated") {
+    return "When a lead's info is updated";
+  }
+  if (triggerType === "lead.assigned") {
+    return "When a lead is assigned to staff";
+  }
+  if (triggerType === "lead.stage_entered") {
+    const stageKey = config.stage_key as string | undefined;
+    const stage = leadStages.find((s) => s.key === stageKey);
+    return `When a lead enters "${stage?.label ?? "a stage"}"`;
+  }
+  if (triggerType === "lead.status_changed") {
+    const stageKey = config.to_status as string | undefined;
+    const stage = leadStages.find((s) => s.key === stageKey);
+    const label = stage?.label ?? (stageKey === "active" ? "Active" : stageKey === "lost" ? "Lost" : (stageKey ?? "?"));
+    return `When a lead's status changes to "${label}"`;
+  }
+  if (triggerType === "lead.converted_to_client") {
+    return "When a lead is converted to a client";
+  }
+  if (triggerType === "lead.marked_lost") {
+    return "When a lead is marked lost";
+  }
   return triggerType;
 }
 
@@ -88,6 +123,7 @@ export function TriggerFields({
   organizerTemplates,
   services = [],
   pipelines = [],
+  leadStages = [],
   disabled,
 }: {
   triggerType: string;
@@ -97,6 +133,7 @@ export function TriggerFields({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
+  leadStages?: LeadStageOption[];
   disabled?: boolean;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
@@ -275,6 +312,50 @@ export function TriggerFields({
             </select>
           </label>
         </>
+      )}
+
+      {triggerType === "lead.stage_entered" && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Stage
+          <select
+            disabled={disabled}
+            value={(config.stage_key as string) ?? ""}
+            onChange={(e) => onConfigChange({ stage_key: e.target.value })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Choose a stage
+            </option>
+            {leadStages.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {triggerType === "lead.status_changed" && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Status
+          <select
+            disabled={disabled}
+            value={(config.to_status as string) ?? ""}
+            onChange={(e) => onConfigChange({ to_status: e.target.value })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Choose a status
+            </option>
+            {leadStages.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+            <option value="active">Active (converted)</option>
+            <option value="lost">Lost</option>
+          </select>
+        </label>
       )}
 
       {triggerType === "client.service_interest_selected" && (
