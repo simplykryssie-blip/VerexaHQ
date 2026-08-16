@@ -32,7 +32,7 @@ export function AddTaskForm({
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium" },
             { value: "high", label: "High" },
-            { value: "urgent", label: "Urgent" },
+            { value: "critical", label: "Critical" },
           ],
         },
         {
