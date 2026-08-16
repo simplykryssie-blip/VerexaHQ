@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
+import { TextPdf } from "@/lib/pdf/textPdf";
 
 function displayValue(fieldType: string, raw: unknown): string {
   if (raw === null || raw === undefined || raw === "") return "--";
@@ -23,91 +23,18 @@ function displayValue(fieldType: string, raw: unknown): string {
   return String(raw);
 }
 
-// StandardFonts only support WinAnsi-encodable characters -- a client typing
-// an emoji or non-Latin script into a free-text answer would otherwise throw
-// and fail the whole filing step, so anything outside that range is dropped
-// to "?" rather than crashing the request.
-function sanitizeForPdf(text: string): string {
-  return Array.from(text)
-    .map((ch) => {
-      const code = ch.codePointAt(0) ?? 0;
-      return code >= 0x20 && code <= 0xff && code !== 0x7f ? ch : "?";
-    })
-    .join("");
-}
-
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [""];
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (current && font.widthOfTextAtSize(candidate, size) > maxWidth) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = candidate;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
-const PAGE_WIDTH = 612; // US Letter, points
-const PAGE_HEIGHT = 792;
-const MARGIN = 50;
-const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
-const LINE_HEIGHT = 13;
-
 async function buildOrganizerPdf(
   templateName: string,
   submittedLabel: string,
   rows: { label: string; value: string }[]
 ): Promise<Uint8Array> {
-  const pdfDoc = await PDFDocument.create();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  let page: PDFPage = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  let y = PAGE_HEIGHT - MARGIN;
-
-  function ensureSpace(needed: number) {
-    if (y - needed < MARGIN) {
-      page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      y = PAGE_HEIGHT - MARGIN;
-    }
-  }
-
-  ensureSpace(20);
-  page.drawText(sanitizeForPdf(templateName), { x: MARGIN, y: y - 18, size: 18, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
-  y -= 32;
-
-  ensureSpace(LINE_HEIGHT);
-  page.drawText(sanitizeForPdf(`Submitted ${submittedLabel}`), { x: MARGIN, y: y - 10, size: 10, font, color: rgb(0.45, 0.45, 0.45) });
-  y -= LINE_HEIGHT + 14;
-
+  const pdf = await TextPdf.create();
+  pdf.heading(templateName);
+  pdf.subtle(`Submitted ${submittedLabel}`);
   for (const row of rows) {
-    const label = sanitizeForPdf(row.label);
-    const valueLines = wrapText(sanitizeForPdf(row.value), font, 10, CONTENT_WIDTH);
-
-    ensureSpace(LINE_HEIGHT);
-    page.drawText(label, { x: MARGIN, y: y - 10, size: 10, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
-    y -= LINE_HEIGHT + 1;
-
-    for (const line of valueLines) {
-      ensureSpace(LINE_HEIGHT);
-      page.drawText(line, { x: MARGIN, y: y - 10, size: 10, font, color: rgb(0.25, 0.25, 0.25) });
-      y -= LINE_HEIGHT;
-    }
-
-    y -= 6;
-    ensureSpace(1);
-    page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_WIDTH - MARGIN, y }, thickness: 0.5, color: rgb(0.9, 0.9, 0.9) });
-    y -= 8;
+    pdf.labelValueRow(row.label, row.value);
   }
-
-  return pdfDoc.save();
+  return pdf.save();
 }
 
 // Called right after an organizer response is actually completed (public

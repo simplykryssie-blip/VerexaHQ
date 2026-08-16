@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { renderTemplate } from "@/lib/templates/render";
+import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -60,17 +61,22 @@ async function sendOne(
     if (!template) throw new Error("Engagement letter template not found");
 
     const clientName = client?.business_name || [client?.first_name, client?.last_name].filter(Boolean).join(" ") || "";
-    const html = renderTemplate(template.body_html, {
+    const mergedHtml = renderTemplate(template.body_html, {
       client_name: clientName,
       firm_name: workspace?.name ?? "",
       firm_address: "",
       firm_phone: "",
     });
+    // A rendered PDF, not raw HTML -- the signing page only knows how to
+    // preview PDFs and images, and this gives the letter a real, visible
+    // signature line instead of a bare "type your name" box with nothing
+    // to sign underneath it.
+    const pdfBytes = await renderLetterPdf(template.name, mergedHtml, clientName || "Client");
 
-    const fileName = `${template.name}.html`;
+    const fileName = `${template.name}.pdf`;
     const path = `${job.workspace_id}/${job.engagement_id}/${Date.now()}-${fileName}`;
-    const blob = new Blob([html], { type: "text/html" });
-    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "text/html" });
+    const blob = new Blob([Buffer.from(pdfBytes)], { type: "application/pdf" });
+    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "application/pdf" });
     if (uploadErr) throw new Error(uploadErr.message);
 
     const { data: attachment, error: attachmentErr } = await supabase
@@ -81,7 +87,7 @@ async function sendOne(
         entity_id: job.engagement_id,
         file_name: fileName,
         storage_path: path,
-        mime_type: "text/html",
+        mime_type: "application/pdf",
         file_size_bytes: blob.size,
         visibility: "internal",
         category: "Engagement Letter",

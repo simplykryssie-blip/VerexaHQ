@@ -55,7 +55,10 @@ export function SignaturesPanel({
   const [attachmentId, setAttachmentId] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [signersRaw, setSignersRaw] = useState("");
+  // Defaults to the client this panel is already open for -- otherwise
+  // there's no visible way to say who a request goes to beyond typing a
+  // name/email into a bare textarea from scratch.
+  const [signersRaw, setSignersRaw] = useState(clientName ? `${clientName}, ${clientEmail ?? ""}` : "");
   const [error, setError] = useState<string | null>(null);
   const [signingId, setSigningId] = useState<string | null>(null);
   const [typedName, setTypedName] = useState("");
@@ -266,14 +269,24 @@ export function SignaturesPanel({
               onChange={(e) => setDueDate(e.target.value)}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
-            <textarea
-              required
-              placeholder={"Signers, one per line: Name, email@example.com"}
-              value={signersRaw}
-              onChange={(e) => setSignersRaw(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <div>
+              <label className="block text-xs font-medium text-muted">
+                Who signs this -- one per line, as &quot;Name, email@example.com&quot;
+              </label>
+              <textarea
+                required
+                placeholder={"Signers, one per line: Name, email@example.com"}
+                value={signersRaw}
+                onChange={(e) => setSignersRaw(e.target.value)}
+                rows={3}
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <p className="mt-1 text-xs text-muted">
+                {clientName
+                  ? `Pre-filled with ${clientName}. Add another line to include additional signers (e.g. a spouse).`
+                  : "This is who the signing link goes to -- add one signer per line."}
+              </p>
+            </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
               Create request
