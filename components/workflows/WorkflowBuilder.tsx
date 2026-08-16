@@ -41,6 +41,7 @@ import {
   type PipelineOption,
   type LeadStageOption,
 } from "@/components/workflows/TriggerFields";
+import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 
 export type StaffOption = { id: string; display_name: string | null };
 export type AutomationOption = { id: string; name: string };
@@ -906,10 +907,12 @@ export function WorkflowBuilder({
   engagementLetterTemplates,
   documentRequestTemplates,
   services = [],
+  serviceCategories = [],
   pipelines = [],
   leadStages = [],
   staffOptions = [],
   automationOptions = [],
+  conditions: initialConditions = [],
 }: {
   automationId: string;
   triggerType: string;
@@ -925,10 +928,12 @@ export function WorkflowBuilder({
   engagementLetterTemplates: TemplateOption[];
   documentRequestTemplates: TemplateOption[];
   services?: TemplateOption[];
+  serviceCategories?: TemplateOption[];
   pipelines?: PipelineOption[];
   leadStages?: LeadStageOption[];
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
+  conditions?: Condition[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -936,9 +941,13 @@ export function WorkflowBuilder({
   const [currentTriggerType, setCurrentTriggerType] = useState(triggerType);
   const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
+  const [conditions, setConditions] = useState<Condition[]>(initialConditions);
 
   async function saveTrigger() {
-    const { error } = await supabase.from("automations").update({ trigger_type: currentTriggerType, trigger_config: config as never }).eq("id", automationId);
+    const { error } = await supabase
+      .from("automations")
+      .update({ trigger_type: currentTriggerType, trigger_config: config as never, conditions: conditions as never })
+      .eq("id", automationId);
     if (error) {
       toast.show(error.message, "error");
       return;
@@ -1000,6 +1009,21 @@ export function WorkflowBuilder({
             leadStages={leadStages}
             disabled={!canManage}
           />
+
+          <div className="mt-4 border-t border-border pt-3">
+            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Only run when</h4>
+            <ConditionsEditor
+              conditions={conditions}
+              onChange={setConditions}
+              staffOptions={staffOptions}
+              services={services}
+              serviceCategories={serviceCategories}
+              pipelines={pipelines}
+              leadStages={leadStages}
+              disabled={!canManage}
+            />
+          </div>
+
           {canManage && (
             <div className="mt-3 flex justify-end">
               <button type="button" onClick={saveTrigger} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">

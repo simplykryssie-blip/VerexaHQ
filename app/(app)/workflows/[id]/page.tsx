@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow, type StaffOption, type AutomationOption } from "@/components/workflows/WorkflowBuilder";
-import type { PipelineOption, LeadStageOption } from "@/components/workflows/TriggerFields";
+import type { PipelineOption, LeadStageOption, TemplateOption } from "@/components/workflows/TriggerFields";
+import type { Condition } from "@/components/workflows/ConditionsEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   const { data: automation } = await supabase
     .from("automations")
-    .select("id, name, description, trigger_type, trigger_config, is_enabled, status")
+    .select("id, name, description, trigger_type, trigger_config, conditions, is_enabled, status")
     .eq("id", params.id)
     .eq("workspace_id", workspace.id)
     .maybeSingle();
@@ -37,6 +38,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     { data: leadStagesRaw },
     { data: staffMembers },
     { data: otherAutomations },
+    { data: serviceCategoriesRaw },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -112,6 +114,11 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .eq("status", "published")
         .neq("id", automation.id)
         .order("name"),
+      supabase
+        .from("service_categories")
+        .select("id, name")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .order("name"),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -153,6 +160,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   const automationOptions: AutomationOption[] = otherAutomations ?? [];
 
+  const serviceCategories: TemplateOption[] = serviceCategoriesRaw ?? [];
+
   return (
     <>
       <PageHeader backHref="/workflows" backLabel="Back to Workflows" title={automation.name} description={automation.description ?? undefined} />
@@ -172,10 +181,12 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           engagementLetterTemplates={engagementLetterTemplates ?? []}
           documentRequestTemplates={documentRequestTemplates ?? []}
           services={services ?? []}
+          serviceCategories={serviceCategories}
           pipelines={pipelines}
           leadStages={leadStages}
           staffOptions={staffOptions}
           automationOptions={automationOptions}
+          conditions={(automation.conditions as unknown as Condition[]) ?? []}
         />
       </div>
     </>
