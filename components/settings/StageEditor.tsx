@@ -2,123 +2,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Pencil, Plus, Trash2, Eye } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { DeleteStageDialog } from "@/components/settings/DeleteStageDialog";
-import { TemplateSelect } from "@/components/settings/TemplateSelect";
-import { DocumentRequestTemplatePreview } from "@/components/settings/DocumentRequestTemplatePreview";
-
-type Option = { id: string; name: string };
 
 type ProcessStage = {
   id: string;
   process_id: string;
   name: string;
   display_order: number;
-  organizer_template_id?: string | null;
-  document_request_template_id?: string | null;
-  engagement_letter_template_id?: string | null;
 };
 type ProcessTask = { id: string; process_stage_id: string; name: string; description: string | null; display_order: number; is_required: boolean };
 type ProcessInfo = { id: string; name: string; workspace_id: string | null } | null;
-
-function StageTemplateAttachments({
-  stage,
-  organizerTemplates,
-  documentRequestTemplates,
-  engagementLetterTemplates,
-}: {
-  stage: ProcessStage;
-  organizerTemplates: Option[];
-  documentRequestTemplates: Option[];
-  engagementLetterTemplates: Option[];
-}) {
-  const router = useRouter();
-  const supabase = createClient();
-  const [organizerId, setOrganizerId] = useState(stage.organizer_template_id ?? "");
-  const [documentRequestId, setDocumentRequestId] = useState(stage.document_request_template_id ?? "");
-  const [engagementLetterId, setEngagementLetterId] = useState(stage.engagement_letter_template_id ?? "");
-
-  async function update(column: "organizer_template_id" | "document_request_template_id" | "engagement_letter_template_id", value: string) {
-    await supabase
-      .from("process_stages")
-      .update({ [column]: value || null } as Record<typeof column, string | null>)
-      .eq("id", stage.id);
-    router.refresh();
-  }
-
-  const documentRequestName = documentRequestTemplates.find((t) => t.id === documentRequestId)?.name;
-
-  return (
-    <div className="mt-3 border-t border-border pt-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted">When an engagement reaches this stage</p>
-      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <div>
-          <TemplateSelect
-            value={organizerId}
-            onChange={(v) => {
-              setOrganizerId(v);
-              update("organizer_template_id", v);
-            }}
-            options={organizerTemplates}
-            placeholder="Send organizer..."
-          />
-          {organizerId && (
-            <Link
-              href={`/templates/organizers/${organizerId}`}
-              target="_blank"
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-            >
-              <Eye size={12} /> Preview
-            </Link>
-          )}
-        </div>
-        <div>
-          <TemplateSelect
-            value={documentRequestId}
-            onChange={(v) => {
-              setDocumentRequestId(v);
-              update("document_request_template_id", v);
-            }}
-            options={documentRequestTemplates}
-            placeholder="Request documents..."
-          />
-          {documentRequestId && documentRequestName && (
-            <div className="mt-1">
-              <DocumentRequestTemplatePreview templateId={documentRequestId} templateName={documentRequestName} />
-            </div>
-          )}
-        </div>
-        <div>
-          <TemplateSelect
-            value={engagementLetterId}
-            onChange={(v) => {
-              setEngagementLetterId(v);
-              update("engagement_letter_template_id", v);
-            }}
-            options={engagementLetterTemplates}
-            placeholder="Send for signature..."
-          />
-          {engagementLetterId && (
-            <Link
-              href={`/templates/engagement-letters/${engagementLetterId}`}
-              target="_blank"
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-            >
-              <Eye size={12} /> Preview
-            </Link>
-          )}
-        </div>
-      </div>
-      <p className="mt-1.5 text-xs text-muted">
-        Attaching a template here doesn&apos;t send anything automatically -- it just pre-selects the right one when staff use the manual send
-        action on an engagement at this stage.
-      </p>
-    </div>
-  );
-}
 
 function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: ProcessTask[]; canEdit: boolean }) {
   const router = useRouter();
@@ -270,9 +166,6 @@ export function StageEditor({
   stages,
   tasks,
   engagementCountsByStage,
-  organizerTemplates,
-  documentRequestTemplates,
-  engagementLetterTemplates,
 }: {
   /** A stage editor either bootstraps its process from a Service (the
    *  original flow) or operates on an already-standalone Pipeline created
@@ -286,9 +179,6 @@ export function StageEditor({
   stages: ProcessStage[];
   tasks: ProcessTask[];
   engagementCountsByStage: Record<string, number>;
-  organizerTemplates: Option[];
-  documentRequestTemplates: Option[];
-  engagementLetterTemplates: Option[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -384,13 +274,7 @@ export function StageEditor({
         <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
           This is a system default {noun}. Its workflow can&apos;t be edited here -- clone it to create your own editable copy.
         </p>
-        <StageListReadOnly
-          stages={stages}
-          tasks={tasks}
-          organizerTemplates={organizerTemplates}
-          documentRequestTemplates={documentRequestTemplates}
-          engagementLetterTemplates={engagementLetterTemplates}
-        />
+        <StageListReadOnly stages={stages} tasks={tasks} />
       </div>
     );
   }
@@ -401,13 +285,7 @@ export function StageEditor({
         <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
           Only workspace admins can edit this {noun}&apos;s workflow.
         </p>
-        <StageListReadOnly
-          stages={stages}
-          tasks={tasks}
-          organizerTemplates={organizerTemplates}
-          documentRequestTemplates={documentRequestTemplates}
-          engagementLetterTemplates={engagementLetterTemplates}
-        />
+        <StageListReadOnly stages={stages} tasks={tasks} />
       </div>
     );
   }
@@ -499,12 +377,6 @@ export function StageEditor({
               )}
             </div>
             <StageTasks stage={stage} tasks={tasks.filter((t) => t.process_stage_id === stage.id)} canEdit />
-            <StageTemplateAttachments
-              stage={stage}
-              organizerTemplates={organizerTemplates}
-              documentRequestTemplates={documentRequestTemplates}
-              engagementLetterTemplates={engagementLetterTemplates}
-            />
           </div>
         );
       })}
@@ -556,74 +428,25 @@ export function StageEditor({
   );
 }
 
-function StageListReadOnly({
-  stages,
-  tasks,
-  organizerTemplates,
-  documentRequestTemplates,
-  engagementLetterTemplates,
-}: {
-  stages: ProcessStage[];
-  tasks: ProcessTask[];
-  organizerTemplates: Option[];
-  documentRequestTemplates: Option[];
-  engagementLetterTemplates: Option[];
-}) {
+function StageListReadOnly({ stages, tasks }: { stages: ProcessStage[]; tasks: ProcessTask[] }) {
   if (stages.length === 0) return null;
   return (
     <div className="mt-4 space-y-3">
-      {stages.map((stage) => {
-        const organizer = stage.organizer_template_id && organizerTemplates.find((t) => t.id === stage.organizer_template_id);
-        const documentRequest = stage.document_request_template_id && documentRequestTemplates.find((t) => t.id === stage.document_request_template_id);
-        const engagementLetter = stage.engagement_letter_template_id && engagementLetterTemplates.find((t) => t.id === stage.engagement_letter_template_id);
-        const hasAttachments = Boolean(organizer || documentRequest || engagementLetter);
-        return (
-          <div key={stage.id} className="rounded-xl border border-border bg-surface p-4">
-            <h4 className="text-sm font-semibold text-ink">{stage.name}</h4>
-            <ul className="mt-2 space-y-1">
-              {tasks
-                .filter((t) => t.process_stage_id === stage.id)
-                .map((t) => (
-                  <li key={t.id} className="text-sm text-slate">
-                    {t.name}
-                    {t.is_required && <span className="ml-1.5 text-[10px] font-semibold uppercase text-warning">Required</span>}
-                  </li>
-                ))}
-            </ul>
-            {hasAttachments && (
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted">
-                {organizer && (
-                  <span className="flex items-center gap-1">
-                    Organizer: {organizer.name}
-                    <Link href={`/templates/organizers/${organizer.id}`} target="_blank" className="text-accent hover:underline" aria-label="Preview organizer">
-                      <Eye size={12} />
-                    </Link>
-                  </span>
-                )}
-                {documentRequest && (
-                  <span className="flex items-center gap-1">
-                    Documents: {documentRequest.name}
-                    <DocumentRequestTemplatePreview templateId={documentRequest.id} templateName={documentRequest.name} />
-                  </span>
-                )}
-                {engagementLetter && (
-                  <span className="flex items-center gap-1">
-                    Engagement letter: {engagementLetter.name}
-                    <Link
-                      href={`/templates/engagement-letters/${engagementLetter.id}`}
-                      target="_blank"
-                      className="text-accent hover:underline"
-                      aria-label="Preview engagement letter"
-                    >
-                      <Eye size={12} />
-                    </Link>
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {stages.map((stage) => (
+        <div key={stage.id} className="rounded-xl border border-border bg-surface p-4">
+          <h4 className="text-sm font-semibold text-ink">{stage.name}</h4>
+          <ul className="mt-2 space-y-1">
+            {tasks
+              .filter((t) => t.process_stage_id === stage.id)
+              .map((t) => (
+                <li key={t.id} className="text-sm text-slate">
+                  {t.name}
+                  {t.is_required && <span className="ml-1.5 text-[10px] font-semibold uppercase text-warning">Required</span>}
+                </li>
+              ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

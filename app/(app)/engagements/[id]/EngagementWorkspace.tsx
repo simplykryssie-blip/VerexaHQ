@@ -214,15 +214,7 @@ export function EngagementWorkspace({
               <IrsNoticesPanel workspaceId={workspace.id} entityType="engagement" entityId={engagement.id} notices={irsNotices} />
             )}
             {tab === "Workflow" && (
-              <WorkflowTab
-                stages={stages}
-                engagementId={engagement.id}
-                clientId={client?.id ?? ""}
-                workspaceId={workspace.id}
-                primaryEmail={client?.primary_email ?? null}
-                firmName={workspace.name}
-                clientName={client ? clientLabel(client) : undefined}
-              />
+              <WorkflowTab stages={stages} />
             )}
             {tab === "Tasks" && (
               <TasksTab workspaceId={workspace.id} engagementId={engagement.id} tasks={tasks} staffOptions={staffOptions} />

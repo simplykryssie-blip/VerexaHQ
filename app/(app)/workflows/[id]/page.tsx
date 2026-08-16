@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow } from "@/components/workflows/WorkflowBuilder";
+import type { PipelineOption } from "@/components/workflows/TriggerFields";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     { data: services },
     { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
+    { data: processes },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -87,6 +89,12 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
         .eq("status", "published")
         .order("name"),
+      supabase
+        .from("processes")
+        .select("id, name, process_stages(id, name, display_order)")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("status", "published")
+        .order("name"),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -111,6 +119,15 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     client_name: clientLabelFor(r.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
   }));
 
+  const pipelines: PipelineOption[] = (processes ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    stages: (p.process_stages as unknown as { id: string; name: string; display_order: number }[])
+      .slice()
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((s) => ({ id: s.id, name: s.name })),
+  }));
+
   return (
     <>
       <PageHeader backHref="/workflows" backLabel="Back to Workflows" title={automation.name} description={automation.description ?? undefined} />
@@ -130,6 +147,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           engagementLetterTemplates={engagementLetterTemplates ?? []}
           documentRequestTemplates={documentRequestTemplates ?? []}
           services={services ?? []}
+          pipelines={pipelines}
         />
       </div>
     </>

@@ -22,21 +22,9 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
   if (!process) notFound();
 
   const isSystemDefault = !process.workspace_id;
-  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [
-    { data: isWorkspaceAdmin },
-    { data: organizerTemplates },
-    { data: documentRequestTemplates },
-    { data: engagementLetterTemplates },
-    { data: stages },
-    { data: tasks },
-    { data: stageCounts },
-  ] = await Promise.all([
+  const [{ data: isWorkspaceAdmin }, { data: stages }, { data: tasks }, { data: stageCounts }] = await Promise.all([
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
-    supabase.from("organizer_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("document_request_templates").select("id, name").or(orFilter).order("name"),
-    supabase.from("engagement_letter_templates").select("id, name").or(orFilter).order("name"),
     supabase.from("process_stages").select("*").eq("process_id", process.id).order("display_order"),
     supabase
       .from("process_tasks")
@@ -77,9 +65,6 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
           stages={stages ?? []}
           tasks={(tasks ?? []) as never}
           engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
-          organizerTemplates={organizerTemplates ?? []}
-          documentRequestTemplates={documentRequestTemplates ?? []}
-          engagementLetterTemplates={engagementLetterTemplates ?? []}
         />
       </div>
     </div>

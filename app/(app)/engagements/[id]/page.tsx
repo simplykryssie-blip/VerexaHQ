@@ -232,16 +232,6 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const slaByStage = new Map((slaRows ?? []).map((s: any) => [s.workflow_stage_id, s.sla_category as string]));
 
-  const processStageIds = Array.from(new Set((stages ?? []).map((s: any) => s.process_stage_id).filter(Boolean)));
-  const { data: processStageTemplates } =
-    processStageIds.length > 0
-      ? await supabase
-          .from("process_stages")
-          .select("id, organizer_template_id, document_request_template_id, engagement_letter_template_id")
-          .in("id", processStageIds)
-      : { data: [] as { id: string; organizer_template_id: string | null; document_request_template_id: string | null; engagement_letter_template_id: string | null }[] };
-  const processStageTemplateById = new Map((processStageTemplates ?? []).map((p) => [p.id, p]));
-
   const stagesWithSla = (stages ?? []).map((s: any) => ({ ...s, sla_category: slaByStage.get(s.id) ?? null }));
 
   const taskIds = (tasks ?? []).map((t) => t.id);
@@ -410,57 +400,6 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     signers: r.signers ?? [],
   }));
 
-  // "Already sent for this stage's template" is derived from existing tables
-  // (no new state-tracking table) -- each list is ordered newest-first, so
-  // the first hit per template id is the most recent status.
-  const organizerSentStatusByTemplateId = new Map<string, string>();
-  for (const r of organizerResponses ?? []) {
-    if (!organizerSentStatusByTemplateId.has(r.organizer_template_id)) organizerSentStatusByTemplateId.set(r.organizer_template_id, r.status);
-  }
-  const documentRequestSentStatusByTemplateId = new Map<string, string>();
-  for (const r of documentRequestRows ?? []) {
-    if (r.document_request_template_id && !documentRequestSentStatusByTemplateId.has(r.document_request_template_id)) {
-      documentRequestSentStatusByTemplateId.set(r.document_request_template_id, r.status);
-    }
-  }
-  const signatureSentStatusByTemplateId = new Map<string, string>();
-  for (const r of signatureRequestRows ?? []) {
-    if (r.engagement_letter_template_id && !signatureSentStatusByTemplateId.has(r.engagement_letter_template_id)) {
-      signatureSentStatusByTemplateId.set(r.engagement_letter_template_id, r.status);
-    }
-  }
-
-  function attachedTemplateFor(
-    templateId: string | null | undefined,
-    options: { id: string; name: string; body_html?: string }[],
-    sentByTemplateId: Map<string, string>
-  ) {
-    if (!templateId) return null;
-    const template = options.find((t) => t.id === templateId);
-    if (!template) return null;
-    return { id: template.id, name: template.name, body_html: template.body_html, sentStatus: sentByTemplateId.get(templateId) ?? null };
-  }
-
-  const stagesWithTemplates = stagesWithSla.map((s: any) => {
-    const stageTemplates = s.process_stage_id ? processStageTemplateById.get(s.process_stage_id) : undefined;
-    return {
-      ...s,
-      attachedTemplates: {
-        organizer: attachedTemplateFor(stageTemplates?.organizer_template_id, organizerTemplates ?? [], organizerSentStatusByTemplateId),
-        documentRequest: attachedTemplateFor(
-          stageTemplates?.document_request_template_id,
-          documentRequestTemplates ?? [],
-          documentRequestSentStatusByTemplateId
-        ),
-        engagementLetter: attachedTemplateFor(
-          stageTemplates?.engagement_letter_template_id,
-          engagementLetterTemplates ?? [],
-          signatureSentStatusByTemplateId
-        ),
-      },
-    };
-  });
-
   const [{ data: taxDetail }, { data: irsNotices }, { data: taxYears }] = await Promise.all([
     supabase.from("engagement_tax_details").select("*").eq("engagement_id", engagement.id).maybeSingle(),
     supabase
@@ -478,7 +417,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       workspace={workspace}
       permissions={permissions}
       engagement={engagement as never}
-      stages={stagesWithTemplates as never}
+      stages={stagesWithSla as never}
       tasks={tasksWithDeps as never}
       documents={documentsWithUploader}
       documentFolders={documentFolders ?? []}

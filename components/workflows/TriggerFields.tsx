@@ -3,6 +3,7 @@
 import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 
 export type TemplateOption = { id: string; name: string };
+export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
@@ -16,6 +17,7 @@ export const TRIGGER_TYPES = [
   { value: "appointment.status_changed", label: "An appointment's status changes to" },
   { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service" },
   { value: "document_request.completed", label: "All requested documents are received for a service" },
+  { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage" },
 ];
 
 export function defaultTriggerConfig(triggerType: string): Record<string, unknown> {
@@ -28,7 +30,8 @@ export function triggerSummary(
   triggerType: string,
   config: Record<string, unknown>,
   organizerTemplates: TemplateOption[],
-  services: TemplateOption[] = []
+  services: TemplateOption[] = [],
+  pipelines: PipelineOption[] = []
 ) {
   if (triggerType === "engagement.status_changed") {
     return `When engagement status changes to "${config.to_status ?? "?"}"`;
@@ -67,6 +70,13 @@ export function triggerSummary(
     const service = services.find((s) => s.id === serviceId);
     return `When all requested documents are received for "${service?.name ?? "a service"}"`;
   }
+  if (triggerType === "engagement.stage_entered") {
+    const processId = config.process_id as string | undefined;
+    const stageId = config.process_stage_id as string | undefined;
+    const pipeline = pipelines.find((p) => p.id === processId);
+    const stage = pipeline?.stages.find((s) => s.id === stageId);
+    return `When an engagement enters "${stage?.name ?? "a stage"}" in "${pipeline?.name ?? "a pipeline"}"`;
+  }
   return triggerType;
 }
 
@@ -77,6 +87,7 @@ export function TriggerFields({
   onConfigChange,
   organizerTemplates,
   services = [],
+  pipelines = [],
   disabled,
 }: {
   triggerType: string;
@@ -85,8 +96,10 @@ export function TriggerFields({
   onConfigChange: (c: Record<string, unknown>) => void;
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
+  pipelines?: PipelineOption[];
   disabled?: boolean;
 }) {
+  const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
   return (
     <div className="grid grid-cols-2 gap-3">
       <label className="flex flex-col gap-1 text-xs text-muted">
@@ -221,6 +234,47 @@ export function TriggerFields({
             ))}
           </select>
         </label>
+      )}
+
+      {triggerType === "engagement.stage_entered" && (
+        <>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Pipeline
+            <select
+              disabled={disabled}
+              value={(config.process_id as string) ?? ""}
+              onChange={(e) => onConfigChange({ process_id: e.target.value, process_stage_id: "" })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="" disabled>
+                Choose a pipeline
+              </option>
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Stage
+            <select
+              disabled={disabled || !selectedPipeline}
+              value={(config.process_stage_id as string) ?? ""}
+              onChange={(e) => onConfigChange({ process_id: config.process_id, process_stage_id: e.target.value })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="" disabled>
+                {selectedPipeline ? "Choose a stage" : "Choose a pipeline first"}
+              </option>
+              {selectedPipeline?.stages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
 
       {triggerType === "client.service_interest_selected" && (

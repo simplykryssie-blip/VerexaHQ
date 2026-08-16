@@ -4875,15 +4875,12 @@ export type Database = {
           created_at: string
           critical_threshold: string | null
           display_order: number
-          document_request_template_id: string | null
           due_date_rule: Json
-          engagement_letter_template_id: string | null
           entry_conditions: Json
           expected_duration: string | null
           id: string
           name: string
           notify_on_entry: Json
-          organizer_template_id: string | null
           process_id: string
           reviewer_role_id: string | null
           updated_at: string
@@ -4894,15 +4891,12 @@ export type Database = {
           created_at?: string
           critical_threshold?: string | null
           display_order?: number
-          document_request_template_id?: string | null
           due_date_rule?: Json
-          engagement_letter_template_id?: string | null
           entry_conditions?: Json
           expected_duration?: string | null
           id?: string
           name: string
           notify_on_entry?: Json
-          organizer_template_id?: string | null
           process_id: string
           reviewer_role_id?: string | null
           updated_at?: string
@@ -4913,42 +4907,18 @@ export type Database = {
           created_at?: string
           critical_threshold?: string | null
           display_order?: number
-          document_request_template_id?: string | null
           due_date_rule?: Json
-          engagement_letter_template_id?: string | null
           entry_conditions?: Json
           expected_duration?: string | null
           id?: string
           name?: string
           notify_on_entry?: Json
-          organizer_template_id?: string | null
           process_id?: string
           reviewer_role_id?: string | null
           updated_at?: string
           warning_threshold?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "process_stages_document_request_template_id_fkey"
-            columns: ["document_request_template_id"]
-            isOneToOne: false
-            referencedRelation: "document_request_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "process_stages_engagement_letter_template_id_fkey"
-            columns: ["engagement_letter_template_id"]
-            isOneToOne: false
-            referencedRelation: "engagement_letter_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "process_stages_organizer_template_id_fkey"
-            columns: ["organizer_template_id"]
-            isOneToOne: false
-            referencedRelation: "organizer_templates"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "process_stages_process_id_fkey"
             columns: ["process_id"]
