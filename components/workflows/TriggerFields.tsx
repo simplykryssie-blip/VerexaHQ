@@ -26,7 +26,13 @@ export const TRIGGER_TYPES = [
   { value: "lead.status_changed", label: "A lead's status changes to" },
   { value: "lead.converted_to_client", label: "A lead is converted to a client" },
   { value: "lead.marked_lost", label: "A lead is marked lost" },
+  { value: "quote.created", label: "A quote is created" },
+  { value: "quote.sent", label: "A quote is sent" },
+  { value: "quote.accepted", label: "A quote is accepted" },
+  { value: "quote.declined", label: "A quote is declined" },
 ];
+
+const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
 
 export function defaultTriggerConfig(triggerType: string): Record<string, unknown> {
   if (triggerType === "engagement.status_changed") return { to_status: ENGAGEMENT_STATUS_OPTIONS[0] };
@@ -111,6 +117,14 @@ export function triggerSummary(
   }
   if (triggerType === "lead.marked_lost") {
     return "When a lead is marked lost";
+  }
+  if (QUOTE_TRIGGER_TYPES.has(triggerType)) {
+    const verb = { "quote.created": "is created", "quote.sent": "is sent", "quote.accepted": "is accepted", "quote.declined": "is declined" }[
+      triggerType
+    ];
+    const serviceId = config.service_id as string | undefined;
+    const service = serviceId ? services.find((s) => s.id === serviceId) : undefined;
+    return `When a quote ${verb}${service ? ` for "${service.name}"` : ""}`;
   }
   return triggerType;
 }
@@ -354,6 +368,25 @@ export function TriggerFields({
             ))}
             <option value="active">Active (converted)</option>
             <option value="lost">Lost</option>
+          </select>
+        </label>
+      )}
+
+      {QUOTE_TRIGGER_TYPES.has(triggerType) && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Service (optional)
+          <select
+            disabled={disabled}
+            value={(config.service_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ service_id: e.target.value || undefined })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="">Any service</option>
+            {services.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
         </label>
       )}
