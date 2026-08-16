@@ -18,7 +18,6 @@ const CONTACT_TABS = [
 type ContactTab = (typeof CONTACT_TABS)[number]["key"];
 
 const CLIENT_LIFECYCLE_STATUSES = ["active", "inactive", "archived"];
-const LEAD_LIFECYCLE_STATUSES = ["lead"];
 
 const CLIENT_STATUS_FILTERS = [
   { value: "", label: "All" },
@@ -26,15 +25,12 @@ const CLIENT_STATUS_FILTERS = [
   { value: "inactive", label: "Inactive" },
   { value: "archived", label: "Archived" },
 ];
-const LEAD_STATUS_FILTERS = [
-  { value: "", label: "All" },
-  { value: "lead", label: "Lead" },
-];
 
 function statusTone(status: string): BadgeTone {
-  if (status === "lead") return "warning";
+  if (status === "lost") return "danger";
   if (status === "active") return "success";
-  return "neutral";
+  if (status === "archived") return "neutral";
+  return "warning";
 }
 
 function clientDisplayName(c: {
@@ -57,6 +53,7 @@ type ClientRow = {
   primary_phone: string | null;
   lifecycle_status: string;
   requestedService?: string | null;
+  stageLabel?: string | null;
 };
 
 const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -80,7 +77,7 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
     header: "Status",
     render: (c) => (
       <Badge tone={statusTone(c.lifecycle_status)} className="capitalize">
-        {c.lifecycle_status === "lead" ? "Lead" : c.lifecycle_status.replace("_", " ")}
+        {c.stageLabel ?? c.lifecycle_status.replace(/_/g, " ")}
       </Badge>
     ),
   },
@@ -91,18 +88,34 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   if (!workspace) return null;
 
   const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
-  const lifecycleScope = tab === "leads" ? LEAD_LIFECYCLE_STATUSES : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters = tab === "leads" ? LEAD_STATUS_FILTERS : CLIENT_STATUS_FILTERS;
+  const supabase = createClient();
+
+  // lead_stages.key doubles as a valid clients.lifecycle_status value
+  // (enforced by validate_client_lifecycle_status) -- a lead's status is
+  // literally whichever stage it's on, plus the terminal 'lost' outcome.
+  const { data: leadStagesRaw } =
+    tab === "leads"
+      ? await supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order")
+      : { data: [] as { key: string; label: string }[] };
+  const leadStages = leadStagesRaw ?? [];
+  const stageLabelByKey = new Map(leadStages.map((s) => [s.key, s.label]));
+
+  const lifecycleScope = tab === "leads" ? [...leadStages.map((s) => s.key), "lost"] : CLIENT_LIFECYCLE_STATUSES;
+  const statusFilters =
+    tab === "leads"
+      ? [{ value: "", label: "All" }, ...leadStages.map((s) => ({ value: s.key, label: s.label })), { value: "lost", label: "Lost" }]
+      : CLIENT_STATUS_FILTERS;
   const status = searchParams.status && lifecycleScope.includes(searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const supabase = createClient();
   const clientsQuery = supabase
     .from("clients")
-    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", { count: "exact" })
+    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", {
+      count: "exact",
+    })
     .eq("workspace_id", workspace.id)
     .is("merged_into_client_id", null)
     .in("lifecycle_status", status ? [status] : lifecycleScope)
@@ -138,7 +151,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     const label = [categoryName, serviceName].filter(Boolean).join(" -- ");
     if (label) latestInterestByClient.set(interest.client_id, label);
   }
-  const clientRows: ClientRow[] = (clients ?? []).map((c) => ({ ...c, requestedService: latestInterestByClient.get(c.id) ?? null }));
+  const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
+    ...c,
+    requestedService: latestInterestByClient.get(c.id) ?? null,
+    stageLabel: stageLabelByKey.get(c.lifecycle_status) ?? null,
+  }));
 
   const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : ""].filter(Boolean).join("&");
 

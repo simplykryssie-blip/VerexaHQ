@@ -1515,6 +1515,7 @@ export type Database = {
           itin_last4: string | null
           last_name: string | null
           lifecycle_status: string
+          lost_reason: string | null
           merged_into_client_id: string | null
           middle_name: string | null
           normalized_email: string | null
@@ -1561,6 +1562,7 @@ export type Database = {
           itin_last4?: string | null
           last_name?: string | null
           lifecycle_status?: string
+          lost_reason?: string | null
           merged_into_client_id?: string | null
           middle_name?: string | null
           normalized_email?: string | null
@@ -1607,6 +1609,7 @@ export type Database = {
           itin_last4?: string | null
           last_name?: string | null
           lifecycle_status?: string
+          lost_reason?: string | null
           merged_into_client_id?: string | null
           middle_name?: string | null
           normalized_email?: string | null

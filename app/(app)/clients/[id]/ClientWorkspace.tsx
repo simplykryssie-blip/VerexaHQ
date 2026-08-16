@@ -4,6 +4,8 @@ import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
+import { MarkLeadLostButton } from "./MarkLeadLostButton";
+import { LeadStageControl } from "./LeadStageControl";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -112,6 +114,7 @@ export function ClientWorkspace({
   staffOptions,
   accountHolder,
   requestedService,
+  leadStages,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -147,6 +150,7 @@ export function ClientWorkspace({
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
   requestedService: string | null;
+  leadStages: { key: string; label: string }[];
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -196,7 +200,17 @@ export function ClientWorkspace({
       />
 
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
-        <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+        <LeadStageControl clientId={client.id} lifecycleStatus={client.lifecycle_status} stages={leadStages} />
+        <ConvertLeadButton
+          clientId={client.id}
+          lifecycleStatus={client.lifecycle_status}
+          leadStageKeys={leadStages.map((s) => s.key)}
+        />
+        <MarkLeadLostButton
+          clientId={client.id}
+          lifecycleStatus={client.lifecycle_status}
+          leadStageKeys={leadStages.map((s) => s.key)}
+        />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}
