@@ -22,6 +22,9 @@ export type GalleryCard = {
   badges: string[];
   href: string;
   actionLabel: string;
+  /** Which table this row's status pill writes to -- organizer and engagement-letter rows share one list, so this travels per-row instead of once for the whole gallery. */
+  statusTable: "organizer_templates" | "engagement_letter_templates";
+  icon: LucideIcon;
 };
 
 const STATUS_FILTERS = [
@@ -31,27 +34,22 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
-// A dense, bordered list (search, status filters, a slim create button in
-// the toolbar) shared by the Organizer and Engagement Letter libraries,
-// which were otherwise duplicating the same search/filter/list/create-modal
-// structure with only their row content and create-form fields differing.
+// A dense, bordered list (search, status filters, create buttons in the
+// toolbar) shared by every template type shown under Form Templates --
+// organizer and engagement-letter rows are mixed in the same list, since a
+// combined (signable) template is just an organizer template with the
+// right field types, not a separate underlying kind.
 export function TemplateGallery({
   cards,
-  icon: Icon,
-  statusTable,
   searchPlaceholder,
   emptyMessage,
-  createTileLabel,
-  onCreateClick,
+  createActions,
   onDeleteClick,
 }: {
   cards: GalleryCard[];
-  icon: LucideIcon;
-  statusTable: "organizer_templates" | "engagement_letter_templates";
   searchPlaceholder: string;
   emptyMessage: string;
-  createTileLabel: string;
-  onCreateClick: () => void;
+  createActions: { label: string; onClick: () => void; primary?: boolean }[];
   /** Workspace-owned templates only -- system defaults never show a delete button. */
   onDeleteClick?: (card: GalleryCard) => void;
 }) {
@@ -91,13 +89,22 @@ export function TemplateGallery({
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onCreateClick}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent"
-        >
-          <Plus size={14} /> {createTileLabel}
-        </button>
+        <div className="flex items-center gap-2">
+          {createActions.map((action) => (
+            <button
+              key={action.label}
+              type="button"
+              onClick={action.onClick}
+              className={
+                action.primary
+                  ? "inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white hover:bg-accent/90"
+                  : "inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+              }
+            >
+              <Plus size={14} /> {action.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -108,7 +115,7 @@ export function TemplateGallery({
             {filtered.map((c) => (
               <div key={c.id} className="group flex items-center gap-3 px-4 py-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
-                  <Icon size={14} aria-hidden="true" />
+                  <c.icon size={14} aria-hidden="true" />
                 </span>
 
                 <div className="min-w-0 flex-1">
@@ -125,7 +132,7 @@ export function TemplateGallery({
                       {c.status}
                     </Badge>
                   ) : (
-                    <TemplateStatusCycle table={statusTable} id={c.id} status={c.status} />
+                    <TemplateStatusCycle table={c.statusTable} id={c.id} status={c.status} />
                   )}
                   {c.badges.map((b) => (
                     <span key={b} className="hidden text-xs text-muted sm:inline">

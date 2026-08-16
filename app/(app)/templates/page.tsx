@@ -3,9 +3,9 @@ import { FormTemplateLibrary } from "@/components/settings/FormTemplateLibrary";
 
 export const dynamic = "force-dynamic";
 
-export default async function TemplatesPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function TemplatesPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
-  return <FormTemplateLibrary workspaceId={workspace.id} activeTabParam={searchParams.tab} />;
+  return <FormTemplateLibrary workspaceId={workspace.id} />;
 }
