@@ -18,6 +18,8 @@ import {
   NotesTab,
   type ContactRow,
   type AddressRow,
+  type EmailRow,
+  type PhoneRow,
   type PortalUserRow,
   type RelationshipRow,
   type NoteRow,
@@ -84,6 +86,8 @@ export function ClientWorkspace({
   client,
   contacts,
   addresses,
+  emails,
+  phones,
   relationships,
   portalUsers,
   engagements,
@@ -122,6 +126,8 @@ export function ClientWorkspace({
   client: ClientRow;
   contacts: ContactRow[];
   addresses: AddressRow[];
+  emails: EmailRow[];
+  phones: PhoneRow[];
   relationships: RelationshipRow[];
   portalUsers: PortalUserRow[];
   engagements: EngagementRow[];
@@ -247,6 +253,8 @@ export function ClientWorkspace({
                 canEditSensitive={permissions.clientsEditSensitive}
                 contacts={contacts}
                 addresses={addresses}
+                emails={emails}
+                phones={phones}
                 portalUsers={portalUsers}
                 relationships={relationships}
                 staffOptions={staffOptions}

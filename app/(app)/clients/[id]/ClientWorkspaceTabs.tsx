@@ -33,6 +33,15 @@ import {
   AddNoteForm,
   EditNoteForm,
 } from "./AddForms";
+import {
+  AddEmailForm,
+  SetEmailPrimaryButton,
+  DeleteEmailButton,
+  AddPhoneForm,
+  SetPhonePrimaryButton,
+  DeletePhoneButton,
+  SetAddressPrimaryButton,
+} from "./ContactChannelForms";
 import { EditClientProfileForm } from "./EditClientProfileForm";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
@@ -83,6 +92,8 @@ export function OverviewTab({
   canEditSensitive,
   contacts,
   addresses,
+  emails,
+  phones,
   portalUsers,
   relationships,
   staffOptions,
@@ -123,6 +134,8 @@ export function OverviewTab({
   canEditSensitive: boolean;
   contacts: ContactRow[];
   addresses: AddressRow[];
+  emails: EmailRow[];
+  phones: PhoneRow[];
   portalUsers: PortalUserRow[];
   relationships: RelationshipRow[];
   staffOptions: StaffOption[];
@@ -216,6 +229,60 @@ export function OverviewTab({
             <TaxIdReveal clientId={client.id} kind="ein" last4={client.ein_last4} />
           )}
         </dl>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-2">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Emails</h3>
+              <AddEmailForm clientId={client.id} workspaceId={workspaceId} />
+            </div>
+            {emails.length === 0 ? (
+              <EmptyState message="No emails on file." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {emails.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                    <span>
+                      {e.email}
+                      <span className="ml-2 text-xs capitalize text-muted">{e.email_type}</span>
+                      {e.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!e.is_primary && <SetEmailPrimaryButton emailId={e.id} />}
+                      <DeleteEmailButton emailId={e.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Phones</h3>
+              <AddPhoneForm clientId={client.id} workspaceId={workspaceId} />
+            </div>
+            {phones.length === 0 ? (
+              <EmptyState message="No phones on file." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {phones.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                    <span>
+                      {p.phone_number}
+                      <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
+                      {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {!p.is_primary && <SetPhonePrimaryButton phoneId={p.id} />}
+                      <DeletePhoneButton phoneId={p.id} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
 
         {showStaffRoles && (
           <div className="mt-4 border-t border-border pt-4">
@@ -315,8 +382,10 @@ export function OverviewTab({
                   <span>
                     <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
                     {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                    {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                   </span>
                   <div className="flex shrink-0 items-center gap-2">
+                    {!a.is_primary && <SetAddressPrimaryButton addressId={a.id} />}
                     <EditAddressForm address={a} />
                     <DeleteAddressButton addressId={a.id} />
                   </div>
@@ -1040,7 +1109,9 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
 // ------------------------------------------------------------------- Types
 
 export type ContactRow = { id: string; first_name: string | null; last_name: string | null; title: string | null; email: string | null; phone: string | null; is_primary: boolean };
-export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null };
+export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean };
+export type EmailRow = { id: string; email: string; email_type: string; is_primary: boolean };
+export type PhoneRow = { id: string; phone_number: string; phone_type: string; is_primary: boolean };
 export type PortalUserRow = { id: string; invited_name: string | null; invited_email: string; is_primary: boolean; status: string };
 export type RelationshipRow = {
   id: string;
