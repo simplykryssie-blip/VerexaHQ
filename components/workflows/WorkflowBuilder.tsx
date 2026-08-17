@@ -515,24 +515,34 @@ function StepCard({
 
         {actionType === "send_notification" && (
           <>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Notify
-              <select
-                disabled={!canManage}
-                value={(config.staff_id as string) ?? ""}
-                onChange={(e) => setField("staff_id", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="" disabled>
-                  Choose staff
-                </option>
-                {staffOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.display_name ?? "Staff"}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+              Notifies the workspace owner and every active staff member -- no need to pick one person.
+            </p>
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Send via
+              <div className="flex items-center gap-4 pt-1">
+                {(["In-App", "Email"] as const).map((channel) => {
+                  const selected: string[] = Array.isArray(config.channels) ? (config.channels as string[]) : ["In-App"];
+                  const checked = selected.includes(channel);
+                  return (
+                    <label key={channel} className="flex items-center gap-1.5 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        disabled={!canManage}
+                        checked={checked}
+                        onChange={(e) => {
+                          const next = e.target.checked ? [...selected, channel] : selected.filter((c) => c !== channel);
+                          setConfig((c) => ({ ...c, channels: next.length > 0 ? next : ["In-App"] }));
+                          setSaved(false);
+                        }}
+                        className="rounded border-border text-accent focus:ring-accent disabled:opacity-60"
+                      />
+                      {channel === "In-App" ? "Staff portal" : "Email"}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Priority
               <select
