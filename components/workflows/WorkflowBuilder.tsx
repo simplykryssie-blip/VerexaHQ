@@ -942,16 +942,20 @@ export function WorkflowBuilder({
   const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
   const [conditions, setConditions] = useState<Condition[]>(initialConditions);
+  const [savingTrigger, setSavingTrigger] = useState(false);
 
   async function saveTrigger() {
+    setSavingTrigger(true);
     const { error } = await supabase
       .from("automations")
       .update({ trigger_type: currentTriggerType, trigger_config: config as never, conditions: conditions as never })
       .eq("id", automationId);
+    setSavingTrigger(false);
     if (error) {
       toast.show(error.message, "error");
       return;
     }
+    toast.show("Trigger saved", "success");
     router.refresh();
   }
 
@@ -1026,8 +1030,13 @@ export function WorkflowBuilder({
 
           {canManage && (
             <div className="mt-3 flex justify-end">
-              <button type="button" onClick={saveTrigger} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
-                Save trigger
+              <button
+                type="button"
+                onClick={saveTrigger}
+                disabled={savingTrigger}
+                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              >
+                {savingTrigger ? "Saving..." : "Save trigger"}
               </button>
             </div>
           )}
