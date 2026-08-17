@@ -70,27 +70,23 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
   }
 
   async function sign() {
-    if (!typedName.trim() && !drawnDataUrl) return;
+    if (!typedName.trim() || !drawnDataUrl) return;
     setSubmitting(true);
     setError(null);
 
-    let signatureType: "typed" | "drawn" = "typed";
-    let signatureImagePath: string | null = null;
-    if (drawnDataUrl) {
-      const res = await fetch(`/api/e/${token}/signature-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl: drawnDataUrl }),
-      });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setSubmitting(false);
-        setError(result.error ?? "Could not save your signature.");
-        return;
-      }
-      signatureType = "drawn";
-      signatureImagePath = result.path;
+    const res = await fetch(`/api/e/${token}/signature-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: drawnDataUrl }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setSubmitting(false);
+      setError(result.error ?? "Could not save your signature.");
+      return;
     }
+    const signatureType = "drawn" as const;
+    const signatureImagePath = result.path as string;
 
     if (requires_portal_signup) {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -113,10 +109,10 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
         p_last_name: lastName.trim(),
         p_email: email.trim(),
         p_phone: phone.trim(),
-        p_typed_name: signatureType === "typed" ? typedName.trim() : "",
+        p_typed_name: typedName.trim(),
         p_auth_user_id: signUpData.user.id,
         p_signature_type: signatureType,
-        p_signature_image_path: signatureImagePath ?? undefined,
+        p_signature_image_path: signatureImagePath,
       });
       setSubmitting(false);
       if (rpcError) {
@@ -142,9 +138,9 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       p_last_name: lastName.trim(),
       p_email: email.trim(),
       p_phone: phone.trim(),
-      p_typed_name: signatureType === "typed" ? typedName.trim() : "",
+      p_typed_name: typedName.trim(),
       p_signature_type: signatureType,
-      p_signature_image_path: signatureImagePath ?? undefined,
+      p_signature_image_path: signatureImagePath,
     });
     setSubmitting(false);
     if (rpcError) {
@@ -290,7 +286,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
               <button
                 type="button"
                 onClick={sign}
-                disabled={submitting || (!typedName.trim() && !drawnDataUrl)}
+                disabled={submitting || !typedName.trim() || !drawnDataUrl}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
               >
                 {submitting ? "Signing..." : "Confirm signature"}

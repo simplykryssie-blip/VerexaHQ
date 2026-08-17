@@ -1,16 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 const CANVAS_WIDTH = 600;
 const CANVAS_HEIGHT = 160;
 
-export type SignatureMode = "typed" | "drawn";
-
-/** A typed-name input or a hand-drawn canvas signature, toggled by tab.
- * Reused by every client-facing signing flow (engagement letters, generic
- * document signing) so the experience is consistent everywhere someone
- * has to sign something. */
+/** A typed-name input AND a hand-drawn canvas signature -- both required,
+ * shown together rather than as alternate modes. Reused by every
+ * client-facing signing flow (engagement letters, generic document signing)
+ * so the experience is consistent everywhere someone has to sign
+ * something. */
 export function SignaturePad({
   typedName,
   onTypedNameChange,
@@ -22,7 +21,6 @@ export function SignaturePad({
   onDrawnChange: (dataUrl: string | null) => void;
   typedLabel?: string;
 }) {
-  const [mode, setMode] = useState<SignatureMode>("typed");
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const hasDrawnRef = useRef(false);
@@ -75,62 +73,37 @@ export function SignaturePad({
     onDrawnChange(null);
   }
 
-  function switchMode(next: SignatureMode) {
-    setMode(next);
-    if (next === "typed") onDrawnChange(null);
-  }
-
   return (
-    <div>
-      <div className="mb-2 flex gap-1 rounded-lg bg-surfaceMuted p-1 text-xs font-medium">
-        <button
-          type="button"
-          onClick={() => switchMode("typed")}
-          className={`flex-1 rounded-md py-1.5 transition ${mode === "typed" ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
-        >
-          Type
-        </button>
-        <button
-          type="button"
-          onClick={() => switchMode("drawn")}
-          className={`flex-1 rounded-md py-1.5 transition ${mode === "drawn" ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink"}`}
-        >
-          Draw
+    <div className="space-y-4">
+      <div>
+        <label htmlFor="typed-signature" className="block text-sm font-medium text-ink">
+          {typedLabel}
+        </label>
+        <input
+          id="typed-signature"
+          value={typedName}
+          onChange={(e) => onTypedNameChange(e.target.value)}
+          placeholder="Full name"
+          className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </div>
+      <div>
+        <p className="text-sm font-medium text-ink">Also draw your signature below</p>
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_WIDTH}
+          height={CANVAS_HEIGHT}
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerLeave={end}
+          style={{ touchAction: "none" }}
+          className="mt-2 w-full cursor-crosshair rounded-lg border border-border bg-white"
+        />
+        <button type="button" onClick={clear} className="mt-1.5 text-xs font-medium text-muted hover:text-ink">
+          Clear
         </button>
       </div>
-
-      {mode === "typed" ? (
-        <>
-          <label htmlFor="typed-signature" className="block text-sm font-medium text-ink">
-            {typedLabel}
-          </label>
-          <input
-            id="typed-signature"
-            value={typedName}
-            onChange={(e) => onTypedNameChange(e.target.value)}
-            placeholder="Full name"
-            className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-medium text-ink">Draw your signature below</p>
-          <canvas
-            ref={canvasRef}
-            width={CANVAS_WIDTH}
-            height={CANVAS_HEIGHT}
-            onPointerDown={start}
-            onPointerMove={move}
-            onPointerUp={end}
-            onPointerLeave={end}
-            style={{ touchAction: "none" }}
-            className="mt-2 w-full cursor-crosshair rounded-lg border border-border bg-white"
-          />
-          <button type="button" onClick={clear} className="mt-1.5 text-xs font-medium text-muted hover:text-ink">
-            Clear
-          </button>
-        </>
-      )}
     </div>
   );
 }

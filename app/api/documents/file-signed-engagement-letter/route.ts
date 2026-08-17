@@ -42,17 +42,23 @@ export async function POST(request: Request) {
   // so the filed document actually shows what the client signed with,
   // instead of just the letter text plus a database row nobody sees.
   const signedAt = signature.signed_at ? new Date(signature.signed_at).toLocaleString() : "";
-  let signatureBlockHtml = "";
+  let imageHtml = "";
+  let typedHtml = "";
   if (signature.signature_type === "drawn" && signature.signature_image_path) {
     const { data: imageBytes } = await supabase.storage.from("signatures").download(signature.signature_image_path);
     if (imageBytes) {
       const base64 = Buffer.from(await imageBytes.arrayBuffer()).toString("base64");
-      signatureBlockHtml = `<div style="margin-top:2em"><img src="data:image/png;base64,${base64}" alt="Signature" style="max-width:300px;display:block" /><p style="color:#64748b;font-size:0.8em;margin-top:4px">Signed ${signedAt}</p></div>`;
+      imageHtml = `<img src="data:image/png;base64,${base64}" alt="Signature" style="max-width:300px;display:block" />`;
     }
-  } else if (signature.typed_name) {
-    const escapedName = signature.typed_name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    signatureBlockHtml = `<div style="margin-top:2em"><p style="font-family:cursive;font-size:1.4em;border-bottom:1px solid #0f172a;display:inline-block;padding-bottom:4px">${escapedName}</p><p style="color:#64748b;font-size:0.8em;margin-top:4px">Signed ${signedAt}</p></div>`;
   }
+  if (signature.typed_name) {
+    const escapedName = signature.typed_name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    typedHtml = `<p style="font-family:cursive;font-size:1.4em;border-bottom:1px solid #0f172a;display:inline-block;padding-bottom:4px;margin-top:${imageHtml ? "8px" : "0"}">${escapedName}</p>`;
+  }
+  const signatureBlockHtml =
+    imageHtml || typedHtml
+      ? `<div style="margin-top:2em">${imageHtml}${typedHtml}<p style="color:#64748b;font-size:0.8em;margin-top:4px">Signed ${signedAt}</p></div>`
+      : "";
 
   const templateName = (signature.engagement_letter_templates as unknown as { name?: string } | null)?.name ?? "Engagement Letter";
   const fileName = `${templateName} (signed).html`;

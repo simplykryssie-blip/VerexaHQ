@@ -41,7 +41,7 @@ export function EngagementLetterPreview({ bodyHtml, requiresSignature }: { bodyH
             <button
               type="button"
               onClick={() => toast.show("This is a preview -- nothing is submitted here.", "info")}
-              disabled={!typedName.trim() && !drawnDataUrl}
+              disabled={!typedName.trim() || !drawnDataUrl}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
               Confirm signature
