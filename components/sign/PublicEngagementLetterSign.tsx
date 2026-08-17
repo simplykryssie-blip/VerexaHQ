@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { RichTextEditor } from "@/components/settings/RichTextEditor";
+import { PaginatedDocument } from "@/components/documents/PaginatedDocument";
 import { SignaturePad } from "@/components/SignaturePad";
 import { renderTemplate } from "@/lib/templates/render";
 import { formatPhone } from "@/lib/phone";
@@ -266,34 +266,34 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       )}
 
       {step === "review" && (
-        <>
-          <div className="min-h-[40vh] rounded-xl border border-border bg-surfaceMuted p-3">
-            <RichTextEditor content={preview} editable={false} documentStyle allowPageBreak />
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <SignaturePad
-              typedName={typedName}
-              onTypedNameChange={setTypedName}
-              onDrawnChange={setDrawnDataUrl}
-              typedLabel="Type your full name to sign this letter electronically"
-            />
-            {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-            <div className="mt-3 flex items-center gap-3">
-              <button type="button" onClick={() => setStep("contact")} className="text-sm text-muted hover:text-ink">
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={sign}
-                disabled={submitting || !typedName.trim() || !drawnDataUrl}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-              >
-                {submitting ? "Signing..." : "Confirm signature"}
-              </button>
+        <PaginatedDocument
+          html={preview}
+          footer={
+            <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+              <p className="mb-3 text-xs text-muted">You&apos;ve reached the end of the letter -- sign below to confirm.</p>
+              <SignaturePad
+                typedName={typedName}
+                onTypedNameChange={setTypedName}
+                onDrawnChange={setDrawnDataUrl}
+                typedLabel="Type your full name to sign this letter electronically"
+              />
+              {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+              <div className="mt-3 flex items-center gap-3">
+                <button type="button" onClick={() => setStep("contact")} className="text-sm text-muted hover:text-ink">
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={sign}
+                  disabled={submitting || !typedName.trim() || !drawnDataUrl}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {submitting ? "Signing..." : "Confirm signature"}
+                </button>
+              </div>
             </div>
-          </div>
-        </>
+          }
+        />
       )}
     </div>
   );

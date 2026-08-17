@@ -123,6 +123,29 @@ export class TextPdf {
     this.y = PAGE_HEIGHT - MARGIN;
   }
 
+  // Embeds an already-captured drawn signature (PNG bytes) plus the typed
+  // name beneath it -- for filing an already-signed document, as opposed to
+  // signatureLine()'s blank "sign here" line for a document going out for
+  // signature.
+  async signatureImage(pngBytes: Uint8Array, typedName: string, signedAtLabel: string) {
+    const image = await this.pdfDoc.embedPng(pngBytes);
+    const maxWidth = 220;
+    const scale = Math.min(1, maxWidth / image.width);
+    const width = image.width * scale;
+    const height = image.height * scale;
+
+    this.ensureSpace(height + 50);
+    this.y -= 10;
+    this.page.drawImage(image, { x: MARGIN, y: this.y - height, width, height });
+    this.y -= height + 4;
+    this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: MARGIN + maxWidth, y: this.y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
+    this.y -= 12;
+    this.page.drawText(sanitizeForPdf(typedName), { x: MARGIN, y: this.y, size: 11, font: this.fontBold, color: rgb(0.1, 0.1, 0.1) });
+    this.y -= 14;
+    this.page.drawText(`Signed ${sanitizeForPdf(signedAtLabel)}`, { x: MARGIN, y: this.y, size: 9, font: this.font, color: rgb(0.45, 0.45, 0.45) });
+    this.y -= 16;
+  }
+
   // A visible "sign here" line + label, e.g. for the bottom of a rendered
   // engagement letter -- keeps to the same page unless there's truly no
   // room left, rather than starting a fresh page for two lines of text.

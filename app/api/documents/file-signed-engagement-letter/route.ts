@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
+import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
 
 // Called right after a public engagement-letter signature succeeds
 // (components/sign/PublicEngagementLetterSign.tsx and the anonymous public
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   const { data: signature } = await supabase
     .from("engagement_letter_public_signatures")
     .select(
-      "id, workspace_id, client_id, resolved_body_html, filed_as_attachment, signature_type, signature_image_path, typed_name, signed_at, engagement_letter_templates(name)"
+      "id, workspace_id, client_id, resolved_body_html, filed_as_attachment, signature_type, signature_image_path, typed_name, signer_name, signed_at, engagement_letter_templates(name)"
     )
     .eq("id", signatureId)
     .maybeSingle();
@@ -38,34 +39,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, alreadyFiled: true });
   }
 
-  // The stored letter body has no visible signature of its own -- append one
-  // so the filed document actually shows what the client signed with,
-  // instead of just the letter text plus a database row nobody sees.
+  // Renders a real, standard-Letter-sized, paginated PDF (matching what the
+  // client actually paged through when signing) with the real drawn
+  // signature embedded, rather than a raw HTML blob -- consistent with the
+  // PDF the automation-driven signature-request flow already produces.
   const signedAt = signature.signed_at ? new Date(signature.signed_at).toLocaleString() : "";
-  let imageHtml = "";
-  let typedHtml = "";
-  if (signature.signature_type === "drawn" && signature.signature_image_path) {
-    const { data: imageBytes } = await supabase.storage.from("signatures").download(signature.signature_image_path);
-    if (imageBytes) {
-      const base64 = Buffer.from(await imageBytes.arrayBuffer()).toString("base64");
-      imageHtml = `<img src="data:image/png;base64,${base64}" alt="Signature" style="max-width:300px;display:block" />`;
-    }
+  let signatureImageBytes: Uint8Array | null = null;
+  if (signature.signature_image_path) {
+    const { data: imageBlob } = await supabase.storage.from("signatures").download(signature.signature_image_path);
+    if (imageBlob) signatureImageBytes = new Uint8Array(await imageBlob.arrayBuffer());
   }
-  if (signature.typed_name) {
-    const escapedName = signature.typed_name.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    typedHtml = `<p style="font-family:cursive;font-size:1.4em;border-bottom:1px solid #0f172a;display:inline-block;padding-bottom:4px;margin-top:${imageHtml ? "8px" : "0"}">${escapedName}</p>`;
-  }
-  const signatureBlockHtml =
-    imageHtml || typedHtml
-      ? `<div style="margin-top:2em">${imageHtml}${typedHtml}<p style="color:#64748b;font-size:0.8em;margin-top:4px">Signed ${signedAt}</p></div>`
-      : "";
 
   const templateName = (signature.engagement_letter_templates as unknown as { name?: string } | null)?.name ?? "Engagement Letter";
-  const fileName = `${templateName} (signed).html`;
-  const path = `${signature.workspace_id}/${signature.client_id}/${Date.now()}-${fileName}`;
-  const blob = new Blob([signature.resolved_body_html + signatureBlockHtml], { type: "text/html" });
+  const pdfBytes = await renderLetterPdf(
+    templateName,
+    signature.resolved_body_html,
+    signature.typed_name ?? signature.signer_name,
+    signatureImageBytes ? { signatureImageBytes, typedName: signature.typed_name ?? "", signedAtLabel: signedAt } : undefined
+  );
 
-  const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "text/html" });
+  const fileName = `${templateName} (signed).pdf`;
+  const path = `${signature.workspace_id}/${signature.client_id}/${Date.now()}-${fileName}`;
+  const blob = new Blob([pdfBytes as unknown as BlobPart], { type: "application/pdf" });
+
+  const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, blob, { contentType: "application/pdf" });
   if (uploadErr) {
     return NextResponse.json({ error: uploadErr.message }, { status: 500 });
   }
@@ -76,7 +73,7 @@ export async function POST(request: Request) {
     entity_id: signature.client_id,
     file_name: fileName,
     storage_path: path,
-    mime_type: "text/html",
+    mime_type: "application/pdf",
     file_size_bytes: blob.size,
     visibility: "client_visible",
     category: "Engagement Letter",
