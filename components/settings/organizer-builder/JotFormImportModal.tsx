@@ -91,7 +91,7 @@ export function JotFormImportModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
       <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-5 shadow-lg">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink">Import from JotForm</h2>
