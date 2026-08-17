@@ -6,7 +6,14 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
-type ChangeRow = { id: string; targetTable: string; targetColumn: string; oldValue: string | null; newValue: string };
+type ChangeRow = {
+  id: string;
+  targetTable: string;
+  targetColumn: string;
+  oldValue: string | null;
+  newValue: string;
+  newValueLast4: string | null;
+};
 
 const COLUMN_LABELS: Record<string, string> = {
   first_name: "First name",
@@ -18,7 +25,21 @@ const COLUMN_LABELS: Record<string, string> = {
   city: "City",
   state: "State",
   zip: "Zip",
+  ssn: "SSN",
+  date_of_birth: "Date of birth",
 };
+
+// primary_email/primary_phone/street/city/state/zip approving adds a new
+// primary entry on the client's contact card and keeps the old one as a
+// secondary rather than erasing it -- staff can retag or delete either
+// afterward from the client profile. ssn's new_value is encrypted
+// ciphertext, never safe to render directly; show only the masked last 4.
+function displayValue(change: ChangeRow, value: string | null) {
+  if (change.targetColumn === "ssn") {
+    return value ? `Ending in ${value}` : "(on file)";
+  }
+  return value || "(blank)";
+}
 
 export function ReviewQueueClientChangeItem({
   batchId,
@@ -101,8 +122,9 @@ export function ReviewQueueClientChangeItem({
       <ul className="mt-3 space-y-1 border-t border-border pt-2">
         {changes.map((c) => (
           <li key={c.id} className="text-xs text-slate">
-            <span className="font-medium text-ink">{COLUMN_LABELS[c.targetColumn] ?? c.targetColumn}:</span> {c.oldValue || "(blank)"}{" "}
-            <span className="text-muted">→</span> {c.newValue}
+            <span className="font-medium text-ink">{COLUMN_LABELS[c.targetColumn] ?? c.targetColumn}:</span>{" "}
+            {displayValue(c, c.oldValue)} <span className="text-muted">→</span>{" "}
+            {c.targetColumn === "ssn" ? displayValue(c, c.newValueLast4) : c.newValue}
           </li>
         ))}
       </ul>

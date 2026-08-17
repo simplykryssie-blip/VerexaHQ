@@ -46,7 +46,7 @@ export default async function ReviewQueuePage() {
   const { data: pendingClientChanges } = await supabase
     .from("client_pending_changes")
     .select(
-      "id, batch_id, client_id, target_table, target_column, old_value, new_value, created_at, clients(client_type, first_name, last_name, business_name)"
+      "id, batch_id, client_id, target_table, target_column, old_value, new_value, new_value_last4, created_at, clients(client_type, first_name, last_name, business_name)"
     )
     .eq("workspace_id", workspace.id)
     .eq("status", "pending")
@@ -79,6 +79,7 @@ export default async function ReviewQueuePage() {
                     targetColumn: r.target_column,
                     oldValue: r.old_value,
                     newValue: r.new_value,
+                    newValueLast4: r.new_value_last4,
                   }))}
                 />
               ))}

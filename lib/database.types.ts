@@ -915,6 +915,7 @@ export type Database = {
           display_order: number
           id: string
           is_primary: boolean
+          source_batch_id: string | null
           state: string | null
           street: string | null
           updated_at: string
@@ -929,6 +930,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_primary?: boolean
+          source_batch_id?: string | null
           state?: string | null
           street?: string | null
           updated_at?: string
@@ -943,6 +945,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_primary?: boolean
+          source_batch_id?: string | null
           state?: string | null
           street?: string | null
           updated_at?: string
@@ -1143,6 +1146,7 @@ export type Database = {
           decision_notes: string | null
           id: string
           new_value: string
+          new_value_last4: string | null
           old_value: string | null
           organizer_field_id: string | null
           organizer_response_id: string | null
@@ -1163,6 +1167,7 @@ export type Database = {
           decision_notes?: string | null
           id?: string
           new_value: string
+          new_value_last4?: string | null
           old_value?: string | null
           organizer_field_id?: string | null
           organizer_response_id?: string | null
@@ -1183,6 +1188,7 @@ export type Database = {
           decision_notes?: string | null
           id?: string
           new_value?: string
+          new_value_last4?: string | null
           old_value?: string | null
           organizer_field_id?: string | null
           organizer_response_id?: string | null
@@ -7553,6 +7559,39 @@ export type Database = {
         Args: { p_token: string }
         Returns: string
       }
+      add_client_address: {
+        Args: {
+          p_address_type?: string
+          p_city: string
+          p_client_id: string
+          p_make_primary?: boolean
+          p_state: string
+          p_street: string
+          p_workspace_id: string
+          p_zip: string
+        }
+        Returns: string
+      }
+      add_client_email: {
+        Args: {
+          p_client_id: string
+          p_email: string
+          p_email_type?: string
+          p_make_primary?: boolean
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      add_client_phone: {
+        Args: {
+          p_client_id: string
+          p_make_primary?: boolean
+          p_phone: string
+          p_phone_type?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       add_process_stage: {
         Args: { p_service_id: string; p_stage_name: string }
         Returns: string
@@ -7803,6 +7842,8 @@ export type Database = {
       decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_firm_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
+      delete_client_email: { Args: { p_email_id: string }; Returns: undefined }
+      delete_client_phone: { Args: { p_phone_id: string }; Returns: undefined }
       delete_process_stage: {
         Args: {
           p_destination_stage_id?: string
@@ -8138,6 +8179,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      propose_client_sensitive_field: {
+        Args: {
+          p_field: string
+          p_new_value: string
+          p_organizer_field_id?: string
+          p_organizer_response_id?: string
+        }
+        Returns: undefined
+      }
       record_consent: {
         Args: {
           p_client_id?: string
@@ -8334,6 +8384,18 @@ export type Database = {
           error_detail: string
           passed: boolean
         }[]
+      }
+      set_client_address_primary: {
+        Args: { p_address_id: string }
+        Returns: undefined
+      }
+      set_client_email_primary: {
+        Args: { p_email_id: string }
+        Returns: undefined
+      }
+      set_client_phone_primary: {
+        Args: { p_phone_id: string }
+        Returns: undefined
       }
       set_config_object_status: {
         Args: { p_id: string; p_status: string; p_table: string }
