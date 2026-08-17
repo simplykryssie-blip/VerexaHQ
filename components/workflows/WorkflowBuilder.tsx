@@ -1044,14 +1044,7 @@ export function WorkflowBuilder({
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink">Steps</h3>
-          {canManage && (
-            <button type="button" onClick={addStep} className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline">
-              <Plus size={13} /> Add step
-            </button>
-          )}
-        </div>
+        <h3 className="mb-2 text-sm font-semibold text-ink">Steps</h3>
         {steps.length === 0 ? (
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
         ) : (
@@ -1077,6 +1070,15 @@ export function WorkflowBuilder({
               />
             ))}
           </div>
+        )}
+        {canManage && (
+          <button
+            type="button"
+            onClick={addStep}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-accent hover:bg-accentSoft"
+          >
+            <Plus size={14} /> Add step
+          </button>
         )}
       </div>
 

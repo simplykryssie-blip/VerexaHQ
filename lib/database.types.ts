@@ -8266,6 +8266,10 @@ export type Database = {
         Args: { p_field_ids: string[]; p_template_id: string }
         Returns: undefined
       }
+      reorder_process_stage: {
+        Args: { p_direction: string; p_stage_id: string }
+        Returns: undefined
+      }
       resolve_and_sign_organizer_response: {
         Args: {
           p_client_email: string

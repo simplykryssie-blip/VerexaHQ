@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { DeleteStageDialog } from "@/components/settings/DeleteStageDialog";
@@ -149,7 +149,11 @@ function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: Pro
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => setAdding(true)} className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-accent hover:bg-accentSoft"
+          >
             <Plus size={12} /> Add task
           </button>
         ))}
@@ -189,6 +193,19 @@ export function StageEditor({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ProcessStage | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
+
+  async function moveStage(stageId: string, direction: "up" | "down") {
+    setMovingId(stageId);
+    setError(null);
+    const { error } = await supabase.rpc("reorder_process_stage", { p_stage_id: stageId, p_direction: direction });
+    setMovingId(null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    router.refresh();
+  }
 
   const readOnly = isSystemDefault || !canEdit;
   const noun = source.kind === "service" ? "service" : "pipeline";
@@ -334,7 +351,7 @@ export function StageEditor({
 
   return (
     <div className="space-y-3">
-      {stages.map((stage) => {
+      {stages.map((stage, index) => {
         const count = engagementCountsByStage[stage.name] ?? 0;
         return (
           <div key={stage.id} className="rounded-xl border border-border bg-surface p-4">
@@ -366,8 +383,26 @@ export function StageEditor({
                 </div>
               )}
               {renamingId !== stage.id && (
-                <div className="flex shrink-0 items-center gap-3">
-                  <button type="button" onClick={() => startRename(stage)} className="text-muted hover:text-ink" aria-label="Rename stage">
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveStage(stage.id, "up")}
+                    disabled={index === 0 || movingId !== null}
+                    className="rounded p-1 text-muted hover:bg-surfaceMuted hover:text-ink disabled:opacity-30"
+                    aria-label="Move stage up"
+                  >
+                    <ArrowUp size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveStage(stage.id, "down")}
+                    disabled={index === stages.length - 1 || movingId !== null}
+                    className="rounded p-1 text-muted hover:bg-surfaceMuted hover:text-ink disabled:opacity-30"
+                    aria-label="Move stage down"
+                  >
+                    <ArrowDown size={13} />
+                  </button>
+                  <button type="button" onClick={() => startRename(stage)} className="ml-2 text-muted hover:text-ink" aria-label="Rename stage">
                     <Pencil size={13} />
                   </button>
                   <button type="button" onClick={() => handleDeleteClick(stage)} className="text-muted hover:text-danger" aria-label="Delete stage">
@@ -407,7 +442,7 @@ export function StageEditor({
         <button
           type="button"
           onClick={() => setAddingStage(true)}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-accent hover:bg-accentSoft"
         >
           <Plus size={14} /> Add stage
         </button>
