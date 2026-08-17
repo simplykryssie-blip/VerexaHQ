@@ -2650,6 +2650,8 @@ export type Database = {
           filed_as_attachment: boolean
           id: string
           resolved_body_html: string
+          signature_image_path: string | null
+          signature_type: string
           signed_at: string
           signer_email: string
           signer_name: string
@@ -2664,6 +2666,8 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html: string
+          signature_image_path?: string | null
+          signature_type?: string
           signed_at?: string
           signer_email: string
           signer_name: string
@@ -2678,6 +2682,8 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html?: string
+          signature_image_path?: string | null
+          signature_type?: string
           signed_at?: string
           signer_email?: string
           signer_name?: string
@@ -8524,6 +8530,8 @@ export type Database = {
           p_first_name: string
           p_last_name: string
           p_phone: string
+          p_signature_image_path?: string
+          p_signature_type?: string
           p_token: string
           p_typed_name: string
         }
@@ -8536,6 +8544,8 @@ export type Database = {
           p_first_name: string
           p_last_name: string
           p_phone: string
+          p_signature_image_path?: string
+          p_signature_type?: string
           p_token: string
           p_typed_name: string
         }

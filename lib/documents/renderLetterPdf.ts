@@ -1,11 +1,17 @@
 import { TextPdf } from "@/lib/pdf/textPdf";
 
 // Templates are authored as body_html (a simple rich-text editor's output --
-// paragraphs, line breaks, the occasional list), not full page-layout HTML,
-// so a crude block-to-paragraph conversion is enough to get readable text
-// into the PDF without pulling in a full HTML renderer.
+// paragraphs, line breaks, the occasional list, an explicit page break), not
+// full page-layout HTML, so a crude block-to-paragraph conversion is enough
+// to get readable text into the PDF without pulling in a full HTML renderer.
+export const PAGE_BREAK_SENTINEL = "@@PAGE_BREAK@@";
+
 function htmlToParagraphs(html: string): string[] {
   const withBreaks = (html ?? "")
+    // A page break (lib/tiptap/pageBreak.ts) serializes as an empty
+    // <div data-page-break>; must be swapped out before the generic
+    // </div> -> blank-line rule below would otherwise eat it silently.
+    .replace(/<div[^>]*\bdata-page-break\b[^>]*>[\s\S]*?<\/div>|<div[^>]*\bdata-page-break\b[^>]*\/?>/gi, `\n\n${PAGE_BREAK_SENTINEL}\n\n`)
     .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, "\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<li[^>]*>/gi, "• ");
@@ -34,6 +40,10 @@ export async function renderLetterPdf(title: string, bodyHtml: string, signerLab
   const pdf = await TextPdf.create();
   pdf.heading(title);
   for (const paragraph of htmlToParagraphs(bodyHtml)) {
+    if (paragraph === PAGE_BREAK_SENTINEL) {
+      pdf.newPage();
+      continue;
+    }
     pdf.paragraph(paragraph);
   }
   pdf.spacer(20);

@@ -115,6 +115,14 @@ export class TextPdf {
     this.y -= amount;
   }
 
+  // Forces a fresh page regardless of how much room is left on the current
+  // one -- for an explicit page-break marker in the source content, as
+  // opposed to ensureSpace()'s automatic break when a page just runs out.
+  newPage() {
+    this.page = this.pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    this.y = PAGE_HEIGHT - MARGIN;
+  }
+
   // A visible "sign here" line + label, e.g. for the bottom of a rendered
   // engagement letter -- keeps to the same page unless there's truly no
   // room left, rather than starting a fresh page for two lines of text.

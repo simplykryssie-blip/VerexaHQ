@@ -152,6 +152,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               content={bodyHtml}
               editable={!readOnly}
               documentStyle
+              allowPageBreak
               onEditorReady={(editor) => (editorRef.current = editor)}
               onChange={(html) => {
                 setBodyHtml(html);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { SignaturePad } from "@/components/SignaturePad";
 
 type SignRequestData = {
   signer_id: string;
@@ -30,6 +31,7 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [typedName, setTypedName] = useState(initialData.signer_name);
+  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [showDecline, setShowDecline] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,13 +48,31 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
   }, [token]);
 
   async function sign() {
-    if (!typedName.trim()) return;
+    if (!typedName.trim() && !drawnDataUrl) return;
     setSubmitting(true);
     setError(null);
+
+    let signatureImagePath: string | null = null;
+    if (drawnDataUrl) {
+      const res = await fetch(`/api/sign/${token}/signature-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl: drawnDataUrl }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubmitting(false);
+        setError(result.error ?? "Could not save your signature.");
+        return;
+      }
+      signatureImagePath = result.path;
+    }
+
     const { error: rpcError } = await supabase.rpc("record_signature_by_token", {
       p_token: token,
-      p_signature_type: "typed",
-      p_typed_name: typedName.trim(),
+      p_signature_type: drawnDataUrl ? "drawn" : "typed",
+      p_typed_name: drawnDataUrl ? undefined : typedName.trim(),
+      p_signature_image_path: signatureImagePath ?? undefined,
     });
     setSubmitting(false);
     if (rpcError) {
@@ -124,23 +144,18 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       <div className="rounded-xl border border-border bg-surface p-4">
         {!showDecline ? (
           <>
-            <label htmlFor="typed-name" className="block text-sm font-medium text-ink">
-              Type your full name to sign this document electronically
-            </label>
-            <input
-              id="typed-name"
-              autoFocus
-              value={typedName}
-              onChange={(e) => setTypedName(e.target.value)}
-              placeholder="Full name"
-              className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            <SignaturePad
+              typedName={typedName}
+              onTypedNameChange={setTypedName}
+              onDrawnChange={setDrawnDataUrl}
+              typedLabel="Type your full name to sign this document electronically"
             />
             {error && <p className="mt-2 text-sm text-danger">{error}</p>}
             <div className="mt-3 flex items-center gap-3">
               <button
                 type="button"
                 onClick={sign}
-                disabled={submitting || !typedName.trim()}
+                disabled={submitting || (!typedName.trim() && !drawnDataUrl)}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
               >
                 {submitting ? "Signing..." : "Confirm signature"}

@@ -49,3 +49,28 @@ body {
 .prose :where(p:last-child) {
   margin-bottom: 0;
 }
+
+/* Page-break marker (lib/tiptap/pageBreak.ts) -- a labeled dashed divider in
+   the editor/preview standing in for the real page break renderLetterPdf.ts
+   inserts when generating the signed PDF. */
+.prose [data-page-break] {
+  position: relative;
+  height: 0;
+  margin: 2em 0;
+  border-top: 2px dashed #94a3b8;
+  user-select: none;
+}
+.prose [data-page-break]::after {
+  content: "Page break";
+  position: absolute;
+  top: -0.65em;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 0 0.6em;
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
