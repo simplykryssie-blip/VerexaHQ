@@ -37,6 +37,7 @@ function FixedServiceRow({
       toast.show(error.message, "error");
       return;
     }
+    toast.show("Service turned on", "success");
     router.refresh();
   }
 
@@ -62,6 +63,7 @@ function FixedServiceRow({
       toast.show(error.message, "error");
       return;
     }
+    toast.show("Service turned off", "success");
     router.refresh();
   }
 
@@ -126,6 +128,7 @@ function CustomServiceRow({ service }: { service: OwnedService }) {
       toast.show(error.message, "error");
       return;
     }
+    toast.show("Service deleted", "success");
     router.refresh();
   }
 

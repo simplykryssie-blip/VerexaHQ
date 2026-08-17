@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import type { StaffOption } from "./ClientWorkspaceTabs";
 
 type StaffRef = { id: string; display_name: string | null } | null;
@@ -30,6 +31,7 @@ export function ClientAssignmentForm({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const current = {
     relationship_manager_id: relationshipManager,
     default_reviewer_id: defaultReviewer,
@@ -57,6 +59,7 @@ export function ClientAssignmentForm({
       setError(updateError.message);
       return;
     }
+    toast.show("Assignment saved", "success");
     router.refresh();
   }
 

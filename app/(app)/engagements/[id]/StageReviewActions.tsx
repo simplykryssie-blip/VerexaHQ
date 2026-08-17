@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 export function StageReviewActions({ stageId, label = "Approve" }: { stageId: string; label?: string }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +24,7 @@ export function StageReviewActions({ stageId, label = "Approve" }: { stageId: st
       setError(error.message);
       return;
     }
+    toast.show("Stage approved", "success");
     router.refresh();
   }
 

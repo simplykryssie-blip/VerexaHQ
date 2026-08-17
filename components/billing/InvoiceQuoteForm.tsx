@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import { InvoicePreview, type PreviewLineItem } from "./InvoicePreview";
 
 export type EditingInvoiceQuote = {
@@ -41,6 +42,7 @@ export function InvoiceQuoteForm({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   // A new (not-yet-attached-to-an-engagement) quote needs to say which
   // service it's for -- accepting it creates the engagement for that
   // service. A quote created from within an existing engagement's own
@@ -116,6 +118,7 @@ export function InvoiceQuoteForm({
         setError(updateError.message);
         return;
       }
+      toast.show(kind === "invoice" ? "Invoice saved" : "Quote saved", "success");
       onDone();
       router.refresh();
       return;
@@ -150,6 +153,7 @@ export function InvoiceQuoteForm({
       setError(insertError.message);
       return;
     }
+    toast.show(kind === "invoice" ? "Invoice created" : "Quote created", "success");
     onDone();
     router.refresh();
   }

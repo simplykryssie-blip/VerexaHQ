@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Editor } from "@tiptap/react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
 import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
@@ -59,6 +60,7 @@ export function TemplateEditRow({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +88,7 @@ export function TemplateEditRow({
       setError(updateError.message);
       return;
     }
+    toast.show("Template saved", "success");
     router.refresh();
     onClose();
   }
@@ -110,6 +113,7 @@ export function TemplateEditRow({
         .single();
       if (!insertError && data) {
         setDuplicating(false);
+        toast.show("Template duplicated", "success");
         router.refresh();
         onDuplicated(data as TemplateRow);
         return;

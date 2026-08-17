@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 export function LeadStageControl({
   clientId,
@@ -15,6 +16,7 @@ export function LeadStageControl({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +33,7 @@ export function LeadStageControl({
       setError(updateError.message);
       return;
     }
+    toast.show("Stage updated", "success");
     router.refresh();
   }
 

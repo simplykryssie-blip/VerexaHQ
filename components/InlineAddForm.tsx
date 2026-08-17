@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
+import { useToast } from "@/components/Toast";
 
 export type FieldDef = {
   name: string;
@@ -30,6 +31,7 @@ export function InlineAddForm({
   submitLabel?: string;
   trigger?: (openForm: () => void) => React.ReactNode;
 }) {
+  const toast = useToast();
   const [open, setOpen] = useState(defaultOpen);
   const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export function InlineAddForm({
     }
     setValues(initialValues ?? {});
     setOpen(false);
+    toast.show("Saved", "success");
   }
 
   if (!open) {

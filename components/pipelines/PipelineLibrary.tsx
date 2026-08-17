@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -33,6 +34,7 @@ const STATUS_FILTERS = [
 export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: string; pipelines: PipelineCard[] }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [creating, setCreating] = useState(false);
@@ -70,6 +72,7 @@ export function PipelineLibrary({ workspaceId, pipelines }: { workspaceId: strin
       setDeleteError(error.message);
       return;
     }
+    toast.show("Pipeline deleted", "success");
     router.refresh();
   }
 

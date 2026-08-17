@@ -3,22 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import type { TaskRow as TaskRowType } from "./EngagementWorkspaceTabs";
 
 export function TaskRow({ task }: { task: TaskRowType }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [pending, setPending] = useState(false);
   const completed = task.status === "completed";
   const blockedBy = task.dependencies.filter((d) => d.depends_on_title);
 
   async function toggle() {
     setPending(true);
-    await supabase
+    const { error } = await supabase
       .from("tasks")
       .update({ status: completed ? "pending" : "completed", completed_at: completed ? null : new Date().toISOString() })
       .eq("id", task.id);
     setPending(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(completed ? "Task reopened" : "Task completed", "success");
     router.refresh();
   }
 

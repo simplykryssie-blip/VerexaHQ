@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 export function ConvertLeadButton({
   clientId,
@@ -16,6 +17,7 @@ export function ConvertLeadButton({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [converting, setConverting] = useState(false);
 
   if (!leadStageKeys.includes(lifecycleStatus)) return null;
@@ -25,9 +27,10 @@ export function ConvertLeadButton({
     const { error } = await supabase.from("clients").update({ lifecycle_status: "active" }).eq("id", clientId);
     setConverting(false);
     if (error) {
-      window.alert(error.message);
+      toast.show(error.message, "error");
       return;
     }
+    toast.show("Converted to client", "success");
     router.refresh();
   }
 

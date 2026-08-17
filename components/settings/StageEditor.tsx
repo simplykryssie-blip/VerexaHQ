@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { DeleteStageDialog } from "@/components/settings/DeleteStageDialog";
+import { useToast } from "@/components/Toast";
 
 type ProcessStage = {
   id: string;
@@ -19,6 +20,7 @@ type ProcessInfo = { id: string; name: string; workspace_id: string | null } | n
 function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: ProcessTask[]; canEdit: boolean }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [newTaskName, setNewTaskName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: Pro
     }
     setNewTaskName("");
     setAdding(false);
+    toast.show("Task added", "success");
     router.refresh();
   }
 
@@ -61,6 +64,7 @@ function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: Pro
       return;
     }
     setEditingId(null);
+    toast.show("Task saved", "success");
     router.refresh();
   }
 
@@ -71,6 +75,7 @@ function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: Pro
       setError(error.message);
       return;
     }
+    toast.show("Task deleted", "success");
     router.refresh();
   }
 
@@ -186,6 +191,7 @@ export function StageEditor({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [addingStage, setAddingStage] = useState(false);
   const [newStageName, setNewStageName] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -204,6 +210,7 @@ export function StageEditor({
       setError(error.message);
       return;
     }
+    toast.show("Stage order saved", "success");
     router.refresh();
   }
 
@@ -225,6 +232,7 @@ export function StageEditor({
     }
     setNewStageName("");
     setAddingStage(false);
+    toast.show("Stage added", "success");
     router.refresh();
   }
 
@@ -247,6 +255,7 @@ export function StageEditor({
       return;
     }
     setRenamingId(null);
+    toast.show("Stage renamed", "success");
     router.refresh();
   }
 
@@ -265,6 +274,7 @@ export function StageEditor({
       setError(error.message);
       return;
     }
+    toast.show("Stage deleted", "success");
     router.refresh();
   }
 
@@ -282,6 +292,7 @@ export function StageEditor({
       return;
     }
     setDeleteTarget(null);
+    toast.show("Stage deleted", "success");
     router.refresh();
   }
 

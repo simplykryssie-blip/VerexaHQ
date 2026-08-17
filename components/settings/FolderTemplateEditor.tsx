@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Trash2, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 type FolderItem = { id: string; parent_item_id: string | null; name: string; display_order: number };
 
@@ -22,6 +23,7 @@ function FolderRow({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(item.name);
   const [busy, setBusy] = useState(false);
@@ -45,6 +47,7 @@ function FolderRow({
       return;
     }
     setRenaming(false);
+    toast.show("Folder renamed", "success");
     router.refresh();
   }
 
@@ -73,6 +76,7 @@ function FolderRow({
       onError(error.message);
       return;
     }
+    toast.show("Folder deleted", "success");
     router.refresh();
   }
 
@@ -193,6 +197,7 @@ export function FolderTemplateEditor({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [cloning, setCloning] = useState(false);
 
@@ -220,6 +225,7 @@ export function FolderTemplateEditor({
       setError(updateError.message);
       return;
     }
+    toast.show("Template cloned", "success");
     router.refresh();
   }
 
@@ -234,6 +240,7 @@ export function FolderTemplateEditor({
       setError(insertError.message);
       return;
     }
+    toast.show("Folder added", "success");
     router.refresh();
   }
 
@@ -246,6 +253,7 @@ export function FolderTemplateEditor({
       setError(insertError.message);
       return;
     }
+    toast.show("Folder added", "success");
     router.refresh();
   }
 

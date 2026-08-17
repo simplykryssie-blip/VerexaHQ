@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 // "Delete" archives rather than hard-deletes: engagements have CASCADE
 // foreign keys from tasks, engagement_tax_details, and organizer_responses,
@@ -12,6 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 export function DeleteEngagementButton({ engagementId, workspaceId }: { engagementId: string; workspaceId: string }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [deleting, setDeleting] = useState(false);
 
   async function handleDelete() {
@@ -20,9 +22,10 @@ export function DeleteEngagementButton({ engagementId, workspaceId }: { engageme
     const { error } = await supabase.from("engagements").update({ status: "archived" }).eq("id", engagementId).eq("workspace_id", workspaceId);
     setDeleting(false);
     if (error) {
-      window.alert(error.message);
+      toast.show(error.message, "error");
       return;
     }
+    toast.show("Engagement archived", "success");
     router.push("/engagements");
     router.refresh();
   }

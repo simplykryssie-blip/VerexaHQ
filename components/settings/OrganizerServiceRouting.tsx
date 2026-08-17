@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 type Option = { value: string; label: string };
 type RoutableField = { id: string; label: string; field_type: string; options: Option[] };
@@ -12,6 +13,7 @@ const ROUTABLE_FIELD_TYPES = ["dropdown", "radio_button"];
 
 export function OrganizerServiceRouting({ workspaceId, organizerTemplateId }: { workspaceId: string; organizerTemplateId: string }) {
   const supabase = createClient();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [fields, setFields] = useState<RoutableField[]>([]);
   const [routes, setRoutes] = useState<Route[]>([]);
@@ -53,8 +55,13 @@ export function OrganizerServiceRouting({ workspaceId, organizerTemplateId }: { 
     if (!serviceId) {
       const existing = routes.find((r) => r.answer_value === answerValue);
       if (existing) {
-        await supabase.from("organizer_service_routes").delete().eq("id", existing.id);
+        const { error: deleteError } = await supabase.from("organizer_service_routes").delete().eq("id", existing.id);
+        if (deleteError) {
+          setError(deleteError.message);
+          return;
+        }
         setRoutes((prev) => prev.filter((r) => r.id !== existing.id));
+        toast.show("Routing removed", "success");
       }
       return;
     }
@@ -71,20 +78,30 @@ export function OrganizerServiceRouting({ workspaceId, organizerTemplateId }: { 
       return;
     }
     setRoutes((prev) => [...prev.filter((r) => r.answer_value !== answerValue), data as Route]);
+    toast.show("Routing saved", "success");
   }
 
   async function turnOff() {
     if (!window.confirm("Stop routing this form to more than one service? The service it connects to will go back to the single one set above.")) return;
-    await supabase.from("organizer_service_routes").delete().eq("organizer_template_id", organizerTemplateId);
+    const { error: deleteError } = await supabase.from("organizer_service_routes").delete().eq("organizer_template_id", organizerTemplateId);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
     setRoutes([]);
     setRoutingFieldId("");
     setEnabled(false);
+    toast.show("Routing turned off", "success");
   }
 
   async function chooseRoutingField(fieldId: string) {
     if (routes.length > 0 && fieldId !== routingFieldId) {
       if (!window.confirm("Changing the deciding question clears the service mappings you already set up for this form. Continue?")) return;
-      await supabase.from("organizer_service_routes").delete().eq("organizer_template_id", organizerTemplateId);
+      const { error: deleteError } = await supabase.from("organizer_service_routes").delete().eq("organizer_template_id", organizerTemplateId);
+      if (deleteError) {
+        setError(deleteError.message);
+        return;
+      }
       setRoutes([]);
     }
     setRoutingFieldId(fieldId);

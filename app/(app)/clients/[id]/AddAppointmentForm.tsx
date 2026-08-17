@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 export function AddAppointmentForm({ clientId, workspaceId }: { clientId: string; workspaceId: string }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [startAt, setStartAt] = useState("");
@@ -45,6 +47,7 @@ export function AddAppointmentForm({ clientId, workspaceId }: { clientId: string
     setStartAt("");
     setLocation("");
     setOpen(false);
+    toast.show("Appointment scheduled", "success");
     router.refresh();
   }
 

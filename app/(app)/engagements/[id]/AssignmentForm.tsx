@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import type { StaffRef, StaffOption } from "./EngagementWorkspaceTabs";
 
 const ROLES = [
@@ -30,6 +31,7 @@ export function AssignmentForm({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const current = { assigned_staff_id: assignedStaff, reviewer_id: reviewer, compliance_officer_id: complianceOfficer };
   const [values, setValues] = useState({
     assigned_staff_id: assignedStaff?.id ?? "",
@@ -57,6 +59,7 @@ export function AssignmentForm({
       setError(updateError.message);
       return;
     }
+    toast.show("Assignment saved", "success");
     router.refresh();
   }
 

@@ -69,7 +69,6 @@ export function IrsNoticesPanel({
                 description: v.description || null,
               });
               if (error) return error.message;
-              toast.show("IRS notice logged", "success");
               router.refresh();
             }}
           />

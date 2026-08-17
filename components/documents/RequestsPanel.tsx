@@ -124,7 +124,6 @@ export function RequestsPanel({
                     p_due_date: v.due_date || undefined,
                   });
                   if (error) return error.message;
-                  toast.show("Document request created", "success");
 
                   if (clientEmail) {
                     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;

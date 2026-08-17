@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 
 export function StatusSelect({
   engagementId,
@@ -15,6 +16,7 @@ export function StatusSelect({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [status, setStatus] = useState(currentStatus);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export function StatusSelect({
       setStatus(currentStatus);
       return;
     }
+    toast.show("Status updated", "success");
     router.refresh();
   }
 

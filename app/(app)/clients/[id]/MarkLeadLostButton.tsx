@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserX } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
+import { useToast } from "@/components/Toast";
 
 export function MarkLeadLostButton({
   clientId,
@@ -17,6 +18,7 @@ export function MarkLeadLostButton({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -37,6 +39,7 @@ export function MarkLeadLostButton({
       return;
     }
     setOpen(false);
+    toast.show("Lead marked lost", "success");
     router.refresh();
   }
 

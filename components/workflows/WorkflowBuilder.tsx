@@ -170,6 +170,7 @@ function StepCard({
   onSaved: () => void;
 }) {
   const supabase = createClient();
+  const toast = useToast();
   const [actionType, setActionType] = useState(step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
   const [delayMinutes, setDelayMinutes] = useState(step.delay_minutes?.toString() ?? "0");
@@ -203,13 +204,22 @@ function StepCard({
   }
 
   async function move(direction: "up" | "down") {
-    await supabase.rpc("reorder_automation_step", { p_step_id: step.id, p_direction: direction });
+    const { error } = await supabase.rpc("reorder_automation_step", { p_step_id: step.id, p_direction: direction });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
     onSaved();
   }
 
   async function remove() {
     if (!window.confirm("Remove this step?")) return;
-    await supabase.from("automation_steps").delete().eq("id", step.id);
+    const { error } = await supabase.from("automation_steps").delete().eq("id", step.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Step removed", "success");
     onSaved();
   }
 
@@ -968,6 +978,7 @@ export function WorkflowBuilder({
       toast.show(error.message, "error");
       return;
     }
+    toast.show(next ? "Workflow activated" : "Workflow paused", "success");
     router.refresh();
   }
 
@@ -983,6 +994,7 @@ export function WorkflowBuilder({
       toast.show(error.message, "error");
       return;
     }
+    toast.show("Step added", "success");
     router.refresh();
   }
 

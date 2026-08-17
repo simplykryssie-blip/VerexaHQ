@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DateField } from "@/components/DateField";
+import { useToast } from "@/components/Toast";
 
 export function DateOfBirthInput({ clientId, currentDate }: { clientId: string; currentDate: string | null }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [dob, setDob] = useState(currentDate);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,6 +21,7 @@ export function DateOfBirthInput({ clientId, currentDate }: { clientId: string; 
       return;
     }
     setDob(next);
+    toast.show("Date of birth saved", "success");
     router.refresh();
   }
 

@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
+import { useToast } from "@/components/Toast";
 import {
   TriggerFields,
   defaultTriggerConfig,
@@ -57,6 +58,7 @@ export function WorkflowList({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState("engagement.status_changed");
@@ -90,11 +92,17 @@ export function WorkflowList({
       setError(insertError.message);
       return;
     }
+    toast.show("Workflow created", "success");
     router.push(`/workflows/${data.id}`);
   }
 
   async function toggleEnabled(id: string, current: boolean) {
-    await supabase.from("automations").update({ is_enabled: !current }).eq("id", id);
+    const { error } = await supabase.from("automations").update({ is_enabled: !current }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(current ? "Workflow paused" : "Workflow activated", "success");
     router.refresh();
   }
 
@@ -108,6 +116,7 @@ export function WorkflowList({
       setDeleteError(deleteErr.message);
       return;
     }
+    toast.show("Workflow deleted", "success");
     router.refresh();
   }
 
