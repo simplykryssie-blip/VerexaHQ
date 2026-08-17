@@ -3674,6 +3674,138 @@ export type Database = {
           },
         ]
       }
+      lead_pipeline_runs: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          created_at: string | null
+          current_stage_id: string | null
+          id: string
+          process_id: string
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          id?: string
+          process_id: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          id?: string
+          process_id?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_pipeline_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_runs_current_stage_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "lead_pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_runs_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_pipeline_stages: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          display_order: number
+          id: string
+          lead_pipeline_run_id: string
+          process_stage_id: string
+          stage_name: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          display_order: number
+          id?: string
+          lead_pipeline_run_id: string
+          process_stage_id: string
+          stage_name: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          lead_pipeline_run_id?: string
+          process_stage_id?: string
+          stage_name?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_pipeline_stages_lead_pipeline_run_id_fkey"
+            columns: ["lead_pipeline_run_id"]
+            isOneToOne: false
+            referencedRelation: "lead_pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_stages_process_stage_id_fkey"
+            columns: ["process_stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_stages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_stages: {
         Row: {
           created_at: string
@@ -8608,6 +8740,10 @@ export type Database = {
       }
       start_engagement_workflow: {
         Args: { p_engagement_id: string; p_process_id: string }
+        Returns: string
+      }
+      start_lead_pipeline_run: {
+        Args: { p_client_id: string; p_process_id: string }
         Returns: string
       }
       start_next_automation_step: {

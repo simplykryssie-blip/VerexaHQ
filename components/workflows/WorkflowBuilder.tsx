@@ -428,8 +428,9 @@ function StepCard({
 
         {actionType === "change_stage" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            Marks the engagement&apos;s current pipeline stage complete, moving it into the next stage. Only works on a run with an
-            engagement that has an active pipeline.
+            Marks the current pipeline stage complete, moving into the next stage -- the engagement&apos;s pipeline if this run has an
+            engagement, otherwise the lead&apos;s pipeline (started by a &quot;Move the lead to a pipeline stage&quot; step). Only works
+            if there&apos;s an active pipeline to advance.
           </p>
         )}
 
@@ -561,24 +562,48 @@ function StepCard({
         )}
 
         {actionType === "move_lead_stage" && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Stage
-            <select
-              disabled={!canManage}
-              value={(config.lead_stage_key as string) ?? ""}
-              onChange={(e) => setField("lead_stage_key", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="" disabled>
-                Choose a lead stage
-              </option>
-              {leadStages.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
+          <>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Pipeline
+              <select
+                disabled={!canManage}
+                value={(config.process_id as string) ?? ""}
+                onChange={(e) => setField("process_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a pipeline
                 </option>
-              ))}
-            </select>
-          </label>
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Target stage
+              <select
+                disabled={!canManage || !config.process_id}
+                value={(config.process_stage_id as string) ?? ""}
+                onChange={(e) => setField("process_stage_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a stage
+                </option>
+                {(pipelines.find((p) => p.id === config.process_id)?.stages ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+              Moves the lead forward to this stage, completing every stage in between. If the lead isn&apos;t already in a pipeline, it
+              starts one. Moving backward isn&apos;t supported.
+            </p>
+          </>
         )}
 
         {actionType === "mark_lead_lost" && (
