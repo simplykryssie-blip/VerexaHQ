@@ -1377,6 +1377,8 @@ export type Database = {
           related_ssn_encrypted: string | null
           related_ssn_last4: string | null
           relationship_type: string
+          source_instance_index: number | null
+          source_organizer_response_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -1393,6 +1395,8 @@ export type Database = {
           related_ssn_encrypted?: string | null
           related_ssn_last4?: string | null
           relationship_type: string
+          source_instance_index?: number | null
+          source_organizer_response_id?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -1409,6 +1413,8 @@ export type Database = {
           related_ssn_encrypted?: string | null
           related_ssn_last4?: string | null
           relationship_type?: string
+          source_instance_index?: number | null
+          source_organizer_response_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -1425,6 +1431,13 @@ export type Database = {
             columns: ["related_client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_relationships_source_organizer_response_id_fkey"
+            columns: ["source_organizer_response_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_responses"
             referencedColumns: ["id"]
           },
           {
@@ -4111,6 +4124,7 @@ export type Database = {
           options: Json
           organizer_template_id: string
           parent_field_id: string | null
+          relationship_role: string | null
           updated_at: string
           validation: Json
         }
@@ -4128,6 +4142,7 @@ export type Database = {
           options?: Json
           organizer_template_id: string
           parent_field_id?: string | null
+          relationship_role?: string | null
           updated_at?: string
           validation?: Json
         }
@@ -4145,6 +4160,7 @@ export type Database = {
           options?: Json
           organizer_template_id?: string
           parent_field_id?: string | null
+          relationship_role?: string | null
           updated_at?: string
           validation?: Json
         }
@@ -7520,6 +7536,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      _organizer_name_text: { Args: { p_value: Json }; Returns: string }
+      _organizer_scalar_text: { Args: { p_value: Json }; Returns: string }
       accept_config_object_share: {
         Args: { p_share_id: string }
         Returns: string
