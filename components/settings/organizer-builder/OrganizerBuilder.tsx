@@ -12,6 +12,7 @@ import { FieldPropertiesPanel } from "./FieldPropertiesPanel";
 import { OrganizerPreviewPanel } from "./OrganizerPreviewPanel";
 import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import type { BuilderField, BuilderTemplate } from "./types";
 
 function sortByOrder(fields: BuilderField[]): BuilderField[] {
@@ -30,6 +31,13 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedType, setDraggedType] = useState<OrganizerFieldType | null>(null);
   const [view, setView] = useState<"build" | "preview">("build");
+  const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+
+  async function updateBanner(url: string | null) {
+    setBannerImageUrl(url);
+    const { error } = await supabase.from("organizer_templates").update({ banner_image_url: url }).eq("id", template.id);
+    if (error) toast.show(error.message, "error");
+  }
 
   const topLevelFields = sortByOrder(fields.filter((f) => !f.parent_field_id));
   const childrenByParent = new Map<string, BuilderField[]>();
@@ -193,12 +201,23 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
         </p>
       )}
 
+      {!readOnly && (
+        <div className="border-b border-border bg-surface px-4 py-3">
+          <BannerImageUpload
+            workspaceId={template.workspace_id ?? ""}
+            value={bannerImageUrl}
+            onChange={updateBanner}
+          />
+        </div>
+      )}
+
       {view === "preview" ? (
         <OrganizerPreviewPanel
           templateName={template.name}
           templateDescription={template.description}
           topLevelFields={topLevelFields}
           childrenByParent={childrenByParent}
+          bannerImageUrl={bannerImageUrl}
         />
       ) : (
         <div className="flex flex-1 overflow-hidden">

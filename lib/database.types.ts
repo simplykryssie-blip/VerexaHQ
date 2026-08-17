@@ -4539,6 +4539,7 @@ export type Database = {
       }
       organizer_templates: {
         Row: {
+          banner_image_url: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -4553,6 +4554,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -4567,6 +4569,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null

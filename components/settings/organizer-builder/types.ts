@@ -25,4 +25,5 @@ export type BuilderTemplate = {
   public_token: string;
   is_public: boolean;
   requires_portal_signup: boolean;
+  banner_image_url: string | null;
 };

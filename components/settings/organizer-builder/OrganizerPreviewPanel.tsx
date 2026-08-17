@@ -26,11 +26,13 @@ export function OrganizerPreviewPanel({
   templateDescription,
   topLevelFields,
   childrenByParent,
+  bannerImageUrl,
 }: {
   templateName: string;
   templateDescription: string | null;
   topLevelFields: BuilderField[];
   childrenByParent: Map<string, BuilderField[]>;
+  bannerImageUrl?: string | null;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
@@ -44,7 +46,12 @@ export function OrganizerPreviewPanel({
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
-      <div className="mx-auto max-w-2xl rounded-xl border border-border bg-surface p-6 shadow-sm">
+      <div className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        {bannerImageUrl && currentIndex === 0 && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+        )}
+        <div className="p-6">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">{templateName}</h2>
         {templateDescription && <p className="mt-1 whitespace-pre-line text-sm text-muted">{templateDescription}</p>}
@@ -95,6 +102,7 @@ export function OrganizerPreviewPanel({
               Continue →
             </button>
           )}
+        </div>
         </div>
       </div>
     </main>
