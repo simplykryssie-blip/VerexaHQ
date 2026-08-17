@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
-import { LeadStageControl } from "./LeadStageControl";
+import { LeadPipelineStageControl } from "./LeadPipelineStageControl";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -119,7 +119,7 @@ export function ClientWorkspace({
   staffOptions,
   accountHolder,
   requestedService,
-  leadStages,
+  leadPipeline,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -158,7 +158,7 @@ export function ClientWorkspace({
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
   requestedService: string | null;
-  leadStages: { key: string; label: string }[];
+  leadPipeline: { processId: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -208,17 +208,15 @@ export function ClientWorkspace({
       />
 
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
-        <LeadStageControl clientId={client.id} lifecycleStatus={client.lifecycle_status} stages={leadStages} />
-        <ConvertLeadButton
+        <LeadPipelineStageControl
           clientId={client.id}
           lifecycleStatus={client.lifecycle_status}
-          leadStageKeys={leadStages.map((s) => s.key)}
+          processId={leadPipeline.processId}
+          stages={leadPipeline.stages}
+          currentProcessStageId={leadPipeline.currentProcessStageId}
         />
-        <MarkLeadLostButton
-          clientId={client.id}
-          lifecycleStatus={client.lifecycle_status}
-          leadStageKeys={leadStages.map((s) => s.key)}
-        />
+        <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+        <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}

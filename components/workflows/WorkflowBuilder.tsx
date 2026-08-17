@@ -35,13 +35,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
-import {
-  TriggerFields,
-  triggerSummary,
-  type TemplateOption,
-  type PipelineOption,
-  type LeadStageOption,
-} from "@/components/workflows/TriggerFields";
+import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 
 export type StaffOption = { id: string; display_name: string | null };
@@ -150,7 +144,6 @@ function StepCard({
   documentRequestTemplates,
   services,
   pipelines,
-  leadStages,
   staffOptions,
   automationOptions,
   canManage,
@@ -166,7 +159,6 @@ function StepCard({
   documentRequestTemplates: TemplateOption[];
   services: TemplateOption[];
   pipelines: PipelineOption[];
-  leadStages: LeadStageOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   canManage: boolean;
@@ -957,7 +949,6 @@ export function WorkflowBuilder({
   services = [],
   serviceCategories = [],
   pipelines = [],
-  leadStages = [],
   staffOptions = [],
   automationOptions = [],
   conditions: initialConditions = [],
@@ -978,7 +969,6 @@ export function WorkflowBuilder({
   services?: TemplateOption[];
   serviceCategories?: TemplateOption[];
   pipelines?: PipelineOption[];
-  leadStages?: LeadStageOption[];
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
   conditions?: Condition[];
@@ -1060,7 +1050,6 @@ export function WorkflowBuilder({
             organizerTemplates={organizerTemplates}
             services={services}
             pipelines={pipelines}
-            leadStages={leadStages}
             disabled={!canManage}
           />
 
@@ -1073,7 +1062,6 @@ export function WorkflowBuilder({
               services={services}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
-              leadStages={leadStages}
               disabled={!canManage}
             />
           </div>
@@ -1112,7 +1100,6 @@ export function WorkflowBuilder({
                 documentRequestTemplates={documentRequestTemplates}
                 services={services}
                 pipelines={pipelines}
-                leadStages={leadStages}
                 staffOptions={staffOptions}
                 automationOptions={automationOptions}
                 canManage={canManage}

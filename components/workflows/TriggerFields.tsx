@@ -4,7 +4,6 @@ import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 
 export type TemplateOption = { id: string; name: string };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
-export type LeadStageOption = { key: string; label: string };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
@@ -51,8 +50,7 @@ export function triggerSummary(
   config: Record<string, unknown>,
   organizerTemplates: TemplateOption[],
   services: TemplateOption[] = [],
-  pipelines: PipelineOption[] = [],
-  leadStages: LeadStageOption[] = []
+  pipelines: PipelineOption[] = []
 ) {
   if (triggerType === "engagement.status_changed") {
     return `When engagement status changes to "${config.to_status ?? "?"}"`;
@@ -116,8 +114,7 @@ export function triggerSummary(
   }
   if (triggerType === "lead.status_changed") {
     const stageKey = config.to_status as string | undefined;
-    const stage = leadStages.find((s) => s.key === stageKey);
-    const label = stage?.label ?? (stageKey === "active" ? "Active" : stageKey === "lost" ? "Lost" : (stageKey ?? "?"));
+    const label = stageKey === "active" ? "Active" : stageKey === "lost" ? "Lost" : (stageKey ?? "?");
     return `When a lead's status changes to "${label}"`;
   }
   if (triggerType === "lead.converted_to_client") {
@@ -163,7 +160,6 @@ export function TriggerFields({
   organizerTemplates,
   services = [],
   pipelines = [],
-  leadStages = [],
   disabled,
 }: {
   triggerType: string;
@@ -173,7 +169,6 @@ export function TriggerFields({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
-  leadStages?: LeadStageOption[];
   disabled?: boolean;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
@@ -407,11 +402,6 @@ export function TriggerFields({
             <option value="" disabled>
               Choose a status
             </option>
-            {leadStages.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
             <option value="active">Active (converted)</option>
             <option value="lost">Lost</option>
           </select>

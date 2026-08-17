@@ -6,21 +6,13 @@ import { UserCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
-export function ConvertLeadButton({
-  clientId,
-  lifecycleStatus,
-  leadStageKeys,
-}: {
-  clientId: string;
-  lifecycleStatus: string;
-  leadStageKeys: string[];
-}) {
+export function ConvertLeadButton({ clientId, lifecycleStatus }: { clientId: string; lifecycleStatus: string }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [converting, setConverting] = useState(false);
 
-  if (!leadStageKeys.includes(lifecycleStatus)) return null;
+  if (lifecycleStatus !== "lead") return null;
 
   async function convert() {
     setConverting(true);

@@ -3809,44 +3809,6 @@ export type Database = {
           },
         ]
       }
-      lead_stages: {
-        Row: {
-          created_at: string
-          display_order: number
-          id: string
-          is_entry_stage: boolean
-          key: string
-          label: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          is_entry_stage?: boolean
-          key: string
-          label: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          is_entry_stage?: boolean
-          key?: string
-          label?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_stages_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       login_history: {
         Row: {
           created_at: string
@@ -7191,6 +7153,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          default_lead_process_id: string | null
           id: string
           mailing_address: string | null
           name: string
@@ -7215,6 +7178,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          default_lead_process_id?: string | null
           id?: string
           mailing_address?: string | null
           name: string
@@ -7239,6 +7203,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          default_lead_process_id?: string | null
           id?: string
           mailing_address?: string | null
           name?: string
@@ -7260,7 +7225,15 @@ export type Database = {
           website?: string | null
           workspace_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_default_lead_process_id_fkey"
+            columns: ["default_lead_process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -7816,6 +7789,14 @@ export type Database = {
       add_process_stage_to_pipeline: {
         Args: { p_process_id: string; p_stage_name: string }
         Returns: string
+      }
+      advance_lead_pipeline_stage: {
+        Args: {
+          p_client_id: string
+          p_process_id: string
+          p_process_stage_id: string
+        }
+        Returns: undefined
       }
       advance_ready_automation_step: {
         Args: { p_pending_step_id: string }
@@ -8671,6 +8652,7 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string | null
+          default_lead_process_id: string | null
           id: string
           mailing_address: string | null
           name: string

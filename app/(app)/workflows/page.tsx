@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkflowList, type WorkflowRow } from "@/components/workflows/WorkflowList";
-import type { PipelineOption, LeadStageOption } from "@/components/workflows/TriggerFields";
+import type { PipelineOption } from "@/components/workflows/TriggerFields";
 
 export const dynamic = "force-dynamic";
 
@@ -13,24 +13,22 @@ export default async function WorkflowsPage() {
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: leadStagesRaw }] =
-    await Promise.all([
-      supabase
-        .from("automations")
-        .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, created_at, automation_steps(id), automation_runs(id)")
-        .eq("workspace_id", workspace.id)
-        .order("created_at", { ascending: false }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
-      supabase.from("organizer_templates").select("id, name").or(orFilter).eq("status", "published").order("name"),
-      supabase.from("services").select("id, name").or(orFilter).eq("status", "published").order("name"),
-      supabase
-        .from("processes")
-        .select("id, name, process_stages(id, name, display_order)")
-        .or(orFilter)
-        .eq("status", "published")
-        .order("name"),
-      supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
-    ]);
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }] = await Promise.all([
+    supabase
+      .from("automations")
+      .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, created_at, automation_steps(id), automation_runs(id)")
+      .eq("workspace_id", workspace.id)
+      .order("created_at", { ascending: false }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
+    supabase.from("organizer_templates").select("id, name").or(orFilter).eq("status", "published").order("name"),
+    supabase.from("services").select("id, name").or(orFilter).eq("status", "published").order("name"),
+    supabase
+      .from("processes")
+      .select("id, name, process_stages(id, name, display_order)")
+      .or(orFilter)
+      .eq("status", "published")
+      .order("name"),
+  ]);
 
   const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
     id: a.id,
@@ -53,8 +51,6 @@ export default async function WorkflowsPage() {
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
-  const leadStages: LeadStageOption[] = leadStagesRaw ?? [];
-
   return (
     <>
       <PageHeader
@@ -69,7 +65,6 @@ export default async function WorkflowsPage() {
           organizerTemplates={organizerTemplates ?? []}
           services={services ?? []}
           pipelines={pipelines}
-          leadStages={leadStages}
         />
       </div>
     </>

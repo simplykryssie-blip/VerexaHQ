@@ -5,14 +5,22 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
-export function LeadStageControl({
+/** Moves a lead through the workspace's default pipeline (real Pipelines,
+ * not the old flat lead_stages list). Forward-only, same semantics as the
+ * "Move the lead to a pipeline stage" automation action -- selecting a
+ * stage starts the pipeline run if none exists yet. */
+export function LeadPipelineStageControl({
   clientId,
   lifecycleStatus,
+  processId,
   stages,
+  currentProcessStageId,
 }: {
   clientId: string;
   lifecycleStatus: string;
-  stages: { key: string; label: string }[];
+  processId: string | null;
+  stages: { id: string; name: string }[];
+  currentProcessStageId: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -20,17 +28,20 @@ export function LeadStageControl({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isOnPipeline = stages.some((s) => s.key === lifecycleStatus);
-  if (!isOnPipeline) return null;
+  if (lifecycleStatus !== "lead" || !processId || stages.length === 0) return null;
 
-  async function move(stageKey: string) {
-    if (!stageKey || stageKey === lifecycleStatus) return;
+  async function move(stageId: string) {
+    if (!stageId || stageId === currentProcessStageId) return;
     setSaving(true);
     setError(null);
-    const { error: updateError } = await supabase.from("clients").update({ lifecycle_status: stageKey }).eq("id", clientId);
+    const { error: rpcError } = await supabase.rpc("advance_lead_pipeline_stage", {
+      p_client_id: clientId,
+      p_process_id: processId as string,
+      p_process_stage_id: stageId,
+    });
     setSaving(false);
-    if (updateError) {
-      setError(updateError.message);
+    if (rpcError) {
+      setError(rpcError.message);
       return;
     }
     toast.show("Stage updated", "success");
@@ -40,14 +51,17 @@ export function LeadStageControl({
   return (
     <div className="flex items-center gap-1.5">
       <select
-        value={lifecycleStatus}
+        value={currentProcessStageId ?? ""}
         onChange={(e) => move(e.target.value)}
         disabled={saving}
         className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-slate focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
       >
+        <option value="" disabled>
+          Not started
+        </option>
         {stages.map((s) => (
-          <option key={s.key} value={s.key}>
-            {s.label}
+          <option key={s.id} value={s.id}>
+            {s.name}
           </option>
         ))}
       </select>

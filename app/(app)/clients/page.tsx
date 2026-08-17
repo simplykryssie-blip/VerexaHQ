@@ -106,23 +106,50 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
 
   const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
   const supabase = createClient();
+  const isLeadsTab = tab === "leads";
 
-  // lead_stages.key doubles as a valid clients.lifecycle_status value
-  // (enforced by validate_client_lifecycle_status) -- a lead's status is
-  // literally whichever stage it's on, plus the terminal 'lost' outcome.
-  const { data: leadStagesRaw } =
-    tab === "leads"
-      ? await supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order")
-      : { data: [] as { key: string; label: string }[] };
-  const leadStages = leadStagesRaw ?? [];
-  const stageLabelByKey = new Map(leadStages.map((s) => [s.key, s.label]));
+  // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
+  // -- the same system "Move the lead to a pipeline stage" and "A lead enters
+  // a pipeline stage" already use -- rather than the old flat, uncustomizable
+  // lead_stages list. Which pipeline is "the" one for new leads is a
+  // workspace setting (Pipelines page), so with none set the Leads tab just
+  // shows All/Lost.
+  let stageFilters: { value: string; label: string }[] = [];
+  let defaultLeadProcessId: string | null = null;
+  if (isLeadsTab) {
+    const { data: workspaceRow } = await supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle();
+    defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
+    if (defaultLeadProcessId) {
+      const { data: stages } = await supabase
+        .from("process_stages")
+        .select("id, name")
+        .eq("process_id", defaultLeadProcessId)
+        .order("display_order");
+      stageFilters = (stages ?? []).map((s) => ({ value: s.id, label: s.name }));
+    }
+  }
 
-  const lifecycleScope = tab === "leads" ? [...leadStages.map((s) => s.key), "lost"] : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters =
-    tab === "leads"
-      ? [{ value: "", label: "All" }, ...leadStages.map((s) => ({ value: s.key, label: s.label })), { value: "lost", label: "Lost" }]
-      : CLIENT_STATUS_FILTERS;
-  const status = searchParams.status && lifecycleScope.includes(searchParams.status) ? searchParams.status : "";
+  const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
+  const statusFilters = isLeadsTab
+    ? [{ value: "", label: "All" }, ...stageFilters, { value: "lost", label: "Lost" }]
+    : CLIENT_STATUS_FILTERS;
+  const isStageFilter = isLeadsTab && !!searchParams.status && searchParams.status !== "lost" && stageFilters.some((f) => f.value === searchParams.status);
+  const status = searchParams.status && (isStageFilter || statusFilters.some((f) => f.value === searchParams.status)) ? searchParams.status : "";
+
+  // A stage filter isn't a lifecycle_status -- resolve which clients are
+  // currently sitting on that pipeline stage first, then filter by id.
+  let stageClientIds: string[] | null = null;
+  if (isStageFilter) {
+    const { data: activeStages } = await supabase
+      .from("lead_pipeline_stages")
+      .select("lead_pipeline_run_id")
+      .eq("process_stage_id", status)
+      .eq("status", "In Progress");
+    const runIds = (activeStages ?? []).map((s) => s.lead_pipeline_run_id);
+    const { data: runs } =
+      runIds.length > 0 ? await supabase.from("lead_pipeline_runs").select("client_id").in("id", runIds) : { data: [] as { client_id: string }[] };
+    stageClientIds = (runs ?? []).map((r) => r.client_id);
+  }
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -137,9 +164,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     })
     .eq("workspace_id", workspace.id)
     .is("merged_into_client_id", null)
-    .in("lifecycle_status", status ? [status] : lifecycleScope)
     .order("created_at", { ascending: false })
     .range(from, to);
+  if (isStageFilter) {
+    clientsQuery = clientsQuery.eq("lifecycle_status", "lead").in("id", stageClientIds && stageClientIds.length > 0 ? stageClientIds : ["-"]);
+  } else {
+    clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
+  }
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
   const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
@@ -155,14 +186,22 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   ]);
 
   const clientIds = (clients ?? []).map((c) => c.id);
-  const { data: interests } =
+  const [{ data: interests }, { data: activeRuns }] = await Promise.all([
     clientIds.length > 0
-      ? await supabase
+      ? supabase
           .from("client_service_interests")
           .select("client_id, created_at, service_categories(name), services(name)")
           .in("client_id", clientIds)
           .order("created_at", { ascending: false })
-      : { data: [] as never[] };
+      : Promise.resolve({ data: [] as never[] }),
+    isLeadsTab && clientIds.length > 0
+      ? supabase
+          .from("lead_pipeline_runs")
+          .select("client_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(stage_name)")
+          .in("client_id", clientIds)
+          .eq("status", "Active")
+      : Promise.resolve({ data: [] as { client_id: string; lead_pipeline_stages: { stage_name: string } | null }[] }),
+  ]);
 
   const latestInterestByClient = new Map<string, string>();
   for (const interest of interests ?? []) {
@@ -172,10 +211,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     const label = [categoryName, serviceName].filter(Boolean).join(" -- ");
     if (label) latestInterestByClient.set(interest.client_id, label);
   }
+  const stageNameByClient = new Map<string, string>();
+  for (const run of activeRuns ?? []) {
+    const stageName = (run.lead_pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
+    if (stageName) stageNameByClient.set(run.client_id, stageName);
+  }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     requestedService: latestInterestByClient.get(c.id) ?? null,
-    stageLabel: stageLabelByKey.get(c.lifecycle_status) ?? null,
+    stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
   }));
 
   const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""]
@@ -209,6 +253,16 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             </Link>
           ))}
         </nav>
+
+        {isLeadsTab && !defaultLeadProcessId && (
+          <p className="mb-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+            No pipeline is set for new leads yet --{" "}
+            <Link href="/pipelines" className="font-medium text-accent hover:underline">
+              pick one in Pipelines
+            </Link>{" "}
+            to track leads through stages here.
+          </p>
+        )}
 
         <div className="mb-2 flex flex-wrap gap-2">
           {statusFilters.map((f) => (

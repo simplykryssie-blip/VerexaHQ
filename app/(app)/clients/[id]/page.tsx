@@ -43,7 +43,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: documentFolders },
     { data: staffMembers },
     { data: appointments },
-    { data: leadStages },
+    { data: workspaceRow },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -118,10 +118,29 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .gte("start_at", new Date().toISOString())
       .order("start_at", { ascending: true })
       .limit(5),
-    supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
+    supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle(),
   ]);
 
   const { data: workspaceTags } = await supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id });
+
+  const defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
+  const [{ data: leadPipelineStages }, { data: activeLeadRun }] = await Promise.all([
+    defaultLeadProcessId
+      ? supabase.from("process_stages").select("id, name").eq("process_id", defaultLeadProcessId).order("display_order")
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    supabase
+      .from("lead_pipeline_runs")
+      .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
+      .eq("client_id", client.id)
+      .eq("status", "Active")
+      .maybeSingle(),
+  ]);
+  const leadPipeline = {
+    processId: defaultLeadProcessId,
+    stages: leadPipelineStages ?? [],
+    currentProcessStageId:
+      (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
+  };
 
   const { data: ownerRow } = await supabase
     .from("workspace_users")
@@ -405,7 +424,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       staffOptions={staffOptions}
       accountHolder={accountHolder}
       requestedService={requestedService}
-      leadStages={leadStages ?? []}
+      leadPipeline={leadPipeline}
     />
   );
 }
