@@ -2656,7 +2656,7 @@ export type Database = {
           signer_email: string
           signer_name: string
           signer_phone: string | null
-          typed_name: string
+          typed_name: string | null
           workspace_id: string
         }
         Insert: {
@@ -2672,7 +2672,7 @@ export type Database = {
           signer_email: string
           signer_name: string
           signer_phone?: string | null
-          typed_name: string
+          typed_name?: string | null
           workspace_id: string
         }
         Update: {
@@ -2688,7 +2688,7 @@ export type Database = {
           signer_email?: string
           signer_name?: string
           signer_phone?: string | null
-          typed_name?: string
+          typed_name?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -4747,6 +4747,61 @@ export type Database = {
           },
           {
             foreignKeyName: "pending_engagement_letter_sends_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_portal_invites: {
+        Row: {
+          client_id: string
+          client_portal_user_id: string
+          created_at: string
+          error: string | null
+          id: string
+          processed_at: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          client_portal_user_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          client_portal_user_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_portal_invites_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_portal_invites_client_portal_user_id_fkey"
+            columns: ["client_portal_user_id"]
+            isOneToOne: false
+            referencedRelation: "client_portal_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_portal_invites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

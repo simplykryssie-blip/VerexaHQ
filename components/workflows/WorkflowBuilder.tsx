@@ -30,6 +30,7 @@ import {
   MessageCircle,
   PlayCircle,
   StopCircle,
+  LogIn,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -94,6 +95,7 @@ const ACTION_TYPES = [
   { value: "send_quote", label: "Send the draft quote" },
   { value: "add_tag", label: "Add a tag to the client" },
   { value: "remove_tag", label: "Remove a tag from the client" },
+  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)" },
   { value: "add_note", label: "Add an internal note" },
   { value: "send_portal_message", label: "Send a portal message" },
   { value: "start_workflow", label: "Start another workflow" },
@@ -129,6 +131,7 @@ function actionIcon(type: string) {
   if (type === "create_quote") return <DollarSign size={15} />;
   if (type === "send_quote") return <Send size={15} />;
   if (type === "add_tag" || type === "remove_tag") return <Tag size={15} />;
+  if (type === "invite_to_portal") return <LogIn size={15} />;
   if (type === "add_note") return <StickyNote size={15} />;
   if (type === "send_portal_message") return <MessageCircle size={15} />;
   if (type === "start_workflow") return <PlayCircle size={15} />;
