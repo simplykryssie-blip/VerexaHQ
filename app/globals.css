@@ -74,3 +74,48 @@ body {
   text-transform: uppercase;
   color: #64748b;
 }
+
+/* Fee/pricing tables (@tiptap/extension-table) -- same Tailwind-preflight
+   gap as lists/headings above: no border, spacing, or cell padding without
+   this. */
+.prose :where(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+.prose :where(th),
+.prose :where(td) {
+  border: 1px solid #cbd5e1;
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+}
+.prose :where(th) {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.prose :where(th > p),
+.prose :where(td > p) {
+  margin: 0;
+}
+
+/* Document checklists (@tiptap/extension-task-list) -- real checkbox items,
+   distinct from a plain bullet list. */
+.prose :where(ul[data-type="taskList"]) {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.75em 0;
+}
+.prose :where(ul[data-type="taskList"] li) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin: 0.35em 0;
+}
+.prose :where(ul[data-type="taskList"] li > label) {
+  flex: 0 0 auto;
+  margin-top: 0.2em;
+}
+.prose :where(ul[data-type="taskList"] li > div) {
+  flex: 1 1 auto;
+}

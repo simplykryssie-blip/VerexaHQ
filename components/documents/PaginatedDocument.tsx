@@ -20,7 +20,10 @@ export function PaginatedDocument({ html, footer }: { html: string; footer?: Rea
     <div>
       <div className="mx-auto w-full max-w-[816px] overflow-hidden rounded-sm bg-white shadow-lg ring-1 ring-border/60">
         <div className="min-h-[1056px]">
-          <RichTextEditor content={pages[index]} editable={false} documentStyle bare />
+          {/* allowPageBreak registers the table/checklist extensions too (needed to
+              correctly parse that markup within a page), even though a single
+              already-split page never itself contains a page-break marker. */}
+          <RichTextEditor content={pages[index]} editable={false} documentStyle allowPageBreak bare />
         </div>
       </div>
 

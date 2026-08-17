@@ -13,6 +13,9 @@ function htmlToParagraphs(html: string): string[] {
     // <div data-page-break>; must be swapped out before the generic
     // </div> -> blank-line rule below would otherwise eat it silently.
     .replace(PAGE_BREAK_HTML_RE, `\n\n${PAGE_BREAK_SENTINEL}\n\n`)
+    // Table cells have no block-level separator of their own -- without this,
+    // adjacent cells in a row would run together with no space between them.
+    .replace(/<\/(td|th)>/gi, " | ")
     .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, "\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<li[^>]*>/gi, "• ");

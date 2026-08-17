@@ -3,7 +3,13 @@
 import { useEffect } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Bold, Italic, List, ListOrdered, Heading2, SeparatorHorizontal } from "lucide-react";
+import { Table } from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableCell from "@tiptap/extension-table-cell";
+import TableHeader from "@tiptap/extension-table-header";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
+import { Bold, Italic, List, ListOrdered, Heading2, SeparatorHorizontal, Table2, ListChecks, Trash2 } from "lucide-react";
 import { PageBreak } from "@/lib/tiptap/pageBreak";
 
 function ToolbarButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
@@ -40,9 +46,31 @@ function Toolbar({ editor, extra, rounded, allowPageBreak }: { editor: Editor; e
           <ListOrdered size={14} />
         </ToolbarButton>
         {allowPageBreak && (
-          <ToolbarButton active={false} onClick={() => editor.chain().focus().setPageBreak().run()} label="Insert page break">
-            <SeparatorHorizontal size={14} />
-          </ToolbarButton>
+          <>
+            <ToolbarButton active={false} onClick={() => editor.chain().focus().setPageBreak().run()} label="Insert page break">
+              <SeparatorHorizontal size={14} />
+            </ToolbarButton>
+            <ToolbarButton
+              active={editor.isActive("taskList")}
+              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              label="Insert checklist"
+            >
+              <ListChecks size={14} />
+            </ToolbarButton>
+            {editor.isActive("table") ? (
+              <ToolbarButton active={false} onClick={() => editor.chain().focus().deleteTable().run()} label="Remove table">
+                <Trash2 size={14} />
+              </ToolbarButton>
+            ) : (
+              <ToolbarButton
+                active={false}
+                onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+                label="Insert table"
+              >
+                <Table2 size={14} />
+              </ToolbarButton>
+            )}
+          </>
         )}
       </div>
       {extra}
@@ -78,7 +106,9 @@ export function RichTextEditor({
   toolbarExtra?: React.ReactNode;
 }) {
   const editor = useEditor({
-    extensions: allowPageBreak ? [StarterKit, PageBreak] : [StarterKit],
+    extensions: allowPageBreak
+      ? [StarterKit, PageBreak, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, TaskList, TaskItem.configure({ nested: true })]
+      : [StarterKit],
     content,
     editable,
     immediatelyRender: false,
