@@ -121,6 +121,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
   ]);
 
+  const { data: workspaceTags } = await supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id });
+
   const { data: ownerRow } = await supabase
     .from("workspace_users")
     .select("user_id, user_profiles(id, display_name)")
@@ -361,6 +363,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       addresses={addresses ?? []}
       emails={emails ?? []}
       phones={phones ?? []}
+      workspaceTags={workspaceTags ?? []}
       relationships={relationships ?? []}
       portalUsers={portalUsers ?? []}
       engagements={engagements ?? []}

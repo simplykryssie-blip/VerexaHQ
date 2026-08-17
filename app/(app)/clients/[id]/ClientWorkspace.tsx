@@ -88,6 +88,7 @@ export function ClientWorkspace({
   addresses,
   emails,
   phones,
+  workspaceTags,
   relationships,
   portalUsers,
   engagements,
@@ -128,6 +129,7 @@ export function ClientWorkspace({
   addresses: AddressRow[];
   emails: EmailRow[];
   phones: PhoneRow[];
+  workspaceTags: string[];
   relationships: RelationshipRow[];
   portalUsers: PortalUserRow[];
   engagements: EngagementRow[];
@@ -255,6 +257,7 @@ export function ClientWorkspace({
                 addresses={addresses}
                 emails={emails}
                 phones={phones}
+                workspaceTags={workspaceTags}
                 portalUsers={portalUsers}
                 relationships={relationships}
                 staffOptions={staffOptions}

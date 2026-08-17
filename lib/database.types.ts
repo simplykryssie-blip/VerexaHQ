@@ -8052,6 +8052,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      get_workspace_tags: {
+        Args: { p_workspace_id: string }
+        Returns: string[]
+      }
       has_completed_portal_basic_info: { Args: never; Returns: boolean }
       has_config_object_share_access: {
         Args: { p_id: string; p_table: string }

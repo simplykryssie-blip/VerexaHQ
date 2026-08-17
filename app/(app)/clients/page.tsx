@@ -52,6 +52,7 @@ type ClientRow = {
   primary_email: string | null;
   primary_phone: string | null;
   lifecycle_status: string;
+  tags: string[] | null;
   requestedService?: string | null;
   stageLabel?: string | null;
 };
@@ -81,9 +82,25 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
       </Badge>
     ),
   },
+  {
+    key: "tags",
+    header: "Tags",
+    render: (c) =>
+      c.tags && c.tags.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {c.tags.map((t) => (
+            <span key={t} className="inline-block rounded-full bg-accentSoft px-2 py-0.5 text-xs font-medium text-accent">
+              {t}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-muted">--</span>
+      ),
+  },
 ];
 
-export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string } }) {
+export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string; tag?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -111,9 +128,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const clientsQuery = supabase
+  const tag = searchParams.tag?.trim() || "";
+
+  let clientsQuery = supabase
     .from("clients")
-    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", {
+    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status, tags", {
       count: "exact",
     })
     .eq("workspace_id", workspace.id)
@@ -121,8 +140,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .in("lifecycle_status", status ? [status] : lifecycleScope)
     .order("created_at", { ascending: false })
     .range(from, to);
+  if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
-  const [{ data: clients, count }, { data: services }, { data: canCreate }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
     clientsQuery,
     supabase
       .from("services")
@@ -131,6 +151,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       .eq("status", "published")
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
   ]);
 
   const clientIds = (clients ?? []).map((c) => c.id);
@@ -157,7 +178,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     stageLabel: stageLabelByKey.get(c.lifecycle_status) ?? null,
   }));
 
-  const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : ""].filter(Boolean).join("&");
+  const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""]
+    .filter(Boolean)
+    .join("&");
+  const statusQuery = tag ? `&tag=${encodeURIComponent(tag)}` : "";
+  const tagQueryBase = `/clients?tab=${tab}${status ? `&status=${status}` : ""}`;
 
   return (
     <>
@@ -185,11 +210,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           ))}
         </nav>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-2 flex flex-wrap gap-2">
           {statusFilters.map((f) => (
             <Link
               key={f.value}
-              href={f.value ? `/clients?tab=${tab}&status=${f.value}` : `/clients?tab=${tab}`}
+              href={f.value ? `/clients?tab=${tab}&status=${f.value}${statusQuery}` : `/clients?tab=${tab}${statusQuery}`}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
               }`}
@@ -198,6 +223,31 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             </Link>
           ))}
         </div>
+
+        {(workspaceTags ?? []).length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">Tag:</span>
+            <Link
+              href={tagQueryBase}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                !tag ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+              }`}
+            >
+              All
+            </Link>
+            {(workspaceTags ?? []).map((t) => (
+              <Link
+                key={t}
+                href={`${tagQueryBase}&tag=${encodeURIComponent(t)}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  tag === t ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+                }`}
+              >
+                {t}
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <DataTable
             columns={CLIENT_COLUMNS}

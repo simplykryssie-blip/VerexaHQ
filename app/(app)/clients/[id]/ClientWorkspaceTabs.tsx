@@ -43,6 +43,7 @@ import {
   SetAddressPrimaryButton,
 } from "./ContactChannelForms";
 import { EditClientProfileForm } from "./EditClientProfileForm";
+import { TagsEditor } from "./TagsEditor";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 function Section({
@@ -94,6 +95,7 @@ export function OverviewTab({
   addresses,
   emails,
   phones,
+  workspaceTags,
   portalUsers,
   relationships,
   staffOptions,
@@ -125,6 +127,7 @@ export function OverviewTab({
     ein_last4: string | null;
     itin_last4: string | null;
     date_of_birth: string | null;
+    tags: string[];
     relationship_manager: ClientHeaderInfo["relationship_manager"];
     default_reviewer: ClientHeaderInfo["default_reviewer"];
     default_compliance_officer: ClientHeaderInfo["default_compliance_officer"];
@@ -136,6 +139,7 @@ export function OverviewTab({
   addresses: AddressRow[];
   emails: EmailRow[];
   phones: PhoneRow[];
+  workspaceTags: string[];
   portalUsers: PortalUserRow[];
   relationships: RelationshipRow[];
   staffOptions: StaffOption[];
@@ -282,6 +286,11 @@ export function OverviewTab({
               </ul>
             )}
           </div>
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Tags</h3>
+          <TagsEditor clientId={client.id} workspaceId={workspaceId} tags={client.tags ?? []} suggestions={workspaceTags} />
         </div>
 
         {showStaffRoles && (
