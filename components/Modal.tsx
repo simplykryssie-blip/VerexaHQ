@@ -25,7 +25,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/30 px-4 py-8"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8"
       onClick={(e) => {
         if (!contentRef.current?.contains(e.target as Node)) onClose();
       }}

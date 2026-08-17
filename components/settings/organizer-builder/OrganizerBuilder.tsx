@@ -153,7 +153,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
         <Link href="/templates?tab=organizers" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
           <ArrowLeft size={14} /> Organizer templates

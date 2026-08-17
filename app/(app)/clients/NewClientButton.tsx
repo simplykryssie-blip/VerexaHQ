@@ -427,7 +427,7 @@ export function NewClientButton({
       </Button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/30 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
           <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg">
             <h2 className="text-base font-semibold text-ink">New client</h2>
 
