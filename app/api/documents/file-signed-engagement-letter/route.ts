@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
+import { fetchImageBytes } from "@/lib/documents/fetchImageBytes";
 
 // Called right after a public engagement-letter signature succeeds
 // (components/sign/PublicEngagementLetterSign.tsx and the anonymous public
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
   const { data: signature } = await supabase
     .from("engagement_letter_public_signatures")
     .select(
-      "id, workspace_id, client_id, resolved_body_html, filed_as_attachment, signature_type, signature_image_path, typed_name, signer_name, signed_at, engagement_letter_templates(name)"
+      "id, workspace_id, client_id, resolved_body_html, filed_as_attachment, signature_type, signature_image_path, typed_name, signer_name, signed_at, engagement_letter_templates(name, banner_image_url)"
     )
     .eq("id", signatureId)
     .maybeSingle();
@@ -50,12 +51,15 @@ export async function POST(request: Request) {
     if (imageBlob) signatureImageBytes = new Uint8Array(await imageBlob.arrayBuffer());
   }
 
-  const templateName = (signature.engagement_letter_templates as unknown as { name?: string } | null)?.name ?? "Engagement Letter";
+  const templateInfo = signature.engagement_letter_templates as unknown as { name?: string; banner_image_url?: string | null } | null;
+  const templateName = templateInfo?.name ?? "Engagement Letter";
+  const bannerImageBytes = await fetchImageBytes(templateInfo?.banner_image_url);
   const pdfBytes = await renderLetterPdf(
     templateName,
     signature.resolved_body_html,
     signature.typed_name ?? signature.signer_name,
-    signatureImageBytes ? { signatureImageBytes, typedName: signature.typed_name ?? "", signedAtLabel: signedAt } : undefined
+    signatureImageBytes ? { signatureImageBytes, typedName: signature.typed_name ?? "", signedAtLabel: signedAt } : undefined,
+    bannerImageBytes ?? undefined
   );
 
   const fileName = `${templateName} (signed).pdf`;

@@ -48,9 +48,13 @@ export async function renderLetterPdf(
   title: string,
   bodyHtml: string,
   signerLabel: string,
-  signedBy?: { signatureImageBytes: Uint8Array; typedName: string; signedAtLabel: string }
+  signedBy?: { signatureImageBytes: Uint8Array; typedName: string; signedAtLabel: string },
+  bannerImageBytes?: Uint8Array
 ): Promise<Uint8Array> {
   const pdf = await TextPdf.create();
+  if (bannerImageBytes) {
+    await pdf.headerImage(bannerImageBytes);
+  }
   pdf.heading(title);
   for (const paragraph of htmlToParagraphs(bodyHtml)) {
     if (paragraph === PAGE_BREAK_SENTINEL) {

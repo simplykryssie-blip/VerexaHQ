@@ -2717,6 +2717,7 @@ export type Database = {
       }
       engagement_letter_templates: {
         Row: {
+          banner_image_url: string | null
           body_html: string
           created_at: string
           created_by: string | null
@@ -2733,6 +2734,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          banner_image_url?: string | null
           body_html?: string
           created_at?: string
           created_by?: string | null
@@ -2749,6 +2751,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          banner_image_url?: string | null
           body_html?: string
           created_at?: string
           created_by?: string | null

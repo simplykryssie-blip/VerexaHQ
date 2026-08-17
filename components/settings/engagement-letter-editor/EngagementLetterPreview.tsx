@@ -13,7 +13,15 @@ import { interpolateSample } from "@/lib/mergeFields";
  * sanitizer is needed. The signature box below is the actual SignaturePad a
  * client signs with on the real link -- fully interactive so staff can check
  * it looks right, but "Confirm signature" doesn't submit anything here. */
-export function EngagementLetterPreview({ bodyHtml, requiresSignature }: { bodyHtml: string; requiresSignature: boolean }) {
+export function EngagementLetterPreview({
+  bodyHtml,
+  requiresSignature,
+  bannerImageUrl,
+}: {
+  bodyHtml: string;
+  requiresSignature: boolean;
+  bannerImageUrl?: string | null;
+}) {
   const toast = useToast();
   const interpolated = interpolateSample(bodyHtml);
   const [typedName, setTypedName] = useState("Jordan Client");
@@ -29,6 +37,7 @@ export function EngagementLetterPreview({ bodyHtml, requiresSignature }: { bodyH
       <div className="mt-4">
         <PaginatedDocument
           html={interpolated}
+          bannerImageUrl={bannerImageUrl}
           footer={
             requiresSignature ? (
               <div className="mt-4 rounded-xl border border-border bg-surface p-4">

@@ -54,7 +54,7 @@ async function sendOne(
 ): Promise<"sent" | "failed"> {
   try {
     const [{ data: template }, { data: workspace }, { data: client }] = await Promise.all([
-      supabase.from("engagement_letter_templates").select("id, name, body_html").eq("id", job.engagement_letter_template_id).single(),
+      supabase.from("engagement_letter_templates").select("id, name, body_html, banner_image_url").eq("id", job.engagement_letter_template_id).single(),
       supabase.from("workspaces").select("name").eq("id", job.workspace_id).single(),
       supabase.from("clients").select("first_name, last_name, business_name, primary_email").eq("id", job.client_id).single(),
     ]);

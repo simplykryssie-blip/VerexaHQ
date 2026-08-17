@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import { EngagementLetterPreview } from "./EngagementLetterPreview";
 import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
 import { extractMergeFieldTokens } from "@/lib/mergeFields";
@@ -25,6 +26,7 @@ export type EngagementLetterTemplateRow = {
   public_token: string;
   is_public: boolean;
   requires_portal_signup: boolean;
+  banner_image_url: string | null;
 };
 
 export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
@@ -35,6 +37,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
   const [name, setName] = useState(template.name);
   const [bodyHtml, setBodyHtml] = useState(template.body_html);
   const [requiresSignature, setRequiresSignature] = useState(template.requires_signature);
+  const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
   const [view, setView] = useState<"edit" | "preview">("edit");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -51,6 +54,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
         body_html: bodyHtml,
         requires_signature: requiresSignature,
         merge_fields: usedTokens,
+        banner_image_url: bannerImageUrl,
       })
       .eq("id", template.id);
     setSaving(false);
@@ -115,7 +119,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
 
       <div className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
         {view === "preview" ? (
-          <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} />
+          <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} />
         ) : (
           <div className="mx-auto max-w-[720px] space-y-4">
             <div className="rounded-xl border border-border bg-surface p-4">
@@ -145,9 +149,27 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
                 />
                 Requires client signature
               </label>
+
+              <div className="mt-4 border-t border-border pt-3">
+                <BannerImageUpload
+                  workspaceId={template.workspace_id ?? ""}
+                  value={bannerImageUrl}
+                  disabled={readOnly}
+                  onChange={(url) => {
+                    setBannerImageUrl(url);
+                    setDirty(true);
+                  }}
+                />
+              </div>
             </div>
 
             <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
+            {bannerImageUrl && (
+              <div className="mx-auto max-w-[720px] overflow-hidden rounded-t-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+              </div>
+            )}
             <RichTextEditor
               content={bodyHtml}
               editable={!readOnly}

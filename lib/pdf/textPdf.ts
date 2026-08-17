@@ -69,6 +69,28 @@ export class TextPdf {
     }
   }
 
+  // Draws a letterhead banner across the top of the current page (only
+  // meaningful right after create(), before anything else is drawn) and
+  // pushes the cursor below it. Staff-uploaded images could be PNG or JPEG,
+  // so PNG is tried first and JPEG is the fallback rather than requiring a
+  // specific format.
+  async headerImage(bytes: Uint8Array, maxHeight = 90) {
+    let image;
+    try {
+      image = await this.pdfDoc.embedPng(bytes);
+    } catch {
+      image = await this.pdfDoc.embedJpg(bytes);
+    }
+    const maxWidth = CONTENT_WIDTH;
+    const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+    const width = image.width * scale;
+    const height = image.height * scale;
+
+    this.ensureSpace(height + 16);
+    this.page.drawImage(image, { x: MARGIN, y: this.y - height, width, height });
+    this.y -= height + 16;
+  }
+
   heading(text: string, size = 18) {
     this.ensureSpace(size + 2);
     this.page.drawText(sanitizeForPdf(text), { x: MARGIN, y: this.y - size, size, font: this.fontBold, color: rgb(0.1, 0.1, 0.1) });

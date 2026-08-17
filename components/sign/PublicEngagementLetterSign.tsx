@@ -9,7 +9,7 @@ import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 
 type TemplateData = {
-  template: { id: string; name: string; body_html: string; requires_signature: boolean };
+  template: { id: string; name: string; body_html: string; requires_signature: boolean; banner_image_url: string | null };
   workspace_name: string;
   firm_name: string | null;
   firm_address: string | null;
@@ -268,6 +268,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       {step === "review" && (
         <PaginatedDocument
           html={preview}
+          bannerImageUrl={template.banner_image_url}
           footer={
             <div className="mt-4 rounded-xl border border-border bg-surface p-4">
               <p className="mb-3 text-xs text-muted">You&apos;ve reached the end of the letter -- sign below to confirm.</p>
