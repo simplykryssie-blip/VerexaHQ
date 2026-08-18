@@ -7691,6 +7691,15 @@ export type Database = {
         Args: { p_client_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      _notify_admins_of_organizer_submitted: {
+        Args: {
+          p_client_id: string
+          p_organizer_template_id: string
+          p_response_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       _notify_admins_of_pending_client_change: {
         Args: {
           p_batch_id: string
