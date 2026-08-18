@@ -9,11 +9,11 @@ import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
 import { useToast } from "@/components/Toast";
-import { caseTypeFromCategorySlug } from "@/lib/caseType";
 
 const DRAFT_KEY = "new-client-button";
 
-type ServiceOption = { id: string; name: string; service_categories?: { slug: string } | null };
+type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
+type ServiceOption = { id: string; name: string };
 
 type Draft = {
   clientType: "individual" | "business";
@@ -30,7 +30,7 @@ type Draft = {
   city: string;
   state: string;
   zip: string;
-  serviceIds: string[];
+  selectedServiceIds: string[];
   ssn: string;
   itin: string;
   ein: string;
@@ -66,11 +66,11 @@ function formatEin(value: string) {
 export function NewClientButton({
   workspaceId,
   workspaceName,
-  services,
+  serviceCategories,
 }: {
   workspaceId: string;
   workspaceName: string;
-  services: ServiceOption[];
+  serviceCategories: ServiceCategory[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,7 +95,7 @@ export function NewClientButton({
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
-  const [serviceIds, setServiceIds] = useState<string[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [ssn, setSsn] = useState("");
   const [itin, setItin] = useState("");
   const [ein, setEin] = useState("");
@@ -137,7 +137,7 @@ export function NewClientButton({
     setCity(draft.city);
     setState(draft.state);
     setZip(draft.zip);
-    setServiceIds(draft.serviceIds);
+    setSelectedServiceIds(draft.selectedServiceIds);
     setSsn(draft.ssn);
     setItin(draft.itin);
     setEin(draft.ein);
@@ -160,7 +160,7 @@ export function NewClientButton({
       city,
       state,
       zip,
-      serviceIds,
+      selectedServiceIds,
       ssn,
       itin,
       ein,
@@ -172,8 +172,10 @@ export function NewClientButton({
     };
   }
 
+  const serviceOptions: ServiceOption[] = serviceCategories.flatMap((c) => c.services);
+
   function toggleService(id: string) {
-    setServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+    setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -358,20 +360,22 @@ export function NewClientButton({
       }
     }
 
-    for (const serviceId of serviceIds) {
-      // Same shared create_engagement RPC NewEngagementForm.tsx uses --
-      // derives workflow_id/current_stage from the service's process so
-      // this bundled path can't fall out of sync with the standalone one.
-      const service = services.find((s) => s.id === serviceId);
-      const { error: engagementError } = await supabase.rpc("create_engagement", {
-        p_workspace_id: workspaceId,
+    // Records what they want, not a commitment yet -- this is the same
+    // client_service_interests signal the public organizer link's own
+    // "what do you need help with" step writes, so each selection fires the
+    // same automation (e.g. auto-sending the matching organizer). A lead can
+    // need more than one at once (bookkeeping + payroll, say), so this loops
+    // one call per selected service. Engagements get created later, once
+    // there's an actual scope to work from.
+    for (const serviceId of selectedServiceIds) {
+      const { error: interestError } = await supabase.rpc("record_client_service_interest", {
         p_client_id: result.client_id,
+        p_workspace_id: workspaceId,
         p_service_id: serviceId,
-        p_case_type: caseTypeFromCategorySlug(service?.service_categories?.slug),
       });
-      if (engagementError) {
+      if (interestError) {
         setLoading(false);
-        setError(engagementError.message);
+        setError(interestError.message);
         return;
       }
     }
@@ -647,27 +651,33 @@ export function NewClientButton({
               )}
 
               <div className="border-t border-border pt-4">
-                <label className="block text-xs font-medium uppercase tracking-wide text-muted">Services</label>
-                {services.length === 0 ? (
+                <label className="block text-xs font-medium uppercase tracking-wide text-muted">What do they need help with?</label>
+                {serviceOptions.length === 0 ? (
                   <p className="mt-1 text-xs text-muted">No services are set up yet -- add one under Services first.</p>
                 ) : (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {services.map((s) => (
-                      <button
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {serviceOptions.map((s) => (
+                      <label
                         key={s.id}
-                        type="button"
-                        onClick={() => toggleService(s.id)}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
-                          serviceIds.includes(s.id)
-                            ? "border-accent bg-accentSoft text-accent"
-                            : "border-border text-slate hover:bg-surfaceMuted"
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                          selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
                         }`}
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedServiceIds.includes(s.id)}
+                          onChange={() => toggleService(s.id)}
+                          className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        />
                         {s.name}
-                      </button>
+                      </label>
                     ))}
                   </div>
                 )}
+                <p className="mt-1.5 text-xs text-muted">
+                  Same choices they&apos;d see picking a service themselves -- select everything that applies. Optional, and just notes interest
+                  for now (no engagement is created yet).
+                </p>
               </div>
 
 

@@ -24,11 +24,11 @@ export type BasicInfoSnapshot = {
   mailing_city: string | null;
   mailing_state: string | null;
   mailing_zip: string | null;
-  service_category_id: string | null;
-  service_id: string | null;
+  service_ids: string[] | null;
 };
 
 type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
+type ServiceOption = { id: string; name: string };
 
 // mode "onboarding" is the one-time gate a client can't get past until it's
 // submitted (portal/basic-info): the service picker is required, and
@@ -52,8 +52,7 @@ export function BasicInfoForm({
   const isProfile = mode === "profile";
 
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(snapshot.service_category_id ?? "");
-  const [selectedServiceId, setSelectedServiceId] = useState(snapshot.service_id ?? "");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(snapshot.service_ids ?? []);
 
   useEffect(() => {
     if (isProfile) return;
@@ -63,7 +62,13 @@ export function BasicInfoForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectedCategory = serviceCategories.find((c) => c.id === selectedCategoryId) ?? null;
+  // Flat, since services are now "basic" (one per organizer) -- there's no
+  // more sub-service layer to cascade through at intake.
+  const serviceOptions: ServiceOption[] = serviceCategories.flatMap((c) => c.services);
+
+  function toggleService(id: string) {
+    setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  }
 
   const [name, setName] = useState(
     stringifyNameValue({
@@ -97,7 +102,7 @@ export function BasicInfoForm({
       setError("First and last name are required.");
       return;
     }
-    if (!isProfile && (!selectedCategoryId || !selectedServiceId)) {
+    if (!isProfile && selectedServiceIds.length === 0) {
       setError("Let us know what service you're interested in.");
       return;
     }
@@ -117,8 +122,7 @@ export function BasicInfoForm({
       p_mailing_city: addressParts.city.trim() || undefined,
       p_mailing_state: addressParts.state.trim() || undefined,
       p_mailing_zip: addressParts.zip.trim() || undefined,
-      p_service_category_id: isProfile ? undefined : selectedCategoryId,
-      p_service_id: isProfile ? undefined : selectedServiceId,
+      p_service_ids: isProfile ? undefined : selectedServiceIds,
     });
 
     setLoading(false);
@@ -171,47 +175,28 @@ export function BasicInfoForm({
       </div>
 
       {!isProfile && (
-        <>
-          <div className={styles.field}>
-            <label htmlFor="service_category">What do you need help with?</label>
-            <select
-              id="service_category"
-              required
-              value={selectedCategoryId}
-              onChange={(e) => {
-                setSelectedCategoryId(e.target.value);
-                setSelectedServiceId("");
-              }}
-              className={styles.input}
-            >
-              <option value="">Select a category...</option>
-              {serviceCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+        <div className={styles.field}>
+          <label>What do you need help with?</label>
+          <p className="text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
+          <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {serviceOptions.map((s) => (
+              <label
+                key={s.id}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                  selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedServiceIds.includes(s.id)}
+                  onChange={() => toggleService(s.id)}
+                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                />
+                {s.name}
+              </label>
+            ))}
           </div>
-
-          <div className={styles.field}>
-            <label htmlFor="service">Specifically?</label>
-            <select
-              id="service"
-              required
-              value={selectedServiceId}
-              onChange={(e) => setSelectedServiceId(e.target.value)}
-              disabled={!selectedCategory}
-              className={styles.input}
-            >
-              <option value="">{selectedCategory ? "Select a service..." : "Choose a category first"}</option>
-              {(selectedCategory?.services ?? []).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
+        </div>
       )}
 
       {error && <AuthError>{error}</AuthError>}

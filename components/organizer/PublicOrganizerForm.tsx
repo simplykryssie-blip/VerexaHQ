@@ -46,6 +46,7 @@ type TemplateData = {
 };
 
 type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
+type ServiceOption = { id: string; name: string };
 
 // Standalone from OrganizerForm.tsx on purpose: that component persists
 // progress incrementally against an already-created organizer_responses row
@@ -73,8 +74,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [selectedServiceId, setSelectedServiceId] = useState("");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -95,7 +95,14 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const selectedCategory = serviceCategories.find((c) => c.id === selectedCategoryId) ?? null;
+  // Flat, since services are now "basic" (one per organizer) -- there's no
+  // more sub-service layer to cascade through at intake; that granularity
+  // is asked inside the organizer itself once they've picked what they need.
+  const serviceOptions: ServiceOption[] = serviceCategories.flatMap((c) => c.services);
+
+  function toggleService(id: string) {
+    setSelectedServiceIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  }
 
   const visibleTopLevelFields = topLevelFields.filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
   const pages = splitIntoPages(visibleTopLevelFields);
@@ -124,7 +131,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       setError("Name and email are required.");
       return;
     }
-    if (!selectedCategoryId || !selectedServiceId) {
+    if (selectedServiceIds.length === 0) {
       setError("Let us know what you need help with.");
       return;
     }
@@ -167,8 +174,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       p_last_name: lastName,
       p_email: email.trim(),
       p_phone: phone.trim(),
-      p_service_category_id: selectedCategoryId,
-      p_service_id: selectedServiceId,
+      p_service_ids: selectedServiceIds,
       p_auth_user_id: newAuthUserId ?? undefined,
       p_middle_name: middleName || undefined,
       p_suffix: suffix || undefined,
@@ -388,39 +394,27 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                 </div>
               </>
             )}
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
-              <select
-                value={selectedCategoryId}
-                onChange={(e) => {
-                  setSelectedCategoryId(e.target.value);
-                  setSelectedServiceId("");
-                }}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              >
-                <option value="">Select a category...</option>
-                {serviceCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink">Specifically? *</label>
-              <select
-                value={selectedServiceId}
-                onChange={(e) => setSelectedServiceId(e.target.value)}
-                disabled={!selectedCategory}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-              >
-                <option value="">{selectedCategory ? "Select a service..." : "Choose a category first"}</option>
-                {(selectedCategory?.services ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
+              <p className="mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {serviceOptions.map((s) => (
+                  <label
+                    key={s.id}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                      selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedServiceIds.includes(s.id)}
+                      onChange={() => toggleService(s.id)}
+                      className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                    />
                     {s.name}
-                  </option>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
           </div>
           {requires_portal_signup && (

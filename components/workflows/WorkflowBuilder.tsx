@@ -378,15 +378,18 @@ function StepCard({
               onChange={(e) => setField("organizer_template_id", e.target.value)}
               className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             >
-              <option value="" disabled>
-                Choose an organizer template
-              </option>
+              <option value="">Auto-detect from the service selected</option>
               {organizerTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
               ))}
             </select>
+            <span className="text-[11px] text-muted">
+              Auto-detect sends whichever organizer is linked to the service that triggered this run (set per
+              service under Services) -- pick a specific template instead only if this step should always send the
+              same organizer regardless of service.
+            </span>
           </label>
         )}
 

@@ -68,6 +68,7 @@ export function triggerSummary(
   }
   if (triggerType === "client.service_interest_selected") {
     const serviceId = config.service_id as string | undefined;
+    if (!serviceId) return "When a client selects any service";
     const service = services.find((s) => s.id === serviceId);
     return `When a client selects "${service?.name ?? "a service"}"`;
   }
@@ -436,15 +437,18 @@ export function TriggerFields({
             onChange={(e) => onConfigChange({ service_id: e.target.value })}
             className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           >
-            <option value="" disabled>
-              Choose a service
-            </option>
+            <option value="">Any service</option>
             {services.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
           </select>
+          <span className="text-[11px] text-muted">
+            Leave as &quot;Any service&quot; to match every service at once -- pair with the &quot;Push an organizer&quot;
+            action left on &quot;Auto-detect&quot; to route each one to its own linked organizer without needing a
+            separate workflow per service.
+          </span>
         </label>
       )}
 

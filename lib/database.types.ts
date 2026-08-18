@@ -7826,8 +7826,7 @@ export type Database = {
           p_mailing_zip?: string
           p_middle_name?: string
           p_phone: string
-          p_service_category_id: string
-          p_service_id: string
+          p_service_ids: string[]
           p_suffix?: string
           p_token: string
         }
@@ -8390,6 +8389,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_client_service_interest: {
+        Args: {
+          p_client_id: string
+          p_service_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       record_consent: {
         Args: {
           p_client_id?: string
@@ -8754,8 +8761,7 @@ export type Database = {
           p_middle_name?: string
           p_primary_email?: string
           p_primary_phone?: string
-          p_service_category_id?: string
-          p_service_id?: string
+          p_service_ids?: string[]
           p_suffix?: string
         }
         Returns: undefined

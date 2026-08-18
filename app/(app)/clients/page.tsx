@@ -173,26 +173,39 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   }
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
-  const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
     clientsQuery,
     supabase
       .from("services")
-      .select("id, name, service_categories(slug)")
+      .select("id, name, service_category_id, service_categories(slug)")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
+      .order("display_order"),
+    supabase
+      .from("service_categories")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
     supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
   ]);
+
+  // Same category -> service grouping shape the public organizer's own
+  // "what do you need help with" contact step uses (get_public_service_options),
+  // so staff pick from the exact same choices clients see on their side.
+  const serviceCategories = (serviceCategoriesRaw ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    services: (services ?? []).filter((s) => s.service_category_id === c.id).map((s) => ({ id: s.id, name: s.name })),
+  })).filter((c) => c.services.length > 0);
 
   const clientIds = (clients ?? []).map((c) => c.id);
   const [{ data: interests }, { data: activeRuns }] = await Promise.all([
     clientIds.length > 0
       ? supabase
           .from("client_service_interests")
-          .select("client_id, created_at, service_categories(name), services(name)")
+          .select("client_id, services(name)")
           .in("client_id", clientIds)
-          .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as never[] }),
     isLeadsTab && clientIds.length > 0
       ? supabase
@@ -203,13 +216,20 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       : Promise.resolve({ data: [] as { client_id: string; lead_pipeline_stages: { stage_name: string } | null }[] }),
   ]);
 
-  const latestInterestByClient = new Map<string, string>();
+  // Services are "basic" now and a lead can select more than one at once
+  // (e.g. Bookkeeping + Payroll), so this shows every distinct one they've
+  // expressed interest in, not just whichever was recorded most recently.
+  const requestedServicesByClient = new Map<string, string[]>();
   for (const interest of interests ?? []) {
-    if (latestInterestByClient.has(interest.client_id)) continue;
-    const categoryName = (interest.service_categories as unknown as { name?: string } | null)?.name;
     const serviceName = (interest.services as unknown as { name?: string } | null)?.name;
-    const label = [categoryName, serviceName].filter(Boolean).join(" -- ");
-    if (label) latestInterestByClient.set(interest.client_id, label);
+    if (!serviceName) continue;
+    const list = requestedServicesByClient.get(interest.client_id) ?? [];
+    if (!list.includes(serviceName)) list.push(serviceName);
+    requestedServicesByClient.set(interest.client_id, list);
+  }
+  const requestedServiceLabelByClient = new Map<string, string>();
+  for (const [clientId, names] of requestedServicesByClient) {
+    requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
   const stageNameByClient = new Map<string, string>();
   for (const run of activeRuns ?? []) {
@@ -218,7 +238,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
-    requestedService: latestInterestByClient.get(c.id) ?? null,
+    requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
     stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
   }));
 
@@ -235,7 +255,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         description={tab === "leads" ? "Prospects who haven't engaged yet." : "Every client in your workspace."}
         actions={
           canCreate ? (
-            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
+            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
           ) : null
         }
       />
@@ -315,7 +335,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             }
             emptyAction={
               !status && canCreate ? (
-                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
+                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
               ) : undefined
             }
           />
