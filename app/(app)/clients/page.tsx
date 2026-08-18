@@ -6,7 +6,6 @@ import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NewClientButton } from "./NewClientButton";
-import { LEAD_STAGES } from "@/lib/clients/leadStages";
 
 export const dynamic = 'force-dynamic';
 
@@ -53,6 +52,7 @@ type ClientRow = {
   primary_email: string | null;
   primary_phone: string | null;
   lifecycle_status: string;
+  tags: string[] | null;
   requestedService?: string | null;
   stageLabel?: string | null;
 };
@@ -82,41 +82,98 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
       </Badge>
     ),
   },
+  {
+    key: "tags",
+    header: "Tags",
+    render: (c) =>
+      c.tags && c.tags.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {c.tags.map((t) => (
+            <span key={t} className="inline-block rounded-full bg-accentSoft px-2 py-0.5 text-xs font-medium text-accent">
+              {t}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-muted">--</span>
+      ),
+  },
 ];
 
-export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string } }) {
+export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string; tag?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
   const supabase = createClient();
+  const isLeadsTab = tab === "leads";
 
-  const leadStages = tab === "leads" ? LEAD_STAGES : [];
-  const stageLabelByKey = new Map(leadStages.map((s) => [s.key, s.label]));
+  // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
+  // -- the same system "Move the lead to a pipeline stage" and "A lead enters
+  // a pipeline stage" already use -- rather than the old flat, uncustomizable
+  // lead_stages list. Which pipeline is "the" one for new leads is a
+  // workspace setting (Pipelines page), so with none set the Leads tab just
+  // shows All/Lost.
+  let stageFilters: { value: string; label: string }[] = [];
+  let defaultLeadProcessId: string | null = null;
+  if (isLeadsTab) {
+    const { data: workspaceRow } = await supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle();
+    defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
+    if (defaultLeadProcessId) {
+      const { data: stages } = await supabase
+        .from("process_stages")
+        .select("id, name")
+        .eq("process_id", defaultLeadProcessId)
+        .order("display_order");
+      stageFilters = (stages ?? []).map((s) => ({ value: s.id, label: s.name }));
+    }
+  }
 
-  const lifecycleScope = tab === "leads" ? [...leadStages.map((s) => s.key), "lost"] : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters =
-    tab === "leads"
-      ? [{ value: "", label: "All" }, ...leadStages.map((s) => ({ value: s.key, label: s.label })), { value: "lost", label: "Lost" }]
-      : CLIENT_STATUS_FILTERS;
-  const status = searchParams.status && lifecycleScope.includes(searchParams.status) ? searchParams.status : "";
+  const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
+  const statusFilters = isLeadsTab
+    ? [{ value: "", label: "All" }, ...stageFilters, { value: "lost", label: "Lost" }]
+    : CLIENT_STATUS_FILTERS;
+  const isStageFilter = isLeadsTab && !!searchParams.status && searchParams.status !== "lost" && stageFilters.some((f) => f.value === searchParams.status);
+  const status = searchParams.status && (isStageFilter || statusFilters.some((f) => f.value === searchParams.status)) ? searchParams.status : "";
+
+  // A stage filter isn't a lifecycle_status -- resolve which clients are
+  // currently sitting on that pipeline stage first, then filter by id.
+  let stageClientIds: string[] | null = null;
+  if (isStageFilter) {
+    const { data: activeStages } = await supabase
+      .from("lead_pipeline_stages")
+      .select("lead_pipeline_run_id")
+      .eq("process_stage_id", status)
+      .eq("status", "In Progress");
+    const runIds = (activeStages ?? []).map((s) => s.lead_pipeline_run_id);
+    const { data: runs } =
+      runIds.length > 0 ? await supabase.from("lead_pipeline_runs").select("client_id").in("id", runIds) : { data: [] as { client_id: string }[] };
+    stageClientIds = (runs ?? []).map((r) => r.client_id);
+  }
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const clientsQuery = supabase
+  const tag = searchParams.tag?.trim() || "";
+
+  let clientsQuery = supabase
     .from("clients")
-    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status", {
+    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status, tags", {
       count: "exact",
     })
     .eq("workspace_id", workspace.id)
     .is("merged_into_client_id", null)
-    .in("lifecycle_status", status ? [status] : lifecycleScope)
     .order("created_at", { ascending: false })
     .range(from, to);
+  if (isStageFilter) {
+    clientsQuery = clientsQuery.eq("lifecycle_status", "lead").in("id", stageClientIds && stageClientIds.length > 0 ? stageClientIds : ["-"]);
+  } else {
+    clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
+  }
+  if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
-  const [{ data: clients, count }, { data: services }, { data: canCreate }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
     clientsQuery,
     supabase
       .from("services")
@@ -125,17 +182,26 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       .eq("status", "published")
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
   ]);
 
   const clientIds = (clients ?? []).map((c) => c.id);
-  const { data: interests } =
+  const [{ data: interests }, { data: activeRuns }] = await Promise.all([
     clientIds.length > 0
-      ? await supabase
+      ? supabase
           .from("client_service_interests")
           .select("client_id, created_at, service_categories(name), services(name)")
           .in("client_id", clientIds)
           .order("created_at", { ascending: false })
-      : { data: [] as never[] };
+      : Promise.resolve({ data: [] as never[] }),
+    isLeadsTab && clientIds.length > 0
+      ? supabase
+          .from("lead_pipeline_runs")
+          .select("client_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(stage_name)")
+          .in("client_id", clientIds)
+          .eq("status", "Active")
+      : Promise.resolve({ data: [] as { client_id: string; lead_pipeline_stages: { stage_name: string } | null }[] }),
+  ]);
 
   const latestInterestByClient = new Map<string, string>();
   for (const interest of interests ?? []) {
@@ -145,13 +211,22 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     const label = [categoryName, serviceName].filter(Boolean).join(" -- ");
     if (label) latestInterestByClient.set(interest.client_id, label);
   }
+  const stageNameByClient = new Map<string, string>();
+  for (const run of activeRuns ?? []) {
+    const stageName = (run.lead_pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
+    if (stageName) stageNameByClient.set(run.client_id, stageName);
+  }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     requestedService: latestInterestByClient.get(c.id) ?? null,
-    stageLabel: stageLabelByKey.get(c.lifecycle_status) ?? null,
+    stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
   }));
 
-  const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : ""].filter(Boolean).join("&");
+  const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""]
+    .filter(Boolean)
+    .join("&");
+  const statusQuery = tag ? `&tag=${encodeURIComponent(tag)}` : "";
+  const tagQueryBase = `/clients?tab=${tab}${status ? `&status=${status}` : ""}`;
 
   return (
     <>
@@ -179,11 +254,21 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           ))}
         </nav>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        {isLeadsTab && !defaultLeadProcessId && (
+          <p className="mb-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+            No pipeline is set for new leads yet --{" "}
+            <Link href="/pipelines" className="font-medium text-accent hover:underline">
+              pick one in Pipelines
+            </Link>{" "}
+            to track leads through stages here.
+          </p>
+        )}
+
+        <div className="mb-2 flex flex-wrap gap-2">
           {statusFilters.map((f) => (
             <Link
               key={f.value}
-              href={f.value ? `/clients?tab=${tab}&status=${f.value}` : `/clients?tab=${tab}`}
+              href={f.value ? `/clients?tab=${tab}&status=${f.value}${statusQuery}` : `/clients?tab=${tab}${statusQuery}`}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
               }`}
@@ -192,6 +277,31 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             </Link>
           ))}
         </div>
+
+        {(workspaceTags ?? []).length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted">Tag:</span>
+            <Link
+              href={tagQueryBase}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                !tag ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+              }`}
+            >
+              All
+            </Link>
+            {(workspaceTags ?? []).map((t) => (
+              <Link
+                key={t}
+                href={`${tagQueryBase}&tag=${encodeURIComponent(t)}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  tag === t ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+                }`}
+              >
+                {t}
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <DataTable
             columns={CLIENT_COLUMNS}

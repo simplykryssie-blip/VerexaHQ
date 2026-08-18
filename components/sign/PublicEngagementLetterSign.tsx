@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { RichTextEditor } from "@/components/settings/RichTextEditor";
+import { PaginatedDocument } from "@/components/documents/PaginatedDocument";
+import { SignaturePad } from "@/components/SignaturePad";
 import { renderTemplate } from "@/lib/templates/render";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 
 type TemplateData = {
-  template: { id: string; name: string; body_html: string; requires_signature: boolean };
+  template: { id: string; name: string; body_html: string; requires_signature: boolean; banner_image_url: string | null };
   workspace_name: string;
   firm_name: string | null;
   firm_address: string | null;
@@ -34,6 +35,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [typedName, setTypedName] = useState("");
+  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [accountCreated, setAccountCreated] = useState(false);
@@ -68,9 +70,23 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
   }
 
   async function sign() {
-    if (!typedName.trim()) return;
+    if (!typedName.trim() || !drawnDataUrl) return;
     setSubmitting(true);
     setError(null);
+
+    const res = await fetch(`/api/e/${token}/signature-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: drawnDataUrl }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setSubmitting(false);
+      setError(result.error ?? "Could not save your signature.");
+      return;
+    }
+    const signatureType = "drawn" as const;
+    const signatureImagePath = result.path as string;
 
     if (requires_portal_signup) {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -95,6 +111,8 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
         p_phone: phone.trim(),
         p_typed_name: typedName.trim(),
         p_auth_user_id: signUpData.user.id,
+        p_signature_type: signatureType,
+        p_signature_image_path: signatureImagePath,
       });
       setSubmitting(false);
       if (rpcError) {
@@ -121,6 +139,8 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       p_email: email.trim(),
       p_phone: phone.trim(),
       p_typed_name: typedName.trim(),
+      p_signature_type: signatureType,
+      p_signature_image_path: signatureImagePath,
     });
     setSubmitting(false);
     if (rpcError) {
@@ -246,38 +266,35 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       )}
 
       {step === "review" && (
-        <>
-          <div className="min-h-[40vh] rounded-xl border border-border bg-surfaceMuted p-3">
-            <RichTextEditor content={preview} editable={false} documentStyle />
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <label htmlFor="typed-name" className="block text-sm font-medium text-ink">
-              Type your full name to sign this letter electronically
-            </label>
-            <input
-              id="typed-name"
-              value={typedName}
-              onChange={(e) => setTypedName(e.target.value)}
-              placeholder="Full name"
-              className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-            <div className="mt-3 flex items-center gap-3">
-              <button type="button" onClick={() => setStep("contact")} className="text-sm text-muted hover:text-ink">
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={sign}
-                disabled={submitting || !typedName.trim()}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-              >
-                {submitting ? "Signing..." : "Confirm signature"}
-              </button>
+        <PaginatedDocument
+          html={preview}
+          bannerImageUrl={template.banner_image_url}
+          footer={
+            <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+              <p className="mb-3 text-xs text-muted">You&apos;ve reached the end of the letter -- sign below to confirm.</p>
+              <SignaturePad
+                typedName={typedName}
+                onTypedNameChange={setTypedName}
+                onDrawnChange={setDrawnDataUrl}
+                typedLabel="Type your full name to sign this letter electronically"
+              />
+              {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+              <div className="mt-3 flex items-center gap-3">
+                <button type="button" onClick={() => setStep("contact")} className="text-sm text-muted hover:text-ink">
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={sign}
+                  disabled={submitting || !typedName.trim() || !drawnDataUrl}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {submitting ? "Signing..." : "Confirm signature"}
+                </button>
+              </div>
             </div>
-          </div>
-        </>
+          }
+        />
       )}
     </div>
   );

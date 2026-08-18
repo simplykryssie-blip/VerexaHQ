@@ -353,7 +353,7 @@ export function SignaturesPanel({
       )}
 
       {signingId && (
-        <div role="dialog" aria-modal="true" aria-label="Capture signature" className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+        <div role="dialog" aria-modal="true" aria-label="Capture signature" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-lg">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-ink">Capture signature</h2>

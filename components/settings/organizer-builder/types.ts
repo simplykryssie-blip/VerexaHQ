@@ -12,6 +12,7 @@ export type BuilderField = {
   options: unknown;
   conditional_logic: unknown;
   client_profile_field: string | null;
+  relationship_role: string | null;
 };
 
 export type BuilderTemplate = {
@@ -24,4 +25,5 @@ export type BuilderTemplate = {
   public_token: string;
   is_public: boolean;
   requires_portal_signup: boolean;
+  banner_image_url: string | null;
 };

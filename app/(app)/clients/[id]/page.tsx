@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { buildOrganizerResponseDetail, hasOrganizerAnswers } from "@/lib/organizer/buildResponseDetail";
-import { LEAD_STAGES } from "@/lib/clients/leadStages";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +27,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const [
     { data: contacts },
     { data: addresses },
+    { data: emails },
+    { data: phones },
     { data: relationships },
     { data: portalUsers },
     { data: engagements },
@@ -42,9 +43,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: documentFolders },
     { data: staffMembers },
     { data: appointments },
+    { data: workspaceRow },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
+    supabase.from("client_emails").select("*").eq("client_id", client.id).order("display_order"),
+    supabase.from("client_phones").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_relationships").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_portal_users").select("*").eq("client_id", client.id).order("display_order"),
     supabase
@@ -114,7 +118,29 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .gte("start_at", new Date().toISOString())
       .order("start_at", { ascending: true })
       .limit(5),
+    supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle(),
   ]);
+
+  const { data: workspaceTags } = await supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id });
+
+  const defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
+  const [{ data: leadPipelineStages }, { data: activeLeadRun }] = await Promise.all([
+    defaultLeadProcessId
+      ? supabase.from("process_stages").select("id, name").eq("process_id", defaultLeadProcessId).order("display_order")
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    supabase
+      .from("lead_pipeline_runs")
+      .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
+      .eq("client_id", client.id)
+      .eq("status", "Active")
+      .maybeSingle(),
+  ]);
+  const leadPipeline = {
+    processId: defaultLeadProcessId,
+    stages: leadPipelineStages ?? [],
+    currentProcessStageId:
+      (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
+  };
 
   const { data: ownerRow } = await supabase
     .from("workspace_users")
@@ -202,7 +228,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
-    .select("id, name, body_html")
+    .select("id, name, body_html, banner_image_url")
     .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
     .eq("status", "published")
     .order("name");
@@ -354,6 +380,9 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       client={client}
       contacts={contacts ?? []}
       addresses={addresses ?? []}
+      emails={emails ?? []}
+      phones={phones ?? []}
+      workspaceTags={workspaceTags ?? []}
       relationships={relationships ?? []}
       portalUsers={portalUsers ?? []}
       engagements={engagements ?? []}
@@ -395,7 +424,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       staffOptions={staffOptions}
       accountHolder={accountHolder}
       requestedService={requestedService}
-      leadStages={LEAD_STAGES}
+      leadPipeline={leadPipeline}
     />
   );
 }

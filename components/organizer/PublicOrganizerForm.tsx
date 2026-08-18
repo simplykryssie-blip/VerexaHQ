@@ -37,7 +37,7 @@ type Branding = {
 } | null;
 
 type TemplateData = {
-  template: { id: string; name: string; description: string | null };
+  template: { id: string; name: string; description: string | null; banner_image_url: string | null };
   workspace_name: string;
   requires_portal_signup: boolean;
   password_min_length?: number;
@@ -300,6 +300,10 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-8">
+      {template.banner_image_url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={template.banner_image_url} alt="" className="-mb-2 w-full rounded-lg object-cover" />
+      )}
       <div>
         {branding?.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.

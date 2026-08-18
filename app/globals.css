@@ -10,3 +10,112 @@ body {
 body {
   @apply bg-surfaceMuted text-ink antialiased;
 }
+
+/* Tailwind's preflight reset strips list markers/indentation and collapses
+   heading font-size/weight to "inherit" -- normally undone by the
+   @tailwindcss/typography plugin's `prose` styles, which isn't installed
+   here even though RichTextEditor already uses the `prose` class. Without
+   this, bullet/numbered lists in engagement letters and organizer rich-text
+   fields rendered as plain, unmarked paragraphs. Scoped to `.prose` and
+   limited to what StarterKit's toolbar actually produces (headings, bold,
+   italic, bullet/ordered lists). */
+.prose :where(ul) {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin: 0.75em 0;
+}
+.prose :where(ol) {
+  list-style: decimal;
+  padding-left: 1.5em;
+  margin: 0.75em 0;
+}
+.prose :where(li) {
+  margin: 0.25em 0;
+}
+.prose :where(li > p) {
+  margin: 0;
+}
+.prose :where(h2) {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+.prose :where(p) {
+  margin: 0.75em 0;
+}
+.prose :where(p:first-child) {
+  margin-top: 0;
+}
+.prose :where(p:last-child) {
+  margin-bottom: 0;
+}
+
+/* Page-break marker (lib/tiptap/pageBreak.ts) -- a labeled dashed divider in
+   the editor/preview standing in for the real page break renderLetterPdf.ts
+   inserts when generating the signed PDF. */
+.prose [data-page-break] {
+  position: relative;
+  height: 0;
+  margin: 2em 0;
+  border-top: 2px dashed #94a3b8;
+  user-select: none;
+}
+.prose [data-page-break]::after {
+  content: "Page break";
+  position: absolute;
+  top: -0.65em;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 0 0.6em;
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+/* Fee/pricing tables (@tiptap/extension-table) -- same Tailwind-preflight
+   gap as lists/headings above: no border, spacing, or cell padding without
+   this. */
+.prose :where(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+.prose :where(th),
+.prose :where(td) {
+  border: 1px solid #cbd5e1;
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+}
+.prose :where(th) {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.prose :where(th > p),
+.prose :where(td > p) {
+  margin: 0;
+}
+
+/* Document checklists (@tiptap/extension-task-list) -- real checkbox items,
+   distinct from a plain bullet list. */
+.prose :where(ul[data-type="taskList"]) {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.75em 0;
+}
+.prose :where(ul[data-type="taskList"] li) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  margin: 0.35em 0;
+}
+.prose :where(ul[data-type="taskList"] li > label) {
+  flex: 0 0 auto;
+  margin-top: 0.2em;
+}
+.prose :where(ul[data-type="taskList"] li > div) {
+  flex: 1 1 auto;
+}

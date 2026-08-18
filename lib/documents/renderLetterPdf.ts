@@ -1,11 +1,21 @@
 import { TextPdf } from "@/lib/pdf/textPdf";
+import { PAGE_BREAK_HTML_RE } from "@/lib/documents/pageBreakSplit";
 
 // Templates are authored as body_html (a simple rich-text editor's output --
-// paragraphs, line breaks, the occasional list), not full page-layout HTML,
-// so a crude block-to-paragraph conversion is enough to get readable text
-// into the PDF without pulling in a full HTML renderer.
+// paragraphs, line breaks, the occasional list, an explicit page break), not
+// full page-layout HTML, so a crude block-to-paragraph conversion is enough
+// to get readable text into the PDF without pulling in a full HTML renderer.
+export const PAGE_BREAK_SENTINEL = "@@PAGE_BREAK@@";
+
 function htmlToParagraphs(html: string): string[] {
   const withBreaks = (html ?? "")
+    // A page break (lib/tiptap/pageBreak.ts) serializes as an empty
+    // <div data-page-break>; must be swapped out before the generic
+    // </div> -> blank-line rule below would otherwise eat it silently.
+    .replace(PAGE_BREAK_HTML_RE, `\n\n${PAGE_BREAK_SENTINEL}\n\n`)
+    // Table cells have no block-level separator of their own -- without this,
+    // adjacent cells in a row would run together with no space between them.
+    .replace(/<\/(td|th)>/gi, " | ")
     .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, "\n\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<li[^>]*>/gi, "• ");
@@ -30,13 +40,34 @@ function htmlToParagraphs(html: string): string[] {
 // PDFs and images, so an HTML attachment never actually rendered there: the
 // signer saw "preview not available" and a bare "type your name" box with
 // no visible connection to any document, let alone a signature line.
-export async function renderLetterPdf(title: string, bodyHtml: string, signerLabel: string): Promise<Uint8Array> {
+//
+// Pass `signedBy` for an already-signed document (e.g. filing a completed
+// public-link signature) to embed the real drawn signature image + typed
+// name instead of a blank "sign here" line.
+export async function renderLetterPdf(
+  title: string,
+  bodyHtml: string,
+  signerLabel: string,
+  signedBy?: { signatureImageBytes: Uint8Array; typedName: string; signedAtLabel: string },
+  bannerImageBytes?: Uint8Array
+): Promise<Uint8Array> {
   const pdf = await TextPdf.create();
+  if (bannerImageBytes) {
+    await pdf.headerImage(bannerImageBytes);
+  }
   pdf.heading(title);
   for (const paragraph of htmlToParagraphs(bodyHtml)) {
+    if (paragraph === PAGE_BREAK_SENTINEL) {
+      pdf.newPage();
+      continue;
+    }
     pdf.paragraph(paragraph);
   }
   pdf.spacer(20);
-  pdf.signatureLine(`Signature -- ${signerLabel}`);
+  if (signedBy) {
+    await pdf.signatureImage(signedBy.signatureImageBytes, signedBy.typedName, signedBy.signedAtLabel);
+  } else {
+    pdf.signatureLine(`Signature -- ${signerLabel}`);
+  }
   return pdf.save();
 }

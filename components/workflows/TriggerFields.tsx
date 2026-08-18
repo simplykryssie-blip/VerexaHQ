@@ -4,7 +4,6 @@ import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 
 export type TemplateOption = { id: string; name: string };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
-export type LeadStageOption = { key: string; label: string };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
@@ -51,8 +50,7 @@ export function triggerSummary(
   config: Record<string, unknown>,
   organizerTemplates: TemplateOption[],
   services: TemplateOption[] = [],
-  pipelines: PipelineOption[] = [],
-  leadStages: LeadStageOption[] = []
+  pipelines: PipelineOption[] = []
 ) {
   if (triggerType === "engagement.status_changed") {
     return `When engagement status changes to "${config.to_status ?? "?"}"`;
@@ -108,14 +106,15 @@ export function triggerSummary(
     return "When a lead is assigned to staff";
   }
   if (triggerType === "lead.stage_entered") {
-    const stageKey = config.stage_key as string | undefined;
-    const stage = leadStages.find((s) => s.key === stageKey);
-    return `When a lead enters "${stage?.label ?? "a stage"}"`;
+    const processId = config.process_id as string | undefined;
+    const stageId = config.process_stage_id as string | undefined;
+    const pipeline = pipelines.find((p) => p.id === processId);
+    const stage = pipeline?.stages.find((s) => s.id === stageId);
+    return `When a lead enters "${stage?.name ?? "a stage"}" in "${pipeline?.name ?? "a pipeline"}"`;
   }
   if (triggerType === "lead.status_changed") {
     const stageKey = config.to_status as string | undefined;
-    const stage = leadStages.find((s) => s.key === stageKey);
-    const label = stage?.label ?? (stageKey === "active" ? "Active" : stageKey === "lost" ? "Lost" : (stageKey ?? "?"));
+    const label = stageKey === "active" ? "Active" : stageKey === "lost" ? "Lost" : (stageKey ?? "?");
     return `When a lead's status changes to "${label}"`;
   }
   if (triggerType === "lead.converted_to_client") {
@@ -161,7 +160,6 @@ export function TriggerFields({
   organizerTemplates,
   services = [],
   pipelines = [],
-  leadStages = [],
   disabled,
 }: {
   triggerType: string;
@@ -171,7 +169,6 @@ export function TriggerFields({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
-  leadStages?: LeadStageOption[];
   disabled?: boolean;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
@@ -353,24 +350,44 @@ export function TriggerFields({
       )}
 
       {triggerType === "lead.stage_entered" && (
-        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Stage
-          <select
-            disabled={disabled}
-            value={(config.stage_key as string) ?? ""}
-            onChange={(e) => onConfigChange({ stage_key: e.target.value })}
-            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          >
-            <option value="" disabled>
-              Choose a stage
-            </option>
-            {leadStages.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
+        <>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Pipeline
+            <select
+              disabled={disabled}
+              value={(config.process_id as string) ?? ""}
+              onChange={(e) => onConfigChange({ process_id: e.target.value, process_stage_id: "" })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="" disabled>
+                Choose a pipeline
               </option>
-            ))}
-          </select>
-        </label>
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Stage
+            <select
+              disabled={disabled || !selectedPipeline}
+              value={(config.process_stage_id as string) ?? ""}
+              onChange={(e) => onConfigChange({ process_id: config.process_id, process_stage_id: e.target.value })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="" disabled>
+                {selectedPipeline ? "Choose a stage" : "Choose a pipeline first"}
+              </option>
+              {selectedPipeline?.stages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
 
       {triggerType === "lead.status_changed" && (
@@ -385,11 +402,6 @@ export function TriggerFields({
             <option value="" disabled>
               Choose a status
             </option>
-            {leadStages.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
             <option value="active">Active (converted)</option>
             <option value="lost">Lost</option>
           </select>

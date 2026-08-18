@@ -3,9 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow, type StaffOption, type AutomationOption } from "@/components/workflows/WorkflowBuilder";
-import type { PipelineOption, LeadStageOption, TemplateOption } from "@/components/workflows/TriggerFields";
+import type { PipelineOption, TemplateOption } from "@/components/workflows/TriggerFields";
 import type { Condition } from "@/components/workflows/ConditionsEditor";
-import { LEAD_STAGES } from "@/lib/clients/leadStages";
 
 export const dynamic = "force-dynamic";
 
@@ -151,8 +150,6 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
-  const leadStages: LeadStageOption[] = LEAD_STAGES;
-
   const staffOptions: StaffOption[] = (staffMembers ?? [])
     .map((m) => m.user_profiles as unknown as { id: string; display_name: string | null } | null)
     .filter((p): p is { id: string; display_name: string | null } => Boolean(p));
@@ -182,7 +179,6 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           services={services ?? []}
           serviceCategories={serviceCategories}
           pipelines={pipelines}
-          leadStages={leadStages}
           staffOptions={staffOptions}
           automationOptions={automationOptions}
           conditions={(automation.conditions as unknown as Condition[]) ?? []}

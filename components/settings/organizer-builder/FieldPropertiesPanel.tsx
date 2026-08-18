@@ -5,6 +5,7 @@ import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS, NON_ANSWERABLE_FIELD_TYPES } fro
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
+import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/organizer/relationshipRoles";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -34,7 +35,7 @@ export function FieldPropertiesPanel({
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field">>
+    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
   ) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
@@ -108,7 +109,7 @@ function PropertiesForm({
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field">>
+    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
   ) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
@@ -213,6 +214,28 @@ function PropertiesForm({
           <span className="mt-1 block text-[11px] normal-case text-muted">
             Fills in from the client&apos;s record when they open this form. If they change it, the update needs your approval before it
             overwrites what&apos;s on file.
+          </span>
+        </label>
+      )}
+
+      {RELATIONSHIP_ROLES_BY_TYPE[field.field_type] && (
+        <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+          Record as a relationship
+          <select
+            value={field.relationship_role ?? ""}
+            disabled={readOnly}
+            onChange={(e) => onUpdate(field.id, { relationship_role: e.target.value || null })}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          >
+            <option value="">None</option>
+            {RELATIONSHIP_ROLES_BY_TYPE[field.field_type]!.map((role) => (
+              <option key={role} value={role}>
+                {RELATIONSHIP_ROLE_LABELS[role]}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] normal-case text-muted">
+            When the client submits this form, their answer is added to their contact card as a spouse or dependent relationship.
           </span>
         </label>
       )}

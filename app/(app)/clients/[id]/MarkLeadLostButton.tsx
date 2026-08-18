@@ -7,15 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 
-export function MarkLeadLostButton({
-  clientId,
-  lifecycleStatus,
-  leadStageKeys,
-}: {
-  clientId: string;
-  lifecycleStatus: string;
-  leadStageKeys: string[];
-}) {
+export function MarkLeadLostButton({ clientId, lifecycleStatus }: { clientId: string; lifecycleStatus: string }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
@@ -24,7 +16,7 @@ export function MarkLeadLostButton({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!leadStageKeys.includes(lifecycleStatus)) return null;
+  if (lifecycleStatus !== "lead") return null;
 
   async function markLost() {
     setSaving(true);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-import type { TemplateOption, PipelineOption, LeadStageOption } from "@/components/workflows/TriggerFields";
+import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
 import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
 
 export type Condition = { field: string; op: string; value: string };
@@ -58,6 +58,13 @@ const ENGAGEMENT_CASE_TYPE_OPTIONS = ["tax_return", "bookkeeping", "payroll", "b
 const QUOTE_STATUS_OPTIONS = ["draft", "sent", "accepted", "declined"];
 const TASK_STATUS_OPTIONS = ["pending", "in_progress", "completed", "blocked"];
 const DOCUMENT_REQUEST_STATUS_OPTIONS = ["open", "completed", "cancelled"];
+const LEAD_STAGE_OPTIONS = [
+  { value: "lead", label: "Lead" },
+  { value: "active", label: "Active client" },
+  { value: "inactive", label: "Inactive" },
+  { value: "archived", label: "Archived" },
+  { value: "lost", label: "Lost" },
+];
 
 const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.lifecycle_status", label: "Lead / client status", group: "Lead & client", valueKind: "lead_stage", ops: LIST_OPS },
@@ -101,7 +108,6 @@ function ConditionRow({
   services,
   serviceCategories,
   pipelines,
-  leadStages,
   disabled,
 }: {
   condition: Condition;
@@ -111,7 +117,6 @@ function ConditionRow({
   services: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
-  leadStages: LeadStageOption[];
   disabled: boolean;
 }) {
   const meta = fieldMeta(condition.field);
@@ -133,14 +138,6 @@ function ConditionRow({
 
   const inputClass =
     "rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60";
-
-  const leadStageOptions = [
-    ...leadStages.map((s) => ({ value: s.key, label: s.label })),
-    { value: "active", label: "Active client" },
-    { value: "inactive", label: "Inactive" },
-    { value: "archived", label: "Archived" },
-    { value: "lost", label: "Lost" },
-  ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface p-2">
@@ -202,7 +199,7 @@ function ConditionRow({
               <option value="" disabled>
                 Choose a status
               </option>
-              {leadStageOptions.map((o) => (
+              {LEAD_STAGE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -328,7 +325,6 @@ export function ConditionsEditor({
   services,
   serviceCategories,
   pipelines,
-  leadStages,
   disabled,
 }: {
   conditions: Condition[];
@@ -337,7 +333,6 @@ export function ConditionsEditor({
   services: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
-  leadStages: LeadStageOption[];
   disabled?: boolean;
 }) {
   function addCondition() {
@@ -369,7 +364,6 @@ export function ConditionsEditor({
                 services={services}
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
-                leadStages={leadStages}
                 disabled={Boolean(disabled)}
               />
             </div>

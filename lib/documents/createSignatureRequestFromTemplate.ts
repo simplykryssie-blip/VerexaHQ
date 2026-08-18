@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderTemplate } from "@/lib/templates/render";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
+import { fetchImageBytes } from "@/lib/documents/fetchImageBytes";
 
 export async function createSignatureRequestFromTemplate({
   supabase,
@@ -18,7 +19,7 @@ export async function createSignatureRequestFromTemplate({
   workspaceId: string;
   entityType: string;
   entityId: string;
-  template: { id: string; name: string; body_html: string };
+  template: { id: string; name: string; body_html: string; banner_image_url?: string | null };
   clientName?: string;
   firmName?: string;
   signers: { signer_name: string; signer_email: string | null }[];
@@ -36,7 +37,8 @@ export async function createSignatureRequestFromTemplate({
   // has a real, visible signature line rather than a bare "type your name"
   // box with no document underneath it.
   const signerLabel = signers[0]?.signer_name || clientName || "Client";
-  const pdfBytes = await renderLetterPdf(template.name, mergedHtml, signerLabel);
+  const bannerImageBytes = await fetchImageBytes(template.banner_image_url);
+  const pdfBytes = await renderLetterPdf(template.name, mergedHtml, signerLabel, undefined, bannerImageBytes ?? undefined);
   const {
     data: { user },
   } = await supabase.auth.getUser();

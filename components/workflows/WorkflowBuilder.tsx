@@ -30,17 +30,12 @@ import {
   MessageCircle,
   PlayCircle,
   StopCircle,
+  LogIn,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
-import {
-  TriggerFields,
-  triggerSummary,
-  type TemplateOption,
-  type PipelineOption,
-  type LeadStageOption,
-} from "@/components/workflows/TriggerFields";
+import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 
 export type StaffOption = { id: string; display_name: string | null };
@@ -94,6 +89,7 @@ const ACTION_TYPES = [
   { value: "send_quote", label: "Send the draft quote" },
   { value: "add_tag", label: "Add a tag to the client" },
   { value: "remove_tag", label: "Remove a tag from the client" },
+  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)" },
   { value: "add_note", label: "Add an internal note" },
   { value: "send_portal_message", label: "Send a portal message" },
   { value: "start_workflow", label: "Start another workflow" },
@@ -129,6 +125,7 @@ function actionIcon(type: string) {
   if (type === "create_quote") return <DollarSign size={15} />;
   if (type === "send_quote") return <Send size={15} />;
   if (type === "add_tag" || type === "remove_tag") return <Tag size={15} />;
+  if (type === "invite_to_portal") return <LogIn size={15} />;
   if (type === "add_note") return <StickyNote size={15} />;
   if (type === "send_portal_message") return <MessageCircle size={15} />;
   if (type === "start_workflow") return <PlayCircle size={15} />;
@@ -147,7 +144,6 @@ function StepCard({
   documentRequestTemplates,
   services,
   pipelines,
-  leadStages,
   staffOptions,
   automationOptions,
   canManage,
@@ -163,7 +159,6 @@ function StepCard({
   documentRequestTemplates: TemplateOption[];
   services: TemplateOption[];
   pipelines: PipelineOption[];
-  leadStages: LeadStageOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   canManage: boolean;
@@ -425,8 +420,9 @@ function StepCard({
 
         {actionType === "change_stage" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            Marks the engagement&apos;s current pipeline stage complete, moving it into the next stage. Only works on a run with an
-            engagement that has an active pipeline.
+            Marks the current pipeline stage complete, moving into the next stage -- the engagement&apos;s pipeline if this run has an
+            engagement, otherwise the lead&apos;s pipeline (started by a &quot;Move the lead to a pipeline stage&quot; step). Only works
+            if there&apos;s an active pipeline to advance.
           </p>
         )}
 
@@ -511,24 +507,34 @@ function StepCard({
 
         {actionType === "send_notification" && (
           <>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Notify
-              <select
-                disabled={!canManage}
-                value={(config.staff_id as string) ?? ""}
-                onChange={(e) => setField("staff_id", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="" disabled>
-                  Choose staff
-                </option>
-                {staffOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.display_name ?? "Staff"}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+              Notifies the workspace owner and every active staff member -- no need to pick one person.
+            </p>
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Send via
+              <div className="flex items-center gap-4 pt-1">
+                {(["In-App", "Email"] as const).map((channel) => {
+                  const selected: string[] = Array.isArray(config.channels) ? (config.channels as string[]) : ["In-App"];
+                  const checked = selected.includes(channel);
+                  return (
+                    <label key={channel} className="flex items-center gap-1.5 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        disabled={!canManage}
+                        checked={checked}
+                        onChange={(e) => {
+                          const next = e.target.checked ? [...selected, channel] : selected.filter((c) => c !== channel);
+                          setConfig((c) => ({ ...c, channels: next.length > 0 ? next : ["In-App"] }));
+                          setSaved(false);
+                        }}
+                        className="rounded border-border text-accent focus:ring-accent disabled:opacity-60"
+                      />
+                      {channel === "In-App" ? "Staff portal" : "Email"}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Priority
               <select
@@ -558,24 +564,48 @@ function StepCard({
         )}
 
         {actionType === "move_lead_stage" && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Stage
-            <select
-              disabled={!canManage}
-              value={(config.lead_stage_key as string) ?? ""}
-              onChange={(e) => setField("lead_stage_key", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="" disabled>
-                Choose a lead stage
-              </option>
-              {leadStages.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
+          <>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Pipeline
+              <select
+                disabled={!canManage}
+                value={(config.process_id as string) ?? ""}
+                onChange={(e) => setField("process_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a pipeline
                 </option>
-              ))}
-            </select>
-          </label>
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Target stage
+              <select
+                disabled={!canManage || !config.process_id}
+                value={(config.process_stage_id as string) ?? ""}
+                onChange={(e) => setField("process_stage_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a stage
+                </option>
+                {(pipelines.find((p) => p.id === config.process_id)?.stages ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
+              Moves the lead forward to this stage, completing every stage in between. If the lead isn&apos;t already in a pipeline, it
+              starts one. Moving backward isn&apos;t supported.
+            </p>
+          </>
         )}
 
         {actionType === "mark_lead_lost" && (
@@ -919,7 +949,6 @@ export function WorkflowBuilder({
   services = [],
   serviceCategories = [],
   pipelines = [],
-  leadStages = [],
   staffOptions = [],
   automationOptions = [],
   conditions: initialConditions = [],
@@ -940,7 +969,6 @@ export function WorkflowBuilder({
   services?: TemplateOption[];
   serviceCategories?: TemplateOption[];
   pipelines?: PipelineOption[];
-  leadStages?: LeadStageOption[];
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
   conditions?: Condition[];
@@ -1022,7 +1050,6 @@ export function WorkflowBuilder({
             organizerTemplates={organizerTemplates}
             services={services}
             pipelines={pipelines}
-            leadStages={leadStages}
             disabled={!canManage}
           />
 
@@ -1035,7 +1062,6 @@ export function WorkflowBuilder({
               services={services}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
-              leadStages={leadStages}
               disabled={!canManage}
             />
           </div>
@@ -1074,7 +1100,6 @@ export function WorkflowBuilder({
                 documentRequestTemplates={documentRequestTemplates}
                 services={services}
                 pipelines={pipelines}
-                leadStages={leadStages}
                 staffOptions={staffOptions}
                 automationOptions={automationOptions}
                 canManage={canManage}

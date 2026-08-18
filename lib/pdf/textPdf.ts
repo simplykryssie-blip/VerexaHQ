@@ -69,6 +69,28 @@ export class TextPdf {
     }
   }
 
+  // Draws a letterhead banner across the top of the current page (only
+  // meaningful right after create(), before anything else is drawn) and
+  // pushes the cursor below it. Staff-uploaded images could be PNG or JPEG,
+  // so PNG is tried first and JPEG is the fallback rather than requiring a
+  // specific format.
+  async headerImage(bytes: Uint8Array, maxHeight = 90) {
+    let image;
+    try {
+      image = await this.pdfDoc.embedPng(bytes);
+    } catch {
+      image = await this.pdfDoc.embedJpg(bytes);
+    }
+    const maxWidth = CONTENT_WIDTH;
+    const scale = Math.min(maxWidth / image.width, maxHeight / image.height, 1);
+    const width = image.width * scale;
+    const height = image.height * scale;
+
+    this.ensureSpace(height + 16);
+    this.page.drawImage(image, { x: MARGIN, y: this.y - height, width, height });
+    this.y -= height + 16;
+  }
+
   heading(text: string, size = 18) {
     this.ensureSpace(size + 2);
     this.page.drawText(sanitizeForPdf(text), { x: MARGIN, y: this.y - size, size, font: this.fontBold, color: rgb(0.1, 0.1, 0.1) });
@@ -113,6 +135,37 @@ export class TextPdf {
 
   spacer(amount: number) {
     this.y -= amount;
+  }
+
+  // Forces a fresh page regardless of how much room is left on the current
+  // one -- for an explicit page-break marker in the source content, as
+  // opposed to ensureSpace()'s automatic break when a page just runs out.
+  newPage() {
+    this.page = this.pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    this.y = PAGE_HEIGHT - MARGIN;
+  }
+
+  // Embeds an already-captured drawn signature (PNG bytes) plus the typed
+  // name beneath it -- for filing an already-signed document, as opposed to
+  // signatureLine()'s blank "sign here" line for a document going out for
+  // signature.
+  async signatureImage(pngBytes: Uint8Array, typedName: string, signedAtLabel: string) {
+    const image = await this.pdfDoc.embedPng(pngBytes);
+    const maxWidth = 220;
+    const scale = Math.min(1, maxWidth / image.width);
+    const width = image.width * scale;
+    const height = image.height * scale;
+
+    this.ensureSpace(height + 50);
+    this.y -= 10;
+    this.page.drawImage(image, { x: MARGIN, y: this.y - height, width, height });
+    this.y -= height + 4;
+    this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: MARGIN + maxWidth, y: this.y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
+    this.y -= 12;
+    this.page.drawText(sanitizeForPdf(typedName), { x: MARGIN, y: this.y, size: 11, font: this.fontBold, color: rgb(0.1, 0.1, 0.1) });
+    this.y -= 14;
+    this.page.drawText(`Signed ${sanitizeForPdf(signedAtLabel)}`, { x: MARGIN, y: this.y, size: 9, font: this.font, color: rgb(0.45, 0.45, 0.45) });
+    this.y -= 16;
   }
 
   // A visible "sign here" line + label, e.g. for the bottom of a rendered
