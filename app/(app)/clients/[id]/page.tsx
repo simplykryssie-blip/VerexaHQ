@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { buildOrganizerResponseDetail, hasOrganizerAnswers } from "@/lib/organizer/buildResponseDetail";
+import { LEAD_STAGES } from "@/lib/clients/leadStages";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: documentFolders },
     { data: staffMembers },
     { data: appointments },
-    { data: leadStages },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -114,7 +114,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .gte("start_at", new Date().toISOString())
       .order("start_at", { ascending: true })
       .limit(5),
-    supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
   ]);
 
   const { data: ownerRow } = await supabase
@@ -396,7 +395,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       staffOptions={staffOptions}
       accountHolder={accountHolder}
       requestedService={requestedService}
-      leadStages={leadStages ?? []}
+      leadStages={LEAD_STAGES}
     />
   );
 }

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow, type StaffOption, type AutomationOption } from "@/components/workflows/WorkflowBuilder";
 import type { PipelineOption, LeadStageOption, TemplateOption } from "@/components/workflows/TriggerFields";
 import type { Condition } from "@/components/workflows/ConditionsEditor";
+import { LEAD_STAGES } from "@/lib/clients/leadStages";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,6 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: processes },
-    { data: leadStagesRaw },
     { data: staffMembers },
     { data: otherAutomations },
     { data: serviceCategoriesRaw },
@@ -100,7 +100,6 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
         .eq("status", "published")
         .order("name"),
-      supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
       supabase
         .from("workspace_users")
         .select("user_id, user_profiles(id, display_name)")
@@ -152,7 +151,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
-  const leadStages: LeadStageOption[] = leadStagesRaw ?? [];
+  const leadStages: LeadStageOption[] = LEAD_STAGES;
 
   const staffOptions: StaffOption[] = (staffMembers ?? [])
     .map((m) => m.user_profiles as unknown as { id: string; display_name: string | null } | null)

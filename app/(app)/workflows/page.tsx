@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { WorkflowList, type WorkflowRow } from "@/components/workflows/WorkflowList";
 import type { PipelineOption, LeadStageOption } from "@/components/workflows/TriggerFields";
+import { LEAD_STAGES } from "@/lib/clients/leadStages";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function WorkflowsPage() {
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: leadStagesRaw }] =
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }] =
     await Promise.all([
       supabase
         .from("automations")
@@ -29,7 +30,6 @@ export default async function WorkflowsPage() {
         .or(orFilter)
         .eq("status", "published")
         .order("name"),
-      supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order"),
     ]);
 
   const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
@@ -53,7 +53,7 @@ export default async function WorkflowsPage() {
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
-  const leadStages: LeadStageOption[] = leadStagesRaw ?? [];
+  const leadStages: LeadStageOption[] = LEAD_STAGES;
 
   return (
     <>

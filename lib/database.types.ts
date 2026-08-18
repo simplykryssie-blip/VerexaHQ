@@ -915,6 +915,7 @@ export type Database = {
           display_order: number
           id: string
           is_primary: boolean
+          source_batch_id: string | null
           state: string | null
           street: string | null
           updated_at: string
@@ -929,6 +930,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_primary?: boolean
+          source_batch_id?: string | null
           state?: string | null
           street?: string | null
           updated_at?: string
@@ -943,6 +945,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_primary?: boolean
+          source_batch_id?: string | null
           state?: string | null
           street?: string | null
           updated_at?: string
@@ -1143,6 +1146,7 @@ export type Database = {
           decision_notes: string | null
           id: string
           new_value: string
+          new_value_last4: string | null
           old_value: string | null
           organizer_field_id: string | null
           organizer_response_id: string | null
@@ -1163,6 +1167,7 @@ export type Database = {
           decision_notes?: string | null
           id?: string
           new_value: string
+          new_value_last4?: string | null
           old_value?: string | null
           organizer_field_id?: string | null
           organizer_response_id?: string | null
@@ -1183,6 +1188,7 @@ export type Database = {
           decision_notes?: string | null
           id?: string
           new_value?: string
+          new_value_last4?: string | null
           old_value?: string | null
           organizer_field_id?: string | null
           organizer_response_id?: string | null
@@ -1371,6 +1377,8 @@ export type Database = {
           related_ssn_encrypted: string | null
           related_ssn_last4: string | null
           relationship_type: string
+          source_instance_index: number | null
+          source_organizer_response_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -1387,6 +1395,8 @@ export type Database = {
           related_ssn_encrypted?: string | null
           related_ssn_last4?: string | null
           relationship_type: string
+          source_instance_index?: number | null
+          source_organizer_response_id?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -1403,6 +1413,8 @@ export type Database = {
           related_ssn_encrypted?: string | null
           related_ssn_last4?: string | null
           relationship_type?: string
+          source_instance_index?: number | null
+          source_organizer_response_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -1419,6 +1431,13 @@ export type Database = {
             columns: ["related_client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_relationships_source_organizer_response_id_fkey"
+            columns: ["source_organizer_response_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_responses"
             referencedColumns: ["id"]
           },
           {
@@ -2631,11 +2650,13 @@ export type Database = {
           filed_as_attachment: boolean
           id: string
           resolved_body_html: string
+          signature_image_path: string | null
+          signature_type: string
           signed_at: string
           signer_email: string
           signer_name: string
           signer_phone: string | null
-          typed_name: string
+          typed_name: string | null
           workspace_id: string
         }
         Insert: {
@@ -2645,11 +2666,13 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html: string
+          signature_image_path?: string | null
+          signature_type?: string
           signed_at?: string
           signer_email: string
           signer_name: string
           signer_phone?: string | null
-          typed_name: string
+          typed_name?: string | null
           workspace_id: string
         }
         Update: {
@@ -2659,11 +2682,13 @@ export type Database = {
           filed_as_attachment?: boolean
           id?: string
           resolved_body_html?: string
+          signature_image_path?: string | null
+          signature_type?: string
           signed_at?: string
           signer_email?: string
           signer_name?: string
           signer_phone?: string | null
-          typed_name?: string
+          typed_name?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -2692,6 +2717,7 @@ export type Database = {
       }
       engagement_letter_templates: {
         Row: {
+          banner_image_url: string | null
           body_html: string
           created_at: string
           created_by: string | null
@@ -2708,6 +2734,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          banner_image_url?: string | null
           body_html?: string
           created_at?: string
           created_by?: string | null
@@ -2724,6 +2751,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          banner_image_url?: string | null
           body_html?: string
           created_at?: string
           created_by?: string | null
@@ -3649,37 +3677,131 @@ export type Database = {
           },
         ]
       }
-      lead_stages: {
+      lead_pipeline_runs: {
         Row: {
-          created_at: string
-          display_order: number
+          client_id: string
+          completed_at: string | null
+          created_at: string | null
+          current_stage_id: string | null
           id: string
-          is_entry_stage: boolean
-          key: string
-          label: string
+          process_id: string
+          started_at: string | null
+          status: string | null
+          updated_at: string | null
           workspace_id: string
         }
         Insert: {
-          created_at?: string
-          display_order?: number
+          client_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
           id?: string
-          is_entry_stage?: boolean
-          key: string
-          label: string
+          process_id: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
           workspace_id: string
         }
         Update: {
-          created_at?: string
-          display_order?: number
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
           id?: string
-          is_entry_stage?: boolean
-          key?: string
-          label?: string
+          process_id?: string
+          started_at?: string | null
+          status?: string | null
+          updated_at?: string | null
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "lead_stages_workspace_id_fkey"
+            foreignKeyName: "lead_pipeline_runs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_runs_current_stage_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "lead_pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_runs_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_pipeline_stages: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          display_order: number
+          id: string
+          lead_pipeline_run_id: string
+          process_stage_id: string
+          stage_name: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          display_order: number
+          id?: string
+          lead_pipeline_run_id: string
+          process_stage_id: string
+          stage_name: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          lead_pipeline_run_id?: string
+          process_stage_id?: string
+          stage_name?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_pipeline_stages_lead_pipeline_run_id_fkey"
+            columns: ["lead_pipeline_run_id"]
+            isOneToOne: false
+            referencedRelation: "lead_pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_stages_process_stage_id_fkey"
+            columns: ["process_stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_pipeline_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -4105,6 +4227,7 @@ export type Database = {
           options: Json
           organizer_template_id: string
           parent_field_id: string | null
+          relationship_role: string | null
           updated_at: string
           validation: Json
         }
@@ -4122,6 +4245,7 @@ export type Database = {
           options?: Json
           organizer_template_id: string
           parent_field_id?: string | null
+          relationship_role?: string | null
           updated_at?: string
           validation?: Json
         }
@@ -4139,6 +4263,7 @@ export type Database = {
           options?: Json
           organizer_template_id?: string
           parent_field_id?: string | null
+          relationship_role?: string | null
           updated_at?: string
           validation?: Json
         }
@@ -4376,6 +4501,7 @@ export type Database = {
       }
       organizer_templates: {
         Row: {
+          banner_image_url: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -4390,6 +4516,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -4404,6 +4531,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -4719,6 +4847,61 @@ export type Database = {
           },
           {
             foreignKeyName: "pending_engagement_letter_sends_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pending_portal_invites: {
+        Row: {
+          client_id: string
+          client_portal_user_id: string
+          created_at: string
+          error: string | null
+          id: string
+          processed_at: string | null
+          status: string
+          workspace_id: string
+        }
+        Insert: {
+          client_id: string
+          client_portal_user_id: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          workspace_id: string
+        }
+        Update: {
+          client_id?: string
+          client_portal_user_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_portal_invites_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_portal_invites_client_portal_user_id_fkey"
+            columns: ["client_portal_user_id"]
+            isOneToOne: false
+            referencedRelation: "client_portal_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_portal_invites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -6970,6 +7153,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          default_lead_process_id: string | null
           id: string
           mailing_address: string | null
           name: string
@@ -6994,6 +7178,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          default_lead_process_id?: string | null
           id?: string
           mailing_address?: string | null
           name: string
@@ -7018,6 +7203,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          default_lead_process_id?: string | null
           id?: string
           mailing_address?: string | null
           name?: string
@@ -7039,7 +7225,15 @@ export type Database = {
           website?: string | null
           workspace_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_default_lead_process_id_fkey"
+            columns: ["default_lead_process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -7497,6 +7691,15 @@ export type Database = {
         Args: { p_client_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      _notify_admins_of_organizer_submitted: {
+        Args: {
+          p_client_id: string
+          p_organizer_template_id: string
+          p_response_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       _notify_admins_of_pending_client_change: {
         Args: {
           p_batch_id: string
@@ -7514,6 +7717,8 @@ export type Database = {
         }
         Returns: undefined
       }
+      _organizer_name_text: { Args: { p_value: Json }; Returns: string }
+      _organizer_scalar_text: { Args: { p_value: Json }; Returns: string }
       accept_config_object_share: {
         Args: { p_share_id: string }
         Returns: string
@@ -7553,6 +7758,39 @@ export type Database = {
         Args: { p_token: string }
         Returns: string
       }
+      add_client_address: {
+        Args: {
+          p_address_type?: string
+          p_city: string
+          p_client_id: string
+          p_make_primary?: boolean
+          p_state: string
+          p_street: string
+          p_workspace_id: string
+          p_zip: string
+        }
+        Returns: string
+      }
+      add_client_email: {
+        Args: {
+          p_client_id: string
+          p_email: string
+          p_email_type?: string
+          p_make_primary?: boolean
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      add_client_phone: {
+        Args: {
+          p_client_id: string
+          p_make_primary?: boolean
+          p_phone: string
+          p_phone_type?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       add_process_stage: {
         Args: { p_service_id: string; p_stage_name: string }
         Returns: string
@@ -7560,6 +7798,14 @@ export type Database = {
       add_process_stage_to_pipeline: {
         Args: { p_process_id: string; p_stage_name: string }
         Returns: string
+      }
+      advance_lead_pipeline_stage: {
+        Args: {
+          p_client_id: string
+          p_process_id: string
+          p_process_stage_id: string
+        }
+        Returns: undefined
       }
       advance_ready_automation_step: {
         Args: { p_pending_step_id: string }
@@ -7589,8 +7835,7 @@ export type Database = {
           p_mailing_zip?: string
           p_middle_name?: string
           p_phone: string
-          p_service_category_id: string
-          p_service_id: string
+          p_service_ids: string[]
           p_suffix?: string
           p_token: string
         }
@@ -7803,6 +8048,8 @@ export type Database = {
       decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_firm_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
+      delete_client_email: { Args: { p_email_id: string }; Returns: undefined }
+      delete_client_phone: { Args: { p_phone_id: string }; Returns: undefined }
       delete_process_stage: {
         Args: {
           p_destination_stage_id?: string
@@ -7993,6 +8240,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      get_workspace_tags: {
+        Args: { p_workspace_id: string }
+        Returns: string[]
+      }
       has_completed_portal_basic_info: { Args: never; Returns: boolean }
       has_config_object_share_access: {
         Args: { p_id: string; p_table: string }
@@ -8135,6 +8386,23 @@ export type Database = {
           p_state: string
           p_street: string
           p_zip: string
+        }
+        Returns: undefined
+      }
+      propose_client_sensitive_field: {
+        Args: {
+          p_field: string
+          p_new_value: string
+          p_organizer_field_id?: string
+          p_organizer_response_id?: string
+        }
+        Returns: undefined
+      }
+      record_client_service_interest: {
+        Args: {
+          p_client_id: string
+          p_service_id: string
+          p_workspace_id: string
         }
         Returns: undefined
       }
@@ -8335,6 +8603,18 @@ export type Database = {
           passed: boolean
         }[]
       }
+      set_client_address_primary: {
+        Args: { p_address_id: string }
+        Returns: undefined
+      }
+      set_client_email_primary: {
+        Args: { p_email_id: string }
+        Returns: undefined
+      }
+      set_client_phone_primary: {
+        Args: { p_phone_id: string }
+        Returns: undefined
+      }
       set_config_object_status: {
         Args: { p_id: string; p_status: string; p_table: string }
         Returns: undefined
@@ -8388,6 +8668,7 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string | null
+          default_lead_process_id: string | null
           id: string
           mailing_address: string | null
           name: string
@@ -8440,6 +8721,8 @@ export type Database = {
           p_first_name: string
           p_last_name: string
           p_phone: string
+          p_signature_image_path?: string
+          p_signature_type?: string
           p_token: string
           p_typed_name: string
         }
@@ -8452,6 +8735,8 @@ export type Database = {
           p_first_name: string
           p_last_name: string
           p_phone: string
+          p_signature_image_path?: string
+          p_signature_type?: string
           p_token: string
           p_typed_name: string
         }
@@ -8459,6 +8744,10 @@ export type Database = {
       }
       start_engagement_workflow: {
         Args: { p_engagement_id: string; p_process_id: string }
+        Returns: string
+      }
+      start_lead_pipeline_run: {
+        Args: { p_client_id: string; p_process_id: string }
         Returns: string
       }
       start_next_automation_step: {
@@ -8481,8 +8770,7 @@ export type Database = {
           p_middle_name?: string
           p_primary_email?: string
           p_primary_phone?: string
-          p_service_category_id?: string
-          p_service_id?: string
+          p_service_ids?: string[]
           p_suffix?: string
         }
         Returns: undefined

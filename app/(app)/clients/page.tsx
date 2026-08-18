@@ -6,6 +6,7 @@ import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NewClientButton } from "./NewClientButton";
+import { LEAD_STAGES } from "@/lib/clients/leadStages";
 
 export const dynamic = 'force-dynamic';
 
@@ -90,14 +91,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
   const supabase = createClient();
 
-  // lead_stages.key doubles as a valid clients.lifecycle_status value
-  // (enforced by validate_client_lifecycle_status) -- a lead's status is
-  // literally whichever stage it's on, plus the terminal 'lost' outcome.
-  const { data: leadStagesRaw } =
-    tab === "leads"
-      ? await supabase.from("lead_stages").select("key, label").eq("workspace_id", workspace.id).order("display_order")
-      : { data: [] as { key: string; label: string }[] };
-  const leadStages = leadStagesRaw ?? [];
+  const leadStages = tab === "leads" ? LEAD_STAGES : [];
   const stageLabelByKey = new Map(leadStages.map((s) => [s.key, s.label]));
 
   const lifecycleScope = tab === "leads" ? [...leadStages.map((s) => s.key), "lost"] : CLIENT_LIFECYCLE_STATUSES;
