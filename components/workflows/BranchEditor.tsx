@@ -136,7 +136,7 @@ export function BranchEditor({
         it the default/else path.
       </p>
       {branches.map((b, i) => (
-        <div key={b.clientKey} className="rounded-xl border border-border bg-surface p-3">
+        <div key={b.clientKey} className="rounded-2xl border border-border bg-surface shadow-soft p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted">
               Branch {i + 1}

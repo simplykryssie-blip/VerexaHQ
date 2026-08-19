@@ -41,7 +41,7 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={save} className="max-w-md space-y-4 rounded-xl border border-border bg-surface p-4">
+    <form onSubmit={save} className="max-w-md space-y-4 rounded-2xl border border-border bg-surface shadow-soft p-4">
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="first_name" className="block text-sm font-medium text-slate">

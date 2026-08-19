@@ -46,7 +46,7 @@ export function OrganizerPreviewPanel({
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
-      <div className="mx-auto max-w-2xl overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-border bg-surface shadow-soft shadow-sm">
         {bannerImageUrl && currentIndex === 0 && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={bannerImageUrl} alt="" className="w-full object-cover" />

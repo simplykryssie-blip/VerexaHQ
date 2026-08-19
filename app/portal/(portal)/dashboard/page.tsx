@@ -66,7 +66,7 @@ export default async function PortalDashboardPage() {
       <PageHeader title={`Welcome, ${identity.clientLabel}`} description="Here's what's happening with your account." />
       <div className="flex-1 space-y-6 px-8 py-6">
         {contact && (
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-surface shadow-soft px-4 py-3 text-sm">
             <span className="font-medium text-slate">Your contact: {contact.name}</span>
             {contact.phone && (
               <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1.5 text-muted hover:text-accent">
@@ -91,7 +91,7 @@ export default async function PortalDashboardPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
             <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Your engagements</h2>
             {activeEngagements.length === 0 ? (
               <EmptyState message="No active engagements right now." />
@@ -110,7 +110,7 @@ export default async function PortalDashboardPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
             <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Recent activity</h2>
             {(activity ?? []).length === 0 ? (
               <EmptyState message="No activity yet." />
@@ -137,7 +137,7 @@ export default async function PortalDashboardPage() {
 
 function StatCard({ icon: Icon, label, value, href }: { icon: React.ElementType; label: string; value: React.ReactNode; href: string }) {
   return (
-    <Link href={href} className="rounded-xl border border-border bg-surface p-4 transition hover:border-accent">
+    <Link href={href} className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
       <div className="flex items-center gap-2 text-muted">
         <Icon size={16} aria-hidden="true" />
         <p className="text-xs uppercase tracking-wide">{label}</p>

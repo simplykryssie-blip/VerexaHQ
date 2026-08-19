@@ -18,7 +18,7 @@ function formatSize(bytes: number) {
 
 function StatCard({ icon: Icon, label, value, href }: { icon: React.ElementType; label: string; value: React.ReactNode; href?: string }) {
   const body = (
-    <div className="rounded-xl border border-border bg-surface p-4 transition hover:border-accent">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
       <div className="flex items-center gap-2 text-muted">
         <Icon size={16} aria-hidden="true" />
         <p className="text-xs uppercase tracking-wide">{label}</p>
@@ -118,7 +118,7 @@ export default async function DocumentCenterHubPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
             <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Pending requests</h2>
             {(openRequests ?? []).length === 0 ? (
               <EmptyState message="No open document requests." />
@@ -146,7 +146,7 @@ export default async function DocumentCenterHubPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
             <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Pending signatures</h2>
             {(pendingSignatures ?? []).length === 0 ? (
               <EmptyState message="No pending signature requests." />

@@ -101,7 +101,7 @@ export function RequestsPanel({
   return (
     <div className="space-y-4">
       {audience === "staff" && canCreate && (
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <h3 className="text-sm font-semibold text-ink">New document request</h3>
           {templates.length === 0 ? (
             <p className="mt-1 text-sm text-muted">No document request templates are set up yet.</p>
@@ -162,7 +162,7 @@ export function RequestsPanel({
             const done = r.items.filter((i) => i.status !== "pending").length;
             const overdue = r.status === "open" && r.due_date && new Date(r.due_date) < new Date();
             return (
-              <li key={r.id} className="rounded-xl border border-border bg-surface p-4">
+              <li key={r.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-ink">{r.title}</span>
                   <span className={`text-xs capitalize ${overdue ? "text-danger" : "text-muted"}`}>

@@ -30,7 +30,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
       <>
         <PageHeader title="Platform Admin" />
         <div className="flex-1 px-8 py-6">
-          <div className="rounded-xl border border-border bg-surface">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState icon={Lock} message="This area is only available to Verexa platform admins." />
           </div>
         </div>
@@ -96,7 +96,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
             <h3 className="text-sm font-semibold text-ink">Workspace</h3>
             <WorkspaceStatusActions workspaceId={workspace.id} status={workspace.status} />
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 text-sm sm:grid-cols-3">
+          <dl className="mt-3 grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Status</dt>
               <dd className="mt-0.5 capitalize text-slate">{workspace.status}</dd>
@@ -131,11 +131,11 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         <div>
           <h3 className="text-sm font-semibold text-ink">Verexa subscription</h3>
           {!subscription ? (
-            <div className="mt-3 rounded-xl border border-border bg-surface">
+            <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
               <EmptyState message="No Verexa subscription on file for this workspace." />
             </div>
           ) : (
-            <dl className="mt-3 grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface p-5 text-sm sm:grid-cols-4">
+            <dl className="mt-3 grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 text-sm sm:grid-cols-4">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-muted">Plan</dt>
                 <dd className="mt-0.5 text-slate">{plan?.name ?? "--"}</dd>
@@ -156,7 +156,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
               </div>
             </dl>
           )}
-          <div className="mt-3 rounded-xl border border-border bg-surface p-4">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
               {subscription ? "Change plan" : "Assign a plan"}
             </p>
@@ -173,11 +173,11 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         <div>
           <h3 className="text-sm font-semibold text-ink">Invoices</h3>
           {!invoices || invoices.length === 0 ? (
-            <div className="mt-3 rounded-xl border border-border bg-surface">
+            <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
               <EmptyState message="No invoices yet." />
             </div>
           ) : (
-            <div className="mt-3 overflow-x-auto rounded-xl border border-border bg-surface">
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
@@ -217,7 +217,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
 
         <div>
           <h3 className="text-sm font-semibold text-ink">Staff ({(staff ?? []).filter((s) => s.status === "active").length})</h3>
-          <div className="mt-3 rounded-xl border border-border bg-surface">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
             {!staff || staff.length === 0 ? (
               <EmptyState message="No staff on this workspace." />
             ) : (
@@ -247,7 +247,7 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         {((asParent && asParent.length > 0) || (asChild && asChild.length > 0)) && (
           <div>
             <h3 className="text-sm font-semibold text-ink">Firm connections</h3>
-            <div className="mt-3 rounded-xl border border-border bg-surface">
+            <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
               <ul className="divide-y divide-border text-sm">
                 {(asParent ?? []).map((c) => (
                   <li key={c.id} className="flex items-center justify-between px-5 py-3">

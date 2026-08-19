@@ -115,7 +115,7 @@ export default async function IntegrationsPage({
         platform fee on transactions.
       </p>
       {searchParams.stripe_connected && <p className="mt-2 text-sm text-success">Stripe connected.</p>}
-      <div className="mt-6 rounded-xl border border-border bg-surface">
+      <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft">
         <ConnectStripeButton
           connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"}
           error={searchParams.stripe_error ?? null}

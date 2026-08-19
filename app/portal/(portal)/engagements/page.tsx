@@ -25,7 +25,7 @@ export default async function PortalEngagementsPage() {
         {(engagements ?? []).length === 0 ? (
           <EmptyState message="No engagements yet." />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(engagements ?? []).map((e) => {
               const taxDetail = (e.engagement_tax_details as unknown as { tax_year: number | null; return_type: string | null; efile_status: string } | null);
               return (

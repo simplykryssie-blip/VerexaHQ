@@ -244,7 +244,7 @@ export function StepCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium text-ink">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surfaceMuted text-xs text-muted">{index + 1}</span>
@@ -1057,7 +1057,7 @@ export function WorkflowBuilder({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">Trigger</h3>
           {canManage && (

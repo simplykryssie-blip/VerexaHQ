@@ -103,7 +103,7 @@ export default async function BillingReportPage({ searchParams }: { searchParams
     >
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Array.from(byStatus.entries()).map(([status, { count, total }]) => (
-          <div key={status} className="rounded-xl border border-border bg-surface p-4">
+          <div key={status} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="text-xs uppercase tracking-wide text-muted capitalize">{status}</p>
             <p className="mt-1 text-xl font-semibold text-ink">{count}</p>
             <p className="text-xs text-muted">{money(total)}</p>

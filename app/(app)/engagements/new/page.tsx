@@ -58,7 +58,7 @@ export default async function NewEngagementPage({
     <>
       <PageHeader backHref="/engagements" backLabel="Back to Engagements" title="New Engagement" description="Start a new engagement for a client." />
       <div className="flex-1 px-8 py-6">
-        <div className="max-w-lg rounded-xl border border-border bg-surface p-6">
+        <div className="max-w-lg rounded-2xl border border-border bg-surface shadow-soft p-6">
           <NewEngagementForm
             workspaceId={workspace.id}
             hasAnyClients={(clientCount ?? 0) > 0}

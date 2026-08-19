@@ -76,15 +76,15 @@ export function DocumentWorkspace({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Documents</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{activeDocuments.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Pending Requests</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{pendingRequests.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Pending Signatures</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{pendingSignatures.length}</p>
         </div>
@@ -167,7 +167,7 @@ export function DocumentWorkspace({
           {showActivity ? "Hide activity" : "Show activity"}
         </button>
         {showActivity && (
-          <div className="mt-3 rounded-xl border border-border bg-surface">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
             {activity.length === 0 ? (
               <EmptyState message="No document activity yet." />
             ) : (

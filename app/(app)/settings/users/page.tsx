@@ -107,14 +107,14 @@ export default async function UsersPage() {
     <div className="max-w-3xl">
       <SettingsSectionHeader icon={Users} title="Users & Staff" description="Everyone with access to this workspace." />
 
-      <div className="mt-6 overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
         <DataTable columns={memberColumns} rows={members} emptyMessage="No workspace members found." />
       </div>
 
       {workspace.is_owner && !canInviteStaff(workspace) && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
-          <div className="mt-3 rounded-xl border border-border bg-surface">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState
               icon={Lock}
               message="Independent PTIN workspaces are solo accounts and can't add staff. Upgrade to an ERO Office or Service Bureau workspace to invite team members."
@@ -127,7 +127,7 @@ export default async function UsersPage() {
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
           <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>
-          <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
             <InviteStaffForm roles={roles ?? []} />
           </div>
         </div>
@@ -136,7 +136,7 @@ export default async function UsersPage() {
       {workspace.is_owner && pendingInvitations.length > 0 && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Pending invitations</h3>
-          <div className="mt-3 overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
             <DataTable columns={invitationColumns} rows={pendingInvitations} emptyMessage="No pending invitations." />
           </div>
         </div>

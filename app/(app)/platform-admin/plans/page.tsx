@@ -15,7 +15,7 @@ export default async function PlatformAdminPlansPage() {
       <>
         <PageHeader title="Subscription Plans" />
         <div className="flex-1 px-8 py-6">
-          <div className="rounded-xl border border-border bg-surface">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState icon={Lock} message="This area is only available to Verexa platform admins." />
           </div>
         </div>

@@ -65,7 +65,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
           {(rows ?? []).length === 0 ? (
             <EmptyState message="No tax details recorded yet -- fill them in from an engagement's Tax tab." />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-surfaceMuted text-xs uppercase tracking-wide text-muted">
@@ -140,7 +140,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
           {(rows ?? []).length === 0 ? (
             <EmptyState message="Nothing is waiting on a reviewer right now." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {(rows ?? []).map((r) => {
                 const overdue = r.due_date && new Date(r.due_date) < new Date();
                 return (
@@ -183,7 +183,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
           {(notices ?? []).length === 0 ? (
             <EmptyState message="No IRS notices on file." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {(notices ?? []).map((n) => {
                 const entity = labelMap.get(`${n.entity_type}:${n.entity_id}`);
                 const overdue = n.status === "open" && n.response_due_date && new Date(n.response_due_date) < new Date();
@@ -223,7 +223,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
           {(rows ?? []).length === 0 ? (
             <EmptyState message="No extended returns on file." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {(rows ?? []).map((r) => {
                 const e = r.engagements as unknown as {
                   id: string;
@@ -264,7 +264,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
           {(rows ?? []).length === 0 ? (
             <EmptyState message="No tax-year data yet." />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-surfaceMuted text-xs uppercase tracking-wide text-muted">
@@ -319,7 +319,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         {(rows ?? []).length === 0 ? (
           <EmptyState message="No staff productivity data yet." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+          <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surfaceMuted text-xs uppercase tracking-wide text-muted">

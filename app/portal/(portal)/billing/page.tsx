@@ -45,7 +45,7 @@ export default async function PortalBillingPage() {
     <>
       <PageHeader title="Billing" description="Invoices and payment history." />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Balance due</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
         </div>
@@ -53,7 +53,7 @@ export default async function PortalBillingPage() {
         {(quotes ?? []).length > 0 && (
           <section>
             <h2 className="mb-2 text-sm font-semibold text-ink">Quotes</h2>
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {(quotes ?? []).map((q) => (
                 <li key={q.id} className="px-4 py-3 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -84,7 +84,7 @@ export default async function PortalBillingPage() {
           {(invoices ?? []).length === 0 ? (
             <EmptyState message="No invoices yet." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {(invoices ?? []).map((inv) => {
                 const balance = inv.total_amount - inv.amount_paid;
                 const plans = plansByInvoice.get(inv.id) ?? [];
@@ -134,7 +134,7 @@ export default async function PortalBillingPage() {
           {(payments ?? []).length === 0 ? (
             <EmptyState message="No payments recorded yet." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {(payments ?? []).map((p) => (
                 <li key={p.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                   <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>

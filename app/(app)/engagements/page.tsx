@@ -94,13 +94,13 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
         </nav>
 
         {isEmpty ? (
-          <div className="rounded-xl border border-border bg-surface">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState message="No engagements yet." />
           </div>
         ) : view === "board" ? (
           <EngagementBoard engagements={boardItems} />
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">

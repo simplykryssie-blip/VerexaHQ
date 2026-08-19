@@ -88,7 +88,7 @@ export function ReviewQueueClientChangeItem({
   }
 
   return (
-    <li key={batchId} className="rounded-xl border border-border bg-surface p-4 text-sm">
+    <li key={batchId} className="rounded-2xl border border-border bg-surface shadow-soft p-4 text-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-medium text-ink">{clientName}</p>

@@ -34,7 +34,7 @@ export function InvoicePreview({
   status?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-8 text-sm">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-8 text-sm">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-base font-semibold text-ink">{firmName}</p>

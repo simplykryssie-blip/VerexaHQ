@@ -22,7 +22,7 @@ export default async function AuditLogsPage() {
     <div className="max-w-3xl">
       <SettingsSectionHeader icon={ScrollText} title="Audit Logs" description="The last 50 audit events for this workspace." />
 
-      <div className="mt-6 rounded-xl border border-border bg-surface">
+      <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft">
         {!logs || logs.length === 0 ? (
           <EmptyState icon={ScrollText} message="No audit events recorded yet." />
         ) : (

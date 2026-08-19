@@ -65,7 +65,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
         {(events ?? []).length === 0 ? (
           <EmptyState icon={ShieldAlert} message="No security events recorded." />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(events ?? []).map((e) => (
               <li key={e.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="text-slate">
@@ -97,7 +97,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
         {(reveals ?? []).length === 0 ? (
           <EmptyState icon={Eye} message="No sensitive data has been revealed." />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(reveals ?? []).map((r) => (
               <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="text-slate">
@@ -131,7 +131,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
         {(logins ?? []).length === 0 ? (
           <EmptyState icon={LogIn} message="No failed login attempts recorded." />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(logins ?? []).map((l) => (
               <li key={l.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="text-slate">{l.display_name ?? "Unknown"}</span>
@@ -162,7 +162,7 @@ export default async function ComplianceReportPage({ searchParams }: { searchPar
       {(mfa ?? []).length === 0 ? (
         <EmptyState icon={Users} message="No staff found." />
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
           {(mfa ?? []).map((m) => (
             <li key={m.user_id} className="flex items-center justify-between px-4 py-2.5 text-sm">
               <div>

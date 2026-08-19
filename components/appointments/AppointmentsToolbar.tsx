@@ -130,7 +130,7 @@ export function AppointmentsToolbar({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-3">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">
           {(["upcoming", "past", "all"] as const).map((f) => (

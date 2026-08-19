@@ -56,7 +56,7 @@ export function CalendarConnectionCard({
   const isConnected = status === "connected";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-ink">{label}</p>

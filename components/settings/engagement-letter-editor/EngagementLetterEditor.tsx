@@ -122,7 +122,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
           <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} />
         ) : (
           <div className="mx-auto max-w-[720px] space-y-4">
-            <div className="rounded-xl border border-border bg-surface p-4">
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
               <label className="block text-xs font-medium uppercase tracking-wide text-muted">
                 Name
                 <input
@@ -186,7 +186,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
             />
 
             {usedTokens.length > 0 && (
-              <div className="rounded-xl border border-border bg-surface p-4">
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">Merge fields used in this letter</p>
                 <p className="mt-1 flex flex-wrap gap-1.5">
                   {usedTokens.map((t) => (

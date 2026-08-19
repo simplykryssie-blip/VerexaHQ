@@ -119,7 +119,7 @@ export default async function ReviewQueuePage() {
         {resolvedShares.length > 0 && (
           <section>
             <h2 className="mb-2 text-sm font-semibold text-ink">Past decisions</h2>
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {resolvedShares.map((s) => {
                 const engagement = s.engagement as unknown as { id: string; engagement_number: string | null; client: Parameters<typeof clientLabel>[0] } | null;
                 return (

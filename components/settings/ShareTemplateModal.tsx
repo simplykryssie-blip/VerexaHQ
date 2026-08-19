@@ -47,7 +47,7 @@ export function ShareTemplateModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
-      <form onSubmit={share} className="w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-lg">
+      <form onSubmit={share} className="w-full max-w-md rounded-2xl border border-border bg-surface shadow-soft p-5 shadow-lg">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-ink">Share &quot;{objectName}&quot;</h2>
           <button type="button" onClick={onClose} className="text-lg text-muted hover:text-ink">

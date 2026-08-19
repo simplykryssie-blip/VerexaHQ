@@ -60,7 +60,7 @@ export function SortableTable({
   if (rows.length === 0) return <EmptyState icon={Search} message={emptyMessage} />;
 
   return (
-    <div className="rounded-xl border border-border bg-surface">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">Report results, {rows.length} rows</caption>

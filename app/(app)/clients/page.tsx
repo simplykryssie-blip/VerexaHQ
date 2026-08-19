@@ -322,7 +322,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             ))}
           </div>
         )}
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
           <DataTable
             columns={CLIENT_COLUMNS}
             rows={clientRows}

@@ -228,7 +228,7 @@ export function SignaturesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">Signature requests</h3>
           {audience === "staff" && canCreate && (
@@ -340,7 +340,7 @@ export function SignaturesPanel({
           {signatureRequests.map((r) => {
             const overdue = r.status === "pending" && r.due_date && new Date(r.due_date) < new Date();
             return (
-              <li key={r.id} className="rounded-xl border border-border bg-surface p-4">
+              <li key={r.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-ink">{r.title}</p>

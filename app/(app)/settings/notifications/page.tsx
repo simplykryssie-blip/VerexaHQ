@@ -50,7 +50,7 @@ export default async function NotificationsPage() {
       <div>
         <SettingsSectionHeader icon={Bell} title="Reminder preferences" description="Choose which automated reminders you receive by email. On by default." />
         {workspace ? (
-          <div className="mt-4 divide-y divide-border rounded-xl border border-border bg-surface">
+          <div className="mt-4 divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {PREFERENCE_ROWS.map((row) => (
               <div key={`${row.eventType}:${row.channel}`} className="flex items-center justify-between gap-4 px-5 py-3">
                 <div>
@@ -79,7 +79,7 @@ export default async function NotificationsPage() {
           reminders send separately once the provider credentials above are configured. The bell in the top corner shows these live.
         </p>
 
-        <div className="mt-4 rounded-xl border border-border bg-surface">
+        <div className="mt-4 rounded-2xl border border-border bg-surface shadow-soft">
           {!notifications || notifications.length === 0 ? (
             <EmptyState icon={Bell} message="No notifications yet." />
           ) : (

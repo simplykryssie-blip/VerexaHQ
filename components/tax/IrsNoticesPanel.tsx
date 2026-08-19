@@ -47,7 +47,7 @@ export function IrsNoticesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         <h3 className="text-sm font-semibold text-ink">Log an IRS notice</h3>
         <div className="mt-2">
           <InlineAddForm
@@ -82,7 +82,7 @@ export function IrsNoticesPanel({
           {notices.map((n) => {
             const overdue = n.status === "open" && n.response_due_date && new Date(n.response_due_date) < new Date();
             return (
-              <li key={n.id} className="rounded-xl border border-border bg-surface p-3">
+              <li key={n.id} className="rounded-2xl border border-border bg-surface shadow-soft p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     {overdue && <AlertTriangle size={14} className="text-danger" aria-hidden="true" />}

@@ -92,7 +92,7 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
 
   if (!emailDomain) {
     return (
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
         <p className="text-sm font-medium text-ink">Sending domain</p>
         <p className="mt-1 text-xs text-muted">
           Verify your own domain so client emails come from <span className="font-mono">notifications@yourfirm.com</span> instead of{" "}
@@ -119,7 +119,7 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-ink">Sending domain</p>

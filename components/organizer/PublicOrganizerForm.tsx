@@ -338,7 +338,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       </div>
 
       {step === "contact" && (
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-ink">Name *</label>
@@ -502,7 +502,7 @@ function PublicRepeatingSection({
   onChange: (rows: Record<string, string>[]) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <label className="block text-sm font-medium text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
@@ -566,7 +566,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>

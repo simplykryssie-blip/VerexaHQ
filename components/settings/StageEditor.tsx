@@ -365,7 +365,7 @@ export function StageEditor({
       {stages.map((stage, index) => {
         const count = engagementCountsByStage[stage.name] ?? 0;
         return (
-          <div key={stage.id} className="rounded-xl border border-border bg-surface p-4">
+          <div key={stage.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <div className="flex items-center justify-between gap-2">
               {renamingId === stage.id ? (
                 <div className="flex flex-1 items-center gap-2">
@@ -428,7 +428,7 @@ export function StageEditor({
       })}
 
       {addingStage ? (
-        <div className="flex items-center gap-2 rounded-xl border border-border bg-surface p-4">
+        <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface shadow-soft p-4">
           <input
             autoFocus
             value={newStageName}
@@ -479,7 +479,7 @@ function StageListReadOnly({ stages, tasks }: { stages: ProcessStage[]; tasks: P
   return (
     <div className="mt-4 space-y-3">
       {stages.map((stage) => (
-        <div key={stage.id} className="rounded-xl border border-border bg-surface p-4">
+        <div key={stage.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <h4 className="text-sm font-semibold text-ink">{stage.name}</h4>
           <ul className="mt-2 space-y-1">
             {tasks

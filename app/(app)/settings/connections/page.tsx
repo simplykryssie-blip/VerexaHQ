@@ -50,7 +50,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
             approval before it can go to e-file.
           </p>
 
-          <div className="mt-3 rounded-xl border border-border bg-surface">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
             {(connectedPtins ?? []).length === 0 ? (
               <EmptyState message="No PTINs connected yet." />
             ) : (
@@ -83,7 +83,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
             : "If your PTIN works with an ERO, connect here using the invite link or code they send you."}
         </p>
 
-        <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+        <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
           {myConnection ? (
             <MyConnectionStatus
               eroName={(myConnection.workspaces as unknown as { name: string } | null)?.name ?? "your ERO"}

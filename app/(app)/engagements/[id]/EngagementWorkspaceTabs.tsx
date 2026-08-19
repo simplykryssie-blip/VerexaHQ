@@ -36,7 +36,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <h2 className="text-sm font-semibold text-ink">{title}</h2>
         {action}
@@ -156,15 +156,15 @@ export function OverviewTab({
       </Section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Open tasks</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{openTasks.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Outstanding invoices</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{outstandingInvoices.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Client</p>
           <p className="mt-1 text-lg font-semibold text-ink">
             {client ? (
@@ -465,7 +465,7 @@ export function MessagesTab({
   }
 
   return (
-    <div className="flex h-[calc(100vh-260px)] flex-col rounded-xl border border-border bg-surface">
+    <div className="flex h-[calc(100vh-260px)] flex-col rounded-2xl border border-border bg-surface shadow-soft">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <EmptyState message="No messages yet -- send one below to start the conversation." />

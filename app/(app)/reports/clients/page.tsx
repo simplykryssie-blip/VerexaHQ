@@ -102,14 +102,14 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
     >
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {chartData.length > 0 && (
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
             <h2 className="text-sm font-semibold text-ink">New clients, last 6 months</h2>
             <div className="mt-3">
               <SimpleBarChart data={chartData} />
             </div>
           </div>
         )}
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
           <h2 className="text-sm font-semibold text-ink">By lifecycle status</h2>
           <ul className="mt-3 space-y-1.5 text-sm">
             {Array.from(byStatus.entries()).map(([status, count]) => (
