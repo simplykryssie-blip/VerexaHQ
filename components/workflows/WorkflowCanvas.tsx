@@ -99,13 +99,30 @@ function TriggerNode({ data }: NodeProps & { data: { summary: string } }) {
 
 const nodeTypes = { action: ActionNode, condition: ConditionNode, trigger: TriggerNode };
 const TRIGGER_NODE_ID = "__trigger__";
+const COLUMN_WIDTH = 260;
+const ROW_HEIGHT = 160;
 
 function autoPosition(index: number): { x: number; y: number } {
   return { x: 300, y: 140 + index * 160 };
 }
 
-function newNodePosition(count: number): { x: number; y: number } {
-  return { x: 80 + (count % 3) * 260, y: 140 + Math.floor(count / 3) * 160 };
+// A brand-new step with no anchor to attach to (the very first node) lands
+// straight below the trigger. One attached to an anchor with no siblings
+// yet goes directly below it -- a single chain stays a straight vertical
+// line. An anchor that already has other children (a condition's other
+// branches) gets its new child placed one column to the right of the
+// rightmost existing sibling, so branches spread out horizontally instead
+// of stacking on top of each other. Existing nodes are never moved, so a
+// manually dragged layout is always respected.
+function positionForNewStep(anchor: WorkflowStepRow | null, siblings: WorkflowStepRow[]): { x: number; y: number } {
+  if (!anchor) return { x: 300, y: 140 };
+  const anchorX = anchor.canvas_x ?? 300;
+  const anchorY = anchor.canvas_y ?? 140;
+  if (siblings.length === 0) {
+    return { x: anchorX, y: anchorY + ROW_HEIGHT };
+  }
+  const maxSiblingX = Math.max(...siblings.map((s) => s.canvas_x ?? anchorX));
+  return { x: maxSiblingX + COLUMN_WIDTH, y: anchorY + ROW_HEIGHT };
 }
 
 function CanvasInner({
@@ -286,18 +303,45 @@ function CanvasInner({
   }
 
   async function addStep(actionType: string) {
-    const position = newNodePosition(steps.length);
-    const { error } = await supabase.from("automation_steps").insert({
-      automation_id: automationId,
-      display_order: steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0,
-      action_type: actionType,
-      action_config: {},
-      canvas_x: position.x,
-      canvas_y: position.y,
-    } as never);
-    if (error) {
-      toast.show(error.message, "error");
+    // Auto-connect to whatever the user has selected, or otherwise to
+    // whichever step was added most recently -- so building a workflow is
+    // "click Add repeatedly" for a simple chain, not "add a floating box,
+    // then separately drag a line to it every single time."
+    const anchor =
+      (selectedStepId && steps.find((s) => s.id === selectedStepId)) ||
+      steps.reduce<WorkflowStepRow | null>((latest, s) => (!latest || s.display_order > latest.display_order ? s : latest), null);
+    const anchorOutgoing = anchor ? edgeRows.filter((e) => e.from_step_id === anchor.id) : [];
+    const canAutoConnect = Boolean(anchor) && (anchor!.action_type === "condition" || anchorOutgoing.length === 0);
+    const siblings = canAutoConnect ? (anchorOutgoing.map((e) => steps.find((s) => s.id === e.to_step_id)).filter(Boolean) as WorkflowStepRow[]) : [];
+    const position = positionForNewStep(canAutoConnect ? anchor : null, siblings);
+
+    const { data: newStep, error } = await supabase
+      .from("automation_steps")
+      .insert({
+        automation_id: automationId,
+        display_order: steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0,
+        action_type: actionType,
+        action_config: {},
+        canvas_x: position.x,
+        canvas_y: position.y,
+      } as never)
+      .select("id")
+      .single();
+    if (error || !newStep) {
+      toast.show(error?.message ?? "Could not add the step", "error");
       return;
+    }
+
+    if (canAutoConnect && anchor) {
+      const { error: edgeError } = await supabase.from("automation_step_edges").insert({
+        automation_id: automationId,
+        from_step_id: anchor.id,
+        to_step_id: (newStep as { id: string }).id,
+        sort_order: anchorOutgoing.length,
+      } as never);
+      if (edgeError) {
+        toast.show(edgeError.message, "error");
+      }
     }
     router.refresh();
   }
@@ -432,7 +476,10 @@ function CanvasInner({
               staffOptions={staffOptions}
               automationOptions={automationOptions}
               canManage={canManage}
-              onSaved={() => router.refresh()}
+              onSaved={() => {
+                router.refresh();
+                setSelectedStepId(null);
+              }}
             />
           ) : null}
         </div>
