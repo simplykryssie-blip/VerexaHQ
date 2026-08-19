@@ -7340,7 +7340,10 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          default_compliance_officer_id: string | null
           default_lead_process_id: string | null
+          default_relationship_manager_id: string | null
+          default_reviewer_id: string | null
           id: string
           mailing_address: string | null
           name: string
@@ -7365,7 +7368,10 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          default_compliance_officer_id?: string | null
           default_lead_process_id?: string | null
+          default_relationship_manager_id?: string | null
+          default_reviewer_id?: string | null
           id?: string
           mailing_address?: string | null
           name: string
@@ -7390,7 +7396,10 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          default_compliance_officer_id?: string | null
           default_lead_process_id?: string | null
+          default_relationship_manager_id?: string | null
+          default_reviewer_id?: string | null
           id?: string
           mailing_address?: string | null
           name?: string
@@ -7414,10 +7423,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "workspaces_default_compliance_officer_id_fkey"
+            columns: ["default_compliance_officer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "workspaces_default_lead_process_id_fkey"
             columns: ["default_lead_process_id"]
             isOneToOne: false
             referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_default_relationship_manager_id_fkey"
+            columns: ["default_relationship_manager_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspaces_default_reviewer_id_fkey"
+            columns: ["default_reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -8872,7 +8902,10 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string | null
+          default_compliance_officer_id: string | null
           default_lead_process_id: string | null
+          default_relationship_manager_id: string | null
+          default_reviewer_id: string | null
           id: string
           mailing_address: string | null
           name: string

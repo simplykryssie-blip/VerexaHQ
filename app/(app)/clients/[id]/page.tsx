@@ -150,6 +150,51 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .maybeSingle();
   const accountHolder = (ownerRow as any)?.user_profiles ?? null;
 
+  // Relationship manager/Reviewer/Compliance officer default to whatever an
+  // ERO/Service Bureau presets in Settings > Firm Profile, falling back to
+  // the account holder if nothing's been set. Reviewer/Compliance officer
+  // additionally fall back to the parent firm's preset when this workspace
+  // is itself a connected downline (ero_ptin/service_bureau_ptin/
+  // service_bureau_ero) -- an ERO/SB presetting oversight roles is meant to
+  // apply across their whole network, not just their own direct clients.
+  // Relationship manager is deliberately excluded from that cross-workspace
+  // fallback: it's who owns the day-to-day relationship, which only makes
+  // sense as someone local to the client's own firm.
+  const { data: ownWorkspaceDefaults } = await supabase
+    .from("workspaces")
+    .select(
+      `default_relationship_manager:user_profiles!workspaces_default_relationship_manager_id_fkey(id, display_name),
+      default_reviewer:user_profiles!workspaces_default_reviewer_id_fkey(id, display_name),
+      default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name)`
+    )
+    .eq("id", workspace.id)
+    .single();
+
+  const { data: parentConnection } = await supabase
+    .from("firm_connections")
+    .select("parent_workspace_id")
+    .eq("child_workspace_id", workspace.id)
+    .eq("status", "active")
+    .in("relationship_type", ["ero_ptin", "service_bureau_ptin", "service_bureau_ero"])
+    .maybeSingle();
+
+  const { data: parentWorkspaceDefaults } = parentConnection
+    ? await supabase
+        .from("workspaces")
+        .select(
+          `default_reviewer:user_profiles!workspaces_default_reviewer_id_fkey(id, display_name),
+          default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name)`
+        )
+        .eq("id", parentConnection.parent_workspace_id)
+        .maybeSingle()
+    : { data: null };
+
+  const rmDefault = (ownWorkspaceDefaults as any)?.default_relationship_manager ?? accountHolder;
+  const reviewerDefault =
+    (ownWorkspaceDefaults as any)?.default_reviewer ?? (parentWorkspaceDefaults as any)?.default_reviewer ?? accountHolder;
+  const complianceDefault =
+    (ownWorkspaceDefaults as any)?.default_compliance_officer ?? (parentWorkspaceDefaults as any)?.default_compliance_officer ?? accountHolder;
+
   const invoiceIds = (invoices ?? []).map((i) => i.id);
   const { data: paymentPlanRows } =
     invoiceIds.length > 0
@@ -423,6 +468,9 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       appointments={appointments ?? []}
       staffOptions={staffOptions}
       accountHolder={accountHolder}
+      rmDefault={rmDefault}
+      reviewerDefault={reviewerDefault}
+      complianceDefault={complianceDefault}
       requestedService={requestedService}
       leadPipeline={leadPipeline}
     />

@@ -118,6 +118,9 @@ export function ClientWorkspace({
   appointments,
   staffOptions,
   accountHolder,
+  rmDefault,
+  reviewerDefault,
+  complianceDefault,
   requestedService,
   leadPipeline,
 }: {
@@ -157,6 +160,9 @@ export function ClientWorkspace({
   appointments: AppointmentRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
+  rmDefault: { id: string; display_name: string | null } | null;
+  reviewerDefault: { id: string; display_name: string | null } | null;
+  complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
   leadPipeline: { processId: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
 }) {
@@ -260,6 +266,9 @@ export function ClientWorkspace({
                 relationships={relationships}
                 staffOptions={staffOptions}
                 accountHolder={accountHolder}
+                rmDefault={rmDefault}
+                reviewerDefault={reviewerDefault}
+                complianceDefault={complianceDefault}
                 engagements={engagements}
                 tasks={tasks}
                 appointments={appointments}

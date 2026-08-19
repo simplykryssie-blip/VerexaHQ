@@ -19,14 +19,21 @@ export function ClientAssignmentForm({
   relationshipManager,
   defaultReviewer,
   defaultComplianceOfficer,
-  accountHolder,
+  rmDefault,
+  reviewerDefault,
+  complianceDefault,
   staffOptions,
 }: {
   clientId: string;
   relationshipManager: StaffRef;
   defaultReviewer: StaffRef;
   defaultComplianceOfficer: StaffRef;
-  accountHolder: StaffRef;
+  /** Falls back to the workspace's own Firm Profile preset, then the parent
+   *  firm's preset for Reviewer/Compliance officer, then the account
+   *  holder -- see the resolution in app/(app)/clients/[id]/page.tsx. */
+  rmDefault: StaffRef;
+  reviewerDefault: StaffRef;
+  complianceDefault: StaffRef;
   staffOptions: StaffOption[];
 }) {
   const router = useRouter();
@@ -37,13 +44,29 @@ export function ClientAssignmentForm({
     default_reviewer_id: defaultReviewer,
     default_compliance_officer_id: defaultComplianceOfficer,
   };
+  const defaults = {
+    relationship_manager_id: rmDefault,
+    default_reviewer_id: reviewerDefault,
+    default_compliance_officer_id: complianceDefault,
+  };
   const [values, setValues] = useState({
-    relationship_manager_id: relationshipManager?.id ?? accountHolder?.id ?? "",
-    default_reviewer_id: defaultReviewer?.id ?? accountHolder?.id ?? "",
-    default_compliance_officer_id: defaultComplianceOfficer?.id ?? accountHolder?.id ?? "",
+    relationship_manager_id: relationshipManager?.id ?? rmDefault?.id ?? "",
+    default_reviewer_id: defaultReviewer?.id ?? reviewerDefault?.id ?? "",
+    default_compliance_officer_id: defaultComplianceOfficer?.id ?? complianceDefault?.id ?? "",
   });
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // A default can point at someone outside this workspace's own staff list
+  // (an ERO/SB's preset Reviewer/Compliance officer, for a connected
+  // downline's client) -- make sure that person still shows up as a
+  // selectable, correctly-labeled option instead of the picker silently
+  // falling back to "Unassigned" for a value it doesn't recognize.
+  function optionsFor(field: (typeof ROLES)[number]) {
+    const defaultPerson = defaults[field.key];
+    if (!defaultPerson || staffOptions.some((s) => s.id === defaultPerson.id)) return staffOptions;
+    return [...staffOptions, defaultPerson];
+  }
 
   async function save(field: (typeof ROLES)[number], nextId: string) {
     const previousId = current[field.key]?.id ?? null;
@@ -66,7 +89,8 @@ export function ClientAssignmentForm({
   return (
     <div className="space-y-3">
       {ROLES.map((field) => {
-        const isDefaulted = !current[field.key]?.id && Boolean(accountHolder?.id);
+        const defaultPerson = defaults[field.key];
+        const isDefaulted = !current[field.key]?.id && Boolean(defaultPerson?.id);
         return (
           <div key={field.key} className="flex items-center gap-3">
             <label className="w-44 text-sm font-medium text-slate">{field.label}</label>
@@ -81,13 +105,13 @@ export function ClientAssignmentForm({
               className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             >
               <option value="">Unassigned</option>
-              {staffOptions.map((s) => (
+              {optionsFor(field).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.display_name ?? "Staff"}
                 </option>
               ))}
             </select>
-            {isDefaulted && <span className="text-xs text-muted">(defaulted to account holder)</span>}
+            {isDefaulted && <span className="text-xs text-muted">(defaulted to {defaultPerson?.display_name ?? "preset"})</span>}
           </div>
         );
       })}

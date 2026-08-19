@@ -100,6 +100,9 @@ export function OverviewTab({
   relationships,
   staffOptions,
   accountHolder,
+  rmDefault,
+  reviewerDefault,
+  complianceDefault,
   engagements,
   tasks,
   appointments,
@@ -144,6 +147,9 @@ export function OverviewTab({
   relationships: RelationshipRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
+  rmDefault: { id: string; display_name: string | null } | null;
+  reviewerDefault: { id: string; display_name: string | null } | null;
+  complianceDefault: { id: string; display_name: string | null } | null;
   engagements: EngagementRow[];
   tasks: TaskRow[];
   appointments: AppointmentRow[];
@@ -300,7 +306,9 @@ export function OverviewTab({
               relationshipManager={client.relationship_manager}
               defaultReviewer={client.default_reviewer}
               defaultComplianceOfficer={client.default_compliance_officer}
-              accountHolder={accountHolder}
+              rmDefault={rmDefault}
+              reviewerDefault={reviewerDefault}
+              complianceDefault={complianceDefault}
               staffOptions={staffOptions}
             />
           </div>

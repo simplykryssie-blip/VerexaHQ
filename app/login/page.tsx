@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
@@ -23,6 +23,8 @@ const RAIL_FOOT = (
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
   const supabase = createClient();
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [firstName, setFirstName] = useState("");
@@ -56,7 +58,9 @@ export default function LoginPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+          emailRedirectTo: next
+            ? `${window.location.origin}/auth/confirm?next=${encodeURIComponent(next)}`
+            : `${window.location.origin}/auth/confirm`,
           data: {
             first_name: firstName,
             last_name: lastName,
@@ -114,7 +118,7 @@ export default function LoginPage() {
         body: JSON.stringify({ remember: rememberMe }),
       });
 
-      router.push("/dashboard");
+      router.push(next ?? "/dashboard");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
