@@ -297,65 +297,32 @@ un-promoted previews.
   hard block. Find the current duplicate-check logic (likely in the new
   client/lead creation flow, `NewClientButton.tsx` or similar) before
   building this.
-- **"DELETE requires a WHERE clause" — STILL BROKEN. See item #12 above in
-  "What changed this session" for the full current-state writeup,
-  including the disproven `turn_on_service` workaround, the
-  `supautils`/`session_preload_libraries` lead, and the exact
-  `query_logs` command to run the moment that tool is available. Do not
-  re-attempt a "new bypass function" fix without new evidence — that was
-  tried and failed.** Originally reported on both creating a
-  service (toggle-on/clone) and toggling one off, under Settings >
-  Services. Confirmed the failing call is the `duplicate_config_object`
-  RPC returning HTTP 400 (seen directly in the browser Network/Console
-  tabs — the "turn on" and "create custom service" flows both hit it).
-  Ruled out, this round:
-  - No `safeupdate`-style Postgres extension installed (`pg_extension`).
-  - No function anywhere in the database contains the literal string
-    "WHERE clause" (searched every function body).
-  - A real unfiltered `DELETE` on the live `services` table, run directly
-    (wrapped in `begin`/`rollback`), does not error at the raw Postgres
-    level at all.
-  - The exact temp-table create+delete pattern used inside
-    `duplicate_config_object()` (`tmp_stage_map`, `tmp_field_map`,
-    `tmp_folder_item_map`), reproduced directly, does not error either.
-  - **Called `duplicate_config_object` directly against the DB with the
-    user's real `auth.uid()` simulated via
-    `set_config('request.jwt.claim.sub', ...)`, wrapped in a rollback —
-    it succeeded cleanly**, returning a new service id with no error. This
-    strongly suggests the SQL function itself is not the problem, or the
-    problem is something specific to how the request reaches it via
-    PostgREST that a direct DB call doesn't reproduce.
-  - Only one overload of `duplicate_config_object` exists (ruled out the
-    ambiguous-overload class of bug that hit `create_engagement` earlier
-    this session).
-  - Confirmed she is testing on the correct/current deployment (the
-    Vercel preview URL she was on matched the very latest commit at the
-    time) — not a stale-deployment artifact.
-  - Attempted to get the literal PostgREST response body via the user's
-    browser (DevTools Network tab response, "Copy as fetch" replay) —
-    every attempt surfaced a different confounding issue (Chrome's paste
-    guard, session not stored where a generic script expects, "Copy as
-    fetch" defaulting to `credentials: "include"` which triggers an
-    unrelated CORS block that isn't how the app's real client makes the
-    call) rather than the actual message. None of these got the literal
-    response body.
-  - `query_logs` (Supabase MCP tool, which would read the real server-side
-    error straight from Postgres/PostgREST logs and settle this
-    immediately) is blocked in this environment — every call returns
-    "MCP tool call requires approval" with no way to grant it from here.
-    This is the same class of restriction as several other Supabase MCP
-    tools denied all session (`get_organization`, `list_organizations`,
-    `list_projects`, `generate_typescript_types`) — not something to keep
-    retrying.
-  - **Next step, if picked up again**: either get `query_logs` access (if
-    a future session has it, `select event_message from postgres_logs
-    where event_message ilike '%WHERE clause%'` would likely answer this
-    in one query), or get the literal Network-tab **Response** body text
-    (not just the Console's generic "status 400" line, not a "Copy as
-    fetch" replay) — e.g. by asking a session with real Supabase dashboard
-    access to check the Logs section directly instead of going through
-    the user's browser DevTools, which has proven very difficult to
-    extract this specific detail from over many attempts.
+- **RESOLVED — "DELETE requires a WHERE clause" is fixed; this entry was
+  stale.** Root cause found and fixed same-day this was written
+  (`20260813200005_fix_safeupdate_unfiltered_temp_table_deletes.sql`,
+  already live), but this file was never updated to say so, so a later
+  session could easily have re-opened an already-closed investigation from
+  scratch. Actual root cause: the `authenticator` Postgres role — the one
+  PostgREST connects as for every real API request — has a *per-role*
+  `session_preload_libraries = 'supautils, safeupdate'` override set via
+  `pg_db_role_setting`. That's invisible when checking the global
+  `session_preload_libraries` GUC and invisible when reproducing with
+  `set local role` inside an already-open session (role-level `ALTER ROLE
+  ... SET` only takes effect on a *fresh* connection as that role) — which
+  is exactly why every direct-SQL reproduction attempt in this file's
+  original writeup succeeded while the real app path failed. `safeupdate`
+  hard-blocks any DELETE/UPDATE with no WHERE clause, and both
+  `duplicate_config_object` and `turn_on_service` intentionally cleared a
+  per-transaction temp table with `delete from tmp_x;` (no WHERE, by
+  design, since a temp table is always safe to fully clear). Fix: added
+  `where true` to every such clear, satisfying the check without weakening
+  `safeupdate` for a genuinely-unfiltered statement anywhere else. Verified
+  2026-08-19: current live `duplicate_config_object`/`turn_on_service`
+  already have the `where true` fix; a fresh sweep of every function in
+  `public` for a bare `delete from x;` or `update x set ... ;` with no
+  WHERE anywhere in the body found zero remaining instances, and a sweep of
+  every `.delete()`/`.update()` call in the frontend confirmed all are
+  `.eq(...)`-filtered. Nothing left to do here.
 - **RM/Reviewer/Compliance Officer requested changes, not yet built**:
   should only show on ERO and SB (sub-business/connected) workspace tiers,
   not on independent solo-PTIN workspaces (a similar fix was done in an
