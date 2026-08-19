@@ -6317,11 +6317,12 @@ export type Database = {
       tasks: {
         Row: {
           assigned_staff_id: string | null
+          client_id: string | null
           completed_at: string | null
           created_at: string | null
           description: string | null
           due_date: string | null
-          engagement_id: string
+          engagement_id: string | null
           id: string
           overdue_flagged_at: string | null
           priority: string | null
@@ -6334,11 +6335,12 @@ export type Database = {
         }
         Insert: {
           assigned_staff_id?: string | null
+          client_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
           due_date?: string | null
-          engagement_id: string
+          engagement_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -6351,11 +6353,12 @@ export type Database = {
         }
         Update: {
           assigned_staff_id?: string | null
+          client_id?: string | null
           completed_at?: string | null
           created_at?: string | null
           description?: string | null
           due_date?: string | null
-          engagement_id?: string
+          engagement_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -6372,6 +6375,13 @@ export type Database = {
             columns: ["assigned_staff_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {

@@ -356,12 +356,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       : Promise.resolve({ data: [] as { id: string; thread_id: string; sender_type: string; body: string; is_internal: boolean; created_at: string; sender_id: string | null; workspace_id: string }[] }),
   ]);
 
-  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string }[] = [];
-  if (engagementIds.length > 0) {
+  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null }[] = [];
+  {
+    const engagementFilter = engagementIds.length > 0 ? `engagement_id.in.(${engagementIds.join(",")})` : "";
     const { data: taskRows } = await supabase
       .from("tasks")
       .select("id, title, status, due_date, engagement_id")
-      .in("engagement_id", engagementIds)
+      .or([engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(","))
       .neq("status", "completed")
       .order("due_date");
     tasks = taskRows ?? [];

@@ -1141,7 +1141,7 @@ export type RelationshipRow = {
 };
 export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
-export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string };
+export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null };
 export type QuoteRow = {
   id: string;
   quote_number: string | null;
