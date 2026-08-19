@@ -46,6 +46,7 @@ export async function POST(request: Request) {
   const emailResult = await sendEmailViaResend({
     to: email,
     sender: "team",
+    workspaceId: workspace.id,
     subject: `You've been invited to join ${workspace.name} on VerexaHQ`,
     html: renderEmail({
       heading: `Join ${workspace.name} on VerexaHQ`,

@@ -5,6 +5,7 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
 import { JotFormConnectionCard } from "@/components/settings/JotFormConnectionCard";
+import { EmailDomainCard, type DnsRecord } from "@/components/settings/EmailDomainCard";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +54,18 @@ export default async function IntegrationsPage({
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connect_status").eq("id", workspace!.id).single();
   const { data: isJotformConnected } = await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspace!.id });
+  const { data: emailDomain } = await supabase
+    .from("workspace_email_domains")
+    .select("domain, status, dns_records, from_local_part")
+    .eq("workspace_id", workspace!.id)
+    .maybeSingle();
 
   return (
     <div className="max-w-2xl">
       <SettingsSectionHeader
         icon={Plug}
         title="Integrations"
-        description="Accounts your firm or you personally connect to Verexa. Email and SMS sending are configured platform-wide and aren't shown here."
+        description="Accounts your firm or you personally connect to Verexa. SMS sending is configured platform-wide and isn't shown here."
       />
 
       <h2 className="mt-2 text-base font-semibold text-ink">Stripe Connect</h2>
@@ -72,6 +78,25 @@ export default async function IntegrationsPage({
         <ConnectStripeButton
           connectStatus={workspaceRow?.stripe_connect_status ?? "not_connected"}
           error={searchParams.stripe_error ?? null}
+        />
+      </div>
+
+      <h2 className="mt-8 text-base font-semibold text-ink">Email</h2>
+      <p className="mt-1 text-sm text-muted">
+        Verify your own domain so emails to clients come from your firm instead of verexahq.com.
+      </p>
+      <div className="mt-6">
+        <EmailDomainCard
+          emailDomain={
+            emailDomain
+              ? {
+                  domain: emailDomain.domain,
+                  status: emailDomain.status as "pending" | "verified" | "failed",
+                  dns_records: (emailDomain.dns_records as unknown as DnsRecord[]) ?? [],
+                  from_local_part: emailDomain.from_local_part,
+                }
+              : null
+          }
         />
       </div>
 

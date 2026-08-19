@@ -1,4 +1,5 @@
 import { isEmailConfigured } from "@/lib/providerStatus";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export const SYSTEM_SENDERS = {
   noreply: "noreply@verexahq.com",
@@ -20,6 +21,7 @@ export async function sendEmailViaResend({
   sender = "noreply",
   fromName,
   replyTo,
+  workspaceId,
 }: {
   to: string;
   subject: string;
@@ -27,12 +29,32 @@ export async function sendEmailViaResend({
   sender?: SystemSenderKey;
   fromName?: string;
   replyTo?: string;
+  workspaceId?: string;
 }): Promise<SendEmailResult> {
   if (!isEmailConfigured()) {
     return { sent: false, reason: "Email provider is not configured for this environment." };
   }
 
-  const fromAddress = process.env.EMAIL_FROM_ADDRESS || SYSTEM_SENDERS[sender];
+  let fromAddress = process.env.EMAIL_FROM_ADDRESS || SYSTEM_SENDERS[sender];
+
+  // A firm that's verified its own sending domain (Settings > Integrations)
+  // gets its outbound mail branded with that domain instead of
+  // verexahq.com -- e.g. a client sees mail from "notifications@theirfirm.com"
+  // rather than "noreply@verexahq.com". Falls back silently to the system
+  // default if nothing's configured or verification hasn't completed yet.
+  if (workspaceId) {
+    const supabase = createServiceClient();
+    const { data: customDomain } = await supabase
+      .from("workspace_email_domains")
+      .select("domain, from_local_part, status")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "verified")
+      .maybeSingle();
+    if (customDomain) {
+      fromAddress = `${customDomain.from_local_part}@${customDomain.domain}`;
+    }
+  }
+
   const displayName = fromName || process.env.EMAIL_FROM_NAME || "VerexaHQ";
 
   const res = await fetch("https://api.resend.com/emails", {

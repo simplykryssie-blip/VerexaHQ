@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
 import { sendEmailViaResend, SYSTEM_SENDERS, type SystemSenderKey } from "@/lib/email/resend";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -32,7 +33,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, sent: false, error: "to, subject, and html are required" }, { status: 400 });
   }
 
-  const result = await sendEmailViaResend({ to, subject, html, ...(isSystemSenderKey(sender) ? { sender } : {}) });
+  const workspace = await getCurrentWorkspace();
+  const { data: profile } = await supabase.from("user_profiles").select("display_name").eq("id", user.id).maybeSingle();
+
+  const result = await sendEmailViaResend({
+    to,
+    subject,
+    html,
+    ...(isSystemSenderKey(sender) ? { sender } : {}),
+    ...(workspace ? { workspaceId: workspace.id } : {}),
+    ...(profile?.display_name ? { fromName: profile.display_name } : {}),
+  });
   if (result.reason === undefined) {
     await recordProviderCheck("email", result.sent, result.error);
   }

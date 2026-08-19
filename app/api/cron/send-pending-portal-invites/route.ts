@@ -90,7 +90,7 @@ async function sendOne(
       }
     );
 
-    const result = await sendEmailViaResend({ to: portalUser.invited_email, subject, html, sender: "portal" });
+    const result = await sendEmailViaResend({ to: portalUser.invited_email, subject, html, sender: "portal", workspaceId: job.workspace_id });
     if (!result.sent) throw new Error(result.error ?? result.reason ?? "send failed");
 
     await supabase.from("pending_portal_invites").update({ status: "sent", processed_at: new Date().toISOString() }).eq("id", job.id);

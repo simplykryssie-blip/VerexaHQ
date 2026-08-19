@@ -6725,6 +6725,53 @@ export type Database = {
           },
         ]
       }
+      workspace_email_domains: {
+        Row: {
+          created_at: string
+          dns_records: Json
+          domain: string
+          from_local_part: string
+          id: string
+          resend_domain_id: string
+          status: string
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          dns_records?: Json
+          domain: string
+          from_local_part?: string
+          id?: string
+          resend_domain_id: string
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          dns_records?: Json
+          domain?: string
+          from_local_part?: string
+          id?: string
+          resend_domain_id?: string
+          status?: string
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_email_domains_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_feature_flags: {
         Row: {
           config: Json

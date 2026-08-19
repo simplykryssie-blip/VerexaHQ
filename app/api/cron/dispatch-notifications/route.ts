@@ -105,7 +105,7 @@ async function dispatchOne(
 
       const subject = renderTemplate(template.subject, payload);
       const html = renderTemplate(template.body_html, payload);
-      const result = await sendEmailViaResend({ to: job.recipient_email, subject, html });
+      const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId });
       if (result.reason === undefined) await recordProviderCheck("email", result.sent, result.error);
 
       await supabase.from("email_log").insert({
