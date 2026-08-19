@@ -54,7 +54,7 @@ export type WorkflowStepRow = {
 export type WorkflowStepEdgeRow = {
   id: string;
   from_step_id: string;
-  to_step_id: string;
+  to_step_id: string | null;
   branch_conditions: Condition[] | null;
   label: string | null;
   sort_order: number;

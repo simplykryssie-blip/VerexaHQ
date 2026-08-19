@@ -1,18 +1,42 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 import type { StaffOption, WorkflowStepEdgeRow } from "@/components/workflows/WorkflowBuilder";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
 
-// Editor for a condition node's outgoing branches. Branches themselves are
-// created by dragging a connection from the condition node to a target on
-// the canvas -- this panel only refines an existing connection's label,
-// conditions, and evaluation order (edges are tried top to bottom, first
-// match wins). A branch with no conditions set is the default/else path.
+type DraftBranch = {
+  id: string | null;
+  clientKey: string;
+  label: string;
+  conditions: Condition[];
+  to_step_id: string | null;
+};
+
+function initialBranches(edges: WorkflowStepEdgeRow[]): DraftBranch[] {
+  const sorted = [...edges].sort((a, b) => a.sort_order - b.sort_order);
+  if (sorted.length === 0) {
+    // A brand-new condition step starts pre-filled with the two branches
+    // almost every branch actually needs -- Yes gets its condition filled
+    // in below, No is left empty so it acts as the else/default path.
+    return [
+      { id: null, clientKey: "yes", label: "Yes", conditions: [], to_step_id: null },
+      { id: null, clientKey: "no", label: "No", conditions: [], to_step_id: null },
+    ];
+  }
+  return sorted.map((e) => ({ id: e.id, clientKey: e.id, label: e.label ?? "", conditions: e.branch_conditions ?? [], to_step_id: e.to_step_id }));
+}
+
+// Editing a condition step's branches -- who evaluates in what order, what
+// each one checks, and (once dragged on the canvas) where it leads.
+// A local draft: nothing hits the database until Save, so adding several
+// branches and filling them in doesn't fire a write per keystroke.
 export function BranchEditor({
+  stepId,
+  automationId,
   edges,
   targetLabels,
   staffOptions,
@@ -21,7 +45,11 @@ export function BranchEditor({
   pipelines,
   canManage,
   onSaved,
+  onClose,
+  onDeleteStep,
 }: {
+  stepId: string;
+  automationId: string;
   edges: WorkflowStepEdgeRow[];
   targetLabels: Record<string, string>;
   staffOptions: StaffOption[];
@@ -30,65 +58,75 @@ export function BranchEditor({
   pipelines: PipelineOption[];
   canManage: boolean;
   onSaved: () => void;
+  onClose: () => void;
+  onDeleteStep: () => void;
 }) {
   const supabase = createClient();
   const toast = useToast();
+  const [branches, setBranches] = useState<DraftBranch[]>(() => initialBranches(edges));
+  const [removedIds, setRemovedIds] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  async function updateLabel(edgeId: string, label: string) {
-    const { error } = await supabase.from("automation_step_edges").update({ label: label || null }).eq("id", edgeId);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    onSaved();
+  function addBranch() {
+    setBranches((b) => [...b, { id: null, clientKey: `new-${b.length}-${Date.now()}`, label: "", conditions: [], to_step_id: null }]);
   }
 
-  async function updateConditions(edgeId: string, conditions: Condition[]) {
-    const { error } = await supabase
-      .from("automation_step_edges")
-      .update({ branch_conditions: conditions.length === 0 ? null : (conditions as never) })
-      .eq("id", edgeId);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    onSaved();
+  function updateBranch(key: string, patch: Partial<DraftBranch>) {
+    setBranches((b) => b.map((br) => (br.clientKey === key ? { ...br, ...patch } : br)));
   }
 
-  async function move(edge: WorkflowStepEdgeRow, direction: "up" | "down") {
-    const sorted = [...edges].sort((a, b) => a.sort_order - b.sort_order);
-    const index = sorted.findIndex((e) => e.id === edge.id);
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= sorted.length) return;
-    const other = sorted[swapIndex];
-    const { error: err1 } = await supabase.from("automation_step_edges").update({ sort_order: other.sort_order }).eq("id", edge.id);
-    const { error: err2 } = await supabase.from("automation_step_edges").update({ sort_order: edge.sort_order }).eq("id", other.id);
-    if (err1 || err2) {
-      toast.show(err1?.message ?? err2?.message ?? "Could not reorder branches", "error");
-      return;
-    }
-    onSaved();
+  function removeBranch(key: string) {
+    setBranches((b) => {
+      const target = b.find((br) => br.clientKey === key);
+      if (target?.id) setRemovedIds((r) => [...r, target.id as string]);
+      return b.filter((br) => br.clientKey !== key);
+    });
   }
 
-  async function remove(edgeId: string) {
-    if (!window.confirm("Remove this branch? The connection will be deleted, but the step it points to will stay on the canvas.")) return;
-    const { error } = await supabase.from("automation_step_edges").delete().eq("id", edgeId);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show("Branch removed", "success");
-    onSaved();
+  function move(key: string, direction: "up" | "down") {
+    setBranches((b) => {
+      const index = b.findIndex((br) => br.clientKey === key);
+      const swap = direction === "up" ? index - 1 : index + 1;
+      if (swap < 0 || swap >= b.length) return b;
+      const next = [...b];
+      [next[index], next[swap]] = [next[swap], next[index]];
+      return next;
+    });
   }
 
-  const sorted = [...edges].sort((a, b) => a.sort_order - b.sort_order);
-
-  if (sorted.length === 0) {
-    return (
-      <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-        No branches yet. Drag a connection from this node to another step to create one.
-      </p>
-    );
+  async function save() {
+    setSaving(true);
+    for (const id of removedIds) {
+      const { error } = await supabase.from("automation_step_edges").delete().eq("id", id);
+      if (error) {
+        toast.show(error.message, "error");
+        setSaving(false);
+        return;
+      }
+    }
+    for (let i = 0; i < branches.length; i++) {
+      const b = branches[i];
+      const payload = {
+        automation_id: automationId,
+        from_step_id: stepId,
+        to_step_id: b.to_step_id,
+        label: b.label.trim() || null,
+        branch_conditions: b.conditions.length === 0 ? null : (b.conditions as never),
+        sort_order: i,
+      };
+      const { error } = b.id
+        ? await supabase.from("automation_step_edges").update(payload).eq("id", b.id)
+        : await supabase.from("automation_step_edges").insert(payload as never);
+      if (error) {
+        toast.show(error.message, "error");
+        setSaving(false);
+        return;
+      }
+    }
+    setSaving(false);
+    toast.show("Branches saved", "success");
+    onSaved();
+    onClose();
   }
 
   return (
@@ -97,27 +135,35 @@ export function BranchEditor({
         Branches are evaluated top to bottom -- the first one whose conditions match wins. Leave a branch&apos;s conditions empty to make
         it the default/else path.
       </p>
-      {sorted.map((edge, i) => (
-        <div key={edge.id} className="rounded-xl border border-border bg-surface p-3">
+      {branches.map((b, i) => (
+        <div key={b.clientKey} className="rounded-xl border border-border bg-surface p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted">
-              Branch {i + 1} &rarr; {targetLabels[edge.to_step_id] ?? "Untitled step"}
+              Branch {i + 1}
+              {b.to_step_id ? (
+                <>
+                  {" "}
+                  &rarr; {targetLabels[b.to_step_id] ?? "Untitled step"}
+                </>
+              ) : (
+                <span className="text-amber"> -- not connected yet</span>
+              )}
             </span>
             {canManage && (
               <div className="flex items-center gap-1">
-                <button type="button" disabled={i === 0} onClick={() => move(edge, "up")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move branch up">
+                <button type="button" disabled={i === 0} onClick={() => move(b.clientKey, "up")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move branch up">
                   <ArrowUp size={14} />
                 </button>
                 <button
                   type="button"
-                  disabled={i === sorted.length - 1}
-                  onClick={() => move(edge, "down")}
+                  disabled={i === branches.length - 1}
+                  onClick={() => move(b.clientKey, "down")}
                   className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30"
                   aria-label="Move branch down"
                 >
                   <ArrowDown size={14} />
                 </button>
-                <button type="button" onClick={() => remove(edge.id)} className="rounded p-1 text-muted hover:text-danger" aria-label="Remove branch">
+                <button type="button" onClick={() => removeBranch(b.clientKey)} className="rounded p-1 text-muted hover:text-danger" aria-label="Remove branch">
                   <Trash2 size={14} />
                 </button>
               </div>
@@ -125,15 +171,15 @@ export function BranchEditor({
           </div>
           <input
             disabled={!canManage}
-            defaultValue={edge.label ?? ""}
-            onBlur={(e) => updateLabel(edge.id, e.target.value)}
+            value={b.label}
+            onChange={(e) => updateBranch(b.clientKey, { label: e.target.value })}
             placeholder="Branch label (e.g. Accepted)"
             className="mt-2 w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           />
           <div className="mt-2">
             <ConditionsEditor
-              conditions={edge.branch_conditions ?? []}
-              onChange={(next) => updateConditions(edge.id, next)}
+              conditions={b.conditions}
+              onChange={(next) => updateBranch(b.clientKey, { conditions: next })}
               staffOptions={staffOptions}
               services={services}
               serviceCategories={serviceCategories}
@@ -141,8 +187,41 @@ export function BranchEditor({
               disabled={!canManage}
             />
           </div>
+          {!b.to_step_id && (
+            <p className="mt-2 text-[11px] text-muted">Drag a connection from this node to another step to wire this branch up.</p>
+          )}
         </div>
       ))}
+
+      {canManage && (
+        <>
+          <button
+            type="button"
+            onClick={addBranch}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-accent hover:bg-accentSoft"
+          >
+            <Plus size={14} /> Add branch
+          </button>
+
+          <div className="flex items-center justify-between border-t border-border pt-3">
+            <button
+              type="button"
+              onClick={onDeleteStep}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
+            >
+              <Trash2 size={14} /> Delete this condition
+            </button>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

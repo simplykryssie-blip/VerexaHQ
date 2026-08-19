@@ -583,7 +583,7 @@ export type Database = {
           id: string
           label: string | null
           sort_order: number
-          to_step_id: string
+          to_step_id: string | null
         }
         Insert: {
           automation_id: string
@@ -593,7 +593,7 @@ export type Database = {
           id?: string
           label?: string | null
           sort_order?: number
-          to_step_id: string
+          to_step_id?: string | null
         }
         Update: {
           automation_id?: string
@@ -603,7 +603,7 @@ export type Database = {
           id?: string
           label?: string | null
           sort_order?: number
-          to_step_id?: string
+          to_step_id?: string | null
         }
         Relationships: [
           {

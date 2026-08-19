@@ -165,6 +165,7 @@ function CanvasInner({
   const toast = useToast();
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [activeConditionStepId, setActiveConditionStepId] = useState<string | null>(null);
 
   const rootStepIds = useMemo(() => {
     const hasIncoming = new Set(edgeRows.map((e) => e.to_step_id));
@@ -194,14 +195,18 @@ function CanvasInner({
   }, [steps, edgeRows, triggerType, triggerConfig]);
 
   const initialEdges: Edge[] = useMemo(() => {
-    const realEdges = edgeRows.map((e) => ({
-      id: e.id,
-      source: e.from_step_id,
-      target: e.to_step_id,
-      label: e.label ?? undefined,
-      style: e.branch_conditions ? { stroke: "var(--color-accent, #0b7fe0)" } : undefined,
-      markerEnd: { type: MarkerType.ArrowClosed },
-    }));
+    // A branch with no destination yet (defined via the condition modal,
+    // not dragged to a target) has nothing to draw a line to.
+    const realEdges = edgeRows
+      .filter((e): e is WorkflowStepEdgeRow & { to_step_id: string } => e.to_step_id != null)
+      .map((e) => ({
+        id: e.id,
+        source: e.from_step_id,
+        target: e.to_step_id,
+        label: e.label ?? undefined,
+        style: e.branch_conditions ? { stroke: "var(--color-accent, #0b7fe0)" } : undefined,
+        markerEnd: { type: MarkerType.ArrowClosed },
+      }));
     // Visual only, not a real automation_step_edges row -- shows where
     // execution actually starts (the step(s) with no incoming edge).
     const triggerEdges = rootStepIds.map((id) => ({
@@ -232,11 +237,20 @@ function CanvasInner({
     [supabase]
   );
 
-  const onNodeClick = useCallback<NodeMouseHandler>((_event, node) => {
-    if (node.id === TRIGGER_NODE_ID) return;
-    setSelectedEdgeId(null);
-    setSelectedStepId(node.id);
-  }, []);
+  const onNodeClick = useCallback<NodeMouseHandler>(
+    (_event, node) => {
+      if (node.id === TRIGGER_NODE_ID) return;
+      setSelectedEdgeId(null);
+      if (node.type === "condition") {
+        setSelectedStepId(null);
+        setActiveConditionStepId(node.id);
+      } else {
+        setActiveConditionStepId(null);
+        setSelectedStepId(node.id);
+      }
+    },
+    []
+  );
 
   const onEdgeClick = useCallback<EdgeMouseHandler>((_event, edge) => {
     if (edge.id.startsWith(TRIGGER_NODE_ID)) return;
@@ -254,19 +268,31 @@ function CanvasInner({
       }
       const sourceStep = steps.find((s) => s.id === connection.source);
       const existingOutgoing = edgeRows.filter((e) => e.from_step_id === connection.source);
-      if (sourceStep?.action_type !== "condition" && existingOutgoing.length >= 1) {
+      // A condition defined via the branches modal already has edges for
+      // Yes/No (etc.) with no destination yet -- connecting from it should
+      // wire up the first of those, not pile on a redundant extra edge.
+      const unwiredBranch = existingOutgoing.find((e) => e.to_step_id === null);
+
+      if (!unwiredBranch && sourceStep?.action_type !== "condition" && existingOutgoing.length >= 1) {
         toast.show("This step already has a next step. Only condition steps can branch to more than one.", "error");
         return;
       }
-      const sortOrder = existingOutgoing.length;
       // Reflect the connection immediately -- don't make the user wait on a
       // round trip to see whether the drag "worked."
       setEdges((eds) => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed } }, eds));
+
+      if (unwiredBranch) {
+        const { error } = await supabase.from("automation_step_edges").update({ to_step_id: connection.target }).eq("id", unwiredBranch.id);
+        if (error) toast.show(error.message, "error");
+        router.refresh();
+        return;
+      }
+
       const { error } = await supabase.from("automation_step_edges").insert({
         automation_id: automationId,
         from_step_id: connection.source,
         to_step_id: connection.target,
-        sort_order: sortOrder,
+        sort_order: existingOutgoing.length,
       } as never);
       if (error) {
         toast.show(error.message, "error");
@@ -293,6 +319,7 @@ function CanvasInner({
     setNodes((nds) => nds.filter((n) => n.id !== stepId));
     setEdges((eds) => eds.filter((e) => e.source !== stepId && e.target !== stepId));
     setSelectedStepId(null);
+    setActiveConditionStepId(null);
     const { error } = await supabase.from("automation_steps").delete().eq("id", stepId);
     if (error) {
       toast.show(error.message, "error");
@@ -333,21 +360,32 @@ function CanvasInner({
     }
 
     if (canAutoConnect && anchor) {
-      const { error: edgeError } = await supabase.from("automation_step_edges").insert({
-        automation_id: automationId,
-        from_step_id: anchor.id,
-        to_step_id: (newStep as { id: string }).id,
-        sort_order: anchorOutgoing.length,
-      } as never);
+      // A condition may already have Yes/No (etc.) defined via its branches
+      // modal with no destination yet -- wire the first of those up instead
+      // of adding a redundant extra edge alongside them.
+      const unwiredBranch = anchorOutgoing.find((e) => e.to_step_id === null);
+      const { error: edgeError } = unwiredBranch
+        ? await supabase.from("automation_step_edges").update({ to_step_id: (newStep as { id: string }).id }).eq("id", unwiredBranch.id)
+        : await supabase.from("automation_step_edges").insert({
+            automation_id: automationId,
+            from_step_id: anchor.id,
+            to_step_id: (newStep as { id: string }).id,
+            sort_order: anchorOutgoing.length,
+          } as never);
       if (edgeError) {
         toast.show(edgeError.message, "error");
       }
+    }
+    // A condition step needs its branches defined before it means anything --
+    // open that editor immediately instead of leaving an unconfigured node
+    // on the canvas the user has to remember to come back to.
+    if (actionType === "condition") {
+      setActiveConditionStepId((newStep as { id: string }).id);
     }
     router.refresh();
   }
 
   const selectedStep = steps.find((s) => s.id === selectedStepId) ?? null;
-  const selectedStepOutgoingEdges = selectedStep ? edgeRows.filter((e) => e.from_step_id === selectedStep.id) : [];
   const selectedEdge = selectedEdgeId ? edgeRows.find((e) => e.id === selectedEdgeId) : null;
   const targetLabels = useMemo(() => {
     const map: Record<string, string> = {};
@@ -426,7 +464,8 @@ function CanvasInner({
           {selectedEdge ? (
             <div className="space-y-3">
               <p className="text-sm text-slate">
-                {targetLabels[selectedEdge.from_step_id] ?? "Step"} &rarr; {targetLabels[selectedEdge.to_step_id] ?? "Step"}
+                {targetLabels[selectedEdge.from_step_id] ?? "Step"} &rarr;{" "}
+                {(selectedEdge.to_step_id && targetLabels[selectedEdge.to_step_id]) ?? "Step"}
               </p>
               {canManage && (
                 <button
@@ -435,28 +474,6 @@ function CanvasInner({
                   className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
                 >
                   <Trash2 size={14} /> Delete this connection
-                </button>
-              )}
-            </div>
-          ) : selectedStep?.action_type === "condition" ? (
-            <div className="space-y-3">
-              <BranchEditor
-                edges={selectedStepOutgoingEdges}
-                targetLabels={targetLabels}
-                staffOptions={staffOptions}
-                services={services}
-                serviceCategories={serviceCategories}
-                pipelines={pipelines}
-                canManage={canManage}
-                onSaved={() => router.refresh()}
-              />
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => deleteStep(selectedStep.id)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 px-3 py-1.5 text-xs font-medium text-danger hover:bg-danger/10"
-                >
-                  <Trash2 size={14} /> Delete this condition
                 </button>
               )}
             </div>
@@ -482,6 +499,33 @@ function CanvasInner({
               }}
             />
           ) : null}
+        </div>
+      )}
+
+      {activeConditionStepId && (
+        <div role="dialog" aria-modal="true" aria-label="Edit condition branches" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-ink">Condition branches</h2>
+              <button type="button" onClick={() => setActiveConditionStepId(null)} aria-label="Close" className="text-muted hover:text-ink">
+                <X size={16} />
+              </button>
+            </div>
+            <BranchEditor
+              stepId={activeConditionStepId}
+              automationId={automationId}
+              edges={edgeRows.filter((e) => e.from_step_id === activeConditionStepId)}
+              targetLabels={targetLabels}
+              staffOptions={staffOptions}
+              services={services}
+              serviceCategories={serviceCategories}
+              pipelines={pipelines}
+              canManage={canManage}
+              onSaved={() => router.refresh()}
+              onClose={() => setActiveConditionStepId(null)}
+              onDeleteStep={() => deleteStep(activeConditionStepId)}
+            />
+          </div>
         </div>
       )}
     </div>
