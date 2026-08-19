@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
 import { archivo, publicSans, plexMono } from "@/lib/authFonts";
-import { darkenHex, hexToRgba } from "@/lib/color";
+import { hexToRgba } from "@/lib/color";
 import styles from "./Sidebar.module.css";
 
 export function Sidebar({
@@ -29,13 +29,13 @@ export function Sidebar({
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // primaryColor is unused here now that the sidebar is a light surface --
+  // it's kept in the props/Brand Center settings for a future use (e.g. a
+  // portal accent) rather than driving a colored rail background.
   const sidebarStyle: React.CSSProperties = {};
-  if (primaryColor) {
-    (sidebarStyle as Record<string, string>)["--rail-bg"] = primaryColor;
-    (sidebarStyle as Record<string, string>)["--rail-bg-2"] = darkenHex(primaryColor, 0.25);
-  }
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
+    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
   }
   if (textColor) {
     (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;

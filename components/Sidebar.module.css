@@ -1,18 +1,18 @@
 .sidebar {
-  --rail-bg: #071729;
-  --rail-bg-2: #0b2643;
-  --rail-ink: #f4f4f6;
-  --rail-muted: #a9b7c6;
-  --rail-section: rgba(169, 183, 198, 0.55);
-  --blue-bright: #0da9f9;
+  --rail-bg: #ffffff;
+  --rail-ink: #0f172a;
+  --rail-muted: #6b7280;
+  --rail-section: #9aa1ae;
+  --blue-bright: #0b7fe0;
+  --blue-bright-soft: rgba(11, 127, 224, 0.1);
 
-  background: linear-gradient(165deg, var(--rail-bg) 0%, var(--rail-bg-2) 100%);
+  background: var(--rail-bg);
   color: var(--rail-ink);
-  border-right: none;
+  border-right: 1px solid #eef0f3;
 }
 
 .header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom: 1px solid #eef0f3;
 }
 
 .workspaceName {
@@ -20,7 +20,7 @@
 }
 
 .badge {
-  background: rgba(13, 169, 249, 0.14);
+  background: var(--blue-bright-soft);
   color: var(--blue-bright);
 }
 
@@ -37,20 +37,21 @@
 
 .navItem:hover {
   color: var(--rail-ink);
-  background: rgba(255, 255, 255, 0.06);
+  background: #f4f5f7;
 }
 
 .navItemActive {
   color: var(--blue-bright);
-  background: rgba(13, 169, 249, 0.14);
+  background: var(--blue-bright-soft);
+  font-weight: 600;
 }
 
 .subNav {
-  border-color: rgba(255, 255, 255, 0.09);
+  border-color: #eef0f3;
 }
 
 .footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid #eef0f3;
 }
 
 .signOut {
@@ -59,11 +60,11 @@
 
 .signOut:hover {
   color: var(--rail-ink);
-  background: rgba(255, 255, 255, 0.06);
+  background: #f4f5f7;
 }
 
 .mobileToggle {
   background: #ffffff;
   color: #1e293b;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #e7e9ee;
 }
