@@ -1097,6 +1097,8 @@ export function WorkflowBuilder({
             steps={steps}
             edges={stepEdges}
             canManage={canManage}
+            triggerType={currentTriggerType}
+            triggerConfig={config}
             emailTemplates={emailTemplates}
             smsTemplates={smsTemplates}
             organizerTemplates={organizerTemplates}
