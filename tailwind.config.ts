@@ -34,7 +34,14 @@ const config: Config = {
         roseSoft: "#FDECEF",
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Both loaded via next/font/google in app/layout.tsx, which exposes
+        // them as CSS variables on <html> -- referencing the variable (with
+        // the same fallback stack next/font itself appends) keeps Tailwind
+        // and next/font's font-loading optimization in sync.
+        sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Serif display face for page titles and card headings -- the warmth
+        // and trust that pairs with the sans body/data text.
+        display: ["var(--font-display)", "ui-serif", "Georgia", "serif"],
       },
       // Reopened the corner-sharpening pass from the old Settings redesign --
       // that dense, tight-radius look reads as flat/sterile in practice.

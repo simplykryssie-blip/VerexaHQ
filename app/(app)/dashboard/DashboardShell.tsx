@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown } from "lucide-react";
+import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { KpiWidget } from "@/components/widgets/KpiWidget";
@@ -12,6 +12,7 @@ import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
+import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
@@ -108,18 +109,32 @@ export function DashboardShell({
   function renderWidget(type: WidgetType) {
     switch (type) {
       case "revenue":
-        return <KpiWidget title="Revenue This Month" value={money(data.kpis.revenueThisMonth)} reportHref="/reports/financial" />;
+        return (
+          <KpiWidget
+            title="Revenue This Month"
+            value={money(data.kpis.revenueThisMonth)}
+            icon={DollarSign}
+            chip="emerald"
+            reportHref="/reports/financial"
+          />
+        );
       case "kpis":
         return (
           <WidgetShell title="Engagements & Tasks">
             <div className="grid grid-cols-2 gap-3">
               <div>
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accentSoft text-accent">
+                  <Briefcase size={17} aria-hidden="true" />
+                </span>
                 <p className="text-xs uppercase tracking-wide text-muted">Open Engagements</p>
-                <p className="mt-1 text-2xl font-semibold text-ink">{data.kpis.openEngagements}</p>
+                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ink">{data.kpis.openEngagements}</p>
               </div>
               <div>
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amberSoft text-amber">
+                  <ListChecks size={17} aria-hidden="true" />
+                </span>
                 <p className="text-xs uppercase tracking-wide text-muted">Tasks Due Today</p>
-                <p className={`mt-1 text-2xl font-semibold ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}>
+                <p className={`mt-1 font-display text-2xl font-semibold tabular-nums ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}>
                   {data.kpis.tasksDueToday}
                 </p>
               </div>
@@ -132,6 +147,8 @@ export function DashboardShell({
             title="Outstanding Invoices"
             value={money(data.kpis.outstandingInvoicesTotal)}
             tone={data.kpis.outstandingInvoicesCount > 0 ? "warning" : "default"}
+            icon={Receipt}
+            chip="rose"
             reportHref="/reports/financial?filter=outstanding"
           />
         );
@@ -141,11 +158,13 @@ export function DashboardShell({
             title="Missing Documents"
             value={String(data.kpis.missingDocumentsCount)}
             tone={data.kpis.missingDocumentsCount > 0 ? "warning" : "default"}
+            icon={FileWarning}
+            chip="amber"
             reportHref="/reports/documents"
           />
         );
       case "messages":
-        return <KpiWidget title="Open Client Messages" value={String(data.kpis.openClientMessages)} />;
+        return <KpiWidget title="Open Client Messages" value={String(data.kpis.openClientMessages)} icon={MessageSquare} chip="violet" />;
       case "todays_work":
         return <PrioritiesWidget items={priorities} />;
       case "review_queue":
@@ -189,6 +208,8 @@ export function DashboardShell({
             seenSteps={seenOnboardingSteps}
           />
         )}
+
+        <PromoBanner />
 
         {customizing && (
           <div className="mb-4 rounded-xl border border-border bg-surfaceMuted p-4">
