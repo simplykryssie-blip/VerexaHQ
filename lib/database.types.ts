@@ -8074,6 +8074,7 @@ export type Database = {
           p_date_of_birth?: string
           p_ein?: string
           p_first_name?: string
+          p_force_create?: boolean
           p_itin?: string
           p_last_name?: string
           p_primary_email?: string

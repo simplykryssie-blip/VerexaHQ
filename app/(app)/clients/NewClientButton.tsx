@@ -180,6 +180,10 @@ export function NewClientButton({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    await submit(false);
+  }
+
+  async function submit(forceCreate: boolean) {
     setError(null);
 
     if (!email || !phone) {
@@ -237,6 +241,7 @@ export function NewClientButton({
       p_ssn: clientType === "individual" ? ssn || undefined : undefined,
       p_ein: clientType === "business" ? ein || undefined : undefined,
       p_itin: clientType === "individual" ? itin || undefined : undefined,
+      p_force_create: forceCreate,
     });
 
     if (error) {
@@ -251,7 +256,10 @@ export function NewClientButton({
     if (!result.is_new) {
       // Matched an existing client -- stop here. No address, contact,
       // engagement, or portal invite gets attached until the user confirms
-      // this genuinely isn't a duplicate.
+      // this genuinely isn't a duplicate (either by viewing the existing
+      // client, or by explicitly choosing "create anyway" -- e.g. spouses
+      // or business partners who legitimately share an email/phone --
+      // which re-submits with forceCreate: true and skips this branch).
       setDuplicateMatch({ matchedOn: result.duplicate_matched_on ?? [], existingClientId: result.client_id });
       return;
     }
@@ -722,6 +730,10 @@ export function NewClientButton({
           onViewExisting={() => {
             saveClientDraft(DRAFT_KEY, currentDraft());
             router.push(`/clients/${duplicateMatch.existingClientId}`);
+          }}
+          onCreateAnyway={() => {
+            setDuplicateMatch(null);
+            void submit(true);
           }}
         />
       )}

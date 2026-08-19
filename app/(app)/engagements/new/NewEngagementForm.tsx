@@ -109,6 +109,10 @@ function ClientSearchField({
 
   async function createClientInline(e: React.FormEvent) {
     e.preventDefault();
+    await submitInline(false);
+  }
+
+  async function submitInline(forceCreate: boolean) {
     setCreateError(null);
     if (newClientType === "individual" && (!newFirstName.trim() || !newLastName.trim())) {
       setCreateError("First and last name are required.");
@@ -127,6 +131,7 @@ function ClientSearchField({
       p_business_name: newClientType === "business" ? newBusinessName.trim() : undefined,
       p_primary_email: newEmail || undefined,
       p_primary_phone: newPhone || undefined,
+      p_force_create: forceCreate,
     });
     setCreating(false);
     if (error) {
@@ -293,6 +298,10 @@ function ClientSearchField({
               phone: newPhone,
             } satisfies InlineDraft);
             router.push(`/clients/${duplicateMatch.existingClientId}`);
+          }}
+          onCreateAnyway={() => {
+            setDuplicateMatch(null);
+            void submitInline(true);
           }}
         />
       )}
