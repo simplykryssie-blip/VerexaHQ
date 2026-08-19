@@ -490,6 +490,7 @@ export type Database = {
           automation_id: string
           client_id: string | null
           completed_at: string | null
+          current_step_id: string | null
           engagement_id: string | null
           id: string
           started_at: string
@@ -501,6 +502,7 @@ export type Database = {
           automation_id: string
           client_id?: string | null
           completed_at?: string | null
+          current_step_id?: string | null
           engagement_id?: string | null
           id?: string
           started_at?: string
@@ -512,6 +514,7 @@ export type Database = {
           automation_id?: string
           client_id?: string | null
           completed_at?: string | null
+          current_step_id?: string | null
           engagement_id?: string | null
           id?: string
           started_at?: string
@@ -532,6 +535,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_current_step_id_fkey"
+            columns: ["current_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
             referencedColumns: ["id"]
           },
           {
@@ -564,12 +574,69 @@ export type Database = {
           },
         ]
       }
+      automation_step_edges: {
+        Row: {
+          automation_id: string
+          branch_conditions: Json | null
+          created_at: string
+          from_step_id: string
+          id: string
+          label: string | null
+          sort_order: number
+          to_step_id: string
+        }
+        Insert: {
+          automation_id: string
+          branch_conditions?: Json | null
+          created_at?: string
+          from_step_id: string
+          id?: string
+          label?: string | null
+          sort_order?: number
+          to_step_id: string
+        }
+        Update: {
+          automation_id?: string
+          branch_conditions?: Json | null
+          created_at?: string
+          from_step_id?: string
+          id?: string
+          label?: string | null
+          sort_order?: number
+          to_step_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_step_edges_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_step_edges_from_step_id_fkey"
+            columns: ["from_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_step_edges_to_step_id_fkey"
+            columns: ["to_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_steps: {
         Row: {
           action_config: Json
           action_type: string
           approver_role_id: string | null
           automation_id: string
+          canvas_x: number | null
+          canvas_y: number | null
           created_at: string
           delay_minutes: number
           display_order: number
@@ -582,6 +649,8 @@ export type Database = {
           action_type: string
           approver_role_id?: string | null
           automation_id: string
+          canvas_x?: number | null
+          canvas_y?: number | null
           created_at?: string
           delay_minutes?: number
           display_order?: number
@@ -594,6 +663,8 @@ export type Database = {
           action_type?: string
           approver_role_id?: string | null
           automation_id?: string
+          canvas_x?: number | null
+          canvas_y?: number | null
           created_at?: string
           delay_minutes?: number
           display_order?: number
@@ -8534,6 +8605,10 @@ export type Database = {
           p_user_id: string
           p_workspace_id: string
         }
+        Returns: boolean
+      }
+      is_pending_signer_for_signature_request: {
+        Args: { p_signature_request_id: string; p_workspace_id: string }
         Returns: boolean
       }
       is_platform_admin: { Args: never; Returns: boolean }
