@@ -64,7 +64,17 @@ function ActionNode({ data, selected }: NodeProps & { data: StepNodeData }) {
   );
 }
 
-function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { branchCount: number } }) {
+type ConditionBranchHandle = { id: string; label: string | null; wired: boolean };
+
+// Every branch gets its own source handle spread evenly along the bottom
+// edge, labeled above with the branch's name, so dragging from a specific
+// dot unambiguously wires that specific branch -- there's no more guessing
+// which of several branches sharing one handle a drag was "for". A
+// condition with no branches defined yet (BranchEditor never saved) falls
+// back to a single generic handle so it can still be wired up directly from
+// the canvas.
+function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { branches: ConditionBranchHandle[] } }) {
+  const branches = data.branches;
   return (
     <div
       className={`w-48 rounded-xl border bg-violetSoft px-3 py-2.5 shadow-sm ${selected ? "border-accent ring-2 ring-accent/30" : "border-violet/40"}`}
@@ -76,8 +86,33 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
         </span>
         Condition
       </div>
-      <p className="mt-1 text-[11px] text-muted">{data.branchCount} branch{data.branchCount === 1 ? "" : "es"}</p>
-      <Handle type="source" position={Position.Bottom} style={handleStyle} className="!bg-muted" />
+      <p className="mt-1 text-[11px] text-muted">{branches.length} branch{branches.length === 1 ? "" : "es"}</p>
+      {branches.length > 0 && (
+        <div
+          className="mt-1.5 grid gap-1 text-center text-[10px] font-medium text-muted"
+          style={{ gridTemplateColumns: `repeat(${branches.length}, 1fr)` }}
+        >
+          {branches.map((b, i) => (
+            <span key={b.id} className="truncate" title={b.label || `Branch ${i + 1}`}>
+              {b.label || `#${i + 1}`}
+            </span>
+          ))}
+        </div>
+      )}
+      {branches.length === 0 ? (
+        <Handle type="source" position={Position.Bottom} style={handleStyle} className="!bg-muted" />
+      ) : (
+        branches.map((b, i) => (
+          <Handle
+            key={b.id}
+            id={b.id}
+            type="source"
+            position={Position.Bottom}
+            style={{ ...handleStyle, left: `${((i + 0.5) / branches.length) * 100}%` }}
+            className={b.wired ? "!bg-muted" : "!bg-amber"}
+          />
+        ))
+      )}
     </div>
   );
 }
@@ -174,12 +209,15 @@ function CanvasInner({
 
   const initialNodes: Node[] = useMemo(() => {
     const stepNodes = steps.map((s, i) => {
-      const branchCount = edgeRows.filter((e) => e.from_step_id === s.id).length;
+      const branches = edgeRows
+        .filter((e) => e.from_step_id === s.id)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((e) => ({ id: e.id, label: e.label, wired: e.to_step_id != null }));
       return {
         id: s.id,
         type: s.action_type === "condition" ? "condition" : "action",
         position: s.canvas_x != null && s.canvas_y != null ? { x: s.canvas_x, y: s.canvas_y } : autoPosition(i),
-        data: { step: s, branchCount },
+        data: { step: s, branches },
       };
     });
     const triggerNode: Node = {
@@ -199,14 +237,21 @@ function CanvasInner({
     // not dragged to a target) has nothing to draw a line to.
     const realEdges = edgeRows
       .filter((e): e is WorkflowStepEdgeRow & { to_step_id: string } => e.to_step_id != null)
-      .map((e) => ({
-        id: e.id,
-        source: e.from_step_id,
-        target: e.to_step_id,
-        label: e.label ?? undefined,
-        style: e.branch_conditions ? { stroke: "var(--color-accent, #0b7fe0)" } : undefined,
-        markerEnd: { type: MarkerType.ArrowClosed },
-      }));
+      .map((e) => {
+        const fromStep = steps.find((s) => s.id === e.from_step_id);
+        return {
+          id: e.id,
+          source: e.from_step_id,
+          target: e.to_step_id,
+          // Condition nodes expose one handle per branch, keyed by that
+          // branch's edge id -- pin each edge to its own handle so it
+          // doesn't default to whichever handle React Flow picks first.
+          sourceHandle: fromStep?.action_type === "condition" ? e.id : undefined,
+          label: e.label ?? undefined,
+          style: e.branch_conditions ? { stroke: "var(--color-accent, #0b7fe0)" } : undefined,
+          markerEnd: { type: MarkerType.ArrowClosed },
+        };
+      });
     // Visual only, not a real automation_step_edges row -- shows where
     // execution actually starts (the step(s) with no incoming edge).
     const triggerEdges = rootStepIds.map((id) => ({
@@ -218,7 +263,7 @@ function CanvasInner({
       markerEnd: { type: MarkerType.ArrowClosed },
     }));
     return [...triggerEdges, ...realEdges];
-  }, [edgeRows, rootStepIds]);
+  }, [edgeRows, rootStepIds, steps]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -268,12 +313,18 @@ function CanvasInner({
       }
       const sourceStep = steps.find((s) => s.id === connection.source);
       const existingOutgoing = edgeRows.filter((e) => e.from_step_id === connection.source);
-      // A condition defined via the branches modal already has edges for
-      // Yes/No (etc.) with no destination yet -- connecting from it should
-      // wire up the first of those, not pile on a redundant extra edge.
-      const unwiredBranch = existingOutgoing.find((e) => e.to_step_id === null);
+      // A condition node exposes one connection handle per branch, keyed by
+      // that branch's edge id -- if the drag started from one of those, it
+      // unambiguously identifies which branch to wire up, no guessing.
+      const handleBranch = connection.sourceHandle
+        ? existingOutgoing.find((e) => e.id === connection.sourceHandle)
+        : undefined;
+      // Fallback for a condition with no branches predefined yet (only its
+      // single generic handle exists then) -- wire up the first unwired
+      // branch, same as before per-branch handles existed.
+      const targetBranch = handleBranch ?? existingOutgoing.find((e) => e.to_step_id === null);
 
-      if (!unwiredBranch && sourceStep?.action_type !== "condition" && existingOutgoing.length >= 1) {
+      if (!targetBranch && sourceStep?.action_type !== "condition" && existingOutgoing.length >= 1) {
         toast.show("This step already has a next step. Only condition steps can branch to more than one.", "error");
         return;
       }
@@ -281,8 +332,11 @@ function CanvasInner({
       // round trip to see whether the drag "worked."
       setEdges((eds) => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed } }, eds));
 
-      if (unwiredBranch) {
-        const { error } = await supabase.from("automation_step_edges").update({ to_step_id: connection.target }).eq("id", unwiredBranch.id);
+      if (targetBranch) {
+        // If the handle was already wired (dragging from an already-connected
+        // branch to a new target), this rewires that branch rather than
+        // piling on a duplicate edge for the same branch.
+        const { error } = await supabase.from("automation_step_edges").update({ to_step_id: connection.target }).eq("id", targetBranch.id);
         if (error) toast.show(error.message, "error");
         router.refresh();
         return;
