@@ -2,7 +2,14 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
-import { WorkflowBuilder, type WorkflowStepRow, type WorkflowRunRow, type StaffOption, type AutomationOption } from "@/components/workflows/WorkflowBuilder";
+import {
+  WorkflowBuilder,
+  type WorkflowStepRow,
+  type WorkflowStepEdgeRow,
+  type WorkflowRunRow,
+  type StaffOption,
+  type AutomationOption,
+} from "@/components/workflows/WorkflowBuilder";
 import type { PipelineOption, TemplateOption } from "@/components/workflows/TriggerFields";
 import type { Condition } from "@/components/workflows/ConditionsEditor";
 
@@ -25,6 +32,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   const [
     { data: steps },
+    { data: stepEdges },
     { data: runs },
     { data: logs },
     { data: emailTemplates },
@@ -41,9 +49,14 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
   ] = await Promise.all([
       supabase
         .from("automation_steps")
-        .select("id, display_order, action_type, action_config, delay_minutes")
+        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y")
         .eq("automation_id", automation.id)
         .order("display_order"),
+      supabase
+        .from("automation_step_edges")
+        .select("id, from_step_id, to_step_id, branch_conditions, label, sort_order")
+        .eq("automation_id", automation.id)
+        .order("sort_order"),
       supabase
         .from("automation_runs")
         .select("id, status, started_at, completed_at, engagements(engagement_number), clients(first_name, last_name, business_name)")
@@ -125,6 +138,17 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     action_type: s.action_type,
     action_config: s.action_config as Record<string, unknown>,
     delay_minutes: s.delay_minutes,
+    canvas_x: s.canvas_x,
+    canvas_y: s.canvas_y,
+  }));
+
+  const stepEdgeRows: WorkflowStepEdgeRow[] = (stepEdges ?? []).map((e) => ({
+    id: e.id,
+    from_step_id: e.from_step_id,
+    to_step_id: e.to_step_id,
+    branch_conditions: e.branch_conditions as unknown as Condition[] | null,
+    label: e.label,
+    sort_order: e.sort_order,
   }));
 
   function clientLabelFor(c: { first_name: string | null; last_name: string | null; business_name: string | null } | null) {
@@ -168,6 +192,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           triggerConfig={automation.trigger_config as Record<string, unknown>}
           isEnabled={automation.is_enabled}
           steps={stepRows}
+          stepEdges={stepEdgeRows}
           runs={runRows}
           logs={logs ?? []}
           emailTemplates={emailTemplates ?? []}

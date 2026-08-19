@@ -7,7 +7,6 @@ import {
   ArrowUp,
   Mail,
   MessageSquare,
-  Plus,
   Trash2,
   CheckSquare,
   BookOpen,
@@ -37,6 +36,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
+import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 
 export type StaffOption = { id: string; display_name: string | null };
 export type AutomationOption = { id: string; name: string };
@@ -47,6 +47,17 @@ export type WorkflowStepRow = {
   action_type: string;
   action_config: Record<string, unknown>;
   delay_minutes: number;
+  canvas_x: number | null;
+  canvas_y: number | null;
+};
+
+export type WorkflowStepEdgeRow = {
+  id: string;
+  from_step_id: string;
+  to_step_id: string;
+  branch_conditions: Condition[] | null;
+  label: string | null;
+  sort_order: number;
 };
 
 export type WorkflowRunRow = {
@@ -66,9 +77,9 @@ type WorkflowLogRow = {
   error_message: string | null;
 };
 
-type MessageTemplateOption = { id: string; name: string; slug: string };
+export type MessageTemplateOption = { id: string; name: string; slug: string };
 
-const ACTION_TYPES = [
+export const ACTION_TYPES = [
   { value: "send_email", label: "Send an email" },
   { value: "send_sms", label: "Send a text" },
   { value: "create_task", label: "Create a task" },
@@ -106,7 +117,7 @@ const UPDATE_CLIENT_FIELDS = [
 ];
 const CLIENT_TYPES = ["individual", "business", "trust", "estate", "organization"];
 
-function actionIcon(type: string) {
+export function actionIcon(type: string) {
   if (type === "send_email") return <Mail size={15} />;
   if (type === "send_sms") return <MessageSquare size={15} />;
   if (type === "send_organizer_template") return <BookOpen size={15} />;
@@ -133,7 +144,7 @@ function actionIcon(type: string) {
   return <CheckSquare size={15} />;
 }
 
-function StepCard({
+export function StepCard({
   step,
   index,
   total,
@@ -148,6 +159,7 @@ function StepCard({
   automationOptions,
   canManage,
   onSaved,
+  hideReorder,
 }: {
   step: WorkflowStepRow;
   index: number;
@@ -163,6 +175,7 @@ function StepCard({
   automationOptions: AutomationOption[];
   canManage: boolean;
   onSaved: () => void;
+  hideReorder?: boolean;
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -228,12 +241,16 @@ function StepCard({
         </div>
         {canManage && (
           <div className="flex items-center gap-1">
-            <button type="button" disabled={index === 0} onClick={() => move("up")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move up">
-              <ArrowUp size={14} />
-            </button>
-            <button type="button" disabled={index === total - 1} onClick={() => move("down")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move down">
-              <ArrowDown size={14} />
-            </button>
+            {!hideReorder && (
+              <>
+                <button type="button" disabled={index === 0} onClick={() => move("up")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move up">
+                  <ArrowUp size={14} />
+                </button>
+                <button type="button" disabled={index === total - 1} onClick={() => move("down")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move down">
+                  <ArrowDown size={14} />
+                </button>
+              </>
+            )}
             <button type="button" onClick={remove} className="rounded p-1 text-muted hover:text-danger" aria-label="Delete step">
               <Trash2 size={14} />
             </button>
@@ -941,6 +958,7 @@ export function WorkflowBuilder({
   triggerConfig,
   isEnabled,
   steps,
+  stepEdges,
   runs,
   logs,
   emailTemplates,
@@ -961,6 +979,7 @@ export function WorkflowBuilder({
   triggerConfig: Record<string, unknown>;
   isEnabled: boolean;
   steps: WorkflowStepRow[];
+  stepEdges: WorkflowStepEdgeRow[];
   runs: WorkflowRunRow[];
   logs: WorkflowLogRow[];
   emailTemplates: MessageTemplateOption[];
@@ -1010,22 +1029,6 @@ export function WorkflowBuilder({
       return;
     }
     toast.show(next ? "Workflow activated" : "Workflow paused", "success");
-    router.refresh();
-  }
-
-  async function addStep() {
-    const nextOrder = steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0;
-    const { error } = await supabase.from("automation_steps").insert({
-      automation_id: automationId,
-      display_order: nextOrder,
-      action_type: "create_task",
-      action_config: {},
-    } as never);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show("Step added", "success");
     router.refresh();
   }
 
@@ -1086,39 +1089,25 @@ export function WorkflowBuilder({
 
       <div>
         <h3 className="mb-2 text-sm font-semibold text-ink">Steps</h3>
-        {steps.length === 0 ? (
+        {steps.length === 0 && !canManage ? (
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
         ) : (
-          <div className="space-y-3">
-            {steps.map((s, i) => (
-              <StepCard
-                key={s.id}
-                step={s}
-                index={i}
-                total={steps.length}
-                emailTemplates={emailTemplates}
-                smsTemplates={smsTemplates}
-                organizerTemplates={organizerTemplates}
-                engagementLetterTemplates={engagementLetterTemplates}
-                documentRequestTemplates={documentRequestTemplates}
-                services={services}
-                pipelines={pipelines}
-                staffOptions={staffOptions}
-                automationOptions={automationOptions}
-                canManage={canManage}
-                onSaved={() => router.refresh()}
-              />
-            ))}
-          </div>
-        )}
-        {canManage && (
-          <button
-            type="button"
-            onClick={addStep}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-accent hover:bg-accentSoft"
-          >
-            <Plus size={14} /> Add step
-          </button>
+          <WorkflowCanvas
+            automationId={automationId}
+            steps={steps}
+            edges={stepEdges}
+            canManage={canManage}
+            emailTemplates={emailTemplates}
+            smsTemplates={smsTemplates}
+            organizerTemplates={organizerTemplates}
+            engagementLetterTemplates={engagementLetterTemplates}
+            documentRequestTemplates={documentRequestTemplates}
+            services={services}
+            serviceCategories={serviceCategories}
+            pipelines={pipelines}
+            staffOptions={staffOptions}
+            automationOptions={automationOptions}
+          />
         )}
       </div>
 
