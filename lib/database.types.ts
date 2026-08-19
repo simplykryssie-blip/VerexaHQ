@@ -7770,6 +7770,10 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: string
       }
+      create_config_object_share: {
+        Args: { p_table: string; p_object_id: string; p_target_workspace_id: string }
+        Returns: string
+      }
       accept_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {

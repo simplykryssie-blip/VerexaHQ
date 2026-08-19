@@ -6,6 +6,7 @@ import { ClipboardList, Import } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { JotFormImportModal } from "@/components/settings/organizer-builder/JotFormImportModal";
+import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
 import { slugify } from "@/lib/roleSlug";
 import { useToast } from "@/components/Toast";
 
@@ -23,10 +24,12 @@ export function OrganizerLibrary({
   workspaceId,
   templates,
   isJotformConnected,
+  downlineWorkspaces,
 }: {
   workspaceId: string;
   templates: OrganizerCard[];
   isJotformConnected: boolean;
+  downlineWorkspaces: DownlineWorkspace[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -37,6 +40,7 @@ export function OrganizerLibrary({
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sharingCard, setSharingCard] = useState<GalleryCard | null>(null);
 
   const cards: GalleryCard[] = templates.map((t) => ({
     id: t.id,
@@ -121,7 +125,18 @@ export function OrganizerLibrary({
         createTileLabel="Create new organizer"
         onCreateClick={() => setCreating(true)}
         onDeleteClick={deleteTemplate}
+        onShareClick={downlineWorkspaces.length > 0 ? (card) => setSharingCard(card) : undefined}
       />
+
+      {sharingCard && (
+        <ShareTemplateModal
+          table="organizer_templates"
+          objectId={sharingCard.id}
+          objectName={sharingCard.name}
+          downlineWorkspaces={downlineWorkspaces}
+          onClose={() => setSharingCard(null)}
+        />
+      )}
 
       {creating && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
