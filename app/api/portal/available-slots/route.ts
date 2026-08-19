@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, type BusinessHours } from "@/lib/businessHours";
+import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 
 // Reads services.is_bookable, system_settings, and every appointment on the
 // requested day -- all things the portal session has no established RLS
@@ -60,8 +61,13 @@ export async function GET(request: Request) {
     .gte("start_at", dayStart.toISOString())
     .lt("start_at", dayEnd.toISOString());
 
+  // Also exclude slots blocked on a connected staff member's *personal*
+  // Google/Outlook calendar, not just other Verexa appointments -- best
+  // effort, never blocks booking if a calendar connection can't be reached.
+  const externalBusy = await getExternalBusyBlocks(supabase, identity.workspaceId, dayStart.toISOString(), dayEnd.toISOString());
+
   const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes);
-  const available = filterAvailableSlots(candidates, durationMinutes, existing ?? [], new Date());
+  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], new Date());
 
   return NextResponse.json({ slots: available.map((s) => s.toISOString()), durationMinutes });
 }

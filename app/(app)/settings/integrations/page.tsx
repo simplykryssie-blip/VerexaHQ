@@ -4,6 +4,7 @@ import { Plug } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
+import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
 import { JotFormConnectionCard } from "@/components/settings/JotFormConnectionCard";
 import { EmailDomainCard, type DnsRecord } from "@/components/settings/EmailDomainCard";
 
@@ -12,7 +13,15 @@ export const dynamic = "force-dynamic";
 export default async function IntegrationsPage({
   searchParams,
 }: {
-  searchParams: { zoom_error?: string; zoom_connected?: string; stripe_error?: string; stripe_connected?: string };
+  searchParams: {
+    zoom_error?: string;
+    zoom_connected?: string;
+    google_calendar_error?: string;
+    microsoft_calendar_error?: string;
+    calendar_connected?: string;
+    stripe_error?: string;
+    stripe_connected?: string;
+  };
 }) {
   const workspace = await getCurrentWorkspace();
   const supabase = createClient();
@@ -26,6 +35,11 @@ export default async function IntegrationsPage({
   const { data: zoomConnection } = user
     ? await supabase.from("user_zoom_connections").select("status, zoom_email").eq("user_id", user.id).maybeSingle()
     : { data: null };
+  const { data: calendarConnections } = user
+    ? await supabase.from("user_calendar_connections").select("provider, status, external_account_email").eq("user_id", user.id)
+    : { data: null };
+  const googleConnection = calendarConnections?.find((c) => c.provider === "google");
+  const microsoftConnection = calendarConnections?.find((c) => c.provider === "microsoft");
 
   const zoomSection = user && (
     <>
@@ -43,10 +57,37 @@ export default async function IntegrationsPage({
     </>
   );
 
+  const calendarSection = user && (
+    <>
+      <h2 className="mt-8 text-base font-semibold text-ink">Calendar</h2>
+      <p className="mt-1 text-sm text-muted">
+        Personal to you -- connect your own Google or Outlook calendar so your Verexa appointments show up on it, and so clients can&apos;t book
+        you during something that&apos;s only on your personal calendar.
+      </p>
+      <div className="mt-6 space-y-3">
+        <CalendarConnectionCard
+          provider="google"
+          label="Google Calendar"
+          status={(googleConnection?.status as "connected" | "disconnected" | "revoked" | undefined) ?? "not_connected"}
+          accountEmail={googleConnection?.external_account_email ?? null}
+          error={searchParams.google_calendar_error ?? null}
+        />
+        <CalendarConnectionCard
+          provider="microsoft"
+          label="Outlook Calendar"
+          status={(microsoftConnection?.status as "connected" | "disconnected" | "revoked" | undefined) ?? "not_connected"}
+          accountEmail={microsoftConnection?.external_account_email ?? null}
+          error={searchParams.microsoft_calendar_error ?? null}
+        />
+      </div>
+    </>
+  );
+
   if (!isAdmin) {
     return (
       <div className="max-w-2xl">
         <SettingsSectionHeader icon={Plug} title="Integrations" description="Connect the accounts you use personally -- everyone sees their own." />
+        {calendarSection}
         {zoomSection}
       </div>
     );
@@ -106,6 +147,7 @@ export default async function IntegrationsPage({
         <JotFormConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isJotformConnected)} />
       </div>
 
+      {calendarSection}
       {zoomSection}
     </div>
   );

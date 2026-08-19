@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, type BusinessHours } from "@/lib/businessHours";
+import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 
 // Mirrors the availability check in available-slots/route.ts and re-runs it
 // server-side rather than trusting the slot the client posted back --
@@ -59,8 +60,10 @@ export async function POST(request: Request) {
     .gte("start_at", dayStart.toISOString())
     .lt("start_at", dayEnd.toISOString());
 
+  const externalBusy = await getExternalBusyBlocks(supabase, identity.workspaceId, dayStart.toISOString(), dayEnd.toISOString());
+
   const candidates = slotsForDay(dayStart, businessHours, gridMinutes, durationMinutes);
-  const available = filterAvailableSlots(candidates, durationMinutes, existing ?? [], new Date());
+  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], new Date());
   const stillAvailable = available.some((s) => s.getTime() === start.getTime());
   if (!stillAvailable) {
     return NextResponse.json({ error: "That time is no longer available. Pick another slot." }, { status: 409 });

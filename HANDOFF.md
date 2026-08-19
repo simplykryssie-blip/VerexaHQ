@@ -238,6 +238,36 @@ un-promoted previews.
   user to contact Zoom Developer Support directly — a ready-to-paste bug
   report is in the conversation history, or just re-describe the 403
   above. Nothing left to try on our end until Zoom's side is unblocked.
+- **Google/Outlook calendar sync is fully built (2026-08-19) but has no real
+  OAuth credentials yet -- `GOOGLE_CALENDAR_CLIENT_ID/SECRET` and
+  `MICROSOFT_CALENDAR_CLIENT_ID/SECRET` in `.env.local.example` are both
+  blank.** Same shape as Zoom: per-staff personal connection, cards in
+  Settings → Integrations. What it does once credentials are set: every
+  appointment with a `staff_id` gets pushed (create/update/cancel) to that
+  staff member's connected calendar via a Postgres trigger
+  (`enqueue_calendar_sync` on `public.appointments`) that queues jobs into
+  `calendar_sync_queue`, drained by `/api/cron/sync-calendar-events` every 5
+  minutes -- so it fires for every current and future path that touches
+  `appointments` (staff toolbar, portal self-booking, anything added later),
+  not just one call site. It's two-way: the portal's `available-slots` and
+  `book-appointment` routes also live-query every connected staff member's
+  personal calendar for busy blocks (`lib/calendarSync/freebusy.ts`) so a
+  client can't book over something that only exists on someone's Google/
+  Outlook calendar. Tokens are encrypted at rest the same way as Zoom's
+  (`encrypt_calendar_secret`/`decrypt_calendar_secret`, pgp_sym via a
+  dedicated Vault key `calendar_oauth_vault_key`, service_role only).
+  Getting it live needs: a Google Cloud OAuth client (Calendar API enabled)
+  and an Azure/Entra app registration (Calendars.ReadWrite + User.Read Graph
+  permissions), redirect URIs exactly matching
+  `/api/calendar/google/callback` and `/api/calendar/microsoft/callback` on
+  the real domain, then those four env vars set in Vercel. Nothing left to
+  build on Verexa's side until those exist. Known limitation accepted for
+  scope: Microsoft's `getSchedule` (used for the Outlook freebusy check) is
+  an Exchange/M365 mailbox feature and may not work for a personal
+  outlook.com account with no Microsoft 365 subscription behind it -- the
+  freebusy helper fails open per-connection in that case rather than
+  blocking booking, so worst case is just no extra restriction from that
+  one connection.
 - **`app/api/zoom/connect/start/route.ts` / `callback/route.ts`** rely on
   `NEXT_PUBLIC_APP_URL` being set to exactly `https://verexahq.com` (no
   `www.`, no trailing slash) in Vercel's environment variables — this was

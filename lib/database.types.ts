@@ -61,6 +61,41 @@ export type Database = {
           },
         ]
       }
+      appointment_external_events: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          external_event_id: string
+          id: string
+          updated_at: string
+          user_calendar_connection_id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          external_event_id: string
+          id?: string
+          updated_at?: string
+          user_calendar_connection_id: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          external_event_id?: string
+          id?: string
+          updated_at?: string
+          user_calendar_connection_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_external_events_user_calendar_connection_id_fkey"
+            columns: ["user_calendar_connection_id"]
+            isOneToOne: false
+            referencedRelation: "user_calendar_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           client_id: string | null
@@ -810,6 +845,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      calendar_sync_queue: {
+        Row: {
+          action: string
+          appointment_id: string
+          attempts: number
+          created_at: string
+          description: string | null
+          end_at: string | null
+          error: string | null
+          id: string
+          location: string | null
+          max_attempts: number
+          meeting_url: string | null
+          scheduled_at: string
+          staff_id: string
+          start_at: string | null
+          status: string
+          title: string | null
+        }
+        Insert: {
+          action: string
+          appointment_id: string
+          attempts?: number
+          created_at?: string
+          description?: string | null
+          end_at?: string | null
+          error?: string | null
+          id?: string
+          location?: string | null
+          max_attempts?: number
+          meeting_url?: string | null
+          scheduled_at?: string
+          staff_id: string
+          start_at?: string | null
+          status?: string
+          title?: string | null
+        }
+        Update: {
+          action?: string
+          appointment_id?: string
+          attempts?: number
+          created_at?: string
+          description?: string | null
+          end_at?: string | null
+          error?: string | null
+          id?: string
+          location?: string | null
+          max_attempts?: number
+          meeting_url?: string | null
+          scheduled_at?: string
+          staff_id?: string
+          start_at?: string | null
+          status?: string
+          title?: string | null
+        }
+        Relationships: []
       }
       change_orders: {
         Row: {
@@ -6317,6 +6409,54 @@ export type Database = {
         }
         Relationships: []
       }
+      user_calendar_connections: {
+        Row: {
+          access_token_encrypted: string | null
+          calendar_id: string
+          connected_at: string | null
+          created_at: string
+          external_account_email: string | null
+          id: string
+          provider: string
+          refresh_token_encrypted: string | null
+          refresh_token_rotated_at: string | null
+          status: string
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          calendar_id?: string
+          connected_at?: string | null
+          created_at?: string
+          external_account_email?: string | null
+          id?: string
+          provider: string
+          refresh_token_encrypted?: string | null
+          refresh_token_rotated_at?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          calendar_id?: string
+          connected_at?: string | null
+          created_at?: string
+          external_account_email?: string | null
+          id?: string
+          provider?: string
+          refresh_token_encrypted?: string | null
+          refresh_token_rotated_at?: string | null
+          status?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           avatar_url: string | null
@@ -7770,10 +7910,6 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: string
       }
-      create_config_object_share: {
-        Args: { p_table: string; p_object_id: string; p_target_workspace_id: string }
-        Returns: string
-      }
       accept_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {
@@ -7960,6 +8096,14 @@ export type Database = {
         }
         Returns: string
       }
+      create_config_object_share: {
+        Args: {
+          p_object_id: string
+          p_table: string
+          p_target_workspace_id: string
+        }
+        Returns: string
+      }
       create_document_request: {
         Args: {
           p_due_date?: string
@@ -8096,6 +8240,10 @@ export type Database = {
         Args: { p_reason?: string; p_token: string }
         Returns: undefined
       }
+      decrypt_calendar_secret: {
+        Args: { p_ciphertext: string }
+        Returns: string
+      }
       decrypt_client_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_firm_secret: { Args: { p_ciphertext: string }; Returns: string }
       decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
@@ -8128,6 +8276,10 @@ export type Database = {
           p_table: string
           p_target_workspace_id?: string
         }
+        Returns: string
+      }
+      encrypt_calendar_secret: {
+        Args: { p_plaintext: string }
         Returns: string
       }
       encrypt_client_secret: { Args: { p_plaintext: string }; Returns: string }

@@ -17,11 +17,19 @@
       "schedule": "0 0 31 12 *"
     },
     {
+      "path": "/api/cron/refresh-calendar-tokens",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/refresh-zoom-tokens",
       "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/run-pending-automation-steps",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-calendar-events",
       "schedule": "*/5 * * * *"
     },
     {
