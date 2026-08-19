@@ -26,7 +26,7 @@ export default function ContactPage() {
       </a>
 
       <p className="mt-6 text-sm leading-relaxed text-slate">
-        If you're a client of a tax office or firm using Verexa, contact that firm directly for help with your own
+        If you&apos;re a client of a tax office or firm using Verexa, contact that firm directly for help with your own
         account or file -- they manage your information and can act on your request fastest.
       </p>
 
