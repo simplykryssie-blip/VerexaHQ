@@ -98,6 +98,7 @@ export function OverviewTab({
   phones,
   workspaceTags,
   portalUsers,
+  pendingPortalInvites,
   relationships,
   staffOptions,
   accountHolder,
@@ -146,6 +147,7 @@ export function OverviewTab({
   phones: PhoneRow[];
   workspaceTags: string[];
   portalUsers: PortalUserRow[];
+  pendingPortalInvites: PendingPortalInviteRow[];
   relationships: RelationshipRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
@@ -210,6 +212,7 @@ export function OverviewTab({
               name={clientDisplayName(client)}
               email={client.primary_email}
               portalUsers={portalUsers}
+              pendingInvites={pendingPortalInvites}
             />
             <Link
               href={`/clients/${client.id}/portal-preview`}
@@ -1157,7 +1160,15 @@ export type ContactRow = { id: string; first_name: string | null; last_name: str
 export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean };
 export type EmailRow = { id: string; email: string; email_type: string; is_primary: boolean };
 export type PhoneRow = { id: string; phone_number: string; phone_type: string; is_primary: boolean };
-export type PortalUserRow = { id: string; invited_name: string | null; invited_email: string; is_primary: boolean; status: string };
+export type PortalUserRow = {
+  id: string;
+  invited_name: string | null;
+  invited_email: string;
+  is_primary: boolean;
+  status: string;
+  invitation_token: string;
+};
+export type PendingPortalInviteRow = { client_portal_user_id: string; status: string; error: string | null; created_at: string };
 export type RelationshipRow = {
   id: string;
   relationship_type: string;
