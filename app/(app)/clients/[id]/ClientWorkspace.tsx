@@ -123,6 +123,7 @@ export function ClientWorkspace({
   reviewerDefault,
   complianceDefault,
   requestedService,
+  interestedServiceIds,
   leadPipeline,
 }: {
   workspace: Workspace;
@@ -165,6 +166,7 @@ export function ClientWorkspace({
   reviewerDefault: { id: string; display_name: string | null } | null;
   complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
+  interestedServiceIds: string[];
   leadPipeline: { processId: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
 }) {
   const [tab, setTab] = useState<Tab>("Details");
@@ -224,7 +226,12 @@ export function ClientWorkspace({
         />
         <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
-        <ServiceInterestControl clientId={client.id} workspaceId={workspace.id} services={workspaceServices} />
+        <ServiceInterestControl
+          clientId={client.id}
+          workspaceId={workspace.id}
+          services={workspaceServices}
+          interestedServiceIds={interestedServiceIds}
+        />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}
