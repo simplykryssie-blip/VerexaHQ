@@ -29,12 +29,17 @@ export async function GET(request: Request) {
 
   const supabase = createServiceClient();
 
-  const { data: jobs } = await supabase
+  const { data: jobs, error: queryError } = await supabase
     .from("pending_engagement_letter_sends")
     .select("id, workspace_id, engagement_id, client_id, engagement_letter_template_id")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
+
+  if (queryError) {
+    console.error("send-pending-engagement-letters: could not query pending_engagement_letter_sends", queryError);
+    return NextResponse.json({ processed: 0, sent: 0, failed: 0, queryError: queryError.message }, { status: 200 });
+  }
 
   let sent = 0;
   let failed = 0;
