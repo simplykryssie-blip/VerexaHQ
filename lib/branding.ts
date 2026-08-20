@@ -11,8 +11,6 @@ export type EffectiveBranding = {
   portalLogoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
-  /** Overrides the sidebar's text color when the nav bar color is light enough that the default light text would blend in. */
-  sidebarTextColor: string | null;
 };
 
 /**
@@ -41,7 +39,7 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
 
   const { data: branding } = await supabase
     .from("branding")
-    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color, sidebar_text_color")
+    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color")
     .eq("workspace_id", brandingWorkspaceId)
     .maybeSingle();
 
@@ -73,6 +71,5 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     portalLogoUrl: branding?.portal_logo_url ?? sidebarLogoUrl,
     primaryColor: branding?.primary_color ?? null,
     secondaryColor: branding?.secondary_color ?? null,
-    sidebarTextColor: branding?.sidebar_text_color ?? null,
   };
 }
