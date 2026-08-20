@@ -15,15 +15,12 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
-  textColor,
   isPlatformAdmin,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  /** Overrides the sidebar's text color -- for firms whose nav bar color is light enough that the default light text would blend in. */
-  textColor?: string | null;
   isPlatformAdmin?: boolean;
 }) {
   const pathname = usePathname();
@@ -33,15 +30,18 @@ export function Sidebar({
   // primaryColor is unused here now that the sidebar is a light surface --
   // it's kept in the props/Brand Center settings for a future use (e.g. a
   // portal accent) rather than driving a colored rail background.
+  //
+  // There's no per-workspace text-color override anymore either: that only
+  // ever made sense back when the rail's own background was a custom color
+  // and could get dark enough to need light text. Now that the sidebar is
+  // always this same light surface, applying a stored override can only
+  // ever make text harder to read against it (a leftover light value renders
+  // as near-invisible on the light background) with no upside, so the app
+  // no longer reads or applies branding.sidebar_text_color at all.
   const sidebarStyle: React.CSSProperties = {};
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
     (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
-  }
-  if (textColor) {
-    (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;
-    (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(textColor, 0.7) ?? textColor;
-    (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(textColor, 0.5) ?? textColor;
   }
 
   // Flatten every navigable href (top-level items + group children) so the
