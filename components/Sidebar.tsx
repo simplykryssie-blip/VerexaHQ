@@ -16,12 +16,15 @@ export function Sidebar({
   primaryColor,
   secondaryColor,
   isPlatformAdmin,
+  showMessages,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
   isPlatformAdmin?: boolean;
+  /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
+  showMessages?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -123,7 +126,9 @@ export function Sidebar({
             <div key={section.label}>
               <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
               <div className="space-y-1">
-                {section.items.map((item) => {
+                {section.items
+                  .filter((item) => item.label !== "Messages" || showMessages)
+                  .map((item) => {
                   const Icon = item.icon;
 
                   if ("children" in item) {

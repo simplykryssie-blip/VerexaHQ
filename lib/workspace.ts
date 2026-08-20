@@ -20,6 +20,7 @@ export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
     .select("is_owner, workspaces(id, name, slug, workspace_type)")
     .eq("user_id", user.id)
     .eq("status", "active")
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 

@@ -4121,6 +4121,103 @@ export type Database = {
           },
         ]
       }
+      network_message_threads: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ero_workspace_id: string
+          id: string
+          last_message_at: string | null
+          workspace_a_id: string
+          workspace_b_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ero_workspace_id: string
+          id?: string
+          last_message_at?: string | null
+          workspace_a_id: string
+          workspace_b_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ero_workspace_id?: string
+          id?: string
+          last_message_at?: string | null
+          workspace_a_id?: string
+          workspace_b_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_message_threads_ero_workspace_id_fkey"
+            columns: ["ero_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_message_threads_workspace_a_id_fkey"
+            columns: ["workspace_a_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_message_threads_workspace_b_id_fkey"
+            columns: ["workspace_b_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      network_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_user_id: string | null
+          sender_workspace_id: string
+          thread_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_user_id?: string | null
+          sender_workspace_id: string
+          thread_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_user_id?: string | null
+          sender_workspace_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "network_messages_sender_workspace_id_fkey"
+            columns: ["sender_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "network_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "network_message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           attachments: Json | null
@@ -7419,6 +7516,7 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          allow_connected_ptin_messaging: boolean
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
@@ -7446,6 +7544,7 @@ export type Database = {
           workspace_type: string
         }
         Insert: {
+          allow_connected_ptin_messaging?: boolean
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
@@ -7473,6 +7572,7 @@ export type Database = {
           workspace_type?: string
         }
         Update: {
+          allow_connected_ptin_messaging?: boolean
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
@@ -8149,6 +8249,11 @@ export type Database = {
           p_token: string
         }
         Returns: Json
+      }
+      can_use_network_messaging: { Args: { p_workspace_id: string }; Returns: boolean }
+      get_messageable_network_workspaces: {
+        Args: { p_workspace_id: string }
+        Returns: { workspace_id: string; name: string; workspace_type: string }[]
       }
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
@@ -9096,6 +9201,10 @@ export type Database = {
       }
       start_lead_pipeline_run: {
         Args: { p_client_id: string; p_process_id: string }
+        Returns: string
+      }
+      start_network_message_thread: {
+        Args: { p_workspace_id: string; p_other_workspace_id: string; p_body: string }
         Returns: string
       }
       start_next_automation_step: {
