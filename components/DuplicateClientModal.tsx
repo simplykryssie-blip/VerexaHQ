@@ -63,8 +63,8 @@ export function DuplicateClientModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-lg">
-        <h3 className="text-sm font-semibold text-ink">Possible duplicate client</h3>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-softHover">
+        <h3 className="font-display text-sm font-semibold text-ink">Possible duplicate client</h3>
         <p className="mt-2 text-sm text-slate">
           A client matching this {formatMatchedOn(matchedOn)} already exists{name ? `: ${name}` : "."}
           {name ? "." : ""}

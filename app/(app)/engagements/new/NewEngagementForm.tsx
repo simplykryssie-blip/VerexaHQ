@@ -678,8 +678,8 @@ export function NewEngagementForm({
 
     {organizerPrompt && (
       <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
-        <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-lg">
-          <h3 className="text-sm font-semibold text-ink">Send organizer now?</h3>
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-softHover">
+          <h3 className="font-display text-sm font-semibold text-ink">Send organizer now?</h3>
           <p className="mt-2 text-sm text-slate">
             Send <strong>{organizerPrompt.organizerName}</strong> to <strong>{selectedClient ? clientLabel(selectedClient) : "the client"}</strong> now?
             {selectedClient && !selectedClient.primary_email && " This client has no email on file, so it will be ready in their portal but no notification will be sent."}

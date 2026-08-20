@@ -440,8 +440,8 @@ export function NewClientButton({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg">
-            <h2 className="text-base font-semibold text-ink">New client</h2>
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-softHover">
+            <h2 className="font-display text-base font-semibold text-ink">New client</h2>
 
             <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div className="flex gap-2">

@@ -35,10 +35,10 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`w-full rounded-2xl border border-border bg-surface p-6 shadow-lg ${size === "xl" ? "max-w-4xl" : "max-w-md"}`}
+        className={`w-full rounded-2xl border border-border bg-surface p-6 shadow-softHover ${size === "xl" ? "max-w-4xl" : "max-w-md"}`}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
+          <h2 className="font-display text-base font-semibold text-ink">{title}</h2>
           <button type="button" onClick={onClose} className="text-sm text-muted hover:text-ink">
             Cancel
           </button>
