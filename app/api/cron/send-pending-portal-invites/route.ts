@@ -129,11 +129,19 @@ async function sendOne(
     const result = await sendEmailViaResend({ to: portalUser.invited_email, subject, html, sender: "portal", workspaceId: job.workspace_id });
     if (!result.sent) throw new Error(result.error ?? result.reason ?? "send failed");
 
-    await supabase.from("pending_portal_invites").update({ status: "sent", processed_at: new Date().toISOString() }).eq("id", job.id);
+    const { error: markSentErr } = await supabase
+      .from("pending_portal_invites")
+      .update({ status: "sent", processed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (markSentErr) console.error(`send-pending-portal-invites: sent email for job ${job.id} but could not mark it sent`, markSentErr);
     return "sent";
   } catch (err) {
     const error = err instanceof Error ? err.message : "unknown error";
-    await supabase.from("pending_portal_invites").update({ status: "failed", error, processed_at: new Date().toISOString() }).eq("id", job.id);
+    const { error: markFailedErr } = await supabase
+      .from("pending_portal_invites")
+      .update({ status: "failed", error, processed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (markFailedErr) console.error(`send-pending-portal-invites: job ${job.id} failed (${error}) and could not be marked failed`, markFailedErr);
     return "failed";
   }
 }
