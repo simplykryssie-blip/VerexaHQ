@@ -149,11 +149,19 @@ async function sendOne(
       if (signerErr) throw new Error(signerErr.message);
     }
 
-    await supabase.from("pending_engagement_letter_sends").update({ status: "sent", processed_at: new Date().toISOString() }).eq("id", job.id);
+    const { error: markSentErr } = await supabase
+      .from("pending_engagement_letter_sends")
+      .update({ status: "sent", processed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (markSentErr) console.error(`send-pending-engagement-letters: sent letter for job ${job.id} but could not mark it sent`, markSentErr);
     return "sent";
   } catch (err) {
     const error = err instanceof Error ? err.message : "unknown error";
-    await supabase.from("pending_engagement_letter_sends").update({ status: "failed", error, processed_at: new Date().toISOString() }).eq("id", job.id);
+    const { error: markFailedErr } = await supabase
+      .from("pending_engagement_letter_sends")
+      .update({ status: "failed", error, processed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (markFailedErr) console.error(`send-pending-engagement-letters: job ${job.id} failed (${error}) and could not be marked failed`, markFailedErr);
     return "failed";
   }
 }
