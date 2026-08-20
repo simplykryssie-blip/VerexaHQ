@@ -8,6 +8,7 @@ import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ResendInvitationButton } from "./ResendInvitationButton";
+import { RemoveMemberButton } from "./RemoveMemberButton";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 type MemberRow = {
   id: string;
+  user_id: string;
   status: string;
   is_owner: boolean;
   role_id: string;
@@ -39,7 +41,7 @@ export default async function UsersPage() {
   const [{ data: membersRaw }, { data: roles }, { data: invitationsRaw }, { data: isAdmin }] = await Promise.all([
     supabase
       .from("workspace_users")
-      .select("id, status, is_owner, role_id, user_profiles(display_name, avatar_url), roles(name)")
+      .select("id, user_id, status, is_owner, role_id, user_profiles(display_name, avatar_url), roles(name)")
       .eq("workspace_id", workspace.id)
       .order("created_at" as never, { ascending: true }),
     supabase
@@ -84,6 +86,17 @@ export default async function UsersPage() {
       },
     },
     { key: "status", header: "Status", render: (m) => <span className="capitalize text-slate">{m.status}</span> },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (m) =>
+        isAdmin && !m.is_owner && m.status === "active" ? (
+          <div className="flex justify-end">
+            <RemoveMemberButton workspaceId={workspace.id} userId={m.user_id} name={m.user_profiles?.display_name ?? "this member"} />
+          </div>
+        ) : null,
+    },
   ];
 
   const invitationColumns: DataTableColumn<InvitationRow>[] = [
