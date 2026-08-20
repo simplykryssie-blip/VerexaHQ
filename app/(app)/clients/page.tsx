@@ -114,8 +114,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   // a pipeline stage" already use -- rather than the old flat, uncustomizable
   // lead_stages list. Which pipeline is "the" one for new leads is a
   // workspace setting (Pipelines page). Per-stage filtering/viewing lives on
-  // that pipeline's own board now (see LeadPipelineBoard), not here -- this
-  // page only needs to know whether one is set, for the pointer link below.
+  // that pipeline's own page now (each stage card shows its leads, same
+  // shape as every other pipeline), not here -- this page only needs to
+  // know whether one is set, for the pointer link below.
   let defaultLeadProcessId: string | null = null;
   if (isLeadsTab) {
     const { data: workspaceRow } = await supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle();
