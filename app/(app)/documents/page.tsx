@@ -1,263 +1,176 @@
-"use client";
+import Link from "next/link";
+import { FileText, Clock, AlertTriangle, PenLine, HardDrive } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
+import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
 
-import { useEffect, useState } from "react";
-import { Plus, Upload, LayoutTemplate, Download, Check, X, Eye, EyeOff, Trash2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import type { Document, Client } from "@/lib/types";
-import StatusPill from "@/components/StatusPill";
-import RequestDocumentModal from "@/components/RequestDocumentModal";
-import UploadDocumentModal from "@/components/UploadDocumentModal";
-import ApplyDocumentTemplateModal from "@/components/ApplyDocumentTemplateModal";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import { useToast } from "@/components/Toast";
+export const dynamic = "force-dynamic";
 
-import { friendlyError } from "@/lib/friendlyError";
-type DocumentRow = Document & { clientName: string };
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
-export default function DocumentsPage() {
-  const { showSuccess, showError } = useToast();
-  const [docs, setDocs] = useState<DocumentRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showRequest, setShowRequest] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
-  const [showTemplate, setShowTemplate] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
-  const [deleting, setDeleting] = useState(false);
+function StatCard({ icon: Icon, label, value, href }: { icon: React.ElementType; label: string; value: React.ReactNode; href?: string }) {
+  const body = (
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
+      <div className="flex items-center gap-2 text-muted">
+        <Icon size={16} aria-hidden="true" />
+        <p className="text-xs uppercase tracking-wide">{label}</p>
+      </div>
+      <p className="mt-1 text-2xl font-semibold text-ink">{value}</p>
+    </div>
+  );
+  return href ? <Link href={href}>{body}</Link> : body;
+}
 
-  async function load() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("documents")
-      .select("*")
-      .order("created_at", { ascending: false });
+export default async function DocumentCenterHubPage() {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return null;
 
-    if (error) {
-      setError(friendlyError(error, "Something went wrong. Please try again."));
-      setLoading(false);
-      return;
-    }
-
-    const list = (data as Document[]) ?? [];
-    const clientIds = Array.from(new Set(list.map((d) => d.client_id)));
-    let clientsMap = new Map<string, string>();
-    if (clientIds.length > 0) {
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name, business_name, client_type")
-        .in("id", clientIds);
-      (clientsData as Client[] | null)?.forEach((c) => {
-        const name =
-          c.client_type === "business" && c.business_name
-            ? c.business_name
-            : `${c.first_name} ${c.last_name}`.trim();
-        clientsMap.set(c.id, name);
-      });
-    }
-
-    setDocs(list.map((d) => ({ ...d, clientName: clientsMap.get(d.client_id) ?? "—" })));
-    setError(null);
-    setLoading(false);
+  const supabase = createClient();
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.view" });
+  if (!canView) {
+    return (
+      <>
+        <PageHeader title="Document Center" />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState message="You don't have permission to view the Document Center." />
+        </div>
+      </>
+    );
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  const [{ data: openRequests }, { data: pendingSignatures }, { data: allDocuments }, { data: storageRows }, { data: staffMembers }] = await Promise.all([
+    supabase
+      .from("document_requests")
+      .select(
+        `id, title, due_date, entity_type, entity_id,
+        items:document_request_item_statuses(id, is_required, status)`
+      )
+      .eq("workspace_id", workspace.id)
+      .eq("status", "open"),
+    supabase
+      .from("signature_requests")
+      .select(
+        `id, title, due_date, created_at,
+        attachment:attachments!signature_requests_attachment_id_fkey(file_name)`
+      )
+      .eq("workspace_id", workspace.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("attachments")
+      .select(
+        `id, file_name, storage_path, category, tags, version, mime_type, file_size_bytes, folder_id,
+        is_favorite, is_archived, is_locked, visibility, created_at, uploaded_by, entity_type, entity_id`
+      )
+      .eq("workspace_id", workspace.id)
+      .order("created_at", { ascending: false })
+      .limit(500),
+    supabase.from("attachments").select("file_size_bytes").eq("workspace_id", workspace.id).eq("is_archived", false),
+    supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id).eq("status", "active"),
+  ]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("new") === "1") {
-      setShowRequest(true);
-      window.history.replaceState(null, "", window.location.pathname);
-    }
-  }, []);
+  const labelMap = await buildEntityLabelMap(supabase, [...(openRequests ?? []), ...(allDocuments ?? [])]);
 
-  async function handleDownload(doc: Document) {
-    if (!doc.storage_path) return;
-    const { data, error } = await supabase.storage
-      .from("verexahq-client-documents")
-      .createSignedUrl(doc.storage_path, 60);
-    if (error || !data) {
-      setError(friendlyError(error, "Could not generate a download link. Please try again."));
-      return;
-    }
-    window.open(data.signedUrl, "_blank");
-  }
+  const staffById = new Map(
+    (staffMembers ?? [])
+      .map((m: any) => m.user_profiles)
+      .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
+      .map((p: any) => [p.id, p])
+  );
+  const documentsWithUploader = (allDocuments ?? []).map((d: any) => ({
+    ...d,
+    uploaded_by: d.uploaded_by ? staffById.get(d.uploaded_by) ?? null : null,
+  }));
 
-  async function handleAccept(doc: Document) {
-    const { error } = await supabase.rpc("accept_client_document", { p_document_id: doc.id });
-    if (!error) load();
-    else setError(friendlyError(error, "Something went wrong. Please try again."));
-  }
-
-  async function handleReject(doc: Document) {
-    const reason = window.prompt("Reason for rejecting this document?");
-    if (!reason) return;
-    const { error } = await supabase.rpc("reject_client_document", {
-      p_document_id: doc.id,
-      p_rejection_reason: reason,
-    });
-    if (!error) load();
-    else setError(friendlyError(error, "Something went wrong. Please try again."));
-  }
-
-  async function toggleVisibility(doc: Document) {
-    const { error } = await supabase
-      .from("documents")
-      .update({ is_visible_to_client: !doc.is_visible_to_client })
-      .eq("id", doc.id);
-    if (!error) load();
-  }
-
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    if (deleteTarget.storage_path) {
-      await supabase.storage.from("verexahq-client-documents").remove([deleteTarget.storage_path]);
-    }
-    const { error } = await supabase.from("documents").delete().eq("id", deleteTarget.id);
-    setDeleting(false);
-    setDeleteTarget(null);
-    if (!error) {
-      showSuccess("Document deleted.");
-      load();
-    } else {
-      showError(friendlyError(error, "Something went wrong. Please try again."));
-    }
-  }
-
-  const visible = docs.filter((d) => statusFilter === "all" || d.document_status === statusFilter);
-  const statuses = Array.from(new Set(docs.map((d) => d.document_status)));
+  const missingDocuments = (openRequests ?? []).reduce(
+    (sum, r) => sum + (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length,
+    0
+  );
+  const overdueRequests = (openRequests ?? []).filter((r) => r.due_date && new Date(r.due_date) < new Date());
+  const totalStorage = (storageRows ?? []).reduce((sum, a) => sum + (a.file_size_bytes ?? 0), 0);
 
   return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
-            Client Files
-          </div>
-          <h1 className="font-slab text-2xl font-bold text-ink">Documents</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setShowTemplate(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-          >
-            <LayoutTemplate size={13} /> Apply Template
-          </button>
-          <button
-            onClick={() => setShowRequest(true)}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-sm border border-line text-ink"
-          >
-            <Plus size={13} /> Request
-          </button>
-          <button
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-1.5 bg-ink text-white text-sm font-semibold px-3.5 py-2 rounded-sm hover:bg-[#14273A] transition-colors"
-          >
-            <Upload size={15} /> Upload
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3 mb-4">
-          {error}
-        </div>
-      )}
-
-      {statuses.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button
-            onClick={() => setStatusFilter("all")}
-            className="text-xs font-semibold px-3 py-1.5 rounded-sm border"
-            style={{
-              borderColor: statusFilter === "all" ? "#0D1B2A" : "#DDE3EC",
-              backgroundColor: statusFilter === "all" ? "#0D1B2A" : "white",
-              color: statusFilter === "all" ? "white" : "#0D1B2A",
-            }}
-          >
-            All
-          </button>
-          {statuses.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-sm border"
-              style={{
-                borderColor: statusFilter === s ? "#0D1B2A" : "#DDE3EC",
-                backgroundColor: statusFilter === s ? "#0D1B2A" : "white",
-                color: statusFilter === s ? "white" : "#0D1B2A",
-              }}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="bg-white border border-line rounded-sm divide-y divide-paperDim">
-        {loading && <div className="px-5 py-6 text-sm text-muted">Loading documents…</div>}
-        {!loading && visible.length === 0 && (
-          <div className="px-5 py-6 text-sm text-muted">No documents yet.</div>
-        )}
-        {visible.map((d) => (
-          <div key={d.id} className="flex items-center justify-between px-5 py-3.5">
-            <div>
-              <div className="font-semibold text-ink text-sm">{d.document_name}</div>
-              <div className="text-xs text-muted mt-0.5">
-                {d.clientName} {d.document_category ? `· ${d.document_category}` : ""}
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <StatusPill status={d.document_status} />
-              <button
-                onClick={() => toggleVisibility(d)}
-                className="text-muted hover:text-ink"
-                title={d.is_visible_to_client ? "Visible to client" : "Hidden from client"}
-              >
-                {d.is_visible_to_client ? <Eye size={15} /> : <EyeOff size={15} />}
-              </button>
-              {d.storage_path && (
-                <button onClick={() => handleDownload(d)} className="text-muted hover:text-ink">
-                  <Download size={15} />
-                </button>
-              )}
-              {["Received", "Under Review", "uploaded", "received"].includes(d.document_status) && (
-                <>
-                  <button onClick={() => handleAccept(d)} className="text-green hover:opacity-70">
-                    <Check size={15} />
-                  </button>
-                  <button onClick={() => handleReject(d)} className="text-brick hover:opacity-70">
-                    <X size={15} />
-                  </button>
-                </>
-              )}
-              <button onClick={() => setDeleteTarget(d)} className="text-muted hover:text-brick">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {showRequest && (
-        <RequestDocumentModal onClose={() => setShowRequest(false)} onSaved={load} />
-      )}
-      {showUpload && <UploadDocumentModal onClose={() => setShowUpload(false)} onSaved={load} />}
-      {showTemplate && (
-        <ApplyDocumentTemplateModal onClose={() => setShowTemplate(false)} onSaved={load} />
-      )}
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title={`Delete "${deleteTarget?.document_name ?? ""}"?`}
-        description="This can't be undone."
-        confirmLabel="Delete"
-        busy={deleting}
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+    <>
+      <PageHeader
+        title="Document Center"
+        description="Pending requests, signatures, and storage across every client and engagement -- for analysis, see Reports > Documents."
+        actions={
+          <Link href="/reports/documents" className="text-sm font-medium text-accent hover:underline">
+            View Reports &rarr;
+          </Link>
+        }
       />
-    </div>
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard icon={FileText} label="Pending requests" value={(openRequests ?? []).length} href="/reports/documents?report=completion" />
+          <StatCard icon={AlertTriangle} label="Missing documents" value={missingDocuments} href="/reports/documents?report=missing" />
+          <StatCard icon={Clock} label="Overdue requests" value={overdueRequests.length} href="/reports/documents?report=missing" />
+          <StatCard icon={PenLine} label="Pending signatures" value={(pendingSignatures ?? []).length} href="/reports/documents?report=signatures" />
+          <StatCard icon={HardDrive} label="Storage used" value={formatSize(totalStorage)} href="/reports/documents?report=storage" />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
+            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Pending requests</h2>
+            {(openRequests ?? []).length === 0 ? (
+              <EmptyState message="No open document requests." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {(openRequests ?? []).slice(0, 8).map((r) => {
+                  const entity = labelMap.get(`${r.entity_type}:${r.entity_id}`);
+                  const missing = (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length;
+                  const overdue = Boolean(r.due_date && new Date(r.due_date) < new Date());
+                  return (
+                    <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                      <div>
+                        <Link href={entity?.href ?? "#"} className="font-medium text-accent hover:underline">
+                          {entity?.label ?? "--"}
+                        </Link>
+                        <p className="text-xs text-muted">{r.title}</p>
+                      </div>
+                      <span className={`text-xs ${overdue ? "text-danger" : "text-muted"}`}>
+                        {missing} missing{r.due_date && ` -- due ${new Date(r.due_date).toLocaleDateString()}`}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
+            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Pending signatures</h2>
+            {(pendingSignatures ?? []).length === 0 ? (
+              <EmptyState message="No pending signature requests." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {(pendingSignatures ?? []).slice(0, 8).map((r) => (
+                  <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <div>
+                      <p className="font-medium text-slate">{r.title}</p>
+                      <p className="text-xs text-muted">{r.attachment?.file_name ?? "Document"}</p>
+                    </div>
+                    <span className="text-xs text-muted">{r.due_date ? `Due ${new Date(r.due_date).toLocaleDateString()}` : "No due date"}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-ink">All documents</h2>
+          <AllDocumentsPanel workspaceId={workspace.id} documents={documentsWithUploader as never} entityLabels={labelMap} />
+        </div>
+      </div>
+    </>
   );
 }

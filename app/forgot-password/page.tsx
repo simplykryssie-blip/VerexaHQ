@@ -1,73 +1,118 @@
 "use client";
-import { FormEvent, useState } from "react";
+
+import { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
-import { Logo } from "@/components/Logo";
+import { useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+
+export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+    <span>Streamline. Automate. Grow.</span>
+  </>
+);
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
+  const supabase = createClient();
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [error, setError] = useState<string | null>(null);
-  async function submit(e: FormEvent) {
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      { redirectTo: `${window.location.origin}/update-password` },
-    );
-    setBusy(false);
-    if (resetError)
-      setError("We could not send the reset email. Please try again.");
-    else setSent(true);
+    setLoading(true);
+
+    try {
+      const allowed = await checkRateLimitClientSide("password-reset", email);
+      if (allowed === false) {
+        setError("Too many requests. Please wait a few minutes and try again.");
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      setSent(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
+
+  if (sent) {
+    return (
+      <AuthShell
+        eyebrow="Account recovery"
+        railHeading="Almost there."
+        railSub="Check your inbox for a link to choose a new password."
+        railFoot={RAIL_FOOT}
+      >
+        <h1 className={styles.cardTitle}>Check your email</h1>
+        <p className={styles.lede}>
+          If an account exists for <strong>{email}</strong>, a password reset link has been sent.
+        </p>
+        <Link href="/login" className={styles.submit} style={{ textDecoration: "none" }}>
+          Back to sign in
+        </Link>
+      </AuthShell>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-paper px-4 grid place-items-center">
-      <div className="w-full max-w-md">
-        <div className="mb-7 flex justify-center">
-          <Logo size={24} dark />
+    <AuthShell
+      eyebrow="Account recovery"
+      railHeading="Get back into your account."
+      railSub="We'll email you a secure link to choose a new password."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>Reset your password</h1>
+      <p className={styles.lede}>We&apos;ll email you a link to choose a new password.</p>
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@yourfirm.com"
+            className={styles.input}
+            autoComplete="email"
+          />
         </div>
-        <form
-          onSubmit={submit}
-          className="rounded-2xl border border-line bg-white p-8 shadow-sm"
-        >
-          <h1 className="text-2xl font-bold text-ink">Reset your password</h1>
-          <p className="mt-2 text-sm text-muted">
-            Enter your email and we’ll send a secure reset link.
-          </p>
-          {sent ? (
-            <div className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">
-              If that address has an account, a reset email is on its way.
-            </div>
-          ) : (
-            <>
-              <input
-                required
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-5 w-full rounded-xl border border-line px-3.5 py-3 outline-none focus:border-teal"
-                placeholder="you@yourfirm.com"
-              />
-              {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-              <button
-                disabled={busy}
-                className="brand-gradient mt-4 w-full rounded-xl py-3 font-semibold text-white disabled:opacity-60"
-              >
-                {busy ? "Sending…" : "Send reset link"}
-              </button>
-            </>
-          )}
-          <Link
-            href="/login"
-            className="mt-5 block text-center text-sm font-semibold text-[#108A64]"
-          >
-            Back to sign in
-          </Link>
-        </form>
-      </div>
-    </main>
+
+        {error && <AuthError>{error}</AuthError>}
+
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Sending…" : "Send reset link"}
+        </button>
+      </form>
+
+      <p className={styles.crosslink}>
+        <Link href="/login" className={styles.link}>
+          Back to sign in
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

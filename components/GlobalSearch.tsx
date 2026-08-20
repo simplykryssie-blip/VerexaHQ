@@ -1,166 +1,108 @@
 "use client";
+
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { FileText, Search, Users, Wrench, CheckSquare, X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useWorkspace } from "@/components/WorkspaceProvider";
+import { useRouter } from "next/navigation";
+import { Search, X } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Card } from "@/components/ui/Card";
 
-type Result = {
-  id: string;
-  label: string;
-  sub: string;
-  href: string;
-  kind: "client" | "service" | "task" | "document";
-};
-const icons = {
-  client: Users,
-  service: Wrench,
-  task: CheckSquare,
-  document: FileText,
-};
+type Result = { id: string; label: string; sub: string };
 
-export function GlobalSearch() {
-  const { activeWorkspaceId } = useWorkspace();
+export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
+  const supabase = createClient();
+  const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Result[]>([]);
-  const [busy, setBusy] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
   useEffect(() => {
-    if (timer.current) clearTimeout(timer.current);
-    if (query.trim().length < 2 || !activeWorkspaceId) {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
       setResults([]);
       return;
     }
-    timer.current = setTimeout(async () => {
-      setBusy(true);
-      const needle = `%${query.trim()}%`;
-      const [clients, services, tasks, documents] = await Promise.all([
-        supabase
-          .from("clients")
-          .select("id, first_name, last_name, business_name, email")
-          .eq("workspace_id", activeWorkspaceId)
-          .or(
-            `first_name.ilike.${needle},last_name.ilike.${needle},business_name.ilike.${needle},email.ilike.${needle}`,
-          )
-          .limit(5),
-        supabase
-          .from("services")
-          .select("id, client_id, service_type, service_status")
-          .eq("workspace_id", activeWorkspaceId)
-          .ilike("service_type", needle)
-          .limit(4),
-        supabase
-          .from("tasks")
-          .select("id, client_id, task_title, task_status")
-          .eq("workspace_id", activeWorkspaceId)
-          .ilike("task_title", needle)
-          .limit(4),
-        supabase
-          .from("documents")
-          .select("id, client_id, document_name, document_status")
-          .eq("workspace_id", activeWorkspaceId)
-          .ilike("document_name", needle)
-          .limit(4),
-      ]);
-      const rows: Result[] = [];
-      (clients.data ?? []).forEach((r: any) =>
-        rows.push({
-          id: r.id,
-          label:
-            r.business_name ||
-            `${r.first_name ?? ""} ${r.last_name ?? ""}`.trim() ||
-            "Client",
-          sub: r.email || "Client",
-          href: `/clients/${r.id}`,
-          kind: "client",
-        }),
+    setLoading(true);
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase
+        .from("clients")
+        .select("id, first_name, last_name, business_name, client_type")
+        .eq("workspace_id", workspaceId)
+        .is("merged_into_client_id", null)
+        .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,business_name.ilike.%${q}%`)
+        .limit(8);
+      setResults(
+        (data ?? []).map((c) => ({
+          id: c.id,
+          label: c.business_name || [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client",
+          sub: c.client_type === "business" ? "Business" : "Individual",
+        }))
       );
-      (services.data ?? []).forEach((r: any) =>
-        rows.push({
-          id: r.id,
-          label: r.service_type || "Service",
-          sub: r.service_status || "Service",
-          href: "/services",
-          kind: "service",
-        }),
-      );
-      (tasks.data ?? []).forEach((r: any) =>
-        rows.push({
-          id: r.id,
-          label: r.task_title || "Task",
-          sub: r.task_status || "Task",
-          href: "/tasks",
-          kind: "task",
-        }),
-      );
-      (documents.data ?? []).forEach((r: any) =>
-        rows.push({
-          id: r.id,
-          label: r.document_name || "Document",
-          sub: r.document_status || "Document",
-          href: "/documents",
-          kind: "document",
-        }),
-      );
-      setResults(rows);
-      setBusy(false);
+      setLoading(false);
     }, 250);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
-  }, [query, activeWorkspaceId]);
+    return () => clearTimeout(timeout);
+  }, [query, supabase, workspaceId]);
+
+  function goToClient(id: string) {
+    setOpen(false);
+    setQuery("");
+    router.push(`/clients/${id}`);
+  }
+
   return (
-    <div className="relative w-full min-w-0 max-w-xl">
-      <Search
-        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-        size={17}
-      />
-      <input
-        aria-label="Search clients, work, tasks, documents"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="w-full min-w-0 truncate rounded-xl border border-line bg-paper py-2.5 pl-9 pr-9 text-sm outline-none focus:border-teal focus:bg-white"
-        placeholder="Search…"
-      />
-      {query && (
-        <button
-          aria-label="Clear search"
-          onClick={() => setQuery("")}
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted"
-        >
-          <X size={16} />
-        </button>
-      )}
-      {(results.length > 0 || busy) && query.length >= 2 && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-line bg-white shadow-xl">
-          {busy ? (
-            <div className="p-4 text-sm text-muted">Searching…</div>
+    <div ref={containerRef} className="relative w-full max-w-xs">
+      <div className="flex items-center gap-2 rounded-lg border border-border bg-surfaceMuted px-3 py-1.5 focus-within:border-accent">
+        <Search size={14} className="shrink-0 text-muted" aria-hidden="true" />
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search clients…"
+          aria-label="Search clients"
+          className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="shrink-0 text-muted hover:text-ink">
+            <X size={14} />
+          </button>
+        )}
+      </div>
+
+      {open && query.trim().length >= 2 && (
+        <Card padded={false} className="absolute left-0 top-full z-30 mt-1 w-full shadow-lg">
+          {loading ? (
+            <p className="px-3 py-3 text-sm text-muted">Searching…</p>
+          ) : results.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-muted">No clients found.</p>
           ) : (
-            results.map((row) => {
-              const Icon = icons[row.kind];
-              return (
-                <Link
-                  key={`${row.kind}-${row.id}`}
-                  href={row.href}
-                  onClick={() => setQuery("")}
-                  className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-0 hover:bg-paper"
-                >
-                  <span className="grid h-8 w-8 place-items-center rounded-lg bg-paper text-[#108A64]">
-                    <Icon size={16} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-ink">
-                      {row.label}
-                    </span>
-                    <span className="block truncate text-xs text-muted">
-                      {row.sub}
-                    </span>
-                  </span>
-                </Link>
-              );
-            })
+            <ul className="max-h-72 overflow-y-auto py-1">
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    onClick={() => goToClient(r.id)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surfaceMuted"
+                  >
+                    <span className="truncate text-ink">{r.label}</span>
+                    <span className="shrink-0 text-xs text-muted">{r.sub}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
+        </Card>
       )}
     </div>
   );
