@@ -44,6 +44,7 @@ import {
 } from "./ContactChannelForms";
 import { EditClientProfileForm } from "./EditClientProfileForm";
 import { TagsEditor } from "./TagsEditor";
+import { ServiceInterestControl } from "./ServiceInterestControl";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 function Section({
@@ -111,6 +112,7 @@ export function OverviewTab({
   outstandingBalance,
   organizerResponses,
   workspaceServices,
+  interestedServiceIds,
   onCreateInvoice,
   onShowNotes,
   onCreateNote,
@@ -158,6 +160,7 @@ export function OverviewTab({
   outstandingBalance: number;
   organizerResponses: OrganizerResponseRow[];
   workspaceServices: { id: string; name: string }[];
+  interestedServiceIds: string[];
   onCreateInvoice: () => void;
   onShowNotes: () => void;
   onCreateNote: () => void;
@@ -297,6 +300,31 @@ export function OverviewTab({
         <div className="mt-4 border-t border-border pt-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Tags</h3>
           <TagsEditor clientId={client.id} workspaceId={workspaceId} tags={client.tags ?? []} suggestions={workspaceTags} />
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Service interests</h3>
+            <ServiceInterestControl
+              clientId={client.id}
+              workspaceId={workspaceId}
+              services={workspaceServices}
+              interestedServiceIds={interestedServiceIds}
+            />
+          </div>
+          {interestedServiceIds.length === 0 ? (
+            <EmptyState message="No service interests recorded yet." />
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {workspaceServices
+                .filter((s) => interestedServiceIds.includes(s.id))
+                .map((s) => (
+                  <span key={s.id} className="inline-flex items-center rounded-full bg-accentSoft px-2.5 py-1 text-xs font-medium text-accent">
+                    {s.name}
+                  </span>
+                ))}
+            </div>
+          )}
         </div>
 
         {showStaffRoles && (
