@@ -410,6 +410,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  const { data: allInterests } = await supabase.from("client_service_interests").select("service_id").eq("client_id", client.id);
+  const interestedServiceIds = [...new Set((allInterests ?? []).map((i) => i.service_id).filter((id): id is string => Boolean(id)))];
   const requestedService = latestInterest
     ? [
         (latestInterest.service_categories as unknown as { name?: string } | null)?.name,
@@ -473,6 +475,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       reviewerDefault={reviewerDefault}
       complianceDefault={complianceDefault}
       requestedService={requestedService}
+      interestedServiceIds={interestedServiceIds}
       leadPipeline={leadPipeline}
     />
   );
