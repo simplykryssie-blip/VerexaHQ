@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
-import { LeadPipelineStageControl } from "./LeadPipelineStageControl";
+import Link from "next/link";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -187,6 +187,8 @@ export function ClientWorkspace({
     ...tasks.filter((t) => t.due_date).map((t) => t.due_date as string),
   ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
   const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
+  const currentStageName =
+    client.lifecycle_status === "lead" ? leadPipeline.stages.find((s) => s.id === leadPipeline.currentProcessStageId)?.name : undefined;
 
   return (
     <>
@@ -201,6 +203,11 @@ export function ClientWorkspace({
             {primaryService && <span>{primaryService}</span>}
             {!primaryService && requestedService && <span>Requested: {requestedService}</span>}
             <span className="capitalize">{client.lifecycle_status}</span>
+            {currentStageName && leadPipeline.processId && (
+              <Link href={`/pipelines/${leadPipeline.processId}`} className="text-accent hover:underline">
+                Stage: {currentStageName}
+              </Link>
+            )}
             {showStaffRoles && (
               <>
                 <span>Relationship manager: {client.relationship_manager?.display_name ?? "Unassigned"}</span>
@@ -216,13 +223,6 @@ export function ClientWorkspace({
       />
 
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
-        <LeadPipelineStageControl
-          clientId={client.id}
-          lifecycleStatus={client.lifecycle_status}
-          processId={leadPipeline.processId}
-          stages={leadPipeline.stages}
-          currentProcessStageId={leadPipeline.currentProcessStageId}
-        />
         <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <QuickActions
