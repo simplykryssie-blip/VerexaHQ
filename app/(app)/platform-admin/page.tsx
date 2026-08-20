@@ -143,7 +143,7 @@ export default async function PlatformAdminPage() {
         )}
 
         <div>
-          <h3 className="text-sm font-semibold text-ink">Platform admins</h3>
+          <h3 className="font-display text-sm font-semibold text-ink">Platform admins</h3>
           <p className="mt-1 text-xs text-muted">
             Anyone here can see every workspace on Verexa and manage subscriptions, status, and other admins. Grant this carefully.
           </p>
