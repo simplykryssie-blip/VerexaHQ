@@ -48,6 +48,7 @@ type Props = {
   eroName: string | null;
   isOwner: boolean;
   isAdmin: boolean;
+  canManageSettings: boolean;
   showEin: boolean;
   showEfin: boolean;
   showFirmPtin: boolean;
@@ -103,6 +104,7 @@ export function FirmProfileForm({
   eroName,
   isOwner,
   isAdmin,
+  canManageSettings,
   showEin,
   showEfin,
   showFirmPtin,
@@ -199,13 +201,17 @@ export function FirmProfileForm({
         .from("user_profiles")
         .update({ first_name: first || null, last_name: last || null, display_name: display || null, phone: pPhone || null, avatar_url: avatar })
         .eq("id", userId),
-      supabase
-        .from("system_settings")
-        .upsert({ workspace_id: workspaceId, key: "business_hours", value: hours }, { onConflict: "workspace_id,key" }),
-      supabase
-        .from("system_settings")
-        .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" }),
     ];
+    if (canManageSettings) {
+      writes.push(
+        supabase
+          .from("system_settings")
+          .upsert({ workspace_id: workspaceId, key: "business_hours", value: hours }, { onConflict: "workspace_id,key" }),
+        supabase
+          .from("system_settings")
+          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" })
+      );
+    }
     if (isOwner) {
       writes.push(
         supabase
@@ -513,6 +519,7 @@ export function FirmProfileForm({
         </SettingsCard>
       )}
 
+      {canManageSettings && (
       <SettingsCard
         title="Booking availability"
         description="When clients can self-book a bookable service from their portal. Slot length sets the scheduling grid; each service's own duration determines how much time a booking actually reserves."
@@ -573,6 +580,7 @@ export function FirmProfileForm({
           </select>
         </div>
       </SettingsCard>
+      )}
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
