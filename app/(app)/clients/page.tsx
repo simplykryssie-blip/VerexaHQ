@@ -113,44 +113,18 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   // -- the same system "Move the lead to a pipeline stage" and "A lead enters
   // a pipeline stage" already use -- rather than the old flat, uncustomizable
   // lead_stages list. Which pipeline is "the" one for new leads is a
-  // workspace setting (Pipelines page), so with none set the Leads tab just
-  // shows All/Lost.
-  let stageFilters: { value: string; label: string }[] = [];
+  // workspace setting (Pipelines page). Per-stage filtering/viewing lives on
+  // that pipeline's own board now (see LeadPipelineBoard), not here -- this
+  // page only needs to know whether one is set, for the pointer link below.
   let defaultLeadProcessId: string | null = null;
   if (isLeadsTab) {
     const { data: workspaceRow } = await supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle();
     defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
-    if (defaultLeadProcessId) {
-      const { data: stages } = await supabase
-        .from("process_stages")
-        .select("id, name")
-        .eq("process_id", defaultLeadProcessId)
-        .order("display_order");
-      stageFilters = (stages ?? []).map((s) => ({ value: s.id, label: s.name }));
-    }
   }
 
   const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters = isLeadsTab
-    ? [{ value: "", label: "All" }, ...stageFilters, { value: "lost", label: "Lost" }]
-    : CLIENT_STATUS_FILTERS;
-  const isStageFilter = isLeadsTab && !!searchParams.status && searchParams.status !== "lost" && stageFilters.some((f) => f.value === searchParams.status);
-  const status = searchParams.status && (isStageFilter || statusFilters.some((f) => f.value === searchParams.status)) ? searchParams.status : "";
-
-  // A stage filter isn't a lifecycle_status -- resolve which clients are
-  // currently sitting on that pipeline stage first, then filter by id.
-  let stageClientIds: string[] | null = null;
-  if (isStageFilter) {
-    const { data: activeStages } = await supabase
-      .from("lead_pipeline_stages")
-      .select("lead_pipeline_run_id")
-      .eq("process_stage_id", status)
-      .eq("status", "In Progress");
-    const runIds = (activeStages ?? []).map((s) => s.lead_pipeline_run_id);
-    const { data: runs } =
-      runIds.length > 0 ? await supabase.from("lead_pipeline_runs").select("client_id").in("id", runIds) : { data: [] as { client_id: string }[] };
-    stageClientIds = (runs ?? []).map((r) => r.client_id);
-  }
+  const statusFilters = isLeadsTab ? [{ value: "", label: "All" }, { value: "lost", label: "Lost" }] : CLIENT_STATUS_FILTERS;
+  const status = searchParams.status && statusFilters.some((f) => f.value === searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -167,11 +141,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .is("merged_into_client_id", null)
     .order("created_at", { ascending: false })
     .range(from, to);
-  if (isStageFilter) {
-    clientsQuery = clientsQuery.eq("lifecycle_status", "lead").in("id", stageClientIds && stageClientIds.length > 0 ? stageClientIds : ["-"]);
-  } else {
-    clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
-  }
+  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
   const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
@@ -281,7 +251,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             <Link href="/pipelines" className="font-medium text-accent hover:underline">
               pick one in Pipelines
             </Link>{" "}
-            to track leads through stages here.
+            to track leads through stages.
+          </p>
+        )}
+        {isLeadsTab && defaultLeadProcessId && (
+          <p className="mb-3 text-xs text-muted">
+            <Link href={`/pipelines/${defaultLeadProcessId}`} className="font-medium text-accent hover:underline">
+              View leads by stage in Pipelines →
+            </Link>
           </p>
         )}
 
