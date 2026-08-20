@@ -21,8 +21,16 @@ export default async function FirmProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }, { data: isAdmin }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: contact },
+    { data: branding },
+    { data: settings },
+    effectiveBranding,
+    { data: myProfile },
+    { data: isAdmin },
+    { data: canManageSettings },
+  ] = await Promise.all([
       supabase
         .from("firm_tax_profile")
         .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
@@ -44,6 +52,7 @@ export default async function FirmProfilePage() {
         ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" }),
     ]);
 
   const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
@@ -89,6 +98,7 @@ export default async function FirmProfilePage() {
             eroName={effectiveBranding.eroName ?? null}
             isOwner={workspace.is_owner}
             isAdmin={Boolean(isAdmin)}
+            canManageSettings={Boolean(canManageSettings)}
             showEin
             showEfin={showEfin}
             showFirmPtin={showFirmPtin}
