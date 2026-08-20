@@ -8320,7 +8320,7 @@ export type Database = {
         Returns: string
       }
       create_workspace: {
-        Args: { p_name: string; p_timezone?: string; p_workspace_type?: string }
+        Args: { p_name: string; p_owner_user_id?: string; p_timezone?: string; p_workspace_type?: string }
         Returns: string
       }
       create_workspace_invitation: {
