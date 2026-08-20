@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 import type { StaffOption, WorkflowStepEdgeRow } from "@/components/workflows/WorkflowBuilder";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
+import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
 type DraftBranch = {
   id: string | null;
@@ -35,6 +36,7 @@ function initialBranches(edges: WorkflowStepEdgeRow[]): DraftBranch[] {
 // A local draft: nothing hits the database until Save, so adding several
 // branches and filling them in doesn't fire a write per keystroke.
 export function BranchEditor({
+  workspaceId,
   stepId,
   automationId,
   edges,
@@ -48,6 +50,7 @@ export function BranchEditor({
   onClose,
   onDeleteStep,
 }: {
+  workspaceId: string;
   stepId: string;
   automationId: string;
   edges: WorkflowStepEdgeRow[];
@@ -95,6 +98,11 @@ export function BranchEditor({
   }
 
   async function save() {
+    const tagsToConfirm = collectClientTagValues(branches.flatMap((b) => b.conditions));
+    for (const tag of tagsToConfirm) {
+      if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+    }
+
     setSaving(true);
     for (const id of removedIds) {
       const { error } = await supabase.from("automation_step_edges").delete().eq("id", id);

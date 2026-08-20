@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { X, Plus } from "lucide-react";
+import { ensureTagConfirmed } from "@/lib/ensureTag";
 
 export function TagsEditor({
   clientId,
@@ -41,6 +42,8 @@ export function TagsEditor({
       setAdding(false);
       return;
     }
+    const confirmed = await ensureTagConfirmed(supabase, workspaceId, tag);
+    if (!confirmed) return;
     setValue("");
     setAdding(false);
     await saveTags([...tags, tag]);

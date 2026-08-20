@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   LifeBuoy,
   Kanban,
+  Tags,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -91,6 +92,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
+  { label: "Tags", href: "/settings/tags", icon: Tags },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
@@ -102,7 +104,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Users & Staff", "Roles & Permissions", "Tags", "Connections"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
