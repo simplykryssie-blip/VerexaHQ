@@ -8398,6 +8398,10 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: undefined
       }
+      disconnect_workspace_ghl: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       disconnect_workspace_jotform: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -8572,6 +8576,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_workspace_ghl_connection: {
+        Args: { p_workspace_id: string }
+        Returns: { api_key: string; location_id: string }[]
+      }
       get_workspace_jotform_api_key: {
         Args: { p_workspace_id: string }
         Returns: string
@@ -8655,6 +8663,10 @@ export type Database = {
       }
       is_valid_config_table: { Args: { p_table: string }; Returns: boolean }
       is_workspace_admin: { Args: { p_workspace_id: string }; Returns: boolean }
+      is_workspace_ghl_connected: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       is_workspace_jotform_connected: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -8993,6 +9005,10 @@ export type Database = {
       }
       set_platform_admin_by_id: {
         Args: { p_is_platform_admin: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      set_workspace_ghl_connection: {
+        Args: { p_api_key: string; p_location_id: string; p_workspace_id: string }
         Returns: undefined
       }
       set_workspace_jotform_api_key: {

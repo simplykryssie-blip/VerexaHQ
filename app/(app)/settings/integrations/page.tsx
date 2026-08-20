@@ -6,6 +6,7 @@ import { ConnectStripeButton } from "@/components/settings/ConnectStripeButton";
 import { ZoomConnectionCard } from "@/components/settings/ZoomConnectionCard";
 import { CalendarConnectionCard } from "@/components/settings/CalendarConnectionCard";
 import { JotFormConnectionCard } from "@/components/settings/JotFormConnectionCard";
+import { GhlConnectionCard } from "@/components/settings/GhlConnectionCard";
 import { EmailDomainCard, type DnsRecord } from "@/components/settings/EmailDomainCard";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,7 @@ export default async function IntegrationsPage({
 
   const { data: workspaceRow } = await supabase.from("workspaces").select("stripe_connect_status").eq("id", workspace!.id).single();
   const { data: isJotformConnected } = await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspace!.id });
+  const { data: isGhlConnected } = await supabase.rpc("is_workspace_ghl_connected", { p_workspace_id: workspace!.id });
   const { data: emailDomain } = await supabase
     .from("workspace_email_domains")
     .select("domain, status, dns_records, from_local_part")
@@ -145,6 +147,12 @@ export default async function IntegrationsPage({
       <p className="mt-1 text-sm text-muted">Import your firm&apos;s existing JotForm forms as organizer templates.</p>
       <div className="mt-6">
         <JotFormConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isJotformConnected)} />
+      </div>
+
+      <h2 className="mt-8 text-base font-semibold text-ink">GoHighLevel</h2>
+      <p className="mt-1 text-sm text-muted">Import your firm&apos;s GHL contacts as leads. Pipelines and workflows aren&apos;t auto-imported.</p>
+      <div className="mt-6">
+        <GhlConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isGhlConnected)} />
       </div>
 
       {calendarSection}
