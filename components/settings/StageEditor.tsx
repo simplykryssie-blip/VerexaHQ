@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -167,6 +168,69 @@ function StageTasks({ stage, tasks, canEdit }: { stage: ProcessStage; tasks: Pro
   );
 }
 
+type LeadCard = { clientId: string; name: string };
+
+function StageLeads({
+  processId,
+  stageId,
+  leads,
+  allStages,
+}: {
+  processId: string;
+  stageId: string;
+  leads: LeadCard[];
+  allStages: ProcessStage[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  if (leads.length === 0) return null;
+
+  async function move(clientId: string, newStageId: string) {
+    if (newStageId === stageId) return;
+    setSavingId(clientId);
+    const { error } = await supabase.rpc("advance_lead_pipeline_stage", {
+      p_client_id: clientId,
+      p_process_id: processId,
+      p_process_stage_id: newStageId,
+    });
+    setSavingId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Stage updated", "success");
+    router.refresh();
+  }
+
+  return (
+    <div className="mt-3 space-y-1.5 border-t border-border pt-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Leads on this stage</p>
+      {leads.map((lead) => (
+        <div key={lead.clientId} className="flex items-center justify-between gap-2 text-sm">
+          <Link href={`/clients/${lead.clientId}`} className="text-accent hover:underline">
+            {lead.name}
+          </Link>
+          <select
+            value={stageId}
+            onChange={(e) => move(lead.clientId, e.target.value)}
+            disabled={savingId === lead.clientId}
+            className="rounded-lg border border-border px-2 py-1 text-xs text-slate focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            {allStages.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function StageEditor({
   source,
   isSystemDefault,
@@ -175,6 +239,8 @@ export function StageEditor({
   stages,
   tasks,
   engagementCountsByStage,
+  isLeadPipeline = false,
+  leadsByStage = {},
 }: {
   /** A stage editor either bootstraps its process from a Service (the
    *  original flow) or operates on an already-standalone Pipeline created
@@ -188,6 +254,12 @@ export function StageEditor({
   stages: ProcessStage[];
   tasks: ProcessTask[];
   engagementCountsByStage: Record<string, number>;
+  /** When this pipeline is the workspace's default for new leads, every
+   *  stage card also shows the leads currently sitting on it, with a way to
+   *  move them -- same card shape as every other pipeline, just an extra
+   *  section alongside Tasks, instead of a separate page layout. */
+  isLeadPipeline?: boolean;
+  leadsByStage?: Record<string, LeadCard[]>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -302,7 +374,13 @@ export function StageEditor({
         <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
           This is a system default {noun}. Its workflow can&apos;t be edited here -- clone it to create your own editable copy.
         </p>
-        <StageListReadOnly stages={stages} tasks={tasks} />
+        <StageListReadOnly
+          processId={process?.id}
+          stages={stages}
+          tasks={tasks}
+          isLeadPipeline={isLeadPipeline}
+          leadsByStage={leadsByStage}
+        />
       </div>
     );
   }
@@ -313,7 +391,13 @@ export function StageEditor({
         <p className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted">
           Only workspace admins can edit this {noun}&apos;s workflow.
         </p>
-        <StageListReadOnly stages={stages} tasks={tasks} />
+        <StageListReadOnly
+          processId={process?.id}
+          stages={stages}
+          tasks={tasks}
+          isLeadPipeline={isLeadPipeline}
+          leadsByStage={leadsByStage}
+        />
       </div>
     );
   }
@@ -364,6 +448,7 @@ export function StageEditor({
     <div className="space-y-3">
       {stages.map((stage, index) => {
         const count = engagementCountsByStage[stage.name] ?? 0;
+        const leads = leadsByStage[stage.id] ?? [];
         return (
           <div key={stage.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <div className="flex items-center justify-between gap-2">
@@ -389,6 +474,11 @@ export function StageEditor({
                   {count > 0 && (
                     <span className="rounded-full bg-accentSoft px-2 py-0.5 text-[11px] font-medium text-accent">
                       {count} engagement{count === 1 ? "" : "s"}
+                    </span>
+                  )}
+                  {isLeadPipeline && leads.length > 0 && (
+                    <span className="rounded-full bg-accentSoft px-2 py-0.5 text-[11px] font-medium text-accent">
+                      {leads.length} lead{leads.length === 1 ? "" : "s"}
                     </span>
                   )}
                 </div>
@@ -423,6 +513,7 @@ export function StageEditor({
               )}
             </div>
             <StageTasks stage={stage} tasks={tasks.filter((t) => t.process_stage_id === stage.id)} canEdit />
+            {isLeadPipeline && process && <StageLeads processId={process.id} stageId={stage.id} leads={leads} allStages={stages} />}
           </div>
         );
       })}
@@ -474,7 +565,19 @@ export function StageEditor({
   );
 }
 
-function StageListReadOnly({ stages, tasks }: { stages: ProcessStage[]; tasks: ProcessTask[] }) {
+function StageListReadOnly({
+  processId,
+  stages,
+  tasks,
+  isLeadPipeline = false,
+  leadsByStage = {},
+}: {
+  processId?: string;
+  stages: ProcessStage[];
+  tasks: ProcessTask[];
+  isLeadPipeline?: boolean;
+  leadsByStage?: Record<string, LeadCard[]>;
+}) {
   if (stages.length === 0) return null;
   return (
     <div className="mt-4 space-y-3">
@@ -491,6 +594,9 @@ function StageListReadOnly({ stages, tasks }: { stages: ProcessStage[]; tasks: P
                 </li>
               ))}
           </ul>
+          {isLeadPipeline && processId && (
+            <StageLeads processId={processId} stageId={stage.id} leads={leadsByStage[stage.id] ?? []} allStages={stages} />
+          )}
         </div>
       ))}
     </div>

@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { StageEditor } from "@/components/settings/StageEditor";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { PipelineNameEditor } from "@/components/pipelines/PipelineNameEditor";
-import { LeadPipelineBoard } from "@/components/pipelines/LeadPipelineBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +45,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
     engagementCountsByStage.set(key, (engagementCountsByStage.get(key) ?? 0) + 1);
   }
 
-  let leadCards: { clientId: string; name: string; currentStageId: string }[] = [];
+  const leadsByStage: Record<string, { clientId: string; name: string }[]> = {};
   if (isDefaultLeadPipeline) {
     const { data: runs } = await supabase
       .from("lead_pipeline_runs")
@@ -57,24 +56,24 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
       .eq("workspace_id", workspace.id)
       .eq("status", "Active")
       .not("current_stage_id", "is", null);
-    leadCards = (runs ?? [])
-      .map((r) => {
-        const client = r.clients as unknown as {
-          id: string;
-          first_name: string | null;
-          last_name: string | null;
-          business_name: string | null;
-          client_type: string;
-        } | null;
-        const currentStageId = (r.lead_pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
-        if (!client || !currentStageId) return null;
-        const name =
-          client.client_type === "business" && client.business_name
-            ? client.business_name
-            : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client";
-        return { clientId: client.id, name, currentStageId };
-      })
-      .filter((c): c is { clientId: string; name: string; currentStageId: string } => c !== null);
+    for (const r of runs ?? []) {
+      const client = r.clients as unknown as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        business_name: string | null;
+        client_type: string;
+      } | null;
+      const currentStageId = (r.lead_pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
+      if (!client || !currentStageId) continue;
+      const name =
+        client.client_type === "business" && client.business_name
+          ? client.business_name
+          : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client";
+      const list = leadsByStage[currentStageId] ?? [];
+      list.push({ clientId: client.id, name });
+      leadsByStage[currentStageId] = list;
+    }
   }
 
   return (
@@ -89,27 +88,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
         ) : (
           <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
         )}
-        {isDefaultLeadPipeline && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium text-accent">
-            <Star size={11} fill="currentColor" /> Default lead pipeline
-          </span>
-        )}
       </div>
-      <p className="mt-1 text-xs text-muted">
-        {isDefaultLeadPipeline
-          ? "New leads move through this pipeline -- shown below alongside the stage/task structure every pipeline has."
-          : "An engagement workflow -- its stages and tasks are attached to individual engagements, not leads. Only the pipeline marked \"Default lead pipeline\" shows a leads board."}
-      </p>
-
-      {isDefaultLeadPipeline && (
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold text-ink">Leads in this pipeline</h2>
-          <p className="mt-1 text-xs text-muted">Move a lead to a new stage from here -- this is the default pipeline for new leads.</p>
-          <div className="mt-3">
-            <LeadPipelineBoard processId={process.id} stages={stages ?? []} leads={leadCards} />
-          </div>
-        </div>
-      )}
 
       <div className="mt-8 max-w-3xl">
         <StageEditor
@@ -120,6 +99,8 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
           stages={stages ?? []}
           tasks={(tasks ?? []) as never}
           engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
+          isLeadPipeline={isDefaultLeadPipeline}
+          leadsByStage={leadsByStage}
         />
       </div>
     </div>
