@@ -411,6 +411,17 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .limit(1)
     .maybeSingle();
   const { data: allInterests } = await supabase.from("client_service_interests").select("service_id").eq("client_id", client.id);
+  // pending_portal_invites tracks whether the *email* actually went out --
+  // client_portal_users.status only tracks the account's own lifecycle
+  // (invited/active) and gets set to "invited" the instant the account row
+  // is created, before any send is even attempted. Fetched separately so
+  // PortalInviteStatus can show real delivery state instead of conflating
+  // the two.
+  const { data: pendingPortalInvites } = await supabase
+    .from("pending_portal_invites")
+    .select("client_portal_user_id, status, error, created_at")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false });
   const interestedServiceIds = [...new Set((allInterests ?? []).map((i) => i.service_id).filter((id): id is string => Boolean(id)))];
   const requestedService = latestInterest
     ? [
@@ -433,6 +444,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       workspaceTags={workspaceTags ?? []}
       relationships={relationships ?? []}
       portalUsers={portalUsers ?? []}
+      pendingPortalInvites={pendingPortalInvites ?? []}
       engagements={engagements ?? []}
       notes={notes ?? []}
       documents={documentsWithUploader}

@@ -21,6 +21,7 @@ import {
   type EmailRow,
   type PhoneRow,
   type PortalUserRow,
+  type PendingPortalInviteRow,
   type RelationshipRow,
   type NoteRow,
   type ActivityRow,
@@ -91,6 +92,7 @@ export function ClientWorkspace({
   workspaceTags,
   relationships,
   portalUsers,
+  pendingPortalInvites,
   engagements,
   notes,
   documents,
@@ -136,6 +138,7 @@ export function ClientWorkspace({
   workspaceTags: string[];
   relationships: RelationshipRow[];
   portalUsers: PortalUserRow[];
+  pendingPortalInvites: PendingPortalInviteRow[];
   engagements: EngagementRow[];
   notes: NoteRow[];
   documents: DocumentRow[];
@@ -265,6 +268,7 @@ export function ClientWorkspace({
                 phones={phones}
                 workspaceTags={workspaceTags}
                 portalUsers={portalUsers}
+                pendingPortalInvites={pendingPortalInvites}
                 relationships={relationships}
                 staffOptions={staffOptions}
                 accountHolder={accountHolder}
