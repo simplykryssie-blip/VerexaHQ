@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { StageEditor } from "@/components/settings/StageEditor";
@@ -89,7 +89,17 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
         ) : (
           <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
         )}
+        {isDefaultLeadPipeline && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium text-accent">
+            <Star size={11} fill="currentColor" /> Default lead pipeline
+          </span>
+        )}
       </div>
+      <p className="mt-1 text-xs text-muted">
+        {isDefaultLeadPipeline
+          ? "New leads move through this pipeline -- shown below alongside the stage/task structure every pipeline has."
+          : "An engagement workflow -- its stages and tasks are attached to individual engagements, not leads. Only the pipeline marked \"Default lead pipeline\" shows a leads board."}
+      </p>
 
       {isDefaultLeadPipeline && (
         <div className="mt-8">
