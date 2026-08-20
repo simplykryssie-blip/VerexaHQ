@@ -6,6 +6,7 @@ import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { LeadPipelineStageControl } from "./LeadPipelineStageControl";
+import { ServiceInterestControl } from "./ServiceInterestControl";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -223,6 +224,7 @@ export function ClientWorkspace({
         />
         <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+        <ServiceInterestControl clientId={client.id} workspaceId={workspace.id} services={workspaceServices} />
         <QuickActions
           clientId={client.id}
           workspaceId={workspace.id}
