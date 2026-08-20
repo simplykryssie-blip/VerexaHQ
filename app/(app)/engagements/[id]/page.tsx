@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -132,7 +133,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     { data: invoices },
     { data: activity },
     { data: progressRows },
-    { data: staffMembers },
+    staffMembers,
     { data: documentFolders },
     { data: canShare },
     { data: activeEroConnection },
@@ -192,11 +193,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .order("created_at", { ascending: false })
       .limit(50),
     supabase.from("v_engagement_progress").select("*").eq("engagement_id", engagement.id).maybeSingle(),
-    supabase
-      .from("workspace_users")
-      .select("user_id, user_profiles(id, display_name)")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "active"),
+    getWorkspaceStaff(supabase, workspace.id),
     supabase
       .from("document_folders")
       .select("id, name, parent_folder_id, display_order")
@@ -273,11 +270,9 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       ? await supabase.from("payments").select("*").in("invoice_id", invoiceIds).order("payment_date", { ascending: false })
       : { data: [] as any[] };
 
-  const staffOptions = (staffMembers ?? [])
-    .map((m: any) => m.user_profiles)
-    .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p));
+  const staffOptions = staffMembers.map((m) => ({ id: m.user_id, display_name: m.display_name }));
 
-  const staffById = new Map(staffOptions.map((p: any) => [p.id, p]));
+  const staffById = new Map(staffOptions.map((p) => [p.id, p]));
   const documentsWithUploader = (documents ?? []).map((d: any) => ({
     ...d,
     uploaded_by: d.uploaded_by ? staffById.get(d.uploaded_by) ?? null : null,

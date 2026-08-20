@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   Mail,
   MessageSquare,
   Trash2,
@@ -983,6 +985,24 @@ export function StepCard({
   );
 }
 
+function CollapsibleSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="mb-2 flex w-full items-center gap-1.5 text-left text-sm font-semibold text-ink"
+      >
+        {open ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
+        {title}
+        {typeof count === "number" && <span className="font-normal text-muted">({count})</span>}
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 export function WorkflowBuilder({
   workspaceId,
   automationId,
@@ -1156,8 +1176,7 @@ export function WorkflowBuilder({
         )}
       </div>
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Recent runs</h3>
+      <CollapsibleSection title="Recent runs" count={runs.length}>
         {runs.length === 0 ? (
           <EmptyState message="This workflow hasn't fired yet." />
         ) : (
@@ -1184,11 +1203,10 @@ export function WorkflowBuilder({
             </table>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {logs.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-ink">Execution log</h3>
+        <CollapsibleSection title="Execution log" count={logs.length}>
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
             {logs.map((l) => {
               const data = (l.execution_data ?? {}) as { action_type?: string };
@@ -1204,7 +1222,7 @@ export function WorkflowBuilder({
               );
             })}
           </ul>
-        </div>
+        </CollapsibleSection>
       )}
     </div>
   );
