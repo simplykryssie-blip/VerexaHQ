@@ -112,17 +112,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
   // -- the same system "Move the lead to a pipeline stage" and "A lead enters
   // a pipeline stage" already use -- rather than the old flat, uncustomizable
-  // lead_stages list. Which pipeline is "the" one for new leads is a
-  // workspace setting (Pipelines page). Per-stage filtering/viewing lives on
-  // that pipeline's own page now (each stage card shows its leads, same
-  // shape as every other pipeline), not here -- this page only needs to
-  // know whether one is set, for the pointer link below.
-  let defaultLeadProcessId: string | null = null;
-  if (isLeadsTab) {
-    const { data: workspaceRow } = await supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle();
-    defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
-  }
-
+  // lead_stages list. There's no single designated "default" pipeline for
+  // leads; any pipeline with active leads shows them on its own page (each
+  // stage card shows its leads, same shape as every other pipeline), so
+  // this page just points at Pipelines rather than a specific one.
   const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
   const statusFilters = isLeadsTab ? [{ value: "", label: "All" }, { value: "lost", label: "Lost" }] : CLIENT_STATUS_FILTERS;
   const status = searchParams.status && statusFilters.some((f) => f.value === searchParams.status) ? searchParams.status : "";
@@ -246,18 +239,9 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           ))}
         </nav>
 
-        {isLeadsTab && !defaultLeadProcessId && (
-          <p className="mb-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            No pipeline is set for new leads yet --{" "}
-            <Link href="/pipelines" className="font-medium text-accent hover:underline">
-              pick one in Pipelines
-            </Link>{" "}
-            to track leads through stages.
-          </p>
-        )}
-        {isLeadsTab && defaultLeadProcessId && (
+        {isLeadsTab && (
           <p className="mb-3 text-xs text-muted">
-            <Link href={`/pipelines/${defaultLeadProcessId}`} className="font-medium text-accent hover:underline">
+            <Link href="/pipelines" className="font-medium text-accent hover:underline">
               View leads by stage in Pipelines →
             </Link>
           </p>

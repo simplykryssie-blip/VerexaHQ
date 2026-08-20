@@ -24,7 +24,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
 
   const isSystemDefault = !process.workspace_id;
 
-  const [{ data: isWorkspaceAdmin }, { data: stages }, { data: tasks }, { data: stageCounts }, { data: workspaceRow }] = await Promise.all([
+  const [{ data: isWorkspaceAdmin }, { data: stages }, { data: tasks }, { data: stageCounts }, { data: leadRunSample }] = await Promise.all([
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     supabase.from("process_stages").select("*").eq("process_id", process.id).order("display_order"),
     supabase
@@ -33,11 +33,14 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
       .eq("process_stages.process_id", process.id)
       .order("display_order"),
     supabase.from("engagements").select("current_stage").eq("workflow_id", process.id).not("current_stage", "is", null),
-    supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle(),
+    supabase.from("lead_pipeline_runs").select("id").eq("process_id", process.id).eq("workspace_id", workspace.id).eq("status", "Active").limit(1),
   ]);
 
   const canEdit = !isSystemDefault && Boolean(isWorkspaceAdmin);
-  const isDefaultLeadPipeline = workspaceRow?.default_lead_process_id === process.id;
+  // No single pipeline is designated "the" lead pipeline anymore -- any
+  // pipeline that actually has active leads on it shows them, the same
+  // way any pipeline with active engagements shows its engagement count.
+  const isLeadPipeline = (leadRunSample ?? []).length > 0;
 
   const engagementCountsByStage = new Map<string, number>();
   for (const row of stageCounts ?? []) {
@@ -46,7 +49,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
   }
 
   const leadsByStage: Record<string, { clientId: string; name: string }[]> = {};
-  if (isDefaultLeadPipeline) {
+  if (isLeadPipeline) {
     const { data: runs } = await supabase
       .from("lead_pipeline_runs")
       .select(
@@ -99,7 +102,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
           stages={stages ?? []}
           tasks={(tasks ?? []) as never}
           engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
-          isLeadPipeline={isDefaultLeadPipeline}
+          isLeadPipeline={isLeadPipeline}
           leadsByStage={leadsByStage}
         />
       </div>

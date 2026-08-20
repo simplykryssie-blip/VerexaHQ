@@ -43,7 +43,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: documentFolders },
     { data: staffMembers },
     { data: appointments },
-    { data: workspaceRow },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -118,25 +117,24 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .gte("start_at", new Date().toISOString())
       .order("start_at", { ascending: true })
       .limit(5),
-    supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle(),
   ]);
 
   const { data: workspaceTags } = await supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id });
 
-  const defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
-  const [{ data: leadPipelineStages }, { data: activeLeadRun }] = await Promise.all([
-    defaultLeadProcessId
-      ? supabase.from("process_stages").select("id, name").eq("process_id", defaultLeadProcessId).order("display_order")
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    supabase
-      .from("lead_pipeline_runs")
-      .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
-      .eq("client_id", client.id)
-      .eq("status", "Active")
-      .maybeSingle(),
-  ]);
+  // No single pipeline is designated "the" lead pipeline anymore -- a lead's
+  // stages come from whichever pipeline its own active run actually belongs
+  // to, not a workspace-level default.
+  const { data: activeLeadRun } = await supabase
+    .from("lead_pipeline_runs")
+    .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
+    .eq("client_id", client.id)
+    .eq("status", "Active")
+    .maybeSingle();
+  const { data: leadPipelineStages } = activeLeadRun
+    ? await supabase.from("process_stages").select("id, name").eq("process_id", activeLeadRun.process_id).order("display_order")
+    : { data: [] as { id: string; name: string }[] };
   const leadPipeline = {
-    processId: defaultLeadProcessId,
+    processId: activeLeadRun?.process_id ?? null,
     stages: leadPipelineStages ?? [],
     currentProcessStageId:
       (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,

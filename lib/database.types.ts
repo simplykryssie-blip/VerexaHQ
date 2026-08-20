@@ -7422,7 +7422,6 @@ export type Database = {
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
-          default_lead_process_id: string | null
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
@@ -7450,7 +7449,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
-          default_lead_process_id?: string | null
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
@@ -7478,7 +7476,6 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
-          default_lead_process_id?: string | null
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
@@ -7508,13 +7505,6 @@ export type Database = {
             columns: ["default_compliance_officer_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workspaces_default_lead_process_id_fkey"
-            columns: ["default_lead_process_id"]
-            isOneToOne: false
-            referencedRelation: "processes"
             referencedColumns: ["id"]
           },
           {
@@ -9025,7 +9015,6 @@ export type Database = {
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
-          default_lead_process_id: string | null
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
