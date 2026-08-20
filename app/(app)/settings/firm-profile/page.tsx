@@ -7,7 +7,6 @@ import { SettingsCard } from "@/components/settings/SettingsCard";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmProfileForm } from "./FirmProfileForm";
 import { getEffectiveBranding } from "@/lib/branding";
-import { WorkspaceStaffDefaultsForm } from "@/components/settings/WorkspaceStaffDefaultsForm";
 
 export const dynamic = 'force-dynamic';
 
@@ -48,27 +47,6 @@ export default async function FirmProfilePage() {
     ]);
 
   const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
-  // Client-level Relationship manager/Reviewer/Compliance officer only show
-  // for an ERO/Service Bureau (see ClientWorkspace.tsx's showStaffRoles) --
-  // presetting a default for them makes sense on the exact same workspaces.
-  const showStaffDefaults = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
-  const [{ data: staffDefaults }, { data: staffMembers }] = showStaffDefaults
-    ? await Promise.all([
-        supabase
-          .from("workspaces")
-          .select(
-            `default_relationship_manager:user_profiles!workspaces_default_relationship_manager_id_fkey(id, display_name),
-            default_reviewer:user_profiles!workspaces_default_reviewer_id_fkey(id, display_name),
-            default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name)`
-          )
-          .eq("id", workspace.id)
-          .single(),
-        supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id).eq("status", "active"),
-      ])
-    : [{ data: null }, { data: null }];
-  const staffOptions = (staffMembers ?? [])
-    .map((row) => row.user_profiles as unknown as { id: string; display_name: string | null } | null)
-    .filter((s): s is { id: string; display_name: string | null } => Boolean(s));
   // PTIN belongs to whichever entity the workspace actually represents: for a
   // solo preparer the workspace IS them, so it's a firm-level field; for an
   // ERO/SB, each individual staff member holds their own PTIN, so it's a
@@ -121,23 +99,6 @@ export default async function FirmProfilePage() {
             initialHours={businessHours}
             initialSlotMinutes={slotMinutes}
           />
-        </div>
-      )}
-
-      {showStaffDefaults && isAdmin && (
-        <div className="mt-6 max-w-2xl">
-          <SettingsCard
-            title="Default assignments"
-            description="Who a new client defaults to before anyone manually assigns them. Reviewer and Compliance officer also apply as the default for new clients created in a connected downline firm -- Relationship manager stays local to whichever firm the client belongs to."
-          >
-            <WorkspaceStaffDefaultsForm
-              workspaceId={workspace.id}
-              relationshipManager={(staffDefaults as unknown as { default_relationship_manager: { id: string; display_name: string | null } | null } | null)?.default_relationship_manager ?? null}
-              reviewer={(staffDefaults as unknown as { default_reviewer: { id: string; display_name: string | null } | null } | null)?.default_reviewer ?? null}
-              complianceOfficer={(staffDefaults as unknown as { default_compliance_officer: { id: string; display_name: string | null } | null } | null)?.default_compliance_officer ?? null}
-              staffOptions={staffOptions}
-            />
-          </SettingsCard>
         </div>
       )}
 
