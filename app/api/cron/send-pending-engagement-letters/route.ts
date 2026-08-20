@@ -45,12 +45,41 @@ export async function GET(request: Request) {
   let failed = 0;
 
   for (const job of jobs ?? []) {
-    const result = await sendOne(supabase, job);
+    const result = await sendOneWithTimeout(supabase, job);
     if (result === "sent") sent++;
     else failed++;
   }
 
   return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
+}
+
+// See the identical guard in send-pending-portal-invites/route.ts: a hang in
+// rendering/uploading/Storage can otherwise stall a job forever without ever
+// throwing, leaving the row at 'pending' and blocking every later job behind
+// it on every future cron cycle. Races sendOne against a hard deadline so a
+// hang always turns into a real "failed" row instead of silent stagnation.
+async function sendOneWithTimeout(
+  supabase: ReturnType<typeof createServiceClient>,
+  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  timeoutMs = 25000
+): Promise<"sent" | "failed"> {
+  let timedOut = false;
+  const timer = new Promise<"failed">((resolve) => {
+    setTimeout(() => {
+      timedOut = true;
+      resolve("failed");
+    }, timeoutMs);
+  });
+  const result = await Promise.race([sendOne(supabase, job), timer]);
+  if (timedOut) {
+    console.error(`send-pending-engagement-letters: job ${job.id} timed out after ${timeoutMs}ms`);
+    await supabase
+      .from("pending_engagement_letter_sends")
+      .update({ status: "failed", error: `Timed out after ${timeoutMs}ms`, processed_at: new Date().toISOString() })
+      .eq("id", job.id)
+      .eq("status", "pending");
+  }
+  return result;
 }
 
 async function sendOne(
