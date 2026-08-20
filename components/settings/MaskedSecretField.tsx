@@ -46,15 +46,15 @@ export function MaskedSecretField({
   }
 
   return (
-    <div className="grid grid-cols-[minmax(0,140px)_1fr_auto] items-center gap-4 px-5 py-3">
+    <div className="grid grid-cols-[minmax(0,140px)_1fr_auto] items-center gap-4 px-5 py-4">
       <div>
-        <span className="text-xs font-semibold text-slate">{label}</span>
-        {helpText && <span className="mt-0.5 block text-[11px] leading-snug text-muted">{helpText}</span>}
+        <span className="text-sm font-semibold text-ink">{label}</span>
+        {helpText && <span className="mt-0.5 block text-xs leading-snug text-muted">{helpText}</span>}
       </div>
 
       <div className="flex min-w-0 items-center gap-2.5">
         {last4 && !clear && (
-          <span className="whitespace-nowrap rounded border border-border bg-surfaceMuted px-2 py-1.5 font-mono text-xs text-ink">
+          <span className="whitespace-nowrap rounded-lg bg-accentSoft px-2.5 py-1.5 font-mono text-xs font-medium text-accent">
             {revealed ?? `••••${last4}`}
           </span>
         )}
@@ -63,7 +63,7 @@ export function MaskedSecretField({
           onChange={(e) => onNewValueChange(e.target.value)}
           disabled={clear}
           placeholder={last4 ? "Enter a new value to replace it" : "Not set"}
-          className="min-w-0 flex-1 rounded border border-border px-2.5 py-1.5 font-mono text-xs text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 font-mono text-xs text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted disabled:opacity-60"
         />
       </div>
 
@@ -73,7 +73,7 @@ export function MaskedSecretField({
             type="button"
             disabled={revealing}
             onClick={() => (revealed ? setRevealed(null) : reveal())}
-            className="font-semibold text-accent hover:underline disabled:opacity-60"
+            className="rounded-lg px-2 py-1 font-semibold text-accent hover:bg-accentSoft disabled:opacity-60"
           >
             {revealing ? "Revealing..." : revealed ? "Hide" : "Reveal"}
           </button>

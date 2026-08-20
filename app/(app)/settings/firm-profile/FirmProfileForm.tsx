@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { AddressInput } from "@/components/AddressInput";
 import { AvatarCropModal } from "@/components/AvatarCropModal";
 import { MaskedSecretField } from "@/components/settings/MaskedSecretField";
+import { SettingsCard } from "@/components/settings/SettingsCard";
 import { formatEin, formatEfin, formatPtin } from "@/lib/taxIds";
 import { formatPhone } from "@/lib/phone";
 import { US_STATES, SPECIAL_CERTIFICATION_STATE_CODES } from "@/lib/usStates";
@@ -283,16 +284,13 @@ export function FirmProfileForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-8">
+    <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
       {pendingAvatarFile && (
         <AvatarCropModal file={pendingAvatarFile} onCancel={() => setPendingAvatarFile(null)} onCropped={applyCroppedAvatar} />
       )}
 
-      <div>
-        <h3 className="text-sm font-semibold text-ink">You</h3>
-        <p className="mt-0.5 text-xs text-muted">Personal to you -- not shared with the rest of your workspace.</p>
-
-        <div className="mt-4 flex items-center gap-3">
+      <SettingsCard title="You" description="Personal to you -- not shared with the rest of your workspace.">
+        <div className="flex items-center gap-3">
           <Avatar name={display || `${first} ${last}`.trim()} url={avatar} size="lg" />
           <div className="flex items-center gap-2">
             <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
@@ -332,7 +330,7 @@ export function FirmProfileForm({
         </div>
 
         {showPtin && (
-          <div className="mt-3 overflow-hidden rounded-lg border border-border">
+          <div className="mt-3 overflow-hidden rounded-xl border border-border">
             <MaskedSecretField
               label="PTIN"
               last4={ptinLast4}
@@ -345,16 +343,14 @@ export function FirmProfileForm({
             />
           </div>
         )}
-      </div>
+      </SettingsCard>
 
       {isOwner && (
-        <div className="border-t border-border pt-8">
-          <h3 className="text-sm font-semibold text-ink">Your business</h3>
-          <p className="mt-0.5 text-xs text-muted">
-            One phone number and email here, used everywhere clients see your firm -- the client portal, your public intake forms, and invite emails.
-          </p>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <SettingsCard
+          title="Your business"
+          description="One phone number and email here, used everywhere clients see your firm -- the client portal, your public intake forms, and invite emails."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <LabeledInput label="Business phone" type="tel" value={bizPhone} onChange={(e) => setBizPhone(formatPhone(e.target.value))} />
             <LabeledInput
               label="Business email"
@@ -414,33 +410,33 @@ export function FirmProfileForm({
 
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <label className="block">
-                  <span className="block text-sm font-medium text-slate">Nav bar color</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input type="color" value={primary} onChange={(e) => setPrimary(e.target.value)} className="h-9 w-14 rounded border border-border" />
-                    <span className="font-mono text-xs text-muted">{primary}</span>
-                  </div>
-                </label>
-                <label className="block">
                   <span className="block text-sm font-medium text-slate">Accent color</span>
                   <div className="mt-1 flex items-center gap-2">
                     <input type="color" value={secondary} onChange={(e) => setSecondary(e.target.value)} className="h-9 w-14 rounded border border-border" />
                     <span className="font-mono text-xs text-muted">{secondary}</span>
                   </div>
+                  <span className="mt-1 block text-xs text-muted">Drives your sidebar&apos;s active state and the badges clients see on your portal.</span>
+                </label>
+                <label className="block">
+                  <span className="block text-sm font-medium text-slate">Fallback accent color</span>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input type="color" value={primary} onChange={(e) => setPrimary(e.target.value)} className="h-9 w-14 rounded border border-border" />
+                    <span className="font-mono text-xs text-muted">{primary}</span>
+                  </div>
+                  <span className="mt-1 block text-xs text-muted">Only used on public forms if Accent color above is left unset.</span>
                 </label>
               </div>
             </>
           )}
-        </div>
+        </SettingsCard>
       )}
 
       {isAdmin && (showEin || showEfin || showFirmPtin) && (
-        <div className="border-t border-border pt-8">
-          <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
-          <p className="mt-0.5 text-xs text-muted">
-            EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged.
-          </p>
-
-          <div className="mt-4 overflow-hidden rounded-lg border border-border">
+        <SettingsCard
+          title="Tax identifiers"
+          description="EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged."
+        >
+          <div className="overflow-hidden rounded-xl border border-border">
             <div className="divide-y divide-border">
               {showEin && (
                 <MaskedSecretField
@@ -514,17 +510,14 @@ export function FirmProfileForm({
               ))}
             </div>
           </div>
-        </div>
+        </SettingsCard>
       )}
 
-      <div className="border-t border-border pt-8">
-        <h3 className="text-sm font-semibold text-ink">Booking availability</h3>
-        <p className="mt-0.5 text-xs text-muted">
-          When clients can self-book a bookable service from their portal. Slot length sets the scheduling grid; each service&apos;s own duration
-          determines how much time a booking actually reserves.
-        </p>
-
-        <div className="mt-4 space-y-2">
+      <SettingsCard
+        title="Booking availability"
+        description="When clients can self-book a bookable service from their portal. Slot length sets the scheduling grid; each service's own duration determines how much time a booking actually reserves."
+      >
+        <div className="space-y-2">
           {WEEKDAYS.map((day) => {
             const open = hours[day];
             return (
@@ -579,11 +572,11 @@ export function FirmProfileForm({
             ))}
           </select>
         </div>
-      </div>
+      </SettingsCard>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
-      <div className="border-t border-border pt-4">
+      <div className="flex justify-end">
         <button
           type="submit"
           disabled={saving}

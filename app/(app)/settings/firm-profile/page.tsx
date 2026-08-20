@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { SettingsCard } from "@/components/settings/SettingsCard";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmProfileForm } from "./FirmProfileForm";
 import { getEffectiveBranding } from "@/lib/branding";
@@ -124,13 +125,11 @@ export default async function FirmProfilePage() {
       )}
 
       {showStaffDefaults && isAdmin && (
-        <div className="mt-8 border-t border-border pt-8">
-          <h3 className="text-sm font-semibold text-ink">Default assignments</h3>
-          <p className="mt-1 text-xs text-muted">
-            Who a new client defaults to before anyone manually assigns them. Reviewer and Compliance officer also apply as the default for
-            new clients created in a connected downline firm -- Relationship manager stays local to whichever firm the client belongs to.
-          </p>
-          <div className="mt-3">
+        <div className="mt-6 max-w-2xl">
+          <SettingsCard
+            title="Default assignments"
+            description="Who a new client defaults to before anyone manually assigns them. Reviewer and Compliance officer also apply as the default for new clients created in a connected downline firm -- Relationship manager stays local to whichever firm the client belongs to."
+          >
             <WorkspaceStaffDefaultsForm
               workspaceId={workspace.id}
               relationshipManager={(staffDefaults as unknown as { default_relationship_manager: { id: string; display_name: string | null } | null } | null)?.default_relationship_manager ?? null}
@@ -138,18 +137,16 @@ export default async function FirmProfilePage() {
               complianceOfficer={(staffDefaults as unknown as { default_compliance_officer: { id: string; display_name: string | null } | null } | null)?.default_compliance_officer ?? null}
               staffOptions={staffOptions}
             />
-          </div>
+          </SettingsCard>
         </div>
       )}
 
       {!isAdmin && (
-        <div className="mt-8 border-t border-border pt-8">
-          <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
-          <p className="mt-1 text-xs text-muted">
-            EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and
-            revealing the full value is audit-logged. Only a workspace admin can edit these.
-          </p>
-          <div className="mt-3">
+        <div className="mt-6 max-w-2xl">
+          <SettingsCard
+            title="Tax identifiers"
+            description="EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged. Only a workspace admin can edit these."
+          >
             {!profile ? (
               <EmptyState icon={FileText} message="No firm tax profile set up yet." />
             ) : (
@@ -180,7 +177,7 @@ export default async function FirmProfilePage() {
                 </div>
               </dl>
             )}
-          </div>
+          </SettingsCard>
         </div>
       )}
     </div>
