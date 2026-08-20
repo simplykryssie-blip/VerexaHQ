@@ -27,13 +27,18 @@ export default async function MessagesHubPage() {
   const messageableWorkspaces = (messageableRaw ?? []).map((w) => ({ workspaceId: w.workspace_id, name: w.name }));
 
   if (messageableWorkspaces.length === 0) {
+    const isEroOrSb = workspace.workspace_type === "ero_office" || workspace.workspace_type === "service_bureau";
     return (
       <>
         <PageHeader title="Messages" description="Internal conversations between your firm and its connected network." />
         <div className="flex-1 px-8 py-6">
           <EmptyState
             icon={MessageSquare}
-            message="Messages is for internal conversations between an ERO/Service Bureau and its connected PTINs. This workspace isn't connected to one, so there's no one to message here yet."
+            message={
+              isEroOrSb
+                ? "Messages is for internal conversations with your connected PTINs. You don't have any connected yet -- once a PTIN connects to your firm, you'll be able to message them here."
+                : "Messages is for internal conversations between an ERO/Service Bureau and its connected PTINs. This workspace isn't connected to one, so there's no one to message here yet."
+            }
           />
         </div>
       </>
