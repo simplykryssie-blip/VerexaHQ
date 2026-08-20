@@ -1,18 +1,18 @@
 .sidebar {
   --rail-bg: #ffffff;
   --rail-ink: #0f172a;
-  --rail-muted: #6b7280;
+  --rail-muted: #64748b;
   --rail-section: #9aa1ae;
   --blue-bright: #0b7fe0;
   --blue-bright-soft: rgba(11, 127, 224, 0.1);
 
   background: var(--rail-bg);
   color: var(--rail-ink);
-  border-right: 1px solid #eef0f3;
+  border-right: 1px solid #e7e9ee;
 }
 
 .header {
-  border-bottom: 1px solid #eef0f3;
+  border-bottom: 1px solid #e7e9ee;
 }
 
 .workspaceName {
@@ -37,7 +37,7 @@
 
 .navItem:hover {
   color: var(--rail-ink);
-  background: #f4f5f7;
+  background: #f7f8fa;
 }
 
 .navItemActive {
@@ -47,11 +47,11 @@
 }
 
 .subNav {
-  border-color: #eef0f3;
+  border-color: #e7e9ee;
 }
 
 .footer {
-  border-top: 1px solid #eef0f3;
+  border-top: 1px solid #e7e9ee;
 }
 
 .signOut {
@@ -60,7 +60,7 @@
 
 .signOut:hover {
   color: var(--rail-ink);
-  background: #f4f5f7;
+  background: #f7f8fa;
 }
 
 .mobileToggle {

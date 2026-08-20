@@ -6,7 +6,6 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
-import { archivo, publicSans, plexMono } from "@/lib/authFonts";
 import { hexToRgba } from "@/lib/color";
 import styles from "./Sidebar.module.css";
 
@@ -84,10 +83,10 @@ export function Sidebar({
       )}
 
       <aside
-        className={`${styles.sidebar} ${archivo.variable} ${publicSans.variable} ${plexMono.variable} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
+        className={`${styles.sidebar} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col font-sans shadow-soft transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ fontFamily: "var(--font-public-sans), system-ui, sans-serif", ...sidebarStyle }}
+        style={sidebarStyle}
       >
         <div className={`${styles.header} flex items-center justify-between px-5 py-5`}>
           <div>
