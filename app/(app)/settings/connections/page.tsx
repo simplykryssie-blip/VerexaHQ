@@ -7,6 +7,7 @@ import { ConnectionInviteGenerator } from "./ConnectionInviteGenerator";
 import { ConnectedPtinRow } from "./ConnectedPtinRow";
 import { RedeemConnectionForm } from "./RedeemConnectionForm";
 import { MyConnectionStatus } from "./MyConnectionStatus";
+import { PeerMessagingToggle } from "./PeerMessagingToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: canManage }, { data: connectedPtins }, { data: myConnectionRows }] = await Promise.all([
+  const [{ data: canManage }, { data: connectedPtins }, { data: myConnectionRows }, { data: workspaceRow }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" }),
     supabase
       .from("firm_connections")
@@ -30,6 +31,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       .eq("relationship_type", "ero_ptin")
       .order("created_at", { ascending: false })
       .limit(1),
+    supabase.from("workspaces").select("allow_connected_ptin_messaging").eq("id", workspace.id).maybeSingle(),
   ]);
 
   const myConnection = (myConnectionRows ?? [])[0] ?? null;
@@ -71,6 +73,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
 
           <div className="mt-4">
             <ConnectionInviteGenerator workspaceId={workspace.id} />
+          </div>
+          <div className="mt-4 border-t border-border pt-4">
+            <PeerMessagingToggle workspaceId={workspace.id} initialAllowed={Boolean(workspaceRow?.allow_connected_ptin_messaging)} />
           </div>
         </div>
       )}
