@@ -15,7 +15,7 @@ export function SettingsSectionHeader({
         <Icon size={18} strokeWidth={2} aria-hidden="true" />
       </span>
       <div>
-        <h2 className="text-base font-semibold text-ink">{title}</h2>
+        <h2 className="font-display text-base font-semibold text-ink">{title}</h2>
         {description && <p className="mt-1 text-sm text-muted">{description}</p>}
       </div>
     </div>
