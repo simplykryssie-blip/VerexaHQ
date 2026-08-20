@@ -8,6 +8,7 @@ import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildRepor
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { Lock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -145,11 +146,11 @@ export default async function DocumentsReportPage({
     if (searchParams.to) query = query.lte("created_at", searchParams.to);
     const { data: attachments } = await query;
 
-    const [labelMap, { data: staffMembers }] = await Promise.all([
+    const [labelMap, staffMembers] = await Promise.all([
       buildEntityLabelMap(supabase, attachments ?? []),
-      supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id),
+      getWorkspaceStaff(supabase, workspace.id, { activeOnly: false }),
     ]);
-    const staffById = new Map((staffMembers ?? []).map((m: any) => [m.user_id, m.user_profiles?.display_name as string | null]));
+    const staffById = new Map(staffMembers.map((m) => [m.user_id, m.display_name]));
 
     type Row = { id: string; fileName: string; entityLabel: string; href: string; uploadedBy: string; category: string; createdAt: string };
     let rows: Row[] = (attachments ?? []).map((a: any) => {

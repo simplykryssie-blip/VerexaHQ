@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import type { CalendarItem } from "./CalendarView";
 import { CalendarPageClient } from "./CalendarPageClient";
 import { clientLabel } from "@/lib/documentEntityLabels";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "@/components/appointments/types";
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,7 @@ export default async function CalendarPage() {
     );
   }
 
-  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, { data: staffRows }] =
+  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows] =
     await Promise.all([
       supabase
         .from("engagements")
@@ -62,7 +63,7 @@ export default async function CalendarPage() {
         .eq("workspace_id", workspace.id)
         .is("merged_into_client_id", null),
       supabase.from("engagements").select("id, engagement_number, client_id").eq("workspace_id", workspace.id),
-      supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id).eq("status", "active"),
+      getWorkspaceStaff(supabase, workspace.id),
     ]);
 
   const appointments: AppointmentRow[] = (appointmentRows ?? []).map((a: any) => ({
@@ -84,9 +85,7 @@ export default async function CalendarPage() {
     staff_name: null,
   }));
 
-  const staffNameById = new Map(
-    (staffRows ?? []).map((s: any) => [s.user_id, s.user_profiles?.display_name ?? "Staff member"])
-  );
+  const staffNameById = new Map(staffRows.map((s) => [s.user_id, s.display_name ?? "Staff member"]));
   for (const a of appointments) {
     if (a.staff_id) a.staff_name = staffNameById.get(a.staff_id) ?? null;
   }
@@ -97,7 +96,7 @@ export default async function CalendarPage() {
     client_id: e.client_id,
     label: e.engagement_number ?? "Engagement",
   }));
-  const staff: StaffOption[] = (staffRows ?? []).map((s: any) => ({ id: s.user_id, label: s.user_profiles?.display_name ?? "Staff member" }));
+  const staff: StaffOption[] = staffRows.map((s) => ({ id: s.user_id, label: s.display_name ?? "Staff member" }));
 
   const items: CalendarItem[] = [
     ...(engagements ?? []).map((e) => ({

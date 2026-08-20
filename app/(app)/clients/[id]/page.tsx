@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { buildOrganizerResponseDetail, hasOrganizerAnswers } from "@/lib/organizer/buildResponseDetail";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: messageThreads },
     { data: clientActivity },
     { data: documentFolders },
-    { data: staffMembers },
+    staffMembers,
     { data: appointments },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
@@ -105,11 +106,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .eq("entity_type", "client")
       .eq("entity_id", client.id)
       .order("display_order"),
-    supabase
-      .from("workspace_users")
-      .select("user_id, user_profiles(id, display_name)")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "active"),
+    getWorkspaceStaff(supabase, workspace.id),
     supabase
       .from("appointments")
       .select("id, title, start_at, location")
@@ -140,13 +137,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
   };
 
-  const { data: ownerRow } = await supabase
-    .from("workspace_users")
-    .select("user_id, user_profiles(id, display_name)")
-    .eq("workspace_id", workspace.id)
-    .eq("is_owner", true)
-    .maybeSingle();
-  const accountHolder = (ownerRow as any)?.user_profiles ?? null;
+  const ownerStaff = staffMembers.find((m) => m.is_owner) ?? null;
+  const accountHolder = ownerStaff ? { id: ownerStaff.user_id, display_name: ownerStaff.display_name } : null;
 
   // Relationship manager/Reviewer/Compliance officer default to whatever an
   // ERO/Service Bureau presets in Settings > Firm Profile, falling back to
@@ -300,12 +292,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           .order("created_at", { ascending: false })
       : { data: [] as never[] };
 
-  const staffById = new Map(
-    (staffMembers ?? [])
-      .map((m: any) => m.user_profiles)
-      .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
-      .map((p: any) => [p.id, p])
-  );
+  const staffById = new Map(staffMembers.map((m) => [m.user_id, { id: m.user_id, display_name: m.display_name }]));
   const staffOptions = Array.from(staffById.values());
 
   const documentsWithUploader = (documents ?? []).map((d: any) => ({
