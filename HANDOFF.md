@@ -241,7 +241,13 @@ un-promoted previews.
 - **Google/Outlook calendar sync is fully built (2026-08-19) but has no real
   OAuth credentials yet -- `GOOGLE_CALENDAR_CLIENT_ID/SECRET` and
   `MICROSOFT_CALENDAR_CLIENT_ID/SECRET` in `.env.local.example` are both
-  blank.** Same shape as Zoom: per-staff personal connection, cards in
+  blank.** Confirmed still live (2026-08-20): user hit exactly this
+  blocker trying to connect Google Calendar in production -- "Google
+  Calendar is not configured for this environment" is the literal string
+  `app/api/calendar/google/connect/route.ts` sets on `google_calendar_error`
+  when `isGoogleCalendarConfigured()` is false, i.e. the two `GOOGLE_
+  CALENDAR_CLIENT_ID/SECRET` env vars still aren't set in Vercel. Same shape
+  as Zoom: per-staff personal connection, cards in
   Settings → Integrations. What it does once credentials are set: every
   appointment with a `staff_id` gets pushed (create/update/cancel) to that
   staff member's connected calendar via a Postgres trigger
