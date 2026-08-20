@@ -508,6 +508,21 @@ un-promoted previews.
     "add to the to-do list for now" rather than picking a build order.
     Ask her which one (if either) to start on before beginning real design
     work on either.
+- **Requested (2026-08-20), not built yet: email notifications for failed
+  background jobs, sent to `failedsystem@verexahq.com`.** Came up while
+  debugging the stuck portal-invite cron (see the queue-drain fixes in
+  `app/api/cron/send-pending-portal-invites/route.ts` and
+  `send-pending-engagement-letters/route.ts`, PRs #40-42) — right now a
+  failed job (e.g. `pending_portal_invites`/`pending_engagement_letter_sends`
+  rows landing at `status='failed'`) is only visible by manually querying the
+  table or reading Vercel runtime logs; nobody gets told. Scope this before
+  building: which failure classes should alert (just these two queue tables,
+  or any cron/automation-step failure more broadly — e.g.
+  `automation_runs`/`execute_automation_step` errors too), whether to batch
+  into a digest or send one email per failure (a bad Resend key or a
+  systemic bug could otherwise spam that inbox), and confirm
+  `failedsystem@verexahq.com` is a real, already-provisioned mailbox before
+  wiring `sendEmailViaResend` to it.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
