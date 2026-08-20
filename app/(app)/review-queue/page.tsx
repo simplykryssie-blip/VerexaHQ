@@ -18,6 +18,11 @@ export default async function ReviewQueuePage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+  const { data: canReviewShares } = await supabase.rpc("has_permission", {
+    p_workspace_id: workspace.id,
+    p_permission_key: "engagements.share",
+  });
+
   const { data: shares } = await supabase
     .from("engagement_shares")
     .select(
@@ -87,6 +92,7 @@ export default async function ReviewQueuePage() {
           )}
         </section>
 
+        {canReviewShares && (
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink">Awaiting your review</h2>
           {openShares.length === 0 ? (
@@ -115,8 +121,9 @@ export default async function ReviewQueuePage() {
             </ul>
           )}
         </section>
+        )}
 
-        {resolvedShares.length > 0 && (
+        {canReviewShares && resolvedShares.length > 0 && (
           <section>
             <h2 className="mb-2 text-sm font-semibold text-ink">Past decisions</h2>
             <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
