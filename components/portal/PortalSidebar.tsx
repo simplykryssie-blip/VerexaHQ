@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { PORTAL_NAV_ITEMS } from "@/lib/portalNav";
+import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
 
 export function PortalSidebar({
   clientLabel,
@@ -19,6 +20,7 @@ export function PortalSidebar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const trimmedLogoUrl = useTrimmedLogo(logoUrl);
 
   useEffect(() => {
     setOpen(false);
@@ -44,9 +46,9 @@ export function PortalSidebar({
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-5">
           <div>
-            {logoUrl ? (
+            {trimmedLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
+              <img src={trimmedLogoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
             ) : (
               <p className="text-sm font-semibold text-ink">{firmName || "VerexaHQ"}</p>
             )}
