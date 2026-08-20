@@ -6,6 +6,7 @@ import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NewClientButton } from "./NewClientButton";
+import { TagFilterControl } from "./TagFilterControl";
 
 export const dynamic = 'force-dynamic';
 
@@ -299,27 +300,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         </div>
 
         {(workspaceTags ?? []).length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Tag:</span>
-            <Link
-              href={tagQueryBase}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                !tag ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-              }`}
-            >
-              All
-            </Link>
-            {(workspaceTags ?? []).map((t) => (
-              <Link
-                key={t}
-                href={`${tagQueryBase}&tag=${encodeURIComponent(t)}`}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  tag === t ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-                }`}
-              >
-                {t}
-              </Link>
-            ))}
+          <div className="mb-4">
+            <TagFilterControl tags={workspaceTags ?? []} activeTag={tag} baseHref={tagQueryBase} />
           </div>
         )}
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
