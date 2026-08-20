@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { PlatformAdminsManager } from "./PlatformAdminsManager";
+import { ProvisionWorkspaceForm } from "./ProvisionWorkspaceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +81,8 @@ export default async function PlatformAdminPage() {
         }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
+        <ProvisionWorkspaceForm />
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { label: "Workspaces", value: totalWorkspaces },
