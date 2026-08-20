@@ -11,6 +11,7 @@ type PageResult = {
   imported?: number;
   skippedDuplicate?: number;
   skippedInvalid?: number;
+  skippedTagFilter?: number;
   errors?: string[];
   hasMore?: boolean;
   nextCursor?: Cursor;
@@ -29,18 +30,24 @@ export function GhlImportPanel() {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const stopRequestedRef = useRef(false);
-  const [totals, setTotals] = useState({ imported: 0, skippedDuplicate: 0, skippedInvalid: 0 });
+  const [tagFilterText, setTagFilterText] = useState("Tax| Individual/ Schedule C\nTax| Corporate Return\nTPB");
+  const [totals, setTotals] = useState({ imported: 0, skippedDuplicate: 0, skippedInvalid: 0, skippedTagFilter: 0 });
   const [errors, setErrors] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function runImport() {
+    const filterTags = tagFilterText
+      .split("\n")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
     setRunning(true);
     stopRequestedRef.current = false;
     setDone(false);
     setError(null);
     setErrors([]);
-    setTotals({ imported: 0, skippedDuplicate: 0, skippedInvalid: 0 });
+    setTotals({ imported: 0, skippedDuplicate: 0, skippedInvalid: 0, skippedTagFilter: 0 });
 
     const startResult = await callImportApi({ phase: "start" }).catch(() => null);
     const pausedAutomationIds = (startResult as { pausedAutomationIds?: string[] } | null)?.pausedAutomationIds ?? [];
@@ -55,7 +62,7 @@ export function GhlImportPanel() {
           stoppedEarly = true;
           break;
         }
-        const result = await callImportApi({ phase: "page", cursor });
+        const result = await callImportApi({ phase: "page", cursor, filterTags });
         if (!result.ok) {
           setError(result.error ?? "Import failed.");
           break;
@@ -64,6 +71,7 @@ export function GhlImportPanel() {
           imported: t.imported + (result.imported ?? 0),
           skippedDuplicate: t.skippedDuplicate + (result.skippedDuplicate ?? 0),
           skippedInvalid: t.skippedInvalid + (result.skippedInvalid ?? 0),
+          skippedTagFilter: t.skippedTagFilter + (result.skippedTagFilter ?? 0),
         }));
         if (result.errors && result.errors.length > 0) {
           setErrors((e) => [...e, ...result.errors!]);
@@ -113,11 +121,22 @@ export function GhlImportPanel() {
         )}
       </div>
 
+      <div className="mt-3">
+        <label className="text-xs font-medium text-ink">Only import contacts tagged (any of, one per line -- leave blank for all)</label>
+        <textarea
+          value={tagFilterText}
+          onChange={(e) => setTagFilterText(e.target.value)}
+          disabled={running}
+          rows={3}
+          className="mt-1 w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+        />
+      </div>
+
       {(running || done) && (
         <div className="mt-3 rounded-lg bg-surfaceMuted p-3 text-xs text-slate">
           <p>
             {running ? "Importing..." : "Done."} {totals.imported} imported, {totals.skippedDuplicate} already existed, {totals.skippedInvalid} had
-            no email or phone.
+            no email or phone, {totals.skippedTagFilter} didn&apos;t match the tag filter.
           </p>
           {errors.length > 0 && (
             <div className="mt-2">

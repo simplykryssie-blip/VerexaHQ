@@ -41,6 +41,7 @@ type RequestBody = {
   phase?: "start" | "page" | "finish";
   cursor?: Cursor;
   pausedAutomationIds?: string[];
+  filterTags?: string[];
 };
 
 async function ghlFetch(path: string, apiKey: string) {
@@ -118,12 +119,15 @@ export async function POST(request: Request) {
 
   const contacts = page.contacts ?? [];
   if (contacts.length === 0) {
-    return NextResponse.json({ ok: true, imported: 0, skippedDuplicate: 0, skippedInvalid: 0, hasMore: false, nextCursor: null });
+    return NextResponse.json({ ok: true, imported: 0, skippedDuplicate: 0, skippedInvalid: 0, skippedTagFilter: 0, hasMore: false, nextCursor: null });
   }
+
+  const filterTags = new Set((body.filterTags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean));
 
   let imported = 0;
   let skippedDuplicate = 0;
   let skippedInvalid = 0;
+  let skippedTagFilter = 0;
   const errors: string[] = [];
   const tagsSeen = new Set<string>();
 
@@ -132,6 +136,12 @@ export async function POST(request: Request) {
     const phone = contact.phone?.trim() || undefined;
     if (!email && !phone) {
       skippedInvalid++;
+      continue;
+    }
+
+    const ghlTags = (contact.tags ?? []).map((t) => t.trim()).filter(Boolean);
+    if (filterTags.size > 0 && !ghlTags.some((t) => filterTags.has(t.toLowerCase()))) {
+      skippedTagFilter++;
       continue;
     }
 
@@ -160,7 +170,6 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const ghlTags = (contact.tags ?? []).map((t) => t.trim()).filter(Boolean);
     const tags = Array.from(new Set([...ghlTags, IMPORT_TAG]));
     for (const t of tags) tagsSeen.add(t);
 
@@ -186,6 +195,7 @@ export async function POST(request: Request) {
     imported,
     skippedDuplicate,
     skippedInvalid,
+    skippedTagFilter,
     errors,
     hasMore: contacts.length === PAGE_LIMIT && Boolean(nextCursor),
     nextCursor,
