@@ -37,6 +37,7 @@ import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
+import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
 export type StaffOption = { id: string; display_name: string | null };
 export type AutomationOption = { id: string; name: string };
@@ -145,6 +146,7 @@ export function actionIcon(type: string) {
 }
 
 export function StepCard({
+  workspaceId,
   step,
   index,
   total,
@@ -161,6 +163,7 @@ export function StepCard({
   onSaved,
   hideReorder,
 }: {
+  workspaceId: string;
   step: WorkflowStepRow;
   index: number;
   total: number;
@@ -203,6 +206,11 @@ export function StepCard({
   }
 
   async function save() {
+    if (actionType === "add_tag" || actionType === "remove_tag") {
+      const tag = (config.tag as string | undefined)?.trim();
+      if (tag && !(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+    }
+
     setSaving(true);
     setError(null);
     const delayMinutes = Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0);
@@ -976,6 +984,7 @@ export function StepCard({
 }
 
 export function WorkflowBuilder({
+  workspaceId,
   automationId,
   triggerType,
   triggerConfig,
@@ -997,6 +1006,7 @@ export function WorkflowBuilder({
   automationOptions = [],
   conditions: initialConditions = [],
 }: {
+  workspaceId: string;
   automationId: string;
   triggerType: string;
   triggerConfig: Record<string, unknown>;
@@ -1028,6 +1038,15 @@ export function WorkflowBuilder({
   const [savingTrigger, setSavingTrigger] = useState(false);
 
   async function saveTrigger() {
+    const tagsToConfirm = new Set(collectClientTagValues(conditions));
+    if (currentTriggerType === "client.tag_added") {
+      const triggerTag = (config.tag as string | undefined)?.trim();
+      if (triggerTag) tagsToConfirm.add(triggerTag);
+    }
+    for (const tag of tagsToConfirm) {
+      if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+    }
+
     setSavingTrigger(true);
     const { error } = await supabase
       .from("automations")
@@ -1116,6 +1135,7 @@ export function WorkflowBuilder({
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
         ) : (
           <WorkflowCanvas
+            workspaceId={workspaceId}
             automationId={automationId}
             steps={steps}
             edges={stepEdges}

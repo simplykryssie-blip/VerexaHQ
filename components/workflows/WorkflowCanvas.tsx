@@ -161,6 +161,7 @@ function positionForNewStep(anchor: WorkflowStepRow | null, siblings: WorkflowSt
 }
 
 function CanvasInner({
+  workspaceId,
   automationId,
   steps,
   edges: edgeRows,
@@ -178,6 +179,7 @@ function CanvasInner({
   staffOptions,
   automationOptions,
 }: {
+  workspaceId: string;
   automationId: string;
   steps: WorkflowStepRow[];
   edges: WorkflowStepEdgeRow[];
@@ -533,6 +535,7 @@ function CanvasInner({
             </div>
           ) : selectedStep ? (
             <StepCard
+              workspaceId={workspaceId}
               step={selectedStep}
               index={0}
               total={1}
@@ -566,6 +569,7 @@ function CanvasInner({
               </button>
             </div>
             <BranchEditor
+              workspaceId={workspaceId}
               stepId={activeConditionStepId}
               automationId={automationId}
               edges={edgeRows.filter((e) => e.from_step_id === activeConditionStepId)}

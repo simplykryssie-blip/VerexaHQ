@@ -8109,6 +8109,27 @@ export type Database = {
         Args: { p_pending_step_id: string }
         Returns: undefined
       }
+      create_workspace_tag: {
+        Args: { p_name: string; p_workspace_id: string }
+        Returns: string
+      }
+      rename_workspace_tag: {
+        Args: { p_new_name: string; p_tag_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      delete_workspace_tag: {
+        Args: { p_tag_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      list_workspace_tags_with_usage: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          id: string
+          name: string
+          client_count: number
+          automation_names: string[]
+        }[]
+      }
       approve_automation_step: {
         Args: { p_pending_step_id: string }
         Returns: Json
