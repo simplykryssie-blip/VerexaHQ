@@ -441,6 +441,34 @@ un-promoted previews.
     delete it via Supabase Dashboard → Storage → `branding` bucket → that
     folder.
   - Verified after: exactly 1 workspace, 1 auth user, 0 clients remain.
+- **Reported (2026-08-20), not yet investigated: connecting a custom sending
+  domain fails with a Resend 401.** Exact error: `Resend responded with 401:
+  {"statusCode":401,"message":"This API key is restricted to only send
+  emails","name":"restricted_api_key"}`. This is Resend's own error, not
+  Verexa's — it means the `RESEND_API_KEY` currently set in Vercel was
+  created with "Sending access" only, but domain verification (adding a
+  domain, checking its DNS records) needs a Resend API key with Domains
+  permission (either "Full access" or a key with the Domains scope enabled).
+  **Fix**: in the Resend dashboard, create a new API key with Full
+  access (or Domains scope), then update `RESEND_API_KEY` in Vercel's
+  environment variables to the new key. No code change expected — this is
+  purely a Resend-side key permission issue. Find the domain-connect flow at
+  `app/(app)/settings/integrations` (`EmailDomainCard`) / wherever it calls
+  the Resend Domains API to confirm the exact call site before assuming
+  nothing else needs to change. Confirmed call site: `lib/email/domains.ts`
+  (`createDomain`/`getDomain`/`verifyDomain`/`deleteDomain`, all hitting
+  `${RESEND_API}/domains...` with the same `RESEND_API_KEY`), wired into
+  `EmailDomainCard` on `app/(app)/settings/integrations`.
+- **GHL import (2026-08-20): contacts + tags are done.** Bring-your-own Private
+  Integration Token + Location ID, stored encrypted (Settings → Integrations →
+  GoHighLevel), imports as leads via `create_client` (so its dedupe applies),
+  with a tag filter (defaults to MKB's `Tax| Individual/ Schedule C`,
+  `Tax| Corporate Return`, `TPB`). Discussed with the user what else GHL
+  exposes for import (custom fields, notes, tasks, appointments,
+  conversations, forms) — pipelines and automations are intentionally out of
+  scope (GHL's model doesn't map onto Verexa's automation graph; pipelines are
+  fast enough to hand-recreate via `/pipelines`). Check the conversation for
+  which of the remaining pieces, if any, she decided to have built next.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
