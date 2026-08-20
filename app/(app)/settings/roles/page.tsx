@@ -34,7 +34,7 @@ export default async function RolesPage() {
   // for an ERO/Service Bureau (see ClientWorkspace.tsx's showStaffRoles) --
   // presetting a default for them makes sense on the exact same workspaces.
   const showStaffDefaults = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
-  const [{ data: staffDefaults }, { data: staffMembers }] = showStaffDefaults
+  const [{ data: staffDefaults }, { data: activeMembers }] = showStaffDefaults
     ? await Promise.all([
         supabase
           .from("workspaces")
@@ -45,12 +45,18 @@ export default async function RolesPage() {
           )
           .eq("id", workspace.id)
           .single(),
-        supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id).eq("status", "active"),
+        supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
       ])
     : [{ data: null }, { data: null }];
-  const staffOptions = (staffMembers ?? [])
-    .map((row) => row.user_profiles as unknown as { id: string; display_name: string | null } | null)
-    .filter((s): s is { id: string; display_name: string | null } => Boolean(s));
+  // Queried separately from workspace_users rather than via an embedded
+  // select -- user_profiles isn't directly FK'd from workspace_users (both
+  // it and workspace_users.user_id independently reference auth.users),
+  // which PostgREST can't auto-embed across.
+  const staffUserIds = (activeMembers ?? []).map((m) => m.user_id);
+  const { data: staffProfiles } = staffUserIds.length
+    ? await supabase.from("user_profiles").select("id, display_name").in("id", staffUserIds)
+    : { data: [] };
+  const staffOptions = staffProfiles ?? [];
 
   const memberCountByRole = new Map<string, number>();
   for (const m of members ?? []) {
