@@ -475,6 +475,39 @@ un-promoted previews.
   scope (GHL's model doesn't map onto Verexa's automation graph; pipelines are
   fast enough to hand-recreate via `/pipelines`). Check the conversation for
   which of the remaining pieces, if any, she decided to have built next.
+- **Requested (2026-08-20), not started — two new large product asks,
+  neither built yet, deliberately deferred to a future session.** Came up
+  while discussing what GHL has that Verexa doesn't (Websites/Funnels,
+  Community). Scoped with the user via AskUserQuestion before any code:
+  1. **Website hosting + funnel/landing-page builder.** Explicitly wants
+     the full drag-and-drop version (freeform blocks, custom layouts,
+     multi-step funnels, custom domain support) — she rejected the smaller
+     "templated pages" option. This is genuinely a second product's worth
+     of surface area: a visual page builder, page hosting/routing (likely
+     needs its own custom-domain-per-workspace flow, same shape as
+     `workspace_email_domains`'s DNS verification but for web, not email),
+     and funnel-step sequencing. Lead capture on these pages should almost
+     certainly wire into the existing `create_client`/
+     `record_client_service_interest` path the public organizer links
+     already use, not a separate lead model. No design work done yet on
+     the builder's data model (block schema, page versioning, etc.) — this
+     needs real architecture planning before writing any code, not just a
+     migration.
+  2. **Staff learning hub for EROs/Service Bureaus.** Confirmed scope: an
+     ERO/SB workspace builds training content once and it's visible to
+     staff at every connected office — i.e. it hooks into the *existing*
+     `firm_connections` hierarchy (the same ERO↔connected-office
+     relationship the Connections page already manages), not a
+     per-workspace-only content library. Needs: course/module content
+     tables, some kind of content editor (rich text at minimum, maybe
+     video embeds), staff-facing consumption UI gated by
+     `firm_connections`/role, and probably completion tracking. Smaller
+     than the page builder but still a real multi-piece feature, not a
+     quick add.
+  - **Deliberately not prioritized against each other yet** — user said
+    "add to the to-do list for now" rather than picking a build order.
+    Ask her which one (if either) to start on before beginning real design
+    work on either.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
