@@ -40,6 +40,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ processed: 0, sent: 0, failed: 0, queryError: queryError.message }, { status: 200 });
   }
 
+  console.log(`send-pending-portal-invites: fetched ${jobs?.length ?? 0} job(s)`, (jobs ?? []).map((j) => j.id));
+
   let sent = 0;
   let failed = 0;
 
