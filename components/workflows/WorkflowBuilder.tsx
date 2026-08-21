@@ -210,9 +210,10 @@ export function StepCard({
     if (!slug) return;
     setLoadingTemplate(true);
     const table = kind === "email" ? "email_templates" : "sms_templates";
+    const columns = kind === "email" ? "id, name, status, workspace_id, subject, body_html" : "id, name, status, workspace_id, body";
     const { data, error: fetchError } = await supabase
       .from(table)
-      .select("id, name, status, workspace_id, subject, body_html, body")
+      .select(columns)
       .eq("workspace_id", workspaceId)
       .eq("slug", slug)
       .single();
