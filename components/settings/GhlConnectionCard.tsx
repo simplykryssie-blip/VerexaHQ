@@ -104,8 +104,8 @@ export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: s
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       {!isConnected && (
         <p className="mt-2 text-xs text-muted">
-          In GHL: Settings &gt; Private Integrations &gt; Create New Integration (scopes: View Contacts). Location ID is under Settings &gt;
-          Business Profile.
+          In GHL: Settings &gt; Private Integrations &gt; Create New Integration (scope: View Contacts -- add View Notes/Tasks/Appointments,
+          Conversations, and Forms too if you plan to import those as well). Location ID is under Settings &gt; Business Profile.
         </p>
       )}
 

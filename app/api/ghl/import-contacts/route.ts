@@ -10,14 +10,19 @@ const GHL_VERSION = "2021-07-28";
 // Kept small (well under GHL's own max of 100) so a page of sequential
 // create_client round-trips comfortably finishes inside the function's
 // time budget -- the client loops over pages, so total throughput is the
-// same either way.
-const PAGE_LIMIT = 25;
+// same either way. Dropped further when any of the per-contact extras
+// (notes/tasks/appointments/conversations/forms) are requested, since each
+// of those adds its own GHL round trip per contact.
+const PAGE_LIMIT_CONTACTS_ONLY = 25;
+const PAGE_LIMIT_WITH_EXTRAS = 8;
 const IMPORT_TAG = "source:ghl-import";
 // Automations that could fire once per imported contact -- new-lead
 // notifications/portal invites, and any tag-triggered automation whose tag
 // happens to collide with a GHL tag name -- are paused for the run rather
 // than blasting staff or clients for a batch of historical contacts.
 const PAUSE_TRIGGER_TYPES = ["lead.created", "client.tag_added"];
+
+type GhlCustomFieldValue = { id?: string; value?: unknown };
 
 type GhlContact = {
   id?: string;
@@ -28,12 +33,40 @@ type GhlContact = {
   phone?: string;
   companyName?: string;
   tags?: string[];
+  customFields?: GhlCustomFieldValue[];
 };
 
 type GhlContactsResponse = {
   contacts?: GhlContact[];
   meta?: { startAfterId?: string; startAfter?: number };
 };
+
+type GhlCustomFieldDef = { id: string; name?: string; key?: string; fieldKey?: string };
+type GhlCustomFieldsResponse = { customFields?: GhlCustomFieldDef[] };
+
+type GhlNote = { id?: string; body?: string; dateAdded?: string };
+type GhlNotesResponse = { notes?: GhlNote[] };
+
+type GhlTask = { id?: string; title?: string; body?: string; dueDate?: string; completed?: boolean };
+type GhlTasksResponse = { tasks?: GhlTask[] };
+
+type GhlAppointment = {
+  id?: string;
+  title?: string;
+  startTime?: string;
+  endTime?: string;
+  appointmentStatus?: string;
+  address?: string;
+};
+type GhlAppointmentsResponse = { events?: GhlAppointment[]; appointments?: GhlAppointment[] };
+
+type GhlConversation = { id?: string; type?: string };
+type GhlConversationsSearchResponse = { conversations?: GhlConversation[] };
+type GhlMessage = { id?: string; body?: string; direction?: string; dateAdded?: string; type?: string };
+type GhlMessagesResponse = { messages?: { messages?: GhlMessage[] } | GhlMessage[] };
+
+type GhlFormSubmission = { id?: string; formId?: string; formName?: string; [key: string]: unknown };
+type GhlFormSubmissionsResponse = { submissions?: GhlFormSubmission[] };
 
 type Cursor = { startAfterId?: string; startAfter?: number } | null;
 
@@ -42,9 +75,16 @@ type RequestBody = {
   cursor?: Cursor;
   pausedAutomationIds?: string[];
   filterTags?: string[];
+  importCustomFields?: boolean;
+  importNotes?: boolean;
+  importTasks?: boolean;
+  importAppointments?: boolean;
+  importConversations?: boolean;
+  importForms?: boolean;
+  customFieldDefs?: Record<string, string>;
 };
 
-async function ghlFetch(path: string, apiKey: string) {
+async function ghlFetch<T>(path: string, apiKey: string): Promise<T> {
   const res = await fetch(`${GHL_BASE}${path}`, {
     headers: { Authorization: `Bearer ${apiKey}`, Version: GHL_VERSION, Accept: "application/json" },
   });
@@ -53,7 +93,7 @@ async function ghlFetch(path: string, apiKey: string) {
     const message = (json as { message?: string })?.message || `GoHighLevel returned ${res.status}`;
     throw new Error(message);
   }
-  return json as GhlContactsResponse;
+  return json as T;
 }
 
 function splitName(contact: GhlContact): { firstName?: string; lastName?: string } {
@@ -63,6 +103,173 @@ function splitName(contact: GhlContact): { firstName?: string; lastName?: string
   const parts = (contact.name ?? "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return {};
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") || undefined };
+}
+
+// Best-effort: each of these imports one GHL sub-resource type for one
+// contact. Failures are swallowed into the counters/errors passed back to
+// the caller rather than aborting the whole contact -- a 403 on one scope
+// (e.g. the token was never granted Notes access) shouldn't take down
+// contacts/tags import for everyone else in the batch.
+
+async function importNotesForContact(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  clientId: string,
+  ghlContactId: string,
+  apiKey: string
+): Promise<number> {
+  const data = await ghlFetch<GhlNotesResponse>(`/contacts/${ghlContactId}/notes`, apiKey);
+  let count = 0;
+  for (const note of data.notes ?? []) {
+    const body = note.body?.trim();
+    if (!body) continue;
+    const { error } = await supabase.from("notes").insert({
+      workspace_id: workspaceId,
+      entity_type: "client",
+      entity_id: clientId,
+      body,
+      is_internal: true,
+      is_private: false,
+      is_pinned: false,
+      ...(note.dateAdded ? { created_at: note.dateAdded } : {}),
+    });
+    if (!error) count++;
+  }
+  return count;
+}
+
+async function importTasksForContact(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  clientId: string,
+  ghlContactId: string,
+  apiKey: string
+): Promise<number> {
+  const data = await ghlFetch<GhlTasksResponse>(`/contacts/${ghlContactId}/tasks`, apiKey);
+  let count = 0;
+  for (const task of data.tasks ?? []) {
+    const title = task.title?.trim() || task.body?.trim();
+    if (!title) continue;
+    const { error } = await supabase.from("tasks").insert({
+      workspace_id: workspaceId,
+      client_id: clientId,
+      title,
+      description: task.body?.trim() || null,
+      due_date: task.dueDate ?? null,
+      status: task.completed ? "completed" : "pending",
+    });
+    if (!error) count++;
+  }
+  return count;
+}
+
+async function importAppointmentsForContact(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  clientId: string,
+  ghlContactId: string,
+  apiKey: string
+): Promise<number> {
+  const data = await ghlFetch<GhlAppointmentsResponse>(`/contacts/${ghlContactId}/appointments`, apiKey);
+  const events = data.events ?? data.appointments ?? [];
+  let count = 0;
+  for (const evt of events) {
+    if (!evt.startTime) continue;
+    const start = new Date(evt.startTime);
+    const end = evt.endTime ? new Date(evt.endTime) : new Date(start.getTime() + 30 * 60_000);
+    const { error } = await supabase.from("appointments").insert({
+      workspace_id: workspaceId,
+      client_id: clientId,
+      title: evt.title?.trim() || "Imported appointment",
+      start_at: start.toISOString(),
+      end_at: end.toISOString(),
+      status: (evt.appointmentStatus || "confirmed").toLowerCase(),
+      location: evt.address ?? null,
+      portal_visible: false,
+    });
+    if (!error) count++;
+  }
+  return count;
+}
+
+async function importConversationsForContact(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  clientId: string,
+  ghlContactId: string,
+  locationId: string,
+  apiKey: string
+): Promise<number> {
+  const search = await ghlFetch<GhlConversationsSearchResponse>(
+    `/conversations/search?contactId=${ghlContactId}&locationId=${locationId}`,
+    apiKey
+  );
+  let count = 0;
+  for (const conv of search.conversations ?? []) {
+    if (!conv.id) continue;
+    const { data: threadRow, error: threadError } = await supabase
+      .from("message_threads")
+      .insert({
+        workspace_id: workspaceId,
+        entity_type: "client",
+        entity_id: clientId,
+        channel: (conv.type || "sms").toLowerCase(),
+        status: "closed",
+      })
+      .select("id")
+      .single();
+    if (threadError || !threadRow) continue;
+
+    const msgData = await ghlFetch<GhlMessagesResponse>(`/conversations/${conv.id}/messages`, apiKey);
+    const messages = Array.isArray(msgData.messages) ? msgData.messages : msgData.messages?.messages ?? [];
+    for (const m of messages) {
+      const body = m.body?.trim();
+      if (!body) continue;
+      const { error } = await supabase.from("messages").insert({
+        workspace_id: workspaceId,
+        thread_id: threadRow.id,
+        sender_type: m.direction === "inbound" ? "client" : "staff",
+        body,
+        is_internal: false,
+        ...(m.dateAdded ? { created_at: m.dateAdded } : {}),
+      });
+      if (!error) count++;
+    }
+  }
+  return count;
+}
+
+async function importFormsForContact(
+  supabase: ReturnType<typeof createClient>,
+  workspaceId: string,
+  clientId: string,
+  ghlContactId: string,
+  locationId: string,
+  apiKey: string
+): Promise<number> {
+  const data = await ghlFetch<GhlFormSubmissionsResponse>(
+    `/forms/submissions?locationId=${locationId}&contactId=${ghlContactId}`,
+    apiKey
+  );
+  let count = 0;
+  for (const submission of data.submissions ?? []) {
+    const fieldLines = Object.entries(submission)
+      .filter(([key]) => !["id", "contactId", "formId", "formName"].includes(key))
+      .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
+      .join("\n");
+    const { error } = await supabase.from("notes").insert({
+      workspace_id: workspaceId,
+      entity_type: "client",
+      entity_id: clientId,
+      subject: submission.formName ? `GHL form: ${submission.formName}` : "GHL form submission",
+      body: fieldLines || "(no fields recorded)",
+      is_internal: true,
+      is_private: false,
+      is_pinned: false,
+    });
+    if (!error) count++;
+  }
+  return count;
 }
 
 export async function POST(request: Request) {
@@ -85,7 +292,29 @@ export async function POST(request: Request) {
     if (pausedAutomationIds.length > 0) {
       await supabase.from("automations").update({ is_enabled: false }).in("id", pausedAutomationIds);
     }
-    return NextResponse.json({ ok: true, pausedAutomationIds });
+
+    let customFieldDefs: Record<string, string> = {};
+    if (body.importCustomFields) {
+      const { data: connRows } = await supabase.rpc("get_workspace_ghl_connection", { p_workspace_id: workspace.id });
+      const connection = connRows?.[0];
+      if (connection?.api_key && connection?.location_id) {
+        try {
+          const defs = await ghlFetch<GhlCustomFieldsResponse>(
+            `/locations/${connection.location_id}/customFields`,
+            connection.api_key
+          );
+          customFieldDefs = Object.fromEntries(
+            (defs.customFields ?? []).filter((f) => f.id).map((f) => [f.id as string, f.name || f.fieldKey || f.key || f.id!])
+          );
+        } catch {
+          // Custom field definitions are a nice-to-have label lookup -- if this
+          // fails (e.g. the token lacks that scope), values still import keyed
+          // by GHL's raw field id instead of a human-readable name.
+        }
+      }
+    }
+
+    return NextResponse.json({ ok: true, pausedAutomationIds, customFieldDefs });
   }
 
   if (body.phase === "finish") {
@@ -105,13 +334,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Connect your GoHighLevel account first." }, { status: 400 });
   }
 
-  const params = new URLSearchParams({ locationId: connection.location_id, limit: String(PAGE_LIMIT) });
+  const wantsExtras = Boolean(
+    body.importNotes || body.importTasks || body.importAppointments || body.importConversations || body.importForms
+  );
+  const pageLimit = wantsExtras ? PAGE_LIMIT_WITH_EXTRAS : PAGE_LIMIT_CONTACTS_ONLY;
+
+  const params = new URLSearchParams({ locationId: connection.location_id, limit: String(pageLimit) });
   if (body.cursor?.startAfterId) params.set("startAfterId", body.cursor.startAfterId);
   if (body.cursor?.startAfter) params.set("startAfter", String(body.cursor.startAfter));
 
   let page: GhlContactsResponse;
   try {
-    page = await ghlFetch(`/contacts/?${params.toString()}`, connection.api_key);
+    page = await ghlFetch<GhlContactsResponse>(`/contacts/?${params.toString()}`, connection.api_key);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Could not reach GoHighLevel";
     return NextResponse.json({ ok: false, error: `Could not fetch contacts from GoHighLevel: ${message}` }, { status: 502 });
@@ -119,15 +353,36 @@ export async function POST(request: Request) {
 
   const contacts = page.contacts ?? [];
   if (contacts.length === 0) {
-    return NextResponse.json({ ok: true, imported: 0, skippedDuplicate: 0, skippedInvalid: 0, skippedTagFilter: 0, hasMore: false, nextCursor: null });
+    return NextResponse.json({
+      ok: true,
+      imported: 0,
+      skippedDuplicate: 0,
+      skippedInvalid: 0,
+      skippedTagFilter: 0,
+      notesImported: 0,
+      tasksImported: 0,
+      appointmentsImported: 0,
+      conversationsImported: 0,
+      formsImported: 0,
+      customFieldsSet: 0,
+      hasMore: false,
+      nextCursor: null,
+    });
   }
 
   const filterTags = new Set((body.filterTags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean));
+  const customFieldDefs = body.customFieldDefs ?? {};
 
   let imported = 0;
   let skippedDuplicate = 0;
   let skippedInvalid = 0;
   let skippedTagFilter = 0;
+  let notesImported = 0;
+  let tasksImported = 0;
+  let appointmentsImported = 0;
+  let conversationsImported = 0;
+  let formsImported = 0;
+  let customFieldsSet = 0;
   const errors: string[] = [];
   const tagsSeen = new Set<string>();
 
@@ -165,19 +420,101 @@ export async function POST(request: Request) {
     }
 
     const result = createResult as { client_id: string; is_new: boolean } | null;
-    if (!result?.is_new) {
-      skippedDuplicate++;
+    if (!result?.client_id) {
+      errors.push(`${email || phone || contact.id || "unknown contact"}: create_client returned no client`);
       continue;
     }
 
-    const tags = Array.from(new Set([...ghlTags, IMPORT_TAG]));
-    for (const t of tags) tagsSeen.add(t);
+    if (result.is_new) {
+      const tags = Array.from(new Set([...ghlTags, IMPORT_TAG]));
+      for (const t of tags) tagsSeen.add(t);
 
-    const { error: tagError } = await supabase.from("clients").update({ tags }).eq("id", result.client_id);
-    if (tagError) {
-      errors.push(`${email || phone}: created but couldn't set tags -- ${tagError.message}`);
+      const { error: tagError } = await supabase.from("clients").update({ tags }).eq("id", result.client_id);
+      if (tagError) {
+        errors.push(`${email || phone}: created but couldn't set tags -- ${tagError.message}`);
+      }
+      imported++;
+    } else {
+      skippedDuplicate++;
     }
-    imported++;
+
+    // Sub-resource extras attach to whichever client this GHL contact
+    // resolved to -- the newly-created one, or an existing match by
+    // email/phone -- since either way it's genuinely the same person's
+    // history to bring in.
+    if (body.importCustomFields && contact.customFields && contact.customFields.length > 0) {
+      const values: Record<string, unknown> = {};
+      for (const cf of contact.customFields) {
+        if (!cf.id || cf.value === undefined || cf.value === null || cf.value === "") continue;
+        values[customFieldDefs[cf.id] ?? cf.id] = cf.value;
+      }
+      if (Object.keys(values).length > 0) {
+        const { data: existingClient } = await supabase.from("clients").select("custom_fields").eq("id", result.client_id).maybeSingle();
+        const merged = { ...(existingClient?.custom_fields as Record<string, unknown> | null), ...values };
+        const { error: cfError } = await supabase.from("clients").update({ custom_fields: merged as never }).eq("id", result.client_id);
+        if (!cfError) customFieldsSet++;
+      }
+    }
+
+    if (contact.id) {
+      const tasksToRun: Promise<void>[] = [];
+      if (body.importNotes) {
+        tasksToRun.push(
+          importNotesForContact(supabase, workspace.id, result.client_id, contact.id, connection.api_key)
+            .then((n) => {
+              notesImported += n;
+            })
+            .catch((err) => {
+              errors.push(`${email || phone} notes: ${err instanceof Error ? err.message : "failed"}`);
+            })
+        );
+      }
+      if (body.importTasks) {
+        tasksToRun.push(
+          importTasksForContact(supabase, workspace.id, result.client_id, contact.id, connection.api_key)
+            .then((n) => {
+              tasksImported += n;
+            })
+            .catch((err) => {
+              errors.push(`${email || phone} tasks: ${err instanceof Error ? err.message : "failed"}`);
+            })
+        );
+      }
+      if (body.importAppointments) {
+        tasksToRun.push(
+          importAppointmentsForContact(supabase, workspace.id, result.client_id, contact.id, connection.api_key)
+            .then((n) => {
+              appointmentsImported += n;
+            })
+            .catch((err) => {
+              errors.push(`${email || phone} appointments: ${err instanceof Error ? err.message : "failed"}`);
+            })
+        );
+      }
+      if (body.importConversations) {
+        tasksToRun.push(
+          importConversationsForContact(supabase, workspace.id, result.client_id, contact.id, connection.location_id, connection.api_key)
+            .then((n) => {
+              conversationsImported += n;
+            })
+            .catch((err) => {
+              errors.push(`${email || phone} conversations: ${err instanceof Error ? err.message : "failed"}`);
+            })
+        );
+      }
+      if (body.importForms) {
+        tasksToRun.push(
+          importFormsForContact(supabase, workspace.id, result.client_id, contact.id, connection.location_id, connection.api_key)
+            .then((n) => {
+              formsImported += n;
+            })
+            .catch((err) => {
+              errors.push(`${email || phone} forms: ${err instanceof Error ? err.message : "failed"}`);
+            })
+        );
+      }
+      if (tasksToRun.length > 0) await Promise.all(tasksToRun);
+    }
   }
 
   // Best-effort -- register any new tag names in the workspace's Tags
@@ -196,8 +533,14 @@ export async function POST(request: Request) {
     skippedDuplicate,
     skippedInvalid,
     skippedTagFilter,
+    notesImported,
+    tasksImported,
+    appointmentsImported,
+    conversationsImported,
+    formsImported,
+    customFieldsSet,
     errors,
-    hasMore: contacts.length === PAGE_LIMIT && Boolean(nextCursor),
+    hasMore: contacts.length === pageLimit && Boolean(nextCursor),
     nextCursor,
   });
 }
