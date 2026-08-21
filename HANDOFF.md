@@ -296,13 +296,12 @@ un-promoted previews.
   the best candidate function" error ever resurfaces on a different RPC,
   it's the same root cause: check `pg_proc` for duplicate overloads of that
   function name and drop whichever one predates the current call sites.
-- **Requested, not yet built**: a way to bypass the duplicate email/phone
-  check when creating a new lead/contact -- some people legitimately share
-  a phone or email (spouses, business partners). She still wants to be
-  warned it's a duplicate, but needs a "use anyway" override instead of a
-  hard block. Find the current duplicate-check logic (likely in the new
-  client/lead creation flow, `NewClientButton.tsx` or similar) before
-  building this.
+- **RESOLVED — duplicate email/phone "use anyway" override is already
+  built; this entry was stale.** Verified 2026-08-21: `create_client()`
+  only runs its dedupe check `if not p_force_create`; `NewClientButton.tsx`
+  shows `DuplicateClientModal` on a match, and its "Create as new client
+  anyway" button re-submits with `p_force_create: true`, skipping the
+  check server-side. Nothing left to build here.
 - **RESOLVED — "DELETE requires a WHERE clause" is fixed; this entry was
   stale.** Root cause found and fixed same-day this was written
   (`20260813200005_fix_safeupdate_unfiltered_temp_table_deletes.sql`,
@@ -329,26 +328,30 @@ un-promoted previews.
   WHERE anywhere in the body found zero remaining instances, and a sweep of
   every `.delete()`/`.update()` call in the frontend confirmed all are
   `.eq(...)`-filtered. Nothing left to do here.
-- **RM/Reviewer/Compliance Officer requested changes, not yet built**:
-  should only show on ERO and SB (sub-business/connected) workspace tiers,
-  not on independent solo-PTIN workspaces (a similar fix was done in an
-  earlier now-deleted-branch session — verify current production behavior
-  before assuming it's broken, it may have simply never been ported, same
-  pattern as the automations.manage fix earlier this session). New ask: an
-  ERO/SB-tier workspace should be able to preset these as defaults for
-  their staff accounts and connected accounts. Also these fields currently
-  show by email and should show by staff display name instead.
-- **Requested, not yet investigated**: when an ERO/Service Bureau invites
-  someone and that person signs up via the invite link, the signup screen
-  should not ask them to choose an account type (Service Bureau / ERO /
-  Independent PTIN) — that's only relevant when creating a brand-new
-  workspace, not joining an existing one. Start from
-  `app/accept-invitation/page.tsx` and `app/onboarding/page.tsx`. She also
-  described a specific role list for ERO/Service Bureau accounts (Admin,
-  Staff, Compliance Officer, Manager, Receptionist, PTIN preparer,
-  Reviewer) — worded slightly differently the two times she said it, so
-  confirm the exact intended list and whether "PTIN receptionist" is one
-  role or two before building. Full detail in task #187.
+- **RESOLVED — RM/Reviewer/Compliance Officer changes are already built;
+  this entry was stale.** Verified 2026-08-21, all three asks confirmed
+  live: (1) tier gating via `isIndependentTier()` — `ClientWorkspace.tsx`'s
+  `showStaffRoles` hides the whole `ClientAssignmentForm` (RM + Reviewer +
+  Compliance officer) on independent-PTIN workspaces, and
+  `EngagementWorkspace.tsx`'s `showStaffRoles` hides Reviewer + Compliance
+  officer the same way (Assigned staff stays visible there, matching RM's
+  role on the client side); (2) ERO/SB preset defaults —
+  `WorkspaceStaffDefaultsForm` (Settings → Roles & Permissions, gated to
+  `EFIN_WORKSPACE_TYPES` + admin) sets `workspaces.default_*_id`, which
+  `clients/[id]/page.tsx` resolves as the fallback for a new client (own
+  workspace preset → parent firm's preset for Reviewer/Compliance officer
+  → account holder); (3) every picker already renders `display_name`, never
+  email. Nothing left to build here.
+- **RESOLVED — no account-type picker on invite acceptance; this entry was
+  stale.** Verified 2026-08-21 (and already noted by the task #188 RESOLVED
+  entry below): `app/accept-invitation/page.tsx` has no account-type
+  picker at all — just name/password. The apparent picker was actually the
+  redirect-to-`/onboarding` bug fixed in task #188. Role list also
+  confirmed already built: Admin, Staff, Compliance Officer, Manager,
+  Receptionist, PTIN Preparer, Reviewer all exist as real global roles
+  (plus Owner, ERO, Administrative Staff) — "PTIN receptionist" was
+  resolved as two separate roles (PTIN Preparer + Receptionist), not one
+  combined role. Nothing left to build here.
 - **Reported: a client accepting a portal invite gets sent to `/onboarding`
   ("set up your firm," the staff flow) after confirming their email,
   instead of back to finishing their portal setup.** Intended design
