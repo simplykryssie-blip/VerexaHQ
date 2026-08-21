@@ -119,7 +119,7 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
 
 function TriggerNode({ data }: NodeProps & { data: { summary: string } }) {
   return (
-    <div className="w-56 rounded-xl border border-amber bg-amberSoft px-3 py-2.5 shadow-sm">
+    <div className="w-56 cursor-pointer rounded-xl border border-amber bg-amberSoft px-3 py-2.5 shadow-sm hover:border-amber/70">
       <div className="flex items-center gap-2 text-sm font-medium text-ink">
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-amber">
           <Zap size={14} />
@@ -178,6 +178,7 @@ function CanvasInner({
   pipelines,
   staffOptions,
   automationOptions,
+  onEditTrigger,
 }: {
   workspaceId: string;
   automationId: string;
@@ -196,6 +197,7 @@ function CanvasInner({
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
+  onEditTrigger: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -203,6 +205,7 @@ function CanvasInner({
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [activeConditionStepId, setActiveConditionStepId] = useState<string | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   const rootStepIds = useMemo(() => {
     const hasIncoming = new Set(edgeRows.map((e) => e.to_step_id));
@@ -286,7 +289,10 @@ function CanvasInner({
 
   const onNodeClick = useCallback<NodeMouseHandler>(
     (_event, node) => {
-      if (node.id === TRIGGER_NODE_ID) return;
+      if (node.id === TRIGGER_NODE_ID) {
+        onEditTrigger();
+        return;
+      }
       setSelectedEdgeId(null);
       if (node.type === "condition") {
         setSelectedStepId(null);
@@ -296,7 +302,7 @@ function CanvasInner({
         setSelectedStepId(node.id);
       }
     },
-    []
+    [onEditTrigger]
   );
 
   const onEdgeClick = useCallback<EdgeMouseHandler>((_event, edge) => {
@@ -456,21 +462,38 @@ function CanvasInner({
     <div className="flex h-[600px] overflow-hidden rounded-xl border border-border">
       <div className="relative flex-1">
         {canManage && (
-          <div className="absolute left-3 top-3 z-10 flex gap-2">
+          <div className="absolute right-3 top-3 z-10">
             <button
               type="button"
-              onClick={() => addStep("create_task")}
+              onClick={() => setAddMenuOpen((open) => !open)}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-accent shadow-sm hover:bg-accentSoft"
             >
-              <Plus size={14} /> Add action
+              <Plus size={14} /> Add step
             </button>
-            <button
-              type="button"
-              onClick={() => addStep("condition")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-violet shadow-sm hover:bg-violetSoft"
-            >
-              <Split size={14} /> Add condition
-            </button>
+            {addMenuOpen && (
+              <div className="absolute right-0 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    addStep("create_task");
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
+                >
+                  <Plus size={14} className="text-accent" /> Regular action
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    addStep("condition");
+                  }}
+                  className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-xs font-medium text-ink hover:bg-violetSoft"
+                >
+                  <Split size={14} className="text-violet" /> Condition (if/else)
+                </button>
+              </div>
+            )}
           </div>
         )}
         <ReactFlow
@@ -484,6 +507,7 @@ function CanvasInner({
           onPaneClick={() => {
             setSelectedStepId(null);
             setSelectedEdgeId(null);
+            setAddMenuOpen(false);
           }}
           onConnect={canManage ? onConnect : undefined}
           nodeTypes={nodeTypes}
@@ -492,6 +516,7 @@ function CanvasInner({
           connectionRadius={40}
           elementsSelectable
           fitView
+          fitViewOptions={{ maxZoom: 0.85 }}
         >
           <Background />
           <Controls showInteractive={false} />
