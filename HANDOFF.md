@@ -31,16 +31,17 @@ reference. This file is just "what happened recently and what's still open."
   specific project — she cannot right now.
 - Vercel project: `verexa-tax-office-v2` (team `verexa-hq-crm`), live domain
   `verexahq.com`.
-- **Deploy gotcha, read this twice**: pushing to the branch only builds a
-  *preview* deployment. Nothing goes live on verexahq.com until the user
-  manually clicks "Promote to Production" in the Vercel dashboard — there is
-  no MCP tool that can do this. After every push, tell the user it's built
-  and waiting, and don't assume it's live until they confirm they promoted
-  it. Multiple times this session the user tested against stale
-  never-promoted or wrong (old preview) deployments, which wasted a lot of
-  turns — when something "doesn't look right," check `list_deployments`
-  for what's actually on `target: "production"` before assuming the code is
-  wrong.
+- **Deploy gotcha, read this twice, CORRECTED 2026-08-21**: pushing to the
+  `claude/verexa-tax-office-v2-mhd9mo` branch alone only builds a *preview*
+  deployment. Pushing to `main` builds `target: "production"` directly —
+  no separate "Promote to Production" click was needed for any of today's
+  merges (an earlier version of this note said otherwise; that no longer
+  matches observed behavior, or the project's Vercel Git settings changed
+  at some point). Per the user's 2026-08-21 push/merge policy above, every
+  change now gets merged into `main` and pushed there too, so this should
+  rarely come up — but if something "doesn't look right," confirm against
+  `list_deployments`'s `target: "production"` field and its commit SHA
+  before assuming the code itself is wrong.
 
 ## Standing instructions from the user (still in force)
 
@@ -49,12 +50,48 @@ reference. This file is just "what happened recently and what's still open."
   Services, which the user explicitly asked to be the one place with a
   fixed, hardwired list of preloaded, fully-editable starter content (see
   below). Do not restore seed data anywhere else without her asking again.
-- **All data in the database is test data.** She does not care about
-  preserving it. If a change requires deleting or altering rows in any
-  workspace, just do it — no need to hedge about "other firms' data."
+- **SUPERSEDED (2026-08-21) — read the new policy below, not this line
+  verbatim: "All data in the database is test data, she does not care
+  about preserving it."** That was true early on but is no longer the
+  operating assumption -- see the new workspace-purpose split just below.
+  Don't delete/alter rows in any real workspace (MKB Financial Group LLC,
+  Doucet Financial Group, Your Solutions, or any future demo workspace)
+  without her asking for that specific thing, the same care as any other
+  production data. **Verexa HQ CRM** is still the one place that's always
+  fair game to create/delete/rearrange freely.
+- **Workspace-purpose split, set 2026-08-21 (not yet built, see Open/
+  blocked below for the dashboard/demo-workspace parts):**
+  - **Verexa HQ CRM** (workspace id `74321fb2-9a18-4625-ab12-01c98e888667`,
+    owner `verexahq@gmail.com`) is the user's own testing sandbox going
+    forward. Every pipeline, workflow, test client, form, email/SMS
+    template she creates for testing purposes belongs here, not in a real
+    firm's workspace (that's how the "MKB Test account"/"Test"/"test
+    account2" workspaces + 5 fake leads ended up needing cleanup earlier
+    this session -- don't repeat that pattern).
+  - **MKB Financial Group LLC** and other named firm workspaces are real
+    accounts now -- treat their data with normal production care.
+  - She wants a **platform-operator dashboard** to replace the normal
+    staff CRM landing page specifically for Verexa HQ CRM's login:
+    platform operating health, revenue/income, and what needs her
+    attention -- not the regular per-workspace dashboard every other
+    account gets.
+  - **`/platform-admin` stays exactly what it is today** -- the place she
+    goes to actually change something (workspaces, plans, accounts, the
+    new system-failures page). The new dashboard above is a *view*, not
+    a management surface; don't conflate the two when building this.
 - Verexa is multi-tenant — other real workspaces exist in the same database
   beyond hers. Schema/RLS changes affect everyone; be correct, but don't
   need special permission to touch shared system-default rows.
+- **Push/merge policy (confirmed 2026-08-21): merge `claude/verexa-tax-
+  office-v2-mhd9mo` into `main` and push both, for every change, without
+  asking each time.** `main` is what actually deploys to production
+  (`verexahq.com`) on every push -- there is no separate "promote to
+  production" step observed in practice this session, despite an older
+  note below to the contrary; verify against `list_deployments`'
+  `target: "production"` field if that ever seems to disagree with what's
+  live. Regenerate `lib/database.types.ts` and re-verify it matches the
+  live schema after every merge, since two sessions working the same
+  branch can each add migrations the other doesn't have yet.
 
 ## What changed this session, roughly in order
 
@@ -594,6 +631,44 @@ un-promoted previews.
      phrasing was "maybe," not a firm decision yet. Worth confirming
      scope/layout with her before building, since it changes the shape of
      every page under `/platform-admin`.
+- **Requested (2026-08-21), not started -- explicitly deferred, "goes on
+  the to-do list," not needed right now.** Three related asks, from the
+  user's own words:
+  1. **Reserve Verexa HQ CRM as the only testing sandbox.** "Any pipeline,
+     workflow, test clients, form, email, sms templates all only belong
+     in this account." Mechanically this workspace already exists
+     (`74321fb2-9a18-4625-ab12-01c98e888667`) and needs nothing built to
+     start using it that way -- this is a going-forward *policy*, not a
+     feature. Whether it eventually needs actual enforcement (e.g. a
+     "this is a test workspace" banner, or blocking test-looking data
+     from other workspaces) is an open question, not decided yet.
+  2. **A platform-operator dashboard replacing Verexa HQ CRM's normal
+     login landing page.** Instead of the regular staff CRM dashboard
+     every other workspace gets, logging in here should show: how the
+     platform is operating, revenue/income, and things needing her
+     attention. `/platform-admin` stays as-is -- the place to go make
+     changes (workspaces, plans, accounts, system failures) -- this new
+     thing is a *view*, not a management surface. Needs real scoping
+     before building: what "how the platform is operating" actually means
+     (uptime? error rates? the system-failures count already built?),
+     what "income generating" pulls from (there's no real billing/
+     subscription revenue flowing yet -- `workspace_subscriptions` /
+     `platform_subscription_plans` exist but check whether any workspace
+     actually has an active paid plan before assuming there's real
+     revenue data to show), and what should surface under "needs
+     attention" (unresolved `system_failure_log` rows? pending platform
+     admin actions? something else?). Also needs a decision on
+     *mechanism* -- a special-cased dashboard keyed off this one
+     workspace id, a new `workspace_type` value, or something else --
+     don't guess, ask her.
+  3. **A demo workspace per account type** (Independent PTIN, ERO Office,
+     Service Bureau, Multi-Office Firm) for showing prospects around.
+     Needs scoping before building: how "demo" content gets seeded (hand-
+     built once, or generated/reset on demand so it doesn't accumulate
+     real-looking cruft over repeated demos?), whether these need their
+     own dedicated login(s) or she demos from her own platform-admin
+     access, and whether a demo workspace should be visually/behaviorally
+     marked as such anywhere staff or a prospect could see it.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
