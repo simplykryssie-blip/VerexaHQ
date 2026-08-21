@@ -91,9 +91,11 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
           {myConnection ? (
             <MyConnectionStatus
+              connectionId={myConnection.id}
               eroName={(myConnection.workspaces as unknown as { name: string } | null)?.name ?? "your ERO"}
               billingResponsibility={myConnection.billing_responsibility}
               sharesCommunicationsIdentity={myConnection.shares_communications_identity}
+              canDisconnect={Boolean(canManage) && myConnection.billing_responsibility !== "ero"}
             />
           ) : (
             <RedeemConnectionForm workspaceId={workspace.id} initialToken={searchParams.token} />
