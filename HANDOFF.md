@@ -559,21 +559,41 @@ un-promoted previews.
     "add to the to-do list for now" rather than picking a build order.
     Ask her which one (if either) to start on before beginning real design
     work on either.
-- **Requested (2026-08-20), not built yet: email notifications for failed
-  background jobs, sent to `failedsystem@verexahq.com`.** Came up while
-  debugging the stuck portal-invite cron (see the queue-drain fixes in
-  `app/api/cron/send-pending-portal-invites/route.ts` and
-  `send-pending-engagement-letters/route.ts`, PRs #40-42) — right now a
-  failed job (e.g. `pending_portal_invites`/`pending_engagement_letter_sends`
-  rows landing at `status='failed'`) is only visible by manually querying the
-  table or reading Vercel runtime logs; nobody gets told. Scope this before
-  building: which failure classes should alert (just these two queue tables,
-  or any cron/automation-step failure more broadly — e.g.
-  `automation_runs`/`execute_automation_step` errors too), whether to batch
-  into a digest or send one email per failure (a bad Resend key or a
-  systemic bug could otherwise spam that inbox), and confirm
-  `failedsystem@verexahq.com` is a real, already-provisioned mailbox before
-  wiring `sendEmailViaResend` to it.
+- **RESOLVED (2026-08-21): email notifications for failed background jobs,
+  sent to `failedsystem@verexahq.com`.** Built and pushed. Scoped with the
+  user first: system-level failures (missing templates/env vars, storage/DB
+  errors, Resend outages or key issues -- nothing a workspace admin could
+  fix) get logged to a new `system_failure_log` table
+  (`lib/systemFailures.ts`'s `reportSystemFailure()`, called from
+  `send-pending-portal-invites`/`send-pending-engagement-letters`) and
+  drained into one digest email every 20 minutes
+  (`app/api/cron/digest-system-failures`), not one email per failure.
+  Account-level failures (bad client data, a misconfigured automation
+  step) instead notify the workspace's own admins in-app via a new
+  `notify_workspace_admins()` RPC -- including a new trigger on
+  `automation_execution_logs` that does this for every failed automation
+  step, which previously notified nobody at all. Also added a Platform
+  Admin page, `/platform-admin/system-failures`, listing these
+  (source/workspace/message/digested-or-not), per the user's request that
+  this be visible in the platform itself, not just email.
+- **Requested (2026-08-21), not started, deliberately deferred so the user
+  can test what's built so far first.** Two enhancements to the new
+  `/platform-admin/system-failures` page above:
+  1. Each logged failure should show a **recommended fix**, not just the
+     raw error message -- e.g. "Resend responded with 401" ->
+     "RESEND_API_KEY is likely invalid or revoked; check Vercel env vars."
+     Needs a mapping from `system_failure_log.source` +
+     message-pattern -> a human-readable suggested fix (probably a lookup
+     table/function alongside `reportSystemFailure()`, populated at the
+     point each known failure type is logged rather than parsed after the
+     fact -- same approach as the system/account-level classification
+     already done for the Resend send-failure case).
+  2. **The Platform Admin section might want its own persistent menu/nav
+     bar** (workspaces list, plans, system failures, whatever else lands
+     here) instead of a flat page with ad-hoc header links -- user's
+     phrasing was "maybe," not a firm decision yet. Worth confirming
+     scope/layout with her before building, since it changes the shape of
+     every page under `/platform-admin`.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.
