@@ -40,6 +40,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
+import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
@@ -198,6 +199,30 @@ export function StepCard({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingTemplate, setEditingTemplate] = useState<{
+    kind: "email" | "sms";
+    row: { id: string; name: string; status: string; workspace_id: string | null; subject?: string | null; body_html?: string | null; body?: string | null };
+  } | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+
+  async function openTemplateEditor(kind: "email" | "sms") {
+    const slug = config.template_slug as string | undefined;
+    if (!slug) return;
+    setLoadingTemplate(true);
+    const table = kind === "email" ? "email_templates" : "sms_templates";
+    const { data, error: fetchError } = await supabase
+      .from(table)
+      .select("id, name, status, workspace_id, subject, body_html, body")
+      .eq("workspace_id", workspaceId)
+      .eq("slug", slug)
+      .single();
+    setLoadingTemplate(false);
+    if (fetchError || !data) {
+      toast.show(fetchError?.message ?? "Couldn't load this template", "error");
+      return;
+    }
+    setEditingTemplate({ kind, row: data as never });
+  }
 
   function setField(key: string, value: string) {
     setConfig((c) => ({ ...c, [key]: value }));
@@ -340,43 +365,84 @@ export function StepCard({
         {actionType === "send_email" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
             Email template
-            <select
-              disabled={!canManage}
-              value={(config.template_slug as string) ?? ""}
-              onChange={(e) => setField("template_slug", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="" disabled>
-                Choose a published email template
-              </option>
-              {emailTemplates.map((t) => (
-                <option key={t.id} value={t.slug}>
-                  {t.name}
+            <div className="flex gap-1.5">
+              <select
+                disabled={!canManage}
+                value={(config.template_slug as string) ?? ""}
+                onChange={(e) => setField("template_slug", e.target.value)}
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a published email template
                 </option>
-              ))}
-            </select>
+                {emailTemplates.map((t) => (
+                  <option key={t.id} value={t.slug}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {config.template_slug ? (
+                <button
+                  type="button"
+                  onClick={() => openTemplateEditor("email")}
+                  disabled={loadingTemplate}
+                  title="Edit this email template"
+                  className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted disabled:opacity-60"
+                >
+                  <Pencil size={14} />
+                </button>
+              ) : null}
+            </div>
           </label>
         )}
 
         {actionType === "send_sms" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
             SMS template
-            <select
-              disabled={!canManage}
-              value={(config.template_slug as string) ?? ""}
-              onChange={(e) => setField("template_slug", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="" disabled>
-                Choose a published SMS template
-              </option>
-              {smsTemplates.map((t) => (
-                <option key={t.id} value={t.slug}>
-                  {t.name}
+            <div className="flex gap-1.5">
+              <select
+                disabled={!canManage}
+                value={(config.template_slug as string) ?? ""}
+                onChange={(e) => setField("template_slug", e.target.value)}
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose a published SMS template
                 </option>
-              ))}
-            </select>
+                {smsTemplates.map((t) => (
+                  <option key={t.id} value={t.slug}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {config.template_slug ? (
+                <button
+                  type="button"
+                  onClick={() => openTemplateEditor("sms")}
+                  disabled={loadingTemplate}
+                  title="Edit this SMS template"
+                  className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted disabled:opacity-60"
+                >
+                  <Pencil size={14} />
+                </button>
+              ) : null}
+            </div>
           </label>
+        )}
+
+        {editingTemplate && (
+          <div className="col-span-2">
+            <TemplateEditRow
+              kind={editingTemplate.kind}
+              template={editingTemplate.row}
+              workspaceId={workspaceId}
+              onClose={() => setEditingTemplate(null)}
+              onDuplicated={(row) => {
+                setField("template_slug", (row as unknown as { slug: string }).slug);
+                setEditingTemplate(null);
+              }}
+            />
+          </div>
         )}
 
         {actionType === "create_task" && (
