@@ -119,7 +119,7 @@ async function importNotesForContact(
   for (const note of data.notes ?? []) {
     const body = note.body?.trim();
     if (!body) continue;
-    const { error } = await supabase.from("notes").insert({
+    const row = {
       workspace_id: workspaceId,
       entity_type: "client",
       entity_id: clientId,
@@ -128,8 +128,21 @@ async function importNotesForContact(
       is_private: false,
       is_pinned: false,
       ...(note.dateAdded ? { created_at: note.dateAdded } : {}),
-    });
-    if (!error) count++;
+      ...(note.id ? { external_source: "ghl", external_id: note.id } : {}),
+    };
+    // A GHL id lets a re-run skip a note it already imported; without one
+    // (shouldn't happen in practice) there's nothing to dedupe on, so it
+    // falls back to a plain insert.
+    if (note.id) {
+      const { data: inserted, error } = await supabase
+        .from("notes")
+        .upsert(row, { onConflict: "workspace_id,external_source,external_id", ignoreDuplicates: true })
+        .select("id");
+      if (!error && inserted && inserted.length > 0) count++;
+    } else {
+      const { error } = await supabase.from("notes").insert(row);
+      if (!error) count++;
+    }
   }
   return count;
 }
@@ -146,15 +159,25 @@ async function importTasksForContact(
   for (const task of data.tasks ?? []) {
     const title = task.title?.trim() || task.body?.trim();
     if (!title) continue;
-    const { error } = await supabase.from("tasks").insert({
+    const row = {
       workspace_id: workspaceId,
       client_id: clientId,
       title,
       description: task.body?.trim() || null,
       due_date: task.dueDate ?? null,
       status: task.completed ? "completed" : "pending",
-    });
-    if (!error) count++;
+      ...(task.id ? { external_source: "ghl", external_id: task.id } : {}),
+    };
+    if (task.id) {
+      const { data: inserted, error } = await supabase
+        .from("tasks")
+        .upsert(row, { onConflict: "workspace_id,external_source,external_id", ignoreDuplicates: true })
+        .select("id");
+      if (!error && inserted && inserted.length > 0) count++;
+    } else {
+      const { error } = await supabase.from("tasks").insert(row);
+      if (!error) count++;
+    }
   }
   return count;
 }
@@ -173,7 +196,7 @@ async function importAppointmentsForContact(
     if (!evt.startTime) continue;
     const start = new Date(evt.startTime);
     const end = evt.endTime ? new Date(evt.endTime) : new Date(start.getTime() + 30 * 60_000);
-    const { error } = await supabase.from("appointments").insert({
+    const row = {
       workspace_id: workspaceId,
       client_id: clientId,
       title: evt.title?.trim() || "Imported appointment",
@@ -182,8 +205,18 @@ async function importAppointmentsForContact(
       status: (evt.appointmentStatus || "confirmed").toLowerCase(),
       location: evt.address ?? null,
       portal_visible: false,
-    });
-    if (!error) count++;
+      ...(evt.id ? { external_source: "ghl", external_id: evt.id } : {}),
+    };
+    if (evt.id) {
+      const { data: inserted, error } = await supabase
+        .from("appointments")
+        .upsert(row, { onConflict: "workspace_id,external_source,external_id", ignoreDuplicates: true })
+        .select("id");
+      if (!error && inserted && inserted.length > 0) count++;
+    } else {
+      const { error } = await supabase.from("appointments").insert(row);
+      if (!error) count++;
+    }
   }
   return count;
 }
@@ -203,15 +236,23 @@ async function importConversationsForContact(
   let count = 0;
   for (const conv of search.conversations ?? []) {
     if (!conv.id) continue;
+    // Regular (non-ignoreDuplicates) upsert so a re-run resolves back to the
+    // same thread row by its GHL conversation id instead of creating a
+    // duplicate thread each time -- messages below then dedupe against it.
     const { data: threadRow, error: threadError } = await supabase
       .from("message_threads")
-      .insert({
-        workspace_id: workspaceId,
-        entity_type: "client",
-        entity_id: clientId,
-        channel: (conv.type || "sms").toLowerCase(),
-        status: "closed",
-      })
+      .upsert(
+        {
+          workspace_id: workspaceId,
+          entity_type: "client",
+          entity_id: clientId,
+          channel: (conv.type || "sms").toLowerCase(),
+          status: "closed",
+          external_source: "ghl",
+          external_id: conv.id,
+        },
+        { onConflict: "workspace_id,external_source,external_id" }
+      )
       .select("id")
       .single();
     if (threadError || !threadRow) continue;
@@ -221,15 +262,25 @@ async function importConversationsForContact(
     for (const m of messages) {
       const body = m.body?.trim();
       if (!body) continue;
-      const { error } = await supabase.from("messages").insert({
+      const row = {
         workspace_id: workspaceId,
         thread_id: threadRow.id,
         sender_type: m.direction === "inbound" ? "client" : "staff",
         body,
         is_internal: false,
         ...(m.dateAdded ? { created_at: m.dateAdded } : {}),
-      });
-      if (!error) count++;
+        ...(m.id ? { external_source: "ghl", external_id: m.id } : {}),
+      };
+      if (m.id) {
+        const { data: inserted, error } = await supabase
+          .from("messages")
+          .upsert(row, { onConflict: "workspace_id,external_source,external_id", ignoreDuplicates: true })
+          .select("id");
+        if (!error && inserted && inserted.length > 0) count++;
+      } else {
+        const { error } = await supabase.from("messages").insert(row);
+        if (!error) count++;
+      }
     }
   }
   return count;
