@@ -42,14 +42,14 @@ export default async function NewEngagementPage({
     supabase
       .from("services")
       .select("id, name, organizer_template_id, billing_rule_id, organizer_templates(name), service_categories(slug)")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("workspace_id", workspace.id)
       .eq("status", "published")
       .order("display_order"),
     supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).is("merged_into_client_id", null),
     supabase
       .from("billing_rules")
       .select("id, name")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("workspace_id", workspace.id)
       .eq("status", "published")
       .order("name"),
   ]);
