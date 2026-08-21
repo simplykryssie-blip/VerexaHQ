@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { renderTemplate } from "@/lib/templates/render";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
+import { reportSystemFailure } from "@/lib/systemFailures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -78,6 +79,10 @@ async function sendOneWithTimeout(
       .update({ status: "failed", error: `Timed out after ${timeoutMs}ms`, processed_at: new Date().toISOString() })
       .eq("id", job.id)
       .eq("status", "pending");
+    await reportSystemFailure("send-pending-engagement-letters", `Job ${job.id} timed out after ${timeoutMs}ms`, {
+      workspaceId: job.workspace_id,
+      context: { jobId: job.id },
+    });
   }
   return result;
 }
@@ -162,6 +167,11 @@ async function sendOne(
       .update({ status: "failed", error, processed_at: new Date().toISOString() })
       .eq("id", job.id);
     if (markFailedErr) console.error(`send-pending-engagement-letters: job ${job.id} failed (${error}) and could not be marked failed`, markFailedErr);
+
+    // Every failure mode here (missing template, PDF render, storage
+    // upload, or DB error) is internal to Verexa's own systems -- nothing
+    // a workspace admin could fix on their end.
+    await reportSystemFailure("send-pending-engagement-letters", error, { workspaceId: job.workspace_id, context: { jobId: job.id } });
     return "failed";
   }
 }
