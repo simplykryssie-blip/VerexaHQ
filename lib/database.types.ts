@@ -104,6 +104,8 @@ export type Database = {
           description: string | null
           end_at: string
           engagement_id: string | null
+          external_id: string | null
+          external_source: string | null
           id: string
           location: string | null
           meeting_url: string | null
@@ -122,6 +124,8 @@ export type Database = {
           description?: string | null
           end_at: string
           engagement_id?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           location?: string | null
           meeting_url?: string | null
@@ -140,6 +144,8 @@ export type Database = {
           description?: string | null
           end_at?: string
           engagement_id?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           location?: string | null
           meeting_url?: string | null
@@ -3663,6 +3669,79 @@ export type Database = {
           },
         ]
       }
+      internal_message_threads: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_message_at: string | null
+          user_a_id: string
+          user_b_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          user_a_id: string
+          user_b_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          user_a_id?: string
+          user_b_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_message_threads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+          thread_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+          thread_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "internal_message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           amount_paid: number
@@ -4020,6 +4099,8 @@ export type Database = {
           created_by: string | null
           entity_id: string
           entity_type: string
+          external_id: string | null
+          external_source: string | null
           id: string
           last_message_at: string | null
           status: string
@@ -4033,6 +4114,8 @@ export type Database = {
           created_by?: string | null
           entity_id: string
           entity_type?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           last_message_at?: string | null
           status?: string
@@ -4046,6 +4129,8 @@ export type Database = {
           created_by?: string | null
           entity_id?: string
           entity_type?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           last_message_at?: string | null
           status?: string
@@ -4074,6 +4159,8 @@ export type Database = {
         Row: {
           body: string
           created_at: string
+          external_id: string | null
+          external_source: string | null
           id: string
           is_internal: boolean
           read_at: string | null
@@ -4085,6 +4172,8 @@ export type Database = {
         Insert: {
           body: string
           created_at?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_internal?: boolean
           read_at?: string | null
@@ -4096,6 +4185,8 @@ export type Database = {
         Update: {
           body?: string
           created_at?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_internal?: boolean
           read_at?: string | null
@@ -4117,79 +4208,6 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      internal_message_threads: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          last_message_at: string | null
-          user_a_id: string
-          user_b_id: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          last_message_at?: string | null
-          user_a_id: string
-          user_b_id: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          last_message_at?: string | null
-          user_a_id?: string
-          user_b_id?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "internal_message_threads_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      internal_messages: {
-        Row: {
-          body: string
-          created_at: string
-          id: string
-          read_at: string | null
-          sender_id: string
-          thread_id: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          id?: string
-          read_at?: string | null
-          sender_id: string
-          thread_id: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          id?: string
-          read_at?: string | null
-          sender_id?: string
-          thread_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "internal_messages_thread_id_fkey"
-            columns: ["thread_id"]
-            isOneToOne: false
-            referencedRelation: "internal_message_threads"
             referencedColumns: ["id"]
           },
         ]
@@ -4299,6 +4317,8 @@ export type Database = {
           created_at: string
           entity_id: string
           entity_type: string
+          external_id: string | null
+          external_source: string | null
           id: string
           is_internal: boolean
           is_pinned: boolean
@@ -4317,6 +4337,8 @@ export type Database = {
           created_at?: string
           entity_id: string
           entity_type?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_internal?: boolean
           is_pinned?: boolean
@@ -4335,6 +4357,8 @@ export type Database = {
           created_at?: string
           entity_id?: string
           entity_type?: string
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           is_internal?: boolean
           is_pinned?: boolean
@@ -6493,6 +6517,8 @@ export type Database = {
           description: string | null
           due_date: string | null
           engagement_id: string | null
+          external_id: string | null
+          external_source: string | null
           id: string
           overdue_flagged_at: string | null
           priority: string | null
@@ -6511,6 +6537,8 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           engagement_id?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -6529,6 +6557,8 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           engagement_id?: string | null
+          external_id?: string | null
+          external_source?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -7208,6 +7238,38 @@ export type Database = {
           },
         ]
       }
+      workspace_ghl_connections: {
+        Row: {
+          api_key_encrypted: string
+          connected_at: string
+          connected_by: string | null
+          location_id: string
+          workspace_id: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          connected_at?: string
+          connected_by?: string | null
+          location_id: string
+          workspace_id: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          connected_at?: string
+          connected_by?: string | null
+          location_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_ghl_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_invitations: {
         Row: {
           accepted_at: string | null
@@ -7525,6 +7587,48 @@ export type Database = {
             foreignKeyName: "workspace_subscriptions_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_tags: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_tags_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_tags_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -8272,27 +8376,6 @@ export type Database = {
         Args: { p_pending_step_id: string }
         Returns: undefined
       }
-      create_workspace_tag: {
-        Args: { p_name: string; p_workspace_id: string }
-        Returns: string
-      }
-      rename_workspace_tag: {
-        Args: { p_new_name: string; p_tag_id: string; p_workspace_id: string }
-        Returns: undefined
-      }
-      delete_workspace_tag: {
-        Args: { p_tag_id: string; p_workspace_id: string }
-        Returns: undefined
-      }
-      list_workspace_tags_with_usage: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          id: string
-          name: string
-          client_count: number
-          automation_names: string[]
-        }[]
-      }
       approve_automation_step: {
         Args: { p_pending_step_id: string }
         Returns: Json
@@ -8304,6 +8387,10 @@ export type Database = {
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
+      }
+      can_use_network_messaging: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
       }
       capture_public_lead_from_contact_step: {
         Args: {
@@ -8322,77 +8409,6 @@ export type Database = {
           p_token: string
         }
         Returns: Json
-      }
-      can_use_network_messaging: { Args: { p_workspace_id: string }; Returns: boolean }
-      get_messageable_network_workspaces: {
-        Args: { p_workspace_id: string }
-        Returns: { workspace_id: string; name: string; workspace_type: string }[]
-      }
-      get_ero_return_status: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          source_workspace_id: string
-          source_workspace_name: string
-          engagement_id: string
-          engagement_number: string | null
-          status: string
-          due_date: string | null
-          tax_year: number | null
-          return_type: string | null
-          efile_status: string
-          is_extended: boolean
-          federal_refund_amount: number | null
-          federal_balance_due: number | null
-          client_first_name: string | null
-          client_last_name: string | null
-          client_business_name: string | null
-          client_type: string
-        }[]
-      }
-      get_ero_irs_notices: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          source_workspace_id: string
-          source_workspace_name: string
-          notice_id: string
-          notice_type: string
-          notice_date: string
-          response_due_date: string | null
-          status: string
-          entity_label: string
-        }[]
-      }
-      get_ero_extensions: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          source_workspace_id: string
-          source_workspace_name: string
-          engagement_id: string
-          engagement_number: string | null
-          tax_year: number | null
-          extension_filed_date: string | null
-          extension_due_date: string | null
-          client_first_name: string | null
-          client_last_name: string | null
-          client_business_name: string | null
-          client_type: string
-        }[]
-      }
-      get_ero_tax_year_metrics: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          source_workspace_id: string
-          source_workspace_name: string
-          tax_year: number
-          total_returns: number
-          accepted: number
-          rejected: number
-          transmitted: number
-          not_filed: number
-          extended: number
-          amended: number
-          open_irs_notices: number
-        }[]
       }
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
@@ -8564,7 +8580,12 @@ export type Database = {
         Returns: string
       }
       create_workspace: {
-        Args: { p_name: string; p_owner_user_id?: string; p_timezone?: string; p_workspace_type?: string }
+        Args: {
+          p_name: string
+          p_owner_user_id?: string
+          p_timezone?: string
+          p_workspace_type?: string
+        }
         Returns: string
       }
       create_workspace_invitation: {
@@ -8589,6 +8610,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_workspace_tag: {
+        Args: { p_name: string; p_workspace_id: string }
+        Returns: string
       }
       current_workspace_ids: { Args: never; Returns: string[] }
       decline_config_object_share: {
@@ -8626,6 +8651,10 @@ export type Database = {
       }
       delete_workflow_pipeline: {
         Args: { p_process_id: string }
+        Returns: undefined
+      }
+      delete_workspace_tag: {
+        Args: { p_tag_id: string; p_workspace_id: string }
         Returns: undefined
       }
       disconnect_firm_connection: {
@@ -8721,6 +8750,72 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_ero_extensions: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          client_business_name: string
+          client_first_name: string
+          client_last_name: string
+          client_type: string
+          engagement_id: string
+          engagement_number: string
+          extension_due_date: string
+          extension_filed_date: string
+          source_workspace_id: string
+          source_workspace_name: string
+          tax_year: number
+        }[]
+      }
+      get_ero_irs_notices: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          entity_label: string
+          notice_date: string
+          notice_id: string
+          notice_type: string
+          response_due_date: string
+          source_workspace_id: string
+          source_workspace_name: string
+          status: string
+        }[]
+      }
+      get_ero_return_status: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          client_business_name: string
+          client_first_name: string
+          client_last_name: string
+          client_type: string
+          due_date: string
+          efile_status: string
+          engagement_id: string
+          engagement_number: string
+          federal_balance_due: number
+          federal_refund_amount: number
+          is_extended: boolean
+          return_type: string
+          source_workspace_id: string
+          source_workspace_name: string
+          status: string
+          tax_year: number
+        }[]
+      }
+      get_ero_tax_year_metrics: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          accepted: number
+          amended: number
+          extended: number
+          not_filed: number
+          open_irs_notices: number
+          rejected: number
+          source_workspace_id: string
+          source_workspace_name: string
+          tax_year: number
+          total_returns: number
+          transmitted: number
+        }[]
+      }
       get_firm_connection_invite_preview: {
         Args: { p_token: string }
         Returns: {
@@ -8740,6 +8835,14 @@ export type Database = {
           role_name: string
           status: string
           workspace_name: string
+        }[]
+      }
+      get_messageable_network_workspaces: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          name: string
+          workspace_id: string
+          workspace_type: string
         }[]
       }
       get_my_workspaces: {
@@ -8812,7 +8915,10 @@ export type Database = {
       }
       get_workspace_ghl_connection: {
         Args: { p_workspace_id: string }
-        Returns: { api_key: string; location_id: string }[]
+        Returns: {
+          api_key: string
+          location_id: string
+        }[]
       }
       get_workspace_jotform_api_key: {
         Args: { p_workspace_id: string }
@@ -8918,6 +9024,15 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: undefined
+      }
+      list_workspace_tags_with_usage: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          automation_names: string[]
+          client_count: number
+          id: string
+          name: string
+        }[]
       }
       mark_all_notifications_read: {
         Args: { p_workspace_id: string }
@@ -9102,6 +9217,10 @@ export type Database = {
         Args: { p_new_name: string; p_stage_id: string }
         Returns: undefined
       }
+      rename_workspace_tag: {
+        Args: { p_new_name: string; p_tag_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       render_engagement_letter_merge_fields: {
         Args: {
           p_body: string
@@ -9242,7 +9361,11 @@ export type Database = {
         Returns: undefined
       }
       set_workspace_ghl_connection: {
-        Args: { p_api_key: string; p_location_id: string; p_workspace_id: string }
+        Args: {
+          p_api_key: string
+          p_location_id: string
+          p_workspace_id: string
+        }
         Returns: undefined
       }
       set_workspace_jotform_api_key: {
@@ -9256,6 +9379,7 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: {
+          allow_connected_ptin_messaging: boolean
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
@@ -9338,16 +9462,24 @@ export type Database = {
         Args: { p_engagement_id: string; p_process_id: string }
         Returns: string
       }
+      start_internal_message_thread: {
+        Args: {
+          p_body: string
+          p_other_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       start_lead_pipeline_run: {
         Args: { p_client_id: string; p_process_id: string }
         Returns: string
       }
-      start_internal_message_thread: {
-        Args: { p_workspace_id: string; p_other_user_id: string; p_body: string }
-        Returns: string
-      }
       start_network_message_thread: {
-        Args: { p_workspace_id: string; p_other_workspace_id: string; p_body: string }
+        Args: {
+          p_body: string
+          p_other_workspace_id: string
+          p_workspace_id: string
+        }
         Returns: string
       }
       start_next_automation_step: {
