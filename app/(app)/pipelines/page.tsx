@@ -10,12 +10,11 @@ export default async function PipelinesPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
   const { data: processes } = await supabase
     .from("processes")
     .select("id, name, status, workspace_id, process_stages(id)")
-    .or(orFilter)
+    .eq("workspace_id", workspace.id)
     .order("name");
 
   const pipelines: PipelineCard[] = (processes ?? []).map((p) => ({

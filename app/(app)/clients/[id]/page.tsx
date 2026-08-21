@@ -202,14 +202,14 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const { data: documentRequestTemplates } = await supabase
     .from("document_request_templates")
     .select("id, name")
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
 
   const { data: organizerTemplates } = await supabase
     .from("organizer_templates")
     .select("id, name")
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
 
@@ -224,7 +224,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const { data: workspaceServices } = await supabase
     .from("services")
     .select("id, name")
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
 
@@ -264,7 +264,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
     .select("id, name, body_html, banner_image_url")
-    .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+    .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
 

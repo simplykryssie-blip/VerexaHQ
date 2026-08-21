@@ -88,31 +88,31 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       supabase
         .from("organizer_templates")
         .select("id, name")
-        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("workspace_id", workspace.id)
         .eq("status", "published")
         .order("name"),
       supabase
         .from("services")
         .select("id, name")
-        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("workspace_id", workspace.id)
         .eq("status", "published")
         .order("name"),
       supabase
         .from("engagement_letter_templates")
         .select("id, name")
-        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("workspace_id", workspace.id)
         .eq("status", "published")
         .order("name"),
       supabase
         .from("document_request_templates")
         .select("id, name")
-        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("workspace_id", workspace.id)
         .eq("status", "published")
         .order("name"),
       supabase
         .from("processes")
         .select("id, name, process_stages(id, name, display_order)")
-        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("workspace_id", workspace.id)
         .eq("status", "published")
         .order("name"),
       getWorkspaceStaff(supabase, workspace.id),
@@ -127,7 +127,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       supabase
         .from("service_categories")
         .select("id, name")
-        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .eq("workspace_id", workspace.id)
         .order("name"),
     ]);
 
