@@ -235,7 +235,11 @@ function PropertiesForm({
             ))}
           </select>
           <span className="mt-1 block text-[11px] normal-case text-muted">
-            When the client submits this form, their answer is added to their contact card as a spouse or dependent relationship.
+            When the client submits this form, their answer here is saved as a spouse or dependent on their contact card --
+            no manual entry needed. The choices above are limited by this question&apos;s type (name / date / SSN / dropdown), not
+            by what the question is actually asking -- only pick one if this question truly captures that piece of information
+            about a spouse or dependent. For dependents, put the tagged fields (name, date of birth, relationship) inside a
+            repeating section so each repeat becomes a separate person; spouse fields should stay outside any repeating section.
           </span>
         </label>
       )}
