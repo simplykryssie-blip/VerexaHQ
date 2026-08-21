@@ -21,7 +21,11 @@ export function ConnectionInviteGenerator({ workspaceId }: { workspaceId: string
       toast.show(error?.message ?? "Could not create an invite.", "error");
       return;
     }
-    setInviteUrl(`${window.location.origin}/settings/connections?token=${data.invite_token}`);
+    // /join works whether the recipient already has a Verexa account or has
+    // never signed up -- it previews the invite, handles sign-in/sign-up
+    // inline, and auto-creates+connects their workspace with no separate
+    // "now go paste this code in Settings" step and no account-type picker.
+    setInviteUrl(`${window.location.origin}/join?token=${data.invite_token}`);
   }
 
   return (

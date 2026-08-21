@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
+  ChevronRight,
   Mail,
   MessageSquare,
-  Plus,
   Trash2,
   CheckSquare,
   BookOpen,
@@ -37,6 +38,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
+import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
+import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
 export type StaffOption = { id: string; display_name: string | null };
 export type AutomationOption = { id: string; name: string };
@@ -47,6 +50,17 @@ export type WorkflowStepRow = {
   action_type: string;
   action_config: Record<string, unknown>;
   delay_minutes: number;
+  canvas_x: number | null;
+  canvas_y: number | null;
+};
+
+export type WorkflowStepEdgeRow = {
+  id: string;
+  from_step_id: string;
+  to_step_id: string | null;
+  branch_conditions: Condition[] | null;
+  label: string | null;
+  sort_order: number;
 };
 
 export type WorkflowRunRow = {
@@ -66,9 +80,9 @@ type WorkflowLogRow = {
   error_message: string | null;
 };
 
-type MessageTemplateOption = { id: string; name: string; slug: string };
+export type MessageTemplateOption = { id: string; name: string; slug: string };
 
-const ACTION_TYPES = [
+export const ACTION_TYPES = [
   { value: "send_email", label: "Send an email" },
   { value: "send_sms", label: "Send a text" },
   { value: "create_task", label: "Create a task" },
@@ -106,7 +120,7 @@ const UPDATE_CLIENT_FIELDS = [
 ];
 const CLIENT_TYPES = ["individual", "business", "trust", "estate", "organization"];
 
-function actionIcon(type: string) {
+export function actionIcon(type: string) {
   if (type === "send_email") return <Mail size={15} />;
   if (type === "send_sms") return <MessageSquare size={15} />;
   if (type === "send_organizer_template") return <BookOpen size={15} />;
@@ -133,7 +147,8 @@ function actionIcon(type: string) {
   return <CheckSquare size={15} />;
 }
 
-function StepCard({
+export function StepCard({
+  workspaceId,
   step,
   index,
   total,
@@ -148,7 +163,9 @@ function StepCard({
   automationOptions,
   canManage,
   onSaved,
+  hideReorder,
 }: {
+  workspaceId: string;
   step: WorkflowStepRow;
   index: number;
   total: number;
@@ -163,12 +180,17 @@ function StepCard({
   automationOptions: AutomationOption[];
   canManage: boolean;
   onSaved: () => void;
+  hideReorder?: boolean;
 }) {
   const supabase = createClient();
   const toast = useToast();
   const [actionType, setActionType] = useState(step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
-  const [delayMinutes, setDelayMinutes] = useState(step.delay_minutes?.toString() ?? "0");
+  const [delayUnit, setDelayUnit] = useState<"minutes" | "days">(step.action_config?.delay_unit === "days" ? "days" : "minutes");
+  const [delayValue, setDelayValue] = useState(() => {
+    const mins = step.delay_minutes ?? 0;
+    return delayUnit === "days" ? String(mins / 1440) : String(mins);
+  });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -178,15 +200,28 @@ function StepCard({
     setSaved(false);
   }
 
+  function changeDelayUnit(nextUnit: "minutes" | "days") {
+    const currentMinutes = delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0;
+    setDelayUnit(nextUnit);
+    setDelayValue(nextUnit === "days" ? String(currentMinutes / 1440) : String(Math.round(currentMinutes)));
+    setSaved(false);
+  }
+
   async function save() {
+    if (actionType === "add_tag" || actionType === "remove_tag") {
+      const tag = (config.tag as string | undefined)?.trim();
+      if (tag && !(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+    }
+
     setSaving(true);
     setError(null);
+    const delayMinutes = Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0);
     const { error: updateError } = await supabase
       .from("automation_steps")
       .update({
         action_type: actionType,
-        action_config: config as never,
-        delay_minutes: parseInt(delayMinutes, 10) || 0,
+        action_config: { ...config, delay_unit: delayUnit } as never,
+        delay_minutes: delayMinutes,
       })
       .eq("id", step.id);
     setSaving(false);
@@ -219,7 +254,7 @@ function StepCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium text-ink">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surfaceMuted text-xs text-muted">{index + 1}</span>
@@ -228,12 +263,16 @@ function StepCard({
         </div>
         {canManage && (
           <div className="flex items-center gap-1">
-            <button type="button" disabled={index === 0} onClick={() => move("up")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move up">
-              <ArrowUp size={14} />
-            </button>
-            <button type="button" disabled={index === total - 1} onClick={() => move("down")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move down">
-              <ArrowDown size={14} />
-            </button>
+            {!hideReorder && (
+              <>
+                <button type="button" disabled={index === 0} onClick={() => move("up")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move up">
+                  <ArrowUp size={14} />
+                </button>
+                <button type="button" disabled={index === total - 1} onClick={() => move("down")} className="rounded p-1 text-muted hover:bg-surfaceMuted disabled:opacity-30" aria-label="Move down">
+                  <ArrowDown size={14} />
+                </button>
+              </>
+            )}
             <button type="button" onClick={remove} className="rounded p-1 text-muted hover:text-danger" aria-label="Delete step">
               <Trash2 size={14} />
             </button>
@@ -262,18 +301,29 @@ function StepCard({
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Wait before running (minutes)
-          <input
-            disabled={!canManage}
-            type="number"
-            min={0}
-            value={delayMinutes}
-            onChange={(e) => {
-              setDelayMinutes(e.target.value);
-              setSaved(false);
-            }}
-            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          />
+          Wait before running
+          <div className="flex gap-1.5">
+            <input
+              disabled={!canManage}
+              type="number"
+              min={0}
+              value={delayValue}
+              onChange={(e) => {
+                setDelayValue(e.target.value);
+                setSaved(false);
+              }}
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            />
+            <select
+              disabled={!canManage}
+              value={delayUnit}
+              onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="minutes">Minutes</option>
+              <option value="days">Days</option>
+            </select>
+          </div>
         </label>
 
         {actionType === "send_email" && (
@@ -378,15 +428,18 @@ function StepCard({
               onChange={(e) => setField("organizer_template_id", e.target.value)}
               className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             >
-              <option value="" disabled>
-                Choose an organizer template
-              </option>
+              <option value="">Auto-detect from the service selected</option>
               {organizerTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
                 </option>
               ))}
             </select>
+            <span className="text-[11px] text-muted">
+              Auto-detect sends whichever organizer is linked to the service that triggered this run (set per
+              service under Services) -- pick a specific template instead only if this step should always send the
+              same organizer regardless of service.
+            </span>
           </label>
         )}
 
@@ -932,12 +985,32 @@ function StepCard({
   );
 }
 
+function CollapsibleSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="mb-2 flex w-full items-center gap-1.5 text-left text-sm font-semibold text-ink"
+      >
+        {open ? <ChevronDown size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
+        {title}
+        {typeof count === "number" && <span className="font-normal text-muted">({count})</span>}
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 export function WorkflowBuilder({
+  workspaceId,
   automationId,
   triggerType,
   triggerConfig,
   isEnabled,
   steps,
+  stepEdges,
   runs,
   logs,
   emailTemplates,
@@ -953,11 +1026,13 @@ export function WorkflowBuilder({
   automationOptions = [],
   conditions: initialConditions = [],
 }: {
+  workspaceId: string;
   automationId: string;
   triggerType: string;
   triggerConfig: Record<string, unknown>;
   isEnabled: boolean;
   steps: WorkflowStepRow[];
+  stepEdges: WorkflowStepEdgeRow[];
   runs: WorkflowRunRow[];
   logs: WorkflowLogRow[];
   emailTemplates: MessageTemplateOption[];
@@ -983,6 +1058,15 @@ export function WorkflowBuilder({
   const [savingTrigger, setSavingTrigger] = useState(false);
 
   async function saveTrigger() {
+    const tagsToConfirm = new Set(collectClientTagValues(conditions));
+    if (currentTriggerType === "client.tag_added") {
+      const triggerTag = (config.tag as string | undefined)?.trim();
+      if (triggerTag) tagsToConfirm.add(triggerTag);
+    }
+    for (const tag of tagsToConfirm) {
+      if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+    }
+
     setSavingTrigger(true);
     const { error } = await supabase
       .from("automations")
@@ -1010,25 +1094,9 @@ export function WorkflowBuilder({
     router.refresh();
   }
 
-  async function addStep() {
-    const nextOrder = steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0;
-    const { error } = await supabase.from("automation_steps").insert({
-      automation_id: automationId,
-      display_order: nextOrder,
-      action_type: "create_task",
-      action_config: {},
-    } as never);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show("Step added", "success");
-    router.refresh();
-  }
-
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">Trigger</h3>
           {canManage && (
@@ -1083,44 +1151,32 @@ export function WorkflowBuilder({
 
       <div>
         <h3 className="mb-2 text-sm font-semibold text-ink">Steps</h3>
-        {steps.length === 0 ? (
+        {steps.length === 0 && !canManage ? (
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
         ) : (
-          <div className="space-y-3">
-            {steps.map((s, i) => (
-              <StepCard
-                key={s.id}
-                step={s}
-                index={i}
-                total={steps.length}
-                emailTemplates={emailTemplates}
-                smsTemplates={smsTemplates}
-                organizerTemplates={organizerTemplates}
-                engagementLetterTemplates={engagementLetterTemplates}
-                documentRequestTemplates={documentRequestTemplates}
-                services={services}
-                pipelines={pipelines}
-                staffOptions={staffOptions}
-                automationOptions={automationOptions}
-                canManage={canManage}
-                onSaved={() => router.refresh()}
-              />
-            ))}
-          </div>
-        )}
-        {canManage && (
-          <button
-            type="button"
-            onClick={addStep}
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-accent hover:bg-accentSoft"
-          >
-            <Plus size={14} /> Add step
-          </button>
+          <WorkflowCanvas
+            workspaceId={workspaceId}
+            automationId={automationId}
+            steps={steps}
+            edges={stepEdges}
+            canManage={canManage}
+            triggerType={currentTriggerType}
+            triggerConfig={config}
+            emailTemplates={emailTemplates}
+            smsTemplates={smsTemplates}
+            organizerTemplates={organizerTemplates}
+            engagementLetterTemplates={engagementLetterTemplates}
+            documentRequestTemplates={documentRequestTemplates}
+            services={services}
+            serviceCategories={serviceCategories}
+            pipelines={pipelines}
+            staffOptions={staffOptions}
+            automationOptions={automationOptions}
+          />
         )}
       </div>
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Recent runs</h3>
+      <CollapsibleSection title="Recent runs" count={runs.length}>
         {runs.length === 0 ? (
           <EmptyState message="This workflow hasn't fired yet." />
         ) : (
@@ -1147,11 +1203,10 @@ export function WorkflowBuilder({
             </table>
           </div>
         )}
-      </div>
+      </CollapsibleSection>
 
       {logs.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-ink">Execution log</h3>
+        <CollapsibleSection title="Execution log" count={logs.length}>
           <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
             {logs.map((l) => {
               const data = (l.execution_data ?? {}) as { action_type?: string };
@@ -1167,7 +1222,7 @@ export function WorkflowBuilder({
               );
             })}
           </ul>
-        </div>
+        </CollapsibleSection>
       )}
     </div>
   );

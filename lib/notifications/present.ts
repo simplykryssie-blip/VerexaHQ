@@ -30,6 +30,13 @@ const TITLES: Record<string, (p: Payload) => string> = {
   ENGAGEMENT_SHARE_APPROVED: () => "Your engagement share was approved",
   ENGAGEMENT_SHARE_REJECTED: () => "Your engagement share was rejected",
   ENGAGEMENT_SHARE_CORRECTIONS_REQUESTED: () => "Corrections were requested on your engagement share",
+  ORGANIZER_SUBMITTED: (p) => `${str(p, "organizer_template_name", "An organizer")} was submitted`,
+  automation: (p) => {
+    const message = str(p, "message").trim();
+    if (message) return message;
+    const client = str(p, "client_name").trim();
+    return client ? `Update on ${client}` : "You have a new automation update";
+  },
 };
 
 // Types with no entity_id but a sensible fixed destination.

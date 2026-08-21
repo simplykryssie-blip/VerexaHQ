@@ -128,7 +128,7 @@ export function WorkflowList({
       )}
 
       {open && (
-        <form onSubmit={create} className="space-y-3 rounded-xl border border-border bg-surface p-4">
+        <form onSubmit={create} className="space-y-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
           <label className="flex flex-col gap-1 text-xs text-muted">
             Name
             <input
@@ -165,7 +165,7 @@ export function WorkflowList({
       {workflows.length === 0 ? (
         <EmptyState message="No workflows yet. Create one to automate what happens on an engagement." />
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
           {workflows.map((w) => (
             <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
               <Link href={`/workflows/${w.id}`} className="flex min-w-0 items-center gap-3">

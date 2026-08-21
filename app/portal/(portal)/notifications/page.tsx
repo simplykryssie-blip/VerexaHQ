@@ -57,7 +57,7 @@ export default async function PortalNotificationsPage() {
     <>
       <PageHeader title="Notifications" description="Updates sent to you by your firm." />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <div className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
           {PREFERENCE_ROWS.map((row) => (
             <div key={`${row.eventType}:${row.channel}`} className="flex items-center justify-between gap-4 px-5 py-3">
               <div>
@@ -79,7 +79,7 @@ export default async function PortalNotificationsPage() {
         {(notifications ?? []).length === 0 ? (
           <EmptyState message="No notifications yet." />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(notifications ?? []).map((n) => {
               const { title } = presentNotification(n as NotificationRow);
               return (

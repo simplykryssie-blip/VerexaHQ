@@ -187,7 +187,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       </div>
 
       {step === "contact" && (
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-ink">First name *</label>
@@ -270,7 +270,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
           html={preview}
           bannerImageUrl={template.banner_image_url}
           footer={
-            <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+            <div className="mt-4 rounded-2xl border border-border bg-surface shadow-soft p-4">
               <p className="mb-3 text-xs text-muted">You&apos;ve reached the end of the letter -- sign below to confirm.</p>
               <SignaturePad
                 typedName={typedName}

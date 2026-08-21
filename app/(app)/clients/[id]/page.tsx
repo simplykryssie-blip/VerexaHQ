@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { buildOrganizerResponseDetail, hasOrganizerAnswers } from "@/lib/organizer/buildResponseDetail";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -41,9 +42,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     { data: messageThreads },
     { data: clientActivity },
     { data: documentFolders },
-    { data: staffMembers },
+    staffMembers,
     { data: appointments },
-    { data: workspaceRow },
   ] = await Promise.all([
     supabase.from("client_contacts").select("*").eq("client_id", client.id).order("display_order"),
     supabase.from("client_addresses").select("*").eq("client_id", client.id).order("display_order"),
@@ -106,11 +106,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .eq("entity_type", "client")
       .eq("entity_id", client.id)
       .order("display_order"),
-    supabase
-      .from("workspace_users")
-      .select("user_id, user_profiles(id, display_name)")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "active"),
+    getWorkspaceStaff(supabase, workspace.id),
     supabase
       .from("appointments")
       .select("id, title, start_at, location")
@@ -118,37 +114,76 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       .gte("start_at", new Date().toISOString())
       .order("start_at", { ascending: true })
       .limit(5),
-    supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle(),
   ]);
 
   const { data: workspaceTags } = await supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id });
 
-  const defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
-  const [{ data: leadPipelineStages }, { data: activeLeadRun }] = await Promise.all([
-    defaultLeadProcessId
-      ? supabase.from("process_stages").select("id, name").eq("process_id", defaultLeadProcessId).order("display_order")
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    supabase
-      .from("lead_pipeline_runs")
-      .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
-      .eq("client_id", client.id)
-      .eq("status", "Active")
-      .maybeSingle(),
-  ]);
+  // No single pipeline is designated "the" lead pipeline anymore -- a lead's
+  // stages come from whichever pipeline its own active run actually belongs
+  // to, not a workspace-level default.
+  const { data: activeLeadRun } = await supabase
+    .from("lead_pipeline_runs")
+    .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
+    .eq("client_id", client.id)
+    .eq("status", "Active")
+    .maybeSingle();
+  const { data: leadPipelineStages } = activeLeadRun
+    ? await supabase.from("process_stages").select("id, name").eq("process_id", activeLeadRun.process_id).order("display_order")
+    : { data: [] as { id: string; name: string }[] };
   const leadPipeline = {
-    processId: defaultLeadProcessId,
+    processId: activeLeadRun?.process_id ?? null,
     stages: leadPipelineStages ?? [],
     currentProcessStageId:
       (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
   };
 
-  const { data: ownerRow } = await supabase
-    .from("workspace_users")
-    .select("user_id, user_profiles(id, display_name)")
-    .eq("workspace_id", workspace.id)
-    .eq("is_owner", true)
+  const ownerStaff = staffMembers.find((m) => m.is_owner) ?? null;
+  const accountHolder = ownerStaff ? { id: ownerStaff.user_id, display_name: ownerStaff.display_name } : null;
+
+  // Relationship manager/Reviewer/Compliance officer default to whatever an
+  // ERO/Service Bureau presets in Settings > Firm Profile, falling back to
+  // the account holder if nothing's been set. Reviewer/Compliance officer
+  // additionally fall back to the parent firm's preset when this workspace
+  // is itself a connected downline (ero_ptin/service_bureau_ptin/
+  // service_bureau_ero) -- an ERO/SB presetting oversight roles is meant to
+  // apply across their whole network, not just their own direct clients.
+  // Relationship manager is deliberately excluded from that cross-workspace
+  // fallback: it's who owns the day-to-day relationship, which only makes
+  // sense as someone local to the client's own firm.
+  const { data: ownWorkspaceDefaults } = await supabase
+    .from("workspaces")
+    .select(
+      `default_relationship_manager:user_profiles!workspaces_default_relationship_manager_id_fkey(id, display_name),
+      default_reviewer:user_profiles!workspaces_default_reviewer_id_fkey(id, display_name),
+      default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name)`
+    )
+    .eq("id", workspace.id)
+    .single();
+
+  const { data: parentConnection } = await supabase
+    .from("firm_connections")
+    .select("parent_workspace_id")
+    .eq("child_workspace_id", workspace.id)
+    .eq("status", "active")
+    .in("relationship_type", ["ero_ptin", "service_bureau_ptin", "service_bureau_ero"])
     .maybeSingle();
-  const accountHolder = (ownerRow as any)?.user_profiles ?? null;
+
+  const { data: parentWorkspaceDefaults } = parentConnection
+    ? await supabase
+        .from("workspaces")
+        .select(
+          `default_reviewer:user_profiles!workspaces_default_reviewer_id_fkey(id, display_name),
+          default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name)`
+        )
+        .eq("id", parentConnection.parent_workspace_id)
+        .maybeSingle()
+    : { data: null };
+
+  const rmDefault = (ownWorkspaceDefaults as any)?.default_relationship_manager ?? accountHolder;
+  const reviewerDefault =
+    (ownWorkspaceDefaults as any)?.default_reviewer ?? (parentWorkspaceDefaults as any)?.default_reviewer ?? accountHolder;
+  const complianceDefault =
+    (ownWorkspaceDefaults as any)?.default_compliance_officer ?? (parentWorkspaceDefaults as any)?.default_compliance_officer ?? accountHolder;
 
   const invoiceIds = (invoices ?? []).map((i) => i.id);
   const { data: paymentPlanRows } =
@@ -257,12 +292,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           .order("created_at", { ascending: false })
       : { data: [] as never[] };
 
-  const staffById = new Map(
-    (staffMembers ?? [])
-      .map((m: any) => m.user_profiles)
-      .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
-      .map((p: any) => [p.id, p])
-  );
+  const staffById = new Map(staffMembers.map((m) => [m.user_id, { id: m.user_id, display_name: m.display_name }]));
   const staffOptions = Array.from(staffById.values());
 
   const documentsWithUploader = (documents ?? []).map((d: any) => ({
@@ -311,12 +341,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       : Promise.resolve({ data: [] as { id: string; thread_id: string; sender_type: string; body: string; is_internal: boolean; created_at: string; sender_id: string | null; workspace_id: string }[] }),
   ]);
 
-  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string }[] = [];
-  if (engagementIds.length > 0) {
+  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null }[] = [];
+  {
+    const engagementFilter = engagementIds.length > 0 ? `engagement_id.in.(${engagementIds.join(",")})` : "";
     const { data: taskRows } = await supabase
       .from("tasks")
       .select("id, title, status, due_date, engagement_id")
-      .in("engagement_id", engagementIds)
+      .or([engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(","))
       .neq("status", "completed")
       .order("due_date");
     tasks = taskRows ?? [];
@@ -364,6 +395,19 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  const { data: allInterests } = await supabase.from("client_service_interests").select("service_id").eq("client_id", client.id);
+  // pending_portal_invites tracks whether the *email* actually went out --
+  // client_portal_users.status only tracks the account's own lifecycle
+  // (invited/active) and gets set to "invited" the instant the account row
+  // is created, before any send is even attempted. Fetched separately so
+  // PortalInviteStatus can show real delivery state instead of conflating
+  // the two.
+  const { data: pendingPortalInvites } = await supabase
+    .from("pending_portal_invites")
+    .select("client_portal_user_id, status, error, created_at")
+    .eq("client_id", client.id)
+    .order("created_at", { ascending: false });
+  const interestedServiceIds = [...new Set((allInterests ?? []).map((i) => i.service_id).filter((id): id is string => Boolean(id)))];
   const requestedService = latestInterest
     ? [
         (latestInterest.service_categories as unknown as { name?: string } | null)?.name,
@@ -385,6 +429,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       workspaceTags={workspaceTags ?? []}
       relationships={relationships ?? []}
       portalUsers={portalUsers ?? []}
+      pendingPortalInvites={pendingPortalInvites ?? []}
       engagements={engagements ?? []}
       notes={notes ?? []}
       documents={documentsWithUploader}
@@ -423,7 +468,11 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       appointments={appointments ?? []}
       staffOptions={staffOptions}
       accountHolder={accountHolder}
+      rmDefault={rmDefault}
+      reviewerDefault={reviewerDefault}
+      complianceDefault={complianceDefault}
       requestedService={requestedService}
+      interestedServiceIds={interestedServiceIds}
       leadPipeline={leadPipeline}
     />
   );

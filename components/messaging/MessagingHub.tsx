@@ -147,7 +147,7 @@ export function MessagingHub({
   return (
     <div className="flex h-[calc(100vh-8.5rem)] gap-4">
       <div
-        className={`w-full flex-col rounded-xl border border-border bg-surface sm:flex sm:w-72 sm:shrink-0 ${
+        className={`w-full flex-col rounded-2xl border border-border bg-surface shadow-soft sm:flex sm:w-72 sm:shrink-0 ${
           mobileShowConversation ? "hidden" : "flex"
         }`}
       >
@@ -221,7 +221,7 @@ export function MessagingHub({
         </ul>
       </div>
 
-      <div className={`flex-1 flex-col rounded-xl border border-border bg-surface sm:flex ${mobileShowConversation ? "flex" : "hidden"}`}>
+      <div className={`flex-1 flex-col rounded-2xl border border-border bg-surface shadow-soft sm:flex ${mobileShowConversation ? "flex" : "hidden"}`}>
         {composingNew && newThreadEntity ? (
           <div className="flex flex-1 flex-col p-4">
             <button

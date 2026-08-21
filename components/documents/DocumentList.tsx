@@ -216,7 +216,7 @@ export function DocumentList({
       {visible.length === 0 ? (
         <EmptyState message={showArchived ? "No archived documents." : "No documents here yet."} />
       ) : (
-        <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+        <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
           {visible.map((doc) => (
             <li key={doc.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
               <input

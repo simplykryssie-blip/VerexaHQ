@@ -137,7 +137,7 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
         )}
       </div>
 
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         {!showDecline ? (
           <>
             <SignaturePad

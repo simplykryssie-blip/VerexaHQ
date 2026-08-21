@@ -12,10 +12,11 @@ export default async function PipelinesPage() {
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
-  const [{ data: processes }, { data: workspaceRow }] = await Promise.all([
-    supabase.from("processes").select("id, name, status, workspace_id, process_stages(id)").or(orFilter).order("name"),
-    supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle(),
-  ]);
+  const { data: processes } = await supabase
+    .from("processes")
+    .select("id, name, status, workspace_id, process_stages(id)")
+    .or(orFilter)
+    .order("name");
 
   const pipelines: PipelineCard[] = (processes ?? []).map((p) => ({
     id: p.id,
@@ -32,7 +33,7 @@ export default async function PipelinesPage() {
         description="The stages work moves through, with the right form, document checklist, or engagement letter attached where each one is needed."
       />
       <div className="flex-1 px-8 py-6">
-        <PipelineLibrary workspaceId={workspace.id} pipelines={pipelines} defaultLeadProcessId={workspaceRow?.default_lead_process_id ?? null} />
+        <PipelineLibrary workspaceId={workspace.id} pipelines={pipelines} />
       </div>
     </>
   );

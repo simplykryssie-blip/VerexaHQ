@@ -7,6 +7,7 @@ import { ConnectionInviteGenerator } from "./ConnectionInviteGenerator";
 import { ConnectedPtinRow } from "./ConnectedPtinRow";
 import { RedeemConnectionForm } from "./RedeemConnectionForm";
 import { MyConnectionStatus } from "./MyConnectionStatus";
+import { PeerMessagingToggle } from "./PeerMessagingToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: canManage }, { data: connectedPtins }, { data: myConnectionRows }] = await Promise.all([
+  const [{ data: canManage }, { data: connectedPtins }, { data: myConnectionRows }, { data: workspaceRow }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" }),
     supabase
       .from("firm_connections")
@@ -30,6 +31,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
       .eq("relationship_type", "ero_ptin")
       .order("created_at", { ascending: false })
       .limit(1),
+    supabase.from("workspaces").select("allow_connected_ptin_messaging").eq("id", workspace.id).maybeSingle(),
   ]);
 
   const myConnection = (myConnectionRows ?? [])[0] ?? null;
@@ -50,7 +52,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
             approval before it can go to e-file.
           </p>
 
-          <div className="mt-3 rounded-xl border border-border bg-surface">
+          <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
             {(connectedPtins ?? []).length === 0 ? (
               <EmptyState message="No PTINs connected yet." />
             ) : (
@@ -72,6 +74,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
           <div className="mt-4">
             <ConnectionInviteGenerator workspaceId={workspace.id} />
           </div>
+          <div className="mt-4 border-t border-border pt-4">
+            <PeerMessagingToggle workspaceId={workspace.id} initialAllowed={Boolean(workspaceRow?.allow_connected_ptin_messaging)} />
+          </div>
         </div>
       )}
 
@@ -83,12 +88,14 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
             : "If your PTIN works with an ERO, connect here using the invite link or code they send you."}
         </p>
 
-        <div className="mt-3 rounded-xl border border-border bg-surface p-5">
+        <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
           {myConnection ? (
             <MyConnectionStatus
+              connectionId={myConnection.id}
               eroName={(myConnection.workspaces as unknown as { name: string } | null)?.name ?? "your ERO"}
               billingResponsibility={myConnection.billing_responsibility}
               sharesCommunicationsIdentity={myConnection.shares_communications_identity}
+              canDisconnect={Boolean(canManage) && myConnection.billing_responsibility !== "ero"}
             />
           ) : (
             <RedeemConnectionForm workspaceId={workspace.id} initialToken={searchParams.token} />

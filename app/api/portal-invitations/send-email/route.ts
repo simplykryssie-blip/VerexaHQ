@@ -68,6 +68,6 @@ export async function POST(request: Request) {
     }
   );
 
-  const result = await sendEmailViaResend({ to: invitedEmail, subject, html, sender: "portal" });
+  const result = await sendEmailViaResend({ to: invitedEmail, subject, html, sender: "portal", workspaceId: workspace.id });
   return NextResponse.json({ ok: true, ...result });
 }

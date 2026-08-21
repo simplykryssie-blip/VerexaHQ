@@ -96,7 +96,7 @@ function PlanForm({ initial, planId, onDone }: { initial: FormState; planId?: st
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-surface p-4">
+    <div className="space-y-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
       <div>
         <label className="block text-xs font-medium text-slate">Name</label>
         <input
@@ -231,7 +231,7 @@ export function PlansManager({ plans }: { plans: Plan[] }) {
       {creating && <PlanForm initial={EMPTY_FORM} onDone={refreshAndClose} />}
 
       {plans.length === 0 && !creating ? (
-        <div className="rounded-xl border border-border bg-surface">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft">
           <EmptyState message="No plans yet. Create one to start assigning workspaces to it." />
         </div>
       ) : (
@@ -240,7 +240,7 @@ export function PlansManager({ plans }: { plans: Plan[] }) {
             editingId === p.id ? (
               <PlanForm key={p.id} initial={formForPlan(p)} planId={p.id} onDone={refreshAndClose} />
             ) : (
-              <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4">
+              <div key={p.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-ink">{p.name}</p>

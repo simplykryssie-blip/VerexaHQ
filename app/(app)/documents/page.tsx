@@ -5,6 +5,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ function formatSize(bytes: number) {
 
 function StatCard({ icon: Icon, label, value, href }: { icon: React.ElementType; label: string; value: React.ReactNode; href?: string }) {
   const body = (
-    <div className="rounded-xl border border-border bg-surface p-4 transition hover:border-accent">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
       <div className="flex items-center gap-2 text-muted">
         <Icon size={16} aria-hidden="true" />
         <p className="text-xs uppercase tracking-wide">{label}</p>
@@ -46,7 +47,7 @@ export default async function DocumentCenterHubPage() {
     );
   }
 
-  const [{ data: openRequests }, { data: pendingSignatures }, { data: allDocuments }, { data: storageRows }, { data: staffMembers }] = await Promise.all([
+  const [{ data: openRequests }, { data: pendingSignatures }, { data: allDocuments }, { data: storageRows }, staffMembers] = await Promise.all([
     supabase
       .from("document_requests")
       .select(
@@ -74,17 +75,12 @@ export default async function DocumentCenterHubPage() {
       .order("created_at", { ascending: false })
       .limit(500),
     supabase.from("attachments").select("file_size_bytes").eq("workspace_id", workspace.id).eq("is_archived", false),
-    supabase.from("workspace_users").select("user_id, user_profiles(id, display_name)").eq("workspace_id", workspace.id).eq("status", "active"),
+    getWorkspaceStaff(supabase, workspace.id),
   ]);
 
   const labelMap = await buildEntityLabelMap(supabase, [...(openRequests ?? []), ...(allDocuments ?? [])]);
 
-  const staffById = new Map(
-    (staffMembers ?? [])
-      .map((m: any) => m.user_profiles)
-      .filter((p: any): p is { id: string; display_name: string | null } => Boolean(p))
-      .map((p: any) => [p.id, p])
-  );
+  const staffById = new Map(staffMembers.map((m) => [m.user_id, { id: m.user_id, display_name: m.display_name }]));
   const documentsWithUploader = (allDocuments ?? []).map((d: any) => ({
     ...d,
     uploaded_by: d.uploaded_by ? staffById.get(d.uploaded_by) ?? null : null,
@@ -118,7 +114,7 @@ export default async function DocumentCenterHubPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
             <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Pending requests</h2>
             {(openRequests ?? []).length === 0 ? (
               <EmptyState message="No open document requests." />
@@ -146,7 +142,7 @@ export default async function DocumentCenterHubPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-border bg-surface">
+          <section className="rounded-2xl border border-border bg-surface shadow-soft">
             <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Pending signatures</h2>
             {(pendingSignatures ?? []).length === 0 ? (
               <EmptyState message="No pending signature requests." />

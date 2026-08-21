@@ -31,7 +31,7 @@ export default async function PortalActivityPage() {
         {(activity ?? []).length === 0 ? (
           <EmptyState message="No activity yet." />
         ) : (
-          <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(activity ?? []).map((a) => (
               <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="text-slate">{a.description}</span>

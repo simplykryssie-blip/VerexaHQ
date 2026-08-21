@@ -347,7 +347,7 @@ function RepeatingSectionInput({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <label className="block text-sm font-medium text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
@@ -579,7 +579,7 @@ function FieldInput({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>

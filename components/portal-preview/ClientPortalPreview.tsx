@@ -78,15 +78,15 @@ export function ClientPortalPreview({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="text-xs uppercase tracking-wide text-muted">Open engagements</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived").length}</p>
           </div>
-          <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="text-xs uppercase tracking-wide text-muted">Missing documents</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{missingDocuments}</p>
           </div>
-          <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="text-xs uppercase tracking-wide text-muted">Balance due</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
           </div>
@@ -96,7 +96,7 @@ export function ClientPortalPreview({
           {engagements.length === 0 ? (
             <EmptyState message="No engagements yet." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {engagements.map((e) => (
                 <li key={e.id} className="flex items-center justify-between px-4 py-3 text-sm">
                   <div>
@@ -121,7 +121,7 @@ export function ClientPortalPreview({
           ) : (
             <div className="space-y-3">
               {attachments.length > 0 && (
-                <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+                <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
                   {attachments.map((a) => {
                     const folder = folders.find((f) => f.id === a.folder_id);
                     return (
@@ -134,7 +134,7 @@ export function ClientPortalPreview({
                 </ul>
               )}
               {documentRequests.map((r) => (
-                <div key={r.id} className="rounded-xl border border-border bg-surface p-3 text-sm">
+                <div key={r.id} className="rounded-2xl border border-border bg-surface shadow-soft p-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate">{r.title}</span>
                     <span className="text-xs capitalize text-muted">{r.status}</span>
@@ -145,7 +145,7 @@ export function ClientPortalPreview({
                 </div>
               ))}
               {signatureRequests.map((s) => (
-                <div key={s.id} className="flex items-center justify-between rounded-xl border border-border bg-surface p-3 text-sm">
+                <div key={s.id} className="flex items-center justify-between rounded-2xl border border-border bg-surface shadow-soft p-3 text-sm">
                   <span className="font-medium text-slate">{s.title}</span>
                   <span className="text-xs capitalize text-muted">{s.status}</span>
                 </div>
@@ -163,7 +163,7 @@ export function ClientPortalPreview({
                 const threadMessages = messagesByThread.get(t.id) ?? [];
                 const last = threadMessages[threadMessages.length - 1];
                 return (
-                  <li key={t.id} className="rounded-xl border border-border bg-surface p-3 text-sm">
+                  <li key={t.id} className="rounded-2xl border border-border bg-surface shadow-soft p-3 text-sm">
                     <p className="font-medium text-slate">{t.subject ?? "Conversation"}</p>
                     {last && (
                       <p className="mt-1 truncate text-xs text-muted">
@@ -181,7 +181,7 @@ export function ClientPortalPreview({
           {invoices.length === 0 ? (
             <EmptyState message="No invoices yet." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {invoices.map((inv) => {
                 const plans = plansByInvoice.get(inv.id) ?? [];
                 return (
@@ -216,7 +216,7 @@ export function ClientPortalPreview({
             </ul>
           )}
           {payments.length > 0 && (
-            <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="mt-3 divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {payments.map((p) => (
                 <li key={p.id} className="flex items-center justify-between px-4 py-2 text-sm">
                   <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
@@ -232,7 +232,7 @@ export function ClientPortalPreview({
           {organizerResponses.length === 0 ? (
             <EmptyState message="No organizers started yet." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {organizerResponses.map((r) => (
                 <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                   <span className="font-medium text-slate">{r.organizer_templates?.name ?? "Organizer"}</span>
@@ -247,7 +247,7 @@ export function ClientPortalPreview({
           {appointments.length === 0 ? (
             <EmptyState message="No appointments scheduled." />
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {appointments.map((a) => (
                 <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                   <div>

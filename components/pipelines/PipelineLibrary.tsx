@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Star } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -34,11 +34,9 @@ const STATUS_FILTERS = [
 export function PipelineLibrary({
   workspaceId,
   pipelines,
-  defaultLeadProcessId,
 }: {
   workspaceId: string;
   pipelines: PipelineCard[];
-  defaultLeadProcessId?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -51,20 +49,6 @@ export function PipelineLibrary({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [defaultLeadId, setDefaultLeadId] = useState(defaultLeadProcessId ?? null);
-
-  async function setDefaultForLeads(id: string) {
-    const next = defaultLeadId === id ? null : id;
-    setDefaultLeadId(next);
-    const { error } = await supabase.from("workspaces").update({ default_lead_process_id: next }).eq("id", workspaceId);
-    if (error) {
-      toast.show(error.message, "error");
-      setDefaultLeadId(defaultLeadId);
-      return;
-    }
-    toast.show(next ? "Set as the pipeline for new leads" : "Cleared default lead pipeline", "success");
-    router.refresh();
-  }
 
   const filtered = useMemo(
     () => pipelines.filter((p) => (!query || p.name.toLowerCase().includes(query.toLowerCase())) && (status === "all" || p.status === status)),
@@ -135,7 +119,7 @@ export function PipelineLibrary({
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((p) => (
-              <div key={p.id} className="flex flex-col rounded-xl border border-border bg-surface p-4">
+              <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
                   {p.workspace_id ? (
@@ -164,16 +148,6 @@ export function PipelineLibrary({
                     {p.stage_count} stage{p.stage_count === 1 ? "" : "s"}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDefaultForLeads(p.id)}
-                  className={`mt-2 inline-flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
-                    defaultLeadId === p.id ? "bg-accentSoft text-accent" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  <Star size={11} fill={defaultLeadId === p.id ? "currentColor" : "none"} />
-                  {defaultLeadId === p.id ? "Default for new leads" : "Set as default for new leads"}
-                </button>
                 <Link
                   href={`/pipelines/${p.id}`}
                   className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-ink"
@@ -188,9 +162,9 @@ export function PipelineLibrary({
 
       {creating && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
-          <form onSubmit={createPipeline} className="w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-lg">
+          <form onSubmit={createPipeline} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink">New pipeline</h2>
+              <h2 className="font-display text-sm font-semibold text-ink">New pipeline</h2>
               <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
                 &times;
               </button>

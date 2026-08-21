@@ -8,7 +8,7 @@ export function SettingsNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-4 overflow-x-auto border-b border-border bg-surface px-3 py-2 lg:sticky lg:top-0 lg:block lg:w-56 lg:shrink-0 lg:space-y-4 lg:self-start lg:border-b-0 lg:border-r lg:px-3 lg:py-5">
+    <nav className="flex gap-4 overflow-x-auto px-1 py-2 lg:sticky lg:top-0 lg:block lg:w-56 lg:shrink-0 lg:space-y-4 lg:self-start lg:px-1 lg:py-6">
       {SETTINGS_NAV_SECTIONS.map((section) => (
         <div key={section.label} className="flex gap-1 lg:block lg:space-y-1">
           <p className="hidden px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted lg:block">{section.label}</p>

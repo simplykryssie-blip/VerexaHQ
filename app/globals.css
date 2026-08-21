@@ -8,7 +8,7 @@ body {
 }
 
 body {
-  @apply bg-surfaceMuted text-ink antialiased;
+  @apply bg-surfaceMuted text-ink antialiased font-sans;
 }
 
 /* Tailwind's preflight reset strips list markers/indentation and collapses

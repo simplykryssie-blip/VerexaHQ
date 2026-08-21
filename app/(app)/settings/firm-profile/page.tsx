@@ -3,6 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { SettingsCard } from "@/components/settings/SettingsCard";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmProfileForm } from "./FirmProfileForm";
 import { getEffectiveBranding } from "@/lib/branding";
@@ -20,8 +21,16 @@ export default async function FirmProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: contact }, { data: branding }, { data: settings }, effectiveBranding, { data: myProfile }, { data: isAdmin }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: contact },
+    { data: branding },
+    { data: settings },
+    effectiveBranding,
+    { data: myProfile },
+    { data: isAdmin },
+    { data: canManageSettings },
+  ] = await Promise.all([
       supabase
         .from("firm_tax_profile")
         .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
@@ -43,6 +52,7 @@ export default async function FirmProfilePage() {
         ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
       supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" }),
     ]);
 
   const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
@@ -88,6 +98,7 @@ export default async function FirmProfilePage() {
             eroName={effectiveBranding.eroName ?? null}
             isOwner={workspace.is_owner}
             isAdmin={Boolean(isAdmin)}
+            canManageSettings={Boolean(canManageSettings)}
             showEin
             showEfin={showEfin}
             showFirmPtin={showFirmPtin}
@@ -102,13 +113,11 @@ export default async function FirmProfilePage() {
       )}
 
       {!isAdmin && (
-        <div className="mt-8 border-t border-border pt-8">
-          <h3 className="text-sm font-semibold text-ink">Tax identifiers</h3>
-          <p className="mt-1 text-xs text-muted">
-            EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and
-            revealing the full value is audit-logged. Only a workspace admin can edit these.
-          </p>
-          <div className="mt-3">
+        <div className="mt-6 max-w-2xl">
+          <SettingsCard
+            title="Tax identifiers"
+            description="EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged. Only a workspace admin can edit these."
+          >
             {!profile ? (
               <EmptyState icon={FileText} message="No firm tax profile set up yet." />
             ) : (
@@ -139,7 +148,7 @@ export default async function FirmProfilePage() {
                 </div>
               </dl>
             )}
-          </div>
+          </SettingsCard>
         </div>
       )}
     </div>

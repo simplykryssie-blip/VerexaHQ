@@ -147,7 +147,7 @@ export default async function FinancialReportPage({
       actions={<ExportButtons rows={csvRows} filename="revenue-report" />}
     >
       {chartData.length > 0 && (
-        <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-5">
           <h2 className="text-sm font-semibold text-ink">Revenue collected, last 6 months</h2>
           <div className="mt-3">
             <SimpleBarChart data={chartData} formatValue={money} />

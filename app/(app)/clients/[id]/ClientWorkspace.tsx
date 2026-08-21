@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
-import { LeadPipelineStageControl } from "./LeadPipelineStageControl";
+import Link from "next/link";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
@@ -21,6 +21,7 @@ import {
   type EmailRow,
   type PhoneRow,
   type PortalUserRow,
+  type PendingPortalInviteRow,
   type RelationshipRow,
   type NoteRow,
   type ActivityRow,
@@ -91,6 +92,7 @@ export function ClientWorkspace({
   workspaceTags,
   relationships,
   portalUsers,
+  pendingPortalInvites,
   engagements,
   notes,
   documents,
@@ -118,7 +120,11 @@ export function ClientWorkspace({
   appointments,
   staffOptions,
   accountHolder,
+  rmDefault,
+  reviewerDefault,
+  complianceDefault,
   requestedService,
+  interestedServiceIds,
   leadPipeline,
 }: {
   workspace: Workspace;
@@ -132,6 +138,7 @@ export function ClientWorkspace({
   workspaceTags: string[];
   relationships: RelationshipRow[];
   portalUsers: PortalUserRow[];
+  pendingPortalInvites: PendingPortalInviteRow[];
   engagements: EngagementRow[];
   notes: NoteRow[];
   documents: DocumentRow[];
@@ -157,7 +164,11 @@ export function ClientWorkspace({
   appointments: AppointmentRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
+  rmDefault: { id: string; display_name: string | null } | null;
+  reviewerDefault: { id: string; display_name: string | null } | null;
+  complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
+  interestedServiceIds: string[];
   leadPipeline: { processId: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
 }) {
   const [tab, setTab] = useState<Tab>("Details");
@@ -179,6 +190,8 @@ export function ClientWorkspace({
     ...tasks.filter((t) => t.due_date).map((t) => t.due_date as string),
   ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
   const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
+  const currentStageName =
+    client.lifecycle_status === "lead" ? leadPipeline.stages.find((s) => s.id === leadPipeline.currentProcessStageId)?.name : undefined;
 
   return (
     <>
@@ -193,6 +206,11 @@ export function ClientWorkspace({
             {primaryService && <span>{primaryService}</span>}
             {!primaryService && requestedService && <span>Requested: {requestedService}</span>}
             <span className="capitalize">{client.lifecycle_status}</span>
+            {currentStageName && leadPipeline.processId && (
+              <Link href={`/pipelines/${leadPipeline.processId}`} className="text-accent hover:underline">
+                Stage: {currentStageName}
+              </Link>
+            )}
             {showStaffRoles && (
               <>
                 <span>Relationship manager: {client.relationship_manager?.display_name ?? "Unassigned"}</span>
@@ -208,13 +226,6 @@ export function ClientWorkspace({
       />
 
       <div className="flex items-center gap-2 border-b border-border bg-surface px-8 py-3">
-        <LeadPipelineStageControl
-          clientId={client.id}
-          lifecycleStatus={client.lifecycle_status}
-          processId={leadPipeline.processId}
-          stages={leadPipeline.stages}
-          currentProcessStageId={leadPipeline.currentProcessStageId}
-        />
         <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
         <QuickActions
@@ -257,9 +268,13 @@ export function ClientWorkspace({
                 phones={phones}
                 workspaceTags={workspaceTags}
                 portalUsers={portalUsers}
+                pendingPortalInvites={pendingPortalInvites}
                 relationships={relationships}
                 staffOptions={staffOptions}
                 accountHolder={accountHolder}
+                rmDefault={rmDefault}
+                reviewerDefault={reviewerDefault}
+                complianceDefault={complianceDefault}
                 engagements={engagements}
                 tasks={tasks}
                 appointments={appointments}
@@ -268,6 +283,7 @@ export function ClientWorkspace({
                 outstandingBalance={outstandingBalance}
                 organizerResponses={organizerResponses}
                 workspaceServices={workspaceServices}
+                interestedServiceIds={interestedServiceIds}
                 onCreateInvoice={() => setTab("Billing")}
                 onShowNotes={() => setTab("Notes")}
                 onCreateNote={() => setTab("Notes")}

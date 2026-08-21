@@ -24,7 +24,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
 
   const isSystemDefault = !process.workspace_id;
 
-  const [{ data: isWorkspaceAdmin }, { data: stages }, { data: tasks }, { data: stageCounts }] = await Promise.all([
+  const [{ data: isWorkspaceAdmin }, { data: stages }, { data: tasks }, { data: stageCounts }, { data: leadRunSample }] = await Promise.all([
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     supabase.from("process_stages").select("*").eq("process_id", process.id).order("display_order"),
     supabase
@@ -33,14 +33,50 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
       .eq("process_stages.process_id", process.id)
       .order("display_order"),
     supabase.from("engagements").select("current_stage").eq("workflow_id", process.id).not("current_stage", "is", null),
+    supabase.from("lead_pipeline_runs").select("id").eq("process_id", process.id).eq("workspace_id", workspace.id).eq("status", "Active").limit(1),
   ]);
 
   const canEdit = !isSystemDefault && Boolean(isWorkspaceAdmin);
+  // No single pipeline is designated "the" lead pipeline anymore -- any
+  // pipeline that actually has active leads on it shows them, the same
+  // way any pipeline with active engagements shows its engagement count.
+  const isLeadPipeline = (leadRunSample ?? []).length > 0;
 
   const engagementCountsByStage = new Map<string, number>();
   for (const row of stageCounts ?? []) {
     const key = (row as { current_stage: string }).current_stage;
     engagementCountsByStage.set(key, (engagementCountsByStage.get(key) ?? 0) + 1);
+  }
+
+  const leadsByStage: Record<string, { clientId: string; name: string }[]> = {};
+  if (isLeadPipeline) {
+    const { data: runs } = await supabase
+      .from("lead_pipeline_runs")
+      .select(
+        "lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id), clients(id, first_name, last_name, business_name, client_type)"
+      )
+      .eq("process_id", process.id)
+      .eq("workspace_id", workspace.id)
+      .eq("status", "Active")
+      .not("current_stage_id", "is", null);
+    for (const r of runs ?? []) {
+      const client = r.clients as unknown as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        business_name: string | null;
+        client_type: string;
+      } | null;
+      const currentStageId = (r.lead_pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
+      if (!client || !currentStageId) continue;
+      const name =
+        client.client_type === "business" && client.business_name
+          ? client.business_name
+          : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client";
+      const list = leadsByStage[currentStageId] ?? [];
+      list.push({ clientId: client.id, name });
+      leadsByStage[currentStageId] = list;
+    }
   }
 
   return (
@@ -66,6 +102,8 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
           stages={stages ?? []}
           tasks={(tasks ?? []) as never}
           engagementCountsByStage={Object.fromEntries(engagementCountsByStage)}
+          isLeadPipeline={isLeadPipeline}
+          leadsByStage={leadsByStage}
         />
       </div>
     </div>

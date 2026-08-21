@@ -7,7 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignatureRequestFromTemplate";
+import { uploadSignatureImageClient } from "@/lib/documents/uploadSignatureImage";
 import { renderEmail } from "@/lib/email/template";
+import { SignaturePad } from "@/components/SignaturePad";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
@@ -62,6 +64,9 @@ export function SignaturesPanel({
   const [error, setError] = useState<string | null>(null);
   const [signingId, setSigningId] = useState<string | null>(null);
   const [typedName, setTypedName] = useState("");
+  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
+  const [signingError, setSigningError] = useState<string | null>(null);
+  const [submittingSignature, setSubmittingSignature] = useState(false);
 
   async function createRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -154,19 +159,52 @@ export function SignaturesPanel({
     router.refresh();
   }
 
-  async function submitSignature() {
-    if (!signingId || !typedName.trim()) return;
-    const { error } = await supabase.rpc("record_signature", {
-      p_signer_id: signingId,
-      p_signature_type: "typed",
-      p_typed_name: typedName.trim(),
-    });
+  function closeSigningModal() {
     setSigningId(null);
     setTypedName("");
+    setDrawnDataUrl(null);
+    setSigningError(null);
+  }
+
+  async function submitSignature() {
+    if (!signingId || !typedName.trim()) return;
+    setSigningError(null);
+
+    let signatureType: "typed" | "drawn" = "typed";
+    let signatureImagePath: string | undefined;
+
+    if (audience === "portal") {
+      if (!drawnDataUrl) return;
+      const request = signatureRequests.find((r) => r.signers.some((s) => s.id === signingId));
+      if (!request) {
+        setSigningError("Could not find this signing request.");
+        return;
+      }
+      setSubmittingSignature(true);
+      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, request.id, drawnDataUrl);
+      if ("error" in uploadResult) {
+        setSubmittingSignature(false);
+        setSigningError(uploadResult.error);
+        return;
+      }
+      signatureType = "drawn";
+      signatureImagePath = uploadResult.path;
+    } else {
+      setSubmittingSignature(true);
+    }
+
+    const { error } = await supabase.rpc("record_signature", {
+      p_signer_id: signingId,
+      p_signature_type: signatureType,
+      p_typed_name: typedName.trim(),
+      p_signature_image_path: signatureImagePath,
+    });
+    setSubmittingSignature(false);
     if (error) {
-      toast.show(error.message, "error");
+      setSigningError(error.message);
       return;
     }
+    closeSigningModal();
     toast.show("Signature recorded", "success");
     router.refresh();
   }
@@ -190,7 +228,7 @@ export function SignaturesPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-ink">Signature requests</h3>
           {audience === "staff" && canCreate && (
@@ -302,7 +340,7 @@ export function SignaturesPanel({
           {signatureRequests.map((r) => {
             const overdue = r.status === "pending" && r.due_date && new Date(r.due_date) < new Date();
             return (
-              <li key={r.id} className="rounded-xl border border-border bg-surface p-4">
+              <li key={r.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-ink">{r.title}</p>
@@ -331,7 +369,7 @@ export function SignaturesPanel({
                             </button>
                           )}
                           <button type="button" onClick={() => setSigningId(s.id)} className="flex items-center gap-1 text-accent hover:underline">
-                            <PenLine size={12} /> Mark signed
+                            <PenLine size={12} /> {audience === "portal" ? "Sign now" : "Mark signed"}
                           </button>
                           <button type="button" onClick={() => decline(s.id)} className="text-danger hover:underline">
                             Decline
@@ -354,32 +392,44 @@ export function SignaturesPanel({
 
       {signingId && (
         <div role="dialog" aria-modal="true" aria-label="Capture signature" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-lg">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-softHover">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-ink">Capture signature</h2>
-              <button type="button" onClick={() => setSigningId(null)} aria-label="Close" className="text-muted hover:text-ink">
+              <h2 className="font-display text-base font-semibold text-ink">Capture signature</h2>
+              <button type="button" onClick={closeSigningModal} aria-label="Close" className="text-muted hover:text-ink">
                 <X size={16} />
               </button>
             </div>
-            <p className="mt-2 text-sm text-muted">
-              {audience === "portal"
-                ? "Type your full name to sign this document electronically."
-                : "Staff-recorded signature (in person or via another channel) -- type the signer's full name to confirm."}
-            </p>
-            <input
-              autoFocus
-              value={typedName}
-              onChange={(e) => setTypedName(e.target.value)}
-              placeholder="Full name"
-              className="mt-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            {audience === "portal" ? (
+              <div className="mt-3">
+                <SignaturePad
+                  typedName={typedName}
+                  onTypedNameChange={setTypedName}
+                  onDrawnChange={setDrawnDataUrl}
+                  typedLabel="Type your full name to sign this document electronically"
+                />
+              </div>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-muted">
+                  Staff-recorded signature (in person or via another channel) -- type the signer&apos;s full name to confirm.
+                </p>
+                <input
+                  autoFocus
+                  value={typedName}
+                  onChange={(e) => setTypedName(e.target.value)}
+                  placeholder="Full name"
+                  className="mt-3 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </>
+            )}
+            {signingError && <p className="mt-2 text-sm text-danger">{signingError}</p>}
             <button
               type="button"
               onClick={submitSignature}
-              disabled={!typedName.trim()}
+              disabled={submittingSignature || !typedName.trim() || (audience === "portal" && !drawnDataUrl)}
               className="mt-3 w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
-              Confirm signature
+              {submittingSignature ? "Signing..." : "Confirm signature"}
             </button>
           </div>
         </div>

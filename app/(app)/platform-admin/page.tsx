@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { PlatformAdminsManager } from "./PlatformAdminsManager";
+import { ProvisionWorkspaceForm } from "./ProvisionWorkspaceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export default async function PlatformAdminPage() {
       <>
         <PageHeader title="Platform Admin" />
         <div className="flex-1 px-8 py-6">
-          <div className="rounded-xl border border-border bg-surface">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState icon={Lock} message="This area is only available to Verexa platform admins." />
           </div>
         </div>
@@ -84,6 +85,8 @@ export default async function PlatformAdminPage() {
         }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
+        <ProvisionWorkspaceForm />
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
             { label: "Workspaces", value: totalWorkspaces },
@@ -91,7 +94,7 @@ export default async function PlatformAdminPage() {
             { label: "Suspended", value: suspendedCount },
             { label: "Total staff", value: totalStaff },
           ].map((t) => (
-            <div key={t.label} className="rounded-xl border border-border bg-surface p-4">
+            <div key={t.label} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
               <p className="text-xs uppercase tracking-wide text-muted">{t.label}</p>
               <p className="mt-1 text-2xl font-semibold text-ink">{t.value}</p>
             </div>
@@ -99,11 +102,11 @@ export default async function PlatformAdminPage() {
         </div>
 
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState icon={ShieldEllipsis} message="No workspaces yet." />
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+          <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
@@ -149,7 +152,7 @@ export default async function PlatformAdminPage() {
         )}
 
         <div>
-          <h3 className="text-sm font-semibold text-ink">Platform admins</h3>
+          <h3 className="font-display text-sm font-semibold text-ink">Platform admins</h3>
           <p className="mt-1 text-xs text-muted">
             Anyone here can see every workspace on Verexa and manage subscriptions, status, and other admins. Grant this carefully.
           </p>

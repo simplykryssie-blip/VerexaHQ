@@ -137,7 +137,7 @@ export function OnboardingChecklist({
   const explainer = popupStep ? STEP_EXPLAINERS[popupStep.key] : null;
 
   return (
-    <div className="mb-4 rounded-xl border border-border bg-surface p-5">
+    <div className="mb-4 rounded-2xl border border-border bg-surface shadow-soft p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-ink">{allDone ? "You're all set up" : "Get your firm set up"}</h2>

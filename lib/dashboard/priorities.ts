@@ -24,7 +24,7 @@ export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
       id: `task-${t.id}`,
       label: t.title,
       detail: `Task overdue by ${daysOverdue} day${daysOverdue === 1 ? "" : "s"}`,
-      href: `/engagements/${t.engagement_id}`,
+      href: t.engagement_id ? `/engagements/${t.engagement_id}` : `/clients/${t.client_id}`,
       weight: 100 + daysOverdue,
     });
   }
@@ -65,7 +65,7 @@ export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
       id: `due-today-${t.id}`,
       label: t.title,
       detail: "Due today",
-      href: `/engagements/${t.engagement_id}`,
+      href: t.engagement_id ? `/engagements/${t.engagement_id}` : `/clients/${t.client_id}`,
       weight: 40,
     });
   }

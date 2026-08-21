@@ -152,7 +152,7 @@ export function RichTextEditor({
       toolbarRounded = "rounded-t-sm";
       contentRounded = editable ? "rounded-b-sm" : "rounded-sm";
     } else {
-      wrapperClass = "rounded-xl border border-border bg-surface";
+      wrapperClass = "rounded-2xl border border-border bg-surface shadow-soft";
       toolbarRounded = "rounded-t-xl";
       contentRounded = editable ? "rounded-b-xl" : "rounded-xl";
     }

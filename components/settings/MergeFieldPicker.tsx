@@ -24,7 +24,7 @@ export function MergeFieldPicker({ onInsert, disabled, label = "Insert client de
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-y-auto rounded-xl border border-border bg-surface p-2 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-y-auto rounded-2xl border border-border bg-surface p-2 shadow-lg">
             <p className="px-2 pb-1.5 text-[11px] text-muted">Click a detail to drop it in -- it&apos;ll fill in automatically when this goes out.</p>
             {MERGE_FIELD_GROUPS.map((g) => (
               <div key={g.group} className="mb-2">

@@ -6,8 +6,8 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
-import { archivo, publicSans, plexMono } from "@/lib/authFonts";
-import { darkenHex, hexToRgba } from "@/lib/color";
+import { hexToRgba } from "@/lib/color";
+import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
 import styles from "./Sidebar.module.css";
 
 export function Sidebar({
@@ -15,32 +15,36 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
-  textColor,
   isPlatformAdmin,
+  showMessages,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  /** Overrides the sidebar's text color -- for firms whose nav bar color is light enough that the default light text would blend in. */
-  textColor?: string | null;
   isPlatformAdmin?: boolean;
+  /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
+  showMessages?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const trimmedLogoUrl = useTrimmedLogo(logoUrl);
 
+  // primaryColor is unused here now that the sidebar is a light surface --
+  // it's kept in the props/Brand Center settings for a future use (e.g. a
+  // portal accent) rather than driving a colored rail background.
+  //
+  // There's no per-workspace text-color override anymore either: that only
+  // ever made sense back when the rail's own background was a custom color
+  // and could get dark enough to need light text. Now that the sidebar is
+  // always this same light surface, applying a stored override can only
+  // ever make text harder to read against it (a leftover light value renders
+  // as near-invisible on the light background) with no upside, so the app
+  // no longer reads or applies branding.sidebar_text_color at all.
   const sidebarStyle: React.CSSProperties = {};
-  if (primaryColor) {
-    (sidebarStyle as Record<string, string>)["--rail-bg"] = primaryColor;
-    (sidebarStyle as Record<string, string>)["--rail-bg-2"] = darkenHex(primaryColor, 0.25);
-  }
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
-  }
-  if (textColor) {
-    (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;
-    (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(textColor, 0.7) ?? textColor;
-    (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(textColor, 0.5) ?? textColor;
+    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
   }
 
   // Flatten every navigable href (top-level items + group children) so the
@@ -84,16 +88,16 @@ export function Sidebar({
       )}
 
       <aside
-        className={`${styles.sidebar} ${archivo.variable} ${publicSans.variable} ${plexMono.variable} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
+        className={`${styles.sidebar} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col font-sans shadow-soft transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
-        style={{ fontFamily: "var(--font-public-sans), system-ui, sans-serif", ...sidebarStyle }}
+        style={sidebarStyle}
       >
         <div className={`${styles.header} flex items-center justify-between px-5 py-5`}>
           <div>
-            {logoUrl ? (
+            {trimmedLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
+              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
             ) : (
               <>
                 <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
@@ -122,7 +126,9 @@ export function Sidebar({
             <div key={section.label}>
               <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
               <div className="space-y-1">
-                {section.items.map((item) => {
+                {section.items
+                  .filter((item) => item.label !== "Messages" || showMessages)
+                  .map((item) => {
                   const Icon = item.icon;
 
                   if ("children" in item) {

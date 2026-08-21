@@ -47,7 +47,7 @@ export function PlatformAdminsManager({ admins, currentUserId }: { admins: Admin
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <ul className="divide-y divide-border">
         {admins.map((a) => (
           <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">

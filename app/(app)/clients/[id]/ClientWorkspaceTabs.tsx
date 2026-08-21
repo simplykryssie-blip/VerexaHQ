@@ -44,6 +44,7 @@ import {
 } from "./ContactChannelForms";
 import { EditClientProfileForm } from "./EditClientProfileForm";
 import { TagsEditor } from "./TagsEditor";
+import { ServiceInterestControl } from "./ServiceInterestControl";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 
 function Section({
@@ -56,7 +57,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface">
+    <div className="rounded-2xl border border-border bg-surface shadow-soft">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <h2 className="text-sm font-semibold text-ink">{title}</h2>
         {action}
@@ -97,9 +98,13 @@ export function OverviewTab({
   phones,
   workspaceTags,
   portalUsers,
+  pendingPortalInvites,
   relationships,
   staffOptions,
   accountHolder,
+  rmDefault,
+  reviewerDefault,
+  complianceDefault,
   engagements,
   tasks,
   appointments,
@@ -108,6 +113,7 @@ export function OverviewTab({
   outstandingBalance,
   organizerResponses,
   workspaceServices,
+  interestedServiceIds,
   onCreateInvoice,
   onShowNotes,
   onCreateNote,
@@ -141,9 +147,13 @@ export function OverviewTab({
   phones: PhoneRow[];
   workspaceTags: string[];
   portalUsers: PortalUserRow[];
+  pendingPortalInvites: PendingPortalInviteRow[];
   relationships: RelationshipRow[];
   staffOptions: StaffOption[];
   accountHolder: { id: string; display_name: string | null } | null;
+  rmDefault: { id: string; display_name: string | null } | null;
+  reviewerDefault: { id: string; display_name: string | null } | null;
+  complianceDefault: { id: string; display_name: string | null } | null;
   engagements: EngagementRow[];
   tasks: TaskRow[];
   appointments: AppointmentRow[];
@@ -152,6 +162,7 @@ export function OverviewTab({
   outstandingBalance: number;
   organizerResponses: OrganizerResponseRow[];
   workspaceServices: { id: string; name: string }[];
+  interestedServiceIds: string[];
   onCreateInvoice: () => void;
   onShowNotes: () => void;
   onCreateNote: () => void;
@@ -177,15 +188,15 @@ export function OverviewTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Current engagements</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{openEngagements.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Open tasks</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{openTasks.length}</p>
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
           <p className="text-xs uppercase tracking-wide text-muted">Outstanding balance</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
         </div>
@@ -201,6 +212,7 @@ export function OverviewTab({
               name={clientDisplayName(client)}
               email={client.primary_email}
               portalUsers={portalUsers}
+              pendingInvites={pendingPortalInvites}
             />
             <Link
               href={`/clients/${client.id}/portal-preview`}
@@ -293,6 +305,31 @@ export function OverviewTab({
           <TagsEditor clientId={client.id} workspaceId={workspaceId} tags={client.tags ?? []} suggestions={workspaceTags} />
         </div>
 
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Service interests</h3>
+            <ServiceInterestControl
+              clientId={client.id}
+              workspaceId={workspaceId}
+              services={workspaceServices}
+              interestedServiceIds={interestedServiceIds}
+            />
+          </div>
+          {interestedServiceIds.length === 0 ? (
+            <EmptyState message="No service interests recorded yet." />
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {workspaceServices
+                .filter((s) => interestedServiceIds.includes(s.id))
+                .map((s) => (
+                  <span key={s.id} className="inline-flex items-center rounded-full bg-accentSoft px-2.5 py-1 text-xs font-medium text-accent">
+                    {s.name}
+                  </span>
+                ))}
+            </div>
+          )}
+        </div>
+
         {showStaffRoles && (
           <div className="mt-4 border-t border-border pt-4">
             <ClientAssignmentForm
@@ -300,7 +337,9 @@ export function OverviewTab({
               relationshipManager={client.relationship_manager}
               defaultReviewer={client.default_reviewer}
               defaultComplianceOfficer={client.default_compliance_officer}
-              accountHolder={accountHolder}
+              rmDefault={rmDefault}
+              reviewerDefault={reviewerDefault}
+              complianceDefault={complianceDefault}
               staffOptions={staffOptions}
             />
           </div>
@@ -711,7 +750,7 @@ export function MessagesTab({
   }
 
   return (
-    <div className="flex h-[calc(100vh-260px)] flex-col rounded-xl border border-border bg-surface">
+    <div className="flex h-[calc(100vh-260px)] flex-col rounded-2xl border border-border bg-surface shadow-soft">
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {messages.length === 0 ? (
           <EmptyState message="No messages yet -- send one below to start the conversation." />
@@ -845,7 +884,7 @@ export function BillingTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between rounded-xl border border-border bg-surface p-4">
+      <div className="flex items-center justify-between rounded-2xl border border-border bg-surface shadow-soft p-4">
         <div>
           <p className="text-xs uppercase tracking-wide text-muted">Outstanding balance</p>
           <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
@@ -1121,7 +1160,15 @@ export type ContactRow = { id: string; first_name: string | null; last_name: str
 export type AddressRow = { id: string; address_type: string; street: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean };
 export type EmailRow = { id: string; email: string; email_type: string; is_primary: boolean };
 export type PhoneRow = { id: string; phone_number: string; phone_type: string; is_primary: boolean };
-export type PortalUserRow = { id: string; invited_name: string | null; invited_email: string; is_primary: boolean; status: string };
+export type PortalUserRow = {
+  id: string;
+  invited_name: string | null;
+  invited_email: string;
+  is_primary: boolean;
+  status: string;
+  invitation_token: string;
+};
+export type PendingPortalInviteRow = { client_portal_user_id: string; status: string; error: string | null; created_at: string };
 export type RelationshipRow = {
   id: string;
   relationship_type: string;
@@ -1133,7 +1180,7 @@ export type RelationshipRow = {
 };
 export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
-export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string };
+export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null };
 export type QuoteRow = {
   id: string;
   quote_number: string | null;

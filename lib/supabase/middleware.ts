@@ -2,8 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
-const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password", "/sign/", "/o/", "/e/"];
-const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/mfa-challenge"];
+const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password", "/sign/", "/o/", "/e/", "/privacy", "/terms", "/contact", "/docs/"];
+const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/join", "/mfa-challenge"];
 const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
 const PORTAL_BASIC_INFO_EXEMPT_PATHS = ["/portal/login", "/portal/accept-invitation", "/portal/basic-info"];
 const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
@@ -68,7 +68,10 @@ export async function updateSession(request: NextRequest) {
     if (!isApiPath) {
       if (!user && !isPublicPath) {
         const redirectUrl = new URL(loginPath, request.url);
-        redirectUrl.searchParams.set("next", pathname);
+        // Preserve query params too (pathname alone drops them) -- a
+        // protected link like /settings/connections?token=... needs the
+        // token to survive the round trip through login and back.
+        redirectUrl.searchParams.set("next", pathname + request.nextUrl.search);
         return NextResponse.redirect(redirectUrl);
       }
 

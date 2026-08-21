@@ -154,7 +154,7 @@ export function TemplateEditRow({
         )}
 
         {kind === "email" ? (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
             <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
               <span className="shrink-0 text-xs font-medium text-muted">Subject</span>
               <input

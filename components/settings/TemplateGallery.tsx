@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Trash2, type LucideIcon } from "lucide-react";
+import { Plus, Search, Share2, Trash2, type LucideIcon } from "lucide-react";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -44,6 +44,7 @@ export function TemplateGallery({
   createTileLabel,
   onCreateClick,
   onDeleteClick,
+  onShareClick,
 }: {
   cards: GalleryCard[];
   icon: LucideIcon;
@@ -54,6 +55,8 @@ export function TemplateGallery({
   onCreateClick: () => void;
   /** Workspace-owned templates only -- system defaults never show a delete button. */
   onDeleteClick?: (card: GalleryCard) => void;
+  /** Only passed when this workspace has at least one active downline connection to share with. */
+  onShareClick?: (card: GalleryCard) => void;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -135,6 +138,16 @@ export function TemplateGallery({
                   <Link href={c.href} className="text-xs font-medium text-accent hover:underline">
                     {c.actionLabel}
                   </Link>
+                  {!c.isSystem && onShareClick && (
+                    <button
+                      type="button"
+                      onClick={() => onShareClick(c)}
+                      aria-label={`Share ${c.name} with a downline firm`}
+                      className="rounded p-1 text-muted opacity-0 transition hover:bg-accentSoft hover:text-accent group-hover:opacity-100"
+                    >
+                      <Share2 size={14} />
+                    </button>
+                  )}
                   {!c.isSystem && onDeleteClick && (
                     <button
                       type="button"

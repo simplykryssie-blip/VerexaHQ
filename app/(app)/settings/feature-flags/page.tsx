@@ -43,7 +43,7 @@ export default async function FeatureFlagsPage() {
       ) : (
         <div className="mt-6 space-y-6">
           {Array.from(byModule.entries()).map(([module, moduleFlags]) => (
-            <div key={module} className="rounded-xl border border-border bg-surface">
+            <div key={module} className="rounded-2xl border border-border bg-surface shadow-soft">
               <h3 className="border-b border-border px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted">{module}</h3>
               <ul className="divide-y divide-border">
                 {(moduleFlags ?? []).map((f) => {

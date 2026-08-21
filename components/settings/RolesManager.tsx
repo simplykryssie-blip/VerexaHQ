@@ -165,7 +165,7 @@ export function RolesManager({
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
-      <div className="rounded-xl border border-border bg-surface">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Roles</h3>
           {isAdmin && (
@@ -203,7 +203,7 @@ export function RolesManager({
         )}
       </div>
 
-      <div className="rounded-xl border border-border bg-surface">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft">
         {!selected ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16 text-muted">
             <KeyRound size={24} />

@@ -78,7 +78,7 @@ const TROUBLESHOOTING: Entry[] = [
 
 function EntryList({ entries }: { entries: Entry[] }) {
   return (
-    <div className="divide-y divide-border rounded-xl border border-border bg-surface">
+    <div className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
       {entries.map((e) => (
         <details key={e.title} className="group px-5 py-3">
           <summary className="cursor-pointer list-none text-sm font-medium text-ink marker:content-none">

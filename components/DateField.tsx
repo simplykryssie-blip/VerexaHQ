@@ -100,7 +100,7 @@ export function DateField({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-72 rounded-xl border border-border bg-surface p-3 shadow-lg">
+        <div className="absolute z-50 mt-1 w-72 rounded-2xl border border-border bg-surface p-3 shadow-lg">
           <div className="flex items-center justify-between pb-2">
             <button
               type="button"

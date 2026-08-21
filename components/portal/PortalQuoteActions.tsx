@@ -40,7 +40,7 @@ export function PortalQuoteActions({ quoteId }: { quoteId: string }) {
 
   if (declining) {
     return (
-      <div className="rounded-xl border border-border bg-surface p-4">
+      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
         <label className="block text-sm font-medium text-slate" htmlFor="decline_reason">
           Let your firm know why (optional)
         </label>

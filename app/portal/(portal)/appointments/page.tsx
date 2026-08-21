@@ -55,7 +55,7 @@ export default async function PortalAppointmentsPage() {
         ) : (
           <ul className="space-y-2">
             {(appointments ?? []).map((a) => (
-              <li key={a.id} className="rounded-xl border border-border bg-surface p-4">
+              <li key={a.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-ink">{a.title}</p>

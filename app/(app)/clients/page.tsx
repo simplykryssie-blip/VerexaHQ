@@ -6,6 +6,7 @@ import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { NewClientButton } from "./NewClientButton";
+import { TagFilterControl } from "./TagFilterControl";
 
 export const dynamic = 'force-dynamic';
 
@@ -111,45 +112,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
   // -- the same system "Move the lead to a pipeline stage" and "A lead enters
   // a pipeline stage" already use -- rather than the old flat, uncustomizable
-  // lead_stages list. Which pipeline is "the" one for new leads is a
-  // workspace setting (Pipelines page), so with none set the Leads tab just
-  // shows All/Lost.
-  let stageFilters: { value: string; label: string }[] = [];
-  let defaultLeadProcessId: string | null = null;
-  if (isLeadsTab) {
-    const { data: workspaceRow } = await supabase.from("workspaces").select("default_lead_process_id").eq("id", workspace.id).maybeSingle();
-    defaultLeadProcessId = workspaceRow?.default_lead_process_id ?? null;
-    if (defaultLeadProcessId) {
-      const { data: stages } = await supabase
-        .from("process_stages")
-        .select("id, name")
-        .eq("process_id", defaultLeadProcessId)
-        .order("display_order");
-      stageFilters = (stages ?? []).map((s) => ({ value: s.id, label: s.name }));
-    }
-  }
-
+  // lead_stages list. There's no single designated "default" pipeline for
+  // leads; any pipeline with active leads shows them on its own page (each
+  // stage card shows its leads, same shape as every other pipeline), so
+  // this page just points at Pipelines rather than a specific one.
   const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters = isLeadsTab
-    ? [{ value: "", label: "All" }, ...stageFilters, { value: "lost", label: "Lost" }]
-    : CLIENT_STATUS_FILTERS;
-  const isStageFilter = isLeadsTab && !!searchParams.status && searchParams.status !== "lost" && stageFilters.some((f) => f.value === searchParams.status);
-  const status = searchParams.status && (isStageFilter || statusFilters.some((f) => f.value === searchParams.status)) ? searchParams.status : "";
-
-  // A stage filter isn't a lifecycle_status -- resolve which clients are
-  // currently sitting on that pipeline stage first, then filter by id.
-  let stageClientIds: string[] | null = null;
-  if (isStageFilter) {
-    const { data: activeStages } = await supabase
-      .from("lead_pipeline_stages")
-      .select("lead_pipeline_run_id")
-      .eq("process_stage_id", status)
-      .eq("status", "In Progress");
-    const runIds = (activeStages ?? []).map((s) => s.lead_pipeline_run_id);
-    const { data: runs } =
-      runIds.length > 0 ? await supabase.from("lead_pipeline_runs").select("client_id").in("id", runIds) : { data: [] as { client_id: string }[] };
-    stageClientIds = (runs ?? []).map((r) => r.client_id);
-  }
+  const statusFilters = isLeadsTab ? [{ value: "", label: "All" }, { value: "lost", label: "Lost" }] : CLIENT_STATUS_FILTERS;
+  const status = searchParams.status && statusFilters.some((f) => f.value === searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -166,33 +135,42 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .is("merged_into_client_id", null)
     .order("created_at", { ascending: false })
     .range(from, to);
-  if (isStageFilter) {
-    clientsQuery = clientsQuery.eq("lifecycle_status", "lead").in("id", stageClientIds && stageClientIds.length > 0 ? stageClientIds : ["-"]);
-  } else {
-    clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
-  }
+  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
-  const [{ data: clients, count }, { data: services }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
+  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
     clientsQuery,
     supabase
       .from("services")
-      .select("id, name, service_categories(slug)")
+      .select("id, name, service_category_id, service_categories(slug)")
       .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .eq("status", "published")
+      .order("display_order"),
+    supabase
+      .from("service_categories")
+      .select("id, name")
+      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
     supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
   ]);
+
+  // Same category -> service grouping shape the public organizer's own
+  // "what do you need help with" contact step uses (get_public_service_options),
+  // so staff pick from the exact same choices clients see on their side.
+  const serviceCategories = (serviceCategoriesRaw ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    services: (services ?? []).filter((s) => s.service_category_id === c.id).map((s) => ({ id: s.id, name: s.name })),
+  })).filter((c) => c.services.length > 0);
 
   const clientIds = (clients ?? []).map((c) => c.id);
   const [{ data: interests }, { data: activeRuns }] = await Promise.all([
     clientIds.length > 0
       ? supabase
           .from("client_service_interests")
-          .select("client_id, created_at, service_categories(name), services(name)")
+          .select("client_id, services(name)")
           .in("client_id", clientIds)
-          .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as never[] }),
     isLeadsTab && clientIds.length > 0
       ? supabase
@@ -203,13 +181,20 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       : Promise.resolve({ data: [] as { client_id: string; lead_pipeline_stages: { stage_name: string } | null }[] }),
   ]);
 
-  const latestInterestByClient = new Map<string, string>();
+  // Services are "basic" now and a lead can select more than one at once
+  // (e.g. Bookkeeping + Payroll), so this shows every distinct one they've
+  // expressed interest in, not just whichever was recorded most recently.
+  const requestedServicesByClient = new Map<string, string[]>();
   for (const interest of interests ?? []) {
-    if (latestInterestByClient.has(interest.client_id)) continue;
-    const categoryName = (interest.service_categories as unknown as { name?: string } | null)?.name;
     const serviceName = (interest.services as unknown as { name?: string } | null)?.name;
-    const label = [categoryName, serviceName].filter(Boolean).join(" -- ");
-    if (label) latestInterestByClient.set(interest.client_id, label);
+    if (!serviceName) continue;
+    const list = requestedServicesByClient.get(interest.client_id) ?? [];
+    if (!list.includes(serviceName)) list.push(serviceName);
+    requestedServicesByClient.set(interest.client_id, list);
+  }
+  const requestedServiceLabelByClient = new Map<string, string>();
+  for (const [clientId, names] of requestedServicesByClient) {
+    requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
   const stageNameByClient = new Map<string, string>();
   for (const run of activeRuns ?? []) {
@@ -218,7 +203,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
-    requestedService: latestInterestByClient.get(c.id) ?? null,
+    requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
     stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
   }));
 
@@ -235,7 +220,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         description={tab === "leads" ? "Prospects who haven't engaged yet." : "Every client in your workspace."}
         actions={
           canCreate ? (
-            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
+            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
           ) : null
         }
       />
@@ -254,13 +239,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           ))}
         </nav>
 
-        {isLeadsTab && !defaultLeadProcessId && (
-          <p className="mb-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            No pipeline is set for new leads yet --{" "}
+        {isLeadsTab && (
+          <p className="mb-3 text-xs text-muted">
             <Link href="/pipelines" className="font-medium text-accent hover:underline">
-              pick one in Pipelines
-            </Link>{" "}
-            to track leads through stages here.
+              View leads by stage in Pipelines →
+            </Link>
           </p>
         )}
 
@@ -279,30 +262,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         </div>
 
         {(workspaceTags ?? []).length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted">Tag:</span>
-            <Link
-              href={tagQueryBase}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                !tag ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-              }`}
-            >
-              All
-            </Link>
-            {(workspaceTags ?? []).map((t) => (
-              <Link
-                key={t}
-                href={`${tagQueryBase}&tag=${encodeURIComponent(t)}`}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  tag === t ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-                }`}
-              >
-                {t}
-              </Link>
-            ))}
+          <div className="mb-4">
+            <TagFilterControl tags={workspaceTags ?? []} activeTag={tag} baseHref={tagQueryBase} />
           </div>
         )}
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
           <DataTable
             columns={CLIENT_COLUMNS}
             rows={clientRows}
@@ -315,7 +279,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             }
             emptyAction={
               !status && canCreate ? (
-                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} services={services ?? []} />
+                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
               ) : undefined
             }
           />

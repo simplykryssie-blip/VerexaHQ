@@ -40,7 +40,7 @@ export function EngagementLetterPreview({
           bannerImageUrl={bannerImageUrl}
           footer={
             requiresSignature ? (
-              <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+              <div className="mt-4 rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <SignaturePad
                   typedName={typedName}
                   onTypedNameChange={setTypedName}

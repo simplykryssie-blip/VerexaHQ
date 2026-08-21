@@ -28,7 +28,7 @@ export default async function PortalProfilePage() {
     <>
       <PageHeader title="Profile" description={`Signed in as ${user?.email ?? ""} -- representing ${identity.clientLabel}.`} />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="max-w-md rounded-xl border border-border bg-surface p-4">
+        <div className="max-w-md rounded-2xl border border-border bg-surface shadow-soft p-4">
           <h2 className="text-sm font-semibold text-ink">Your info</h2>
           <p className="mt-1 text-sm text-muted">Name, phone, email, and mailing address on file for {identity.clientLabel}.</p>
           <div className="mt-4">

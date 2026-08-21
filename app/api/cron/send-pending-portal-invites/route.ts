@@ -28,23 +28,61 @@ export async function GET(request: Request) {
 
   const supabase = createServiceClient();
 
-  const { data: jobs } = await supabase
+  const { data: jobs, error: queryError } = await supabase
     .from("pending_portal_invites")
     .select("id, workspace_id, client_id, client_portal_user_id")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
 
+  if (queryError) {
+    console.error("send-pending-portal-invites: could not query pending_portal_invites", queryError);
+    return NextResponse.json({ processed: 0, sent: 0, failed: 0, queryError: queryError.message }, { status: 200 });
+  }
+
+  console.log(`send-pending-portal-invites: fetched ${jobs?.length ?? 0} job(s)`, (jobs ?? []).map((j) => j.id));
+
   let sent = 0;
   let failed = 0;
 
   for (const job of jobs ?? []) {
-    const result = await sendOne(supabase, job);
+    const result = await sendOneWithTimeout(supabase, job);
     if (result === "sent") sent++;
     else failed++;
   }
 
   return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
+}
+
+// A hung fetch to Resend (or any other await in sendOne) can otherwise stall
+// this job forever without ever throwing -- the row just sits at 'pending'
+// indefinitely and every future cron cycle re-fetches the same stuck row
+// ahead of newer ones. Races sendOne against a hard deadline so a hang
+// always turns into a real "failed" row instead of silent stagnation; the
+// `.eq("status", "pending")` guard stops this from clobbering a real result
+// if sendOne actually finishes just after the deadline.
+async function sendOneWithTimeout(
+  supabase: ReturnType<typeof createServiceClient>,
+  job: { id: string; workspace_id: string; client_id: string; client_portal_user_id: string },
+  timeoutMs = 25000
+): Promise<"sent" | "failed"> {
+  let timedOut = false;
+  const timer = new Promise<"failed">((resolve) => {
+    setTimeout(() => {
+      timedOut = true;
+      resolve("failed");
+    }, timeoutMs);
+  });
+  const result = await Promise.race([sendOne(supabase, job), timer]);
+  if (timedOut) {
+    console.error(`send-pending-portal-invites: job ${job.id} timed out after ${timeoutMs}ms`);
+    await supabase
+      .from("pending_portal_invites")
+      .update({ status: "failed", error: `Timed out after ${timeoutMs}ms`, processed_at: new Date().toISOString() })
+      .eq("id", job.id)
+      .eq("status", "pending");
+  }
+  return result;
 }
 
 async function sendOne(
@@ -90,14 +128,22 @@ async function sendOne(
       }
     );
 
-    const result = await sendEmailViaResend({ to: portalUser.invited_email, subject, html, sender: "portal" });
+    const result = await sendEmailViaResend({ to: portalUser.invited_email, subject, html, sender: "portal", workspaceId: job.workspace_id });
     if (!result.sent) throw new Error(result.error ?? result.reason ?? "send failed");
 
-    await supabase.from("pending_portal_invites").update({ status: "sent", processed_at: new Date().toISOString() }).eq("id", job.id);
+    const { error: markSentErr } = await supabase
+      .from("pending_portal_invites")
+      .update({ status: "sent", processed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (markSentErr) console.error(`send-pending-portal-invites: sent email for job ${job.id} but could not mark it sent`, markSentErr);
     return "sent";
   } catch (err) {
     const error = err instanceof Error ? err.message : "unknown error";
-    await supabase.from("pending_portal_invites").update({ status: "failed", error, processed_at: new Date().toISOString() }).eq("id", job.id);
+    const { error: markFailedErr } = await supabase
+      .from("pending_portal_invites")
+      .update({ status: "failed", error, processed_at: new Date().toISOString() })
+      .eq("id", job.id);
+    if (markFailedErr) console.error(`send-pending-portal-invites: job ${job.id} failed (${error}) and could not be marked failed`, markFailedErr);
     return "failed";
   }
 }

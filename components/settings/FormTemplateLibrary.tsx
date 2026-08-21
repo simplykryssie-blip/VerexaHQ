@@ -4,6 +4,8 @@ import { LayoutTemplate } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
+import { PendingTemplateShares, type PendingShare } from "@/components/settings/PendingTemplateShares";
+import type { DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
 
 export type FormTemplateTabKey = "engagement-letter" | "organizers";
 
@@ -55,6 +57,47 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
 
   const { data: jotformConnected } = isOrganizers ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId }) : { data: false };
 
+  // Only an ERO or Service Bureau (a "parent" in an active firm connection)
+  // can share a template down to a connected firm -- never automatic, and
+  // never the other direction.
+  const { data: downlineRows } = await supabase
+    .from("firm_connections")
+    .select("child_workspace_id, workspaces:child_workspace_id(id, name)")
+    .eq("parent_workspace_id", workspaceId)
+    .eq("status", "active");
+  const downlineWorkspaces: DownlineWorkspace[] = (downlineRows ?? [])
+    .map((r) => r.workspaces as unknown as { id: string; name: string } | null)
+    .filter((w): w is { id: string; name: string } => Boolean(w));
+
+  const { data: pendingShareRows } = await supabase
+    .from("config_object_shares")
+    .select("id, object_type, object_id, workspaces:shared_by_workspace_id(name)")
+    .eq("shared_with_workspace_id", workspaceId)
+    .eq("status", "pending")
+    .in("object_type", ["organizer_templates", "engagement_letter_templates"]);
+
+  const pendingOrganizerIds = (pendingShareRows ?? []).filter((r) => r.object_type === "organizer_templates").map((r) => r.object_id);
+  const pendingLetterIds = (pendingShareRows ?? []).filter((r) => r.object_type === "engagement_letter_templates").map((r) => r.object_id);
+
+  const [{ data: pendingOrganizerNames }, { data: pendingLetterNames }] = await Promise.all([
+    pendingOrganizerIds.length > 0
+      ? supabase.from("organizer_templates").select("id, name").in("id", pendingOrganizerIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    pendingLetterIds.length > 0
+      ? supabase.from("engagement_letter_templates").select("id, name").in("id", pendingLetterIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const objectNameById = new Map(
+    [...(pendingOrganizerNames ?? []), ...(pendingLetterNames ?? [])].map((o) => [o.id, o.name])
+  );
+
+  const pendingShares: PendingShare[] = (pendingShareRows ?? []).map((r) => ({
+    id: r.id,
+    objectType: r.object_type as PendingShare["objectType"],
+    objectName: objectNameById.get(r.object_id) ?? "Untitled",
+    sharedByFirmName: (r.workspaces as unknown as { name?: string } | null)?.name ?? "A connected firm",
+  }));
+
   const tabs: { key: FormTemplateTabKey; label: string }[] = [
     { key: "engagement-letter", label: "Engagement Letters" },
     { key: "organizers", label: "Organizers" },
@@ -85,10 +128,16 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       </div>
 
       <div className="mt-4">
+        <PendingTemplateShares shares={pendingShares} />
         {isOrganizers ? (
-          <OrganizerLibrary workspaceId={workspaceId} templates={organizerCards} isJotformConnected={Boolean(jotformConnected)} />
+          <OrganizerLibrary
+            workspaceId={workspaceId}
+            templates={organizerCards}
+            isJotformConnected={Boolean(jotformConnected)}
+            downlineWorkspaces={downlineWorkspaces}
+          />
         ) : (
-          <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} />
+          <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} downlineWorkspaces={downlineWorkspaces} />
         )}
       </div>
     </div>

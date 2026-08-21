@@ -34,7 +34,7 @@ export function QuickActionsWidget({ permissions }: { permissions: QuickActionPe
             <Link
               key={a.label}
               href={a.href}
-              className="flex flex-col items-center gap-1.5 rounded-lg border border-border px-3 py-3 text-center text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+              className="flex flex-col items-center gap-1.5 rounded-xl border border-border px-3 py-3 text-center text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
             >
               <a.icon size={18} aria-hidden="true" />
               {a.label}

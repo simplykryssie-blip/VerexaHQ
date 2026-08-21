@@ -238,6 +238,42 @@ un-promoted previews.
   user to contact Zoom Developer Support directly — a ready-to-paste bug
   report is in the conversation history, or just re-describe the 403
   above. Nothing left to try on our end until Zoom's side is unblocked.
+- **Google/Outlook calendar sync is fully built (2026-08-19) but has no real
+  OAuth credentials yet -- `GOOGLE_CALENDAR_CLIENT_ID/SECRET` and
+  `MICROSOFT_CALENDAR_CLIENT_ID/SECRET` in `.env.local.example` are both
+  blank.** Confirmed still live (2026-08-20): user hit exactly this
+  blocker trying to connect Google Calendar in production -- "Google
+  Calendar is not configured for this environment" is the literal string
+  `app/api/calendar/google/connect/route.ts` sets on `google_calendar_error`
+  when `isGoogleCalendarConfigured()` is false, i.e. the two `GOOGLE_
+  CALENDAR_CLIENT_ID/SECRET` env vars still aren't set in Vercel. Same shape
+  as Zoom: per-staff personal connection, cards in
+  Settings → Integrations. What it does once credentials are set: every
+  appointment with a `staff_id` gets pushed (create/update/cancel) to that
+  staff member's connected calendar via a Postgres trigger
+  (`enqueue_calendar_sync` on `public.appointments`) that queues jobs into
+  `calendar_sync_queue`, drained by `/api/cron/sync-calendar-events` every 5
+  minutes -- so it fires for every current and future path that touches
+  `appointments` (staff toolbar, portal self-booking, anything added later),
+  not just one call site. It's two-way: the portal's `available-slots` and
+  `book-appointment` routes also live-query every connected staff member's
+  personal calendar for busy blocks (`lib/calendarSync/freebusy.ts`) so a
+  client can't book over something that only exists on someone's Google/
+  Outlook calendar. Tokens are encrypted at rest the same way as Zoom's
+  (`encrypt_calendar_secret`/`decrypt_calendar_secret`, pgp_sym via a
+  dedicated Vault key `calendar_oauth_vault_key`, service_role only).
+  Getting it live needs: a Google Cloud OAuth client (Calendar API enabled)
+  and an Azure/Entra app registration (Calendars.ReadWrite + User.Read Graph
+  permissions), redirect URIs exactly matching
+  `/api/calendar/google/callback` and `/api/calendar/microsoft/callback` on
+  the real domain, then those four env vars set in Vercel. Nothing left to
+  build on Verexa's side until those exist. Known limitation accepted for
+  scope: Microsoft's `getSchedule` (used for the Outlook freebusy check) is
+  an Exchange/M365 mailbox feature and may not work for a personal
+  outlook.com account with no Microsoft 365 subscription behind it -- the
+  freebusy helper fails open per-connection in that case rather than
+  blocking booking, so worst case is just no extra restriction from that
+  one connection.
 - **`app/api/zoom/connect/start/route.ts` / `callback/route.ts`** rely on
   `NEXT_PUBLIC_APP_URL` being set to exactly `https://verexahq.com` (no
   `www.`, no trailing slash) in Vercel's environment variables — this was
@@ -260,92 +296,62 @@ un-promoted previews.
   the best candidate function" error ever resurfaces on a different RPC,
   it's the same root cause: check `pg_proc` for duplicate overloads of that
   function name and drop whichever one predates the current call sites.
-- **Requested, not yet built**: a way to bypass the duplicate email/phone
-  check when creating a new lead/contact -- some people legitimately share
-  a phone or email (spouses, business partners). She still wants to be
-  warned it's a duplicate, but needs a "use anyway" override instead of a
-  hard block. Find the current duplicate-check logic (likely in the new
-  client/lead creation flow, `NewClientButton.tsx` or similar) before
-  building this.
-- **"DELETE requires a WHERE clause" — STILL BROKEN. See item #12 above in
-  "What changed this session" for the full current-state writeup,
-  including the disproven `turn_on_service` workaround, the
-  `supautils`/`session_preload_libraries` lead, and the exact
-  `query_logs` command to run the moment that tool is available. Do not
-  re-attempt a "new bypass function" fix without new evidence — that was
-  tried and failed.** Originally reported on both creating a
-  service (toggle-on/clone) and toggling one off, under Settings >
-  Services. Confirmed the failing call is the `duplicate_config_object`
-  RPC returning HTTP 400 (seen directly in the browser Network/Console
-  tabs — the "turn on" and "create custom service" flows both hit it).
-  Ruled out, this round:
-  - No `safeupdate`-style Postgres extension installed (`pg_extension`).
-  - No function anywhere in the database contains the literal string
-    "WHERE clause" (searched every function body).
-  - A real unfiltered `DELETE` on the live `services` table, run directly
-    (wrapped in `begin`/`rollback`), does not error at the raw Postgres
-    level at all.
-  - The exact temp-table create+delete pattern used inside
-    `duplicate_config_object()` (`tmp_stage_map`, `tmp_field_map`,
-    `tmp_folder_item_map`), reproduced directly, does not error either.
-  - **Called `duplicate_config_object` directly against the DB with the
-    user's real `auth.uid()` simulated via
-    `set_config('request.jwt.claim.sub', ...)`, wrapped in a rollback —
-    it succeeded cleanly**, returning a new service id with no error. This
-    strongly suggests the SQL function itself is not the problem, or the
-    problem is something specific to how the request reaches it via
-    PostgREST that a direct DB call doesn't reproduce.
-  - Only one overload of `duplicate_config_object` exists (ruled out the
-    ambiguous-overload class of bug that hit `create_engagement` earlier
-    this session).
-  - Confirmed she is testing on the correct/current deployment (the
-    Vercel preview URL she was on matched the very latest commit at the
-    time) — not a stale-deployment artifact.
-  - Attempted to get the literal PostgREST response body via the user's
-    browser (DevTools Network tab response, "Copy as fetch" replay) —
-    every attempt surfaced a different confounding issue (Chrome's paste
-    guard, session not stored where a generic script expects, "Copy as
-    fetch" defaulting to `credentials: "include"` which triggers an
-    unrelated CORS block that isn't how the app's real client makes the
-    call) rather than the actual message. None of these got the literal
-    response body.
-  - `query_logs` (Supabase MCP tool, which would read the real server-side
-    error straight from Postgres/PostgREST logs and settle this
-    immediately) is blocked in this environment — every call returns
-    "MCP tool call requires approval" with no way to grant it from here.
-    This is the same class of restriction as several other Supabase MCP
-    tools denied all session (`get_organization`, `list_organizations`,
-    `list_projects`, `generate_typescript_types`) — not something to keep
-    retrying.
-  - **Next step, if picked up again**: either get `query_logs` access (if
-    a future session has it, `select event_message from postgres_logs
-    where event_message ilike '%WHERE clause%'` would likely answer this
-    in one query), or get the literal Network-tab **Response** body text
-    (not just the Console's generic "status 400" line, not a "Copy as
-    fetch" replay) — e.g. by asking a session with real Supabase dashboard
-    access to check the Logs section directly instead of going through
-    the user's browser DevTools, which has proven very difficult to
-    extract this specific detail from over many attempts.
-- **RM/Reviewer/Compliance Officer requested changes, not yet built**:
-  should only show on ERO and SB (sub-business/connected) workspace tiers,
-  not on independent solo-PTIN workspaces (a similar fix was done in an
-  earlier now-deleted-branch session — verify current production behavior
-  before assuming it's broken, it may have simply never been ported, same
-  pattern as the automations.manage fix earlier this session). New ask: an
-  ERO/SB-tier workspace should be able to preset these as defaults for
-  their staff accounts and connected accounts. Also these fields currently
-  show by email and should show by staff display name instead.
-- **Requested, not yet investigated**: when an ERO/Service Bureau invites
-  someone and that person signs up via the invite link, the signup screen
-  should not ask them to choose an account type (Service Bureau / ERO /
-  Independent PTIN) — that's only relevant when creating a brand-new
-  workspace, not joining an existing one. Start from
-  `app/accept-invitation/page.tsx` and `app/onboarding/page.tsx`. She also
-  described a specific role list for ERO/Service Bureau accounts (Admin,
-  Staff, Compliance Officer, Manager, Receptionist, PTIN preparer,
-  Reviewer) — worded slightly differently the two times she said it, so
-  confirm the exact intended list and whether "PTIN receptionist" is one
-  role or two before building. Full detail in task #187.
+- **RESOLVED — duplicate email/phone "use anyway" override is already
+  built; this entry was stale.** Verified 2026-08-21: `create_client()`
+  only runs its dedupe check `if not p_force_create`; `NewClientButton.tsx`
+  shows `DuplicateClientModal` on a match, and its "Create as new client
+  anyway" button re-submits with `p_force_create: true`, skipping the
+  check server-side. Nothing left to build here.
+- **RESOLVED — "DELETE requires a WHERE clause" is fixed; this entry was
+  stale.** Root cause found and fixed same-day this was written
+  (`20260813200005_fix_safeupdate_unfiltered_temp_table_deletes.sql`,
+  already live), but this file was never updated to say so, so a later
+  session could easily have re-opened an already-closed investigation from
+  scratch. Actual root cause: the `authenticator` Postgres role — the one
+  PostgREST connects as for every real API request — has a *per-role*
+  `session_preload_libraries = 'supautils, safeupdate'` override set via
+  `pg_db_role_setting`. That's invisible when checking the global
+  `session_preload_libraries` GUC and invisible when reproducing with
+  `set local role` inside an already-open session (role-level `ALTER ROLE
+  ... SET` only takes effect on a *fresh* connection as that role) — which
+  is exactly why every direct-SQL reproduction attempt in this file's
+  original writeup succeeded while the real app path failed. `safeupdate`
+  hard-blocks any DELETE/UPDATE with no WHERE clause, and both
+  `duplicate_config_object` and `turn_on_service` intentionally cleared a
+  per-transaction temp table with `delete from tmp_x;` (no WHERE, by
+  design, since a temp table is always safe to fully clear). Fix: added
+  `where true` to every such clear, satisfying the check without weakening
+  `safeupdate` for a genuinely-unfiltered statement anywhere else. Verified
+  2026-08-19: current live `duplicate_config_object`/`turn_on_service`
+  already have the `where true` fix; a fresh sweep of every function in
+  `public` for a bare `delete from x;` or `update x set ... ;` with no
+  WHERE anywhere in the body found zero remaining instances, and a sweep of
+  every `.delete()`/`.update()` call in the frontend confirmed all are
+  `.eq(...)`-filtered. Nothing left to do here.
+- **RESOLVED — RM/Reviewer/Compliance Officer changes are already built;
+  this entry was stale.** Verified 2026-08-21, all three asks confirmed
+  live: (1) tier gating via `isIndependentTier()` — `ClientWorkspace.tsx`'s
+  `showStaffRoles` hides the whole `ClientAssignmentForm` (RM + Reviewer +
+  Compliance officer) on independent-PTIN workspaces, and
+  `EngagementWorkspace.tsx`'s `showStaffRoles` hides Reviewer + Compliance
+  officer the same way (Assigned staff stays visible there, matching RM's
+  role on the client side); (2) ERO/SB preset defaults —
+  `WorkspaceStaffDefaultsForm` (Settings → Roles & Permissions, gated to
+  `EFIN_WORKSPACE_TYPES` + admin) sets `workspaces.default_*_id`, which
+  `clients/[id]/page.tsx` resolves as the fallback for a new client (own
+  workspace preset → parent firm's preset for Reviewer/Compliance officer
+  → account holder); (3) every picker already renders `display_name`, never
+  email. Nothing left to build here.
+- **RESOLVED — no account-type picker on invite acceptance; this entry was
+  stale.** Verified 2026-08-21 (and already noted by the task #188 RESOLVED
+  entry below): `app/accept-invitation/page.tsx` has no account-type
+  picker at all — just name/password. The apparent picker was actually the
+  redirect-to-`/onboarding` bug fixed in task #188. Role list also
+  confirmed already built: Admin, Staff, Compliance Officer, Manager,
+  Receptionist, PTIN Preparer, Reviewer all exist as real global roles
+  (plus Owner, ERO, Administrative Staff) — "PTIN receptionist" was
+  resolved as two separate roles (PTIN Preparer + Receptionist), not one
+  combined role. Nothing left to build here.
 - **Reported: a client accepting a portal invite gets sent to `/onboarding`
   ("set up your firm," the staff flow) after confirming their email,
   instead of back to finishing their portal setup.** Intended design
@@ -444,6 +450,130 @@ un-promoted previews.
     delete it via Supabase Dashboard → Storage → `branding` bucket → that
     folder.
   - Verified after: exactly 1 workspace, 1 auth user, 0 clients remain.
+- **Reported (2026-08-20), not yet investigated: connecting a custom sending
+  domain fails with a Resend 401.** Exact error: `Resend responded with 401:
+  {"statusCode":401,"message":"This API key is restricted to only send
+  emails","name":"restricted_api_key"}`. This is Resend's own error, not
+  Verexa's — it means the `RESEND_API_KEY` currently set in Vercel was
+  created with "Sending access" only, but domain verification (adding a
+  domain, checking its DNS records) needs a Resend API key with Domains
+  permission (either "Full access" or a key with the Domains scope enabled).
+  **Fix**: in the Resend dashboard, create a new API key with Full
+  access (or Domains scope), then update `RESEND_API_KEY` in Vercel's
+  environment variables to the new key. No code change expected — this is
+  purely a Resend-side key permission issue. Find the domain-connect flow at
+  `app/(app)/settings/integrations` (`EmailDomainCard`) / wherever it calls
+  the Resend Domains API to confirm the exact call site before assuming
+  nothing else needs to change. Confirmed call site: `lib/email/domains.ts`
+  (`createDomain`/`getDomain`/`verifyDomain`/`deleteDomain`, all hitting
+  `${RESEND_API}/domains...` with the same `RESEND_API_KEY`), wired into
+  `EmailDomainCard` on `app/(app)/settings/integrations`.
+- **GHL import (2026-08-20/21): contacts + tags, custom fields, notes,
+  tasks, appointments, conversations are built and live-tested; Forms was
+  built, live-tested, found broken, and removed.** Bring-your-own Private
+  Integration Token + Location ID, stored encrypted (Settings →
+  Integrations → GoHighLevel), imports as leads via `create_client` (so
+  its dedupe applies), with a tag filter (defaults to MKB's
+  `Tax| Individual/ Schedule C`, `Tax| Corporate Return`, `TPB`). Pipelines
+  and automations are intentionally out of scope (GHL's model doesn't map
+  onto Verexa's automation graph; pipelines are fast enough to hand-recreate
+  via `/pipelines`).
+  - The five remaining extras are each an opt-in checkbox in
+    `GhlImportPanel.tsx`, off by default (contacts+tags-only stays exactly
+    as before). Selecting any of notes/tasks/appointments/conversations
+    drops the per-request page size from 25 to 8 contacts (each extra is
+    its own GHL API round trip per contact, run in parallel per contact via
+    `Promise.all` but still adds real wall-clock time) — `route.ts`'s
+    `PAGE_LIMIT_WITH_EXTRAS`.
+  - Custom fields: GHL's field-id → name map is fetched once at
+    `phase: "start"` (`/locations/{id}/customFields`) and threaded through
+    every subsequent page call by the client, rather than refetched per
+    page. Values land on `clients.custom_fields jsonb` (migration
+    `20260821030000_client_custom_fields.sql`) — merged, not overwritten,
+    on re-import. That column already existed live before this migration
+    (visible in `database.types.ts`'s `clients.Row` already) with no
+    corresponding migration file ever committed for it — the new migration
+    file is `add column if not exists`, so it was a no-op against the live
+    DB but fixed that drift going forward.
+  - Notes import into the existing `notes` table (`entity_type: 'client'`);
+    tasks into `tasks`; appointments into `appointments`; conversations
+    create one `message_threads` row per GHL conversation plus one
+    `messages` row per message in it.
+  - **Forms was removed (2026-08-21) after a live test run.** Every
+    contact's forms fetch failed with GHL's own validation error:
+    `property contactId should not exist, limit must be a number
+    conforming to the specified constraints` — meaning `/forms/submissions`
+    doesn't accept a `contactId` filter the way it was called, and requires
+    a `limit` param that was never sent. Rather than guess again at the
+    real contract without live API docs access, the checkbox, the
+    `importFormsForContact` function, the `GhlFormSubmission`/
+    `GhlFormSubmissionsResponse` types, and all `formsImported`
+    counters/wiring were deleted outright (not just disabled) from
+    `route.ts` and `GhlImportPanel.tsx`. If forms import is wanted later,
+    it needs to be rebuilt from GHL's actual current API docs, not
+    resurrected from this commit.
+  - **Also fixed in that same live test**: a completely nameless GHL
+    contact (an `auto.generated@pos.payment` placeholder some POS
+    integrations create) failed `clients_check1` (an individual client
+    needs at least a first or last name). Fixed with a fallback — nameless
+    individuals now get the email's local part as a placeholder last name
+    instead of failing the row.
+  - **Confirmed working via live test** (2026-08-21, real MKB GHL
+    connection, copied onto the "Verexa HQ CRM" workspace for testing):
+    contacts, tags, and the nameless-contact fallback. Notes, tasks,
+    appointments, conversations, and custom fields were not exercised in
+    that specific test run (no errors surfaced for them, but that's not
+    the same as a confirmed pass) — if any of those get reported broken,
+    check the actual GHL response shape against what the code expects
+    before assuming it's a scope-permission issue.
+- **Requested (2026-08-20), not started — two new large product asks,
+  neither built yet, deliberately deferred to a future session.** Came up
+  while discussing what GHL has that Verexa doesn't (Websites/Funnels,
+  Community). Scoped with the user via AskUserQuestion before any code:
+  1. **Website hosting + funnel/landing-page builder.** Explicitly wants
+     the full drag-and-drop version (freeform blocks, custom layouts,
+     multi-step funnels, custom domain support) — she rejected the smaller
+     "templated pages" option. This is genuinely a second product's worth
+     of surface area: a visual page builder, page hosting/routing (likely
+     needs its own custom-domain-per-workspace flow, same shape as
+     `workspace_email_domains`'s DNS verification but for web, not email),
+     and funnel-step sequencing. Lead capture on these pages should almost
+     certainly wire into the existing `create_client`/
+     `record_client_service_interest` path the public organizer links
+     already use, not a separate lead model. No design work done yet on
+     the builder's data model (block schema, page versioning, etc.) — this
+     needs real architecture planning before writing any code, not just a
+     migration.
+  2. **Staff learning hub for EROs/Service Bureaus.** Confirmed scope: an
+     ERO/SB workspace builds training content once and it's visible to
+     staff at every connected office — i.e. it hooks into the *existing*
+     `firm_connections` hierarchy (the same ERO↔connected-office
+     relationship the Connections page already manages), not a
+     per-workspace-only content library. Needs: course/module content
+     tables, some kind of content editor (rich text at minimum, maybe
+     video embeds), staff-facing consumption UI gated by
+     `firm_connections`/role, and probably completion tracking. Smaller
+     than the page builder but still a real multi-piece feature, not a
+     quick add.
+  - **Deliberately not prioritized against each other yet** — user said
+    "add to the to-do list for now" rather than picking a build order.
+    Ask her which one (if either) to start on before beginning real design
+    work on either.
+- **Requested (2026-08-20), not built yet: email notifications for failed
+  background jobs, sent to `failedsystem@verexahq.com`.** Came up while
+  debugging the stuck portal-invite cron (see the queue-drain fixes in
+  `app/api/cron/send-pending-portal-invites/route.ts` and
+  `send-pending-engagement-letters/route.ts`, PRs #40-42) — right now a
+  failed job (e.g. `pending_portal_invites`/`pending_engagement_letter_sends`
+  rows landing at `status='failed'`) is only visible by manually querying the
+  table or reading Vercel runtime logs; nobody gets told. Scope this before
+  building: which failure classes should alert (just these two queue tables,
+  or any cron/automation-step failure more broadly — e.g.
+  `automation_runs`/`execute_automation_step` errors too), whether to batch
+  into a digest or send one email per failure (a bad Resend key or a
+  systemic bug could otherwise spam that inbox), and confirm
+  `failedsystem@verexahq.com` is a real, already-provisioned mailbox before
+  wiring `sendEmailViaResend` to it.
 - No other known gaps as of this session. If picking this back up, ask the
   user what's next rather than assuming — she drives this by describing
   real usage friction, not by a pre-written roadmap.

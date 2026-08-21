@@ -32,7 +32,7 @@ export function FilterBar({
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
+    <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
       <div className="flex-1 min-w-[180px]">
         <label className="block text-xs font-medium text-muted" htmlFor="report-search">
           Search

@@ -7,5 +7,5 @@ export function Card({
   className?: string;
   padded?: boolean;
 }) {
-  return <div className={`rounded-xl border border-border bg-surface ${padded ? "p-5" : ""} ${className}`}>{children}</div>;
+  return <div className={`rounded-2xl border border-border bg-surface shadow-soft ${padded ? "p-5" : ""} ${className}`}>{children}</div>;
 }

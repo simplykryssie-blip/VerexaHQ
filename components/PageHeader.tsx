@@ -22,7 +22,7 @@ export function PageHeader({
             <ArrowLeft size={14} aria-hidden="true" /> {backLabel ?? "Back"}
           </Link>
         )}
-        <h1 className="text-lg font-semibold text-ink">{title}</h1>
+        <h1 className="font-display text-xl font-semibold text-ink">{title}</h1>
         {description && <p className="mt-1 text-sm text-muted">{description}</p>}
       </div>
       {actions}
