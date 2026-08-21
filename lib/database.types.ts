@@ -4121,6 +4121,79 @@ export type Database = {
           },
         ]
       }
+      internal_message_threads: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          last_message_at: string | null
+          user_a_id: string
+          user_b_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          user_a_id: string
+          user_b_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_message_at?: string | null
+          user_a_id?: string
+          user_b_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_message_threads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_id: string
+          thread_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id: string
+          thread_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internal_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "internal_message_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       network_message_threads: {
         Row: {
           created_at: string
@@ -9201,6 +9274,10 @@ export type Database = {
       }
       start_lead_pipeline_run: {
         Args: { p_client_id: string; p_process_id: string }
+        Returns: string
+      }
+      start_internal_message_thread: {
+        Args: { p_workspace_id: string; p_other_user_id: string; p_body: string }
         Returns: string
       }
       start_network_message_thread: {

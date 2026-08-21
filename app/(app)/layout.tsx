@@ -28,16 +28,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: securityPolicy }, branding, { data: isPlatformAdmin }, { data: canUseNetworkMessaging }] = await Promise.all([
-    supabase
-      .from("workspace_security_policies")
-      .select("session_timeout_minutes")
-      .eq("workspace_id", workspace.id)
-      .maybeSingle(),
-    getEffectiveBranding(workspace.id),
-    supabase.rpc("is_platform_admin"),
-    supabase.rpc("can_use_network_messaging", { p_workspace_id: workspace.id }),
-  ]);
+  const [{ data: securityPolicy }, branding, { data: isPlatformAdmin }, { data: canUseNetworkMessaging }, { count: teammateCount }] =
+    await Promise.all([
+      supabase
+        .from("workspace_security_policies")
+        .select("session_timeout_minutes")
+        .eq("workspace_id", workspace.id)
+        .maybeSingle(),
+      getEffectiveBranding(workspace.id),
+      supabase.rpc("is_platform_admin"),
+      supabase.rpc("can_use_network_messaging", { p_workspace_id: workspace.id }),
+      supabase
+        .from("workspace_users")
+        .select("user_id", { count: "exact", head: true })
+        .eq("workspace_id", workspace.id)
+        .eq("status", "active"),
+    ]);
+
+  // Messages is relevant either for cross-firm network messaging (ERO/SB or
+  // a connected PTIN) or plain staff-to-staff DMs within this workspace --
+  // the latter just needs another active teammate to message.
+  const hasTeammates = (teammateCount ?? 0) > 1;
 
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
@@ -64,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
             isPlatformAdmin={Boolean(isPlatformAdmin)}
-            showMessages={Boolean(canUseNetworkMessaging)}
+            showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
