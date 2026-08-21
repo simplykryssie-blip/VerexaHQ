@@ -6427,6 +6427,44 @@ export type Database = {
           },
         ]
       }
+      system_failure_log: {
+        Row: {
+          context: Json | null
+          created_at: string
+          id: string
+          message: string
+          notified_at: string | null
+          source: string
+          workspace_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string
+          id?: string
+          message: string
+          notified_at?: string | null
+          source: string
+          workspace_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string
+          id?: string
+          message?: string
+          notified_at?: string | null
+          source?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_failure_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           id: string
@@ -9048,6 +9086,19 @@ export type Database = {
       }
       merge_clients: {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
+        Returns: undefined
+      }
+      notify_workspace_admins: {
+        Args: {
+          p_channels: string[]
+          p_entity_id: string
+          p_entity_type: string
+          p_payload: Json
+          p_priority: string
+          p_template_key: string
+          p_type: string
+          p_workspace_id: string
+        }
         Returns: undefined
       }
       portal_client_id: { Args: never; Returns: string }

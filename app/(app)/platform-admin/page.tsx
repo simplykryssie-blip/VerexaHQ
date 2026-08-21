@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ShieldEllipsis, Lock, Receipt } from "lucide-react";
+import { ShieldEllipsis, Lock, Receipt, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -44,13 +44,16 @@ export default async function PlatformAdminPage() {
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
-  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }] = await Promise.all([
-    supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
-    supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
-    supabase.from("platform_subscription_plans").select("id, name"),
-    supabase.from("workspace_users").select("workspace_id, status"),
-    supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
-  ]);
+  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }, { data: owners }, { count: unnotifiedFailureCount }] =
+    await Promise.all([
+      supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
+      supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
+      supabase.from("platform_subscription_plans").select("id, name"),
+      supabase.from("workspace_users").select("workspace_id, status"),
+      supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
+      supabase.from("workspace_users").select("workspace_id, user_profiles(display_name)").eq("is_owner", true),
+      supabase.from("system_failure_log").select("id", { count: "exact", head: true }).is("notified_at", null),
+    ]);
 
   const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
   const subscriptionByWorkspace = new Map((subscriptions ?? []).map((s) => [s.workspace_id, s]));
@@ -59,6 +62,9 @@ export default async function PlatformAdminPage() {
     if (m.status !== "active") continue;
     staffCountByWorkspace.set(m.workspace_id, (staffCountByWorkspace.get(m.workspace_id) ?? 0) + 1);
   }
+  const ownerNameByWorkspace = new Map(
+    (owners ?? []).map((o) => [o.workspace_id, (o.user_profiles as unknown as { display_name: string | null } | null)?.display_name ?? null])
+  );
 
   const rows = workspaces ?? [];
   const totalWorkspaces = rows.length;
@@ -72,12 +78,21 @@ export default async function PlatformAdminPage() {
         title="Platform Admin"
         description="Every workspace on Verexa -- subscription status, roster size, and connections, across all tenants."
         actions={
-          <Link
-            href="/platform-admin/plans"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:border-accent hover:text-accent"
-          >
-            <Receipt size={14} /> Manage plans
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/platform-admin/system-failures"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:border-accent hover:text-accent"
+            >
+              <ShieldAlert size={14} /> System failures
+              {Boolean(unnotifiedFailureCount) && <Badge tone="warning">{unnotifiedFailureCount}</Badge>}
+            </Link>
+            <Link
+              href="/platform-admin/plans"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:border-accent hover:text-accent"
+            >
+              <Receipt size={14} /> Manage plans
+            </Link>
+          </div>
         }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
@@ -107,6 +122,7 @@ export default async function PlatformAdminPage() {
               <thead>
                 <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
                   <th className="px-5 py-3 font-medium">Workspace</th>
+                  <th className="px-5 py-3 font-medium">Account holder</th>
                   <th className="px-5 py-3 font-medium">Type</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">Subscription</th>
@@ -125,6 +141,7 @@ export default async function PlatformAdminPage() {
                           {w.name}
                         </Link>
                       </td>
+                      <td className="px-5 py-3 text-slate">{ownerNameByWorkspace.get(w.id) ?? <span className="text-muted">--</span>}</td>
                       <td className="px-5 py-3 text-slate">{WORKSPACE_TYPE_LABELS[w.workspace_type] ?? w.workspace_type}</td>
                       <td className="px-5 py-3">
                         <Badge tone={STATUS_TONE[w.status] ?? "neutral"} className="capitalize">

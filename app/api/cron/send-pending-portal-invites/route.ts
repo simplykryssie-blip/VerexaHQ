@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderPortalInviteEmail } from "@/lib/email/portalInvite";
+import { reportSystemFailure, isAccountLevelResendError } from "@/lib/systemFailures";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -81,6 +82,10 @@ async function sendOneWithTimeout(
       .update({ status: "failed", error: `Timed out after ${timeoutMs}ms`, processed_at: new Date().toISOString() })
       .eq("id", job.id)
       .eq("status", "pending");
+    await reportSystemFailure("send-pending-portal-invites", `Job ${job.id} timed out after ${timeoutMs}ms`, {
+      workspaceId: job.workspace_id,
+      context: { jobId: job.id },
+    });
   }
   return result;
 }
@@ -144,6 +149,26 @@ async function sendOne(
       .update({ status: "failed", error, processed_at: new Date().toISOString() })
       .eq("id", job.id);
     if (markFailedErr) console.error(`send-pending-portal-invites: job ${job.id} failed (${error}) and could not be marked failed`, markFailedErr);
+
+    // A bad recipient address is something the workspace itself can fix
+    // (correct the client's email on file) -- tell them, not platform IT.
+    // Everything else here (missing template, missing env var, an
+    // unexpected Resend/DB error) is a platform-side problem no workspace
+    // admin can act on.
+    if (isAccountLevelResendError(error)) {
+      await supabase.rpc("notify_workspace_admins", {
+        p_workspace_id: job.workspace_id,
+        p_type: "PORTAL_INVITE_SEND_FAILED",
+        p_template_key: "portal_invite_send_failed",
+        p_payload: { error, client_id: job.client_id },
+        p_channels: ["In-App"],
+        p_priority: "Medium",
+        p_entity_type: "client",
+        p_entity_id: job.client_id,
+      });
+    } else {
+      await reportSystemFailure("send-pending-portal-invites", error, { workspaceId: job.workspace_id, context: { jobId: job.id } });
+    }
     return "failed";
   }
 }
