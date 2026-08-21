@@ -65,9 +65,6 @@ type GhlConversationsSearchResponse = { conversations?: GhlConversation[] };
 type GhlMessage = { id?: string; body?: string; direction?: string; dateAdded?: string; type?: string };
 type GhlMessagesResponse = { messages?: { messages?: GhlMessage[] } | GhlMessage[] };
 
-type GhlFormSubmission = { id?: string; formId?: string; formName?: string; [key: string]: unknown };
-type GhlFormSubmissionsResponse = { submissions?: GhlFormSubmission[] };
-
 type Cursor = { startAfterId?: string; startAfter?: number } | null;
 
 type RequestBody = {
@@ -80,7 +77,6 @@ type RequestBody = {
   importTasks?: boolean;
   importAppointments?: boolean;
   importConversations?: boolean;
-  importForms?: boolean;
   customFieldDefs?: Record<string, string>;
 };
 
@@ -239,39 +235,6 @@ async function importConversationsForContact(
   return count;
 }
 
-async function importFormsForContact(
-  supabase: ReturnType<typeof createClient>,
-  workspaceId: string,
-  clientId: string,
-  ghlContactId: string,
-  locationId: string,
-  apiKey: string
-): Promise<number> {
-  const data = await ghlFetch<GhlFormSubmissionsResponse>(
-    `/forms/submissions?locationId=${locationId}&contactId=${ghlContactId}`,
-    apiKey
-  );
-  let count = 0;
-  for (const submission of data.submissions ?? []) {
-    const fieldLines = Object.entries(submission)
-      .filter(([key]) => !["id", "contactId", "formId", "formName"].includes(key))
-      .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
-      .join("\n");
-    const { error } = await supabase.from("notes").insert({
-      workspace_id: workspaceId,
-      entity_type: "client",
-      entity_id: clientId,
-      subject: submission.formName ? `GHL form: ${submission.formName}` : "GHL form submission",
-      body: fieldLines || "(no fields recorded)",
-      is_internal: true,
-      is_private: false,
-      is_pinned: false,
-    });
-    if (!error) count++;
-  }
-  return count;
-}
-
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
@@ -334,9 +297,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Connect your GoHighLevel account first." }, { status: 400 });
   }
 
-  const wantsExtras = Boolean(
-    body.importNotes || body.importTasks || body.importAppointments || body.importConversations || body.importForms
-  );
+  const wantsExtras = Boolean(body.importNotes || body.importTasks || body.importAppointments || body.importConversations);
   const pageLimit = wantsExtras ? PAGE_LIMIT_WITH_EXTRAS : PAGE_LIMIT_CONTACTS_ONLY;
 
   const params = new URLSearchParams({ locationId: connection.location_id, limit: String(pageLimit) });
@@ -363,7 +324,6 @@ export async function POST(request: Request) {
       tasksImported: 0,
       appointmentsImported: 0,
       conversationsImported: 0,
-      formsImported: 0,
       customFieldsSet: 0,
       hasMore: false,
       nextCursor: null,
@@ -381,7 +341,6 @@ export async function POST(request: Request) {
   let tasksImported = 0;
   let appointmentsImported = 0;
   let conversationsImported = 0;
-  let formsImported = 0;
   let customFieldsSet = 0;
   const errors: string[] = [];
   const tagsSeen = new Set<string>();
@@ -402,12 +361,18 @@ export async function POST(request: Request) {
 
     const { firstName, lastName } = splitName(contact);
     const isBusiness = !firstName && !lastName && Boolean(contact.companyName);
+    // GHL allows a contact with no first/last/company name at all -- e.g. the
+    // auto-generated placeholder contacts some POS integrations create for a
+    // one-off payment. clients_check1 requires an individual to have at
+    // least a first or last name, so fall back to the email's local part
+    // rather than fail the whole row.
+    const fallbackLastName = !isBusiness && !firstName && !lastName ? email?.split("@")[0] || "Unnamed" : undefined;
 
     const { data: createResult, error: createError } = await supabase.rpc("create_client", {
       p_workspace_id: workspace.id,
       p_client_type: isBusiness ? "business" : "individual",
       p_first_name: isBusiness ? undefined : firstName,
-      p_last_name: isBusiness ? undefined : lastName,
+      p_last_name: isBusiness ? undefined : lastName ?? fallbackLastName,
       p_business_name: isBusiness ? contact.companyName : undefined,
       p_primary_email: email,
       p_primary_phone: phone,
@@ -502,17 +467,6 @@ export async function POST(request: Request) {
             })
         );
       }
-      if (body.importForms) {
-        tasksToRun.push(
-          importFormsForContact(supabase, workspace.id, result.client_id, contact.id, connection.location_id, connection.api_key)
-            .then((n) => {
-              formsImported += n;
-            })
-            .catch((err) => {
-              errors.push(`${email || phone} forms: ${err instanceof Error ? err.message : "failed"}`);
-            })
-        );
-      }
       if (tasksToRun.length > 0) await Promise.all(tasksToRun);
     }
   }
@@ -537,7 +491,6 @@ export async function POST(request: Request) {
     tasksImported,
     appointmentsImported,
     conversationsImported,
-    formsImported,
     customFieldsSet,
     errors,
     hasMore: contacts.length === pageLimit && Boolean(nextCursor),

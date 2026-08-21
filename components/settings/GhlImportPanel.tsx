@@ -16,7 +16,6 @@ type PageResult = {
   tasksImported?: number;
   appointmentsImported?: number;
   conversationsImported?: number;
-  formsImported?: number;
   customFieldsSet?: number;
   errors?: string[];
   hasMore?: boolean;
@@ -40,7 +39,6 @@ const EXTRA_TYPES = [
   { key: "importTasks", label: "Tasks" },
   { key: "importAppointments", label: "Appointments" },
   { key: "importConversations", label: "Conversations (SMS/email history)" },
-  { key: "importForms", label: "Form submissions" },
 ] as const;
 type ExtraKey = (typeof EXTRA_TYPES)[number]["key"];
 
@@ -53,7 +51,6 @@ const ZERO_TOTALS = {
   tasksImported: 0,
   appointmentsImported: 0,
   conversationsImported: 0,
-  formsImported: 0,
   customFieldsSet: 0,
 };
 
@@ -68,7 +65,6 @@ export function GhlImportPanel() {
     importTasks: false,
     importAppointments: false,
     importConversations: false,
-    importForms: false,
   });
   const [totals, setTotals] = useState(ZERO_TOTALS);
   const [errors, setErrors] = useState<string[]>([]);
@@ -116,7 +112,6 @@ export function GhlImportPanel() {
           tasksImported: t.tasksImported + (result.tasksImported ?? 0),
           appointmentsImported: t.appointmentsImported + (result.appointmentsImported ?? 0),
           conversationsImported: t.conversationsImported + (result.conversationsImported ?? 0),
-          formsImported: t.formsImported + (result.formsImported ?? 0),
           customFieldsSet: t.customFieldsSet + (result.customFieldsSet ?? 0),
         }));
         if (result.errors && result.errors.length > 0) {
@@ -213,12 +208,10 @@ export function GhlImportPanel() {
             totals.tasksImported > 0 ||
             totals.appointmentsImported > 0 ||
             totals.conversationsImported > 0 ||
-            totals.formsImported > 0 ||
             totals.customFieldsSet > 0) && (
             <p className="mt-1">
               Also brought in: {totals.customFieldsSet} contacts with custom fields, {totals.notesImported} notes, {totals.tasksImported} tasks,{" "}
-              {totals.appointmentsImported} appointments, {totals.conversationsImported} conversation messages, {totals.formsImported} form
-              submissions.
+              {totals.appointmentsImported} appointments, {totals.conversationsImported} conversation messages.
             </p>
           )}
           {errors.length > 0 && (

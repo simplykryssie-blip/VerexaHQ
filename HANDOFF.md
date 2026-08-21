@@ -469,56 +469,63 @@ un-promoted previews.
   `${RESEND_API}/domains...` with the same `RESEND_API_KEY`), wired into
   `EmailDomainCard` on `app/(app)/settings/integrations`.
 - **GHL import (2026-08-20/21): contacts + tags, custom fields, notes,
-  tasks, appointments, conversations, and forms are all built —
-  UNTESTED against a live GHL connection, verify before trusting.**
-  Bring-your-own Private Integration Token + Location ID, stored encrypted
-  (Settings → Integrations → GoHighLevel), imports as leads via
-  `create_client` (so its dedupe applies), with a tag filter (defaults to
-  MKB's `Tax| Individual/ Schedule C`, `Tax| Corporate Return`, `TPB`).
-  Pipelines and automations are intentionally out of scope (GHL's model
-  doesn't map onto Verexa's automation graph; pipelines are fast enough to
-  hand-recreate via `/pipelines`).
-  - The six extras are each an opt-in checkbox in `GhlImportPanel.tsx`,
-    off by default (contacts+tags-only stays exactly as before). Selecting
-    any of notes/tasks/appointments/conversations/forms drops the
-    per-request page size from 25 to 8 contacts (each extra is its own GHL
-    API round trip per contact, run in parallel per contact via
+  tasks, appointments, conversations are built and live-tested; Forms was
+  built, live-tested, found broken, and removed.** Bring-your-own Private
+  Integration Token + Location ID, stored encrypted (Settings →
+  Integrations → GoHighLevel), imports as leads via `create_client` (so
+  its dedupe applies), with a tag filter (defaults to MKB's
+  `Tax| Individual/ Schedule C`, `Tax| Corporate Return`, `TPB`). Pipelines
+  and automations are intentionally out of scope (GHL's model doesn't map
+  onto Verexa's automation graph; pipelines are fast enough to hand-recreate
+  via `/pipelines`).
+  - The five remaining extras are each an opt-in checkbox in
+    `GhlImportPanel.tsx`, off by default (contacts+tags-only stays exactly
+    as before). Selecting any of notes/tasks/appointments/conversations
+    drops the per-request page size from 25 to 8 contacts (each extra is
+    its own GHL API round trip per contact, run in parallel per contact via
     `Promise.all` but still adds real wall-clock time) — `route.ts`'s
     `PAGE_LIMIT_WITH_EXTRAS`.
   - Custom fields: GHL's field-id → name map is fetched once at
     `phase: "start"` (`/locations/{id}/customFields`) and threaded through
     every subsequent page call by the client, rather than refetched per
-    page. Values land on a new `clients.custom_fields jsonb` column
-    (migration `20260821030000_client_custom_fields.sql`) — merged, not
-    overwritten, on re-import. That column already existed live before
-    this migration (visible in `database.types.ts`'s `clients.Row`
-    already) with no corresponding migration file ever committed for it —
-    the new migration file is `add column if not exists`, so it's a no-op
-    against the live DB but fixes that drift going forward.
-  - Notes/forms import into the existing `notes` table
-    (`entity_type: 'client'`); tasks into `tasks`; appointments into
-    `appointments`; conversations create one `message_threads` row per GHL
-    conversation plus one `messages` row per message in it. Forms have no
-    dedicated Verexa concept, so each submission is filed as a note titled
-    "GHL form: {name}" with `field: value` lines — a deliberate choice to
-    reuse existing infra rather than add a new table for a comparatively
-    niche need; revisit if that turns out to be the wrong call.
-  - **Not yet verified against a real GHL account** — built from GHL's
-    public v2 API conventions (same auth/versioning pattern as the working
-    contacts endpoint), not from a live test. Endpoint paths/response
-    shapes assumed:
-    `/contacts/{id}/notes|tasks|appointments`,
-    `/conversations/search?contactId=`, `/conversations/{id}/messages`,
-    `/forms/submissions?locationId=&contactId=`,
-    `/locations/{id}/customFields`. Each of these needs its own scope
-    enabled on the user's Private Integration Token (the original one was
-    only ever granted "View Contacts") — a 403 on any one of them is
-    expected until she adds the corresponding scope in GHL, not
-    necessarily a bug. **First thing to do if this gets reported broken:
-    run a small import (a handful of contacts, one extra type at a time)
-    and check the actual GHL response shape against what the code
-    expects** — the contacts+tags path is the only part of this that's
-    been confirmed against real data.
+    page. Values land on `clients.custom_fields jsonb` (migration
+    `20260821030000_client_custom_fields.sql`) — merged, not overwritten,
+    on re-import. That column already existed live before this migration
+    (visible in `database.types.ts`'s `clients.Row` already) with no
+    corresponding migration file ever committed for it — the new migration
+    file is `add column if not exists`, so it was a no-op against the live
+    DB but fixed that drift going forward.
+  - Notes import into the existing `notes` table (`entity_type: 'client'`);
+    tasks into `tasks`; appointments into `appointments`; conversations
+    create one `message_threads` row per GHL conversation plus one
+    `messages` row per message in it.
+  - **Forms was removed (2026-08-21) after a live test run.** Every
+    contact's forms fetch failed with GHL's own validation error:
+    `property contactId should not exist, limit must be a number
+    conforming to the specified constraints` — meaning `/forms/submissions`
+    doesn't accept a `contactId` filter the way it was called, and requires
+    a `limit` param that was never sent. Rather than guess again at the
+    real contract without live API docs access, the checkbox, the
+    `importFormsForContact` function, the `GhlFormSubmission`/
+    `GhlFormSubmissionsResponse` types, and all `formsImported`
+    counters/wiring were deleted outright (not just disabled) from
+    `route.ts` and `GhlImportPanel.tsx`. If forms import is wanted later,
+    it needs to be rebuilt from GHL's actual current API docs, not
+    resurrected from this commit.
+  - **Also fixed in that same live test**: a completely nameless GHL
+    contact (an `auto.generated@pos.payment` placeholder some POS
+    integrations create) failed `clients_check1` (an individual client
+    needs at least a first or last name). Fixed with a fallback — nameless
+    individuals now get the email's local part as a placeholder last name
+    instead of failing the row.
+  - **Confirmed working via live test** (2026-08-21, real MKB GHL
+    connection, copied onto the "Verexa HQ CRM" workspace for testing):
+    contacts, tags, and the nameless-contact fallback. Notes, tasks,
+    appointments, conversations, and custom fields were not exercised in
+    that specific test run (no errors surfaced for them, but that's not
+    the same as a confirmed pass) — if any of those get reported broken,
+    check the actual GHL response shape against what the code expects
+    before assuming it's a scope-permission issue.
 - **Requested (2026-08-20), not started — two new large product asks,
   neither built yet, deliberately deferred to a future session.** Came up
   while discussing what GHL has that Verexa doesn't (Websites/Funnels,
