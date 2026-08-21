@@ -12,10 +12,18 @@ type PageResult = {
   skippedDuplicate?: number;
   skippedInvalid?: number;
   skippedTagFilter?: number;
+  notesImported?: number;
+  tasksImported?: number;
+  appointmentsImported?: number;
+  conversationsImported?: number;
+  formsImported?: number;
+  customFieldsSet?: number;
   errors?: string[];
   hasMore?: boolean;
   nextCursor?: Cursor;
 };
+
+type StartResult = { pausedAutomationIds?: string[]; customFieldDefs?: Record<string, string> };
 
 async function callImportApi(payload: Record<string, unknown>): Promise<PageResult> {
   const res = await fetch("/api/ghl/import-contacts", {
@@ -26,12 +34,43 @@ async function callImportApi(payload: Record<string, unknown>): Promise<PageResu
   return res.json();
 }
 
+const EXTRA_TYPES = [
+  { key: "importCustomFields", label: "Custom fields" },
+  { key: "importNotes", label: "Notes" },
+  { key: "importTasks", label: "Tasks" },
+  { key: "importAppointments", label: "Appointments" },
+  { key: "importConversations", label: "Conversations (SMS/email history)" },
+  { key: "importForms", label: "Form submissions" },
+] as const;
+type ExtraKey = (typeof EXTRA_TYPES)[number]["key"];
+
+const ZERO_TOTALS = {
+  imported: 0,
+  skippedDuplicate: 0,
+  skippedInvalid: 0,
+  skippedTagFilter: 0,
+  notesImported: 0,
+  tasksImported: 0,
+  appointmentsImported: 0,
+  conversationsImported: 0,
+  formsImported: 0,
+  customFieldsSet: 0,
+};
+
 export function GhlImportPanel() {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const stopRequestedRef = useRef(false);
   const [tagFilterText, setTagFilterText] = useState("Tax| Individual/ Schedule C\nTax| Corporate Return\nTPB");
-  const [totals, setTotals] = useState({ imported: 0, skippedDuplicate: 0, skippedInvalid: 0, skippedTagFilter: 0 });
+  const [extras, setExtras] = useState<Record<ExtraKey, boolean>>({
+    importCustomFields: false,
+    importNotes: false,
+    importTasks: false,
+    importAppointments: false,
+    importConversations: false,
+    importForms: false,
+  });
+  const [totals, setTotals] = useState(ZERO_TOTALS);
   const [errors, setErrors] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +86,11 @@ export function GhlImportPanel() {
     setDone(false);
     setError(null);
     setErrors([]);
-    setTotals({ imported: 0, skippedDuplicate: 0, skippedInvalid: 0, skippedTagFilter: 0 });
+    setTotals(ZERO_TOTALS);
 
-    const startResult = await callImportApi({ phase: "start" }).catch(() => null);
-    const pausedAutomationIds = (startResult as { pausedAutomationIds?: string[] } | null)?.pausedAutomationIds ?? [];
+    const startResult = (await callImportApi({ phase: "start", ...extras }).catch(() => null)) as StartResult | null;
+    const pausedAutomationIds = startResult?.pausedAutomationIds ?? [];
+    const customFieldDefs = startResult?.customFieldDefs ?? {};
 
     let cursor: Cursor = null;
     let hasMore = true;
@@ -62,7 +102,7 @@ export function GhlImportPanel() {
           stoppedEarly = true;
           break;
         }
-        const result = await callImportApi({ phase: "page", cursor, filterTags });
+        const result = await callImportApi({ phase: "page", cursor, filterTags, ...extras, customFieldDefs });
         if (!result.ok) {
           setError(result.error ?? "Import failed.");
           break;
@@ -72,6 +112,12 @@ export function GhlImportPanel() {
           skippedDuplicate: t.skippedDuplicate + (result.skippedDuplicate ?? 0),
           skippedInvalid: t.skippedInvalid + (result.skippedInvalid ?? 0),
           skippedTagFilter: t.skippedTagFilter + (result.skippedTagFilter ?? 0),
+          notesImported: t.notesImported + (result.notesImported ?? 0),
+          tasksImported: t.tasksImported + (result.tasksImported ?? 0),
+          appointmentsImported: t.appointmentsImported + (result.appointmentsImported ?? 0),
+          conversationsImported: t.conversationsImported + (result.conversationsImported ?? 0),
+          formsImported: t.formsImported + (result.formsImported ?? 0),
+          customFieldsSet: t.customFieldsSet + (result.customFieldsSet ?? 0),
         }));
         if (result.errors && result.errors.length > 0) {
           setErrors((e) => [...e, ...result.errors!]);
@@ -89,6 +135,8 @@ export function GhlImportPanel() {
       router.refresh();
     }
   }
+
+  const anyExtras = Object.values(extras).some(Boolean);
 
   return (
     <div>
@@ -132,12 +180,47 @@ export function GhlImportPanel() {
         />
       </div>
 
+      <div className="mt-3">
+        <label className="text-xs font-medium text-ink">Also import, per contact (each needs its scope enabled on your GHL Private Integration Token)</label>
+        <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5 sm:grid-cols-3">
+          {EXTRA_TYPES.map((t) => (
+            <label key={t.key} className="flex items-center gap-1.5 text-xs text-slate">
+              <input
+                type="checkbox"
+                checked={extras[t.key]}
+                disabled={running}
+                onChange={(e) => setExtras((prev) => ({ ...prev, [t.key]: e.target.checked }))}
+                className="h-3.5 w-3.5 rounded border-border"
+              />
+              {t.label}
+            </label>
+          ))}
+        </div>
+        {anyExtras && (
+          <p className="mt-1.5 text-xs text-muted">
+            Fetching extras per contact is slower -- larger imports will take noticeably longer and run in more, smaller batches.
+          </p>
+        )}
+      </div>
+
       {(running || done) && (
         <div className="mt-3 rounded-lg bg-surfaceMuted p-3 text-xs text-slate">
           <p>
             {running ? "Importing..." : "Done."} {totals.imported} imported, {totals.skippedDuplicate} already existed, {totals.skippedInvalid} had
             no email or phone, {totals.skippedTagFilter} didn&apos;t match the tag filter.
           </p>
+          {(totals.notesImported > 0 ||
+            totals.tasksImported > 0 ||
+            totals.appointmentsImported > 0 ||
+            totals.conversationsImported > 0 ||
+            totals.formsImported > 0 ||
+            totals.customFieldsSet > 0) && (
+            <p className="mt-1">
+              Also brought in: {totals.customFieldsSet} contacts with custom fields, {totals.notesImported} notes, {totals.tasksImported} tasks,{" "}
+              {totals.appointmentsImported} appointments, {totals.conversationsImported} conversation messages, {totals.formsImported} form
+              submissions.
+            </p>
+          )}
           {errors.length > 0 && (
             <div className="mt-2">
               <p className="font-medium text-danger">{errors.length} row(s) failed:</p>
