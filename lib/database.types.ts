@@ -8328,6 +8328,72 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: { workspace_id: string; name: string; workspace_type: string }[]
       }
+      get_ero_return_status: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          source_workspace_id: string
+          source_workspace_name: string
+          engagement_id: string
+          engagement_number: string | null
+          status: string
+          due_date: string | null
+          tax_year: number | null
+          return_type: string | null
+          efile_status: string
+          is_extended: boolean
+          federal_refund_amount: number | null
+          federal_balance_due: number | null
+          client_first_name: string | null
+          client_last_name: string | null
+          client_business_name: string | null
+          client_type: string
+        }[]
+      }
+      get_ero_irs_notices: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          source_workspace_id: string
+          source_workspace_name: string
+          notice_id: string
+          notice_type: string
+          notice_date: string
+          response_due_date: string | null
+          status: string
+          entity_label: string
+        }[]
+      }
+      get_ero_extensions: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          source_workspace_id: string
+          source_workspace_name: string
+          engagement_id: string
+          engagement_number: string | null
+          tax_year: number | null
+          extension_filed_date: string | null
+          extension_due_date: string | null
+          client_first_name: string | null
+          client_last_name: string | null
+          client_business_name: string | null
+          client_type: string
+        }[]
+      }
+      get_ero_tax_year_metrics: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          source_workspace_id: string
+          source_workspace_name: string
+          tax_year: number
+          total_returns: number
+          accepted: number
+          rejected: number
+          transmitted: number
+          not_filed: number
+          extended: number
+          amended: number
+          open_irs_notices: number
+        }[]
+      }
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
