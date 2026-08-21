@@ -143,13 +143,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     supabase
       .from("services")
       .select("id, name, service_category_id, service_categories(slug)")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("workspace_id", workspace.id)
       .eq("status", "published")
       .order("display_order"),
     supabase
       .from("service_categories")
       .select("id, name")
-      .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+      .eq("workspace_id", workspace.id)
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
     supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),

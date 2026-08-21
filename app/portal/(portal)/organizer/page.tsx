@@ -29,7 +29,7 @@ export default async function PortalOrganizerPage() {
     supabase
       .from("organizer_templates")
       .select("id, name")
-      .or(`workspace_id.is.null,workspace_id.eq.${identity.workspaceId}`)
+      .eq("workspace_id", identity.workspaceId)
       .eq("status", "published")
       .order("name"),
   ]);

@@ -11,7 +11,6 @@ export default async function WorkflowsPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspace.id}`;
 
   const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }] = await Promise.all([
     supabase
@@ -20,12 +19,12 @@ export default async function WorkflowsPage() {
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
-    supabase.from("organizer_templates").select("id, name").or(orFilter).eq("status", "published").order("name"),
-    supabase.from("services").select("id, name").or(orFilter).eq("status", "published").order("name"),
+    supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("services").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase
       .from("processes")
       .select("id, name, process_stages(id, name, display_order)")
-      .or(orFilter)
+      .eq("workspace_id", workspace.id)
       .eq("status", "published")
       .order("name"),
   ]);
