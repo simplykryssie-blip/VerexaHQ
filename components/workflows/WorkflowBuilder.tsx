@@ -32,6 +32,8 @@ import {
   PlayCircle,
   StopCircle,
   LogIn,
+  Clock,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -83,6 +85,7 @@ type WorkflowLogRow = {
 export type MessageTemplateOption = { id: string; name: string; slug: string };
 
 export const ACTION_TYPES = [
+  { value: "delay", label: "Wait / Delay" },
   { value: "send_email", label: "Send an email" },
   { value: "send_sms", label: "Send a text" },
   { value: "create_task", label: "Create a task" },
@@ -121,6 +124,7 @@ const UPDATE_CLIENT_FIELDS = [
 const CLIENT_TYPES = ["individual", "business", "trust", "estate", "organization"];
 
 export function actionIcon(type: string) {
+  if (type === "delay") return <Clock size={15} />;
   if (type === "send_email") return <Mail size={15} />;
   if (type === "send_sms") return <MessageSquare size={15} />;
   if (type === "send_organizer_template") return <BookOpen size={15} />;
@@ -215,12 +219,13 @@ export function StepCard({
 
     setSaving(true);
     setError(null);
-    const delayMinutes = Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0);
+    const isDelay = actionType === "delay";
+    const delayMinutes = isDelay ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
     const { error: updateError } = await supabase
       .from("automation_steps")
       .update({
         action_type: actionType,
-        action_config: { ...config, delay_unit: delayUnit } as never,
+        action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
         delay_minutes: delayMinutes,
       })
       .eq("id", step.id);
@@ -300,31 +305,37 @@ export function StepCard({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-xs text-muted">
-          Wait before running
-          <div className="flex gap-1.5">
-            <input
-              disabled={!canManage}
-              type="number"
-              min={0}
-              value={delayValue}
-              onChange={(e) => {
-                setDelayValue(e.target.value);
-                setSaved(false);
-              }}
-              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            />
-            <select
-              disabled={!canManage}
-              value={delayUnit}
-              onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="minutes">Minutes</option>
-              <option value="days">Days</option>
-            </select>
-          </div>
-        </label>
+        {actionType === "delay" && (
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Wait for
+            <div className="flex gap-1.5">
+              <input
+                disabled={!canManage}
+                type="number"
+                min={0}
+                value={delayValue}
+                onChange={(e) => {
+                  setDelayValue(e.target.value);
+                  setSaved(false);
+                }}
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+              <select
+                disabled={!canManage}
+                value={delayUnit}
+                onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="minutes">Minutes</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
+            <span className="mt-1 text-[11px] normal-case text-muted">
+              Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle from
+              the step that should finish first, and its bottom handle to whichever step should run once the wait is over.
+            </span>
+          </label>
+        )}
 
         {actionType === "send_email" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
@@ -1056,6 +1067,7 @@ export function WorkflowBuilder({
   const [enabled, setEnabled] = useState(isEnabled);
   const [conditions, setConditions] = useState<Condition[]>(initialConditions);
   const [savingTrigger, setSavingTrigger] = useState(false);
+  const [triggerModalOpen, setTriggerModalOpen] = useState(false);
 
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions));
@@ -1096,59 +1108,6 @@ export function WorkflowBuilder({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink">Trigger</h3>
-          {canManage && (
-            <button
-              type="button"
-              onClick={toggleEnabled}
-              className={`rounded-lg border px-3 py-1 text-xs font-medium ${enabled ? "border-success text-success" : "border-border text-muted"}`}
-            >
-              {enabled ? "Active -- click to pause" : "Paused -- click to activate"}
-            </button>
-          )}
-        </div>
-        <div className="mt-3">
-          <TriggerFields
-            triggerType={currentTriggerType}
-            onTriggerTypeChange={setCurrentTriggerType}
-            config={config}
-            onConfigChange={setConfig}
-            organizerTemplates={organizerTemplates}
-            services={services}
-            pipelines={pipelines}
-            disabled={!canManage}
-          />
-
-          <div className="mt-4 border-t border-border pt-3">
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Only run when</h4>
-            <ConditionsEditor
-              conditions={conditions}
-              onChange={setConditions}
-              staffOptions={staffOptions}
-              services={services}
-              serviceCategories={serviceCategories}
-              pipelines={pipelines}
-              disabled={!canManage}
-            />
-          </div>
-
-          {canManage && (
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={saveTrigger}
-                disabled={savingTrigger}
-                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-              >
-                {savingTrigger ? "Saving..." : "Save trigger"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
       <div>
         <h3 className="mb-2 text-sm font-semibold text-ink">Steps</h3>
         {steps.length === 0 && !canManage ? (
@@ -1172,9 +1131,73 @@ export function WorkflowBuilder({
             pipelines={pipelines}
             staffOptions={staffOptions}
             automationOptions={automationOptions}
+            onEditTrigger={() => setTriggerModalOpen(true)}
           />
         )}
       </div>
+
+      {triggerModalOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Edit trigger" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-ink">Trigger</h2>
+              <div className="flex items-center gap-2">
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={toggleEnabled}
+                    className={`rounded-lg border px-3 py-1 text-xs font-medium ${enabled ? "border-success text-success" : "border-border text-muted"}`}
+                  >
+                    {enabled ? "Active -- click to pause" : "Paused -- click to activate"}
+                  </button>
+                )}
+                <button type="button" onClick={() => setTriggerModalOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+            <TriggerFields
+              triggerType={currentTriggerType}
+              onTriggerTypeChange={setCurrentTriggerType}
+              config={config}
+              onConfigChange={setConfig}
+              organizerTemplates={organizerTemplates}
+              services={services}
+              pipelines={pipelines}
+              disabled={!canManage}
+            />
+
+            <div className="mt-4 border-t border-border pt-3">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Only run when</h4>
+              <ConditionsEditor
+                conditions={conditions}
+                onChange={setConditions}
+                staffOptions={staffOptions}
+                services={services}
+                serviceCategories={serviceCategories}
+                pipelines={pipelines}
+                disabled={!canManage}
+              />
+            </div>
+
+            {canManage && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await saveTrigger();
+                    setTriggerModalOpen(false);
+                  }}
+                  disabled={savingTrigger}
+                  className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {savingTrigger ? "Saving..." : "Save trigger"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <CollapsibleSection title="Recent runs" count={runs.length}>
         {runs.length === 0 ? (
