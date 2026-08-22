@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ShieldEllipsis, Lock, Receipt, ShieldAlert } from "lucide-react";
+import { ShieldEllipsis, Lock } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { PlatformAdminsManager } from "./PlatformAdminsManager";
+import { PlatformItManager } from "./PlatformItManager";
 import { ProvisionWorkspaceForm } from "./ProvisionWorkspaceForm";
+import { PlatformAdminTabs } from "./PlatformAdminTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -44,15 +46,15 @@ export default async function PlatformAdminPage() {
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
-  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }, { data: owners }, { count: unnotifiedFailureCount }] =
+  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }, { data: itUsers }, { data: owners }] =
     await Promise.all([
       supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
       supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
       supabase.from("platform_subscription_plans").select("id, name"),
       supabase.from("workspace_users").select("workspace_id, status"),
       supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
+      supabase.from("user_profiles").select("id, display_name").eq("is_platform_it", true).order("display_name"),
       supabase.from("workspace_users").select("workspace_id, user_profiles(display_name)").eq("is_owner", true),
-      supabase.from("system_failure_log").select("id", { count: "exact", head: true }).is("notified_at", null),
     ]);
 
   const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
@@ -77,25 +79,10 @@ export default async function PlatformAdminPage() {
       <PageHeader
         title="Platform Admin"
         description="Every workspace on Verexa -- subscription status, roster size, and connections, across all tenants."
-        actions={
-          <div className="flex items-center gap-2">
-            <Link
-              href="/platform-admin/system-failures"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:border-accent hover:text-accent"
-            >
-              <ShieldAlert size={14} /> System failures
-              {Boolean(unnotifiedFailureCount) && <Badge tone="warning">{unnotifiedFailureCount}</Badge>}
-            </Link>
-            <Link
-              href="/platform-admin/plans"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:border-accent hover:text-accent"
-            >
-              <Receipt size={14} /> Manage plans
-            </Link>
-          </div>
-        }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
+        <PlatformAdminTabs active="overview" />
+
         <ProvisionWorkspaceForm />
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -169,6 +156,17 @@ export default async function PlatformAdminPage() {
           </p>
           <div className="mt-3">
             <PlatformAdminsManager admins={admins ?? []} currentUserId={currentUser?.id ?? ""} />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-display text-sm font-semibold text-ink">Platform IT</h3>
+          <p className="mt-1 text-xs text-muted">
+            IT tools access sees system failures, job queues, and the workspace roster for troubleshooting -- not billing or revenue, and can&apos;t grant
+            admin or IT access to anyone else.
+          </p>
+          <div className="mt-3">
+            <PlatformItManager itUsers={itUsers ?? []} />
           </div>
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getDashboardData } from "@/lib/dashboard/data";
@@ -13,6 +14,20 @@ export default async function DashboardPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+
+  // Verexa's own workspace: platform admins/IT land straight on their
+  // dashboard instead of the normal staff view -- everyone else here
+  // (regular staff testing in this workspace) is unaffected.
+  const [{ data: homeRow }, { data: isPlatformAdmin }, { data: isPlatformIt }] = await Promise.all([
+    supabase.from("workspaces").select("is_platform_home").eq("id", workspace.id).maybeSingle(),
+    supabase.rpc("is_platform_admin"),
+    supabase.rpc("is_platform_it"),
+  ]);
+  if (homeRow?.is_platform_home) {
+    if (isPlatformAdmin) redirect("/platform-admin");
+    if (isPlatformIt) redirect("/platform-admin/it");
+  }
+
   const { data: dashboardId } = await supabase.rpc("ensure_default_dashboard", { p_workspace_id: workspace.id });
   const {
     data: { user },
