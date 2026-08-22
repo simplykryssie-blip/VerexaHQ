@@ -39,6 +39,11 @@ export const TRIGGER_TYPES = [
   { value: "engagement.due_date_reminder", label: "An engagement's due date is approaching" },
   { value: "quote.expiring_reminder", label: "A quote is about to expire" },
   { value: "client.birthday_reminder", label: "It's near a client's birthday" },
+  { value: "email.opened", label: "A client opens an automated email" },
+  { value: "email.clicked", label: "A client clicks a link in an automated email" },
+  { value: "email.bounced", label: "An automated email bounces" },
+  { value: "sms.delivered", label: "An automated text is delivered" },
+  { value: "sms.failed", label: "An automated text fails to deliver" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -175,6 +180,21 @@ export function triggerSummary(
           : "a client's birthday";
     const dayLabel = days === 1 ? "1 day" : `${days} days`;
     return `${dayLabel} ${direction} ${entity} (checked every 6 hours)`;
+  }
+  if (triggerType === "email.opened") {
+    return "When a client opens an automated email";
+  }
+  if (triggerType === "email.clicked") {
+    return "When a client clicks a link in an automated email";
+  }
+  if (triggerType === "email.bounced") {
+    return "When an automated email bounces";
+  }
+  if (triggerType === "sms.delivered") {
+    return "When an automated text is delivered";
+  }
+  if (triggerType === "sms.failed") {
+    return "When an automated text fails to deliver";
   }
   return triggerType;
 }
