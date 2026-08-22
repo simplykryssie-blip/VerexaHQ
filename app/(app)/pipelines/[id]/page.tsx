@@ -24,8 +24,8 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
 
   const isSystemDefault = !process.workspace_id;
 
-  const [{ data: isWorkspaceAdmin }, { data: stages }, { data: tasks }, { data: stageCounts }, { data: leadRunSample }] = await Promise.all([
-    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+  const [{ data: canManagePipelines }, { data: stages }, { data: tasks }, { data: stageCounts }, { data: leadRunSample }] = await Promise.all([
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "pipelines.manage" }),
     supabase.from("process_stages").select("*").eq("process_id", process.id).order("display_order"),
     supabase
       .from("process_tasks")
@@ -36,7 +36,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
     supabase.from("lead_pipeline_runs").select("id").eq("process_id", process.id).eq("workspace_id", workspace.id).eq("status", "Active").limit(1),
   ]);
 
-  const canEdit = !isSystemDefault && Boolean(isWorkspaceAdmin);
+  const canEdit = !isSystemDefault && Boolean(canManagePipelines);
   // No single pipeline is designated "the" lead pipeline anymore -- any
   // pipeline that actually has active leads on it shows them, the same
   // way any pipeline with active engagements shows its engagement count.

@@ -11,11 +11,14 @@ export default async function PipelinesPage() {
 
   const supabase = createClient();
 
-  const { data: processes } = await supabase
-    .from("processes")
-    .select("id, name, status, workspace_id, process_stages(id)")
-    .eq("workspace_id", workspace.id)
-    .order("name");
+  const [{ data: processes }, { data: canManage }] = await Promise.all([
+    supabase
+      .from("processes")
+      .select("id, name, status, workspace_id, process_stages(id)")
+      .eq("workspace_id", workspace.id)
+      .order("name"),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "pipelines.manage" }),
+  ]);
 
   const pipelines: PipelineCard[] = (processes ?? []).map((p) => ({
     id: p.id,
@@ -32,7 +35,7 @@ export default async function PipelinesPage() {
         description="The stages work moves through, with the right form, document checklist, or engagement letter attached where each one is needed."
       />
       <div className="flex-1 px-8 py-6">
-        <PipelineLibrary workspaceId={workspace.id} pipelines={pipelines} />
+        <PipelineLibrary workspaceId={workspace.id} pipelines={pipelines} canManage={Boolean(canManage)} />
       </div>
     </>
   );
