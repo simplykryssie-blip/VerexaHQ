@@ -6560,7 +6560,6 @@ export type Database = {
           id: string
           overdue_flagged_at: string | null
           priority: string | null
-          process_task_id: string | null
           status: string
           title: string
           updated_at: string | null
@@ -6580,7 +6579,6 @@ export type Database = {
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
-          process_task_id?: string | null
           status?: string
           title: string
           updated_at?: string | null
@@ -6600,7 +6598,6 @@ export type Database = {
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
-          process_task_id?: string | null
           status?: string
           title?: string
           updated_at?: string | null
@@ -6642,13 +6639,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
-          },
-          {
-            foreignKeyName: "tasks_process_task_id_fkey"
-            columns: ["process_task_id"]
-            isOneToOne: false
-            referencedRelation: "process_tasks"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tasks_workflow_stage_id_fkey"
@@ -8351,6 +8341,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      accept_firm_connection_invite: {
+        Args: { p_name: string; p_token: string; p_workspace_type?: string }
+        Returns: string
+      }
       accept_portal_invitation: { Args: { p_token: string }; Returns: string }
       accept_quote: { Args: { p_quote_id: string }; Returns: undefined }
       accept_workspace_invitation: {
@@ -8478,10 +8472,6 @@ export type Database = {
           user_id: string
           workspace_id: string
         }[]
-      }
-      copy_preloaded_templates_to_workspace: {
-        Args: { p_workspace_id: string }
-        Returns: undefined
       }
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
