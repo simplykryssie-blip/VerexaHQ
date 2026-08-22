@@ -12,6 +12,15 @@ import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
 // simple enough not to need parenthesized groups.
 export type Condition = { field: string; op: string; value: string; join?: "and" | "or" };
 
+// Naming pattern for a new ValueKind: name it after the DOMAIN CONCEPT it
+// renders, not the widget shape -- "lead_stage" and "pipeline_stage" render
+// a picker tied to a specific concept with its own lookup/options; the
+// generic "select" and "labeled_select" are for anything that's just a
+// plain (or value/label) option list with no special resolution logic.
+// Reach for a new domain-named kind only when the field needs bespoke
+// options, a cascading picker, or run-time resolution that a generic kind
+// can't express -- otherwise use "select"/"labeled_select" with the options
+// supplied directly, same as most of CONDITION_FIELDS below already does.
 type ValueKind =
   | "select"
   | "labeled_select"
@@ -20,7 +29,7 @@ type ValueKind =
   | "service"
   | "category"
   | "pipeline_stage"
-  | "organizer_template_status"
+  | "organizer_status"
   | "text"
   | "number"
   | "boolean";
@@ -110,7 +119,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.service_id", label: "Requested service", group: "Lead & client", valueKind: "service", ops: SELECT_OPS },
   { key: "client.source", label: "Lead source", group: "Lead & client", valueKind: "select", options: CLIENT_SOURCE_OPTIONS, ops: SELECT_OPS },
   { key: "client.portal_status", label: "Portal status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: PORTAL_STATUS_OPTIONS, ops: SELECT_OPS },
-  { key: "client.organizer_status", label: "Organizer status", group: "Lead & client", valueKind: "organizer_template_status", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
+  { key: "client.organizer_status", label: "Organizer status", group: "Lead & client", valueKind: "organizer_status", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
   { key: "lead.process_stage_id", label: "Lead pipeline stage", group: "Lead & client", valueKind: "pipeline_stage", ops: ID_OPS },
 
   { key: "engagement.status", label: "Engagement status", group: "Engagement", valueKind: "select", options: ENGAGEMENT_STATUS_OPTIONS, ops: LIST_OPS },
@@ -251,7 +260,7 @@ function ConditionRow({
             </select>
           )}
 
-          {meta.valueKind === "organizer_template_status" && (
+          {meta.valueKind === "organizer_status" && (
             <>
               <select
                 disabled={disabled}
@@ -262,7 +271,7 @@ function ConditionRow({
                 <option value="" disabled>
                   Choose an organizer
                 </option>
-                <option value="run">Whichever organizer this run sent</option>
+                <option value="current_run">Whichever organizer this run sent</option>
                 {organizerTemplates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
