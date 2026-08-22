@@ -262,6 +262,7 @@ function ConditionRow({
                 <option value="" disabled>
                   Choose an organizer
                 </option>
+                <option value="run">Whichever organizer this run sent</option>
                 {organizerTemplates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
