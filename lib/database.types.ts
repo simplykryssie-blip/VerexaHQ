@@ -6776,6 +6776,7 @@ export type Database = {
           first_name: string | null
           id: string
           is_platform_admin: boolean
+          is_platform_it: boolean
           last_name: string | null
           last_seen_at: string | null
           locked_until: string | null
@@ -6797,6 +6798,7 @@ export type Database = {
           first_name?: string | null
           id: string
           is_platform_admin?: boolean
+          is_platform_it?: boolean
           last_name?: string | null
           last_seen_at?: string | null
           locked_until?: string | null
@@ -6818,6 +6820,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           is_platform_admin?: boolean
+          is_platform_it?: boolean
           last_name?: string | null
           last_seen_at?: string | null
           locked_until?: string | null
@@ -7728,6 +7731,7 @@ export type Database = {
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
+          is_platform_home: boolean
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
@@ -7756,6 +7760,7 @@ export type Database = {
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
+          is_platform_home?: boolean
           mailing_address?: string | null
           name: string
           onboarding_dismissed_at?: string | null
@@ -7784,6 +7789,7 @@ export type Database = {
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
+          is_platform_home?: boolean
           mailing_address?: string | null
           name?: string
           onboarding_dismissed_at?: string | null
@@ -9019,6 +9025,7 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_platform_it: { Args: never; Returns: boolean }
       is_portal_accessible_entity_id: {
         Args: { p_entity_id: string }
         Returns: boolean
@@ -9401,6 +9408,14 @@ export type Database = {
         Args: { p_is_platform_admin: boolean; p_user_id: string }
         Returns: undefined
       }
+      set_platform_it: {
+        Args: { p_is_platform_it: boolean; p_user_email: string }
+        Returns: undefined
+      }
+      set_platform_it_by_id: {
+        Args: { p_is_platform_it: boolean; p_user_id: string }
+        Returns: undefined
+      }
       set_workspace_ghl_connection: {
         Args: {
           p_api_key: string
@@ -9427,6 +9442,7 @@ export type Database = {
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
+          is_platform_home: boolean
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null

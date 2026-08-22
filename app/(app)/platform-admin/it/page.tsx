@@ -1,0 +1,202 @@
+import { createClient } from "@/lib/supabase/server";
+import { Lock, ShieldAlert, ShieldEllipsis } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/Badge";
+import { PlatformAdminTabs } from "../PlatformAdminTabs";
+
+export const dynamic = "force-dynamic";
+
+const FAILURE_PAGE_SIZE = 100;
+
+function statusCounts(rows: { status: string }[]) {
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.status, (counts.get(r.status) ?? 0) + 1);
+  return counts;
+}
+
+export default async function PlatformAdminItPage() {
+  const supabase = createClient();
+  const [{ data: isPlatformIt }, { data: isPlatformAdmin }] = await Promise.all([
+    supabase.rpc("is_platform_it"),
+    supabase.rpc("is_platform_admin"),
+  ]);
+
+  if (!isPlatformIt) {
+    return (
+      <>
+        <PageHeader title="IT Tools" />
+        <div className="flex-1 px-8 py-6">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft">
+            <EmptyState icon={Lock} message="This area is only available to Verexa platform admins and IT." />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const [{ data: failures }, { data: workspaces }, { data: calendarJobs }, { data: notificationJobs }] = await Promise.all([
+    supabase
+      .from("system_failure_log")
+      .select("id, source, workspace_id, message, context, created_at, notified_at")
+      .order("created_at", { ascending: false })
+      .limit(FAILURE_PAGE_SIZE),
+    supabase.from("workspaces").select("id, name, workspace_type, status, created_at").order("created_at", { ascending: false }),
+    supabase.from("calendar_sync_queue").select("status"),
+    supabase.from("notification_queue").select("status"),
+  ]);
+
+  const workspaceIds = Array.from(new Set((failures ?? []).map((f) => f.workspace_id).filter((id): id is string => Boolean(id))));
+  const failureWorkspaceNameById = new Map((workspaces ?? []).filter((w) => workspaceIds.includes(w.id)).map((w) => [w.id, w.name]));
+
+  const failureRows = failures ?? [];
+  const unnotifiedCount = failureRows.filter((f) => !f.notified_at).length;
+
+  const calendarCounts = statusCounts(calendarJobs ?? []);
+  const notificationCounts = statusCounts(notificationJobs ?? []);
+
+  return (
+    <>
+      <PageHeader
+        title="IT Tools"
+        description="System health, error logs, and job queues -- for keeping the platform running, not billing or revenue."
+      />
+      <div className="flex-1 space-y-6 px-8 py-6">
+        {isPlatformAdmin && <PlatformAdminTabs active="it" />}
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">System failures shown</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">{failureRows.length}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Not yet digested</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">{unnotifiedCount}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Calendar sync pending</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">{calendarCounts.get("pending") ?? 0}</p>
+          </div>
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <p className="text-xs uppercase tracking-wide text-muted">Notifications pending</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">{notificationCounts.get("pending") ?? 0}</p>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 font-display text-sm font-semibold text-ink">Job queues</h3>
+          <p className="mb-3 text-xs text-muted">
+            Counts by status only -- for the full run history of what the cron workers actually did, check Vercel&apos;s function logs.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs font-medium text-ink">Calendar sync queue</p>
+              <ul className="mt-2 space-y-1 text-sm text-slate">
+                {calendarCounts.size === 0 ? (
+                  <li className="text-muted">Empty.</li>
+                ) : (
+                  Array.from(calendarCounts.entries()).map(([status, count]) => (
+                    <li key={status} className="flex items-center justify-between capitalize">
+                      <span>{status}</span>
+                      <span className="font-medium text-ink">{count}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs font-medium text-ink">Notification queue</p>
+              <ul className="mt-2 space-y-1 text-sm text-slate">
+                {notificationCounts.size === 0 ? (
+                  <li className="text-muted">Empty.</li>
+                ) : (
+                  Array.from(notificationCounts.entries()).map(([status, count]) => (
+                    <li key={status} className="flex items-center justify-between capitalize">
+                      <span>{status}</span>
+                      <span className="font-medium text-ink">{count}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 font-display text-sm font-semibold text-ink">System failures</h3>
+          <p className="mb-3 text-xs text-muted">
+            Failures nobody outside Verexa could fix -- missing templates/env vars, storage or DB errors, Resend outages or key issues. Also emailed as a
+            digest to failedsystem@verexahq.com every 20 minutes.
+          </p>
+          {failureRows.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface shadow-soft">
+              <EmptyState icon={ShieldAlert} message="No system failures logged." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-5 py-3 font-medium">When</th>
+                    <th className="px-5 py-3 font-medium">Source</th>
+                    <th className="px-5 py-3 font-medium">Workspace</th>
+                    <th className="px-5 py-3 font-medium">Message</th>
+                    <th className="px-5 py-3 font-medium">Digest</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {failureRows.map((f) => (
+                    <tr key={f.id} className="hover:bg-surfaceMuted">
+                      <td className="whitespace-nowrap px-5 py-3 text-slate">{new Date(f.created_at).toLocaleString()}</td>
+                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate">{f.source}</td>
+                      <td className="whitespace-nowrap px-5 py-3 text-slate">
+                        {f.workspace_id ? (failureWorkspaceNameById.get(f.workspace_id) ?? f.workspace_id) : <span className="text-muted">--</span>}
+                      </td>
+                      <td className="px-5 py-3 text-slate">{f.message}</td>
+                      <td className="whitespace-nowrap px-5 py-3">
+                        {f.notified_at ? <Badge tone="neutral">Sent</Badge> : <Badge tone="warning">Pending</Badge>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h3 className="mb-3 font-display text-sm font-semibold text-ink">Workspaces</h3>
+          <p className="mb-3 text-xs text-muted">For identifying which workspace a report or error affects -- no subscription or billing detail here.</p>
+          {!workspaces || workspaces.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface shadow-soft">
+              <EmptyState icon={ShieldEllipsis} message="No workspaces yet." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-5 py-3 font-medium">Workspace</th>
+                    <th className="px-5 py-3 font-medium">Type</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {workspaces.map((w) => (
+                    <tr key={w.id} className="hover:bg-surfaceMuted">
+                      <td className="px-5 py-3 text-slate">{w.name}</td>
+                      <td className="px-5 py-3 text-slate">{w.workspace_type}</td>
+                      <td className="px-5 py-3 text-slate capitalize">{w.status}</td>
+                      <td className="px-5 py-3 text-slate">{new Date(w.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}

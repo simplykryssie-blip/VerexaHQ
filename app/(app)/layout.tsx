@@ -28,7 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: securityPolicy }, branding, { data: isPlatformAdmin }, { data: canUseNetworkMessaging }, { count: teammateCount }] =
+  const [{ data: securityPolicy }, branding, { data: isPlatformAdmin }, { data: isPlatformIt }, { data: canUseNetworkMessaging }, { count: teammateCount }] =
     await Promise.all([
       supabase
         .from("workspace_security_policies")
@@ -37,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .maybeSingle(),
       getEffectiveBranding(workspace.id),
       supabase.rpc("is_platform_admin"),
+      supabase.rpc("is_platform_it"),
       supabase.rpc("can_use_network_messaging", { p_workspace_id: workspace.id }),
       supabase
         .from("workspace_users")
@@ -75,6 +76,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
             isPlatformAdmin={Boolean(isPlatformAdmin)}
+            isPlatformItOnly={Boolean(isPlatformIt) && !isPlatformAdmin}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">

@@ -610,12 +610,27 @@ un-promoted previews.
   `notify_workspace_admins()` RPC -- including a new trigger on
   `automation_execution_logs` that does this for every failed automation
   step, which previously notified nobody at all. Also added a Platform
-  Admin page, `/platform-admin/system-failures`, listing these
+  Admin page, originally `/platform-admin/system-failures`, listing these
   (source/workspace/message/digested-or-not), per the user's request that
-  this be visible in the platform itself, not just email.
+  this be visible in the platform itself, not just email. **(2026-08-22:
+  moved to `/platform-admin/it` -- see below.)**
+- **RESOLVED (2026-08-22).** Item 2 below (persistent nav + a real IT
+  section) is now built: `/platform-admin` gained a tab strip
+  (`PlatformAdminTabs.tsx`) across Overview/Billing/IT tools, a new
+  `is_platform_it` role (separate from `is_platform_admin`, granted via
+  `set_platform_it`/`set_platform_it_by_id`, RLS-scoped to system health
+  tables only -- no billing/subscription visibility, can't grant admin or
+  IT access itself), and `/platform-admin/it` replacing the old
+  `/platform-admin/system-failures` page with the failure log plus job
+  queue counts (`calendar_sync_queue`, `notification_queue`) and a
+  billing-free workspace lookup. Platform admins/IT logging into the
+  Verexa HQ CRM workspace specifically (`workspaces.is_platform_home`)
+  now land on their respective dashboard instead of the normal staff
+  `/dashboard`. Item 1 (recommended-fix mapping per failure type) is
+  still not started.
 - **Requested (2026-08-21), not started, deliberately deferred so the user
-  can test what's built so far first.** Two enhancements to the new
-  `/platform-admin/system-failures` page above:
+  can test what's built so far first.** One remaining enhancement to the
+  `/platform-admin/it` page above (formerly `/platform-admin/system-failures`):
   1. Each logged failure should show a **recommended fix**, not just the
      raw error message -- e.g. "Resend responded with 401" ->
      "RESEND_API_KEY is likely invalid or revoked; check Vercel env vars."
@@ -625,12 +640,6 @@ un-promoted previews.
      point each known failure type is logged rather than parsed after the
      fact -- same approach as the system/account-level classification
      already done for the Resend send-failure case).
-  2. **The Platform Admin section might want its own persistent menu/nav
-     bar** (workspaces list, plans, system failures, whatever else lands
-     here) instead of a flat page with ad-hoc header links -- user's
-     phrasing was "maybe," not a firm decision yet. Worth confirming
-     scope/layout with her before building, since it changes the shape of
-     every page under `/platform-admin`.
 - **Requested (2026-08-21), not started -- explicitly deferred, "goes on
   the to-do list," not needed right now.** Three related asks, from the
   user's own words:

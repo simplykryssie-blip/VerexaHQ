@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, ShieldEllipsis } from "lucide-react";
+import { Menu, X, ChevronDown, ShieldEllipsis, Wrench } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
@@ -16,6 +16,7 @@ export function Sidebar({
   primaryColor,
   secondaryColor,
   isPlatformAdmin,
+  isPlatformItOnly,
   showMessages,
 }: {
   workspaceName: string;
@@ -23,6 +24,8 @@ export function Sidebar({
   primaryColor?: string | null;
   secondaryColor?: string | null;
   isPlatformAdmin?: boolean;
+  /** True only for a platform-IT (not also admin) user -- gets its own nav link since the "Platform Admin" link below is admin-only. */
+  isPlatformItOnly?: boolean;
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
 }) {
@@ -193,6 +196,20 @@ export function Sidebar({
             >
               <ShieldEllipsis size={18} strokeWidth={2} className="shrink-0" />
               Platform Admin
+            </Link>
+          </div>
+        )}
+
+        {isPlatformItOnly && (
+          <div className="px-3 pb-1">
+            <Link
+              href="/platform-admin/it"
+              className={`${
+                pathname === "/platform-admin/it" ? styles.navItemActive : styles.navItem
+              } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+            >
+              <Wrench size={18} strokeWidth={2} className="shrink-0" />
+              IT Tools
             </Link>
           </div>
         )}
