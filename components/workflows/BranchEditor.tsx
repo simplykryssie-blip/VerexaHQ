@@ -4,7 +4,12 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
+import {
+  ConditionGroupsEditor,
+  normalizeToConditionGroups,
+  conditionGroupsAreEmpty,
+  type ConditionGroup,
+} from "@/components/workflows/ConditionsEditor";
 import type { StaffOption, WorkflowStepEdgeRow } from "@/components/workflows/WorkflowBuilder";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
@@ -13,7 +18,7 @@ type DraftBranch = {
   id: string | null;
   clientKey: string;
   label: string;
-  conditions: Condition[];
+  conditions: ConditionGroup[];
   to_step_id: string | null;
 };
 
@@ -24,11 +29,17 @@ function initialBranches(edges: WorkflowStepEdgeRow[]): DraftBranch[] {
     // almost every branch actually needs -- Yes gets its condition filled
     // in below, No is left empty so it acts as the else/default path.
     return [
-      { id: null, clientKey: "yes", label: "Yes", conditions: [], to_step_id: null },
-      { id: null, clientKey: "no", label: "No", conditions: [], to_step_id: null },
+      { id: null, clientKey: "yes", label: "Yes", conditions: [{ conditions: [] }], to_step_id: null },
+      { id: null, clientKey: "no", label: "No", conditions: [{ conditions: [] }], to_step_id: null },
     ];
   }
-  return sorted.map((e) => ({ id: e.id, clientKey: e.id, label: e.label ?? "", conditions: e.branch_conditions ?? [], to_step_id: e.to_step_id }));
+  return sorted.map((e) => ({
+    id: e.id,
+    clientKey: e.id,
+    label: e.label ?? "",
+    conditions: normalizeToConditionGroups(e.branch_conditions),
+    to_step_id: e.to_step_id,
+  }));
 }
 
 // Editing a condition step's branches -- who evaluates in what order, what
@@ -73,7 +84,7 @@ export function BranchEditor({
   const [saving, setSaving] = useState(false);
 
   function addBranch() {
-    setBranches((b) => [...b, { id: null, clientKey: `new-${b.length}-${Date.now()}`, label: "", conditions: [], to_step_id: null }]);
+    setBranches((b) => [...b, { id: null, clientKey: `new-${b.length}-${Date.now()}`, label: "", conditions: [{ conditions: [] }], to_step_id: null }]);
   }
 
   function updateBranch(key: string, patch: Partial<DraftBranch>) {
@@ -100,7 +111,7 @@ export function BranchEditor({
   }
 
   async function save() {
-    const tagsToConfirm = collectClientTagValues(branches.flatMap((b) => b.conditions));
+    const tagsToConfirm = collectClientTagValues(branches.flatMap((b) => b.conditions).flatMap((g) => g.conditions));
     for (const tag of tagsToConfirm) {
       if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
     }
@@ -121,7 +132,7 @@ export function BranchEditor({
         from_step_id: stepId,
         to_step_id: b.to_step_id,
         label: b.label.trim() || null,
-        branch_conditions: b.conditions.length === 0 ? null : (b.conditions as never),
+        branch_conditions: conditionGroupsAreEmpty(b.conditions) ? null : (b.conditions as never),
         sort_order: i,
       };
       const { error } = b.id
@@ -187,8 +198,8 @@ export function BranchEditor({
             className="mt-2 w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           />
           <div className="mt-2">
-            <ConditionsEditor
-              conditions={b.conditions}
+            <ConditionGroupsEditor
+              groups={b.conditions}
               onChange={(next) => updateBranch(b.clientKey, { conditions: next })}
               staffOptions={staffOptions}
               services={services}

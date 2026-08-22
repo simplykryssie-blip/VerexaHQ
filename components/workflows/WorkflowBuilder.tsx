@@ -41,7 +41,14 @@ import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
-import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
+import {
+  ConditionsEditor,
+  ConditionGroupsEditor,
+  normalizeToConditionGroups,
+  conditionGroupsAreEmpty,
+  type Condition,
+  type ConditionGroup,
+} from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
@@ -65,7 +72,10 @@ export type WorkflowStepEdgeRow = {
   id: string;
   from_step_id: string;
   to_step_id: string | null;
-  branch_conditions: Condition[] | null;
+  // Legacy flat Condition[] (every edge saved before condition groups
+  // existed) or the current ConditionGroup[] -- normalizeToConditionGroups
+  // is the only thing that needs to know which.
+  branch_conditions: Condition[] | ConditionGroup[] | null;
   label: string | null;
   sort_order: number;
 };
@@ -1345,7 +1355,7 @@ export function WorkflowBuilder({
   pipelines?: PipelineOption[];
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
-  conditions?: Condition[];
+  conditions?: Condition[] | ConditionGroup[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -1353,12 +1363,12 @@ export function WorkflowBuilder({
   const [currentTriggerType, setCurrentTriggerType] = useState(triggerType);
   const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
-  const [conditions, setConditions] = useState<Condition[]>(initialConditions);
+  const [conditions, setConditions] = useState<ConditionGroup[]>(() => normalizeToConditionGroups(initialConditions));
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
 
   async function saveTrigger() {
-    const tagsToConfirm = new Set(collectClientTagValues(conditions));
+    const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
     if (currentTriggerType === "client.tag_added") {
       const triggerTag = (config.tag as string | undefined)?.trim();
       if (triggerTag) tagsToConfirm.add(triggerTag);
@@ -1457,8 +1467,8 @@ export function WorkflowBuilder({
 
             <div className="mt-4 border-t border-border pt-3">
               <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Only run when</h4>
-              <ConditionsEditor
-                conditions={conditions}
+              <ConditionGroupsEditor
+                groups={conditions}
                 onChange={setConditions}
                 staffOptions={staffOptions}
                 services={services}

@@ -8,9 +8,40 @@ import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
 // `join` describes how this condition combines with the one before it in
 // the list (ignored on the first condition) -- evaluated strictly left to
 // right, same as a simple calculator, not with AND-before-OR precedence.
-// That matches what a short visual list of conditions reads as, and is
-// simple enough not to need parenthesized groups.
+// That's the right amount of power *within* a group of conditions edited
+// together; genuinely compound logic ("(A or B) and (C or D)") is built by
+// grouping -- see ConditionGroup below.
 export type Condition = { field: string; op: string; value: string; join?: "and" | "or" };
+
+// A group of conditions (evaluated among themselves via each condition's own
+// `join`, exactly like a flat ConditionsEditor list) that itself combines
+// with the group before it via the group's own `join` -- one level of
+// nesting, e.g. group1 = "A or B", group2 = "C or D" with group2.join =
+// "and" expresses "(A or B) and (C or D)". Two levels covers the compound
+// logic that actually comes up in a workflow; deeper nesting would need a
+// real expression-tree editor for a case nobody has asked for yet.
+export type ConditionGroup = { conditions: Condition[]; join?: "and" | "or" };
+
+// Accepts either shape a stored condition list could be in: the legacy flat
+// Condition[] (every list saved before groups existed), or the current
+// ConditionGroup[] -- and always returns groups, treating a flat list as one
+// implicit group. Both shapes stay readable forever; only the group shape is
+// ever written going forward.
+export function normalizeToConditionGroups(raw: unknown): ConditionGroup[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [{ conditions: [] }];
+  const first = raw[0] as unknown;
+  if (first && typeof first === "object" && "conditions" in (first as Record<string, unknown>)) {
+    return raw as ConditionGroup[];
+  }
+  return [{ conditions: raw as Condition[] }];
+}
+
+// True when there's nothing here to gate on -- one group with no conditions
+// in it, the shape addCondition/addGroup never leave behind but a brand new
+// automation starts as.
+export function conditionGroupsAreEmpty(groups: ConditionGroup[]): boolean {
+  return groups.length === 0 || (groups.length === 1 && groups[0].conditions.length === 0);
+}
 
 // Naming pattern for a new ValueKind: name it after the DOMAIN CONCEPT it
 // renders, not the widget shape -- "lead_stage" and "pipeline_stage" render
@@ -500,6 +531,103 @@ export function ConditionsEditor({
       {!disabled && (
         <button type="button" onClick={addCondition} className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline">
           <Plus size={13} /> Add condition
+        </button>
+      )}
+    </div>
+  );
+}
+
+// One ConditionsEditor per group (unchanged, reused as-is), with an Or/And
+// toggle between groups matching the one ConditionsEditor already uses
+// between conditions. The common case -- one group -- renders identically
+// to a plain ConditionsEditor plus a single "Add condition group" link, so
+// nobody who only ever needs flat conditions sees any added complexity.
+export function ConditionGroupsEditor({
+  groups,
+  onChange,
+  staffOptions,
+  services,
+  serviceCategories,
+  pipelines,
+  organizerTemplates,
+  disabled,
+}: {
+  groups: ConditionGroup[];
+  onChange: (next: ConditionGroup[]) => void;
+  staffOptions: StaffOption[];
+  services: TemplateOption[];
+  serviceCategories: TemplateOption[];
+  pipelines: PipelineOption[];
+  organizerTemplates: TemplateOption[];
+  disabled?: boolean;
+}) {
+  function addGroup() {
+    onChange([...groups, { conditions: [], join: "or" }]);
+  }
+
+  function updateGroupConditions(index: number, conditions: Condition[]) {
+    onChange(groups.map((g, i) => (i === index ? { ...g, conditions } : g)));
+  }
+
+  function setGroupJoin(index: number, join: "and" | "or") {
+    onChange(groups.map((g, i) => (i === index ? { ...g, join } : g)));
+  }
+
+  function removeGroup(index: number) {
+    const next = groups.filter((_, i) => i !== index);
+    onChange(next.length === 0 ? [{ conditions: [] }] : next);
+  }
+
+  return (
+    <div className="space-y-3">
+      {groups.map((g, i) => (
+        <div key={i}>
+          {i > 0 && (
+            <div className="mb-2 flex justify-center">
+              <div className="inline-flex overflow-hidden rounded-full border border-border text-[10px] font-semibold uppercase tracking-wide">
+                {(["and", "or"] as const).map((j) => (
+                  <button
+                    key={j}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setGroupJoin(i, j)}
+                    className={`px-2.5 py-1 ${
+                      (g.join ?? "and") === j ? "bg-accent text-white" : "bg-surface text-muted hover:bg-surfaceMuted"
+                    } disabled:cursor-default`}
+                  >
+                    {j}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className={groups.length > 1 ? "rounded-xl border border-border bg-surfaceMuted/40 p-2.5" : ""}>
+            {groups.length > 1 && (
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">Group {i + 1}</span>
+                {!disabled && (
+                  <button type="button" onClick={() => removeGroup(i)} className="rounded p-1 text-muted hover:text-danger" aria-label="Remove group">
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            )}
+            <ConditionsEditor
+              conditions={g.conditions}
+              onChange={(next) => updateGroupConditions(i, next)}
+              staffOptions={staffOptions}
+              services={services}
+              serviceCategories={serviceCategories}
+              pipelines={pipelines}
+              organizerTemplates={organizerTemplates}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+      ))}
+      {!disabled && (
+        <button type="button" onClick={addGroup} className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline">
+          <Plus size={13} /> Add condition group
         </button>
       )}
     </div>
