@@ -695,6 +695,63 @@ export type Database = {
           },
         ]
       }
+      automation_webhook_deliveries: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          next_attempt_at: string
+          payload: Json
+          run_id: string | null
+          sent_at: string | null
+          status: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          payload?: Json
+          run_id?: string | null
+          sent_at?: string | null
+          status?: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          next_attempt_at?: string
+          payload?: Json
+          run_id?: string | null
+          sent_at?: string | null
+          status?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_webhook_deliveries_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "automation_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_webhook_deliveries_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automations: {
         Row: {
           ai_config: Json | null
@@ -710,6 +767,7 @@ export type Database = {
           trigger_config: Json
           trigger_type: string
           updated_at: string
+          webhook_token: string
           workspace_id: string | null
         }
         Insert: {
@@ -726,6 +784,7 @@ export type Database = {
           trigger_config?: Json
           trigger_type: string
           updated_at?: string
+          webhook_token?: string
           workspace_id?: string | null
         }
         Update: {
@@ -742,6 +801,7 @@ export type Database = {
           trigger_config?: Json
           trigger_type?: string
           updated_at?: string
+          webhook_token?: string
           workspace_id?: string | null
         }
         Relationships: [
@@ -8321,6 +8381,16 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      _evaluate_condition_list: {
+        Args: {
+          p_client_id: string
+          p_conditions: Json
+          p_context: Json
+          p_engagement_id: string
+          p_workspace_id: string
+        }
+        Returns: boolean
       }
       _notify_admins_of_new_public_lead: {
         Args: { p_client_id: string; p_workspace_id: string }

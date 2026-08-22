@@ -35,6 +35,7 @@ export const TRIGGER_TYPES = [
   { value: "task.completed", label: "A task is completed" },
   { value: "client_message.received", label: "A client sends a message" },
   { value: "task.overdue", label: "A task becomes overdue" },
+  { value: "webhook.received", label: "A webhook is received" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -150,6 +151,9 @@ export function triggerSummary(
   if (triggerType === "task.overdue") {
     return "When a task becomes overdue (checked every 6 hours)";
   }
+  if (triggerType === "webhook.received") {
+    return "When a webhook is received";
+  }
   return triggerType;
 }
 
@@ -161,6 +165,7 @@ export function TriggerFields({
   organizerTemplates,
   services = [],
   pipelines = [],
+  webhookUrl,
   disabled,
 }: {
   triggerType: string;
@@ -170,6 +175,7 @@ export function TriggerFields({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
+  webhookUrl?: string;
   disabled?: boolean;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
@@ -210,6 +216,22 @@ export function TriggerFields({
             ))}
           </select>
         </label>
+      )}
+
+      {triggerType === "webhook.received" && webhookUrl && (
+        <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Webhook URL -- point any external tool (Zapier, Calendly, a form on your site) here to start this workflow
+          <input
+            readOnly
+            value={webhookUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <span className="mt-1 text-[11px] normal-case text-muted">
+            POST JSON to this URL. An <code>email</code> or <code>phone</code> field finds or creates a matching lead; every
+            field in the body becomes available to this run&apos;s conditions and merge fields.
+          </span>
+        </div>
       )}
 
       {triggerType === "organizer.submitted" && (
