@@ -36,13 +36,23 @@ export const TRIGGER_TYPES = [
   { value: "client_message.received", label: "A client sends a message" },
   { value: "task.overdue", label: "A task becomes overdue" },
   { value: "webhook.received", label: "A webhook is received" },
+  { value: "engagement.due_date_reminder", label: "An engagement's due date is approaching" },
+  { value: "quote.expiring_reminder", label: "A quote is about to expire" },
+  { value: "client.birthday_reminder", label: "It's near a client's birthday" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
 
+const DATE_REMINDER_TRIGGER_TYPES = new Set([
+  "engagement.due_date_reminder",
+  "quote.expiring_reminder",
+  "client.birthday_reminder",
+]);
+
 export function defaultTriggerConfig(triggerType: string): Record<string, unknown> {
   if (triggerType === "engagement.status_changed") return { to_status: ENGAGEMENT_STATUS_OPTIONS[0] };
   if (triggerType === "appointment.status_changed") return { to_status: APPOINTMENT_STATUS_OPTIONS[0] };
+  if (DATE_REMINDER_TRIGGER_TYPES.has(triggerType)) return { direction: "before", days: 3 };
   return {};
 }
 
@@ -153,6 +163,18 @@ export function triggerSummary(
   }
   if (triggerType === "webhook.received") {
     return "When a webhook is received";
+  }
+  if (DATE_REMINDER_TRIGGER_TYPES.has(triggerType)) {
+    const direction = (config.direction as string) ?? "before";
+    const days = (config.days as number) ?? 0;
+    const entity =
+      triggerType === "engagement.due_date_reminder"
+        ? "an engagement's due date"
+        : triggerType === "quote.expiring_reminder"
+          ? "a quote expires"
+          : "a client's birthday";
+    const dayLabel = days === 1 ? "1 day" : `${days} days`;
+    return `${dayLabel} ${direction} ${entity} (checked every 6 hours)`;
   }
   return triggerType;
 }
@@ -472,6 +494,37 @@ export function TriggerFields({
             separate workflow per service.
           </span>
         </label>
+      )}
+
+      {DATE_REMINDER_TRIGGER_TYPES.has(triggerType) && (
+        <>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            When
+            <select
+              disabled={disabled}
+              value={(config.direction as string) ?? "before"}
+              onChange={(e) => onConfigChange({ ...config, direction: e.target.value })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="before">Before</option>
+              <option value="after">After</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Days
+            <input
+              disabled={disabled}
+              type="number"
+              min={0}
+              value={(config.days as number) ?? 0}
+              onChange={(e) => onConfigChange({ ...config, days: Number(e.target.value) })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            />
+          </label>
+          <span className="col-span-2 text-[11px] text-muted">
+            Checked every 6 hours, so this fires on the matching calendar day rather than at a precise time.
+          </span>
+        </>
       )}
 
       {triggerType === "appointment.status_changed" && (

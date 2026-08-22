@@ -17,6 +17,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/fire-date-reminder-automations",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/ensure-next-tax-year",
       "schedule": "0 0 31 12 *"
     },
