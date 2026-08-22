@@ -13,7 +13,7 @@ import {
 } from "@/components/workflows/WorkflowBuilder";
 import { WorkflowNameEditor } from "@/components/workflows/WorkflowNameEditor";
 import type { PipelineOption, TemplateOption } from "@/components/workflows/TriggerFields";
-import type { Condition } from "@/components/workflows/ConditionsEditor";
+import type { Condition, ConditionGroup } from "@/components/workflows/ConditionsEditor";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 
 export const dynamic = "force-dynamic";
@@ -145,7 +145,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     id: e.id,
     from_step_id: e.from_step_id,
     to_step_id: e.to_step_id,
-    branch_conditions: e.branch_conditions as unknown as Condition[] | null,
+    branch_conditions: e.branch_conditions as unknown as Condition[] | ConditionGroup[] | null,
     label: e.label,
     sort_order: e.sort_order,
   }));
@@ -212,7 +212,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           pipelines={pipelines}
           staffOptions={staffOptions}
           automationOptions={automationOptions}
-          conditions={(automation.conditions as unknown as Condition[]) ?? []}
+          conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
         />
       </div>
     </>
