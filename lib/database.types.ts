@@ -5344,6 +5344,39 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_system_credentials: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          secret_encrypted: string
+          system_name: string
+          updated_at: string
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          secret_encrypted: string
+          system_name: string
+          updated_at?: string
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          secret_encrypted?: string
+          system_name?: string
+          updated_at?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       pricing_rules: {
         Row: {
           allow_override: boolean
@@ -7731,6 +7764,7 @@ export type Database = {
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
+          is_demo: boolean
           is_platform_home: boolean
           mailing_address: string | null
           name: string
@@ -7760,6 +7794,7 @@ export type Database = {
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
+          is_demo?: boolean
           is_platform_home?: boolean
           mailing_address?: string | null
           name: string
@@ -7789,6 +7824,7 @@ export type Database = {
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
+          is_demo?: boolean
           is_platform_home?: boolean
           mailing_address?: string | null
           name?: string
@@ -8675,6 +8711,10 @@ export type Database = {
       decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
       delete_client_email: { Args: { p_email_id: string }; Returns: undefined }
       delete_client_phone: { Args: { p_phone_id: string }; Returns: undefined }
+      delete_platform_system_credential: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
       delete_process_stage: {
         Args: {
           p_destination_stage_id?: string
@@ -8903,6 +8943,10 @@ export type Database = {
           workspace_id: string
           workspace_name: string
         }[]
+      }
+      get_platform_system_credential_secret: {
+        Args: { p_id: string }
+        Returns: string
       }
       get_portal_client_contact: {
         Args: never
@@ -9428,6 +9472,16 @@ export type Database = {
         Args: { p_is_platform_it: boolean; p_user_id: string }
         Returns: undefined
       }
+      set_platform_system_credential: {
+        Args: {
+          p_id: string
+          p_notes: string
+          p_secret: string
+          p_system_name: string
+          p_username: string
+        }
+        Returns: string
+      }
       set_workspace_ghl_connection: {
         Args: {
           p_api_key: string
@@ -9454,6 +9508,7 @@ export type Database = {
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
+          is_demo: boolean
           is_platform_home: boolean
           mailing_address: string | null
           name: string
@@ -9499,6 +9554,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      should_advance_wait_until_step: {
+        Args: { p_pending_id: string }
+        Returns: boolean
       }
       sign_public_engagement_letter: {
         Args: {

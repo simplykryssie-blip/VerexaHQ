@@ -572,6 +572,7 @@ function CanvasInner({
               engagementLetterTemplates={engagementLetterTemplates}
               documentRequestTemplates={documentRequestTemplates}
               services={services}
+              serviceCategories={serviceCategories}
               pipelines={pipelines}
               staffOptions={staffOptions}
               automationOptions={automationOptions}

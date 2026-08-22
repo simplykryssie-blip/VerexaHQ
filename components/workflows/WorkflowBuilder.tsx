@@ -167,6 +167,7 @@ export function StepCard({
   engagementLetterTemplates,
   documentRequestTemplates,
   services,
+  serviceCategories,
   pipelines,
   staffOptions,
   automationOptions,
@@ -184,6 +185,7 @@ export function StepCard({
   engagementLetterTemplates: TemplateOption[];
   documentRequestTemplates: TemplateOption[];
   services: TemplateOption[];
+  serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
@@ -357,6 +359,22 @@ export function StepCard({
         </label>
         {actionType === "delay" && (
           <label className="flex flex-col gap-1 text-xs text-muted">
+            Wait mode
+            <select
+              disabled={!canManage}
+              value={(config.wait_mode as string) ?? "duration"}
+              onChange={(e) => setField("wait_mode", e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="duration">For a duration</option>
+              <option value="until_date">Until a specific date/time</option>
+              <option value="until_condition">Until a condition is met</option>
+            </select>
+          </label>
+        )}
+
+        {actionType === "delay" && (!config.wait_mode || config.wait_mode === "duration") && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
             Wait for
             <div className="flex gap-1.5">
               <input
@@ -385,6 +403,55 @@ export function StepCard({
               the step that should finish first, and its bottom handle to whichever step should run once the wait is over.
             </span>
           </label>
+        )}
+
+        {actionType === "delay" && config.wait_mode === "until_date" && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Wait until
+            <input
+              disabled={!canManage}
+              type="datetime-local"
+              value={typeof config.wait_until_at === "string" ? config.wait_until_at.slice(0, 16) : ""}
+              onChange={(e) => setField("wait_until_at", e.target.value ? new Date(e.target.value).toISOString() : "")}
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            />
+          </label>
+        )}
+
+        {actionType === "delay" && config.wait_mode === "until_condition" && (
+          <div className="col-span-2 flex flex-col gap-3">
+            <div>
+              <p className="mb-1 text-xs text-muted">Wait until</p>
+              <ConditionsEditor
+                conditions={(config.wait_conditions as Condition[]) ?? []}
+                onChange={(next) => {
+                  setConfig((c) => ({ ...c, wait_conditions: next as never }));
+                  setSaved(false);
+                }}
+                staffOptions={staffOptions}
+                services={services}
+                serviceCategories={serviceCategories}
+                pipelines={pipelines}
+                organizerTemplates={organizerTemplates}
+                disabled={!canManage}
+              />
+            </div>
+            <label className="flex w-40 flex-col gap-1 text-xs text-muted">
+              Give up after (days)
+              <input
+                disabled={!canManage}
+                type="number"
+                min={1}
+                value={(config.wait_timeout_days as string) ?? "30"}
+                onChange={(e) => setField("wait_timeout_days", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <span className="text-[11px] normal-case text-muted">
+              If the condition still hasn&apos;t been met after that many days, the workflow continues anyway instead of waiting
+              forever.
+            </span>
+          </div>
         )}
 
         {actionType === "send_email" && (
