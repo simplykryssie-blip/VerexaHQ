@@ -7,7 +7,7 @@ import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
 
 export type Condition = { field: string; op: string; value: string };
 
-type ValueKind = "select" | "lead_stage" | "staff" | "service" | "category" | "pipeline_stage" | "text" | "number" | "boolean";
+type ValueKind = "select" | "labeled_select" | "lead_stage" | "staff" | "service" | "category" | "pipeline_stage" | "text" | "number" | "boolean";
 
 type FieldMeta = {
   key: string;
@@ -15,6 +15,7 @@ type FieldMeta = {
   group: string;
   valueKind: ValueKind;
   options?: string[];
+  labeledOptions?: { value: string; label: string }[];
   ops: string[];
 };
 
@@ -38,7 +39,25 @@ const NUMBER_OPS = ["eq", "neq", "gt", "gte", "lt", "lte"];
 
 const CLIENT_TYPE_OPTIONS = ["individual", "business", "trust", "estate", "organization"];
 const CLIENT_SOURCE_OPTIONS = ["public_organizer_signup", "manual", "portal_basic_info"];
-const PORTAL_STATUS_OPTIONS = ["invited", "active", "revoked"];
+// "not_sent" isn't a real client_portal_users.status value -- there's no
+// row at all until an invite goes out, so evaluate_automation_conditions
+// treats a missing row as 'not_sent' for this field specifically, letting
+// it be selected here like any other real status.
+const PORTAL_STATUS_OPTIONS = [
+  { value: "not_sent", label: "Not sent" },
+  { value: "invited", label: "Sent (not yet activated)" },
+  { value: "active", label: "Active" },
+  { value: "revoked", label: "Archived" },
+];
+// Same "no row yet" treatment as portal status: 'not_sent' means no
+// organizer_responses row exists for this client at all.
+const ORGANIZER_STATUS_OPTIONS = [
+  { value: "not_sent", label: "Not sent" },
+  { value: "not_started", label: "Sent, not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "submitted", label: "Submitted" },
+  { value: "reviewed", label: "Reviewed" },
+];
 const ENGAGEMENT_STATUS_OPTIONS = [
   "New",
   "Waiting On Client",
@@ -74,7 +93,8 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.service_category_id", label: "Requested category", group: "Lead & client", valueKind: "category", ops: SELECT_OPS },
   { key: "client.service_id", label: "Requested service", group: "Lead & client", valueKind: "service", ops: SELECT_OPS },
   { key: "client.source", label: "Lead source", group: "Lead & client", valueKind: "select", options: CLIENT_SOURCE_OPTIONS, ops: SELECT_OPS },
-  { key: "client.portal_status", label: "Portal status", group: "Lead & client", valueKind: "select", options: PORTAL_STATUS_OPTIONS, ops: ID_OPS },
+  { key: "client.portal_status", label: "Portal status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: PORTAL_STATUS_OPTIONS, ops: SELECT_OPS },
+  { key: "client.organizer_status", label: "Organizer status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
   { key: "lead.process_stage_id", label: "Lead pipeline stage", group: "Lead & client", valueKind: "pipeline_stage", ops: ID_OPS },
 
   { key: "engagement.status", label: "Engagement status", group: "Engagement", valueKind: "select", options: ENGAGEMENT_STATUS_OPTIONS, ops: LIST_OPS },
@@ -190,6 +210,19 @@ function ConditionRow({
               {pipelines.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {meta.valueKind === "labeled_select" && (
+            <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
+              <option value="" disabled>
+                Choose a value
+              </option>
+              {(meta.labeledOptions ?? []).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </select>
