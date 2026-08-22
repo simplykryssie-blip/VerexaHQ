@@ -5,29 +5,39 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { slugify } from "@/lib/roleSlug";
 
-// Only asks for the two identifying fields (matches the Organizer/Engagement
-// Letter create-modal pattern) -- the actual subject/body get written in the
-// real composer (TemplateEditRow) immediately after, via onSuccess.
-export function CreateTemplateForm({
+// Organizer and engagement letter templates need their full builder page for
+// actual content (a drag/drop field list, or a rich-text body with merge
+// fields and signature settings) -- there's no small modal composer for
+// either. This only creates the stub row (name, and description for
+// organizers) so it exists and can be picked here immediately; the caller is
+// expected to link out to the real builder to finish it.
+export function CreateQuickTemplate({
   workspaceId,
   kind,
   defaultOpen,
   onSuccess,
 }: {
   workspaceId: string;
-  kind: "email" | "sms";
+  kind: "organizer" | "engagement_letter";
   defaultOpen?: boolean;
-  onSuccess?: (row: { id: string; name: string; slug: string }) => void;
+  onSuccess?: (row: { id: string; name: string }) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const table = kind === "email" ? "email_templates" : "sms_templates";
+  const table = kind === "organizer" ? "organizer_templates" : "engagement_letter_templates";
 
   return (
     <InlineAddForm
       label="New Template"
       defaultOpen={defaultOpen}
-      fields={[{ name: "name", label: "Name", required: true }]}
+      fields={
+        kind === "organizer"
+          ? [
+              { name: "name", label: "Name", required: true },
+              { name: "description", label: "Description (optional)", type: "textarea" },
+            ]
+          : [{ name: "name", label: "Name", required: true }]
+      }
       onSubmit={async (v) => {
         const base = slugify(v.name);
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -39,13 +49,13 @@ export function CreateTemplateForm({
               name: v.name,
               slug,
               status: "draft",
-              ...(kind === "email" ? { subject: "", body_html: "" } : { body: "" }),
+              ...(kind === "organizer" ? { description: v.description || null } : { body_html: "<p></p>" }),
             } as never)
-            .select("id, name, slug")
+            .select("id, name")
             .single();
           if (!error && data) {
             router.refresh();
-            onSuccess?.(data as { id: string; name: string; slug: string });
+            onSuccess?.(data as { id: string; name: string });
             return;
           }
           if (error?.code !== "23505") return error?.message ?? "Could not create template.";
