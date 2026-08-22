@@ -7,7 +7,18 @@ import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
 
 export type Condition = { field: string; op: string; value: string };
 
-type ValueKind = "select" | "labeled_select" | "lead_stage" | "staff" | "service" | "category" | "pipeline_stage" | "text" | "number" | "boolean";
+type ValueKind =
+  | "select"
+  | "labeled_select"
+  | "lead_stage"
+  | "staff"
+  | "service"
+  | "category"
+  | "pipeline_stage"
+  | "organizer_template_status"
+  | "text"
+  | "number"
+  | "boolean";
 
 type FieldMeta = {
   key: string;
@@ -94,7 +105,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.service_id", label: "Requested service", group: "Lead & client", valueKind: "service", ops: SELECT_OPS },
   { key: "client.source", label: "Lead source", group: "Lead & client", valueKind: "select", options: CLIENT_SOURCE_OPTIONS, ops: SELECT_OPS },
   { key: "client.portal_status", label: "Portal status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: PORTAL_STATUS_OPTIONS, ops: SELECT_OPS },
-  { key: "client.organizer_status", label: "Organizer status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
+  { key: "client.organizer_status", label: "Organizer status", group: "Lead & client", valueKind: "organizer_template_status", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
   { key: "lead.process_stage_id", label: "Lead pipeline stage", group: "Lead & client", valueKind: "pipeline_stage", ops: ID_OPS },
 
   { key: "engagement.status", label: "Engagement status", group: "Engagement", valueKind: "select", options: ENGAGEMENT_STATUS_OPTIONS, ops: LIST_OPS },
@@ -129,6 +140,7 @@ function ConditionRow({
   services,
   serviceCategories,
   pipelines,
+  organizerTemplates,
   disabled,
 }: {
   condition: Condition;
@@ -138,11 +150,17 @@ function ConditionRow({
   services: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
+  organizerTemplates: TemplateOption[];
   disabled: boolean;
 }) {
   const meta = fieldMeta(condition.field);
   const stagePipeline = pipelines.find((p) => p.stages.some((s) => s.id === condition.value));
   const [stagePipelineId, setStagePipelineId] = useState(stagePipeline?.id ?? "");
+  // "<organizer_template_id>|<status>" -- both halves are persisted (unlike
+  // stagePipelineId above, which is only used to filter the stage dropdown),
+  // since a client can have responses to more than one organizer template
+  // and the status alone doesn't say which one this condition means.
+  const [organizerTemplateId, organizerStatusValue] = condition.value.split("|");
 
   function setField(nextField: string) {
     const nextMeta = fieldMeta(nextField);
@@ -226,6 +244,41 @@ function ConditionRow({
                 </option>
               ))}
             </select>
+          )}
+
+          {meta.valueKind === "organizer_template_status" && (
+            <>
+              <select
+                disabled={disabled}
+                value={organizerTemplateId ?? ""}
+                onChange={(e) => setValue(`${e.target.value}|${organizerStatusValue ?? ""}`)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose an organizer
+                </option>
+                {organizerTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                disabled={disabled || !organizerTemplateId}
+                value={organizerStatusValue ?? ""}
+                onChange={(e) => setValue(`${organizerTemplateId ?? ""}|${e.target.value}`)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose a status
+                </option>
+                {(meta.labeledOptions ?? []).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </>
           )}
 
           {meta.valueKind === "lead_stage" && (
@@ -359,6 +412,7 @@ export function ConditionsEditor({
   services,
   serviceCategories,
   pipelines,
+  organizerTemplates,
   disabled,
 }: {
   conditions: Condition[];
@@ -367,6 +421,7 @@ export function ConditionsEditor({
   services: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
+  organizerTemplates: TemplateOption[];
   disabled?: boolean;
 }) {
   function addCondition() {
@@ -398,6 +453,7 @@ export function ConditionsEditor({
                 services={services}
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
+                organizerTemplates={organizerTemplates}
                 disabled={Boolean(disabled)}
               />
             </div>

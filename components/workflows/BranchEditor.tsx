@@ -45,6 +45,7 @@ export function BranchEditor({
   services,
   serviceCategories,
   pipelines,
+  organizerTemplates,
   canManage,
   onSaved,
   onClose,
@@ -59,6 +60,7 @@ export function BranchEditor({
   services: TemplateOption[];
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
+  organizerTemplates: TemplateOption[];
   canManage: boolean;
   onSaved: () => void;
   onClose: () => void;
@@ -192,6 +194,7 @@ export function BranchEditor({
               services={services}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
+              organizerTemplates={organizerTemplates}
               disabled={!canManage}
             />
           </div>
