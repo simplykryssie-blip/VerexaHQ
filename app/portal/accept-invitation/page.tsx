@@ -115,9 +115,9 @@ export default function PortalAcceptInvitationPage() {
         email: preview.invited_email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(
-            `/portal/accept-invitation?token=${token}`
-          )}`,
+          // Flat next path + a separate invite_token param, not a nested
+          // "?token=..." inside next's value -- see app/join/page.tsx for why.
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/portal/accept-invitation&invite_token=${encodeURIComponent(token)}`,
           data: { first_name: firstName, last_name: lastName },
         },
       });
