@@ -1,187 +1,147 @@
-"use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useWorkspace } from "@/components/WorkspaceProvider";
-import { friendlyError } from "@/lib/friendlyError";
-type Event = {
-  id: string;
-  title: string;
-  date: string;
-  kind: string;
-  client_id: string | null;
-};
-type DeadlineRow = { id: string; deadline_title: string; due_date: string; client_id: string | null };
-type CalendarEventRow = { id: string; event_title: string; start_at: string; client_id: string | null; event_category: string | null };
-export default function CalendarPage() {
-  const { activeWorkspaceId } = useWorkspace();
-  const [cursor, setCursor] = useState(() => new Date());
-  const [events, setEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(async () => {
-    if (!activeWorkspaceId) return;
-    setLoading(true);
-    const start = new Date(
-      cursor.getFullYear(),
-      cursor.getMonth(),
-      1,
-    ).toISOString();
-    const end = new Date(
-      cursor.getFullYear(),
-      cursor.getMonth() + 1,
-      1,
-    ).toISOString();
-    const [d, c] = await Promise.all([
+import { Lock } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import type { CalendarItem } from "./CalendarView";
+import { CalendarPageClient } from "./CalendarPageClient";
+import { clientLabel } from "@/lib/documentEntityLabels";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
+import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "@/components/appointments/types";
+
+export const dynamic = 'force-dynamic';
+
+export default async function CalendarPage() {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return null;
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: canView }, { data: canManage }] = await Promise.all([
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.view" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
+  ]);
+
+  if (!canView) {
+    return (
+      <>
+        <PageHeader title="Calendar" description="Engagement and task due dates, and appointments, across your workspace." />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState icon={Lock} message="You don't have permission to view the calendar." />
+        </div>
+      </>
+    );
+  }
+
+  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows] =
+    await Promise.all([
       supabase
-        .from("deadlines")
-        .select("id,deadline_title,due_date,client_id")
-        .eq("workspace_id", activeWorkspaceId)
-        .gte("due_date", start.slice(0, 10))
-        .lt("due_date", end.slice(0, 10)),
+        .from("engagements")
+        .select("id, engagement_number, due_date")
+        .eq("workspace_id", workspace.id)
+        .not("due_date", "is", null),
       supabase
-        .from("workspace_calendar_events")
-        .select("id,event_title,start_at,client_id,event_category")
-        .eq("workspace_id", activeWorkspaceId)
-        .neq("event_status", "canceled")
-        .gte("start_at", start)
-        .lt("start_at", end),
+        .from("tasks")
+        .select("id, title, due_date")
+        .eq("workspace_id", workspace.id)
+        .not("due_date", "is", null)
+        .neq("status", "completed"),
+      supabase
+        .from("appointments")
+        .select(
+          "id, title, description, location, meeting_url, start_at, end_at, status, portal_visible, client_id, engagement_id, staff_id, clients(first_name, last_name, business_name, client_type, primary_email), engagements(engagement_number)"
+        )
+        .eq("workspace_id", workspace.id)
+        .order("start_at", { ascending: true })
+        .limit(200),
+      supabase
+        .from("clients")
+        .select("id, first_name, last_name, business_name, client_type, primary_email")
+        .eq("workspace_id", workspace.id)
+        .is("merged_into_client_id", null),
+      supabase.from("engagements").select("id, engagement_number, client_id").eq("workspace_id", workspace.id),
+      getWorkspaceStaff(supabase, workspace.id),
     ]);
-    const firstError = d.error ?? c.error;
-    if (firstError) {
-      setError(friendlyError(firstError, "We couldn't load your calendar right now. Please try again."));
-      setLoading(false);
-      return;
-    }
-    setError(null);
-    setEvents([
-      ...((d.data as DeadlineRow[]) ?? []).map((r) => ({
-        id: r.id,
-        title: r.deadline_title,
-        date: r.due_date,
-        kind: "Deadline",
-        client_id: r.client_id,
+
+  const appointments: AppointmentRow[] = (appointmentRows ?? []).map((a: any) => ({
+    id: a.id,
+    title: a.title,
+    description: a.description,
+    location: a.location,
+    meeting_url: a.meeting_url,
+    start_at: a.start_at,
+    end_at: a.end_at,
+    status: a.status,
+    portal_visible: a.portal_visible,
+    client_id: a.client_id,
+    client_label: a.clients ? clientLabel(a.clients) : null,
+    client_email: a.clients?.primary_email ?? null,
+    engagement_id: a.engagement_id,
+    engagement_label: a.engagements ? `${a.engagements.engagement_number ?? "Engagement"}${a.clients ? ` -- ${clientLabel(a.clients)}` : ""}` : null,
+    staff_id: a.staff_id,
+    staff_name: null,
+  }));
+
+  const staffNameById = new Map(staffRows.map((s) => [s.user_id, s.display_name ?? "Staff member"]));
+  for (const a of appointments) {
+    if (a.staff_id) a.staff_name = staffNameById.get(a.staff_id) ?? null;
+  }
+
+  const clients: ClientOption[] = (clientRows ?? []).map((c: any) => ({ id: c.id, label: clientLabel(c), email: c.primary_email ?? null }));
+  const engagementOpts: EngagementOption[] = (engagementOptions ?? []).map((e) => ({
+    id: e.id,
+    client_id: e.client_id,
+    label: e.engagement_number ?? "Engagement",
+  }));
+  const staff: StaffOption[] = staffRows.map((s) => ({ id: s.user_id, label: s.display_name ?? "Staff member" }));
+
+  const items: CalendarItem[] = [
+    ...(engagements ?? []).map((e) => ({
+      id: e.id,
+      date: e.due_date as string,
+      label: e.engagement_number ?? "Engagement",
+      href: `/engagements/${e.id}`,
+      kind: "engagement" as const,
+    })),
+    ...(tasks ?? []).map((t) => ({
+      id: t.id,
+      date: t.due_date as string,
+      label: t.title,
+      href: undefined,
+      kind: "task" as const,
+    })),
+    ...appointments
+      .filter((a) => a.status !== "cancelled")
+      .map((a) => ({
+        id: a.id,
+        date: a.start_at,
+        label: a.title,
+        href: undefined,
+        kind: "appointment" as const,
       })),
-      ...((c.data as CalendarEventRow[]) ?? []).map((r) => ({
-        id: r.id,
-        title: r.event_title,
-        date: r.start_at,
-        kind: r.event_category || "Event",
-        client_id: r.client_id,
-      })),
-    ]);
-    setLoading(false);
-  }, [activeWorkspaceId, cursor]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-  const days = useMemo(() => {
-    const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-    const last = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
-    const a: (Date | null)[] = Array(first.getDay()).fill(null);
-    for (let i = 1; i <= last.getDate(); i++)
-      a.push(new Date(cursor.getFullYear(), cursor.getMonth(), i));
-    while (a.length % 7) a.push(null);
-    return a;
-  }, [cursor]);
+  ];
+
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">Calendar</h1>
-          <p className="mt-1 text-sm text-muted">
-            Deadlines and firm events in one place.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() =>
-              setCursor(
-                new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1),
-              )
-            }
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white"
-          >
-            <ChevronLeft />
-          </button>
-          <button
-            onClick={() => setCursor(new Date())}
-            className="rounded-xl border border-line bg-white px-3 py-2 text-sm font-semibold"
-          >
-            Today
-          </button>
-          <button
-            onClick={() =>
-              setCursor(
-                new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1),
-              )
-            }
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white"
-          >
-            <ChevronRight />
-          </button>
-        </div>
+    <>
+      <PageHeader
+        title="Calendar"
+        description="Engagement and task due dates, and appointments, in one place."
+      />
+      <div className="flex-1 px-8 py-6">
+        <CalendarPageClient
+          workspaceId={workspace.id}
+          items={items}
+          appointments={appointments}
+          clients={clients}
+          engagements={engagementOpts}
+          staff={staff}
+          canManage={Boolean(canManage)}
+          currentUserId={user?.id ?? null}
+        />
       </div>
-      <h2 className="mb-3 text-lg font-bold text-ink">
-        {cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-      </h2>
-      {error && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
-      )}
-      {loading && (
-        <div className="mb-4 text-sm text-muted">Loading calendar…</div>
-      )}
-      <div className="overflow-x-auto">
-        <div className="min-w-[760px] overflow-hidden rounded-2xl border border-line bg-white">
-          <div className="grid grid-cols-7 bg-paper">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div
-                key={d}
-                className="p-3 text-xs font-bold uppercase text-muted"
-              >
-                {d}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {days.map((day, i) => {
-              const items = day
-                ? events.filter(
-                    (e) =>
-                      new Date(e.date).toDateString() === day.toDateString(),
-                  )
-                : [];
-              return (
-                <div
-                  key={i}
-                  className="min-h-28 border-r border-t border-line p-2 last:border-r-0"
-                >
-                  <div className="text-xs font-semibold text-muted">
-                    {day?.getDate()}
-                  </div>
-                  {items.slice(0, 3).map((e) => (
-                    <Link
-                      key={`${e.kind}-${e.id}`}
-                      href={
-                        e.client_id ? `/clients/${e.client_id}` : "/deadlines"
-                      }
-                      className="mt-1 block truncate rounded-lg bg-cyan-50 px-2 py-1 text-[11px] font-semibold text-cyan-800"
-                    >
-                      {e.title}
-                    </Link>
-                  ))}
-                  {items.length > 3 && (
-                    <div className="mt-1 text-[10px] text-muted">
-                      +{items.length - 3} more
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

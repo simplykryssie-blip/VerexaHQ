@@ -1,233 +1,222 @@
-"use client";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { getDashboardData } from "@/lib/dashboard/data";
+import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
+import { DashboardShell } from "./DashboardShell";
+import type { OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
+import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ArrowRight,
-  CalendarClock,
-  CheckSquare,
-  CircleDollarSign,
-  FileClock,
-  FileText,
-  Plus,
-  Upload,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import { useWorkspace } from "@/components/WorkspaceProvider";
-import { friendlyError } from "@/lib/friendlyError";
-import type { Invoice } from "@/lib/types";
+export const dynamic = "force-dynamic";
 
-type DeadlineRow = {
-  id: string;
-  deadline_title: string;
-  due_date: string;
-  deadline_status: string;
-};
+export default async function DashboardPage() {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return null;
 
-type TaskRow = {
-  id: string;
-  task_title: string;
-  due_date: string | null;
-  priority: string | null;
-  task_status: string;
-};
+  const supabase = createClient();
 
-type ActivityRow = {
-  id: string;
-  document_name: string;
-  document_status: string;
-  created_at: string;
-};
+  // Verexa's own workspace: platform admins/IT land straight on their
+  // dashboard instead of the normal staff view -- everyone else here
+  // (regular staff testing in this workspace) is unaffected.
+  const [{ data: homeRow }, { data: isPlatformAdmin }, { data: isPlatformIt }] = await Promise.all([
+    supabase.from("workspaces").select("is_platform_home").eq("id", workspace.id).maybeSingle(),
+    supabase.rpc("is_platform_admin"),
+    supabase.rpc("is_platform_it"),
+  ]);
+  if (homeRow?.is_platform_home) {
+    if (isPlatformAdmin) redirect("/platform-admin");
+    if (isPlatformIt) redirect("/platform-admin/it");
+  }
 
-type DashboardData = {
-  clients: number;
-  openTasks: number;
-  outstanding: number;
-  awaitingDocuments: number;
-  deadlines: DeadlineRow[];
-  tasks: TaskRow[];
-  documents: ActivityRow[];
-};
+  const { data: dashboardId } = await supabase.rpc("ensure_default_dashboard", { p_workspace_id: workspace.id });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-const INITIAL: DashboardData = {
-  clients: 0,
-  openTasks: 0,
-  outstanding: 0,
-  awaitingDocuments: 0,
-  deadlines: [],
-  tasks: [],
-  documents: [],
-};
+  const [
+    { data: widgets },
+    data,
+    { data: clientsCreate },
+    { data: engagementsManage },
+    { data: billingManage },
+    { data: documentsRequest },
+    { data: appointmentsManage },
+    { data: onboardingRow },
+    { data: profileRow },
+  ] = await Promise.all([
+    dashboardId
+      ? supabase
+          .from("dashboard_widgets")
+          .select("id, widget_type, title, display_order, is_visible")
+          .eq("dashboard_id", dashboardId)
+          .order("display_order")
+      : Promise.resolve({ data: [] }),
+    getDashboardData(workspace.id),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "documents.request" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
+    supabase.from("workspaces").select("onboarding_dismissed_at, stripe_connected_account_id").eq("id", workspace.id).maybeSingle(),
+    user
+      ? supabase.from("user_profiles").select("seen_onboarding_steps, first_name, avatar_url").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
-export default function DashboardPage() {
-  const { activeWorkspaceId, activeWorkspace } = useWorkspace();
-  const [data, setData] = useState<DashboardData>(INITIAL);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const quickActionPermissions = {
+    clientsCreate: Boolean(clientsCreate),
+    engagementsManage: Boolean(engagementsManage),
+    billingManage: Boolean(billingManage),
+    documentsRequest: Boolean(documentsRequest),
+    appointmentsManage: Boolean(appointmentsManage),
+  };
 
-  const load = useCallback(async () => {
-    if (!activeWorkspaceId) return;
-    setLoading(true);
-    setError(null);
+  const widgetIds = (widgets ?? []).map((w) => w.id);
+  const { data: preferences } =
+    user && widgetIds.length > 0
+      ? await supabase
+          .from("user_widget_preferences")
+          .select("dashboard_widget_id, is_visible, display_order")
+          .eq("user_id", user.id)
+          .in("dashboard_widget_id", widgetIds)
+      : { data: [] as { dashboard_widget_id: string; is_visible: boolean | null; display_order: number | null }[] };
+  const prefByWidget = new Map((preferences ?? []).map((p) => [p.dashboard_widget_id, p]));
 
-    const today = new Date().toISOString().slice(0, 10);
-    const [clients, tasks, invoices, docs, deadlines, taskList, recentDocs] =
-      await Promise.all([
-        supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).is("archived_at", null),
-        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).not("task_status", "in", '("Completed","Canceled")'),
-        supabase.from("invoices").select("total_amount,amount_paid").eq("workspace_id", activeWorkspaceId).not("invoice_status", "in", '("paid","void")'),
-        supabase.from("documents").select("id", { count: "exact", head: true }).eq("workspace_id", activeWorkspaceId).in("document_status", ["Needed", "Requested"]),
-        supabase.from("deadlines").select("id,deadline_title,due_date,deadline_status").eq("workspace_id", activeWorkspaceId).gte("due_date", today).neq("deadline_status", "Completed").order("due_date", { ascending: true }).limit(6),
-        supabase.from("tasks").select("id,task_title,due_date,priority,task_status").eq("workspace_id", activeWorkspaceId).not("task_status", "in", '("Completed","Canceled")').order("due_date", { ascending: true, nullsFirst: false }).limit(6),
-        supabase.from("documents").select("id,document_name,document_status,created_at").eq("workspace_id", activeWorkspaceId).order("created_at", { ascending: false }).limit(5),
-      ]);
+  const mergedWidgets = (widgets ?? []).map((w) => {
+    const pref = prefByWidget.get(w.id);
+    return {
+      ...w,
+      is_visible: pref?.is_visible ?? w.is_visible,
+      display_order: pref?.display_order ?? w.display_order,
+    };
+  });
 
-    const firstError = [clients, tasks, invoices, docs, deadlines, taskList, recentDocs].find((result) => result.error)?.error;
-    if (firstError) {
-      setError(friendlyError(firstError, "We couldn't load your dashboard right now. Please try again."));
-      setLoading(false);
-      return;
-    }
+  const priorities = computeTodaysPriorities(data);
 
-    const outstanding = ((invoices.data ?? []) as Pick<Invoice, "total_amount" | "amount_paid">[]).reduce(
-      (sum, invoice) => sum + Math.max(Number(invoice.total_amount ?? 0) - Number(invoice.amount_paid ?? 0), 0),
-      0,
-    );
+  const onboardingDismissed = Boolean(onboardingRow?.onboarding_dismissed_at);
+  let onboardingSteps: OnboardingStep[] = [];
+  if (!onboardingDismissed) {
+    const showEroSteps = canInviteStaff(workspace);
+    const [
+      { count: serviceCount },
+      { count: organizerCount },
+      { count: clientCount },
+      { count: staffCount },
+      { count: pendingInviteCount },
+      { count: automationCount },
+      { count: customRoleCount },
+      { count: connectionCount },
+    ] = await Promise.all([
+      supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      showEroSteps
+        ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
+        : Promise.resolve({ count: null }),
+      showEroSteps
+        ? supabase
+            .from("workspace_invitations")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", workspace.id)
+            .eq("status", "pending")
+        : Promise.resolve({ count: null }),
+      supabase.from("automations").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      showEroSteps
+        ? supabase.from("roles").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("is_system_role", false)
+        : Promise.resolve({ count: null }),
+      showEroSteps
+        ? supabase.from("firm_connections").select("id", { count: "exact", head: true }).eq("parent_workspace_id", workspace.id)
+        : Promise.resolve({ count: null }),
+    ]);
 
-    setData({
-      clients: clients.count ?? 0,
-      openTasks: tasks.count ?? 0,
-      outstanding,
-      awaitingDocuments: docs.count ?? 0,
-      deadlines: (deadlines.data ?? []) as DeadlineRow[],
-      tasks: (taskList.data ?? []) as TaskRow[],
-      documents: (recentDocs.data ?? []) as ActivityRow[],
-    });
-    setLoading(false);
-  }, [activeWorkspaceId]);
+    // A photo is nice-to-have, not a gate -- a name is enough to call the profile "done".
+    // Check first_name, not display_name -- display_name silently defaults to the user's
+    // email at signup (handle_new_auth_user()), so it's always truthy and can't signal
+    // real completion. first_name is only set when the user actually provided one.
+    const profileComplete = Boolean(profileRow?.first_name);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  }, []);
+    onboardingSteps = [
+      {
+        key: "profile",
+        label: "Complete your profile",
+        description: "Add your name and a photo so colleagues recognize you in messages.",
+        href: "/settings/firm-profile",
+        complete: profileComplete,
+      },
+      ...(showEroSteps
+        ? [
+            {
+              key: "invite",
+              label: "Add users",
+              description: "Add staff so they can share the workload.",
+              href: "/settings/users",
+              complete: (staffCount ?? 0) > 1 || (pendingInviteCount ?? 0) > 0,
+            },
+            {
+              key: "roles",
+              label: "Set roles & permissions",
+              description: "Control what each role on your team can see and do.",
+              href: "/settings/roles",
+              complete: (customRoleCount ?? 0) > 0,
+            },
+            {
+              key: "connections",
+              label: "Send connections",
+              description: "Invite the PTINs you work with to connect to your ERO.",
+              href: "/settings/connections",
+              complete: (connectionCount ?? 0) > 0,
+            },
+          ]
+        : []),
+      {
+        key: "integrations",
+        label: "Set up integrations",
+        description: "Connect Stripe to get paid and Zoom for client meetings.",
+        href: "/settings/integrations",
+        complete: Boolean(onboardingRow?.stripe_connected_account_id),
+      },
+      {
+        key: "service",
+        label: "Turn on your first service",
+        description: "Choose which services your firm offers and customize the pipeline for each one.",
+        href: "/settings/services",
+        complete: (serviceCount ?? 0) > 0,
+      },
+      {
+        key: "organizer",
+        label: "Add a client intake form",
+        description: "Build the questions clients answer before you start their work.",
+        href: "/templates",
+        complete: (organizerCount ?? 0) > 0,
+      },
+      {
+        key: "client",
+        label: "Add your first client",
+        description: "Bring in a real or test client to see the workflow end to end.",
+        href: "/clients",
+        complete: (clientCount ?? 0) > 0,
+      },
+      {
+        key: "automations",
+        label: "Set up your automations",
+        description: "Decide what happens automatically -- welcome emails, sending an organizer, moving a client into a pipeline.",
+        href: "/workflows",
+        complete: (automationCount ?? 0) > 0,
+      },
+    ];
+  }
 
   return (
-    <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-line bg-[#132922] p-6 text-white shadow-sm md:p-7">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.16em] text-white/50">Workspace command center</p>
-            <h1 className="mt-2 text-2xl font-bold md:text-3xl">{greeting}. Here’s what needs attention.</h1>
-            <p className="mt-2 text-sm text-white/65">{activeWorkspace?.name ?? "Your firm"} · Keep client work, deadlines, and cash flow moving.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <QuickLink href="/clients" icon={Plus} label="Add client" />
-            <QuickLink href="/documents" icon={Upload} label="Request documents" />
-            <QuickLink href="/billing" icon={CircleDollarSign} label="Create invoice" />
-          </div>
-        </div>
-      </section>
-
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon={Users} label="Active clients" value={data.clients.toLocaleString()} helper="Across this workspace" loading={loading} />
-        <Metric icon={CheckSquare} label="Open tasks" value={data.openTasks.toLocaleString()} helper="Work still in motion" loading={loading} />
-        <Metric icon={FileClock} label="Documents needed" value={data.awaitingDocuments.toLocaleString()} helper="Requested or missing" loading={loading} />
-        <Metric icon={CircleDollarSign} label="Outstanding" value={money(data.outstanding)} helper="Unpaid invoice balance" loading={loading} />
-      </section>
-
-      <section className="grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
-        <div className="app-card p-5">
-          <SectionHeader title="Today’s work" href="/tasks" />
-          <div className="mt-4 divide-y divide-line">
-            {!loading && data.tasks.length === 0 && <Empty text="No open tasks. Your queue is clear." />}
-            {data.tasks.map((task) => (
-              <Link key={task.id} href="/tasks" className="flex items-center justify-between gap-4 py-3.5 transition hover:bg-paper">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-ink">{task.task_title}</div>
-                  <div className="mt-1 text-xs text-muted">{task.due_date ? `Due ${formatDate(task.due_date)}` : "No due date"}</div>
-                </div>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${priorityClass(task.priority)}`}>{task.priority || "Normal"}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="app-card p-5">
-          <SectionHeader title="Upcoming deadlines" href="/deadlines" />
-          <div className="mt-4 space-y-3">
-            {!loading && data.deadlines.length === 0 && <Empty text="No upcoming deadlines found." />}
-            {data.deadlines.map((deadline) => (
-              <Link key={deadline.id} href="/deadlines" className="flex items-start gap-3 rounded-xl border border-line p-3.5 hover:border-[#108A64]/40 hover:bg-emerald-50/40">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-[#108A64]"><CalendarClock size={18} /></div>
-                <div className="min-w-0"><div className="truncate text-sm font-semibold text-ink">{deadline.deadline_title}</div><div className="mt-1 text-xs text-muted">{formatDate(deadline.due_date)} · {deadline.deadline_status}</div></div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="app-card p-5">
-        <SectionHeader title="Recent client activity" href="/documents" />
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {!loading && data.documents.length === 0 && <Empty text="Recent uploads and document requests will appear here." />}
-          {data.documents.map((doc) => (
-            <Link key={doc.id} href="/documents" className="flex items-center gap-3 rounded-xl border border-line p-4 hover:border-[#108A64]/35 hover:shadow-sm">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-700"><FileText size={18} /></div>
-              <div className="min-w-0"><div className="truncate text-sm font-semibold text-ink">{doc.document_name}</div><div className="mt-1 text-xs text-muted">{doc.document_status} · {formatDate(doc.created_at)}</div></div>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </div>
+    <DashboardShell
+      workspaceName={workspace.name}
+      isAdmin={workspace.is_owner}
+      widgets={mergedWidgets}
+      data={data}
+      priorities={priorities}
+      quickActionPermissions={quickActionPermissions}
+      workspaceId={workspace.id}
+      onboardingSteps={onboardingDismissed ? null : onboardingSteps}
+      seenOnboardingSteps={profileRow?.seen_onboarding_steps ?? []}
+    />
   );
 }
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-  helper,
-  loading,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  helper: string;
-  loading: boolean;
-}) {
-  return (
-    <div className="app-card p-5">
-      <div className="flex items-center justify-between">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-[#108A64]"><Icon size={19} /></div>
-      </div>
-      {loading ? (
-        <div className="mt-5 h-8 w-20 animate-pulse rounded-md bg-paperDim" aria-hidden="true" />
-      ) : (
-        <div className="mt-5 text-3xl font-bold tabular-nums text-ink">{value}</div>
-      )}
-      <div className="mt-1 text-sm font-semibold text-ink">{label}</div>
-      <div className="mt-1 text-xs text-muted">{helper}</div>
-    </div>
-  );
-}
-
-function QuickLink({ href, icon: Icon, label }: { href: string; icon: LucideIcon; label: string }) {
-  return <Link href={href} className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-white/15"><Icon size={16} />{label}</Link>;
-}
-
-function SectionHeader({ title, href }: { title: string; href: string }) {
-  return <div className="flex items-center justify-between"><h2 className="font-bold text-ink">{title}</h2><Link href={href} className="flex items-center gap-1 text-xs font-semibold text-[#108A64]">View all <ArrowRight size={14} /></Link></div>;
-}
-
-function Empty({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-line p-5 text-sm text-muted">{text}</div>; }
-function money(value: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value); }
-function formatDate(value: string) { return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
-function priorityClass(priority: string | null) { const p = (priority ?? "").toLowerCase(); if (p.includes("high") || p.includes("urgent")) return "bg-red-50 text-red-700"; if (p.includes("low")) return "bg-slate-100 text-slate-600"; return "bg-amber-50 text-amber-700"; }

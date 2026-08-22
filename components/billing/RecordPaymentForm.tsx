@@ -1,0 +1,120 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
+
+export function RecordPaymentForm({
+  invoiceId,
+  workspaceId,
+  clientId,
+  balanceDue,
+}: {
+  invoiceId: string;
+  workspaceId: string;
+  clientId: string;
+  balanceDue: number;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(balanceDue.toFixed(2));
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reference, setReference] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function record(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const amountNum = Number(amount);
+    if (!amountNum || amountNum <= 0) {
+      setError("Enter a payment amount greater than zero.");
+      return;
+    }
+    setSaving(true);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { error: insertError } = await supabase.from("payments").insert({
+      workspace_id: workspaceId,
+      client_id: clientId,
+      invoice_id: invoiceId,
+      amount: amountNum,
+      payment_date: paymentDate,
+      reference: reference || null,
+      recorded_by: user?.id,
+    });
+
+    setSaving(false);
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+    toast.show("Payment recorded", "success");
+    setOpen(false);
+    router.refresh();
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="text-xs font-medium text-accent hover:underline">
+        Record payment
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={record} className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surfaceMuted p-3">
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        Amount
+        <input
+          required
+          type="number"
+          min={0.01}
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-28 rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        Date
+        <input
+          required
+          type="date"
+          value={paymentDate}
+          onChange={(e) => setPaymentDate(e.target.value)}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        Reference (optional)
+        <input
+          type="text"
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="Check #, last 4, etc."
+          className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      </label>
+      {error && <p className="w-full text-sm text-danger">{error}</p>}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate hover:bg-surface">
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {saving ? "Recording..." : "Record payment"}
+        </button>
+      </div>
+    </form>
+  );
+}

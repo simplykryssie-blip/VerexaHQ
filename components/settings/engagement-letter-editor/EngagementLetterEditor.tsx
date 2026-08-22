@@ -1,0 +1,203 @@
+"use client";
+
+import { useRef, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import type { Editor } from "@tiptap/react";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
+import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
+import { EngagementLetterPreview } from "./EngagementLetterPreview";
+import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
+import { extractMergeFieldTokens } from "@/lib/mergeFields";
+
+export type EngagementLetterTemplateRow = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  workspace_id: string | null;
+  body_html: string;
+  requires_signature: boolean;
+  merge_fields: unknown;
+  public_token: string;
+  is_public: boolean;
+  requires_portal_signup: boolean;
+  banner_image_url: string | null;
+};
+
+export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
+  const supabase = createClient();
+  const toast = useToast();
+  const readOnly = !template.workspace_id;
+
+  const [name, setName] = useState(template.name);
+  const [bodyHtml, setBodyHtml] = useState(template.body_html);
+  const [requiresSignature, setRequiresSignature] = useState(template.requires_signature);
+  const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+  const [view, setView] = useState<"edit" | "preview">("edit");
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const editorRef = useRef<Editor | null>(null);
+
+  const usedTokens = extractMergeFieldTokens(bodyHtml);
+
+  async function save() {
+    setSaving(true);
+    const { error } = await supabase
+      .from("engagement_letter_templates")
+      .update({
+        name,
+        body_html: bodyHtml,
+        requires_signature: requiresSignature,
+        merge_fields: usedTokens,
+        banner_image_url: bannerImageUrl,
+      })
+      .eq("id", template.id);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setDirty(false);
+    toast.show("Saved", "success");
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+        <Link href="/templates?tab=engagement-letter" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+          <ArrowLeft size={14} /> Engagement letters
+        </Link>
+        <div className="text-center">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Engagement letter</p>
+          <p className="text-sm font-semibold text-ink">
+            {name} {readOnly && <span className="ml-1 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!readOnly && (
+            <PublicLinkToggle
+              table="engagement_letter_templates"
+              id={template.id}
+              path="e"
+              publicToken={template.public_token}
+              status={template.status}
+              initialIsPublic={template.is_public}
+              initialRequiresPortalSignup={template.requires_portal_signup}
+            />
+          )}
+          {!readOnly && <TemplateStatusCycle table="engagement_letter_templates" id={template.id} status={template.status} />}
+          <button
+            type="button"
+            onClick={() => setView((v) => (v === "edit" ? "preview" : "edit"))}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+          >
+            {view === "edit" ? "Preview" : "Back to editor"}
+          </button>
+          {!readOnly && view === "edit" && (
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving || !dirty}
+              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          )}
+        </div>
+      </header>
+
+      {readOnly && (
+        <p className="border-b border-border bg-surfaceMuted px-4 py-2 text-xs text-muted">
+          This is a system default and can&apos;t be edited here -- clone the service it belongs to first.
+        </p>
+      )}
+
+      <div className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
+        {view === "preview" ? (
+          <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} />
+        ) : (
+          <div className="mx-auto max-w-[720px] space-y-4">
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Name
+                <input
+                  value={name}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setDirty(true);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+                />
+              </label>
+
+              <label className="mt-3 flex items-center gap-2 text-sm text-slate">
+                <input
+                  type="checkbox"
+                  checked={requiresSignature}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setRequiresSignature(e.target.checked);
+                    setDirty(true);
+                  }}
+                  className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                />
+                Requires client signature
+              </label>
+
+              <div className="mt-4 border-t border-border pt-3">
+                <BannerImageUpload
+                  workspaceId={template.workspace_id ?? ""}
+                  value={bannerImageUrl}
+                  disabled={readOnly}
+                  onChange={(url) => {
+                    setBannerImageUrl(url);
+                    setDirty(true);
+                  }}
+                />
+              </div>
+            </div>
+
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
+            {bannerImageUrl && (
+              <div className="mx-auto max-w-[720px] overflow-hidden rounded-t-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+              </div>
+            )}
+            <RichTextEditor
+              content={bodyHtml}
+              editable={!readOnly}
+              documentStyle
+              allowPageBreak
+              onEditorReady={(editor) => (editorRef.current = editor)}
+              onChange={(html) => {
+                setBodyHtml(html);
+                setDirty(true);
+              }}
+              toolbarExtra={
+                !readOnly && <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
+              }
+            />
+
+            {usedTokens.length > 0 && (
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted">Merge fields used in this letter</p>
+                <p className="mt-1 flex flex-wrap gap-1.5">
+                  {usedTokens.map((t) => (
+                    <code key={t} className="rounded bg-surfaceMuted px-1.5 py-0.5 text-xs">{`{{${t}}}`}</code>
+                  ))}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

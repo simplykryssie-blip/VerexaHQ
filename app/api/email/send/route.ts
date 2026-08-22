@@ -1,29 +1,51 @@
-import { NextRequest, NextResponse } from "next/server";
-import { isEmailConfigured } from "@/lib/providerStatus";
-import { authenticateRequest } from "@/lib/serverAuth";
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { sendEmailViaResend, SYSTEM_SENDERS, type SystemSenderKey } from "@/lib/email/resend";
+import { recordProviderCheck } from "@/lib/providerHealth";
+import { checkRateLimit } from "@/lib/rateLimit";
 
-export async function POST(req: NextRequest) {
-  try { await authenticateRequest(req); } catch {
-    return NextResponse.json({ ok: false, error: "Unauthorized." }, { status: 401 });
+function isSystemSenderKey(value: unknown): value is SystemSenderKey {
+  return typeof value === "string" && value in SYSTEM_SENDERS;
+}
+
+export async function POST(request: Request) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ ok: false, sent: false, error: "Not authenticated" }, { status: 401 });
   }
 
-  const payload = await req.json().catch(() => null) as { to?: string; subject?: string; html?: string } | null;
-  const to = payload?.to?.trim();
-  const subject = payload?.subject?.trim();
-  const html = payload?.html?.trim();
-  if (!to || !subject || !html || subject.length > 300 || html.length > 200000) {
-    return NextResponse.json({ ok: false, error: "Invalid email request." }, { status: 400 });
+  const allowed = await checkRateLimit(`email-send:${user.id}`, 30, 60);
+  if (!allowed) {
+    return NextResponse.json({ ok: false, sent: false, error: "Too many requests. Try again shortly." }, { status: 429 });
   }
-  if (!isEmailConfigured()) {
-    return NextResponse.json({ ok: false, sent: false, reason: "Email delivery is not configured." }, { status: 503 });
+
+  const { to, subject, html, sender } = (await request.json()) as {
+    to?: string;
+    subject?: string;
+    html?: string;
+    sender?: string;
+  };
+  if (!to || !subject || !html) {
+    return NextResponse.json({ ok: false, sent: false, error: "to, subject, and html are required" }, { status: 400 });
   }
-  try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const { data, error } = await resend.emails.send({ from: process.env.EMAIL_FROM_ADDRESS as string, to, subject, html });
-    if (error) return NextResponse.json({ ok: false, sent: false, error: error.message }, { status: 502 });
-    return NextResponse.json({ ok: true, sent: true, id: data?.id });
-  } catch (error) {
-    return NextResponse.json({ ok: false, sent: false, error: error instanceof Error ? error.message : "Email delivery failed." }, { status: 500 });
+
+  const workspace = await getCurrentWorkspace();
+  const { data: profile } = await supabase.from("user_profiles").select("display_name").eq("id", user.id).maybeSingle();
+
+  const result = await sendEmailViaResend({
+    to,
+    subject,
+    html,
+    ...(isSystemSenderKey(sender) ? { sender } : {}),
+    ...(workspace ? { workspaceId: workspace.id } : {}),
+    ...(profile?.display_name ? { fromName: profile.display_name } : {}),
+  });
+  if (result.reason === undefined) {
+    await recordProviderCheck("email", result.sent, result.error);
   }
+  return NextResponse.json({ ok: true, ...result });
 }

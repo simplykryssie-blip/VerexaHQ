@@ -1,246 +1,184 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { PageHeader } from "@/components/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import { MessageSquare } from "lucide-react";
+import { NetworkMessagingHub, type NetworkThread, type NetworkMessage } from "@/components/messaging/NetworkMessagingHub";
+import { InternalMessagingHub, type InternalThread, type InternalMessage, type Teammate } from "@/components/messaging/InternalMessagingHub";
+import { MessagesTabs } from "@/components/messaging/MessagesTabs";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 
-import { useEffect, useState } from "react";
-import { Send } from "lucide-react";
-import { supabase } from "@/lib/supabase";
-import type { PortalConversation, PortalMessage, Client } from "@/lib/types";
-import StatusPill from "@/components/StatusPill";
+export const dynamic = "force-dynamic";
 
-import { friendlyError } from "@/lib/friendlyError";
-type ConversationRow = PortalConversation & { clientName: string };
+// Two independent messaging systems share this one tab: internal DMs
+// between two members of *this* workspace (e.g. an ERO owner and their own
+// staff), and network messaging between an ERO/SB and a separately
+// connected PTIN *workspace*. Either capability is enough to show
+// something useful here; a workspace with neither gets an explanation
+// instead of a dead inbox.
+export default async function MessagesHubPage() {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return null;
 
-export default function StaffMessagesPage() {
-  const [conversations, setConversations] = useState<ConversationRow[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<PortalMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [draft, setDraft] = useState("");
-  const [asInternalNote, setAsInternalNote] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "waiting_on_firm">("all");
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const currentUserId = user?.id ?? "";
 
-  async function loadConversations() {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("portal_conversations")
-      .select("*")
-      .order("last_message_at", { ascending: false });
+  const [{ data: messageableRaw }, staffMembers] = await Promise.all([
+    supabase.rpc("get_messageable_network_workspaces", { p_workspace_id: workspace.id }),
+    getWorkspaceStaff(supabase, workspace.id),
+  ]);
+  const messageableWorkspaces = (messageableRaw ?? []).map((w) => ({ workspaceId: w.workspace_id, name: w.name }));
+  const teammates: Teammate[] = staffMembers
+    .filter((m) => m.user_id !== currentUserId)
+    .map((m) => ({ id: m.user_id, name: m.display_name ?? "Team member", avatarUrl: m.avatar_url }));
 
-    if (error) {
-      setError(friendlyError(error, "Something went wrong. Please try again."));
-      setLoading(false);
-      return;
-    }
+  const hasNetwork = messageableWorkspaces.length > 0;
+  const hasTeam = teammates.length > 0;
 
-    const list = (data as PortalConversation[]) ?? [];
-    const clientIds = Array.from(new Set(list.map((c) => c.client_id)));
-    let clientsMap = new Map<string, string>();
-    if (clientIds.length > 0) {
-      const { data: clientsData } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name, business_name, client_type")
-        .in("id", clientIds);
-      (clientsData as Client[] | null)?.forEach((c) => {
-        const name =
-          c.client_type === "business" && c.business_name
-            ? c.business_name
-            : `${c.first_name} ${c.last_name}`.trim();
-        clientsMap.set(c.id, name);
-      });
-    }
-
-    const rows = list.map((c) => ({ ...c, clientName: clientsMap.get(c.client_id) ?? "—" }));
-    setConversations(rows);
-    if (rows.length > 0 && !activeId) setActiveId(rows[0].id);
-    setError(null);
-    setLoading(false);
+  if (!hasNetwork && !hasTeam) {
+    const isEroOrSb = workspace.workspace_type === "ero_office" || workspace.workspace_type === "service_bureau";
+    return (
+      <>
+        <PageHeader title="Messages" description="Internal conversations with your team and your connected network." />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState
+            icon={MessageSquare}
+            message={
+              isEroOrSb
+                ? "You don't have any teammates or connected PTINs to message yet. Invite staff from Settings > Users & Staff, or wait for a PTIN to connect to your firm."
+                : "You don't have any teammates to message yet. Invite staff from Settings > Users & Staff, or connect with an ERO/Service Bureau from Settings > Connections to message them too."
+            }
+          />
+        </div>
+      </>
+    );
   }
 
-  async function loadMessages(conversationId: string) {
-    const { data } = await supabase
-      .from("portal_messages")
-      .select("*")
-      .eq("conversation_id", conversationId)
-      .order("created_at", { ascending: true });
-    setMessages((data as PortalMessage[]) ?? []);
-  }
+  const [{ data: networkThreadsRaw }, { data: internalThreadsRaw }] = await Promise.all([
+    hasNetwork
+      ? supabase
+          .from("network_message_threads")
+          .select("id, workspace_a_id, workspace_b_id, last_message_at")
+          .or(`workspace_a_id.eq.${workspace.id},workspace_b_id.eq.${workspace.id}`)
+          .order("last_message_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+    hasTeam
+      ? supabase
+          .from("internal_message_threads")
+          .select("id, user_a_id, user_b_id, last_message_at")
+          .eq("workspace_id", workspace.id)
+          .or(`user_a_id.eq.${currentUserId},user_b_id.eq.${currentUserId}`)
+          .order("last_message_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  useEffect(() => {
-    loadConversations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const networkThreadIds = (networkThreadsRaw ?? []).map((t) => t.id);
+  const internalThreadIds = (internalThreadsRaw ?? []).map((t) => t.id);
 
-  useEffect(() => {
-    if (activeId) loadMessages(activeId);
-  }, [activeId]);
+  const [{ data: networkMessagesRaw }, { data: internalMessagesRaw }] = await Promise.all([
+    networkThreadIds.length
+      ? supabase
+          .from("network_messages")
+          .select("id, thread_id, sender_workspace_id, sender_user_id, body, created_at, read_at")
+          .in("thread_id", networkThreadIds)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] }),
+    internalThreadIds.length
+      ? supabase
+          .from("internal_messages")
+          .select("id, thread_id, sender_id, body, created_at, read_at")
+          .in("thread_id", internalThreadIds)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] }),
+  ]);
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
-    const activeConversation = conversations.find((c) => c.id === activeId);
-    if (!activeConversation || !draft.trim()) return;
-    setSending(true);
-    setError(null);
-
-    const { error } = await supabase.rpc("send_portal_message_as_firm", {
-      p_client_id: activeConversation.client_id,
-      p_subject: null,
-      p_message_body: draft,
-      p_service_id: null,
-      p_conversation_id: activeConversation.id,
-      p_attachment_document_id: null,
-      p_is_internal: asInternalNote,
-    });
-
-    setSending(false);
-    if (error) {
-      setError(friendlyError(error, "Something went wrong. Please try again."));
-      return;
-    }
-    setDraft("");
-    await loadConversations();
-    loadMessages(activeConversation.id);
-  }
-
-  const visibleConversations = conversations.filter(
-    (c) => filter === "all" || c.conversation_status === "Waiting on Firm"
+  const otherWorkspaceIds = Array.from(
+    new Set((networkThreadsRaw ?? []).map((t) => (t.workspace_a_id === workspace.id ? t.workspace_b_id : t.workspace_a_id)))
   );
-  const activeConversation = conversations.find((c) => c.id === activeId);
+  const { data: otherWorkspaces } = otherWorkspaceIds.length
+    ? await supabase.from("workspaces").select("id, name").in("id", otherWorkspaceIds)
+    : { data: [] };
+  const otherWorkspaceNameById = new Map((otherWorkspaces ?? []).map((w) => [w.id, w.name]));
+
+  const networkThreads: NetworkThread[] = (networkThreadsRaw ?? []).map((t) => {
+    const otherId = t.workspace_a_id === workspace.id ? t.workspace_b_id : t.workspace_a_id;
+    return {
+      id: t.id,
+      otherWorkspaceId: otherId,
+      otherWorkspaceName: otherWorkspaceNameById.get(otherId) ?? "Unknown firm",
+      lastMessageAt: t.last_message_at,
+    };
+  });
+
+  const networkMessages: NetworkMessage[] = (networkMessagesRaw ?? []).map((m) => ({
+    id: m.id,
+    threadId: m.thread_id,
+    senderWorkspaceId: m.sender_workspace_id,
+    senderUserId: m.sender_user_id,
+    body: m.body,
+    createdAt: m.created_at,
+    readAt: m.read_at,
+  }));
+
+  const senderUserIds = Array.from(new Set(networkMessages.map((m) => m.senderUserId).filter((id): id is string => Boolean(id))));
+  const { data: senderProfiles } = senderUserIds.length
+    ? await supabase.from("user_profiles").select("id, display_name, avatar_url").in("id", senderUserIds)
+    : { data: [] };
+  const senderProfileMap = Object.fromEntries((senderProfiles ?? []).map((p) => [p.id, { display_name: p.display_name, avatar_url: p.avatar_url }]));
+
+  const teammateById = new Map(teammates.map((t) => [t.id, t]));
+  const internalThreads: InternalThread[] = (internalThreadsRaw ?? []).map((t) => {
+    const otherId = t.user_a_id === currentUserId ? t.user_b_id : t.user_a_id;
+    const other = teammateById.get(otherId);
+    return {
+      id: t.id,
+      otherUserId: otherId,
+      otherUserName: other?.name ?? "Team member",
+      otherUserAvatar: other?.avatarUrl ?? null,
+      lastMessageAt: t.last_message_at,
+    };
+  });
+
+  const internalMessages: InternalMessage[] = (internalMessagesRaw ?? []).map((m) => ({
+    id: m.id,
+    threadId: m.thread_id,
+    senderId: m.sender_id,
+    body: m.body,
+    createdAt: m.created_at,
+    readAt: m.read_at,
+  }));
+
+  const teamHub = hasTeam ? (
+    <InternalMessagingHub workspaceId={workspace.id} threads={internalThreads} messages={internalMessages} currentUserId={currentUserId} teammates={teammates} />
+  ) : null;
+
+  const networkHub = hasNetwork ? (
+    <NetworkMessagingHub
+      workspaceId={workspace.id}
+      threads={networkThreads}
+      messages={networkMessages}
+      currentUserId={currentUserId}
+      messageableWorkspaces={messageableWorkspaces}
+      senderProfiles={senderProfileMap}
+    />
+  ) : null;
+
+  const teamUnread = internalMessages.filter((m) => m.senderId !== currentUserId && !m.readAt).length;
+  const networkUnread = networkMessages.filter((m) => m.senderWorkspaceId !== workspace.id && !m.readAt).length;
 
   return (
-    <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-4 border-b border-line pb-3">
-        <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted font-semibold mb-1">
-            Client Portal
-          </div>
-          <h1 className="font-slab text-2xl font-bold text-ink">Messages</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setFilter("all")}
-            className="text-xs font-semibold px-3 py-1.5 rounded-sm border"
-            style={{
-              borderColor: filter === "all" ? "#0D1B2A" : "#DDE3EC",
-              backgroundColor: filter === "all" ? "#0D1B2A" : "white",
-              color: filter === "all" ? "white" : "#0D1B2A",
-            }}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilter("waiting_on_firm")}
-            className="text-xs font-semibold px-3 py-1.5 rounded-sm border"
-            style={{
-              borderColor: filter === "waiting_on_firm" ? "#0D1B2A" : "#DDE3EC",
-              backgroundColor: filter === "waiting_on_firm" ? "#0D1B2A" : "white",
-              color: filter === "waiting_on_firm" ? "white" : "#0D1B2A",
-            }}
-          >
-            Waiting on Firm
-          </button>
-        </div>
+    <>
+      <PageHeader title="Messages" description="Internal conversations with your team and your connected network." />
+      <div className="flex-1 px-8 py-6">
+        {hasTeam && hasNetwork ? (
+          <MessagesTabs team={teamHub} network={networkHub} teamUnread={teamUnread} networkUnread={networkUnread} />
+        ) : (
+          teamHub ?? networkHub
+        )}
       </div>
-
-      {error && (
-        <div className="text-sm text-brick bg-brick/10 border border-brick/30 rounded-sm px-4 py-3 mb-4">
-          {error}
-        </div>
-      )}
-
-      <div className="grid grid-cols-3 gap-4">
-        <div className="col-span-1 bg-white border border-line rounded-sm divide-y divide-paperDim max-h-[520px] overflow-y-auto">
-          {loading && <div className="px-4 py-4 text-sm text-muted">Loading…</div>}
-          {!loading && visibleConversations.length === 0 && (
-            <div className="px-4 py-4 text-sm text-muted">No conversations yet.</div>
-          )}
-          {visibleConversations.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveId(c.id)}
-              className="w-full text-left px-4 py-3"
-              style={{ backgroundColor: activeId === c.id ? "#F5F7FA" : "white" }}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-ink truncate">{c.clientName}</div>
-                <StatusPill status={c.conversation_status} />
-              </div>
-              <div className="text-xs text-muted mt-0.5 truncate">{c.subject}</div>
-            </button>
-          ))}
-        </div>
-
-        <div className="col-span-2 bg-white border border-line rounded-sm flex flex-col min-h-[520px]">
-          {!activeConversation && (
-            <div className="flex-1 flex items-center justify-center text-sm text-muted">
-              Select a conversation.
-            </div>
-          )}
-          {activeConversation && (
-            <>
-              <div className="border-b border-line px-4 py-3">
-                <div className="font-semibold text-ink text-sm">
-                  {activeConversation.clientName}
-                </div>
-                <div className="text-xs text-muted">{activeConversation.subject}</div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className="max-w-[80%] rounded-sm px-3 py-2 text-sm"
-                    style={{
-                      marginLeft: m.sender_type !== "Client" ? "auto" : "0",
-                      backgroundColor: m.is_internal
-                        ? "#FDF4E3"
-                        : m.sender_type === "Client"
-                        ? "#F5F7FA"
-                        : "#0D1B2A",
-                      color: m.is_internal ? "#B45309" : m.sender_type === "Client" ? "#0D1B2A" : "white",
-                      border: m.is_internal ? "1px dashed #B45309" : "none",
-                    }}
-                  >
-                    {m.is_internal && (
-                      <div className="text-[10px] uppercase tracking-wide font-bold mb-1">
-                        Internal note
-                      </div>
-                    )}
-                    {m.message_body}
-                  </div>
-                ))}
-              </div>
-              <form onSubmit={handleSend} className="border-t border-line p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <label className="flex items-center gap-1.5 text-xs text-muted">
-                    <input
-                      type="checkbox"
-                      checked={asInternalNote}
-                      onChange={(e) => setAsInternalNote(e.target.checked)}
-                      className="accent-[#B45309]"
-                    />
-                    Internal note (client won&apos;t see this)
-                  </label>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder={asInternalNote ? "Add an internal note…" : "Reply to client…"}
-                    className="flex-1 border border-line rounded-sm px-3 py-2 text-sm"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sending || !draft.trim()}
-                    className="bg-ink text-white px-3 py-2 rounded-sm disabled:opacity-50"
-                  >
-                    <Send size={15} />
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+    </>
   );
 }

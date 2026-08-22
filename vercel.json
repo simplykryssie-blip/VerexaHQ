@@ -1,0 +1,48 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/check-overdue-tasks",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/dispatch-notifications",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/digest-system-failures",
+      "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/cron/enqueue-reminders",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/ensure-next-tax-year",
+      "schedule": "0 0 31 12 *"
+    },
+    {
+      "path": "/api/cron/refresh-calendar-tokens",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-zoom-tokens",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/run-pending-automation-steps",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-calendar-events",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-pending-engagement-letters",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/send-pending-portal-invites",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

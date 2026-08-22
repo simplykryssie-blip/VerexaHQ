@@ -2,139 +2,131 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabasePortal } from "@/lib/supabasePortal";
-import { LogoMark } from "@/components/Logo";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { friendlyAuthError } from "@/lib/authErrors";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 
-import { friendlyError } from "@/lib/friendlyError";
+export const dynamic = "force-dynamic";
+
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path
+        d="M7 1L12 3v4c0 3.5-2.2 5.7-5 6.5C4.2 12.7 2 10.5 2 7V3l5-2Z"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="round"
+      />
+    </svg>
+    <span>Encrypted &amp; audit-logged, firm-side</span>
+  </>
+);
+
 export default function PortalLoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const supabase = createClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError(null);
-    setNotice(null);
+    setLoading(true);
 
-    if (mode === "login") {
-      const { error } = await supabasePortal.auth.signInWithPassword({ email, password });
+    const { data: lockout } = await supabase.rpc("check_login_lockout", { p_email: email });
+    if ((lockout as { locked?: boolean } | null)?.locked) {
       setLoading(false);
-      if (error) {
-        setError(friendlyError(error, "Something went wrong. Please try again."));
-        return;
-      }
-      router.push("/portal");
+      setError("This account is temporarily locked due to too many failed sign-in attempts. Try again later.");
       return;
     }
 
-    const { error, data } = await supabasePortal.auth.signUp({ email, password });
-    setLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    await supabase.rpc("record_login_result", { p_email: email, p_success: !error });
     if (error) {
-      setError(friendlyError(error, "Something went wrong. Please try again."));
+      setLoading(false);
+      setError(friendlyAuthError(error.message));
       return;
     }
-    if (!data.session) {
-      setNotice(
-        "Account created. If email confirmation is required, check your inbox, then come back and sign in."
-      );
-      setMode("login");
-      return;
-    }
-    router.push("/portal");
+
+    await fetch("/api/auth/set-remember", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remember: rememberMe }),
+    });
+
+    setLoading(false);
+    router.push("/portal/dashboard");
+    router.refresh();
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-paper px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8 flex flex-col items-center">
-          <LogoMark size={44} />
-          <div className="font-slab text-2xl font-bold text-ink mt-3">Client Portal</div>
-          <div className="text-[11px] uppercase tracking-widest text-muted mt-1">
-            Powered by VerexaHQ
-          </div>
+    <AuthShell
+      eyebrow="Client portal"
+      railHeading="Your documents, your return — one place."
+      railSub="Every file and message here is encrypted and visible only to your tax team."
+      railFoot={RAIL_FOOT}
+    >
+      <h1 className={styles.cardTitle}>Client Portal</h1>
+      <p className={styles.lede}>Sign in to view your documents, messages, and billing.</p>
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
+          <input
+            id="email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className={styles.input}
+            autoComplete="email"
+          />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="password">Password</label>
+          <input
+            id="password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            className={styles.input}
+            autoComplete="current-password"
+          />
         </div>
 
-        <div className="flex mb-4 border border-line rounded-sm overflow-hidden">
-          <button
-            onClick={() => setMode("login")}
-            className="flex-1 text-sm font-semibold py-2"
-            style={{
-              backgroundColor: mode === "login" ? "#0D1B2A" : "white",
-              color: mode === "login" ? "white" : "#0D1B2A",
-            }}
-          >
-            Sign in
-          </button>
-          <button
-            onClick={() => setMode("signup")}
-            className="flex-1 text-sm font-semibold py-2"
-            style={{
-              backgroundColor: mode === "signup" ? "#0D1B2A" : "white",
-              color: mode === "signup" ? "white" : "#0D1B2A",
-            }}
-          >
-            Create account
-          </button>
+        <div className={styles.row}>
+          <label className={styles.remember}>
+            <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />
+            Remember me
+          </label>
+          <Link href="/forgot-password" className={styles.link}>
+            Forgot password?
+          </Link>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white border border-line rounded-sm p-6 space-y-4"
-        >
-          <div>
-            <label className="block text-xs font-semibold text-ink mb-1.5">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-line rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink"
-              placeholder="you@email.com"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-ink mb-1.5">Password</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-line rounded-sm px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ink"
-              placeholder="••••••••"
-            />
-          </div>
+        {error && <AuthError>{error}</AuthError>}
 
-          {notice && (
-            <div className="text-xs text-green bg-green/10 border border-green/30 rounded-sm px-3 py-2">
-              {notice}
-            </div>
-          )}
-          {error && (
-            <div className="text-xs text-brick bg-brick/10 border border-brick/30 rounded-sm px-3 py-2">
-              {error}
-            </div>
-          )}
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading && <span className={styles.spinner} />}
+          {loading ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-ink text-white text-sm font-semibold py-2.5 rounded-sm hover:bg-[#14273A] transition-colors disabled:opacity-60"
-          >
-            {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-          </button>
-        </form>
-
-        <p className="text-center text-xs text-muted mt-4">
-          If your accountant sent you a portal invitation link, use that link
-          directly — it will connect your new account to your records automatically.
-        </p>
-      </div>
-    </div>
+      <p className={styles.crosslink}>
+        Firm staff should sign in at{" "}
+        <Link href="/login" className={styles.link}>
+          the staff login
+        </Link>{" "}
+        instead.
+      </p>
+    </AuthShell>
   );
 }
