@@ -34,9 +34,11 @@ const STATUS_FILTERS = [
 export function PipelineLibrary({
   workspaceId,
   pipelines,
+  canManage,
 }: {
   workspaceId: string;
   pipelines: PipelineCard[];
+  canManage: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -102,13 +104,15 @@ export function PipelineLibrary({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-        >
-          + New pipeline
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
+          >
+            + New pipeline
+          </button>
+        )}
       </div>
 
       {deleteError && <p className="mt-2 text-sm text-danger">{deleteError}</p>}
@@ -123,15 +127,17 @@ export function PipelineLibrary({
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
                   {p.workspace_id ? (
-                    <button
-                      type="button"
-                      onClick={() => deletePipeline(p.id, p.name)}
-                      disabled={deletingId === p.id}
-                      className="shrink-0 text-muted hover:text-danger disabled:opacity-50"
-                      aria-label="Delete pipeline"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    canManage && (
+                      <button
+                        type="button"
+                        onClick={() => deletePipeline(p.id, p.name)}
+                        disabled={deletingId === p.id}
+                        className="shrink-0 text-muted hover:text-danger disabled:opacity-50"
+                        aria-label="Delete pipeline"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )
                   ) : (
                     <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
                   )}
@@ -152,7 +158,7 @@ export function PipelineLibrary({
                   href={`/pipelines/${p.id}`}
                   className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-ink"
                 >
-                  {p.workspace_id ? "Edit" : "View"}
+                  {p.workspace_id && canManage ? "Edit" : "View"}
                 </Link>
               </div>
             ))}
