@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { Copy, Plus, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -64,6 +64,7 @@ export function WorkflowList({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -115,6 +116,23 @@ export function WorkflowList({
     }
     toast.show("Workflow deleted", "success");
     router.refresh();
+  }
+
+  async function duplicate(id: string, name: string) {
+    setDuplicatingId(id);
+    const { data, error } = await supabase.rpc("duplicate_config_object", {
+      p_table: "automations",
+      p_id: id,
+      p_target_workspace_id: workspaceId,
+      p_new_name: `${name} (copy)`,
+    });
+    setDuplicatingId(null);
+    if (error || !data) {
+      toast.show(error?.message ?? "Could not duplicate the workflow", "error");
+      return;
+    }
+    toast.show("Workflow duplicated", "success");
+    router.push(`/workflows/${data}`);
   }
 
   return (
@@ -193,6 +211,15 @@ export function WorkflowList({
                       className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
                     >
                       {w.is_enabled ? "Pause" : "Activate"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => duplicate(w.id, w.name)}
+                      disabled={duplicatingId === w.id}
+                      className="text-muted hover:text-ink disabled:opacity-50"
+                      aria-label="Duplicate workflow"
+                    >
+                      <Copy size={14} />
                     </button>
                     <button
                       type="button"

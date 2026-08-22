@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -51,6 +51,7 @@ export function PipelineLibrary({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () => pipelines.filter((p) => (!query || p.name.toLowerCase().includes(query.toLowerCase())) && (status === "all" || p.status === status)),
@@ -82,6 +83,23 @@ export function PipelineLibrary({
     }
     toast.show("Pipeline deleted", "success");
     router.refresh();
+  }
+
+  async function duplicatePipeline(id: string, name: string) {
+    setDuplicatingId(id);
+    const { data, error } = await supabase.rpc("duplicate_config_object", {
+      p_table: "processes",
+      p_id: id,
+      p_target_workspace_id: workspaceId,
+      p_new_name: `${name} (copy)`,
+    });
+    setDuplicatingId(null);
+    if (error || !data) {
+      toast.show(error?.message ?? "Could not duplicate the pipeline", "error");
+      return;
+    }
+    toast.show("Pipeline duplicated", "success");
+    router.push(`/pipelines/${data}`);
   }
 
   return (
@@ -126,19 +144,31 @@ export function PipelineLibrary({
               <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
-                  {p.workspace_id ? (
-                    canManage && (
+                  {canManage && (
+                    <div className="flex shrink-0 items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => deletePipeline(p.id, p.name)}
-                        disabled={deletingId === p.id}
-                        className="shrink-0 text-muted hover:text-danger disabled:opacity-50"
-                        aria-label="Delete pipeline"
+                        onClick={() => duplicatePipeline(p.id, p.name)}
+                        disabled={duplicatingId === p.id}
+                        className="text-muted hover:text-ink disabled:opacity-50"
+                        aria-label="Duplicate pipeline"
                       >
-                        <Trash2 size={14} />
+                        <Copy size={14} />
                       </button>
-                    )
-                  ) : (
+                      {p.workspace_id && (
+                        <button
+                          type="button"
+                          onClick={() => deletePipeline(p.id, p.name)}
+                          disabled={deletingId === p.id}
+                          className="text-muted hover:text-danger disabled:opacity-50"
+                          aria-label="Delete pipeline"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!canManage && !p.workspace_id && (
                     <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
                   )}
                 </div>
