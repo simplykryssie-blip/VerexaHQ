@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   const explicitNext = searchParams.get("next");
+  const inviteToken = searchParams.get("invite_token");
 
   const supabase = createClient();
 
@@ -35,7 +36,13 @@ export async function GET(request: Request) {
   // instead of their portal. If no explicit next survived, check which
   // kind of identity was just confirmed and route accordingly.
   async function resolveNext() {
-    if (explicitNext) return explicitNext;
+    if (explicitNext) {
+      // invite_token rides as its own flat param (see app/join/page.tsx,
+      // app/accept-invitation/page.tsx, app/portal/accept-invitation/page.tsx)
+      // rather than nested inside next's own value, then gets reattached to
+      // the destination path here as the "?token=..." those pages expect.
+      return inviteToken ? `${explicitNext}?token=${encodeURIComponent(inviteToken)}` : explicitNext;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();

@@ -179,12 +179,17 @@ export default function JoinPage() {
       }
 
       setLoading(true);
-      const nextPath = `/join?token=${encodeURIComponent(token)}`;
+      // next stays a bare path (no embedded "?token=...") -- invite_token
+      // rides as its own flat query param instead, since a query string
+      // nested inside another query string's value is exactly the shape
+      // that got mangled somewhere between Supabase's confirmation email
+      // and app/auth/confirm/route.ts, silently dropping the whole thing
+      // and landing the user on the generic dashboard instead of back here.
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(nextPath)}`,
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/join&invite_token=${encodeURIComponent(token)}`,
           data: { first_name: firstName, last_name: lastName, company_name: companyName },
         },
       });
