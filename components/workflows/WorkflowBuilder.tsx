@@ -847,23 +847,70 @@ export function StepCard({
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted">
-              Staff member
+              How
               <select
                 disabled={!canManage}
-                value={(config.staff_id as string) ?? ""}
-                onChange={(e) => setField("staff_id", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                value={(config.assignment_mode as string) ?? "fixed"}
+                onChange={(e) => setField("assignment_mode", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               >
-                <option value="" disabled>
-                  Choose staff
-                </option>
-                {staffOptions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.display_name ?? "Staff"}
-                  </option>
-                ))}
+                <option value="fixed">A specific staff member</option>
+                <option value="round_robin">Round robin -- whoever has the fewest open ones</option>
               </select>
             </label>
+
+            {(!config.assignment_mode || config.assignment_mode === "fixed") && (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Staff member
+                <select
+                  disabled={!canManage}
+                  value={(config.staff_id as string) ?? ""}
+                  onChange={(e) => setField("staff_id", e.target.value)}
+                  className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                >
+                  <option value="" disabled>
+                    Choose staff
+                  </option>
+                  {staffOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.display_name ?? "Staff"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {config.assignment_mode === "round_robin" && (
+              <div className="col-span-2 flex flex-col gap-1.5 text-xs text-muted">
+                Eligible staff (leave all unchecked to include everyone active)
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
+                  {staffOptions.map((s) => {
+                    const pool: string[] = Array.isArray(config.staff_pool) ? (config.staff_pool as string[]) : [];
+                    const checked = pool.includes(s.id);
+                    return (
+                      <label key={s.id} className="flex items-center gap-1.5 text-sm text-ink">
+                        <input
+                          type="checkbox"
+                          disabled={!canManage}
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked ? [...pool, s.id] : pool.filter((id) => id !== s.id);
+                            setConfig((c) => ({ ...c, staff_pool: next as never }));
+                            setSaved(false);
+                          }}
+                          className="rounded border-border text-accent focus:ring-accent disabled:opacity-60"
+                        />
+                        {s.display_name ?? "Staff"}
+                      </label>
+                    );
+                  })}
+                </div>
+                <span className="mt-1 normal-case text-[11px] text-muted">
+                  Ties (same open count) are broken randomly, so assignments spread out evenly over time even between staff who
+                  never get further ahead or behind.
+                </span>
+              </div>
+            )}
           </>
         )}
 
