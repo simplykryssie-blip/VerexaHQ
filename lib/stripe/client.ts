@@ -215,6 +215,30 @@ export async function getSubscriptionPrimaryItemId(stripeSubscriptionId: string)
   return { ok: true, data: { id: itemId } };
 }
 
+export type CustomerDefaultPaymentMethod = { brand: string; last4: string; expMonth: number; expYear: number } | null;
+
+// Platform billing has no local copy of card details -- checked live against
+// Stripe rather than caching brand/last4 from a webhook, since the Billing
+// tab only calls this for a handful of workspace subscriptions per page load.
+export async function getCustomerDefaultPaymentMethod(stripeCustomerId: string): Promise<StripeResult<CustomerDefaultPaymentMethod>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const params = new URLSearchParams({ "expand[]": "invoice_settings.default_payment_method" });
+  const res = await fetch(`${STRIPE_API}/customers/${stripeCustomerId}?${params.toString()}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as {
+    invoice_settings?: { default_payment_method?: { card?: { brand: string; last4: string; exp_month: number; exp_year: number } } | null };
+  };
+  const card = data.invoice_settings?.default_payment_method?.card;
+  if (!card) return { ok: true, data: null };
+  return { ok: true, data: { brand: card.brand, last4: card.last4, expMonth: card.exp_month, expYear: card.exp_year } };
+}
+
 export async function updateSubscriptionItemQuantity({
   subscriptionItemId,
   quantity,

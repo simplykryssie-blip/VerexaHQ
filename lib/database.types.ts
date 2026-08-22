@@ -8892,6 +8892,18 @@ export type Database = {
           workspace_type: string
         }[]
       }
+      get_platform_staff_directory: {
+        Args: never
+        Returns: {
+          display_name: string
+          email: string
+          is_owner: boolean
+          last_sign_in_at: string
+          user_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
       get_portal_client_contact: {
         Args: never
         Returns: {
