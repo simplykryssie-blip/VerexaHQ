@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Lock, Receipt, AlertTriangle } from "lucide-react";
+import { Lock, Receipt, AlertTriangle, CreditCard } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { PlatformAdminTabs } from "../PlatformAdminTabs";
+import { getCustomerDefaultPaymentMethod } from "@/lib/stripe/client";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +48,10 @@ export default async function PlatformAdminBillingPage() {
     );
   }
 
-  const [{ data: subscriptions }, { data: plans }, { data: workspaces }, { data: invoices }] = await Promise.all([
-    supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
+  const [{ data: subscriptions }, { data: plans }, { data: workspaces }, { data: invoices }, { data: paidInvoices }] = await Promise.all([
+    supabase
+      .from("workspace_subscriptions")
+      .select("workspace_id, plan_id, stripe_status, stripe_customer_id, seat_count, current_period_end"),
     supabase.from("platform_subscription_plans").select("id, name, base_price_cents, included_seats, per_seat_price_cents"),
     supabase.from("workspaces").select("id, name"),
     supabase
@@ -56,23 +59,52 @@ export default async function PlatformAdminBillingPage() {
       .select("id, workspace_id, amount_due, amount_paid, status, period_start, period_end, hosted_invoice_url, created_at")
       .order("created_at", { ascending: false })
       .limit(25),
+    supabase
+      .from("workspace_subscription_invoices")
+      .select("workspace_id, amount_paid, paid_at")
+      .eq("status", "paid")
+      .order("paid_at", { ascending: false })
+      .limit(100),
   ]);
 
   const planById = new Map((plans ?? []).map((p) => [p.id, p]));
   const workspaceNameById = new Map((workspaces ?? []).map((w) => [w.id, w.name]));
   const subs = subscriptions ?? [];
 
+  // First row per workspace wins since paidInvoices is already ordered
+  // most-recent-first -- that's this workspace's last payment.
+  const lastPaymentByWorkspace = new Map<string, { amount_paid: number; paid_at: string | null }>();
+  for (const inv of paidInvoices ?? []) {
+    if (!lastPaymentByWorkspace.has(inv.workspace_id)) {
+      lastPaymentByWorkspace.set(inv.workspace_id, { amount_paid: inv.amount_paid, paid_at: inv.paid_at });
+    }
+  }
+
+  // Checked live against Stripe rather than cached -- there's no local copy
+  // of card details anywhere in the schema, and this only runs for however
+  // many workspaces actually have a subscription (a handful, not a scale
+  // concern for a per-page-load call).
+  const paymentMethodByCustomer = new Map<string, { brand: string; last4: string; expMonth: number; expYear: number } | null>();
+  await Promise.all(
+    Array.from(new Set(subs.map((s) => s.stripe_customer_id).filter((id): id is string => Boolean(id)))).map(async (customerId) => {
+      const result = await getCustomerDefaultPaymentMethod(customerId);
+      paymentMethodByCustomer.set(customerId, result.ok ? result.data : null);
+    })
+  );
+
   // An estimate, not a true MRR figure -- it prices the plan base + any seats
   // beyond what's included, but leaves out metered overages (email/SMS/storage),
   // which only Stripe knows the actual usage for.
   let estimatedMonthlyCents = 0;
   const revenueByPlan = new Map<string, { name: string; workspaceCount: number; cents: number }>();
+  const estimatedCentsByWorkspace = new Map<string, number>();
   for (const s of subs) {
-    if (s.stripe_status !== "active" && s.stripe_status !== "trialing") continue;
     const plan = planById.get(s.plan_id);
     if (!plan) continue;
     const extraSeats = Math.max(0, s.seat_count - plan.included_seats);
     const cents = plan.base_price_cents + extraSeats * plan.per_seat_price_cents;
+    estimatedCentsByWorkspace.set(s.workspace_id, cents);
+    if (s.stripe_status !== "active" && s.stripe_status !== "trialing") continue;
     estimatedMonthlyCents += cents;
     const entry = revenueByPlan.get(plan.id) ?? { name: plan.name, workspaceCount: 0, cents: 0 };
     entry.workspaceCount += 1;
@@ -105,6 +137,79 @@ export default async function PlatformAdminBillingPage() {
               <p className="mt-1 text-2xl font-semibold text-ink">{t.value}</p>
             </div>
           ))}
+        </div>
+
+        <div>
+          <h3 className="mb-1 font-display text-sm font-semibold text-ink">Workspace subscriptions</h3>
+          <p className="mb-3 text-xs text-muted">Every workspace with a subscription -- what they owe, whether a card is on file, and when they last paid.</p>
+          {subs.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface shadow-soft">
+              <EmptyState icon={Receipt} message="No workspace has been put on a paid plan yet." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-5 py-3 font-medium">Workspace</th>
+                    <th className="px-5 py-3 font-medium">Plan</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Est. amount</th>
+                    <th className="px-5 py-3 font-medium">Card on file</th>
+                    <th className="px-5 py-3 font-medium">Last payment</th>
+                    <th className="px-5 py-3 font-medium">Next payment due</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {subs.map((s) => {
+                    const plan = planById.get(s.plan_id);
+                    const lastPayment = lastPaymentByWorkspace.get(s.workspace_id);
+                    const card = s.stripe_customer_id ? paymentMethodByCustomer.get(s.stripe_customer_id) : undefined;
+                    return (
+                      <tr key={s.workspace_id}>
+                        <td className="px-5 py-3">
+                          <Link href={`/platform-admin/${s.workspace_id}`} className="font-medium text-accent hover:underline">
+                            {workspaceNameById.get(s.workspace_id) ?? s.workspace_id}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-3 text-slate">{plan?.name ?? <span className="text-muted">--</span>}</td>
+                        <td className="px-5 py-3">
+                          <Badge tone={STATUS_TONE[s.stripe_status] ?? "neutral"} className="capitalize">
+                            {s.stripe_status.replace(/_/g, " ")}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3 text-slate">{formatCents(estimatedCentsByWorkspace.get(s.workspace_id) ?? 0)}</td>
+                        <td className="px-5 py-3 text-slate">
+                          {!s.stripe_customer_id ? (
+                            <span className="text-muted">--</span>
+                          ) : card ? (
+                            <span className="inline-flex items-center gap-1 capitalize">
+                              <CreditCard size={12} /> {card.brand} •••• {card.last4}
+                            </span>
+                          ) : (
+                            <span className="text-danger">No card on file</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-slate">
+                          {lastPayment ? (
+                            <>
+                              {formatCents(lastPayment.amount_paid)}
+                              {lastPayment.paid_at && <span className="text-muted"> -- {new Date(lastPayment.paid_at).toLocaleDateString()}</span>}
+                            </>
+                          ) : (
+                            <span className="text-muted">--</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-slate">
+                          {s.current_period_end ? new Date(s.current_period_end).toLocaleDateString() : <span className="text-muted">--</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between">

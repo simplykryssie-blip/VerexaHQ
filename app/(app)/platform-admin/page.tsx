@@ -46,7 +46,7 @@ export default async function PlatformAdminPage() {
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
-  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }, { data: itUsers }, { data: owners }] =
+  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }, { data: itUsers }, { data: owners }, { data: staffDirectory }] =
     await Promise.all([
       supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
       supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
@@ -55,6 +55,7 @@ export default async function PlatformAdminPage() {
       supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
       supabase.from("user_profiles").select("id, display_name").eq("is_platform_it", true).order("display_name"),
       supabase.from("workspace_users").select("workspace_id, user_profiles(display_name)").eq("is_owner", true),
+      supabase.rpc("get_platform_staff_directory"),
     ]);
 
   const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
@@ -72,7 +73,11 @@ export default async function PlatformAdminPage() {
   const totalWorkspaces = rows.length;
   const suspendedCount = rows.filter((w) => w.status === "suspended").length;
   const activeSubscriptionCount = (subscriptions ?? []).filter((s) => s.stripe_status === "active" || s.stripe_status === "trialing").length;
-  const totalStaff = Array.from(staffCountByWorkspace.values()).reduce((sum, n) => sum + n, 0);
+  // Sum only workspaces that still exist -- workspace_users can carry orphaned
+  // rows pointing at a deleted workspace_id (a real one caused "Total staff"
+  // to overcount before), so this deliberately doesn't just sum every entry
+  // in staffCountByWorkspace.
+  const totalStaff = rows.reduce((sum, w) => sum + (staffCountByWorkspace.get(w.id) ?? 0), 0);
 
   return (
     <>
@@ -148,6 +153,47 @@ export default async function PlatformAdminPage() {
             </table>
           </div>
         )}
+
+        <div>
+          <h3 className="mb-1 font-display text-sm font-semibold text-ink">Staff</h3>
+          <p className="mb-3 text-xs text-muted">Every active staff member across every workspace, most recently logged in first.</p>
+          {!staffDirectory || staffDirectory.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface shadow-soft">
+              <EmptyState icon={ShieldEllipsis} message="No staff yet." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-5 py-3 font-medium">Name</th>
+                    <th className="px-5 py-3 font-medium">Email</th>
+                    <th className="px-5 py-3 font-medium">Workspace</th>
+                    <th className="px-5 py-3 font-medium">Role</th>
+                    <th className="px-5 py-3 font-medium">Last login</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {staffDirectory.map((s) => (
+                    <tr key={`${s.workspace_id}-${s.user_id}`} className="hover:bg-surfaceMuted">
+                      <td className="px-5 py-3 text-slate">{s.display_name ?? <span className="text-muted">--</span>}</td>
+                      <td className="px-5 py-3 text-slate">{s.email}</td>
+                      <td className="px-5 py-3">
+                        <Link href={`/platform-admin/${s.workspace_id}`} className="font-medium text-accent hover:underline">
+                          {s.workspace_name}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-3 text-slate">{s.is_owner ? "Owner" : "Staff"}</td>
+                      <td className="px-5 py-3 text-slate">
+                        {s.last_sign_in_at ? new Date(s.last_sign_in_at).toLocaleString() : <span className="text-muted">Never</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
 
         <div>
           <h3 className="font-display text-sm font-semibold text-ink">Platform admins</h3>
