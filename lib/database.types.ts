@@ -2705,11 +2705,14 @@ export type Database = {
       email_log: {
         Row: {
           bounced_at: string | null
+          click_count: number
+          clicked_at: string | null
           created_at: string
           delivered_at: string | null
           failed_reason: string | null
           id: string
           message_id: string | null
+          notification_queue_id: string | null
           open_count: number
           opened_at: string | null
           provider_reference: string | null
@@ -2722,11 +2725,14 @@ export type Database = {
         }
         Insert: {
           bounced_at?: string | null
+          click_count?: number
+          clicked_at?: string | null
           created_at?: string
           delivered_at?: string | null
           failed_reason?: string | null
           id?: string
           message_id?: string | null
+          notification_queue_id?: string | null
           open_count?: number
           opened_at?: string | null
           provider_reference?: string | null
@@ -2739,11 +2745,14 @@ export type Database = {
         }
         Update: {
           bounced_at?: string | null
+          click_count?: number
+          clicked_at?: string | null
           created_at?: string
           delivered_at?: string | null
           failed_reason?: string | null
           id?: string
           message_id?: string | null
+          notification_queue_id?: string | null
           open_count?: number
           opened_at?: string | null
           provider_reference?: string | null
@@ -2760,6 +2769,13 @@ export type Database = {
             columns: ["message_id"]
             isOneToOne: false
             referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_log_notification_queue_id_fkey"
+            columns: ["notification_queue_id"]
+            isOneToOne: false
+            referencedRelation: "notification_queue"
             referencedColumns: ["id"]
           },
           {
@@ -6450,6 +6466,7 @@ export type Database = {
           failed_reason: string | null
           id: string
           message_id: string | null
+          notification_queue_id: string | null
           provider_reference: string | null
           recipient_phone: string
           sent_at: string | null
@@ -6464,6 +6481,7 @@ export type Database = {
           failed_reason?: string | null
           id?: string
           message_id?: string | null
+          notification_queue_id?: string | null
           provider_reference?: string | null
           recipient_phone: string
           sent_at?: string | null
@@ -6478,6 +6496,7 @@ export type Database = {
           failed_reason?: string | null
           id?: string
           message_id?: string | null
+          notification_queue_id?: string | null
           provider_reference?: string | null
           recipient_phone?: string
           sent_at?: string | null
@@ -6491,6 +6510,13 @@ export type Database = {
             columns: ["message_id"]
             isOneToOne: false
             referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_log_notification_queue_id_fkey"
+            columns: ["notification_queue_id"]
+            isOneToOne: false
+            referencedRelation: "notification_queue"
             referencedColumns: ["id"]
           },
           {

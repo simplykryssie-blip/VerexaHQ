@@ -110,6 +110,7 @@ async function dispatchOne(
 
       await supabase.from("email_log").insert({
         workspace_id: workspaceId,
+        notification_queue_id: job.id,
         template_key: job.template_key,
         recipient_email: job.recipient_email,
         subject,
@@ -131,6 +132,7 @@ async function dispatchOne(
 
       await supabase.from("sms_log").insert({
         workspace_id: workspaceId,
+        notification_queue_id: job.id,
         template_key: job.template_key,
         recipient_phone: job.recipient_phone,
         body,

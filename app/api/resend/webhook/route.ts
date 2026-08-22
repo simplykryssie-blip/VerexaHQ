@@ -40,6 +40,12 @@ export async function POST(request: Request) {
         .from("email_log")
         .update({ opened_at: now, open_count: (existing?.open_count ?? 0) + 1 })
         .eq("provider_reference", emailId);
+    } else if (event.type === "email.clicked") {
+      const { data: existing } = await supabase.from("email_log").select("click_count").eq("provider_reference", emailId).maybeSingle();
+      await supabase
+        .from("email_log")
+        .update({ clicked_at: now, click_count: (existing?.click_count ?? 0) + 1 })
+        .eq("provider_reference", emailId);
     } else if (event.type === "email.bounced" || event.type === "email.complained") {
       await supabase
         .from("email_log")
