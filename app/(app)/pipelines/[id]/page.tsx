@@ -6,6 +6,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { StageEditor } from "@/components/settings/StageEditor";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { PipelineNameEditor } from "@/components/pipelines/PipelineNameEditor";
+import { DuplicatePipelineButton } from "@/components/pipelines/DuplicatePipelineButton";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,9 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
           <TemplateStatusCycle table="processes" id={process.id} status={process.status} />
         ) : (
           <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>
+        )}
+        {canManagePipelines && (
+          <DuplicatePipelineButton processId={process.id} workspaceId={workspace.id} name={process.name} />
         )}
       </div>
 
