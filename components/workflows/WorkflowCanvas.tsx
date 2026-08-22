@@ -604,6 +604,7 @@ function CanvasInner({
               services={services}
               serviceCategories={serviceCategories}
               pipelines={pipelines}
+              organizerTemplates={organizerTemplates}
               canManage={canManage}
               onSaved={() => router.refresh()}
               onClose={() => setActiveConditionStepId(null)}

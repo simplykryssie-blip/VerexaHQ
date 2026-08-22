@@ -1243,6 +1243,7 @@ export function WorkflowBuilder({
                 services={services}
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
+                organizerTemplates={organizerTemplates}
                 disabled={!canManage}
               />
             </div>
