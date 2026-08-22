@@ -35,6 +35,19 @@ export async function GET(request: Request) {
   // dashboard sends a brand-new client straight to "Set up your firm"
   // instead of their portal. If no explicit next survived, check which
   // kind of identity was just confirmed and route accordingly.
+  //
+  // Confirmed live via the raw confirmation email (Resend): our own
+  // emailRedirectTo is built and sent correctly, with next and invite_token
+  // as flat sibling params -- so the stripping happens inside Supabase's own
+  // /auth/v1/verify redirect, a step this app doesn't control. That's the
+  // same class of bug as the portal-signup case above, just unrecoverable by
+  // guessing (there's no way to reverse-engineer *which* invite from
+  // identity alone). So pending-invite flows (app/join/page.tsx,
+  // app/accept-invitation/page.tsx, app/portal/accept-invitation/page.tsx)
+  // additionally stash their token + destination in user_metadata at signUp
+  // time -- that's written straight to the auth.users row, not threaded
+  // through any redirect URL, so it survives even when the query string
+  // doesn't. It's consulted only as a fallback, after the URL-based params.
   async function resolveNext() {
     if (explicitNext) {
       // invite_token rides as its own flat param (see app/join/page.tsx,
@@ -47,6 +60,10 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
+      const meta = user.user_metadata as { pending_invite_next?: string; pending_invite_token?: string } | undefined;
+      if (meta?.pending_invite_next && meta?.pending_invite_token) {
+        return `${meta.pending_invite_next}?token=${encodeURIComponent(meta.pending_invite_token)}`;
+      }
       const { data: portalUser } = await supabase
         .from("client_portal_users")
         .select("id")

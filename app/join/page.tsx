@@ -185,12 +185,24 @@ export default function JoinPage() {
       // that got mangled somewhere between Supabase's confirmation email
       // and app/auth/confirm/route.ts, silently dropping the whole thing
       // and landing the user on the generic dashboard instead of back here.
+      // pending_invite_next/pending_invite_token are a second, independent
+      // copy of the same info written straight into user_metadata rather
+      // than the redirect URL -- confirmed live that Supabase's own
+      // /auth/v1/verify redirect can still drop the URL-based params even
+      // when they're sent correctly, so app/auth/confirm/route.ts falls
+      // back to these when that happens.
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/confirm?next=/join&invite_token=${encodeURIComponent(token)}`,
-          data: { first_name: firstName, last_name: lastName, company_name: companyName },
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            company_name: companyName,
+            pending_invite_next: "/join",
+            pending_invite_token: token,
+          },
         },
       });
       setLoading(false);

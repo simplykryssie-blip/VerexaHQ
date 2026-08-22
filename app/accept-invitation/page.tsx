@@ -93,8 +93,12 @@ export default function AcceptInvitationPage() {
         options: {
           // Flat next path + a separate invite_token param, not a nested
           // "?token=..." inside next's value -- see app/join/page.tsx for why.
+          // pending_invite_next/pending_invite_token duplicate the same info
+          // into user_metadata as a fallback -- see app/join/page.tsx and
+          // app/auth/confirm/route.ts for why the URL-based params alone
+          // aren't reliable.
           emailRedirectTo: `${window.location.origin}/auth/confirm?next=/accept-invitation&invite_token=${encodeURIComponent(token)}`,
-          data: { first_name: firstName, last_name: lastName },
+          data: { first_name: firstName, last_name: lastName, pending_invite_next: "/accept-invitation", pending_invite_token: token },
         },
       });
       setLoading(false);
