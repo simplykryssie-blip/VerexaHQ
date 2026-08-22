@@ -5,7 +5,12 @@ import { Plus, Trash2 } from "lucide-react";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
 import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
 
-export type Condition = { field: string; op: string; value: string };
+// `join` describes how this condition combines with the one before it in
+// the list (ignored on the first condition) -- evaluated strictly left to
+// right, same as a simple calculator, not with AND-before-OR precedence.
+// That matches what a short visual list of conditions reads as, and is
+// simple enough not to need parenthesized groups.
+export type Condition = { field: string; op: string; value: string; join?: "and" | "or" };
 
 type ValueKind =
   | "select"
@@ -425,11 +430,15 @@ export function ConditionsEditor({
   disabled?: boolean;
 }) {
   function addCondition() {
-    onChange([...conditions, { field: CONDITION_FIELDS[0].key, op: CONDITION_FIELDS[0].ops[0], value: "" }]);
+    onChange([...conditions, { field: CONDITION_FIELDS[0].key, op: CONDITION_FIELDS[0].ops[0], value: "", join: "and" }]);
   }
 
   function updateCondition(index: number, next: Condition) {
     onChange(conditions.map((c, i) => (i === index ? next : c)));
+  }
+
+  function setJoin(index: number, join: "and" | "or") {
+    onChange(conditions.map((c, i) => (i === index ? { ...c, join } : c)));
   }
 
   function removeCondition(index: number) {
@@ -444,7 +453,25 @@ export function ConditionsEditor({
         <div className="space-y-2">
           {conditions.map((c, i) => (
             <div key={i}>
-              {i > 0 && <div className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-muted">And</div>}
+              {i > 0 && (
+                <div className="mb-2 flex justify-center">
+                  <div className="inline-flex overflow-hidden rounded-full border border-border text-[10px] font-semibold uppercase tracking-wide">
+                    {(["and", "or"] as const).map((j) => (
+                      <button
+                        key={j}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => setJoin(i, j)}
+                        className={`px-2.5 py-1 ${
+                          (c.join ?? "and") === j ? "bg-accent text-white" : "bg-surface text-muted hover:bg-surfaceMuted"
+                        } disabled:cursor-default`}
+                      >
+                        {j}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <ConditionRow
                 condition={c}
                 onChange={(next) => updateCondition(i, next)}
