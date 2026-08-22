@@ -77,7 +77,7 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
   const branches = data.branches;
   return (
     <div
-      className={`w-48 rounded-xl border bg-violetSoft px-3 py-2.5 shadow-sm ${selected ? "border-accent ring-2 ring-accent/30" : "border-violet/40"}`}
+      className={`w-72 rounded-xl border bg-violetSoft px-3 py-2.5 shadow-sm ${selected ? "border-accent ring-2 ring-accent/30" : "border-violet/40"}`}
     >
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
       <div className="flex items-center gap-2 text-sm font-medium text-ink">
@@ -88,13 +88,14 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
       </div>
       <p className="mt-1 text-[11px] text-muted">{branches.length} branch{branches.length === 1 ? "" : "es"}</p>
       {branches.length > 0 && (
-        <div
-          className="mt-1.5 grid gap-1 text-center text-[10px] font-medium text-muted"
-          style={{ gridTemplateColumns: `repeat(${branches.length}, 1fr)` }}
-        >
+        // One row per branch (not a side-by-side grid) so each branch's full
+        // condition text is legible without hovering -- with 3+ branches
+        // sharing a fixed-width node, a grid truncates every label down to
+        // just a few characters, making different branches look identical.
+        <div className="mt-1.5 flex flex-col gap-1 text-[10px] font-medium text-muted">
           {branches.map((b, i) => (
-            <span key={b.id} className="truncate" title={b.label || `Branch ${i + 1}`}>
-              {b.label || `#${i + 1}`}
+            <span key={b.id} title={b.label || `Branch ${i + 1}`}>
+              <span className="text-violet">{i + 1}.</span> {b.label || `Branch ${i + 1}`}
             </span>
           ))}
         </div>
