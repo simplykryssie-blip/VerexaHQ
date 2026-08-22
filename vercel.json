@@ -5,6 +5,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/check-overdue-invoices",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/dispatch-notifications",
       "schedule": "*/5 * * * *"
     },

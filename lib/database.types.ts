@@ -3865,6 +3865,7 @@ export type Database = {
           issue_date: string
           line_items: Json
           notes: string | null
+          overdue_flagged_at: string | null
           payment_method: string | null
           sent_at: string | null
           status: string
@@ -3889,6 +3890,7 @@ export type Database = {
           issue_date?: string
           line_items?: Json
           notes?: string | null
+          overdue_flagged_at?: string | null
           payment_method?: string | null
           sent_at?: string | null
           status?: string
@@ -3913,6 +3915,7 @@ export type Database = {
           issue_date?: string
           line_items?: Json
           notes?: string | null
+          overdue_flagged_at?: string | null
           payment_method?: string | null
           sent_at?: string | null
           status?: string
@@ -8924,6 +8927,7 @@ export type Database = {
         Returns: string
       }
       fire_date_reminder_automations: { Args: never; Returns: number }
+      fire_invoice_overdue_automations: { Args: never; Returns: number }
       fire_task_overdue_automations: { Args: never; Returns: number }
       format_mailing_address: { Args: { p_raw: string }; Returns: string }
       format_organizer_answer: {
