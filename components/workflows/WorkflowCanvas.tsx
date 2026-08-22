@@ -441,9 +441,14 @@ function CanvasInner({
     }
     // A condition step needs its branches defined before it means anything --
     // open that editor immediately instead of leaving an unconfigured node
-    // on the canvas the user has to remember to come back to.
+    // on the canvas the user has to remember to come back to. Every other
+    // action type was already chosen from the full list in the Add step
+    // menu, so its config panel opens immediately too, ready to fill in --
+    // no separate click on the new node required.
     if (actionType === "condition") {
       setActiveConditionStepId((newStep as { id: string }).id);
+    } else {
+      setSelectedStepId((newStep as { id: string }).id);
     }
     router.refresh();
   }
@@ -472,27 +477,33 @@ function CanvasInner({
               <Plus size={14} /> Add step
             </button>
             {addMenuOpen && (
-              <div className="absolute right-0 mt-1 w-52 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAddMenuOpen(false);
-                    addStep("create_task");
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
-                >
-                  <Plus size={14} className="text-accent" /> Regular action
-                </button>
+              <div className="absolute right-0 mt-1 w-64 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
                 <button
                   type="button"
                   onClick={() => {
                     setAddMenuOpen(false);
                     addStep("condition");
                   }}
-                  className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-xs font-medium text-ink hover:bg-violetSoft"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-violetSoft"
                 >
                   <Split size={14} className="text-violet" /> Condition (if/else)
                 </button>
+                <div className="max-h-72 overflow-y-auto border-t border-border">
+                  {ACTION_TYPES.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        addStep(t.value);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
+                    >
+                      <span className="text-accent">{actionIcon(t.value)}</span>
+                      <span className="truncate">{t.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
