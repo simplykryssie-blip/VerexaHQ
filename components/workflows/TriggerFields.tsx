@@ -44,6 +44,10 @@ export const TRIGGER_TYPES = [
   { value: "email.bounced", label: "An automated email bounces" },
   { value: "sms.delivered", label: "An automated text is delivered" },
   { value: "sms.failed", label: "An automated text fails to deliver" },
+  { value: "invoice.sent", label: "An invoice is sent" },
+  { value: "invoice.paid", label: "An invoice is paid in full" },
+  { value: "invoice.overdue", label: "An invoice becomes overdue" },
+  { value: "payment_plan.installment_paid", label: "A payment plan installment is paid" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -195,6 +199,18 @@ export function triggerSummary(
   }
   if (triggerType === "sms.failed") {
     return "When an automated text fails to deliver";
+  }
+  if (triggerType === "invoice.sent") {
+    return "When an invoice is sent";
+  }
+  if (triggerType === "invoice.paid") {
+    return "When an invoice is paid in full";
+  }
+  if (triggerType === "invoice.overdue") {
+    return "When an invoice becomes overdue (checked every 6 hours)";
+  }
+  if (triggerType === "payment_plan.installment_paid") {
+    return "When a payment plan installment is paid";
   }
   return triggerType;
 }
