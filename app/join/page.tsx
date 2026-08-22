@@ -103,13 +103,18 @@ export default function JoinPage() {
   async function autoCreateAndConnect(name: string) {
     setConnecting(true);
     setError(null);
-    const { data: newWorkspaceId, error: createError } = await supabase.rpc("create_workspace", {
+    // Creates the workspace and redeems this invite atomically, server-side
+    // -- accept_firm_connection_invite validates the token is still a real,
+    // pending, unexpired invite before creating anything, so this can't be
+    // used to spin up an unconnected workspace the way calling
+    // create_workspace directly could.
+    const { data: newWorkspaceId, error: acceptError } = await supabase.rpc("accept_firm_connection_invite", {
+      p_token: token,
       p_name: name,
-      p_workspace_type: "independent_ptin",
     });
-    if (createError || !newWorkspaceId) {
+    if (acceptError || !newWorkspaceId) {
       setConnecting(false);
-      setError(createError?.message ?? "Could not create your workspace.");
+      setError(acceptError?.message ?? "Could not create your workspace.");
       setAuthState("needs-workspace");
       return;
     }
@@ -124,7 +129,12 @@ export default function JoinPage() {
         .update({ first_name: meta?.first_name ?? null, last_name: meta?.last_name ?? null, display_name: displayName || null })
         .eq("id", user.id);
     }
-    await redeem(newWorkspaceId as string);
+    setConnecting(false);
+    setConnected(true);
+    setTimeout(() => {
+      router.push("/dashboard");
+      router.refresh();
+    }, 1200);
   }
 
   async function redeem(targetWorkspaceId: string) {
