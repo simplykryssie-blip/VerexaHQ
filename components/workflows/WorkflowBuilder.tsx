@@ -134,8 +134,19 @@ const TASK_PRIORITIES = ["low", "medium", "high"];
 const NOTIFICATION_PRIORITIES = ["Low", "Medium", "High"];
 const UPDATE_CLIENT_FIELDS = [
   { value: "first_name", label: "First name" },
+  { value: "middle_name", label: "Middle name" },
   { value: "last_name", label: "Last name" },
+  { value: "suffix", label: "Suffix" },
+  { value: "business_name", label: "Business name" },
+  { value: "client_type", label: "Client type" },
+  { value: "primary_email", label: "Email" },
   { value: "primary_phone", label: "Phone" },
+  { value: "address_line1", label: "Address line 1" },
+  { value: "address_line2", label: "Address line 2" },
+  { value: "city", label: "City" },
+  { value: "state", label: "State" },
+  { value: "postal_code", label: "ZIP / postal code" },
+  { value: "country", label: "Country" },
   { value: "relationship_manager_id", label: "Relationship manager" },
 ];
 const CLIENT_TYPES = ["individual", "business", "trust", "estate", "organization"];
@@ -1077,11 +1088,31 @@ export function StepCard({
                   ))}
                 </select>
               </label>
+            ) : config.field === "client_type" ? (
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                New value
+                <select
+                  disabled={!canManage}
+                  value={(config.value as string) ?? ""}
+                  onChange={(e) => setField("value", e.target.value)}
+                  className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink capitalize focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                >
+                  <option value="" disabled>
+                    Choose a type
+                  </option>
+                  {CLIENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : (
               <label className="flex flex-col gap-1 text-xs text-muted">
                 New value
                 <input
                   disabled={!canManage}
+                  type={config.field === "primary_email" ? "email" : "text"}
                   value={(config.value as string) ?? ""}
                   onChange={(e) => setField("value", e.target.value)}
                   className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
