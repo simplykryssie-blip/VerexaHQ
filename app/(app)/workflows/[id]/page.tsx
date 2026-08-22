@@ -26,7 +26,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   const { data: automation } = await supabase
     .from("automations")
-    .select("id, name, description, trigger_type, trigger_config, conditions, is_enabled, status")
+    .select("id, name, description, trigger_type, trigger_config, conditions, is_enabled, status, webhook_token")
     .eq("id", params.id)
     .eq("workspace_id", workspace.id)
     .maybeSingle();
@@ -213,6 +213,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           staffOptions={staffOptions}
           automationOptions={automationOptions}
           conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
+          webhookToken={automation.webhook_token}
         />
       </div>
     </>

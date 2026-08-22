@@ -33,6 +33,10 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "path": "/api/cron/send-pending-automation-webhooks",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/sync-calendar-events",
       "schedule": "*/5 * * * *"
     },

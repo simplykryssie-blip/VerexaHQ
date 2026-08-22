@@ -35,6 +35,7 @@ import {
   Clock,
   Plus,
   ExternalLink,
+  Webhook,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -126,6 +127,7 @@ export const ACTION_TYPES = [
   { value: "send_portal_message", label: "Send a portal message" },
   { value: "start_workflow", label: "Start another workflow" },
   { value: "end_workflow", label: "End this workflow" },
+  { value: "webhook", label: "Call a webhook" },
 ];
 
 const TASK_PRIORITIES = ["low", "medium", "high"];
@@ -163,6 +165,7 @@ export function actionIcon(type: string) {
   if (type === "send_portal_message") return <MessageCircle size={15} />;
   if (type === "start_workflow") return <PlayCircle size={15} />;
   if (type === "end_workflow") return <StopCircle size={15} />;
+  if (type === "webhook") return <Webhook size={15} />;
   return <CheckSquare size={15} />;
 }
 
@@ -1326,6 +1329,24 @@ export function StepCard({
             Stops this workflow here -- no further steps will run for this trigger.
           </p>
         )}
+
+        {actionType === "webhook" && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Webhook URL
+            <input
+              disabled={!canManage}
+              type="url"
+              value={(config.url as string) ?? ""}
+              onChange={(e) => setField("url", e.target.value)}
+              placeholder="https://hooks.zapier.com/..."
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            />
+            <span className="mt-1 text-[11px] normal-case text-muted">
+              Sends a JSON payload with the same fields available to email/SMS merge fields (client name, engagement number,
+              firm name, and so on), plus the data that started this run.
+            </span>
+          </label>
+        )}
       </div>
 
       {canManage && (
@@ -1381,6 +1402,7 @@ export function WorkflowBuilder({
   staffOptions = [],
   automationOptions = [],
   conditions: initialConditions = [],
+  webhookToken,
 }: {
   workspaceId: string;
   automationId: string;
@@ -1403,6 +1425,7 @@ export function WorkflowBuilder({
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
   conditions?: Condition[] | ConditionGroup[];
+  webhookToken?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -1509,6 +1532,7 @@ export function WorkflowBuilder({
               organizerTemplates={organizerTemplates}
               services={services}
               pipelines={pipelines}
+              webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
               disabled={!canManage}
             />
 
