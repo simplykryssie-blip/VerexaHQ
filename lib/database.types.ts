@@ -351,6 +351,38 @@ export type Database = {
           },
         ]
       }
+      automation_date_reminders_sent: {
+        Row: {
+          automation_id: string
+          entity_id: string
+          entity_type: string
+          reminder_date: string
+          sent_at: string
+        }
+        Insert: {
+          automation_id: string
+          entity_id: string
+          entity_type: string
+          reminder_date: string
+          sent_at?: string
+        }
+        Update: {
+          automation_id?: string
+          entity_id?: string
+          entity_type?: string
+          reminder_date?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_date_reminders_sent_automation_id_fkey"
+            columns: ["automation_id"]
+            isOneToOne: false
+            referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_execution_logs: {
         Row: {
           automation_id: string
@@ -8865,6 +8897,7 @@ export type Database = {
         }
         Returns: string
       }
+      fire_date_reminder_automations: { Args: never; Returns: number }
       fire_task_overdue_automations: { Args: never; Returns: number }
       format_mailing_address: { Args: { p_raw: string }; Returns: string }
       format_organizer_answer: {
