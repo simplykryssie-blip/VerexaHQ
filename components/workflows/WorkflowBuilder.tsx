@@ -33,6 +33,8 @@ import {
   StopCircle,
   LogIn,
   Clock,
+  Plus,
+  ExternalLink,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -41,6 +43,8 @@ import { useToast } from "@/components/Toast";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { ConditionsEditor, type Condition } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
+import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
+import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
@@ -204,6 +208,26 @@ export function StepCard({
     row: { id: string; name: string; status: string; workspace_id: string | null; subject?: string | null; body_html?: string | null; body?: string | null };
   } | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [creatingTemplateKind, setCreatingTemplateKind] = useState<"email" | "sms" | "organizer" | "engagement_letter" | null>(null);
+  // Newly created templates this session -- shown in their dropdown right
+  // away rather than waiting on the parent Server Component's router.refresh()
+  // to land, since that's a real network round trip and the selection should
+  // feel instant.
+  const [extraEmailTemplates, setExtraEmailTemplates] = useState<MessageTemplateOption[]>([]);
+  const [extraSmsTemplates, setExtraSmsTemplates] = useState<MessageTemplateOption[]>([]);
+  const [extraOrganizerTemplates, setExtraOrganizerTemplates] = useState<TemplateOption[]>([]);
+  const [extraEngagementLetterTemplates, setExtraEngagementLetterTemplates] = useState<TemplateOption[]>([]);
+  // Organizer/engagement letter templates need their full builder page to get
+  // real content -- point staff at it right after the quick-create stub saves.
+  const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
+
+  const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
+  const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
+  const organizerOptions = [...organizerTemplates, ...extraOrganizerTemplates.filter((e) => !organizerTemplates.some((t) => t.id === e.id))];
+  const engagementLetterOptions = [
+    ...engagementLetterTemplates,
+    ...extraEngagementLetterTemplates.filter((e) => !engagementLetterTemplates.some((t) => t.id === e.id)),
+  ];
 
   async function openTemplateEditor(kind: "email" | "sms") {
     const slug = config.template_slug as string | undefined;
@@ -376,7 +400,7 @@ export function StepCard({
                 <option value="" disabled>
                   Choose a published email template
                 </option>
-                {emailTemplates.map((t) => (
+                {emailOptions.map((t) => (
                   <option key={t.id} value={t.slug}>
                     {t.name}
                   </option>
@@ -393,7 +417,35 @@ export function StepCard({
                   <Pencil size={14} />
                 </button>
               ) : null}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setCreatingTemplateKind("email")}
+                  title="Create a new email template"
+                  className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
             </div>
+            {creatingTemplateKind === "email" && (
+              <div className="mt-1">
+                <CreateTemplateForm
+                  workspaceId={workspaceId}
+                  kind="email"
+                  defaultOpen
+                  onSuccess={(row) => {
+                    setExtraEmailTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
+                    setField("template_slug", row.slug);
+                    setCreatingTemplateKind(null);
+                    setEditingTemplate({
+                      kind: "email",
+                      row: { id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, subject: "", body_html: "" },
+                    });
+                  }}
+                />
+              </div>
+            )}
           </label>
         )}
 
@@ -410,7 +462,7 @@ export function StepCard({
                 <option value="" disabled>
                   Choose a published SMS template
                 </option>
-                {smsTemplates.map((t) => (
+                {smsOptions.map((t) => (
                   <option key={t.id} value={t.slug}>
                     {t.name}
                   </option>
@@ -427,7 +479,35 @@ export function StepCard({
                   <Pencil size={14} />
                 </button>
               ) : null}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setCreatingTemplateKind("sms")}
+                  title="Create a new SMS template"
+                  className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
             </div>
+            {creatingTemplateKind === "sms" && (
+              <div className="mt-1">
+                <CreateTemplateForm
+                  workspaceId={workspaceId}
+                  kind="sms"
+                  defaultOpen
+                  onSuccess={(row) => {
+                    setExtraSmsTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
+                    setField("template_slug", row.slug);
+                    setCreatingTemplateKind(null);
+                    setEditingTemplate({
+                      kind: "sms",
+                      row: { id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, body: "" },
+                    });
+                  }}
+                />
+              </div>
+            )}
           </label>
         )}
 
@@ -500,24 +580,61 @@ export function StepCard({
         {actionType === "send_organizer_template" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
             Organizer
-            <select
-              disabled={!canManage}
-              value={(config.organizer_template_id as string) ?? ""}
-              onChange={(e) => setField("organizer_template_id", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="">Auto-detect from the service selected</option>
-              {organizerTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-1.5">
+              <select
+                disabled={!canManage}
+                value={(config.organizer_template_id as string) ?? ""}
+                onChange={(e) => setField("organizer_template_id", e.target.value)}
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="">Auto-detect from the service selected</option>
+                {organizerOptions.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setCreatingTemplateKind("organizer")}
+                  title="Create a new organizer"
+                  className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
+            </div>
             <span className="text-[11px] text-muted">
               Auto-detect sends whichever organizer is linked to the service that triggered this run (set per
               service under Services) -- pick a specific template instead only if this step should always send the
               same organizer regardless of service.
             </span>
+            {creatingTemplateKind === "organizer" && (
+              <div className="mt-1">
+                <CreateQuickTemplate
+                  workspaceId={workspaceId}
+                  kind="organizer"
+                  defaultOpen
+                  onSuccess={(row) => {
+                    setExtraOrganizerTemplates((prev) => [...prev, row]);
+                    setField("organizer_template_id", row.id);
+                    setCreatingTemplateKind(null);
+                    setJustCreatedLink({ kind: "organizer", id: row.id, name: row.name });
+                  }}
+                />
+              </div>
+            )}
+            {justCreatedLink?.kind === "organizer" && justCreatedLink.id === config.organizer_template_id && (
+              <a
+                href={`/templates/organizers/${justCreatedLink.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex w-fit items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+              >
+                Finish building &quot;{justCreatedLink.name}&quot; <ExternalLink size={11} />
+              </a>
+            )}
           </label>
         )}
 
@@ -531,21 +648,58 @@ export function StepCard({
         {actionType === "send_engagement_letter" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
             Engagement letter
-            <select
-              disabled={!canManage}
-              value={(config.engagement_letter_template_id as string) ?? ""}
-              onChange={(e) => setField("engagement_letter_template_id", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="" disabled>
-                Choose an engagement letter template
-              </option>
-              {engagementLetterTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
+            <div className="flex gap-1.5">
+              <select
+                disabled={!canManage}
+                value={(config.engagement_letter_template_id as string) ?? ""}
+                onChange={(e) => setField("engagement_letter_template_id", e.target.value)}
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="" disabled>
+                  Choose an engagement letter template
                 </option>
-              ))}
-            </select>
+                {engagementLetterOptions.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setCreatingTemplateKind("engagement_letter")}
+                  title="Create a new engagement letter"
+                  className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
+                >
+                  <Plus size={14} />
+                </button>
+              )}
+            </div>
+            {creatingTemplateKind === "engagement_letter" && (
+              <div className="mt-1">
+                <CreateQuickTemplate
+                  workspaceId={workspaceId}
+                  kind="engagement_letter"
+                  defaultOpen
+                  onSuccess={(row) => {
+                    setExtraEngagementLetterTemplates((prev) => [...prev, row]);
+                    setField("engagement_letter_template_id", row.id);
+                    setCreatingTemplateKind(null);
+                    setJustCreatedLink({ kind: "engagement_letter", id: row.id, name: row.name });
+                  }}
+                />
+              </div>
+            )}
+            {justCreatedLink?.kind === "engagement_letter" && justCreatedLink.id === config.engagement_letter_template_id && (
+              <a
+                href={`/templates/engagement-letters/${justCreatedLink.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex w-fit items-center gap-1 text-[11px] font-medium text-accent hover:underline"
+              >
+                Finish building &quot;{justCreatedLink.name}&quot; <ExternalLink size={11} />
+              </a>
+            )}
           </label>
         )}
 
