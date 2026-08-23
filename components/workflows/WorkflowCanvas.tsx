@@ -36,6 +36,7 @@ import {
   ACTION_TYPES,
   type WorkflowStepRow,
   type WorkflowStepEdgeRow,
+  type WorkflowRunRow,
   type MessageTemplateOption,
   type StaffOption,
   type AutomationOption,
@@ -43,7 +44,54 @@ import {
 import { triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { BranchEditor } from "@/components/workflows/BranchEditor";
 
-type StepNodeData = { step: WorkflowStepRow };
+type StepNodeData = { step: WorkflowStepRow; activeRuns: WorkflowRunRow[]; onOpenRun: (runId: string) => void };
+
+function runInitials(run: WorkflowRunRow) {
+  const label = run.client_name ?? run.engagement_number ?? "?";
+  const parts = label.trim().split(/\s+/).filter(Boolean);
+  const initials = parts.length >= 2 ? parts[0][0] + parts[1][0] : label.slice(0, 2);
+  return initials.toUpperCase();
+}
+
+// GHL's "small box that flows with the automation": one avatar chip per
+// client currently sitting at this step (status='running', current_step_id
+// = this step), floating on the node's corner so it's visible without
+// opening anything. A soft pulse marks it as live, not a static count.
+// Clicking one opens that specific client's run in RunDetailPanel; a stack
+// past 3 collapses into a "+N" chip that opens the most recent of the rest.
+function RunTicker({ runs, onOpenRun }: { runs: WorkflowRunRow[]; onOpenRun: (runId: string) => void }) {
+  if (runs.length === 0) return null;
+  const shown = runs.slice(0, 3);
+  const overflow = runs.slice(3);
+  return (
+    <div className="nodrag absolute -right-2 -top-2.5 z-10 flex items-center" onClick={(e) => e.stopPropagation()}>
+      {shown.map((run, i) => (
+        <button
+          key={run.id}
+          type="button"
+          title={`${run.client_name ?? run.engagement_number ?? "Client"} -- click to view this run`}
+          onClick={() => onOpenRun(run.id)}
+          style={{ marginLeft: i === 0 ? 0 : -8, zIndex: shown.length - i }}
+          className="relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-accent text-[10px] font-bold text-white shadow-sm hover:scale-110"
+        >
+          <span className="absolute inset-0 animate-ping rounded-full bg-accent/60" />
+          <span className="relative">{runInitials(run)}</span>
+        </button>
+      ))}
+      {overflow.length > 0 && (
+        <button
+          type="button"
+          title={`${overflow.length} more client${overflow.length === 1 ? "" : "s"} on this step`}
+          onClick={() => onOpenRun(overflow[0].id)}
+          style={{ marginLeft: -8, zIndex: 0 }}
+          className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-surface bg-slate text-[9px] font-bold text-white shadow-sm hover:scale-110"
+        >
+          +{overflow.length}
+        </button>
+      )}
+    </div>
+  );
+}
 
 // React Flow's default handle hit-target is a tiny ~6px dot -- easy to miss
 // entirely on a trackpad, especially once the canvas is zoomed to fit
@@ -79,13 +127,14 @@ function stepKind(actionType: string) {
 }
 
 function ActionNode({ data, selected }: NodeProps & { data: StepNodeData }) {
-  const { step } = data;
+  const { step, activeRuns, onOpenRun } = data;
   const actionMeta = ACTION_TYPES.find((a) => a.value === step.action_type);
   const kind = stepKind(step.action_type);
   return (
     <div
-      className={`w-64 rounded-2xl border bg-surface px-4 py-3 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-border"}`}
+      className={`relative w-64 rounded-2xl border bg-surface px-4 py-3 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-border"}`}
     >
+      <RunTicker runs={activeRuns} onOpenRun={onOpenRun} />
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
       <div className="flex items-center gap-3">
         <span
@@ -123,8 +172,9 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
   const branches = data.branches;
   return (
     <div
-      className={`w-80 rounded-2xl border bg-surface px-4 py-3.5 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-[#DDD9FB]"}`}
+      className={`relative w-80 rounded-2xl border bg-surface px-4 py-3.5 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-[#DDD9FB]"}`}
     >
+      <RunTicker runs={data.activeRuns} onOpenRun={data.onOpenRun} />
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-violetSoft text-violet">
@@ -345,6 +395,7 @@ function CanvasInner({
   automationId,
   steps,
   edges: edgeRows,
+  runs,
   canManage,
   triggerType,
   triggerConfig,
@@ -359,11 +410,13 @@ function CanvasInner({
   staffOptions,
   automationOptions,
   onEditTrigger,
+  onOpenRun,
 }: {
   workspaceId: string;
   automationId: string;
   steps: WorkflowStepRow[];
   edges: WorkflowStepEdgeRow[];
+  runs: WorkflowRunRow[];
   canManage: boolean;
   triggerType: string;
   triggerConfig: Record<string, unknown>;
@@ -378,6 +431,7 @@ function CanvasInner({
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   onEditTrigger: () => void;
+  onOpenRun: (runId: string) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -386,6 +440,21 @@ function CanvasInner({
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [activeConditionStepId, setActiveConditionStepId] = useState<string | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+
+  // Only a run currently sitting at a step (not one that's finished or
+  // failed there) belongs on the live ticker -- completed/failed runs stay
+  // visible in the "All runs" table below, one click away, without
+  // cluttering the canvas with stale markers.
+  const runsByStepId = useMemo(() => {
+    const map = new Map<string, WorkflowRunRow[]>();
+    for (const r of runs) {
+      if (r.status !== "running" || !r.current_step_id) continue;
+      const list = map.get(r.current_step_id) ?? [];
+      list.push(r);
+      map.set(r.current_step_id, list);
+    }
+    return map;
+  }, [runs]);
 
   const rootStepIds = useMemo(() => {
     const hasIncoming = new Set(edgeRows.map((e) => e.to_step_id));
@@ -403,7 +472,7 @@ function CanvasInner({
         id: s.id,
         type: s.action_type === "condition" ? "condition" : "action",
         position: s.canvas_x != null && s.canvas_y != null ? { x: s.canvas_x, y: s.canvas_y } : autoLayout.get(s.id) ?? { x: TRUNK_X, y: 140 },
-        data: { step: s, branches },
+        data: { step: s, branches, activeRuns: runsByStepId.get(s.id) ?? [], onOpenRun },
       };
     });
     const triggerNode: Node = {
@@ -416,7 +485,7 @@ function CanvasInner({
     };
     return [triggerNode, ...stepNodes];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps, edgeRows, triggerType, triggerConfig]);
+  }, [steps, edgeRows, triggerType, triggerConfig, runsByStepId, onOpenRun]);
 
   const initialEdges: Edge[] = useMemo(() => {
     // A branch with no destination yet (defined via the condition modal,
@@ -437,6 +506,11 @@ function CanvasInner({
           label: e.label ?? undefined,
           style: e.branch_conditions ? { stroke: "var(--color-accent, #0b7fe0)" } : undefined,
           markerEnd: { type: MarkerType.ArrowClosed },
+          // A moving-dash line into whichever step currently has a live
+          // ticker -- the "flows with the automation" feel, driven by the
+          // same running-run data as the ticker itself rather than a
+          // separate animation to keep in sync.
+          animated: runsByStepId.has(e.to_step_id),
           data: { canManage, onInsert: (actionType: string) => insertStepOnEdge(e.id, actionType) },
         };
       });
@@ -452,11 +526,12 @@ function CanvasInner({
       style: { strokeDasharray: "4 3" },
       selectable: false,
       markerEnd: { type: MarkerType.ArrowClosed },
+      animated: runsByStepId.has(id),
       data: { canManage, onInsert: (actionType: string) => insertStepOnEdge(`${TRIGGER_NODE_ID}-${id}`, actionType) },
     }));
     return [...triggerEdges, ...realEdges];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [edgeRows, rootStepIds, steps, canManage]);
+  }, [edgeRows, rootStepIds, steps, canManage, runsByStepId]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);

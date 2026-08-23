@@ -58,6 +58,7 @@ import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
+import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
 export type StaffOption = { id: string; display_name: string | null };
@@ -90,6 +91,7 @@ export type WorkflowRunRow = {
   status: string;
   started_at: string;
   completed_at: string | null;
+  current_step_id: string | null;
   engagement_number: string | null;
   client_name: string | null;
 };
@@ -1597,6 +1599,7 @@ export function WorkflowBuilder({
   const [conditions, setConditions] = useState<ConditionGroup[]>(() => normalizeToConditionGroups(initialConditions));
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
+  const [openRunId, setOpenRunId] = useState<string | null>(null);
 
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
@@ -1647,6 +1650,7 @@ export function WorkflowBuilder({
             automationId={automationId}
             steps={steps}
             edges={stepEdges}
+            runs={runs}
             canManage={canManage}
             triggerType={currentTriggerType}
             triggerConfig={config}
@@ -1661,6 +1665,7 @@ export function WorkflowBuilder({
             staffOptions={staffOptions}
             automationOptions={automationOptions}
             onEditTrigger={() => setTriggerModalOpen(true)}
+            onOpenRun={(runId) => setOpenRunId(runId)}
           />
         )}
       </div>
@@ -1730,7 +1735,7 @@ export function WorkflowBuilder({
         </div>
       )}
 
-      <CollapsibleSection title="Recent runs" count={runs.length}>
+      <CollapsibleSection title="All runs" count={runs.length}>
         {runs.length === 0 ? (
           <EmptyState message="This workflow hasn't fired yet." />
         ) : (
@@ -1746,9 +1751,18 @@ export function WorkflowBuilder({
               </thead>
               <tbody className="divide-y divide-border">
                 {runs.map((r) => (
-                  <tr key={r.id}>
-                    <td className="px-4 py-2 text-slate">{r.engagement_number ?? r.client_name ?? "--"}</td>
-                    <td className="px-4 py-2 capitalize text-slate">{r.status}</td>
+                  <tr key={r.id} onClick={() => setOpenRunId(r.id)} className="cursor-pointer hover:bg-surfaceMuted">
+                    <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${
+                          r.status === "running" ? "text-accent" : r.status === "failed" ? "text-danger" : r.status === "completed" ? "text-success" : "text-muted"
+                        }`}
+                      >
+                        {r.status === "running" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+                        {r.status}
+                      </span>
+                    </td>
                     <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
                     <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>
                   </tr>
@@ -1778,6 +1792,8 @@ export function WorkflowBuilder({
           </ul>
         </CollapsibleSection>
       )}
+
+      {openRunId && <RunDetailPanel runId={openRunId} onClose={() => setOpenRunId(null)} />}
     </div>
   );
 }

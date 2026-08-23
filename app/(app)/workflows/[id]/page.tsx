@@ -62,10 +62,10 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .order("sort_order"),
       supabase
         .from("automation_runs")
-        .select("id, status, started_at, completed_at, engagements(engagement_number), clients(first_name, last_name, business_name)")
+        .select("id, status, started_at, completed_at, current_step_id, engagements(engagement_number), clients(first_name, last_name, business_name)")
         .eq("automation_id", automation.id)
         .order("started_at", { ascending: false })
-        .limit(20),
+        .limit(50),
       supabase
         .from("automation_execution_logs")
         .select("id, status, executed_at, execution_data, error_message")
@@ -160,6 +160,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     status: r.status,
     started_at: r.started_at,
     completed_at: r.completed_at,
+    current_step_id: r.current_step_id,
     engagement_number: (r.engagements as unknown as { engagement_number: string | null } | null)?.engagement_number ?? null,
     client_name: clientLabelFor(r.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
   }));
