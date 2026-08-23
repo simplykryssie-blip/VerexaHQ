@@ -6,6 +6,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  BackgroundVariant,
   Controls,
   Handle,
   Position,
@@ -13,9 +14,13 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   type Node,
   type Edge,
   type NodeProps,
+  type EdgeProps,
   type Connection,
   type NodeMouseHandler,
   type EdgeMouseHandler,
@@ -46,19 +51,60 @@ type StepNodeData = { step: WorkflowStepRow };
 // style instead of the library default.
 const handleStyle = { width: 14, height: 14, borderWidth: 2 };
 
+// Color-codes a step by what KIND of thing it does (not by status), matching
+// the app's existing categorical chip palette (Badge/dashboard tiles already
+// use emerald/amber/violet/rose this same way) -- so at a glance, without
+// reading every label, a wait looks different from a message which looks
+// different from a pipeline move. Anything not listed falls back to the
+// generic accent "Action" treatment.
+const STEP_KIND: Record<string, { label: string; color: string; soft: string }> = {
+  delay: { label: "Wait", color: "#F59E0B", soft: "#FEF3DE" },
+  business_hours_delay: { label: "Wait", color: "#F59E0B", soft: "#FEF3DE" },
+  send_email: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_sms: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_portal_message: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_document_request: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_engagement_letter: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_quote: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_organizer_template: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
+  send_notification: { label: "Notify", color: "#FB7185", soft: "#FDECEF" },
+  change_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
+  move_lead_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
+  move_lead_to_service_pipeline: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
+  move_engagement_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
+};
+const DEFAULT_STEP_KIND = { label: "Action", color: "#0B7FE0", soft: "#E8F3FE" };
+function stepKind(actionType: string) {
+  return STEP_KIND[actionType] ?? DEFAULT_STEP_KIND;
+}
+
 function ActionNode({ data, selected }: NodeProps & { data: StepNodeData }) {
   const { step } = data;
   const actionMeta = ACTION_TYPES.find((a) => a.value === step.action_type);
+  const kind = stepKind(step.action_type);
   return (
     <div
-      className={`w-56 rounded-xl border bg-surface px-3 py-2.5 shadow-sm ${selected ? "border-accent ring-2 ring-accent/30" : "border-border"}`}
+      className={`w-64 rounded-2xl border bg-surface px-4 py-3 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-border"}`}
     >
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
-      <div className="flex items-center gap-2 text-sm font-medium text-ink">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surfaceMuted text-accent">{actionIcon(step.action_type)}</span>
-        <span className="truncate">{actionMeta?.label ?? step.action_type}</span>
+      <div className="flex items-center gap-3">
+        <span
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
+          style={{ background: kind.soft, color: kind.color }}
+        >
+          {actionIcon(step.action_type)}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[13.5px] font-semibold text-ink">{actionMeta?.label ?? step.action_type}</p>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: kind.color }} />
+            <span className="text-[11px] font-medium text-muted">
+              {kind.label}
+              {step.delay_minutes > 0 ? ` · ${step.delay_minutes}m` : ""}
+            </span>
+          </div>
+        </div>
       </div>
-      {step.delay_minutes > 0 && <p className="mt-1 text-[11px] text-muted">Waits {step.delay_minutes}m before running</p>}
       <Handle type="source" position={Position.Bottom} style={handleStyle} className="!bg-muted" />
     </div>
   );
@@ -77,24 +123,31 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
   const branches = data.branches;
   return (
     <div
-      className={`w-72 rounded-xl border bg-violetSoft px-3 py-2.5 shadow-sm ${selected ? "border-accent ring-2 ring-accent/30" : "border-violet/40"}`}
+      className={`w-80 rounded-2xl border bg-surface px-4 py-3.5 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-[#DDD9FB]"}`}
     >
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
-      <div className="flex items-center gap-2 text-sm font-medium text-ink">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-violet">
-          <Split size={14} />
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-violetSoft text-violet">
+          <Split size={18} />
         </span>
-        Condition
+        <div className="min-w-0">
+          <p className="text-[14px] font-semibold text-ink">Condition</p>
+          <div className="mt-0.5 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet" />
+            <span className="text-[11px] font-medium text-muted">
+              {branches.length} branch{branches.length === 1 ? "" : "es"}
+            </span>
+          </div>
+        </div>
       </div>
-      <p className="mt-1 text-[11px] text-muted">{branches.length} branch{branches.length === 1 ? "" : "es"}</p>
       {branches.length > 0 && (
         // One row per branch (not a side-by-side grid) so each branch's full
         // condition text is legible without hovering -- with 3+ branches
         // sharing a fixed-width node, a grid truncates every label down to
         // just a few characters, making different branches look identical.
-        <div className="mt-1.5 flex flex-col gap-1 text-[10px] font-medium text-muted">
+        <div className="mt-2.5 flex flex-col gap-1 border-t border-border pt-2 text-[11px] font-medium text-muted">
           {branches.map((b, i) => (
-            <span key={b.id} title={b.label || `Branch ${i + 1}`}>
+            <span key={b.id} title={b.label || `Branch ${i + 1}`} className="truncate">
               <span className="text-violet">{i + 1}.</span> {b.label || `Branch ${i + 1}`}
             </span>
           ))}
@@ -120,26 +173,152 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
 
 function TriggerNode({ data }: NodeProps & { data: { summary: string } }) {
   return (
-    <div className="w-56 cursor-pointer rounded-xl border border-amber bg-amberSoft px-3 py-2.5 shadow-sm hover:border-amber/70">
-      <div className="flex items-center gap-2 text-sm font-medium text-ink">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-amber">
-          <Zap size={14} />
+    <div className="w-64 cursor-pointer rounded-2xl bg-ink px-4 py-3 shadow-soft">
+      <div className="flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.14] text-white">
+          <Zap size={16} />
         </span>
-        Trigger
+        <div className="min-w-0">
+          <p className="truncate text-[13.5px] font-semibold text-white">{data.summary}</p>
+          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/60">Trigger</p>
+        </div>
       </div>
-      <p className="mt-1 text-[11px] text-muted">{data.summary}</p>
       <Handle type="source" position={Position.Bottom} style={handleStyle} className="!bg-muted" isConnectable={false} />
     </div>
   );
 }
 
+// The connector's own "+" -- click it to insert a new step *between* the two
+// steps it already joins (rewiring the existing connection to point at the
+// new step, then reconnecting the new step to the old target), same
+// interaction GHL and Tax Nitro build their canvases around. This is in
+// addition to, not instead of, the "Add step" button up top -- that one
+// always appends after whatever's selected; this one lets a step go
+// anywhere in the middle of an existing chain without first deleting and
+// redrawing connections by hand.
+function StepEdge({ id, sourceX, sourceY, targetX, targetY, style, markerEnd, data }: EdgeProps) {
+  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, borderRadius: 14 });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const edgeData = data as { canManage?: boolean; onInsert?: (actionType: string) => void } | undefined;
+  const canManage = Boolean(edgeData?.canManage);
+  const onInsert = edgeData?.onInsert;
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {canManage && onInsert && (
+        <EdgeLabelRenderer>
+          <div
+            className="nodrag nopan"
+            style={{ position: "absolute", transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`, pointerEvents: "all", zIndex: 20 }}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen((v) => !v);
+              }}
+              aria-label="Insert a step here"
+              className="flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] border-dashed border-muted/50 bg-surface text-accent shadow-soft hover:border-accent hover:bg-accentSoft"
+            >
+              <Plus size={13} />
+            </button>
+            {menuOpen && (
+              <div
+                onMouseLeave={() => setMenuOpen(false)}
+                className="absolute left-1/2 top-8 z-30 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onInsert("condition");
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-violetSoft"
+                >
+                  <Split size={14} className="text-violet" /> Condition (if/else)
+                </button>
+                <div className="max-h-64 overflow-y-auto border-t border-border">
+                  {ACTION_TYPES.map((t) => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onInsert(t.value);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
+                    >
+                      <span className="text-accent">{actionIcon(t.value)}</span>
+                      <span className="truncate">{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
 const nodeTypes = { action: ActionNode, condition: ConditionNode, trigger: TriggerNode };
+const edgeTypes = { step: StepEdge };
 const TRIGGER_NODE_ID = "__trigger__";
 const COLUMN_WIDTH = 260;
 const ROW_HEIGHT = 160;
+const TRUNK_X = 300;
 
-function autoPosition(index: number): { x: number; y: number } {
-  return { x: 300, y: 140 + index * 160 };
+// Graph-aware fallback for any step with no saved canvas position (never
+// dragged, or added outside the canvas UI entirely -- e.g. by a migration).
+// Walks the real edges breadth-first from each root step, so a plain chain
+// lays out as one straight vertical line and a condition's branches spread
+// out evenly to either side of it, instead of the old index-based fallback
+// (autoPosition(i) = fixed x, y by array order) which ignored the graph
+// completely and stacked unrelated branches on top of each other.
+// Already-positioned steps are never moved by this -- it only fills in for
+// the ones that have nothing saved yet.
+function computeAutoLayout(steps: WorkflowStepRow[], edgeRows: WorkflowStepEdgeRow[]): Map<string, { x: number; y: number }> {
+  const outgoing = new Map<string, WorkflowStepEdgeRow[]>();
+  for (const e of edgeRows) {
+    if (!e.to_step_id) continue;
+    const list = outgoing.get(e.from_step_id) ?? [];
+    list.push(e);
+    outgoing.set(e.from_step_id, list);
+  }
+  const hasIncoming = new Set(edgeRows.filter((e) => e.to_step_id).map((e) => e.to_step_id as string));
+  const roots = steps.filter((s) => !hasIncoming.has(s.id));
+
+  const positions = new Map<string, { x: number; y: number }>();
+  const visited = new Set<string>();
+  const queue: { id: string; x: number; depth: number }[] = roots.map((r) => ({ id: r.id, x: TRUNK_X, depth: 0 }));
+
+  while (queue.length > 0) {
+    const next = queue.shift();
+    if (!next || visited.has(next.id)) continue;
+    visited.add(next.id);
+    positions.set(next.id, { x: next.x, y: 140 + next.depth * ROW_HEIGHT });
+
+    const outs = (outgoing.get(next.id) ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+    const n = outs.length;
+    outs.forEach((e, i) => {
+      if (!e.to_step_id || visited.has(e.to_step_id)) return;
+      const offset = n <= 1 ? 0 : (i - (n - 1) / 2) * COLUMN_WIDTH;
+      queue.push({ id: e.to_step_id, x: next.x + offset, depth: next.depth + 1 });
+    });
+  }
+
+  // Anything unreachable from a root (shouldn't normally happen) still needs
+  // somewhere to render rather than silently disappearing.
+  let strayIndex = 0;
+  for (const s of steps) {
+    if (!positions.has(s.id)) {
+      positions.set(s.id, { x: TRUNK_X + 2 * COLUMN_WIDTH, y: 140 + strayIndex * ROW_HEIGHT });
+      strayIndex += 1;
+    }
+  }
+  return positions;
 }
 
 // A brand-new step with no anchor to attach to (the very first node) lands
@@ -151,8 +330,8 @@ function autoPosition(index: number): { x: number; y: number } {
 // of stacking on top of each other. Existing nodes are never moved, so a
 // manually dragged layout is always respected.
 function positionForNewStep(anchor: WorkflowStepRow | null, siblings: WorkflowStepRow[]): { x: number; y: number } {
-  if (!anchor) return { x: 300, y: 140 };
-  const anchorX = anchor.canvas_x ?? 300;
+  if (!anchor) return { x: TRUNK_X, y: 140 };
+  const anchorX = anchor.canvas_x ?? TRUNK_X;
   const anchorY = anchor.canvas_y ?? 140;
   if (siblings.length === 0) {
     return { x: anchorX, y: anchorY + ROW_HEIGHT };
@@ -214,7 +393,8 @@ function CanvasInner({
   }, [steps, edgeRows]);
 
   const initialNodes: Node[] = useMemo(() => {
-    const stepNodes = steps.map((s, i) => {
+    const autoLayout = computeAutoLayout(steps, edgeRows);
+    const stepNodes = steps.map((s) => {
       const branches = edgeRows
         .filter((e) => e.from_step_id === s.id)
         .sort((a, b) => a.sort_order - b.sort_order)
@@ -222,14 +402,14 @@ function CanvasInner({
       return {
         id: s.id,
         type: s.action_type === "condition" ? "condition" : "action",
-        position: s.canvas_x != null && s.canvas_y != null ? { x: s.canvas_x, y: s.canvas_y } : autoPosition(i),
+        position: s.canvas_x != null && s.canvas_y != null ? { x: s.canvas_x, y: s.canvas_y } : autoLayout.get(s.id) ?? { x: TRUNK_X, y: 140 },
         data: { step: s, branches },
       };
     });
     const triggerNode: Node = {
       id: TRIGGER_NODE_ID,
       type: "trigger",
-      position: { x: 300, y: -20 },
+      position: { x: TRUNK_X, y: -20 },
       data: { summary: triggerSummary(triggerType, triggerConfig, organizerTemplates, services, pipelines) },
       draggable: false,
       selectable: false,
@@ -247,6 +427,7 @@ function CanvasInner({
         const fromStep = steps.find((s) => s.id === e.from_step_id);
         return {
           id: e.id,
+          type: "step",
           source: e.from_step_id,
           target: e.to_step_id,
           // Condition nodes expose one handle per branch, keyed by that
@@ -256,20 +437,26 @@ function CanvasInner({
           label: e.label ?? undefined,
           style: e.branch_conditions ? { stroke: "var(--color-accent, #0b7fe0)" } : undefined,
           markerEnd: { type: MarkerType.ArrowClosed },
+          data: { canManage, onInsert: (actionType: string) => insertStepOnEdge(e.id, actionType) },
         };
       });
     // Visual only, not a real automation_step_edges row -- shows where
-    // execution actually starts (the step(s) with no incoming edge).
+    // execution actually starts (the step(s) with no incoming edge). Still
+    // gets the same insert-a-step "+" as a real edge, treated as "insert
+    // before this root step" (see insertStepOnEdge).
     const triggerEdges = rootStepIds.map((id) => ({
       id: `${TRIGGER_NODE_ID}-${id}`,
+      type: "step",
       source: TRIGGER_NODE_ID,
       target: id,
       style: { strokeDasharray: "4 3" },
       selectable: false,
       markerEnd: { type: MarkerType.ArrowClosed },
+      data: { canManage, onInsert: (actionType: string) => insertStepOnEdge(`${TRIGGER_NODE_ID}-${id}`, actionType) },
     }));
     return [...triggerEdges, ...realEdges];
-  }, [edgeRows, rootStepIds, steps]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edgeRows, rootStepIds, steps, canManage]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -388,6 +575,72 @@ function CanvasInner({
       toast.show(error.message, "error");
     } else {
       toast.show("Step removed", "success");
+    }
+    router.refresh();
+  }
+
+  // Inserts a new step *between* the two steps an existing connector already
+  // joins -- the connector's own "+" button, GHL/Tax Nitro's core building
+  // interaction. edgeId is either a real automation_step_edges id (rewire
+  // its to_step_id to the new step, then connect the new step to the old
+  // target) or a virtual trigger-edge id "__trigger__-<rootStepId>" (no real
+  // edge to rewire -- the new step just becomes the new root, wired straight
+  // to the step that used to be first).
+  async function insertStepOnEdge(edgeId: string, actionType: string) {
+    const isTriggerEdge = edgeId.startsWith(TRIGGER_NODE_ID);
+    const realEdge = isTriggerEdge ? null : edgeRows.find((e) => e.id === edgeId);
+    if (!isTriggerEdge && !realEdge) return;
+    const targetStepId = isTriggerEdge ? edgeId.slice(TRIGGER_NODE_ID.length + 1) : realEdge!.to_step_id;
+    if (!targetStepId) return;
+    const targetStep = steps.find((s) => s.id === targetStepId);
+    const sourceStep = isTriggerEdge ? null : steps.find((s) => s.id === realEdge!.from_step_id);
+
+    const targetX = targetStep?.canvas_x ?? TRUNK_X;
+    const sourceX = sourceStep?.canvas_x ?? targetX;
+    const targetY = targetStep?.canvas_y ?? 140;
+    const sourceY = sourceStep?.canvas_y ?? targetY - ROW_HEIGHT;
+    const position = { x: (sourceX + targetX) / 2, y: (sourceY + targetY) / 2 };
+
+    const { data: newStep, error } = await supabase
+      .from("automation_steps")
+      .insert({
+        automation_id: automationId,
+        display_order: steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0,
+        action_type: actionType,
+        action_config: {},
+        canvas_x: position.x,
+        canvas_y: position.y,
+      } as never)
+      .select("id")
+      .single();
+    if (error || !newStep) {
+      toast.show(error?.message ?? "Could not insert a step", "error");
+      return;
+    }
+    const newStepId = (newStep as { id: string }).id;
+
+    if (!isTriggerEdge && realEdge) {
+      const { error: rewireError } = await supabase.from("automation_step_edges").update({ to_step_id: newStepId }).eq("id", realEdge.id);
+      if (rewireError) {
+        toast.show(rewireError.message, "error");
+        return;
+      }
+    }
+    const { error: newEdgeError } = await supabase.from("automation_step_edges").insert({
+      automation_id: automationId,
+      from_step_id: newStepId,
+      to_step_id: targetStepId,
+      sort_order: 0,
+    } as never);
+    if (newEdgeError) {
+      toast.show(newEdgeError.message, "error");
+      return;
+    }
+
+    if (actionType === "condition") {
+      setActiveConditionStepId(newStepId);
+    } else {
+      setSelectedStepId(newStepId);
     }
     router.refresh();
   }
@@ -523,6 +776,7 @@ function CanvasInner({
           }}
           onConnect={canManage ? onConnect : undefined}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           nodesDraggable={canManage}
           nodesConnectable={canManage}
           connectionRadius={40}
@@ -530,7 +784,7 @@ function CanvasInner({
           fitView
           fitViewOptions={{ maxZoom: 0.85 }}
         >
-          <Background />
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.5} color="#DDE1E8" />
           <Controls showInteractive={false} />
         </ReactFlow>
       </div>
