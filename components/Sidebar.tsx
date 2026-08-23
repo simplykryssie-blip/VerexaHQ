@@ -4,11 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, ShieldEllipsis, Wrench } from "lucide-react";
+import { Menu, X, ChevronDown, ShieldEllipsis, Wrench, Layers, Check } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
 import styles from "./Sidebar.module.css";
+
+const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
+  independent_ptin: "PTIN",
+  ero_office: "ERO",
+  service_bureau: "SB",
+};
 
 export function Sidebar({
   workspaceName,
@@ -17,6 +23,7 @@ export function Sidebar({
   secondaryColor,
   isPlatformAdmin,
   isPlatformItOnly,
+  switchableWorkspaces,
   showMessages,
 }: {
   workspaceName: string;
@@ -26,10 +33,29 @@ export function Sidebar({
   isPlatformAdmin?: boolean;
   /** True only for a platform-IT (not also admin) user -- gets its own nav link since the "Platform Admin" link below is admin-only. */
   isPlatformItOnly?: boolean;
+  /** Home workspace + the demo PTIN/ERO/SB shells a platform admin can switch into to demo the product. Empty for everyone else. */
+  switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
 }) {
   const pathname = usePathname();
+  const [switching, setSwitching] = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+
+  async function switchWorkspace(workspaceId: string) {
+    if (switching) return;
+    setSwitching(true);
+    const res = await fetch("/api/workspace/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId }),
+    });
+    if (res.ok) {
+      window.location.href = "/dashboard";
+      return;
+    }
+    setSwitching(false);
+  }
   const [open, setOpen] = useState(false);
   const trimmedLogoUrl = useTrimmedLogo(logoUrl);
 
@@ -195,7 +221,7 @@ export function Sidebar({
               } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
             >
               <ShieldEllipsis size={18} strokeWidth={2} className="shrink-0" />
-              Platform Admin
+              Admin Dashboard
             </Link>
           </div>
         )}
@@ -203,14 +229,47 @@ export function Sidebar({
         {isPlatformItOnly && (
           <div className="px-3 pb-1">
             <Link
-              href="/platform-admin/it"
+              href="/platform-admin/systems"
               className={`${
-                pathname === "/platform-admin/it" ? styles.navItemActive : styles.navItem
+                pathname === "/platform-admin/systems" ? styles.navItemActive : styles.navItem
               } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
             >
               <Wrench size={18} strokeWidth={2} className="shrink-0" />
-              IT Tools
+              Systems
             </Link>
+          </div>
+        )}
+
+        {Boolean(switchableWorkspaces?.length) && (
+          <div className="px-3 pb-1">
+            <button
+              type="button"
+              onClick={() => setDemoOpen((v) => !v)}
+              aria-expanded={demoOpen}
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+            >
+              <Layers size={18} strokeWidth={2} className="shrink-0" />
+              <span className="flex-1 text-left">Demo Workspace</span>
+              <ChevronDown size={14} className={`shrink-0 transition-transform ${demoOpen ? "rotate-180" : ""}`} />
+            </button>
+            {demoOpen && (
+              <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
+                {switchableWorkspaces!.map((w) => (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => switchWorkspace(w.id)}
+                    disabled={switching || w.isActive}
+                    className={`${
+                      w.isActive ? styles.navItemActive : styles.navItem
+                    } flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium disabled:cursor-default`}
+                  >
+                    <span className="truncate">{w.isHome ? w.name : `Demo: ${WORKSPACE_TYPE_SHORT_LABELS[w.workspaceType] ?? w.workspaceType}`}</span>
+                    {w.isActive && <Check size={14} className="shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
