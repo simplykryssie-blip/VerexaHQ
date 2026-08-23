@@ -4274,6 +4274,7 @@ export type Database = {
           passing_score_percent: number
           title: string
           updated_at: string
+          video_storage_path: string | null
           video_url: string | null
         }
         Insert: {
@@ -4286,6 +4287,7 @@ export type Database = {
           passing_score_percent?: number
           title: string
           updated_at?: string
+          video_storage_path?: string | null
           video_url?: string | null
         }
         Update: {
@@ -4298,6 +4300,7 @@ export type Database = {
           passing_score_percent?: number
           title?: string
           updated_at?: string
+          video_storage_path?: string | null
           video_url?: string | null
         }
         Relationships: [
@@ -7540,41 +7543,6 @@ export type Database = {
           },
         ]
       }
-      workspace_business_hours: {
-        Row: {
-          close_time: string
-          day_of_week: number
-          is_open: boolean
-          open_time: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          close_time?: string
-          day_of_week: number
-          is_open?: boolean
-          open_time?: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          close_time?: string
-          day_of_week?: number
-          is_open?: boolean
-          open_time?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_business_hours_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workspace_email_domains: {
         Row: {
           created_at: string
@@ -9823,10 +9791,6 @@ export type Database = {
           passed: boolean
         }[]
       }
-      seed_default_business_hours: {
-        Args: { p_workspace_id: string }
-        Returns: undefined
-      }
       set_client_address_primary: {
         Args: { p_address_id: string }
         Returns: undefined
@@ -9896,10 +9860,6 @@ export type Database = {
           p_username: string
         }
         Returns: string
-      }
-      set_workspace_business_hours: {
-        Args: { p_hours: Json; p_workspace_id: string }
-        Returns: undefined
       }
       set_workspace_ghl_connection: {
         Args: {
