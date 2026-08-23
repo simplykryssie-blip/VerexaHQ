@@ -11,6 +11,7 @@ import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
+import { automationActionLabel } from "@/lib/automationLabels";
 import {
   OverviewTab,
   MessagesTab,
@@ -126,6 +127,7 @@ export function ClientWorkspace({
   requestedService,
   interestedServiceIds,
   leadPipeline,
+  automationStatus,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -169,7 +171,8 @@ export function ClientWorkspace({
   complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
   interestedServiceIds: string[];
-  leadPipeline: { processId: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
+  leadPipeline: { processId: string | null; processName: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
+  automationStatus: { automationName: string; status: string; stepActionType: string | null; error: string | null } | null;
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -192,6 +195,14 @@ export function ClientWorkspace({
   const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
   const currentStageName =
     client.lifecycle_status === "lead" ? leadPipeline.stages.find((s) => s.id === leadPipeline.currentProcessStageId)?.name : undefined;
+  const automationStepLabel = automationStatus ? automationActionLabel(automationStatus.stepActionType) : null;
+  const automationStatusText =
+    automationStatus &&
+    (automationStatus.status === "failed"
+      ? `${automationStatus.automationName} -- failed at "${automationStepLabel}"`
+      : automationStatus.status === "completed"
+        ? `${automationStatus.automationName} -- completed`
+        : `${automationStatus.automationName} -- ${automationStepLabel}`);
 
   return (
     <>
@@ -208,8 +219,13 @@ export function ClientWorkspace({
             <span className="capitalize">{client.lifecycle_status}</span>
             {currentStageName && leadPipeline.processId && (
               <Link href={`/pipelines/${leadPipeline.processId}`} className="text-accent hover:underline">
-                Stage: {currentStageName}
+                {leadPipeline.processName ?? "Pipeline"}: {currentStageName}
               </Link>
+            )}
+            {automationStatusText && (
+              <span className={automationStatus?.status === "failed" ? "text-danger" : undefined} title={automationStatus?.error ?? undefined}>
+                Automation: {automationStatusText}
+              </span>
             )}
             {showStaffRoles && (
               <>

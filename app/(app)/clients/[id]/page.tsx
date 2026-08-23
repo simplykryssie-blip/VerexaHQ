@@ -123,7 +123,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   // to, not a workspace-level default.
   const { data: activeLeadRun } = await supabase
     .from("lead_pipeline_runs")
-    .select("id, process_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
+    .select("id, process_id, processes(name), lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
     .eq("client_id", client.id)
     .eq("status", "Active")
     .maybeSingle();
@@ -132,10 +132,43 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     : { data: [] as { id: string; name: string }[] };
   const leadPipeline = {
     processId: activeLeadRun?.process_id ?? null,
+    processName: (activeLeadRun?.processes as unknown as { name?: string } | null)?.name ?? null,
     stages: leadPipelineStages ?? [],
     currentProcessStageId:
       (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
   };
+
+  // Staff need to see not just that an automation touched this lead/client
+  // but where it currently stands -- which automation, which step, and
+  // whether it's stuck. Only the single most recent run is surfaced here
+  // (older runs are visible in the automation's own run history).
+  const { data: latestAutomationRun } = await supabase
+    .from("automation_runs")
+    .select("id, status, started_at, automations(name), automation_steps!automation_runs_current_step_id_fkey(action_type)")
+    .eq("client_id", client.id)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let automationRunError: string | null = null;
+  if (latestAutomationRun?.status === "failed") {
+    const { data: latestLog } = await supabase
+      .from("automation_execution_logs")
+      .select("error_message")
+      .eq("execution_data->>run_id", latestAutomationRun.id)
+      .not("error_message", "is", null)
+      .order("executed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    automationRunError = latestLog?.error_message ?? null;
+  }
+  const automationStatus = latestAutomationRun
+    ? {
+        automationName: (latestAutomationRun.automations as unknown as { name?: string } | null)?.name ?? "Automation",
+        status: latestAutomationRun.status,
+        stepActionType: (latestAutomationRun.automation_steps as unknown as { action_type?: string } | null)?.action_type ?? null,
+        error: automationRunError,
+      }
+    : null;
 
   const ownerStaff = staffMembers.find((m) => m.is_owner) ?? null;
   const accountHolder = ownerStaff ? { id: ownerStaff.user_id, display_name: ownerStaff.display_name } : null;
@@ -474,6 +507,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       requestedService={requestedService}
       interestedServiceIds={interestedServiceIds}
       leadPipeline={leadPipeline}
+      automationStatus={automationStatus}
     />
   );
 }
