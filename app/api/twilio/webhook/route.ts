@@ -63,6 +63,13 @@ function last10Digits(phone: string | null | undefined) {
   return (phone ?? "").replace(/\D/g, "").slice(-10);
 }
 
+// Twilio's own standard compliance keywords -- https://www.twilio.com/docs/messaging/features/opt-out.
+// A long-code number (what TWILIO_FROM_NUMBER is) doesn't get Twilio's
+// built-in Advanced Opt-Out handling, so honoring these ourselves is the
+// only thing standing between this system and a TCPA violation.
+const STOP_KEYWORDS = new Set(["stop", "stopall", "unsubscribe", "cancel", "end", "quit"]);
+const START_KEYWORDS = new Set(["start", "yes", "unstop"]);
+
 // Everyone in this account sends SMS from the same shared
 // TWILIO_FROM_NUMBER (no per-workspace numbers), so a reply's From
 // number resolves to a client by digits alone -- ambiguous only if the
@@ -117,6 +124,19 @@ async function handleInboundMessage(
     await supabase
       .from("webhook_events")
       .insert({ provider: "twilio", event_type: "inbound_unresolved", external_id: messageSid, payload: params as never });
+    return;
+  }
+
+  const keyword = body.trim().toLowerCase();
+  if (STOP_KEYWORDS.has(keyword) || START_KEYWORDS.has(keyword)) {
+    const optOut = STOP_KEYWORDS.has(keyword);
+    await supabase
+      .from("clients")
+      .update({ sms_opt_out: optOut, sms_opt_out_at: optOut ? new Date().toISOString() : null })
+      .eq("id", resolved.clientId);
+    await supabase
+      .from("webhook_events")
+      .insert({ provider: "twilio", event_type: optOut ? "opted_out" : "opted_in", external_id: messageSid, payload: params as never });
     return;
   }
 

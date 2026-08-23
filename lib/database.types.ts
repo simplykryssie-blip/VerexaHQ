@@ -1787,6 +1787,8 @@ export type Database = {
           ein_encrypted: string | null
           ein_hash: string | null
           ein_last4: string | null
+          email_opt_out: boolean
+          email_opt_out_at: string | null
           first_name: string | null
           has_portal_access: boolean
           id: string
@@ -1807,6 +1809,8 @@ export type Database = {
           primary_phone: string | null
           relationship_manager_id: string | null
           search_vector: unknown
+          sms_opt_out: boolean
+          sms_opt_out_at: string | null
           source_workspace_id: string | null
           ssn_encrypted: string | null
           ssn_hash: string | null
@@ -1834,6 +1838,8 @@ export type Database = {
           ein_encrypted?: string | null
           ein_hash?: string | null
           ein_last4?: string | null
+          email_opt_out?: boolean
+          email_opt_out_at?: string | null
           first_name?: string | null
           has_portal_access?: boolean
           id?: string
@@ -1854,6 +1860,8 @@ export type Database = {
           primary_phone?: string | null
           relationship_manager_id?: string | null
           search_vector?: unknown
+          sms_opt_out?: boolean
+          sms_opt_out_at?: string | null
           source_workspace_id?: string | null
           ssn_encrypted?: string | null
           ssn_hash?: string | null
@@ -1881,6 +1889,8 @@ export type Database = {
           ein_encrypted?: string | null
           ein_hash?: string | null
           ein_last4?: string | null
+          email_opt_out?: boolean
+          email_opt_out_at?: string | null
           first_name?: string | null
           has_portal_access?: boolean
           id?: string
@@ -1901,6 +1911,8 @@ export type Database = {
           primary_phone?: string | null
           relationship_manager_id?: string | null
           search_vector?: unknown
+          sms_opt_out?: boolean
+          sms_opt_out_at?: string | null
           source_workspace_id?: string | null
           ssn_encrypted?: string | null
           ssn_hash?: string | null
