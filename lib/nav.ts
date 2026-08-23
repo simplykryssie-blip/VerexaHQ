@@ -23,6 +23,7 @@ import {
   LifeBuoy,
   Kanban,
   Tags,
+  GraduationCap,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -51,6 +52,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Tax Office", href: "/tax", icon: Landmark },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
+  { label: "Learning Hub", href: "/learning", icon: GraduationCap },
   {
     label: "Templates",
     icon: LayoutTemplate,
@@ -72,7 +74,7 @@ export type NavSection = { label: string; items: NavItem[] };
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Templates"] },
-  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports"] },
+  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 

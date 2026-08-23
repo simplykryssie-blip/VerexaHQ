@@ -4174,6 +4174,203 @@ export type Database = {
           },
         ]
       }
+      learning_courses: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_order: number
+          id: string
+          owner_workspace_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          owner_workspace_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          owner_workspace_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_courses_owner_workspace_id_fkey"
+            columns: ["owner_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_module_completions: {
+        Row: {
+          completed_at: string
+          id: string
+          module_id: string
+          passed: boolean | null
+          score_percent: number | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          completed_at?: string
+          id?: string
+          module_id: string
+          passed?: boolean | null
+          score_percent?: number | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          completed_at?: string
+          id?: string
+          module_id?: string
+          passed?: boolean | null
+          score_percent?: number | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_module_completions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learning_module_completions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_modules: {
+        Row: {
+          body: string | null
+          course_id: string
+          created_at: string
+          display_order: number
+          id: string
+          module_type: string
+          passing_score_percent: number
+          title: string
+          updated_at: string
+          video_url: string | null
+        }
+        Insert: {
+          body?: string | null
+          course_id: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          module_type: string
+          passing_score_percent?: number
+          title: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Update: {
+          body?: string | null
+          course_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          module_type?: string
+          passing_score_percent?: number
+          title?: string
+          updated_at?: string
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_modules_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "learning_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_quiz_options: {
+        Row: {
+          display_order: number
+          id: string
+          is_correct: boolean
+          option_text: string
+          question_id: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          is_correct?: boolean
+          option_text: string
+          question_id: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          is_correct?: boolean
+          option_text?: string
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_quiz_options_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "learning_quiz_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_quiz_questions: {
+        Row: {
+          display_order: number
+          id: string
+          module_id: string
+          question_text: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          module_id: string
+          question_text: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          module_id?: string
+          question_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_quiz_questions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_history: {
         Row: {
           created_at: string
@@ -9056,6 +9253,23 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      get_learning_completion_rollup: {
+        Args: { p_owner_workspace_id: string }
+        Returns: {
+          completed_at: string
+          course_id: string
+          course_title: string
+          module_id: string
+          module_title: string
+          module_type: string
+          passed: boolean
+          score_percent: number
+          source_workspace_id: string
+          source_workspace_name: string
+          user_email: string
+          user_id: string
+        }[]
+      }
       get_messageable_network_workspaces: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -9123,6 +9337,7 @@ export type Database = {
         Returns: Json
       }
       get_public_service_options: { Args: { p_token: string }; Returns: Json }
+      get_quiz_for_taking: { Args: { p_module_id: string }; Returns: Json }
       get_signature_request_by_token: {
         Args: { p_token: string }
         Returns: {
@@ -9166,6 +9381,10 @@ export type Database = {
       has_completed_portal_basic_info: { Args: never; Returns: boolean }
       has_config_object_share_access: {
         Args: { p_id: string; p_table: string }
+        Returns: boolean
+      }
+      has_learning_hub_access: {
+        Args: { p_owner_workspace_id: string }
         Returns: boolean
       }
       has_pending_engagement_share_access: {
@@ -9276,6 +9495,10 @@ export type Database = {
       }
       mark_document_request_item_received: {
         Args: { p_item_status_id: string }
+        Returns: undefined
+      }
+      mark_lesson_complete: {
+        Args: { p_module_id: string }
         Returns: undefined
       }
       mark_notification_read: {
@@ -9803,6 +10026,10 @@ export type Database = {
           p_phone: string
           p_token: string
         }
+        Returns: Json
+      }
+      submit_quiz_attempt: {
+        Args: { p_answers: Json; p_module_id: string }
         Returns: Json
       }
       turn_on_service: {
