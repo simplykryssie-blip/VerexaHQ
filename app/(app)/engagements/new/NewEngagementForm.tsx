@@ -317,6 +317,7 @@ export function NewEngagementForm({
   defaultClient,
   services,
   billingRules,
+  pipelines,
   autoAssignToSelf,
 }: {
   workspaceId: string;
@@ -331,6 +332,7 @@ export function NewEngagementForm({
     service_categories: { slug: string } | null;
   }[];
   billingRules: { id: string; name: string }[];
+  pipelines: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
    *  account holder creating the engagement. */
@@ -341,6 +343,7 @@ export function NewEngagementForm({
   const [selectedClient, setSelectedClient] = useState<ClientOption | null>(defaultClient);
   const [serviceId, setServiceId] = useState("");
   const [serviceTouched, setServiceTouched] = useState(false);
+  const [processId, setProcessId] = useState("");
   const [billingRuleId, setBillingRuleId] = useState("");
   const [billingRuleTouched, setBillingRuleTouched] = useState(false);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
@@ -411,6 +414,10 @@ export function NewEngagementForm({
       setError("Select a service.");
       return;
     }
+    if (!processId) {
+      setError("Select a pipeline.");
+      return;
+    }
 
     setLoading(true);
 
@@ -424,14 +431,14 @@ export function NewEngagementForm({
 
     const selectedServiceForCaseType = services.find((s) => s.id === serviceId);
 
-    // create_engagement is the single source of truth for deriving
-    // workflow_id/current_stage from a service's process -- this form and
-    // the bundled engagement step in NewClientButton.tsx both call it, so
-    // the derivation can't drift out of sync between the two entry points.
+    // Pipeline is always a staff choice now, not derived from the
+    // service -- create_engagement's p_process_id wins whenever it's
+    // given, so this always passes the one picked below.
     const { data, error } = await supabase.rpc("create_engagement", {
       p_workspace_id: workspaceId,
       p_client_id: selectedClient.id,
       p_service_id: serviceId,
+      p_process_id: processId,
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
       p_billing_rule_id: billingRuleId || undefined,
@@ -584,6 +591,14 @@ export function NewEngagementForm({
     );
   }
 
+  if (pipelines.length === 0) {
+    return (
+      <p className="text-sm text-muted">
+        No published pipelines yet -- add one under Pipelines before creating an engagement.
+      </p>
+    );
+  }
+
   return (
     <>
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -614,8 +629,28 @@ export function NewEngagementForm({
             Suggested from the organizer they already completed -- their answers will be attached to this engagement instead of asking again.
           </p>
         ) : (
-          <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
+          <p className="mt-1 text-xs text-muted">Determines the default organizer and billing for this engagement.</p>
         )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-slate">Pipeline</label>
+        <select
+          required
+          value={processId}
+          onChange={(e) => setProcessId(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          <option value="" disabled>
+            Select a pipeline
+          </option>
+          {pipelines.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
       </div>
 
       <div>
