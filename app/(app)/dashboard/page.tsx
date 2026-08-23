@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   ]);
   if (homeRow?.is_platform_home) {
     if (isPlatformAdmin) redirect("/platform-admin");
-    if (isPlatformIt) redirect("/platform-admin/it");
+    if (isPlatformIt) redirect("/platform-admin/systems");
   }
 
   const { data: dashboardId } = await supabase.rpc("ensure_default_dashboard", { p_workspace_id: workspace.id });
