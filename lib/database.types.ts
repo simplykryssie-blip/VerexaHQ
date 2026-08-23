@@ -4274,6 +4274,7 @@ export type Database = {
           passing_score_percent: number
           title: string
           updated_at: string
+          video_storage_path: string | null
           video_url: string | null
         }
         Insert: {
@@ -4286,6 +4287,7 @@ export type Database = {
           passing_score_percent?: number
           title: string
           updated_at?: string
+          video_storage_path?: string | null
           video_url?: string | null
         }
         Update: {
@@ -4298,6 +4300,7 @@ export type Database = {
           passing_score_percent?: number
           title?: string
           updated_at?: string
+          video_storage_path?: string | null
           video_url?: string | null
         }
         Relationships: [
@@ -8854,6 +8857,14 @@ export type Database = {
           user_id: string
           workspace_id: string
         }[]
+      }
+      compute_business_hours_deadline: {
+        Args: {
+          p_hours_needed: number
+          p_start: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
