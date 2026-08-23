@@ -36,7 +36,16 @@ export default async function PlatformAdminSystemsPage() {
     );
   }
 
-  const [{ data: failures }, { data: workspaces }, { data: calendarJobs }, { data: notificationJobs }, { data: credentials }] = await Promise.all([
+  const [
+    { data: failures },
+    { data: workspaces },
+    { data: calendarJobs },
+    { data: notificationJobs },
+    { data: portalInviteJobs },
+    { data: engagementLetterJobs },
+    { data: webhookJobs },
+    { data: credentials },
+  ] = await Promise.all([
     supabase
       .from("system_failure_log")
       .select("id, source, workspace_id, message, context, created_at, notified_at")
@@ -45,6 +54,9 @@ export default async function PlatformAdminSystemsPage() {
     supabase.from("workspaces").select("id, name, workspace_type, status, created_at").order("created_at", { ascending: false }),
     supabase.from("calendar_sync_queue").select("status"),
     supabase.from("notification_queue").select("status"),
+    supabase.from("pending_portal_invites").select("status"),
+    supabase.from("pending_engagement_letter_sends").select("status"),
+    supabase.from("automation_webhook_deliveries").select("status"),
     supabase.from("platform_system_credentials").select("id, system_name, username, notes, updated_at").order("system_name"),
   ]);
 
@@ -56,6 +68,9 @@ export default async function PlatformAdminSystemsPage() {
 
   const calendarCounts = statusCounts(calendarJobs ?? []);
   const notificationCounts = statusCounts(notificationJobs ?? []);
+  const portalInviteCounts = statusCounts(portalInviteJobs ?? []);
+  const engagementLetterCounts = statusCounts(engagementLetterJobs ?? []);
+  const webhookCounts = statusCounts(webhookJobs ?? []);
 
   return (
     <>
@@ -99,9 +114,10 @@ export default async function PlatformAdminSystemsPage() {
         <div>
           <h3 className="mb-3 font-display text-sm font-semibold text-ink">Job queues</h3>
           <p className="mb-3 text-xs text-muted">
-            Counts by status only -- for the full run history of what the cron workers actually did, check Vercel&apos;s function logs.
+            Counts by status only -- for the full run history of what the cron workers actually did, check Vercel&apos;s function logs. A queue with a
+            growing &quot;pending&quot; count that isn&apos;t shrinking on refresh is exactly what the stale-queue check below watches for.
           </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
               <p className="text-xs font-medium text-ink">Calendar sync queue</p>
               <ul className="mt-2 space-y-1 text-sm text-slate">
@@ -124,6 +140,51 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(notificationCounts.entries()).map(([status, count]) => (
+                    <li key={status} className="flex items-center justify-between capitalize">
+                      <span>{status}</span>
+                      <span className="font-medium text-ink">{count}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs font-medium text-ink">Portal invite queue</p>
+              <ul className="mt-2 space-y-1 text-sm text-slate">
+                {portalInviteCounts.size === 0 ? (
+                  <li className="text-muted">Empty.</li>
+                ) : (
+                  Array.from(portalInviteCounts.entries()).map(([status, count]) => (
+                    <li key={status} className="flex items-center justify-between capitalize">
+                      <span>{status}</span>
+                      <span className="font-medium text-ink">{count}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs font-medium text-ink">Engagement letter send queue</p>
+              <ul className="mt-2 space-y-1 text-sm text-slate">
+                {engagementLetterCounts.size === 0 ? (
+                  <li className="text-muted">Empty.</li>
+                ) : (
+                  Array.from(engagementLetterCounts.entries()).map(([status, count]) => (
+                    <li key={status} className="flex items-center justify-between capitalize">
+                      <span>{status}</span>
+                      <span className="font-medium text-ink">{count}</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs font-medium text-ink">Automation webhook queue</p>
+              <ul className="mt-2 space-y-1 text-sm text-slate">
+                {webhookCounts.size === 0 ? (
+                  <li className="text-muted">Empty.</li>
+                ) : (
+                  Array.from(webhookCounts.entries()).map(([status, count]) => (
                     <li key={status} className="flex items-center justify-between capitalize">
                       <span>{status}</span>
                       <span className="font-medium text-ink">{count}</span>
