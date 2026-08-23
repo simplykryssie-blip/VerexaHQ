@@ -42,7 +42,7 @@
     },
     {
       "path": "/api/cron/run-pending-automation-steps",
-      "schedule": "*/5 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/send-pending-automation-webhooks",
