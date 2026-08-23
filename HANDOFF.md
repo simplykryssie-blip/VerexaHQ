@@ -613,24 +613,35 @@ un-promoted previews.
   Admin page, originally `/platform-admin/system-failures`, listing these
   (source/workspace/message/digested-or-not), per the user's request that
   this be visible in the platform itself, not just email. **(2026-08-22:
-  moved to `/platform-admin/it` -- see below.)**
+  moved to `/platform-admin/systems` -- see below.)**
 - **RESOLVED (2026-08-22).** Item 2 below (persistent nav + a real IT
   section) is now built: `/platform-admin` gained a tab strip
-  (`PlatformAdminTabs.tsx`) across Overview/Billing/IT tools, a new
+  (`PlatformAdminTabs.tsx`) across Overview/Billing/Systems, a new
   `is_platform_it` role (separate from `is_platform_admin`, granted via
   `set_platform_it`/`set_platform_it_by_id`, RLS-scoped to system health
   tables only -- no billing/subscription visibility, can't grant admin or
-  IT access itself), and `/platform-admin/it` replacing the old
-  `/platform-admin/system-failures` page with the failure log plus job
-  queue counts (`calendar_sync_queue`, `notification_queue`) and a
-  billing-free workspace lookup. Platform admins/IT logging into the
+  IT access itself), and `/platform-admin/systems` replacing the old
+  `/platform-admin/system-failures` page with the failure log, job
+  queue counts (`calendar_sync_queue`, `notification_queue`), a
+  billing-free workspace lookup, and (2026-08-22, second pass) a
+  `platform_system_credentials` password vault for the systems Verexa
+  itself depends on (Stripe, Resend, Supabase, Vercel, etc.), encrypted
+  at rest via the same `encrypt_firm_secret`/`decrypt_firm_secret` pair
+  used for GHL connections. Platform admins/IT logging into the
   Verexa HQ CRM workspace specifically (`workspaces.is_platform_home`)
   now land on their respective dashboard instead of the normal staff
-  `/dashboard`. Item 1 (recommended-fix mapping per failure type) is
-  still not started.
+  `/dashboard`. Also added (2026-08-22, second pass): a real
+  cookie-backed workspace switcher (`getCurrentWorkspace()` in
+  `lib/workspace.ts`, `/api/workspace/switch`) and three clean demo
+  shells (`workspaces.is_demo`) -- Demo - Independent PTIN, Demo - ERO
+  Office, Demo - Service Bureau, each seeded with a couple of obviously
+  fake sample clients -- reachable from a "Demo Workspace" section in
+  the sidebar so Krystal can click into a fully working PTIN/ERO/SB
+  instance for live demos without ever risking real client data. Item 1
+  (recommended-fix mapping per failure type) is still not started.
 - **Requested (2026-08-21), not started, deliberately deferred so the user
   can test what's built so far first.** One remaining enhancement to the
-  `/platform-admin/it` page above (formerly `/platform-admin/system-failures`):
+  `/platform-admin/systems` page above (formerly `/platform-admin/system-failures`):
   1. Each logged failure should show a **recommended fix**, not just the
      raw error message -- e.g. "Resend responded with 401" ->
      "RESEND_API_KEY is likely invalid or revoked; check Vercel env vars."

@@ -51,6 +51,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
 
+  // Only fetched for a platform admin -- the sidebar's demo-workspace
+  // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
+  // account, not something regular staff need an extra query for on every
+  // page load. is_platform_home sorts first, then PTIN/ERO/SB in that order.
+  const DEMO_SORT_ORDER: Record<string, number> = { independent_ptin: 1, ero_office: 2, service_bureau: 3 };
+  let switchableWorkspaces: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[] = [];
+  if (isPlatformAdmin) {
+    const { data: switchRows } = await supabase
+      .from("workspaces")
+      .select("id, name, workspace_type, is_platform_home")
+      .or("is_platform_home.eq.true,is_demo.eq.true");
+    switchableWorkspaces = (switchRows ?? [])
+      .map((w) => ({ id: w.id, name: w.name, workspaceType: w.workspace_type, isHome: w.is_platform_home, isActive: w.id === workspace.id }))
+      .sort((a, b) => (a.isHome === b.isHome ? 0 : a.isHome ? -1 : 1) || (DEMO_SORT_ORDER[a.workspaceType] ?? 99) - (DEMO_SORT_ORDER[b.workspaceType] ?? 99));
+  }
+
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
     const accentRgb = hexToRgbTriplet(branding.secondaryColor);
@@ -77,6 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             secondaryColor={branding.secondaryColor}
             isPlatformAdmin={Boolean(isPlatformAdmin)}
             isPlatformItOnly={Boolean(isPlatformIt) && !isPlatformAdmin}
+            switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">

@@ -3,11 +3,11 @@ import Link from "next/link";
 const TABS = [
   { href: "/platform-admin", label: "Overview", key: "overview" },
   { href: "/platform-admin/billing", label: "Billing", key: "billing" },
-  { href: "/platform-admin/it", label: "IT tools", key: "it" },
+  { href: "/platform-admin/systems", label: "Systems", key: "systems" },
 ] as const;
 
 // Only rendered on pages an is_platform_admin() viewer can reach -- IT-only
-// viewers land straight on /platform-admin/it with no tab strip, since
+// viewers land straight on /platform-admin/systems with no tab strip, since
 // Overview and Billing aren't in their reach and a clickable-but-forbidden
 // tab is worse than no tab at all.
 export function PlatformAdminTabs({ active }: { active: (typeof TABS)[number]["key"] }) {

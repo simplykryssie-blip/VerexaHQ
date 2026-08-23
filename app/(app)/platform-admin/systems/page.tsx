@@ -1,9 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { Lock, ShieldAlert, ShieldEllipsis } from "lucide-react";
+import { Lock, ShieldAlert, ShieldEllipsis, KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { PlatformAdminTabs } from "../PlatformAdminTabs";
+import { SystemCredentialsManager } from "./SystemCredentialsManager";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ function statusCounts(rows: { status: string }[]) {
   return counts;
 }
 
-export default async function PlatformAdminItPage() {
+export default async function PlatformAdminSystemsPage() {
   const supabase = createClient();
   const [{ data: isPlatformIt }, { data: isPlatformAdmin }] = await Promise.all([
     supabase.rpc("is_platform_it"),
@@ -25,7 +26,7 @@ export default async function PlatformAdminItPage() {
   if (!isPlatformIt) {
     return (
       <>
-        <PageHeader title="IT Tools" />
+        <PageHeader title="Systems" />
         <div className="flex-1 px-8 py-6">
           <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState icon={Lock} message="This area is only available to Verexa platform admins and IT." />
@@ -35,7 +36,7 @@ export default async function PlatformAdminItPage() {
     );
   }
 
-  const [{ data: failures }, { data: workspaces }, { data: calendarJobs }, { data: notificationJobs }] = await Promise.all([
+  const [{ data: failures }, { data: workspaces }, { data: calendarJobs }, { data: notificationJobs }, { data: credentials }] = await Promise.all([
     supabase
       .from("system_failure_log")
       .select("id, source, workspace_id, message, context, created_at, notified_at")
@@ -44,6 +45,7 @@ export default async function PlatformAdminItPage() {
     supabase.from("workspaces").select("id, name, workspace_type, status, created_at").order("created_at", { ascending: false }),
     supabase.from("calendar_sync_queue").select("status"),
     supabase.from("notification_queue").select("status"),
+    supabase.from("platform_system_credentials").select("id, system_name, username, notes, updated_at").order("system_name"),
   ]);
 
   const workspaceIds = Array.from(new Set((failures ?? []).map((f) => f.workspace_id).filter((id): id is string => Boolean(id))));
@@ -58,11 +60,11 @@ export default async function PlatformAdminItPage() {
   return (
     <>
       <PageHeader
-        title="IT Tools"
-        description="System health, error logs, and job queues -- for keeping the platform running, not billing or revenue."
+        title="Systems"
+        description="System health, error logs, job queues, and credentials for the systems that run the CRM -- not billing or revenue."
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        {isPlatformAdmin && <PlatformAdminTabs active="it" />}
+        {isPlatformAdmin && <PlatformAdminTabs active="systems" />}
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
@@ -81,6 +83,17 @@ export default async function PlatformAdminItPage() {
             <p className="text-xs uppercase tracking-wide text-muted">Notifications pending</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{notificationCounts.get("pending") ?? 0}</p>
           </div>
+        </div>
+
+        <div>
+          <h3 className="mb-1 flex items-center gap-1.5 font-display text-sm font-semibold text-ink">
+            <KeyRound size={14} /> Credentials
+          </h3>
+          <p className="mb-3 text-xs text-muted">
+            Logins for the systems Verexa itself depends on (Stripe, Resend, Supabase, Vercel, domains, etc.) -- encrypted at rest, revealed only on
+            demand.
+          </p>
+          <SystemCredentialsManager credentials={credentials ?? []} />
         </div>
 
         <div>
