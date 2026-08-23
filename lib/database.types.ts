@@ -7540,6 +7540,41 @@ export type Database = {
           },
         ]
       }
+      workspace_business_hours: {
+        Row: {
+          close_time: string
+          day_of_week: number
+          is_open: boolean
+          open_time: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          close_time?: string
+          day_of_week: number
+          is_open?: boolean
+          open_time?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          close_time?: string
+          day_of_week?: number
+          is_open?: boolean
+          open_time?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_business_hours_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_email_domains: {
         Row: {
           created_at: string
@@ -8855,6 +8890,14 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      compute_business_hours_deadline: {
+        Args: {
+          p_hours_needed: number
+          p_start: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
         Returns: Json
@@ -9780,6 +9823,10 @@ export type Database = {
           passed: boolean
         }[]
       }
+      seed_default_business_hours: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       set_client_address_primary: {
         Args: { p_address_id: string }
         Returns: undefined
@@ -9849,6 +9896,10 @@ export type Database = {
           p_username: string
         }
         Returns: string
+      }
+      set_workspace_business_hours: {
+        Args: { p_hours: Json; p_workspace_id: string }
+        Returns: undefined
       }
       set_workspace_ghl_connection: {
         Args: {
