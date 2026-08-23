@@ -6,6 +6,71 @@ system is actually built (schema, auth, permissions, every module), see
 `PLATFORM.md` in this same repo root — that's the living architecture
 reference. This file is just "what happened recently and what's still open."
 
+## Addendum — 2026-08-23: "New Leads Enter CRM" finished
+
+The owner asked for a specific lead-intake automation (trigger on
+`lead.created` → move to New Lead Pipeline → 2 min wait → welcome
+email+SMS → portal invite if not already sent → push organizer for the
+selected service → 5 min wait → check organizer status → branch on
+completed/pending, with escalation and a stalled-lead fallback). A
+different concurrent Claude session had already built ~70% of this under
+different names (PR #93, `wire_new_leads_enter_crm_past_condition`) by the
+time this request came in — this addendum documents finishing it, not
+starting it.
+
+- **`New Leads Enter CRM`** (automation id `f0cf2f59-df2f-438d-b501-9d0c535f0e5b`,
+  workspace `74321fb2-...` / Verexa HQ CRM): full flow now wired end to
+  end. Still `is_enabled = false` — **ask the owner before flipping it on**,
+  since it will start emailing/texting real new leads.
+- **New standalone action type `business_hours_delay`** (kept separate from
+  `delay` per the owner: "I want each step to have 1 capability unless it's
+  a condition of that step"). Backed by new `workspace_business_hours`
+  table (per-workspace weekly schedule, Mon–Fri 9–5 default seeded for
+  every workspace) and `compute_business_hours_deadline()`. No settings UI
+  exists yet to edit the hours — only `set_workspace_business_hours(p_workspace_id, p_hours)` RPC. **Building that UI is the natural next step.**
+- **New automation `Organizer Completed Follow-up`** (`a1cedcb0-...`):
+  notifies staff, moves the lead onto its service pipeline, waits 24
+  business hours, escalates if `clients.relationship_manager_id` is still
+  null (nobody took ownership). Started only via `start_workflow` from all
+  three "organizer completed" resolution points in New Leads Enter CRM —
+  never fires on its own trigger by design (same defensive
+  never-auto-fires trigger_type convention as the automation below).
+- **Renamed** the pipeline + automation that used to be called "Pending
+  Organizer Pipeline" / "Waiting on Organizer Completion (New Lead)" to
+  **`Lead Stalled- No Organizer`** (both), per the owner's exact requested
+  naming, and gave the automation its first real steps (create_task +
+  staff notification + tag) — it previously had none.
+- **Bugs found and fixed along the way** (all pre-dated this addendum,
+  introduced by the concurrent session building the first ~70%):
+  - The original "Organizer Pending" branch condition ANDed two equality
+    checks against the same field with two different literal values —
+    literally never true, silently dead-ending the whole automation for
+    the common case. Same shape of bug existed on the recheck condition
+    too (only a null catch-all, no explicit "submitted" edge at all).
+    Fixed by using an explicit check first + null-catch-all second
+    everywhere a 2-way branch exists — see migration
+    `20260823184935_rewire_new_leads_enter_crm_full_flow.sql` for the full
+    writeup.
+  - `lead-welcome-email`'s subject and `welcom_sms_new_lead`'s body used
+    `{{client_first_name}}`/`{{firm_phone}}`, which don't exist in the
+    automation's context payload (`{{first_name}}`/`{{office_phone}}` do)
+    — rendered blank. The SMS template was also stuck in `draft` status,
+    so every welcome text was silently failing outright. Fixed in
+    `20260823184626_fix_welcome_templates_merge_vars_and_publish.sql`.
+  - `send_email`/`send_sms`'s `organizer_link` merge var only supported a
+    hardcoded `organizer_template_id`, useless for a generic automation
+    that has to work across all 9 service pipelines. Extended it to accept
+    the sentinel `'current_run'` (reads `trigger_snapshot.last_organizer_template_id`), matching the same sentinel convention the condition system already used.
+  - The `automation_steps_sync_edges` trigger auto-links every step
+    sequentially by `display_order` *until* the automation has a condition
+    step, then goes permanently inert for that automation. Building a new
+    automation's steps across several statements with the condition step
+    inserted partway through (or never, for a fully-linear automation)
+    causes it to silently duplicate the early edges. Cleaned up once here
+    (`20260823185204_dedupe_automation_step_edges_from_sync_trigger.sql`)
+    — **worth knowing about if anyone else hand-builds an automation via
+    raw SQL instead of the builder UI.**
+
 ## Orientation
 
 - Repo: `simplykryssie-blip/VerexaHQ`, branch `claude/verexa-tax-office-v2-mhd9mo`
