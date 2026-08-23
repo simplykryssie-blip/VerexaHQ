@@ -40,6 +40,7 @@ import {
   CalendarPlus,
   BellOff,
   BellRing,
+  Milestone,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -117,6 +118,7 @@ export const ACTION_TYPES = [
   { value: "assign_user", label: "Assign staff" },
   { value: "send_notification", label: "Notify a staff member" },
   { value: "move_lead_stage", label: "Move the lead to a pipeline stage" },
+  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service" },
   { value: "mark_lead_lost", label: "Mark the lead lost" },
   { value: "convert_lead_to_client", label: "Convert the lead to an active client" },
   { value: "update_client", label: "Update a client field" },
@@ -176,6 +178,7 @@ export function actionIcon(type: string) {
   if (type === "assign_user") return <UserCog size={15} />;
   if (type === "send_notification") return <Bell size={15} />;
   if (type === "move_lead_stage") return <GitBranch size={15} />;
+  if (type === "move_lead_to_service_pipeline") return <Milestone size={15} />;
   if (type === "mark_lead_lost") return <UserX size={15} />;
   if (type === "convert_lead_to_client") return <UserCheck size={15} />;
   if (type === "update_client") return <Pencil size={15} />;
