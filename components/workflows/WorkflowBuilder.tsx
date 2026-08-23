@@ -38,6 +38,8 @@ import {
   Webhook,
   X,
   CalendarPlus,
+  BellOff,
+  BellRing,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -130,6 +132,14 @@ export const ACTION_TYPES = [
   { value: "start_workflow", label: "Start another workflow" },
   { value: "end_workflow", label: "End this workflow" },
   { value: "webhook", label: "Call a webhook" },
+  { value: "add_dnd", label: "Opt the client out of SMS/email" },
+  { value: "remove_dnd", label: "Opt the client back into SMS/email" },
+];
+
+const DND_CHANNELS = [
+  { value: "both", label: "SMS and email" },
+  { value: "sms", label: "SMS only" },
+  { value: "email", label: "Email only" },
 ];
 
 const TASK_PRIORITIES = ["low", "medium", "high"];
@@ -180,6 +190,8 @@ export function actionIcon(type: string) {
   if (type === "start_workflow") return <PlayCircle size={15} />;
   if (type === "end_workflow") return <StopCircle size={15} />;
   if (type === "webhook") return <Webhook size={15} />;
+  if (type === "add_dnd") return <BellOff size={15} />;
+  if (type === "remove_dnd") return <BellRing size={15} />;
   return <CheckSquare size={15} />;
 }
 
@@ -758,6 +770,29 @@ export function StepCard({
               availability check yet, so pick a time that&apos;s likely to work.
             </span>
           </>
+        )}
+
+        {(actionType === "add_dnd" || actionType === "remove_dnd") && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Channel
+            <select
+              disabled={!canManage}
+              value={(config.channel as string) ?? "both"}
+              onChange={(e) => setField("channel", e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              {DND_CHANNELS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <span className="text-[11px] text-muted">
+              {actionType === "add_dnd"
+                ? "Future automated sends on this channel skip this client instead of failing the workflow."
+                : "Re-enables automated sends on this channel for this client."}
+            </span>
+          </label>
         )}
 
         {actionType === "send_organizer_template" && (
