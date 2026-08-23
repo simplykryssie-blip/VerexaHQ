@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -14,22 +14,48 @@ function embedUrl(url: string): string | null {
   return null;
 }
 
+// Signed URLs expire (4h here), so a hosted video's URL is resolved fresh
+// on each view rather than stored anywhere -- learning_modules only ever
+// keeps the storage path.
+const SIGNED_URL_TTL_SECONDS = 60 * 60 * 4;
+
 export function LessonViewer({
   moduleId,
   body,
   videoUrl,
+  videoStoragePath,
   alreadyComplete,
 }: {
   moduleId: string;
   body: string | null;
   videoUrl: string | null;
+  videoStoragePath: string | null;
   alreadyComplete: boolean;
 }) {
   const supabase = createClient();
   const toast = useToast();
   const [complete, setComplete] = useState(alreadyComplete);
   const [saving, setSaving] = useState(false);
+  const [hostedVideoUrl, setHostedVideoUrl] = useState<string | null>(null);
   const embed = videoUrl ? embedUrl(videoUrl) : null;
+
+  useEffect(() => {
+    if (!videoStoragePath) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.storage.from("learning-videos").createSignedUrl(videoStoragePath, SIGNED_URL_TTL_SECONDS);
+      if (cancelled) return;
+      if (error) {
+        toast.show(error.message, "error");
+        return;
+      }
+      setHostedVideoUrl(data.signedUrl);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoStoragePath]);
 
   async function markComplete() {
     setSaving(true);
@@ -45,17 +71,28 @@ export function LessonViewer({
 
   return (
     <div className="space-y-4">
-      {videoUrl && (
+      {videoStoragePath ? (
         <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-soft">
-          {embed ? (
-            <div className="aspect-video">
-              <iframe src={embed} className="h-full w-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
-            </div>
-          ) : (
+          {hostedVideoUrl ? (
             // eslint-disable-next-line jsx-a11y/media-has-caption
-            <video src={videoUrl} controls className="aspect-video w-full" />
+            <video src={hostedVideoUrl} controls className="aspect-video w-full" />
+          ) : (
+            <div className="flex aspect-video items-center justify-center text-sm text-white/60">Loading video...</div>
           )}
         </div>
+      ) : (
+        videoUrl && (
+          <div className="overflow-hidden rounded-2xl border border-border bg-black shadow-soft">
+            {embed ? (
+              <div className="aspect-video">
+                <iframe src={embed} className="h-full w-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+              </div>
+            ) : (
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video src={videoUrl} controls className="aspect-video w-full" />
+            )}
+          </div>
+        )
       )}
 
       {body && (

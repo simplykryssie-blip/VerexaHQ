@@ -15,10 +15,12 @@ export default async function ManageModulePage({ params }: { params: { courseId:
 
   const { data: module_ } = await supabase
     .from("learning_modules")
-    .select("id, course_id, title, module_type, body, video_url, passing_score_percent")
+    .select("id, course_id, title, module_type, body, video_url, video_storage_path, passing_score_percent, learning_courses(owner_workspace_id)")
     .eq("id", params.moduleId)
     .maybeSingle();
   if (!module_) notFound();
+
+  const ownerWorkspaceId = (module_.learning_courses as unknown as { owner_workspace_id: string } | null)?.owner_workspace_id ?? workspace.id;
 
   let questions: { id: string; question_text: string; display_order: number; options: { id: string; option_text: string; is_correct: boolean; display_order: number }[] }[] = [];
   if (module_.module_type === "quiz") {
@@ -43,7 +45,14 @@ export default async function ManageModulePage({ params }: { params: { courseId:
       <div className="flex-1 px-8 py-6">
         <div className="mx-auto max-w-[720px]">
           {module_.module_type === "lesson" ? (
-            <LessonEditor moduleId={module_.id} title={module_.title} body={module_.body} videoUrl={module_.video_url} />
+            <LessonEditor
+              ownerWorkspaceId={ownerWorkspaceId}
+              moduleId={module_.id}
+              title={module_.title}
+              body={module_.body}
+              videoUrl={module_.video_url}
+              videoStoragePath={module_.video_storage_path}
+            />
           ) : (
             <QuizEditor moduleId={module_.id} title={module_.title} passingScorePercent={module_.passing_score_percent} questions={questions} />
           )}

@@ -17,7 +17,7 @@ export default async function ModuleViewerPage({ params }: { params: { courseId:
     supabase.from("learning_courses").select("id, title").eq("id", params.courseId).maybeSingle(),
     supabase
       .from("learning_modules")
-      .select("id, title, module_type, body, video_url")
+      .select("id, title, module_type, body, video_url, video_storage_path")
       .eq("id", params.moduleId)
       .maybeSingle(),
     supabase
@@ -35,7 +35,13 @@ export default async function ModuleViewerPage({ params }: { params: { courseId:
       <div className="flex-1 px-8 py-6">
         <div className="mx-auto max-w-[720px]">
           {module_.module_type === "lesson" ? (
-            <LessonViewer moduleId={module_.id} body={module_.body} videoUrl={module_.video_url} alreadyComplete={Boolean(completion?.passed)} />
+            <LessonViewer
+              moduleId={module_.id}
+              body={module_.body}
+              videoUrl={module_.video_url}
+              videoStoragePath={module_.video_storage_path}
+              alreadyComplete={Boolean(completion?.passed)}
+            />
           ) : (
             <QuizPlayer moduleId={module_.id} previousScore={completion?.score_percent ?? null} previouslyPassed={completion?.passed ?? null} />
           )}
