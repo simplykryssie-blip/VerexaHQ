@@ -37,6 +37,7 @@ import {
   ExternalLink,
   Webhook,
   X,
+  CalendarPlus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -105,6 +106,7 @@ export const ACTION_TYPES = [
   { value: "send_email", label: "Send an email" },
   { value: "send_sms", label: "Send a text" },
   { value: "create_task", label: "Create a task" },
+  { value: "create_appointment", label: "Schedule an appointment (request)" },
   { value: "send_organizer_template", label: "Push an organizer to the client's portal" },
   { value: "create_engagement", label: "Create the engagement and start its pipeline" },
   { value: "send_engagement_letter", label: "Send the engagement letter for signature" },
@@ -153,6 +155,7 @@ const CLIENT_TYPES = ["individual", "business", "trust", "estate", "organization
 
 export function actionIcon(type: string) {
   if (type === "delay") return <Clock size={15} />;
+  if (type === "create_appointment") return <CalendarPlus size={15} />;
   if (type === "send_email") return <Mail size={15} />;
   if (type === "send_sms") return <MessageSquare size={15} />;
   if (type === "send_organizer_template") return <BookOpen size={15} />;
@@ -665,6 +668,95 @@ export function StepCard({
                 ))}
               </select>
             </label>
+          </>
+        )}
+
+        {actionType === "create_appointment" && (
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Title
+              <input
+                disabled={!canManage}
+                value={(config.title as string) ?? ""}
+                onChange={(e) => setField("title", e.target.value)}
+                placeholder="Appointment"
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Description
+              <textarea
+                disabled={!canManage}
+                rows={2}
+                value={(config.description as string) ?? ""}
+                onChange={(e) => setField("description", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Days from now
+              <input
+                disabled={!canManage}
+                type="number"
+                min={0}
+                value={(config.days_from_now as string) ?? ""}
+                onChange={(e) => setField("days_from_now", e.target.value)}
+                placeholder="1"
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Time of day
+              <input
+                disabled={!canManage}
+                type="time"
+                value={(config.time_of_day as string) ?? ""}
+                onChange={(e) => setField("time_of_day", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Duration (minutes)
+              <input
+                disabled={!canManage}
+                type="number"
+                min={5}
+                step={5}
+                value={(config.duration_minutes as string) ?? ""}
+                onChange={(e) => setField("duration_minutes", e.target.value)}
+                placeholder="30"
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Location (optional)
+              <input
+                disabled={!canManage}
+                value={(config.location as string) ?? ""}
+                onChange={(e) => setField("location", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+            </label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Staff member (optional)
+              <select
+                disabled={!canManage}
+                value={(config.staff_id as string) ?? ""}
+                onChange={(e) => setField("staff_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="">Unassigned</option>
+                {staffOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.display_name ?? "Staff"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span className="col-span-2 text-[11px] text-muted">
+              Lands on the calendar as a scheduled request for staff to confirm or reschedule -- there&apos;s no
+              availability check yet, so pick a time that&apos;s likely to work.
+            </span>
           </>
         )}
 
