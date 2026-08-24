@@ -6673,6 +6673,139 @@ export type Database = {
           },
         ]
       }
+      site_funnels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_funnels_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_page_sections: {
+        Row: {
+          config: Json
+          created_at: string
+          display_order: number
+          id: string
+          page_id: string
+          section_type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          display_order: number
+          id?: string
+          page_id: string
+          section_type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          display_order?: number
+          id?: string
+          page_id?: string
+          section_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_page_sections_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "site_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_pages: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          funnel_id: string | null
+          funnel_position: number | null
+          id: string
+          meta_description: string | null
+          slug: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          funnel_id?: string | null
+          funnel_position?: number | null
+          id?: string
+          meta_description?: string | null
+          slug: string
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          funnel_id?: string | null
+          funnel_position?: number | null
+          id?: string
+          meta_description?: string | null
+          slug?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_pages_funnel_id_fkey"
+            columns: ["funnel_id"]
+            isOneToOne: false
+            referencedRelation: "site_funnels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_pages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sms_log: {
         Row: {
           body: string
@@ -8827,6 +8960,18 @@ export type Database = {
         }
         Returns: Json
       }
+      capture_public_lead_from_site_page: {
+        Args: {
+          p_email: string
+          p_first_name: string
+          p_last_name: string
+          p_page_id: string
+          p_phone: string
+          p_section_id: string
+          p_service_ids?: string[]
+        }
+        Returns: Json
+      }
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
@@ -9037,6 +9182,7 @@ export type Database = {
         Returns: string
       }
       current_workspace_ids: { Args: never; Returns: string[] }
+      debug_whoami: { Args: never; Returns: string }
       decline_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -9348,6 +9494,10 @@ export type Database = {
         Returns: Json
       }
       get_public_service_options: { Args: { p_token: string }; Returns: Json }
+      get_public_site_page: {
+        Args: { p_page_slug: string; p_workspace_slug: string }
+        Returns: Json
+      }
       get_quiz_for_taking: { Args: { p_module_id: string }; Returns: Json }
       get_signature_request_by_token: {
         Args: { p_token: string }
@@ -9718,12 +9868,20 @@ export type Database = {
         Args: { p_direction: string; p_step_id: string }
         Returns: undefined
       }
+      reorder_funnel_pages: {
+        Args: { p_funnel_id: string; p_page_ids: string[] }
+        Returns: undefined
+      }
       reorder_organizer_fields: {
         Args: { p_field_ids: string[]; p_template_id: string }
         Returns: undefined
       }
       reorder_process_stage: {
         Args: { p_direction: string; p_stage_id: string }
+        Returns: undefined
+      }
+      reorder_site_page_sections: {
+        Args: { p_page_id: string; p_section_ids: string[] }
         Returns: undefined
       }
       resolve_and_sign_organizer_response: {
