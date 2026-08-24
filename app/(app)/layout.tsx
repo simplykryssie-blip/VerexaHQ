@@ -91,8 +91,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logoUrl={branding.sidebarLogoUrl}
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
-            isPlatformAdmin={Boolean(isPlatformAdmin)}
-            isPlatformItOnly={Boolean(isPlatformIt) && !isPlatformAdmin}
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}

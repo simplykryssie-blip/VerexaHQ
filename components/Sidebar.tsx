@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, ShieldEllipsis, Wrench, Layers, Check } from "lucide-react";
+import { Menu, X, ChevronDown, Layers, Check } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
@@ -21,8 +21,6 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
-  isPlatformAdmin,
-  isPlatformItOnly,
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
@@ -31,9 +29,6 @@ export function Sidebar({
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  isPlatformAdmin?: boolean;
-  /** True only for a platform-IT (not also admin) user -- gets its own nav link since the "Platform Admin" link below is admin-only. */
-  isPlatformItOnly?: boolean;
   /** True only while the active workspace is Verexa's own is_platform_home
    *  workspace -- swaps the whole nav for the platform-admin tooling instead
    *  of the client-facing CRM nav every other (real or demo) workspace gets. */
@@ -219,34 +214,6 @@ export function Sidebar({
             </div>
           ))}
         </nav>
-
-        {isPlatformAdmin && !isPlatformHomeWorkspace && (
-          <div className="px-3 pb-1">
-            <Link
-              href="/platform-admin"
-              className={`${
-                pathname === "/platform-admin" || pathname.startsWith("/platform-admin/") ? styles.navItemActive : styles.navItem
-              } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
-            >
-              <ShieldEllipsis size={18} strokeWidth={2} className="shrink-0" />
-              Admin Dashboard
-            </Link>
-          </div>
-        )}
-
-        {isPlatformItOnly && !isPlatformHomeWorkspace && (
-          <div className="px-3 pb-1">
-            <Link
-              href="/platform-admin/systems"
-              className={`${
-                pathname === "/platform-admin/systems" ? styles.navItemActive : styles.navItem
-              } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
-            >
-              <Wrench size={18} strokeWidth={2} className="shrink-0" />
-              Systems
-            </Link>
-          </div>
-        )}
 
         {Boolean(switchableWorkspaces?.length) && (
           <div className="px-3 pb-1">

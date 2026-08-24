@@ -61,7 +61,10 @@ export default async function PlatformAdminPage() {
     { count: undigestedFailureCount },
     { data: latestFailures },
   ] = await Promise.all([
-    supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
+    supabase
+      .from("workspaces")
+      .select("id, name, workspace_type, status, suspension_reason, is_demo, created_at")
+      .order("created_at", { ascending: false }),
     supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, cancel_at_period_end, seat_count, current_period_end"),
     supabase.from("platform_subscription_plans").select("id, name"),
     supabase.from("workspace_users").select("workspace_id, status"),
@@ -86,15 +89,16 @@ export default async function PlatformAdminPage() {
   );
 
   const rows = workspaces ?? [];
-  const totalWorkspaces = rows.length;
-  const activeCount = rows.filter((w) => w.status === "active").length;
-  const suspendedCount = rows.filter((w) => w.status === "suspended").length;
-  const pendingCancellationCount = (subscriptions ?? []).filter((s) => s.stripe_status === "active" && s.cancel_at_period_end).length;
-  // Sum only workspaces that still exist -- workspace_users can carry orphaned
-  // rows pointing at a deleted workspace_id (a real one caused "Total staff"
-  // to overcount before), so this deliberately doesn't just sum every entry
-  // in staffCountByWorkspace.
-  const totalStaff = rows.reduce((sum, w) => sum + (staffCountByWorkspace.get(w.id) ?? 0), 0);
+  // Demo shells (Demo - Independent PTIN/ERO/SB) exist to show off the
+  // product, not as customers -- they'd otherwise inflate every count here.
+  const realRows = rows.filter((w) => !w.is_demo);
+  const realWorkspaceIds = new Set(realRows.map((w) => w.id));
+  const totalWorkspaces = realRows.length;
+  const activeCount = realRows.filter((w) => w.status === "active").length;
+  const suspendedCount = realRows.filter((w) => w.status === "suspended").length;
+  const pendingCancellationCount = (subscriptions ?? []).filter(
+    (s) => s.stripe_status === "active" && s.cancel_at_period_end && realWorkspaceIds.has(s.workspace_id)
+  ).length;
 
   return (
     <>
