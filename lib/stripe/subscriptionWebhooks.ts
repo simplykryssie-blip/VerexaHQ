@@ -11,6 +11,7 @@ type StripeSubscription = {
   current_period_start: number;
   current_period_end: number;
   trial_end: number | null;
+  cancel_at_period_end?: boolean;
   metadata?: { workspace_id?: string };
   items: { data: Array<{ id: string; price: { id: string } }> };
 };
@@ -138,6 +139,7 @@ export async function handleSubscriptionCreated(
       current_period_start: toIso(subscription.current_period_start),
       current_period_end: toIso(subscription.current_period_end),
       trial_end: toIso(subscription.trial_end),
+      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
       locked_plan_snapshot: snapshotFromPlan(plan),
     },
     { onConflict: "workspace_id" }
@@ -172,6 +174,7 @@ export async function handleSubscriptionUpdated(
     current_period_start: toIso(subscription.current_period_start),
     current_period_end: newPeriodEnd,
     trial_end: toIso(subscription.trial_end),
+    cancel_at_period_end: subscription.cancel_at_period_end ?? false,
   };
 
   // Apply a pending grandfathered price migration exactly at the renewal

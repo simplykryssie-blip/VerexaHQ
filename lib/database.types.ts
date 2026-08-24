@@ -7919,6 +7919,7 @@ export type Database = {
       }
       workspace_subscriptions: {
         Row: {
+          cancel_at_period_end: boolean
           card_funding_type: string | null
           created_at: string
           current_period_end: string | null
@@ -7937,6 +7938,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          cancel_at_period_end?: boolean
           card_funding_type?: string | null
           created_at?: string
           current_period_end?: string | null
@@ -7955,6 +7957,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          cancel_at_period_end?: boolean
           card_funding_type?: string | null
           created_at?: string
           current_period_end?: string | null

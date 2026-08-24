@@ -20,12 +20,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
   // Verexa's own workspace: platform admins/IT land straight on their
   // dashboard instead of the normal staff view -- everyone else here
   // (regular staff testing in this workspace) is unaffected.
-  const [{ data: homeRow }, { data: isPlatformAdmin }, { data: isPlatformIt }] = await Promise.all([
-    supabase.from("workspaces").select("is_platform_home").eq("id", workspace.id).maybeSingle(),
-    supabase.rpc("is_platform_admin"),
-    supabase.rpc("is_platform_it"),
-  ]);
-  if (homeRow?.is_platform_home) {
+  if (workspace.is_platform_home) {
+    const [{ data: isPlatformAdmin }, { data: isPlatformIt }] = await Promise.all([
+      supabase.rpc("is_platform_admin"),
+      supabase.rpc("is_platform_it"),
+    ]);
     if (isPlatformAdmin) redirect("/platform-admin");
     if (isPlatformIt) redirect("/platform-admin/systems");
   }

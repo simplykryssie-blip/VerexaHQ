@@ -24,6 +24,8 @@ import {
   Kanban,
   Tags,
   GraduationCap,
+  CreditCard,
+  Wrench,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -82,6 +84,43 @@ export const NAV_SECTIONS: NavSection[] = NAV_SECTION_MEMBERS.map((section) => (
   label: section.label,
   items: section.itemLabels.map((label) => NAV_ITEMS.find((item) => item.label === label)).filter((item): item is NavItem => Boolean(item)),
 }));
+
+/**
+ * Verexa HQ (the platform's own is_platform_home workspace) doesn't serve
+ * real clients -- its job is running and monitoring the CRM platform
+ * itself, not the client-facing operations every other workspace's nav is
+ * built around. "Dashboard"/"Billing"/"Systems" point at the /platform-admin
+ * tooling instead of the regular per-workspace pages of the same name.
+ */
+export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", href: "/platform-admin", icon: LayoutDashboard },
+  { label: "Billing", href: "/platform-admin/billing", icon: CreditCard },
+  { label: "Systems", href: "/platform-admin/systems", icon: Wrench },
+  {
+    label: "Pipelines & Workflows",
+    icon: Kanban,
+    children: [
+      { label: "Pipelines", href: "/pipelines" },
+      { label: "Workflows", href: "/workflows" },
+    ],
+  },
+  {
+    label: "Templates",
+    icon: LayoutTemplate,
+    children: [
+      { label: "Email & SMS", href: "/automations" },
+      { label: "Form Templates", href: "/templates" },
+    ],
+  },
+  { label: "Calendar", href: "/calendar", icon: Calendar },
+  { label: "Documents", href: "/documents", icon: FolderOpen },
+  { label: "Reports", href: "/reports", icon: BarChart3 },
+  { label: "Learning Hub", href: "/learning", icon: GraduationCap },
+  { label: "Support", href: "/support", icon: LifeBuoy },
+  { label: "Settings", href: "/settings", icon: Settings },
+];
+
+export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", items: PLATFORM_HOME_NAV_ITEMS }];
 
 export type SettingsNavItem = {
   label: string;

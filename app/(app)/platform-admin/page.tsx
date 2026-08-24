@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ShieldEllipsis, Lock } from "lucide-react";
+import { ShieldEllipsis, Lock, ShieldAlert, ArrowRight } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -46,17 +46,33 @@ export default async function PlatformAdminPage() {
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
-  const [{ data: workspaces }, { data: subscriptions }, { data: plans }, { data: members }, { data: admins }, { data: itUsers }, { data: owners }, { data: staffDirectory }] =
-    await Promise.all([
-      supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
-      supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, seat_count, current_period_end"),
-      supabase.from("platform_subscription_plans").select("id, name"),
-      supabase.from("workspace_users").select("workspace_id, status"),
-      supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
-      supabase.from("user_profiles").select("id, display_name").eq("is_platform_it", true).order("display_name"),
-      supabase.from("workspace_users").select("workspace_id, user_profiles(display_name)").eq("is_owner", true),
-      supabase.rpc("get_platform_staff_directory"),
-    ]);
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    { data: workspaces },
+    { data: subscriptions },
+    { data: plans },
+    { data: members },
+    { data: admins },
+    { data: itUsers },
+    { data: owners },
+    { data: staffDirectory },
+    { count: recentFailureCount },
+    { count: undigestedFailureCount },
+    { data: latestFailures },
+  ] = await Promise.all([
+    supabase.from("workspaces").select("id, name, workspace_type, status, suspension_reason, created_at").order("created_at", { ascending: false }),
+    supabase.from("workspace_subscriptions").select("workspace_id, plan_id, stripe_status, cancel_at_period_end, seat_count, current_period_end"),
+    supabase.from("platform_subscription_plans").select("id, name"),
+    supabase.from("workspace_users").select("workspace_id, status"),
+    supabase.from("user_profiles").select("id, display_name").eq("is_platform_admin", true).order("display_name"),
+    supabase.from("user_profiles").select("id, display_name").eq("is_platform_it", true).order("display_name"),
+    supabase.from("workspace_users").select("workspace_id, user_profiles(display_name)").eq("is_owner", true),
+    supabase.rpc("get_platform_staff_directory"),
+    supabase.from("system_failure_log").select("id", { count: "exact", head: true }).gte("created_at", twentyFourHoursAgo),
+    supabase.from("system_failure_log").select("id", { count: "exact", head: true }).is("notified_at", null),
+    supabase.from("system_failure_log").select("id, source, message, created_at").order("created_at", { ascending: false }).limit(5),
+  ]);
 
   const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
   const subscriptionByWorkspace = new Map((subscriptions ?? []).map((s) => [s.workspace_id, s]));
@@ -71,8 +87,9 @@ export default async function PlatformAdminPage() {
 
   const rows = workspaces ?? [];
   const totalWorkspaces = rows.length;
+  const activeCount = rows.filter((w) => w.status === "active").length;
   const suspendedCount = rows.filter((w) => w.status === "suspended").length;
-  const activeSubscriptionCount = (subscriptions ?? []).filter((s) => s.stripe_status === "active" || s.stripe_status === "trialing").length;
+  const pendingCancellationCount = (subscriptions ?? []).filter((s) => s.stripe_status === "active" && s.cancel_at_period_end).length;
   // Sum only workspaces that still exist -- workspace_users can carry orphaned
   // rows pointing at a deleted workspace_id (a real one caused "Total staff"
   // to overcount before), so this deliberately doesn't just sum every entry
@@ -90,18 +107,67 @@ export default async function PlatformAdminPage() {
 
         <ProvisionWorkspaceForm />
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[
-            { label: "Workspaces", value: totalWorkspaces },
-            { label: "Active subscriptions", value: activeSubscriptionCount },
-            { label: "Suspended", value: suspendedCount },
-            { label: "Total staff", value: totalStaff },
-          ].map((t) => (
-            <div key={t.label} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">{t.label}</p>
-              <p className="mt-1 text-2xl font-semibold text-ink">{t.value}</p>
+        <div>
+          <h2 className="mb-3 font-display text-sm font-semibold text-ink">Platform overview</h2>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {[
+              { label: "Total workspaces", value: totalWorkspaces },
+              { label: "Active workspaces", value: activeCount },
+              { label: "Suspended workspaces", value: suspendedCount },
+              { label: "Pending cancellations", value: pendingCancellationCount },
+            ].map((t) => (
+              <div key={t.label} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <p className="text-xs uppercase tracking-wide text-muted">{t.label}</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">{t.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-sm font-semibold text-ink">System failures</h2>
+            <Link href="/platform-admin/systems" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+              View all <ArrowRight size={12} aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs uppercase tracking-wide text-muted">Last 24 hours</p>
+              <p className={`mt-1 text-2xl font-semibold ${(recentFailureCount ?? 0) > 0 ? "text-danger" : "text-ink"}`}>{recentFailureCount ?? 0}</p>
             </div>
-          ))}
+            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+              <p className="text-xs uppercase tracking-wide text-muted">Not yet digested</p>
+              <p className="mt-1 text-2xl font-semibold text-ink">{undigestedFailureCount ?? 0}</p>
+            </div>
+          </div>
+          {latestFailures && latestFailures.length > 0 && (
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-5 py-3 font-medium">When</th>
+                    <th className="px-5 py-3 font-medium">Source</th>
+                    <th className="px-5 py-3 font-medium">Message</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {latestFailures.map((f) => (
+                    <tr key={f.id} className="hover:bg-surfaceMuted">
+                      <td className="whitespace-nowrap px-5 py-3 text-slate">{new Date(f.created_at).toLocaleString()}</td>
+                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate">{f.source}</td>
+                      <td className="px-5 py-3 text-slate">{f.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {(!latestFailures || latestFailures.length === 0) && (
+            <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
+              <EmptyState icon={ShieldAlert} message="No system failures logged." />
+            </div>
+          )}
         </div>
 
         {rows.length === 0 ? (
