@@ -67,6 +67,17 @@ export const MERGE_FIELD_GROUPS: { group: string; fields: MergeFieldDef[] }[] = 
     ],
   },
   {
+    group: "Portal",
+    fields: [
+      // The client's sign-in link, not a one-time invite token -- for any
+      // regular email/text that just needs to point someone back to their
+      // portal (a reminder, a status update), as opposed to the dedicated
+      // portal-invite-email flow, which has always sent its own tokenized
+      // accept-invitation link automatically.
+      { token: "portal_link", label: "Client portal link", kind: "auto", source: "app portal sign-in page", sample: "https://verexahq.com/portal/login" },
+    ],
+  },
+  {
     group: "Filled in when sent (not auto-populated)",
     fields: [
       { token: "payment_terms", label: "Payment terms", kind: "manual", sample: "due upon receipt" },
