@@ -180,6 +180,7 @@ export function PageBuilder({
           {canManage && (
             <SectionPropertiesPanel
               workspaceId={page.workspace_id}
+              websiteId={websiteId}
               section={selectedSection}
               onUpdate={updateSectionConfig}
               workspaceServices={workspaceServices}

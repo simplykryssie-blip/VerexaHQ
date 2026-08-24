@@ -50,7 +50,14 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
-  { label: "Websites", href: "/websites", icon: Globe },
+  {
+    label: "Websites",
+    icon: Globe,
+    children: [
+      { label: "Websites", href: "/websites" },
+      { label: "Funnels", href: "/funnels" },
+    ],
+  },
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },

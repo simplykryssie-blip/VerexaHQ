@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PageLibrary, type SitePageCard } from "./PageLibrary";
 import { WebsiteSettings } from "./WebsiteSettings";
+import { MediaLibrary } from "./MediaLibrary";
 
 type Website = {
   id: string;
@@ -13,6 +14,8 @@ type Website = {
   head_tracking_code: string | null;
   body_tracking_code: string | null;
 };
+
+const TABS = ["pages", "media", "settings"] as const;
 
 export function WebsiteDetail({
   workspaceSlug,
@@ -25,12 +28,12 @@ export function WebsiteDetail({
   pages: SitePageCard[];
   canManage: boolean;
 }) {
-  const [tab, setTab] = useState<"pages" | "settings">("pages");
+  const [tab, setTab] = useState<(typeof TABS)[number]>("pages");
 
   return (
     <div>
       <div className="flex gap-1 border-b border-border">
-        {(["pages", "settings"] as const).map((t) => (
+        {TABS.map((t) => (
           <button
             key={t}
             type="button"
@@ -45,7 +48,7 @@ export function WebsiteDetail({
       </div>
 
       <div className="mt-4">
-        {tab === "pages" ? (
+        {tab === "pages" && (
           <PageLibrary
             workspaceId={website.workspace_id}
             workspaceSlug={workspaceSlug}
@@ -54,9 +57,9 @@ export function WebsiteDetail({
             pages={pages}
             canManage={canManage}
           />
-        ) : (
-          <WebsiteSettings website={website} canManage={canManage} />
         )}
+        {tab === "media" && <MediaLibrary workspaceId={website.workspace_id} websiteId={website.id} canManage={canManage} />}
+        {tab === "settings" && <WebsiteSettings website={website} canManage={canManage} />}
       </div>
     </div>
   );

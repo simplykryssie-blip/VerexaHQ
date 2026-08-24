@@ -7,10 +7,12 @@ type TestimonialConfig = { quote?: string; author_name?: string; author_title?: 
 
 export function TestimonialEditor({
   workspaceId,
+  websiteId,
   config,
   onChange,
 }: {
   workspaceId: string;
+  websiteId: string;
   config: TestimonialConfig;
   onChange: (patch: Partial<TestimonialConfig>) => void;
 }) {
@@ -28,7 +30,13 @@ export function TestimonialEditor({
         Author title
         <input value={config.author_title ?? ""} onChange={(e) => onChange({ author_title: e.target.value })} className={inputClass} />
       </label>
-      <SectionImageUpload workspaceId={workspaceId} value={config.avatar_url} onChange={(url) => onChange({ avatar_url: url ?? undefined })} label="Avatar (optional)" />
+      <SectionImageUpload
+        workspaceId={workspaceId}
+        websiteId={websiteId}
+        value={config.avatar_url}
+        onChange={(url) => onChange({ avatar_url: url ?? undefined })}
+        label="Avatar (optional)"
+      />
     </div>
   );
 }

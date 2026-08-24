@@ -1,30 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, X, FolderOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { mediaLibraryPrefix } from "@/components/websites/MediaLibrary";
 
-// Same public "branding" bucket + path convention as BannerImageUpload.tsx,
-// just for arbitrary section images rather than a document letterhead.
+type LibraryFile = { name: string; url: string };
+
+// Uploads land in the same per-website "branding" bucket prefix the
+// website's Media tab (MediaLibrary.tsx) manages, so anything uploaded here
+// shows up there and vice versa -- one media library, not two.
 export function SectionImageUpload({
   workspaceId,
+  websiteId,
   value,
   onChange,
   label = "Image",
 }: {
   workspaceId: string;
+  websiteId: string;
   value?: string;
   onChange: (url: string | null) => void;
   label?: string;
 }) {
   const supabase = createClient();
   const toast = useToast();
+  const prefix = mediaLibraryPrefix(workspaceId, websiteId);
   const [uploading, setUploading] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [libraryFiles, setLibraryFiles] = useState<LibraryFile[] | null>(null);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
   async function upload(file: File) {
     setUploading(true);
-    const path = `${workspaceId}/site-${Date.now()}-${file.name}`;
+    const path = `${prefix}/${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
     setUploading(false);
     if (error) {
@@ -33,6 +43,23 @@ export function SectionImageUpload({
     }
     const { data } = supabase.storage.from("branding").getPublicUrl(path);
     onChange(data.publicUrl);
+  }
+
+  async function openLibrary() {
+    setBrowsing(true);
+    if (libraryFiles !== null) return;
+    setLoadingLibrary(true);
+    const { data, error } = await supabase.storage.from("branding").list(prefix, { sortBy: { column: "created_at", order: "desc" } });
+    setLoadingLibrary(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setLibraryFiles(
+      (data ?? [])
+        .filter((f) => f.id)
+        .map((f) => ({ name: f.name, url: supabase.storage.from("branding").getPublicUrl(`${prefix}/${f.name}`).data.publicUrl }))
+    );
   }
 
   return (
@@ -51,11 +78,51 @@ export function SectionImageUpload({
           </button>
         </div>
       ) : (
-        <label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent">
-          <ImagePlus size={14} />
-          {uploading ? "Uploading..." : "Upload"}
-          <input type="file" accept="image/*" disabled={uploading} className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-        </label>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent">
+            <ImagePlus size={14} />
+            {uploading ? "Uploading..." : "Upload"}
+            <input type="file" accept="image/*" disabled={uploading} className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
+          </label>
+          <button
+            type="button"
+            onClick={openLibrary}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+          >
+            <FolderOpen size={14} />
+            Browse library
+          </button>
+        </div>
+      )}
+
+      {browsing && (
+        <div className="mt-2 rounded-lg border border-border bg-surface p-2">
+          {loadingLibrary ? (
+            <p className="p-2 text-xs text-muted">Loading...</p>
+          ) : !libraryFiles || libraryFiles.length === 0 ? (
+            <p className="p-2 text-xs text-muted">No media uploaded yet -- upload one above, or add some from the website&apos;s Media tab.</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5">
+              {libraryFiles.map((f) => (
+                <button
+                  key={f.name}
+                  type="button"
+                  onClick={() => {
+                    onChange(f.url);
+                    setBrowsing(false);
+                  }}
+                  className="overflow-hidden rounded-lg border border-border hover:border-accent"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.url} alt={f.name} className="aspect-video w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={() => setBrowsing(false)} className="mt-2 text-xs font-medium text-muted hover:text-ink">
+            Close
+          </button>
+        </div>
       )}
     </div>
   );
