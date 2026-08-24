@@ -24,6 +24,7 @@ export function LeadFormSection({
   pageId,
   sectionId,
   workspaceSlug,
+  websiteSlug,
   funnel,
   accentColor,
 }: {
@@ -31,6 +32,7 @@ export function LeadFormSection({
   pageId: string;
   sectionId: string;
   workspaceSlug: string;
+  websiteSlug: string;
   funnel: SiteFunnel;
   accentColor?: string;
 }) {
@@ -78,7 +80,7 @@ export function LeadFormSection({
       const currentIndex = funnel.pages.findIndex((p) => p.id === pageId);
       const nextPage = currentIndex >= 0 ? funnel.pages[currentIndex + 1] : undefined;
       if (nextPage) {
-        router.push(`/site/${workspaceSlug}/${nextPage.slug}`);
+        router.push(`/site/${workspaceSlug}/${websiteSlug}/${nextPage.slug}`);
         return;
       }
     }

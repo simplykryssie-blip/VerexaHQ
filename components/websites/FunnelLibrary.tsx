@@ -9,65 +9,54 @@ import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 
-export type SitePageCard = { id: string; title: string; slug: string; status: string };
+export type FunnelCard = { id: string; name: string; status: string; page_count: number };
 
-function slugify(title: string) {
-  return (
-    title
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || "page"
-  );
-}
-
-export function PageLibrary({
+export function FunnelLibrary({
   workspaceId,
-  workspaceSlug,
-  pages,
+  websiteId,
+  funnels,
   canManage,
 }: {
   workspaceId: string;
-  workspaceSlug: string;
-  pages: SitePageCard[];
+  websiteId: string;
+  funnels: FunnelCard[];
   canManage: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
-  const [title, setTitle] = useState("");
+  const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  async function createPage(e: React.FormEvent) {
+  async function createFunnel(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
-    setError(null);
-    const trimmed = title.trim();
+    const trimmed = name.trim();
     if (!trimmed) {
-      setSaving(false);
-      setError("A page title is required.");
+      setError("A funnel name is required.");
       return;
     }
+    setSaving(true);
+    setError(null);
     const { data, error } = await supabase
-      .from("site_pages")
-      .insert({ workspace_id: workspaceId, title: trimmed, slug: slugify(trimmed) })
+      .from("site_funnels")
+      .insert({ workspace_id: workspaceId, website_id: websiteId, name: trimmed })
       .select("id")
       .single();
     setSaving(false);
     if (error || !data) {
-      setError(error?.message ?? "Could not create page.");
+      setError(error?.message ?? "Could not create funnel.");
       return;
     }
-    router.push(`/pages/${data.id}`);
+    router.push(`/websites/${websiteId}/funnels/${data.id}`);
   }
 
-  async function deletePage(id: string) {
-    if (!confirm("Delete this page? This can't be undone.")) return;
+  async function deleteFunnel(id: string) {
+    if (!confirm("Delete this funnel? Its pages will become standalone pages, not deleted.")) return;
     setDeletingId(id);
-    const { error } = await supabase.from("site_pages").delete().eq("id", id);
+    const { error } = await supabase.from("site_funnels").delete().eq("id", id);
     setDeletingId(null);
     if (error) {
       toast.show(error.message, "error");
@@ -78,30 +67,23 @@ export function PageLibrary({
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3">
-        <Link href="/pages/funnels" className="text-sm font-medium text-accent hover:underline">
-          Manage funnels &rarr;
-        </Link>
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-          >
-            + New page
+      {canManage && (
+        <div className="flex justify-end">
+          <button type="button" onClick={() => setCreating(true)} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
+            + New funnel
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {creating && (
-        <form onSubmit={createPage} className="mt-4 flex items-end gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft">
+        <form onSubmit={createFunnel} className="mt-4 flex items-end gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft">
           <label className="flex-1 text-xs font-medium uppercase tracking-wide text-muted">
-            Page title
+            Funnel name
             <input
               autoFocus
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Free Consultation"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Free Consultation Funnel"
               className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
@@ -112,7 +94,7 @@ export function PageLibrary({
             type="button"
             onClick={() => {
               setCreating(false);
-              setTitle("");
+              setName("");
               setError(null);
             }}
             className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-slate hover:border-accent hover:text-ink"
@@ -124,39 +106,41 @@ export function PageLibrary({
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
       <div className="mt-4">
-        {pages.length === 0 ? (
-          <EmptyState message="No pages yet -- create one to start building your public site." />
+        {funnels.length === 0 ? (
+          <EmptyState message="No funnels yet." />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {pages.map((p) => (
-              <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft">
+            {funnels.map((f) => (
+              <div key={f.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-ink">{p.title}</h3>
+                  <h3 className="text-sm font-semibold text-ink">{f.name}</h3>
                   {canManage && (
                     <button
                       type="button"
-                      onClick={() => deletePage(p.id)}
-                      disabled={deletingId === p.id}
+                      onClick={() => deleteFunnel(f.id)}
+                      disabled={deletingId === f.id}
                       className="shrink-0 rounded p-1 text-muted hover:text-danger disabled:opacity-60"
-                      aria-label="Delete page"
+                      aria-label="Delete funnel"
                     >
                       <Trash2 size={14} />
                     </button>
                   )}
                 </div>
-                <p className="mt-1 truncate text-xs text-muted">/site/{workspaceSlug}/{p.slug}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {f.page_count} page{f.page_count === 1 ? "" : "s"}
+                </p>
                 <div className="mt-3">
                   {canManage ? (
-                    <TemplateStatusCycle table="site_pages" id={p.id} status={p.status} />
+                    <TemplateStatusCycle table="site_funnels" id={f.id} status={f.status} />
                   ) : (
-                    <span className="rounded-full bg-surfaceMuted px-2.5 py-1 text-xs font-medium capitalize text-muted">{p.status}</span>
+                    <span className="rounded-full bg-surfaceMuted px-2.5 py-1 text-xs font-medium capitalize text-muted">{f.status}</span>
                   )}
                 </div>
                 <Link
-                  href={`/pages/${p.id}`}
+                  href={`/websites/${websiteId}/funnels/${f.id}`}
                   className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-ink"
                 >
-                  {canManage ? "Edit" : "View"}
+                  {canManage ? "Manage" : "View"}
                 </Link>
               </div>
             ))}

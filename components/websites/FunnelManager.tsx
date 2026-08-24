@@ -10,7 +10,7 @@ import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 
 type MemberPage = { id: string; title: string; slug: string; status: string; funnel_position: number | null };
 type AvailablePage = { id: string; title: string; slug: string };
-type Funnel = { id: string; workspace_id: string; name: string; status: string };
+type Funnel = { id: string; workspace_id: string; website_id: string; name: string; status: string };
 
 function slugify(title: string) {
   return (
@@ -99,14 +99,21 @@ export function FunnelManager({
     if (!trimmed) return;
     const { data, error } = await supabase
       .from("site_pages")
-      .insert({ workspace_id: funnel.workspace_id, title: trimmed, slug: slugify(trimmed), funnel_id: funnel.id, funnel_position: pages.length })
+      .insert({
+        workspace_id: funnel.workspace_id,
+        website_id: funnel.website_id,
+        title: trimmed,
+        slug: slugify(trimmed),
+        funnel_id: funnel.id,
+        funnel_position: pages.length,
+      })
       .select("id")
       .single();
     if (error || !data) {
       toast.show(error?.message ?? "Could not create page.", "error");
       return;
     }
-    router.push(`/pages/${data.id}`);
+    router.push(`/websites/${funnel.website_id}/pages/${data.id}`);
   }
 
   return (
@@ -153,7 +160,10 @@ export function FunnelManager({
                 >
                   <ChevronDown size={14} />
                 </button>
-                <Link href={`/pages/${p.id}`} className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:border-accent hover:text-ink">
+                <Link
+                  href={`/websites/${funnel.website_id}/pages/${p.id}`}
+                  className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:border-accent hover:text-ink"
+                >
                   Edit
                 </Link>
                 <button type="button" onClick={() => removeFromFunnel(p.id)} className="rounded p-1 text-muted hover:text-danger" aria-label="Remove from funnel">
