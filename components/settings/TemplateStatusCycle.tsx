@@ -27,7 +27,8 @@ export function TemplateStatusCycle({
     | "organizer_templates"
     | "processes"
     | "site_pages"
-    | "site_funnels";
+    | "site_funnels"
+    | "site_websites";
   id: string;
   status: string;
 }) {

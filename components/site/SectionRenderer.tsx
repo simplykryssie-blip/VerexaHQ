@@ -17,6 +17,7 @@ export function SectionRenderer({
   section,
   pageId,
   workspaceSlug,
+  websiteSlug,
   funnel,
   accentColor,
   firmName,
@@ -24,6 +25,7 @@ export function SectionRenderer({
   section: SiteSection;
   pageId: string;
   workspaceSlug: string;
+  websiteSlug: string;
   funnel: SiteFunnel;
   accentColor?: string;
   firmName: string | null;
@@ -48,6 +50,7 @@ export function SectionRenderer({
           pageId={pageId}
           sectionId={section.id}
           workspaceSlug={workspaceSlug}
+          websiteSlug={websiteSlug}
           funnel={funnel}
           accentColor={accentColor}
         />

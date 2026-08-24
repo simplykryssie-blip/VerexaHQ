@@ -6687,6 +6687,7 @@ export type Database = {
           name: string
           status: string
           updated_at: string
+          website_id: string
           workspace_id: string
         }
         Insert: {
@@ -6696,6 +6697,7 @@ export type Database = {
           name: string
           status?: string
           updated_at?: string
+          website_id: string
           workspace_id: string
         }
         Update: {
@@ -6705,9 +6707,17 @@ export type Database = {
           name?: string
           status?: string
           updated_at?: string
+          website_id?: string
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "site_funnels_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "site_websites"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "site_funnels_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -6767,6 +6777,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string
+          website_id: string
           workspace_id: string
         }
         Insert: {
@@ -6780,6 +6791,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string
+          website_id: string
           workspace_id: string
         }
         Update: {
@@ -6793,6 +6805,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string
+          website_id?: string
           workspace_id?: string
         }
         Relationships: [
@@ -6804,7 +6817,64 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "site_pages_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "site_websites"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "site_pages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_websites: {
+        Row: {
+          body_tracking_code: string | null
+          created_at: string
+          created_by: string | null
+          favicon_url: string | null
+          head_tracking_code: string | null
+          id: string
+          name: string
+          slug: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body_tracking_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          favicon_url?: string | null
+          head_tracking_code?: string | null
+          id?: string
+          name: string
+          slug: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body_tracking_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          favicon_url?: string | null
+          head_tracking_code?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_websites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -9504,7 +9574,11 @@ export type Database = {
       }
       get_public_service_options: { Args: { p_token: string }; Returns: Json }
       get_public_site_page: {
-        Args: { p_page_slug: string; p_workspace_slug: string }
+        Args: {
+          p_page_slug: string
+          p_website_slug: string
+          p_workspace_slug: string
+        }
         Returns: Json
       }
       get_quiz_for_taking: { Args: { p_module_id: string }; Returns: Json }

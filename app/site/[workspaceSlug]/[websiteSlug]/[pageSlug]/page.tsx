@@ -6,25 +6,33 @@ import type { SitePageData } from "@/components/site/types";
 
 export const dynamic = "force-dynamic";
 
-type Params = { workspaceSlug: string; pageSlug: string };
+type Params = { workspaceSlug: string; websiteSlug: string; pageSlug: string };
 
 // Deduped with React's request cache so generateMetadata and the page body
 // share one round trip instead of two -- get_public_site_page is a POST RPC,
 // which Next's automatic fetch memoization doesn't cover on its own.
-const loadPage = cache(async (workspaceSlug: string, pageSlug: string) => {
+const loadPage = cache(async (workspaceSlug: string, websiteSlug: string, pageSlug: string) => {
   const supabase = createClient();
-  const { data } = await supabase.rpc("get_public_site_page", { p_workspace_slug: workspaceSlug, p_page_slug: pageSlug });
+  const { data } = await supabase.rpc("get_public_site_page", {
+    p_workspace_slug: workspaceSlug,
+    p_website_slug: websiteSlug,
+    p_page_slug: pageSlug,
+  });
   return data as unknown as SitePageData | null;
 });
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const data = await loadPage(params.workspaceSlug, params.pageSlug);
+  const data = await loadPage(params.workspaceSlug, params.websiteSlug, params.pageSlug);
   if (!data) return { title: "Page not found" };
-  return { title: data.page.title, description: data.page.meta_description ?? undefined };
+  return {
+    title: data.page.title,
+    description: data.page.meta_description ?? undefined,
+    icons: data.website.favicon_url ? { icon: data.website.favicon_url } : undefined,
+  };
 }
 
 export default async function PublicSiteRoutePage({ params }: { params: Params }) {
-  const data = await loadPage(params.workspaceSlug, params.pageSlug);
+  const data = await loadPage(params.workspaceSlug, params.websiteSlug, params.pageSlug);
 
   if (!data) {
     return (
@@ -35,5 +43,5 @@ export default async function PublicSiteRoutePage({ params }: { params: Params }
     );
   }
 
-  return <PublicSitePage workspaceSlug={params.workspaceSlug} data={data} />;
+  return <PublicSitePage workspaceSlug={params.workspaceSlug} websiteSlug={params.websiteSlug} data={data} />;
 }
