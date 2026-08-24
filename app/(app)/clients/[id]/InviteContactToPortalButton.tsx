@@ -10,11 +10,17 @@ export function InviteContactToPortalButton({
   workspaceId,
   name,
   email,
+  reissueFor,
 }: {
   clientId: string;
   workspaceId: string;
   name: string;
   email: string;
+  /** Pass this when the contact's existing invite was revoked (30 days unconfirmed) --
+   * the partial unique index on client_portal_users only covers status = 'invited' rows,
+   * so a revoked one needs invite_portal_user() to issue a genuinely fresh row/token
+   * rather than a plain insert. */
+  reissueFor?: { isPrimary: boolean };
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -23,11 +29,14 @@ export function InviteContactToPortalButton({
 
   async function invite() {
     setInviting(true);
-    const { data: invite, error } = await supabase
-      .from("client_portal_users")
-      .insert({ client_id: clientId, workspace_id: workspaceId, invited_name: name, invited_email: email })
-      .select("invitation_token")
-      .single();
+
+    const { data: invite, error } = reissueFor
+      ? await supabase.rpc("invite_portal_user", { p_client_id: clientId, p_email: email, p_name: name, p_is_primary: reissueFor.isPrimary })
+      : await supabase
+          .from("client_portal_users")
+          .insert({ client_id: clientId, workspace_id: workspaceId, invited_name: name, invited_email: email })
+          .select("invitation_token")
+          .single();
     if (error || !invite) {
       setInviting(false);
       toast.show(error?.message ?? "Could not create invitation.", "error");
@@ -51,9 +60,9 @@ export function InviteContactToPortalButton({
 
     setInviting(false);
     if (!emailRes.ok || !emailResult?.sent) {
-      toast.show(`Invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`, "error");
+      toast.show(`Invite ${reissueFor ? "reissued" : "created"}, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`, "error");
     } else {
-      toast.show("Portal invitation sent", "success");
+      toast.show(`Portal invitation ${reissueFor ? "reissued" : "sent"}`, "success");
     }
     router.refresh();
   }
@@ -65,7 +74,7 @@ export function InviteContactToPortalButton({
       disabled={inviting}
       className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
     >
-      {inviting ? "Inviting..." : "Invite to portal"}
+      {inviting ? (reissueFor ? "Reissuing..." : "Inviting...") : reissueFor ? "Reissue invite" : "Invite to portal"}
     </button>
   );
 }

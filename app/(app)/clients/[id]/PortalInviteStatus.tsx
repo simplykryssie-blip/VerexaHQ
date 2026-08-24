@@ -70,6 +70,43 @@ export function PortalInviteStatus({
     }
   }
 
+  // A revoked invite (30 days unconfirmed, see revoke_expired_portal_access)
+  // can't just be re-sent -- its token is dead and the partial unique index
+  // on client_portal_users only covers status = 'invited' rows, so
+  // invite_portal_user() issues a genuinely fresh row/token here rather
+  // than reviving the old one.
+  async function reissue() {
+    if (!existing || !email) return;
+    setInviting(true);
+    const { data: freshInvite, error } = await supabase.rpc("invite_portal_user", {
+      p_client_id: clientId,
+      p_email: email,
+      p_name: name,
+      p_is_primary: existing.is_primary,
+    });
+    if (error || !freshInvite) {
+      setInviting(false);
+      toast.show(error?.message ?? "Could not reissue the invitation.", "error");
+      return;
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const acceptUrl = `${appUrl}/portal/accept-invitation?token=${freshInvite.invitation_token}`;
+    const emailRes = await fetch("/api/portal-invitations/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, invitedEmail: email, invitedName: name, acceptUrl }),
+    });
+    const emailResult = await emailRes.json().catch(() => null);
+    setInviting(false);
+    if (!emailRes.ok || !emailResult?.sent) {
+      toast.show(`Invite reissued, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`, "error");
+    } else {
+      toast.show("Portal invitation reissued", "success");
+    }
+    router.refresh();
+  }
+
   if (existing) {
     if (latestInvite?.status === "pending") {
       return <span className="text-xs text-muted">Portal: invite queued, not sent yet</span>;
@@ -87,6 +124,21 @@ export function PortalInviteStatus({
             className="font-medium text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80 disabled:opacity-60"
           >
             {inviting ? "Retrying..." : "Retry"}
+          </button>
+        </span>
+      );
+    }
+    if (existing.status === "revoked") {
+      return (
+        <span className="inline-flex items-center gap-2 text-xs">
+          <span className="text-muted">Portal: invite expired (30 days unconfirmed)</span>
+          <button
+            type="button"
+            onClick={reissue}
+            disabled={inviting}
+            className="font-medium text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80 disabled:opacity-60"
+          >
+            {inviting ? "Reissuing..." : "Reissue invite"}
           </button>
         </span>
       );

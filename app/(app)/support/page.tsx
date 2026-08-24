@@ -36,6 +36,10 @@ const HOW_IT_WORKS: Entry[] = [
     body: "This is what your clients see when they log in: their own documents, messages, invoices, organizers, and e-signature requests -- scoped strictly to their own file. The portal's logo and colors follow your firm's branding (Firm Profile > Branding); if your firm is connected to an ERO, your portal shows the ERO's brand instead of your own.",
   },
   {
+    title: "Portal invite 30-day expiration",
+    body: "If a client is invited to the portal but never activates and confirms the invite within 30 days, that invite is automatically deactivated -- a daily background job checks for invites still sitting unconfirmed past that window and revokes them. This is separate from the invite link itself, which already stops working after 7 days regardless. Once revoked, the client's page (or their entry under Contacts, for a business client's contact) shows \"Portal: invite expired\" with a Reissue invite button -- that button issues a brand-new invite and link, and starts the 30-day window over.",
+  },
+  {
     title: "Connections (ERO / PTIN)",
     body: "If your firm works with other PTINs for e-filing, Settings > Connections lets you invite them to connect to your ERO. Once connected, a PTIN can share a client's engagement with you for review before it goes to e-file, and you can choose whether to cover their subscription billing.",
   },

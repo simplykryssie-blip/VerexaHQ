@@ -9,13 +9,13 @@ function isAuthorized(request: Request) {
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-// Enforces the 30-day portal retention window for disengaged (lifecycle_status
-// = 'lost') leads: once clients.lost_at is 30+ days old, revoke_expired_portal_access
-// flips their client_portal_users row to status = 'revoked', which is the same
-// status getPortalIdentity() already gates on -- no separate access check needed
-// here, just keeping that column current. Idempotent: only touches status = 'active'
-// rows, so a lead re-engaged (lifecycle_status changed back) or already revoked is
-// never touched twice.
+// Enforces the 30-day portal invite policy: an invite that's still sitting
+// unconfirmed (status = 'invited', accepted_at null) 30+ days after being
+// sent gets deactivated. revoke_expired_portal_access flips it to status =
+// 'revoked', the same status getPortalIdentity() already gates portal
+// access on -- no separate access check needed here, just keeping that
+// column current. Idempotent: only touches status = 'invited' rows, so an
+// invite that was accepted (or already revoked) is never touched again.
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

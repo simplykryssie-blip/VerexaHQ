@@ -376,7 +376,18 @@ export function OverviewTab({
                         {c.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                       </span>
                       <div className="flex items-center gap-2">
-                        {portal ? (
+                        {portal?.status === "revoked" ? (
+                          <span className="inline-flex items-center gap-2">
+                            <span className="text-xs text-muted">Portal: invite expired (30 days unconfirmed)</span>
+                            <InviteContactToPortalButton
+                              clientId={client.id}
+                              workspaceId={workspaceId}
+                              name={name}
+                              email={c.email ?? ""}
+                              reissueFor={{ isPrimary: portal.is_primary }}
+                            />
+                          </span>
+                        ) : portal ? (
                           <span className="text-xs capitalize text-muted">Portal: {portal.status}</span>
                         ) : c.email ? (
                           <InviteContactToPortalButton clientId={client.id} workspaceId={workspaceId} name={name} email={c.email} />
