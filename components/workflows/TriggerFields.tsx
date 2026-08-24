@@ -1,6 +1,7 @@
 "use client";
 
 import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
+import { TagNameInput } from "@/components/workflows/TagNameInput";
 
 export type TemplateOption = { id: string; name: string };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
@@ -223,6 +224,7 @@ export function TriggerFields({
   organizerTemplates,
   services = [],
   pipelines = [],
+  tagOptions = [],
   webhookUrl,
   disabled,
 }: {
@@ -233,6 +235,7 @@ export function TriggerFields({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
+  tagOptions?: string[];
   webhookUrl?: string;
   disabled?: boolean;
 }) {
@@ -316,12 +319,11 @@ export function TriggerFields({
       {triggerType === "client.tag_added" && (
         <label className="flex flex-col gap-1 text-xs text-muted">
           Tag
-          <input
+          <TagNameInput
             disabled={disabled}
             value={(config.tag as string) ?? ""}
-            onChange={(e) => onConfigChange({ tag: e.target.value })}
-            placeholder="e.g. vip"
-            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            onChange={(v) => onConfigChange({ tag: v })}
+            tagOptions={tagOptions}
           />
         </label>
       )}
