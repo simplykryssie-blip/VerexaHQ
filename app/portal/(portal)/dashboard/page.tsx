@@ -67,7 +67,7 @@ export default async function PortalDashboardPage() {
       <div className="flex-1 space-y-6 px-8 py-6">
         {contact && (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-surface shadow-soft px-4 py-3 text-sm">
-            <span className="font-medium text-slate">Your contact: {contact.name}</span>
+            <span className="font-medium text-slate">Your preparer: {contact.name}</span>
             {contact.phone && (
               <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1.5 text-muted hover:text-accent">
                 <Phone size={13} aria-hidden="true" />

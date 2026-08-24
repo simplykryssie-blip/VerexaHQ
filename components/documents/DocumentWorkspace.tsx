@@ -118,6 +118,7 @@ export function DocumentWorkspace({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
+              canRename={audience !== "portal"}
             />
           </div>
         </div>

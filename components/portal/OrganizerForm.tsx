@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, PenLine } from "lucide-react";
+import { CheckCircle2, Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { Modal } from "@/components/Modal";
 import { coerceAddressAnswerToString, coerceNameAnswerToString, normalizeOptions, parseAddressValue, parseNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
 import { NameInput } from "@/components/NameInput";
@@ -98,6 +99,7 @@ export function OrganizerForm({
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
+  const [justSubmitted, setJustSubmitted] = useState(false);
 
   async function saveAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
@@ -216,7 +218,15 @@ export function OrganizerForm({
       // Best-effort -- the submission itself is already recorded; filing
       // it into Documents can be retried later if this fails.
     });
-    toast.show("Organizer submitted", "success");
+    // A toast alone was easy to miss -- nothing on screen told the client
+    // their organizer actually went through. This blocks on an explicit
+    // "OK" instead, then sends them back to the dashboard rather than
+    // leaving them looking at the (now read-only) form they just finished.
+    setJustSubmitted(true);
+  }
+
+  function backToDashboard() {
+    router.push("/portal/dashboard");
     router.refresh();
   }
 
@@ -230,6 +240,23 @@ export function OrganizerForm({
 
   return (
     <div className="space-y-4">
+      {justSubmitted && (
+        <Modal title="Organizer submitted" onClose={backToDashboard}>
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <CheckCircle2 size={40} className="text-success" aria-hidden="true" />
+            <p className="text-sm text-slate">
+              Your organizer has been submitted. Your firm has been notified and will review your answers.
+            </p>
+            <button
+              type="button"
+              onClick={backToDashboard}
+              className="mt-2 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            >
+              OK
+            </button>
+          </div>
+        </Modal>
+      )}
       {readOnly && (
         <OrganizerPrintSummary
           templateName={templateName}

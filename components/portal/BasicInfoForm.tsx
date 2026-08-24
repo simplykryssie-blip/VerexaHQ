@@ -35,21 +35,28 @@ type ServiceOption = { id: string; name: string };
 // success moves them on to `next`. mode "profile" is the ongoing "review
 // your info" card on the Profile page: no service picker (already asked
 // once, and re-asking on every visit would be noise), success just toasts
-// and refreshes in place.
+// and refreshes in place. In profile mode it also carries the client's
+// portal login -- userId/displayName -- so "Display name" can live in this
+// one form instead of a second card duplicating the name fields below it.
 export function BasicInfoForm({
   snapshot,
   next,
   mode = "onboarding",
+  userId,
+  displayName,
 }: {
   snapshot: BasicInfoSnapshot;
   next?: string;
   mode?: "onboarding" | "profile";
+  userId?: string;
+  displayName?: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const isBusiness = snapshot.client_type === "business";
   const isProfile = mode === "profile";
+  const [display, setDisplay] = useState(displayName ?? "");
 
   const [serviceCategories, setServiceCategories] = useState<ServiceCategory[]>([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>(snapshot.service_ids ?? []);
@@ -125,6 +132,15 @@ export function BasicInfoForm({
       p_service_ids: isProfile ? undefined : selectedServiceIds,
     });
 
+    if (!error && isProfile && userId) {
+      const { error: displayNameError } = await supabase.from("user_profiles").update({ display_name: display.trim() || null }).eq("id", userId);
+      if (displayNameError) {
+        setLoading(false);
+        setError(displayNameError.message);
+        return;
+      }
+    }
+
     setLoading(false);
     if (error) {
       setError(error.message);
@@ -156,6 +172,19 @@ export function BasicInfoForm({
         <div className={styles.field}>
           <label>Name</label>
           <NameInput value={name} onChange={setName} />
+        </div>
+      )}
+
+      {isProfile && userId && (
+        <div className={styles.field}>
+          <label htmlFor="display_name">Display name</label>
+          <input
+            id="display_name"
+            value={display}
+            onChange={(e) => setDisplay(e.target.value)}
+            placeholder="How your name shows up in messages and activity"
+            className={styles.input}
+          />
         </div>
       )}
 

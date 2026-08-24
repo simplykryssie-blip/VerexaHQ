@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
-import { ProfileForm } from "@/components/portal/ProfileForm";
 import { BasicInfoForm, type BasicInfoSnapshot } from "@/components/portal/BasicInfoForm";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +17,7 @@ export default async function PortalProfilePage() {
   const [{ data: profile }, { data: snapshot }] = await Promise.all([
     supabase
       .from("user_profiles")
-      .select("first_name, last_name, display_name")
+      .select("display_name")
       .eq("id", user?.id ?? "")
       .maybeSingle(),
     supabase.rpc("get_portal_client_snapshot"),
@@ -32,16 +31,14 @@ export default async function PortalProfilePage() {
           <h2 className="text-sm font-semibold text-ink">Your info</h2>
           <p className="mt-1 text-sm text-muted">Name, phone, email, and mailing address on file for {identity.clientLabel}.</p>
           <div className="mt-4">
-            <BasicInfoForm snapshot={(snapshot as BasicInfoSnapshot) ?? ({} as BasicInfoSnapshot)} mode="profile" />
+            <BasicInfoForm
+              snapshot={(snapshot as BasicInfoSnapshot) ?? ({} as BasicInfoSnapshot)}
+              mode="profile"
+              userId={user?.id}
+              displayName={profile?.display_name}
+            />
           </div>
         </div>
-
-        <ProfileForm
-          userId={user?.id ?? ""}
-          firstName={profile?.first_name ?? null}
-          lastName={profile?.last_name ?? null}
-          displayName={profile?.display_name ?? null}
-        />
       </div>
     </>
   );

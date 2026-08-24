@@ -24,6 +24,7 @@ export function DocumentList({
   entityType,
   entityId,
   entityLabels,
+  canRename = true,
 }: {
   documents: DocumentRow[];
   folders: DocumentFolderRow[];
@@ -35,6 +36,10 @@ export function DocumentList({
   entityId?: string;
   // Workspace-wide list only: which client/engagement each row belongs to.
   entityLabels?: Map<string, { label: string; href: string }>;
+  // Off for the portal audience -- a client renaming the file their firm
+  // staged for them (an organizer PDF, a signed letter) makes it harder for
+  // staff to find later and isn't something they should control.
+  canRename?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -228,7 +233,7 @@ export function DocumentList({
               />
               <FileText size={16} className="shrink-0 text-muted" aria-hidden="true" />
               <div className="min-w-0 flex-1">
-                {renamingId === doc.id ? (
+                {canRename && renamingId === doc.id ? (
                   <input
                     autoFocus
                     value={renameValue}
@@ -279,17 +284,19 @@ export function DocumentList({
                       onChange={(e) => e.target.files?.[0] && replaceVersion(doc, e.target.files[0])}
                     />
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRenamingId(doc.id);
-                      setRenameValue(doc.file_name);
-                    }}
-                    aria-label={`Rename ${doc.file_name}`}
-                    className="text-muted hover:text-ink"
-                  >
-                    <Pencil size={16} />
-                  </button>
+                  {canRename && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRenamingId(doc.id);
+                        setRenameValue(doc.file_name);
+                      }}
+                      aria-label={`Rename ${doc.file_name}`}
+                      className="text-muted hover:text-ink"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                  )}
                 </>
               )}
             </li>
