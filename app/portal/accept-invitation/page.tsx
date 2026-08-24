@@ -75,6 +75,12 @@ export default function PortalAcceptInvitationPage() {
         return;
       }
       setPreview(data[0]);
+      const invitedName = data[0].invited_name?.trim();
+      if (invitedName) {
+        const [first, ...rest] = invitedName.split(/\s+/);
+        setFirstName(first ?? "");
+        setLastName(rest.join(" "));
+      }
     });
     supabase.auth.getUser().then(({ data }) => setCurrentUserEmail(data.user?.email ?? null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
