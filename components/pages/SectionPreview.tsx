@@ -10,8 +10,12 @@ import { FooterSection } from "@/components/site/sections/FooterSection";
 import type { BuilderSection } from "./types";
 
 // Reuses the real public-facing section components for everything except
-// lead_form -- that one calls a real lead-capture RPC on submit, which must
-// never fire from an unsaved staff preview, so it gets a static stand-in.
+// lead_form and custom_html. lead_form calls a real lead-capture RPC on
+// submit, which must never fire from an unsaved staff preview. custom_html
+// re-executes arbitrary staff-pasted <script> tags -- fine on the actual
+// public page (own content, own audience), but the canvas below renders
+// inside the authenticated staff app, so running untrusted script there
+// would be a real privilege escalation. Both get a static stand-in instead.
 export function SectionPreview({ section, accentColor }: { section: BuilderSection; accentColor?: string }) {
   switch (section.section_type) {
     case "hero":
@@ -46,6 +50,14 @@ export function SectionPreview({ section, accentColor }: { section: BuilderSecti
         </section>
       );
     }
+    case "custom_html":
+      return (
+        <section className="mx-auto max-w-5xl px-6 py-8">
+          <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">
+            Custom HTML block -- preview only, code runs live on the published page.
+          </div>
+        </section>
+      );
     default:
       return null;
   }

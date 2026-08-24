@@ -11,6 +11,7 @@ import { LeadFormSection } from "./sections/LeadFormSection";
 import { CtaButtonSection } from "./sections/CtaButtonSection";
 import { SpacerSection } from "./sections/SpacerSection";
 import { FooterSection } from "./sections/FooterSection";
+import { CustomHtmlSection } from "./sections/CustomHtmlSection";
 
 export function SectionRenderer({
   section,
@@ -57,6 +58,8 @@ export function SectionRenderer({
       return <SpacerSection config={section.config as never} />;
     case "footer":
       return <FooterSection config={section.config as never} firmName={firmName} />;
+    case "custom_html":
+      return <CustomHtmlSection config={section.config as never} />;
     default:
       return null;
   }
