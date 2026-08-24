@@ -5017,6 +5017,8 @@ export type Database = {
           needs_service_review: boolean
           organizer_template_id: string
           resolved_service_id: string | null
+          review_note: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
           reviewed_at: string | null
           reviewed_by: string | null
           signature_request_id: string | null
@@ -5035,6 +5037,8 @@ export type Database = {
           needs_service_review?: boolean
           organizer_template_id: string
           resolved_service_id?: string | null
+          review_note?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           signature_request_id?: string | null
@@ -5053,6 +5057,8 @@ export type Database = {
           needs_service_review?: boolean
           organizer_template_id?: string
           resolved_service_id?: string | null
+          review_note?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           signature_request_id?: string | null
@@ -9836,6 +9842,10 @@ export type Database = {
       }
       set_my_ptin: {
         Args: { p_clear?: boolean; p_ptin: string }
+        Returns: undefined
+      }
+      set_organizer_response_review_status: {
+        Args: { p_note?: string; p_response_id: string; p_status: Database["public"]["Enums"]["review_status"] }
         Returns: undefined
       }
       set_platform_admin: {
