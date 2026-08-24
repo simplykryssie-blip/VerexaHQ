@@ -50,6 +50,7 @@ export function WorkflowList({
   organizerTemplates,
   services = [],
   pipelines = [],
+  tagOptions = [],
 }: {
   workspaceId: string;
   workflows: WorkflowRow[];
@@ -58,6 +59,7 @@ export function WorkflowList({
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
+  tagOptions?: string[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -206,6 +208,7 @@ export function WorkflowList({
               organizerTemplates={organizerTemplates}
               services={services}
               pipelines={pipelines}
+              tagOptions={tagOptions}
             />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
