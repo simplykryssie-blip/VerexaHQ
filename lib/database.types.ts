@@ -8939,6 +8939,10 @@ export type Database = {
         Args: { p_pending_step_id: string }
         Returns: Json
       }
+      accept_platform_terms: {
+        Args: { p_version: string }
+        Returns: undefined
+      }
       approve_client_pending_change: {
         Args: { p_notes?: string; p_pending_change_id: string }
         Returns: undefined
@@ -9457,6 +9461,29 @@ export type Database = {
           workspace_type: string
         }[]
       }
+      get_platform_account_holders: {
+        Args: never
+        Returns: {
+          cancel_at_period_end: boolean
+          current_period_end: string | null
+          display_name: string | null
+          email: string
+          first_name: string | null
+          last_name: string | null
+          last_payment_amount_cents: number | null
+          last_payment_at: string | null
+          phone: string | null
+          plan_name: string | null
+          seat_count: number | null
+          stripe_status: string | null
+          user_id: string
+          workspace_created_at: string
+          workspace_id: string
+          workspace_name: string
+          workspace_status: string
+          workspace_type: string
+        }[]
+      }
       get_platform_staff_directory: {
         Args: never
         Returns: {
@@ -9464,6 +9491,18 @@ export type Database = {
           email: string
           is_owner: boolean
           last_sign_in_at: string
+          user_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      get_platform_terms_acceptance_status: {
+        Args: { p_version: string }
+        Returns: {
+          accepted: boolean
+          accepted_at: string | null
+          display_name: string | null
+          email: string
           user_id: string
           workspace_id: string
           workspace_name: string
@@ -9559,6 +9598,10 @@ export type Database = {
       }
       has_pending_engagement_share_access: {
         Args: { p_engagement_id: string }
+        Returns: boolean
+      }
+      has_accepted_platform_terms: {
+        Args: { p_version: string }
         Returns: boolean
       }
       has_permission: {

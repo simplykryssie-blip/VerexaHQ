@@ -54,8 +54,6 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
     data: { user: currentUser },
   } = await supabase.auth.getUser();
 
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
   const [
     { data: workspaces },
     { data: subscriptions },
@@ -65,9 +63,7 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
     { data: itUsers },
     { data: owners },
     { data: staffDirectory },
-    { count: recentFailureCount },
     { count: undigestedFailureCount },
-    { data: latestFailures },
     { data: homeWorkspace },
   ] = await Promise.all([
     supabase
@@ -81,9 +77,7 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
     supabase.from("user_profiles").select("id, display_name").eq("is_platform_it", true).order("display_name"),
     supabase.from("workspace_users").select("workspace_id, user_profiles(display_name)").eq("is_owner", true),
     supabase.rpc("get_platform_staff_directory"),
-    supabase.from("system_failure_log").select("id", { count: "exact", head: true }).gte("created_at", twentyFourHoursAgo),
     supabase.from("system_failure_log").select("id", { count: "exact", head: true }).is("notified_at", null),
-    supabase.from("system_failure_log").select("id, source, message, created_at").order("created_at", { ascending: false }).limit(5),
     supabase.from("workspaces").select("id").eq("is_platform_home", true).maybeSingle(),
   ]);
 
@@ -190,51 +184,20 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
           </div>
         )}
 
-        <div>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-sm font-semibold text-ink">System failures</h2>
-            <Link href="/platform-admin/systems" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
-              View all <ArrowRight size={12} aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Last 24 hours</p>
-              <p className={`mt-1 text-2xl font-semibold ${(recentFailureCount ?? 0) > 0 ? "text-danger" : "text-ink"}`}>{recentFailureCount ?? 0}</p>
-            </div>
-            <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-              <p className="text-xs uppercase tracking-wide text-muted">Not yet digested</p>
-              <p className="mt-1 text-2xl font-semibold text-ink">{undigestedFailureCount ?? 0}</p>
-            </div>
-          </div>
-          {latestFailures && latestFailures.length > 0 && (
-            <div className="mt-3 overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                    <th className="px-5 py-3 font-medium">When</th>
-                    <th className="px-5 py-3 font-medium">Source</th>
-                    <th className="px-5 py-3 font-medium">Message</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {latestFailures.map((f) => (
-                    <tr key={f.id} className="hover:bg-surfaceMuted">
-                      <td className="whitespace-nowrap px-5 py-3 text-slate">{new Date(f.created_at).toLocaleString()}</td>
-                      <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate">{f.source}</td>
-                      <td className="px-5 py-3 text-slate">{f.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {(!latestFailures || latestFailures.length === 0) && (
-            <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
-              <EmptyState icon={ShieldAlert} message="No system failures logged." />
-            </div>
-          )}
-        </div>
+        <Link
+          href="/platform-admin/review"
+          className="flex items-center justify-between rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent"
+        >
+          <span className="flex items-center gap-2">
+            <ShieldAlert size={16} className={(undigestedFailureCount ?? 0) > 0 ? "text-danger" : "text-muted"} aria-hidden="true" />
+            <span className="text-sm font-medium text-ink">
+              {undigestedFailureCount ?? 0} undigested system failure{(undigestedFailureCount ?? 0) === 1 ? "" : "s"}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
+            Review queue <ArrowRight size={12} aria-hidden="true" />
+          </span>
+        </Link>
 
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-border bg-surface shadow-soft">

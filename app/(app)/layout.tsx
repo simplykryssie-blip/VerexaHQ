@@ -9,6 +9,8 @@ import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
+import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
+import { LEGAL_VERSION } from "@/lib/legal";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const workspace = await getCurrentWorkspace();
@@ -28,23 +30,41 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: securityPolicy }, branding, { data: isPlatformAdmin }, { data: isPlatformIt }, { data: canUseNetworkMessaging }, { count: teammateCount }] =
-    await Promise.all([
-      supabase
-        .from("workspace_security_policies")
-        .select("session_timeout_minutes")
-        .eq("workspace_id", workspace.id)
-        .maybeSingle(),
-      getEffectiveBranding(workspace.id),
-      supabase.rpc("is_platform_admin"),
-      supabase.rpc("is_platform_it"),
-      supabase.rpc("can_use_network_messaging", { p_workspace_id: workspace.id }),
-      supabase
-        .from("workspace_users")
-        .select("user_id", { count: "exact", head: true })
-        .eq("workspace_id", workspace.id)
-        .eq("status", "active"),
-    ]);
+  const [
+    { data: securityPolicy },
+    branding,
+    { data: isPlatformAdmin },
+    { data: isPlatformIt },
+    { data: canUseNetworkMessaging },
+    { count: teammateCount },
+    { data: hasAcceptedTerms },
+  ] = await Promise.all([
+    supabase
+      .from("workspace_security_policies")
+      .select("session_timeout_minutes")
+      .eq("workspace_id", workspace.id)
+      .maybeSingle(),
+    getEffectiveBranding(workspace.id),
+    supabase.rpc("is_platform_admin"),
+    supabase.rpc("is_platform_it"),
+    supabase.rpc("can_use_network_messaging", { p_workspace_id: workspace.id }),
+    supabase
+      .from("workspace_users")
+      .select("user_id", { count: "exact", head: true })
+      .eq("workspace_id", workspace.id)
+      .eq("status", "active"),
+    // Only a workspace owner needs to accept -- staff are covered under
+    // the Firm's own acceptance, same as the Terms' own language.
+    workspace.is_owner
+      ? supabase.rpc("has_accepted_platform_terms", { p_version: LEGAL_VERSION })
+      : Promise.resolve({ data: true }),
+  ]);
+
+  // Blocks the whole shell -- rendered instead of every other page, not a
+  // dismissible overlay on top of one, so there is no route that skips it.
+  if (workspace.is_owner && !hasAcceptedTerms) {
+    return <AcceptTermsGate version={LEGAL_VERSION} />;
+  }
 
   // Messages is relevant either for cross-firm network messaging (ERO/SB or
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --

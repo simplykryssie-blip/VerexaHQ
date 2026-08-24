@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, Layers, Check } from "lucide-react";
+import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
@@ -72,6 +72,12 @@ export function Sidebar({
   // no longer reads or applies branding.sidebar_text_color at all.
   const navItems = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_ITEMS : NAV_ITEMS;
   const navSections = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_SECTIONS : NAV_SECTIONS;
+
+  // Verexa HQ CRM is home base, not one more option in a list of demos --
+  // it gets its own pinned "back to" link (shown only while elsewhere), and
+  // the collapsible list below is exclusively the demo PTIN/ERO/SB shells.
+  const homeWorkspaceEntry = switchableWorkspaces?.find((w) => w.isHome);
+  const demoWorkspaces = switchableWorkspaces?.filter((w) => !w.isHome) ?? [];
 
   const sidebarStyle: React.CSSProperties = {};
   if (secondaryColor) {
@@ -215,7 +221,21 @@ export function Sidebar({
           ))}
         </nav>
 
-        {Boolean(switchableWorkspaces?.length) && (
+        {homeWorkspaceEntry && !homeWorkspaceEntry.isActive && (
+          <div className="px-3 pb-1">
+            <button
+              type="button"
+              onClick={() => switchWorkspace(homeWorkspaceEntry.id)}
+              disabled={switching}
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-default`}
+            >
+              <Home size={18} strokeWidth={2} className="shrink-0" />
+              Back to {homeWorkspaceEntry.name}
+            </button>
+          </div>
+        )}
+
+        {demoWorkspaces.length > 0 && (
           <div className="px-3 pb-1">
             <button
               type="button"
@@ -224,12 +244,12 @@ export function Sidebar({
               className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
             >
               <Layers size={18} strokeWidth={2} className="shrink-0" />
-              <span className="flex-1 text-left">Demo Workspace</span>
+              <span className="flex-1 text-left">Demo Accounts</span>
               <ChevronDown size={14} className={`shrink-0 transition-transform ${demoOpen ? "rotate-180" : ""}`} />
             </button>
             {demoOpen && (
               <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
-                {switchableWorkspaces!.map((w) => (
+                {demoWorkspaces.map((w) => (
                   <button
                     key={w.id}
                     type="button"
@@ -239,7 +259,7 @@ export function Sidebar({
                       w.isActive ? styles.navItemActive : styles.navItem
                     } flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium disabled:cursor-default`}
                   >
-                    <span className="truncate">{w.isHome ? w.name : `Demo: ${WORKSPACE_TYPE_SHORT_LABELS[w.workspaceType] ?? w.workspaceType}`}</span>
+                    <span className="truncate">{`Demo: ${WORKSPACE_TYPE_SHORT_LABELS[w.workspaceType] ?? w.workspaceType}`}</span>
                     {w.isActive && <Check size={14} className="shrink-0" />}
                   </button>
                 ))}
