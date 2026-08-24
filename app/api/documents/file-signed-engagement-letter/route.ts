@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
 import { fetchImageBytes } from "@/lib/documents/fetchImageBytes";
+import { resolveClientServiceFolder } from "@/lib/documents/resolveClientServiceFolder";
 
 // Called right after a public engagement-letter signature succeeds
 // (components/sign/PublicEngagementLetterSign.tsx and the anonymous public
@@ -71,10 +72,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: uploadErr.message }, { status: 500 });
   }
 
+  const folderId = await resolveClientServiceFolder(supabase, signature.workspace_id, signature.client_id);
+
   const { error: insertErr } = await supabase.from("attachments").insert({
     workspace_id: signature.workspace_id,
     entity_type: "client",
     entity_id: signature.client_id,
+    folder_id: folderId,
     file_name: fileName,
     storage_path: path,
     mime_type: "application/pdf",

@@ -9,6 +9,11 @@ export type DocumentFolderRow = {
   name: string;
   parent_folder_id: string | null;
   display_order: number;
+  // Present only on the workspace-wide fetch (Document Center), which spans
+  // every entity's folders in one list -- a single client/engagement's
+  // Files tab already has its scope fixed and doesn't need these.
+  entity_type?: EntityType;
+  entity_id?: string;
 };
 
 export type DocumentRow = {

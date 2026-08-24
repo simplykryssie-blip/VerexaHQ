@@ -47,7 +47,7 @@ export default async function DocumentCenterHubPage() {
     );
   }
 
-  const [{ data: openRequests }, { data: pendingSignatures }, { data: allDocuments }, { data: storageRows }, staffMembers] = await Promise.all([
+  const [{ data: openRequests }, { data: pendingSignatures }, { data: allDocuments }, { data: allFolders }, { data: storageRows }, staffMembers] = await Promise.all([
     supabase
       .from("document_requests")
       .select(
@@ -74,11 +74,12 @@ export default async function DocumentCenterHubPage() {
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: false })
       .limit(500),
+    supabase.from("document_folders").select("id, name, parent_folder_id, display_order, entity_type, entity_id").eq("workspace_id", workspace.id),
     supabase.from("attachments").select("file_size_bytes").eq("workspace_id", workspace.id).eq("is_archived", false),
     getWorkspaceStaff(supabase, workspace.id),
   ]);
 
-  const labelMap = await buildEntityLabelMap(supabase, [...(openRequests ?? []), ...(allDocuments ?? [])]);
+  const labelMap = await buildEntityLabelMap(supabase, [...(openRequests ?? []), ...(allDocuments ?? []), ...(allFolders ?? [])]);
 
   const staffById = new Map(staffMembers.map((m) => [m.user_id, { id: m.user_id, display_name: m.display_name }]));
   const documentsWithUploader = (allDocuments ?? []).map((d: any) => ({
@@ -164,7 +165,7 @@ export default async function DocumentCenterHubPage() {
 
         <div>
           <h2 className="mb-3 text-sm font-semibold text-ink">All documents</h2>
-          <AllDocumentsPanel workspaceId={workspace.id} documents={documentsWithUploader as never} entityLabels={labelMap} />
+          <AllDocumentsPanel workspaceId={workspace.id} documents={documentsWithUploader as never} folders={(allFolders ?? []) as never} entityLabels={labelMap} />
         </div>
       </div>
     </>

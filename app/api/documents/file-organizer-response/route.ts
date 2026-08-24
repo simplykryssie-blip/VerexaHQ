@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
 import { TextPdf } from "@/lib/pdf/textPdf";
+import { resolveClientServiceFolder } from "@/lib/documents/resolveClientServiceFolder";
 
 function displayValue(fieldType: string, raw: unknown): string {
   if (raw === null || raw === undefined || raw === "") return "--";
@@ -98,6 +99,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: uploadErr.message }, { status: 500 });
   }
 
+  const folderId = await resolveClientServiceFolder(supabase, response.workspace_id, response.client_id);
+
   // client_visible: the client filled this organizer in themselves, so they
   // should be able to see and download their own submitted answers, same as
   // any other document shared with them.
@@ -105,6 +108,7 @@ export async function POST(request: Request) {
     workspace_id: response.workspace_id,
     entity_type: "client",
     entity_id: response.client_id,
+    folder_id: folderId,
     file_name: fileName,
     storage_path: path,
     mime_type: "application/pdf",
