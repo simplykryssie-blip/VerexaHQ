@@ -65,6 +65,62 @@ export async function handleCheckoutSessionCompleted(
   return { skipped: undefined };
 }
 
+type FailedPaymentIntent = {
+  id: string;
+  amount: number;
+  metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string };
+  last_payment_error?: { message?: string } | null;
+};
+
+/**
+ * A card decline mid-checkout, not an abandoned session (that's
+ * checkout.session.expired, which we don't currently listen for since an
+ * abandoned session isn't itself informative -- the client can just retry).
+ * Recorded the same way a success is, so the dashboard's payment-failures
+ * tile and existing payment history both pick it up with no separate table.
+ */
+export async function handlePaymentIntentFailed(
+  supabase: ReturnType<typeof createServiceClient>,
+  intent: FailedPaymentIntent
+): Promise<{ skipped: string } | { skipped: undefined }> {
+  const workspaceId = intent.metadata?.workspace_id;
+  let invoiceId = intent.metadata?.invoice_id;
+  const paymentPlanId = intent.metadata?.payment_plan_id;
+
+  if (!workspaceId || (!invoiceId && !paymentPlanId)) {
+    return { skipped: "missing metadata" };
+  }
+
+  if (paymentPlanId && !invoiceId) {
+    const { data: plan } = await supabase.from("payment_plans").select("invoice_id").eq("id", paymentPlanId).single();
+    if (!plan) {
+      return { skipped: "payment plan not found" };
+    }
+    invoiceId = plan.invoice_id;
+  }
+
+  if (!invoiceId) {
+    return { skipped: "no invoice reference" };
+  }
+
+  const { data: invoice } = await supabase.from("invoices").select("client_id").eq("id", invoiceId).single();
+  if (!invoice) {
+    return { skipped: "invoice not found" };
+  }
+
+  await supabase.from("payments").insert({
+    workspace_id: workspaceId,
+    client_id: invoice.client_id,
+    invoice_id: invoiceId,
+    amount: intent.amount / 100,
+    status: "failed",
+    stripe_payment_intent_id: intent.id,
+    notes: intent.last_payment_error?.message ?? null,
+  });
+
+  return { skipped: undefined };
+}
+
 export async function markWebhookProcessed(
   supabase: ReturnType<typeof createServiceClient>,
   webhookEventId: string | undefined,

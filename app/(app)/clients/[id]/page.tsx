@@ -249,7 +249,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const { data: organizerResponses } = await supabase
     .from("organizer_responses")
     .select(
-      "id, status, submitted_at, organizer_template_id, filed_as_attachment, engagement_id, resolved_service_id, needs_service_review, organizer_templates(name), services(name)"
+      "id, status, submitted_at, organizer_template_id, filed_as_attachment, engagement_id, resolved_service_id, needs_service_review, review_status, review_note, organizer_templates(name), services(name)"
     )
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
@@ -493,6 +493,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
         resolved_service_id: o.resolved_service_id,
         needs_service_review: o.needs_service_review,
         resolved_service_name: o.services?.name ?? null,
+        review_status: o.review_status,
+        review_note: o.review_note,
       }))}
       workspaceServices={workspaceServices ?? []}
       documentRequestTemplates={documentRequestTemplates ?? []}

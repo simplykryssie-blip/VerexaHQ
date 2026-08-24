@@ -9,15 +9,16 @@ export type CurrentWorkspace = {
   slug: string;
   workspace_type: string;
   is_owner: boolean;
+  is_platform_home: boolean;
 };
 
 function toCurrentWorkspace(row: {
   is_owner: boolean;
-  workspaces: { id: string; name: string; slug: string; workspace_type: string } | null;
+  workspaces: { id: string; name: string; slug: string; workspace_type: string; is_platform_home: boolean } | null;
 }): CurrentWorkspace | null {
   if (!row.workspaces) return null;
   const ws = row.workspaces;
-  return { id: ws.id, name: ws.name, slug: ws.slug, workspace_type: ws.workspace_type, is_owner: row.is_owner };
+  return { id: ws.id, name: ws.name, slug: ws.slug, workspace_type: ws.workspace_type, is_owner: row.is_owner, is_platform_home: ws.is_platform_home };
 }
 
 export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
@@ -36,7 +37,7 @@ export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
   if (activeWorkspaceId) {
     const { data } = await supabase
       .from("workspace_users")
-      .select("is_owner, workspaces(id, name, slug, workspace_type)")
+      .select("is_owner, workspaces(id, name, slug, workspace_type, is_platform_home)")
       .eq("user_id", user.id)
       .eq("workspace_id", activeWorkspaceId)
       .eq("status", "active")
@@ -47,7 +48,7 @@ export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
 
   const { data } = await supabase
     .from("workspace_users")
-    .select("is_owner, workspaces(id, name, slug, workspace_type)")
+    .select("is_owner, workspaces(id, name, slug, workspace_type, is_platform_home)")
     .eq("user_id", user.id)
     .eq("status", "active")
     .order("created_at", { ascending: true })

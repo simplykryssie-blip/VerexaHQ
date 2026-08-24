@@ -55,6 +55,11 @@ export async function createCheckoutSession({
   });
   for (const [key, value] of Object.entries(metadata)) {
     body.set(`metadata[${key}]`, value);
+    // Session metadata doesn't carry over to the PaymentIntent it creates --
+    // set it there too so a payment_intent.payment_failed webhook (a card
+    // decline, not just an abandoned session) can still resolve which
+    // invoice/plan it belongs to.
+    body.set(`payment_intent_data[metadata][${key}]`, value);
   }
 
   const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(connectedAccountId), body });

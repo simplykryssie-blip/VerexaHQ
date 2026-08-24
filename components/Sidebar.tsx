@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, ShieldEllipsis, Wrench, Layers, Check } from "lucide-react";
-import { NAV_ITEMS, NAV_SECTIONS } from "@/lib/nav";
+import { Menu, X, ChevronDown, Layers, Check } from "lucide-react";
+import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
 import styles from "./Sidebar.module.css";
@@ -21,8 +21,7 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
-  isPlatformAdmin,
-  isPlatformItOnly,
+  isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
 }: {
@@ -30,9 +29,10 @@ export function Sidebar({
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  isPlatformAdmin?: boolean;
-  /** True only for a platform-IT (not also admin) user -- gets its own nav link since the "Platform Admin" link below is admin-only. */
-  isPlatformItOnly?: boolean;
+  /** True only while the active workspace is Verexa's own is_platform_home
+   *  workspace -- swaps the whole nav for the platform-admin tooling instead
+   *  of the client-facing CRM nav every other (real or demo) workspace gets. */
+  isPlatformHomeWorkspace?: boolean;
   /** Home workspace + the demo PTIN/ERO/SB shells a platform admin can switch into to demo the product. Empty for everyone else. */
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
@@ -70,6 +70,9 @@ export function Sidebar({
   // ever make text harder to read against it (a leftover light value renders
   // as near-invisible on the light background) with no upside, so the app
   // no longer reads or applies branding.sidebar_text_color at all.
+  const navItems = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_ITEMS : NAV_ITEMS;
+  const navSections = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_SECTIONS : NAV_SECTIONS;
+
   const sidebarStyle: React.CSSProperties = {};
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
@@ -79,13 +82,13 @@ export function Sidebar({
   // Flatten every navigable href (top-level items + group children) so the
   // longest-prefix-match logic works regardless of nesting, and a group's
   // children can be matched the same way leaf items always were.
-  const allHrefs = NAV_ITEMS.flatMap((item) => ("children" in item ? item.children.map((c) => c.href) : [item.href]));
+  const allHrefs = navItems.flatMap((item) => ("children" in item ? item.children.map((c) => c.href) : [item.href]));
   const activeNavHref = allHrefs
     .filter((href) => pathname === href || pathname.startsWith(href + "/"))
     .sort((a, b) => b.length - a.length)[0];
 
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(NAV_ITEMS.filter((item) => "children" in item && item.children.some((c) => c.href === activeNavHref)).map((item) => item.label))
+    () => new Set(navItems.filter((item) => "children" in item && item.children.some((c) => c.href === activeNavHref)).map((item) => item.label))
   );
 
   function toggleExpanded(label: string) {
@@ -151,7 +154,7 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
-          {NAV_SECTIONS.map((section) => (
+          {navSections.map((section) => (
             <div key={section.label}>
               <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
               <div className="space-y-1">
@@ -211,34 +214,6 @@ export function Sidebar({
             </div>
           ))}
         </nav>
-
-        {isPlatformAdmin && (
-          <div className="px-3 pb-1">
-            <Link
-              href="/platform-admin"
-              className={`${
-                pathname === "/platform-admin" || pathname.startsWith("/platform-admin/") ? styles.navItemActive : styles.navItem
-              } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
-            >
-              <ShieldEllipsis size={18} strokeWidth={2} className="shrink-0" />
-              Admin Dashboard
-            </Link>
-          </div>
-        )}
-
-        {isPlatformItOnly && (
-          <div className="px-3 pb-1">
-            <Link
-              href="/platform-admin/systems"
-              className={`${
-                pathname === "/platform-admin/systems" ? styles.navItemActive : styles.navItem
-              } flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
-            >
-              <Wrench size={18} strokeWidth={2} className="shrink-0" />
-              Systems
-            </Link>
-          </div>
-        )}
 
         {Boolean(switchableWorkspaces?.length) && (
           <div className="px-3 pb-1">

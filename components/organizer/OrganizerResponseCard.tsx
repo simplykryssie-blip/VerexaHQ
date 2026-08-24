@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, FileCheck } from "lucide-react";
+import { ChevronDown, ChevronRight, FileCheck, Check, X, HelpCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
 
 export type OrganizerFieldAnswer = { fieldId: string; answerId: string | null; label: string; fieldType: string; display: string; maskable: boolean };
 export type OrganizerRepeaterGroup = { fieldId: string; label: string; instances: { index: number; fields: OrganizerFieldAnswer[] }[] };
+export type OrganizerReviewStatus = "Pending" | "In Review" | "Approved" | "Rejected" | "Corrections Requested";
 export type OrganizerResponseDetail = {
   id: string;
   status: string;
@@ -21,6 +22,16 @@ export type OrganizerResponseDetail = {
   resolved_service_id?: string | null;
   resolved_service_name?: string | null;
   needs_service_review?: boolean;
+  review_status?: OrganizerReviewStatus | null;
+  review_note?: string | null;
+};
+
+const REVIEW_BADGE_TONE: Record<OrganizerReviewStatus, string> = {
+  Pending: "bg-surfaceMuted text-muted",
+  "In Review": "bg-accentSoft text-accent",
+  Approved: "bg-emeraldSoft text-emerald",
+  Rejected: "bg-roseSoft text-rose",
+  "Corrections Requested": "bg-amberSoft text-amber",
 };
 
 // Clicking anywhere on the row expands/collapses the answers -- the
@@ -39,6 +50,29 @@ export function OrganizerResponseCard({
   const [open, setOpen] = useState(false);
   const [filing, setFiling] = useState(false);
   const [pickingService, setPickingService] = useState(false);
+  const [reviewing, setReviewing] = useState<OrganizerReviewStatus | null>(null);
+
+  async function setReview(status: OrganizerReviewStatus, notePrompt?: string) {
+    let note: string | null = null;
+    if (notePrompt) {
+      const entered = window.prompt(notePrompt);
+      if (entered === null) return; // cancelled -- leave the review status as-is
+      note = entered.trim() || null;
+    }
+    setReviewing(status);
+    const { error } = await supabase.rpc("set_organizer_response_review_status", {
+      p_response_id: response.id,
+      p_status: status,
+      p_note: note ?? undefined,
+    });
+    setReviewing(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(`Marked ${status}.`, "success");
+    router.refresh();
+  }
 
   async function pickService(serviceId: string) {
     if (!serviceId) return;
@@ -148,6 +182,43 @@ export function OrganizerResponseCard({
               This form is used by more than one service -- pick which one this is for
             </button>
           )}
+        </div>
+      )}
+
+      {hasAnswers && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2" onClick={(e) => e.stopPropagation()}>
+          {response.review_status && (
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${REVIEW_BADGE_TONE[response.review_status]}`}>
+              {response.review_status}
+            </span>
+          )}
+          {response.review_status && response.review_note && <span className="text-xs text-muted">&quot;{response.review_note}&quot;</span>}
+          <span className="ml-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setReview("Approved")}
+              disabled={reviewing !== null}
+              className="inline-flex items-center gap-1 rounded-full border border-emerald px-2 py-0.5 text-[11px] font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
+            >
+              <Check size={11} /> {reviewing === "Approved" ? "Saving..." : "Approve"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReview("Corrections Requested", "What's needed from the client?")}
+              disabled={reviewing !== null}
+              className="inline-flex items-center gap-1 rounded-full border border-amber px-2 py-0.5 text-[11px] font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
+            >
+              <HelpCircle size={11} /> {reviewing === "Corrections Requested" ? "Saving..." : "Needs Info"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setReview("Rejected", "Reason for denying (optional):")}
+              disabled={reviewing !== null}
+              className="inline-flex items-center gap-1 rounded-full border border-rose px-2 py-0.5 text-[11px] font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
+            >
+              <X size={11} /> {reviewing === "Rejected" ? "Saving..." : "Deny"}
+            </button>
+          </span>
         </div>
       )}
 

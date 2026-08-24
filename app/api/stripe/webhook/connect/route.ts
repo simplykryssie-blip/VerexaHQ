@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { deriveConnectStatus, verifyStripeSignature } from "@/lib/stripe/client";
 import { createServiceClient } from "@/lib/supabase/service";
-import { handleCheckoutSessionCompleted, markWebhookFailed, markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
+import { handleCheckoutSessionCompleted, handlePaymentIntentFailed, markWebhookFailed, markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
@@ -50,6 +50,13 @@ export async function POST(request: Request) {
       };
       const result = await handleCheckoutSessionCompleted(supabase, session);
       await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id ?? workspaceId);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
+    } else if (event.type === "payment_intent.payment_failed") {
+      const intent = event.data.object as Parameters<typeof handlePaymentIntentFailed>[1];
+      const result = await handlePaymentIntentFailed(supabase, intent);
+      await markWebhookProcessed(supabase, logRow?.id, intent.metadata?.workspace_id ?? workspaceId);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });
       }

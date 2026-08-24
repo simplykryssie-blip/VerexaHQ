@@ -6,24 +6,25 @@ import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
 import { DashboardShell } from "./DashboardShell";
 import type { OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
+import { isDashboardRange } from "@/lib/dashboard/range";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: { range?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
+  const range = isDashboardRange(searchParams.range) ? searchParams.range : "month";
 
   const supabase = createClient();
 
   // Verexa's own workspace: platform admins/IT land straight on their
   // dashboard instead of the normal staff view -- everyone else here
   // (regular staff testing in this workspace) is unaffected.
-  const [{ data: homeRow }, { data: isPlatformAdmin }, { data: isPlatformIt }] = await Promise.all([
-    supabase.from("workspaces").select("is_platform_home").eq("id", workspace.id).maybeSingle(),
-    supabase.rpc("is_platform_admin"),
-    supabase.rpc("is_platform_it"),
-  ]);
-  if (homeRow?.is_platform_home) {
+  if (workspace.is_platform_home) {
+    const [{ data: isPlatformAdmin }, { data: isPlatformIt }] = await Promise.all([
+      supabase.rpc("is_platform_admin"),
+      supabase.rpc("is_platform_it"),
+    ]);
     if (isPlatformAdmin) redirect("/platform-admin");
     if (isPlatformIt) redirect("/platform-admin/systems");
   }
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
           .eq("dashboard_id", dashboardId)
           .order("display_order")
       : Promise.resolve({ data: [] }),
-    getDashboardData(workspace.id),
+    getDashboardData(workspace.id, range),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
@@ -217,6 +218,7 @@ export default async function DashboardPage() {
       workspaceId={workspace.id}
       onboardingSteps={onboardingDismissed ? null : onboardingSteps}
       seenOnboardingSteps={profileRow?.seen_onboarding_steps ?? []}
+      range={range}
     />
   );
 }
