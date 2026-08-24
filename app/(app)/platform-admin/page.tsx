@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ShieldEllipsis, Lock, ShieldAlert, ArrowRight } from "lucide-react";
+import { ShieldEllipsis, Lock, ShieldAlert, ArrowRight, Users, DollarSign, RefreshCw, CreditCard, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -8,6 +8,13 @@ import { PlatformAdminsManager } from "./PlatformAdminsManager";
 import { PlatformItManager } from "./PlatformItManager";
 import { ProvisionWorkspaceForm } from "./ProvisionWorkspaceForm";
 import { PlatformAdminTabs } from "./PlatformAdminTabs";
+import { RangeSwitcher } from "@/components/dashboard/RangeSwitcher";
+import { isDashboardRange } from "@/lib/dashboard/range";
+import { getBusinessSnapshot } from "@/lib/dashboard/businessSnapshot";
+
+function money(n: number) {
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 export const dynamic = "force-dynamic";
 
@@ -25,9 +32,10 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   archived: "neutral",
 };
 
-export default async function PlatformAdminPage() {
+export default async function PlatformAdminPage({ searchParams }: { searchParams: { range?: string } }) {
   const supabase = createClient();
   const { data: isPlatformAdmin } = await supabase.rpc("is_platform_admin");
+  const range = isDashboardRange(searchParams.range) ? searchParams.range : "month";
 
   if (!isPlatformAdmin) {
     return (
@@ -60,6 +68,7 @@ export default async function PlatformAdminPage() {
     { count: recentFailureCount },
     { count: undigestedFailureCount },
     { data: latestFailures },
+    { data: homeWorkspace },
   ] = await Promise.all([
     supabase
       .from("workspaces")
@@ -75,7 +84,10 @@ export default async function PlatformAdminPage() {
     supabase.from("system_failure_log").select("id", { count: "exact", head: true }).gte("created_at", twentyFourHoursAgo),
     supabase.from("system_failure_log").select("id", { count: "exact", head: true }).is("notified_at", null),
     supabase.from("system_failure_log").select("id, source, message, created_at").order("created_at", { ascending: false }).limit(5),
+    supabase.from("workspaces").select("id").eq("is_platform_home", true).maybeSingle(),
   ]);
+
+  const businessSnapshot = homeWorkspace ? await getBusinessSnapshot(homeWorkspace.id, range) : null;
 
   const planNameById = new Map((plans ?? []).map((p) => [p.id, p.name]));
   const subscriptionByWorkspace = new Map((subscriptions ?? []).map((s) => [s.workspace_id, s]));
@@ -127,6 +139,56 @@ export default async function PlatformAdminPage() {
             ))}
           </div>
         </div>
+
+        {businessSnapshot && (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-display text-sm font-semibold text-ink">Your practice -- {businessSnapshot.rangeLabel}</h2>
+              <RangeSwitcher range={range} />
+            </div>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accentSoft text-accent">
+                  <Users size={17} aria-hidden="true" />
+                </span>
+                <p className="text-xs uppercase tracking-wide text-muted">Active Customers</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">{businessSnapshot.activeCustomers}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emeraldSoft text-emerald">
+                  <DollarSign size={17} aria-hidden="true" />
+                </span>
+                <p className="text-xs uppercase tracking-wide text-muted">Revenue</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">{money(businessSnapshot.revenueInRange)}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-violetSoft text-violet">
+                  <RefreshCw size={17} aria-hidden="true" />
+                </span>
+                <p className="text-xs uppercase tracking-wide text-muted">Upcoming Renewals</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">
+                  {businessSnapshot.upcomingRenewalsCount} ({money(businessSnapshot.upcomingRenewalsTotal)})
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-roseSoft text-rose">
+                  <CreditCard size={17} aria-hidden="true" />
+                </span>
+                <p className="text-xs uppercase tracking-wide text-muted">Payment Failures</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">
+                  {businessSnapshot.paymentFailuresOpen} open <span className="text-muted">/</span> {businessSnapshot.paymentFailuresClosed} closed
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amberSoft text-amber">
+                  <Receipt size={17} aria-hidden="true" />
+                </span>
+                <p className="text-xs uppercase tracking-wide text-muted">Outstanding Invoices</p>
+                <p className="mt-1 text-2xl font-semibold text-ink">{money(businessSnapshot.outstandingInvoicesTotal)}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div>
           <div className="mb-3 flex items-center justify-between">
