@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Copy, Plus, Trash2, Zap } from "lucide-react";
@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
+import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
+import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
+import type { LibraryFolderRow } from "@/components/library/types";
 import {
   TriggerFields,
   defaultTriggerConfig,
@@ -25,6 +28,7 @@ export type WorkflowRow = {
   trigger_config: Record<string, unknown>;
   is_enabled: boolean;
   status: string;
+  folder_id: string | null;
   step_count: number;
   run_count: number;
 };
@@ -41,6 +45,7 @@ function slugify(name: string) {
 export function WorkflowList({
   workspaceId,
   workflows,
+  folders,
   canManage,
   organizerTemplates,
   services = [],
@@ -48,6 +53,7 @@ export function WorkflowList({
 }: {
   workspaceId: string;
   workflows: WorkflowRow[];
+  folders: LibraryFolderRow[];
   canManage: boolean;
   organizerTemplates: TemplateOption[];
   services?: TemplateOption[];
@@ -65,6 +71,29 @@ export function WorkflowList({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+
+  const visibleWorkflows = useMemo(
+    () => (selectedFolderId === null ? workflows : workflows.filter((w) => w.folder_id === selectedFolderId)),
+    [workflows, selectedFolderId]
+  );
+
+  const folderCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const w of workflows) {
+      if (w.folder_id) map.set(w.folder_id, (map.get(w.folder_id) ?? 0) + 1);
+    }
+    return map;
+  }, [workflows]);
+
+  async function moveWorkflow(id: string, folderId: string | null) {
+    const { error } = await supabase.from("automations").update({ folder_id: folderId }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -136,107 +165,121 @@ export function WorkflowList({
   }
 
   return (
-    <div className="space-y-4">
-      {canManage && (
-        <div className="flex justify-end">
-          <Button size="sm" onClick={() => setOpen((v) => !v)}>
-            <Plus size={14} /> New workflow
-          </Button>
-        </div>
-      )}
-
-      {open && (
-        <form onSubmit={create} className="space-y-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <label className="flex flex-col gap-1 text-xs text-muted">
-            Name
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Notify client when review is done"
-              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-          </label>
-          <TriggerFields
-            triggerType={triggerType}
-            onTriggerTypeChange={setTriggerType}
-            config={triggerConfig}
-            onConfigChange={setTriggerConfig}
-            organizerTemplates={organizerTemplates}
-            services={services}
-            pipelines={pipelines}
-          />
-          {error && <p className="text-sm text-danger">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="tertiary" size="sm" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" size="sm" disabled={saving}>
-              {saving ? "Creating..." : "Create workflow"}
+    <div className="flex flex-col gap-4 sm:flex-row">
+      <LibraryFolderPane
+        workspaceId={workspaceId}
+        itemType="workflow"
+        canManage={canManage}
+        folders={folders}
+        selectedFolderId={selectedFolderId}
+        onSelect={setSelectedFolderId}
+        totalCount={workflows.length}
+        counts={folderCounts}
+        rootLabel="All Workflows"
+      />
+      <div className="min-w-0 flex-1 space-y-4">
+        {canManage && (
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => setOpen((v) => !v)}>
+              <Plus size={14} /> New workflow
             </Button>
           </div>
-        </form>
-      )}
+        )}
 
-      {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
+        {open && (
+          <form onSubmit={create} className="space-y-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Name
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Notify client when review is done"
+                className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
+            <TriggerFields
+              triggerType={triggerType}
+              onTriggerTypeChange={setTriggerType}
+              config={triggerConfig}
+              onConfigChange={setTriggerConfig}
+              organizerTemplates={organizerTemplates}
+              services={services}
+              pipelines={pipelines}
+            />
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="tertiary" size="sm" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={saving}>
+                {saving ? "Creating..." : "Create workflow"}
+              </Button>
+            </div>
+          </form>
+        )}
 
-      {workflows.length === 0 ? (
-        <EmptyState message="No workflows yet. Create one to automate what happens on an engagement." />
-      ) : (
-        <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
-          {workflows.map((w) => (
-            <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
-              <Link href={`/workflows/${w.id}`} className="flex min-w-0 items-center gap-3">
-                <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="truncate text-sm font-medium text-ink">{w.name}</p>
-                    {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+        {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
+
+        {visibleWorkflows.length === 0 ? (
+          <EmptyState message={workflows.length === 0 ? "No workflows yet. Create one to automate what happens on an engagement." : "No workflows in this folder."} />
+        ) : (
+          <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
+            {visibleWorkflows.map((w) => (
+              <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <Link href={`/workflows/${w.id}`} className="flex min-w-0 items-center gap-3">
+                  <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-sm font-medium text-ink">{w.name}</p>
+                      {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+                    </div>
+                    <p className="truncate text-xs text-muted">
+                      {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
+                      {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
+                    </p>
                   </div>
-                  <p className="truncate text-xs text-muted">
-                    {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
-                    {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
-                  </p>
+                </Link>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className={`text-xs font-medium ${w.is_enabled && w.step_count > 0 ? "text-success" : "text-muted"}`}>
+                    {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
+                  </span>
+                  {canManage && (
+                    <>
+                      <FolderMoveSelect folders={folders} value={w.folder_id} onChange={(folderId) => moveWorkflow(w.id, folderId)} />
+                      <button
+                        type="button"
+                        onClick={() => toggleEnabled(w.id, w.is_enabled)}
+                        className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
+                      >
+                        {w.is_enabled ? "Pause" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => duplicate(w.id, w.name)}
+                        disabled={duplicatingId === w.id}
+                        className="text-muted hover:text-ink disabled:opacity-50"
+                        aria-label="Duplicate workflow"
+                      >
+                        <Copy size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(w.id)}
+                        disabled={deletingId === w.id}
+                        className="text-muted hover:text-danger disabled:opacity-50"
+                        aria-label="Delete workflow"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
-              </Link>
-              <div className="flex shrink-0 items-center gap-3">
-                <span className={`text-xs font-medium ${w.is_enabled && w.step_count > 0 ? "text-success" : "text-muted"}`}>
-                  {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
-                </span>
-                {canManage && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => toggleEnabled(w.id, w.is_enabled)}
-                      className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
-                    >
-                      {w.is_enabled ? "Pause" : "Activate"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => duplicate(w.id, w.name)}
-                      disabled={duplicatingId === w.id}
-                      className="text-muted hover:text-ink disabled:opacity-50"
-                      aria-label="Duplicate workflow"
-                    >
-                      <Copy size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => remove(w.id)}
-                      disabled={deletingId === w.id}
-                      className="text-muted hover:text-danger disabled:opacity-50"
-                      aria-label="Delete workflow"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

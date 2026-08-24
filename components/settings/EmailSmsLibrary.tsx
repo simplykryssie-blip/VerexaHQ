@@ -14,7 +14,10 @@ export async function EmailSmsLibrary({ workspaceId, activeTabParam }: { workspa
 
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
-  const { data: rows } = await supabase.from(table).select("*").or(orFilter).order("name");
+  const [{ data: rows }, { data: folders }] = await Promise.all([
+    supabase.from(table).select("*").or(orFilter).order("name"),
+    supabase.from("library_folders").select("id, parent_folder_id, name").eq("workspace_id", workspaceId).eq("item_type", "email_sms_template").order("name"),
+  ]);
 
   // Every workspace gets its own copy of each preloaded template at creation
   // (see copy_preloaded_templates_to_workspace), so the shared workspace_id
@@ -64,7 +67,7 @@ export async function EmailSmsLibrary({ workspaceId, activeTabParam }: { workspa
       </div>
 
       <div className="mt-4">
-        <EmailSmsTemplateGallery kind={activeTab} workspaceId={workspaceId} templates={templates ?? []} />
+        <EmailSmsTemplateGallery kind={activeTab} workspaceId={workspaceId} templates={templates ?? []} folders={folders ?? []} />
       </div>
     </div>
   );

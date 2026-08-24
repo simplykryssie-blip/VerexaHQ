@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { JotFormImportModal } from "@/components/settings/organizer-builder/JotFormImportModal";
 import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
+import type { LibraryFolderRow } from "@/components/library/types";
 import { slugify } from "@/lib/roleSlug";
 import { useToast } from "@/components/Toast";
 
@@ -16,6 +17,7 @@ export type OrganizerCard = {
   description: string | null;
   status: string;
   workspace_id: string | null;
+  folder_id: string | null;
   topLevelFieldCount: number;
   totalFieldCount: number;
 };
@@ -23,11 +25,13 @@ export type OrganizerCard = {
 export function OrganizerLibrary({
   workspaceId,
   templates,
+  folders,
   isJotformConnected,
   downlineWorkspaces,
 }: {
   workspaceId: string;
   templates: OrganizerCard[];
+  folders: LibraryFolderRow[];
   isJotformConnected: boolean;
   downlineWorkspaces: DownlineWorkspace[];
 }) {
@@ -48,6 +52,7 @@ export function OrganizerLibrary({
     description: t.description,
     status: t.status,
     isSystem: !t.workspace_id,
+    folder_id: t.folder_id,
     href: `/templates/organizers/${t.id}`,
     actionLabel: t.workspace_id ? "Edit" : "View",
     badges: [
@@ -55,6 +60,15 @@ export function OrganizerLibrary({
       ...(t.totalFieldCount !== t.topLevelFieldCount ? [`${t.totalFieldCount} total incl. repeats`] : []),
     ],
   }));
+
+  async function moveTemplate(card: GalleryCard, folderId: string | null) {
+    const { error } = await supabase.from("organizer_templates").update({ folder_id: folderId }).eq("id", card.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
 
   async function createTemplate(e: React.FormEvent) {
     e.preventDefault();
@@ -117,6 +131,9 @@ export function OrganizerLibrary({
       {importing && <JotFormImportModal workspaceId={workspaceId} isConnected={isJotformConnected} onClose={() => setImporting(false)} />}
 
       <TemplateGallery
+        workspaceId={workspaceId}
+        itemType="form_template"
+        folders={folders}
         cards={cards}
         icon={ClipboardList}
         statusTable="organizer_templates"
@@ -126,6 +143,7 @@ export function OrganizerLibrary({
         onCreateClick={() => setCreating(true)}
         onDeleteClick={deleteTemplate}
         onShareClick={downlineWorkspaces.length > 0 ? (card) => setSharingCard(card) : undefined}
+        onMoveClick={moveTemplate}
       />
 
       {sharingCard && (

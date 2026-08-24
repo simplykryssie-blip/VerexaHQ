@@ -20,7 +20,11 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
 
   const { data: engagementLetterTemplates } = !isOrganizers
-    ? await supabase.from("engagement_letter_templates").select("id, name, status, workspace_id, requires_signature, merge_fields").or(orFilter).order("name")
+    ? await supabase
+        .from("engagement_letter_templates")
+        .select("id, name, status, workspace_id, folder_id, requires_signature, merge_fields")
+        .or(orFilter)
+        .order("name")
     : { data: null };
 
   const engagementLetterCards: EngagementLetterCard[] = (engagementLetterTemplates ?? []).map((t) => ({
@@ -28,6 +32,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     name: t.name,
     status: t.status,
     workspace_id: t.workspace_id,
+    folder_id: t.folder_id,
     requires_signature: t.requires_signature,
     merge_field_count: Array.isArray(t.merge_fields) ? t.merge_fields.length : 0,
   }));
@@ -50,10 +55,18 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       description: t.description,
       status: t.status,
       workspace_id: t.workspace_id,
+      folder_id: t.folder_id,
       topLevelFieldCount: fieldsForTemplate.filter((f) => !f.parent_field_id).length,
       totalFieldCount: fieldsForTemplate.length,
     };
   });
+
+  const { data: folders } = await supabase
+    .from("library_folders")
+    .select("id, parent_folder_id, name")
+    .eq("workspace_id", workspaceId)
+    .eq("item_type", "form_template")
+    .order("name");
 
   const { data: jotformConnected } = isOrganizers ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId }) : { data: false };
 
@@ -133,11 +146,17 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
           <OrganizerLibrary
             workspaceId={workspaceId}
             templates={organizerCards}
+            folders={folders ?? []}
             isJotformConnected={Boolean(jotformConnected)}
             downlineWorkspaces={downlineWorkspaces}
           />
         ) : (
-          <EngagementLetterLibrary workspaceId={workspaceId} templates={engagementLetterCards} downlineWorkspaces={downlineWorkspaces} />
+          <EngagementLetterLibrary
+            workspaceId={workspaceId}
+            templates={engagementLetterCards}
+            folders={folders ?? []}
+            downlineWorkspaces={downlineWorkspaces}
+          />
         )}
       </div>
     </div>
