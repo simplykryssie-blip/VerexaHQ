@@ -12,22 +12,24 @@ export default async function WorkflowsPage() {
 
   const supabase = createClient();
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }] = await Promise.all([
-    supabase
-      .from("automations")
-      .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, created_at, automation_steps(id), automation_runs(id)")
-      .eq("workspace_id", workspace.id)
-      .order("created_at", { ascending: false }),
-    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
-    supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
-    supabase.from("services").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
-    supabase
-      .from("processes")
-      .select("id, name, process_stages(id, name, display_order)")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "published")
-      .order("name"),
-  ]);
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: folders }] =
+    await Promise.all([
+      supabase
+        .from("automations")
+        .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, folder_id, automation_steps(id), automation_runs(id)")
+        .eq("workspace_id", workspace.id)
+        .order("name"),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
+      supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+      supabase.from("services").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+      supabase
+        .from("processes")
+        .select("id, name, process_stages(id, name, display_order)")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "published")
+        .order("name"),
+      supabase.from("library_folders").select("id, parent_folder_id, name").eq("workspace_id", workspace.id).eq("item_type", "workflow").order("name"),
+    ]);
 
   const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
     id: a.id,
@@ -37,6 +39,7 @@ export default async function WorkflowsPage() {
     trigger_config: a.trigger_config as Record<string, unknown>,
     is_enabled: a.is_enabled,
     status: a.status,
+    folder_id: a.folder_id,
     step_count: (a.automation_steps as unknown as { id: string }[]).length,
     run_count: (a.automation_runs as unknown as { id: string }[]).length,
   }));
@@ -60,6 +63,7 @@ export default async function WorkflowsPage() {
         <WorkflowList
           workspaceId={workspace.id}
           workflows={rows}
+          folders={folders ?? []}
           canManage={Boolean(canManage)}
           organizerTemplates={organizerTemplates ?? []}
           services={services ?? []}

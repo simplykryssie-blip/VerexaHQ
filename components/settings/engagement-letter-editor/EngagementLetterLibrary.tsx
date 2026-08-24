@@ -6,6 +6,7 @@ import { FileSignature } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
+import type { LibraryFolderRow } from "@/components/library/types";
 import { slugify } from "@/lib/roleSlug";
 import { useToast } from "@/components/Toast";
 
@@ -14,6 +15,7 @@ export type EngagementLetterCard = {
   name: string;
   status: string;
   workspace_id: string | null;
+  folder_id: string | null;
   requires_signature: boolean;
   merge_field_count: number;
 };
@@ -21,10 +23,12 @@ export type EngagementLetterCard = {
 export function EngagementLetterLibrary({
   workspaceId,
   templates,
+  folders,
   downlineWorkspaces,
 }: {
   workspaceId: string;
   templates: EngagementLetterCard[];
+  folders: LibraryFolderRow[];
   downlineWorkspaces: DownlineWorkspace[];
 }) {
   const router = useRouter();
@@ -41,6 +45,7 @@ export function EngagementLetterLibrary({
     name: t.name,
     status: t.status,
     isSystem: !t.workspace_id,
+    folder_id: t.folder_id,
     href: `/templates/engagement-letters/${t.id}`,
     actionLabel: t.workspace_id ? "Edit" : "View",
     badges: [
@@ -48,6 +53,15 @@ export function EngagementLetterLibrary({
       `${t.merge_field_count} merge field${t.merge_field_count === 1 ? "" : "s"}`,
     ],
   }));
+
+  async function moveTemplate(card: GalleryCard, folderId: string | null) {
+    const { error } = await supabase.from("engagement_letter_templates").update({ folder_id: folderId }).eq("id", card.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
 
   async function createTemplate(e: React.FormEvent) {
     e.preventDefault();
@@ -103,6 +117,9 @@ export function EngagementLetterLibrary({
   return (
     <div>
       <TemplateGallery
+        workspaceId={workspaceId}
+        itemType="form_template"
+        folders={folders}
         cards={cards}
         icon={FileSignature}
         statusTable="engagement_letter_templates"
@@ -112,6 +129,7 @@ export function EngagementLetterLibrary({
         onCreateClick={() => setCreating(true)}
         onDeleteClick={deleteTemplate}
         onShareClick={downlineWorkspaces.length > 0 ? (card) => setSharingCard(card) : undefined}
+        onMoveClick={moveTemplate}
       />
 
       {sharingCard && (

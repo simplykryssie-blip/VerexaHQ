@@ -791,6 +791,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          folder_id: string | null
           id: string
           is_enabled: boolean
           name: string
@@ -808,6 +809,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           is_enabled?: boolean
           name: string
@@ -825,6 +827,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           is_enabled?: boolean
           name?: string
@@ -837,6 +840,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "automations_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "automations_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -2805,6 +2815,7 @@ export type Database = {
           category: string | null
           created_at: string
           created_by: string | null
+          folder_id: string | null
           id: string
           merge_fields: Json
           name: string
@@ -2820,6 +2831,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           merge_fields?: Json
           name: string
@@ -2835,6 +2847,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           merge_fields?: Json
           name?: string
@@ -2846,6 +2859,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "email_templates_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "email_templates_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -3010,6 +3030,7 @@ export type Database = {
           body_html: string
           created_at: string
           created_by: string | null
+          folder_id: string | null
           id: string
           is_public: boolean
           merge_fields: Json
@@ -3027,6 +3048,7 @@ export type Database = {
           body_html?: string
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           is_public?: boolean
           merge_fields?: Json
@@ -3044,6 +3066,7 @@ export type Database = {
           body_html?: string
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           is_public?: boolean
           merge_fields?: Json
@@ -3057,6 +3080,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "engagement_letter_templates_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "engagement_letter_templates_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -4374,6 +4404,54 @@ export type Database = {
           },
         ]
       }
+      library_folders: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_type: string
+          name: string
+          parent_folder_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_type: string
+          name: string
+          parent_folder_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_type?: string
+          name?: string
+          parent_folder_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_folders_parent_folder_id_fkey"
+            columns: ["parent_folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "library_folders_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_history: {
         Row: {
           created_at: string
@@ -5191,6 +5269,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          folder_id: string | null
           id: string
           is_public: boolean
           name: string
@@ -5206,6 +5285,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           is_public?: boolean
           name: string
@@ -5221,6 +5301,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           is_public?: boolean
           name?: string
@@ -5232,6 +5313,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "organizer_templates_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "organizer_templates_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -5902,6 +5990,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          folder_id: string | null
           id: string
           name: string
           slug: string
@@ -5913,6 +6002,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           name: string
           slug: string
@@ -5924,6 +6014,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           name?: string
           slug?: string
@@ -5932,6 +6023,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "processes_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "processes_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -6838,6 +6936,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           favicon_url: string | null
+          folder_id: string | null
           head_tracking_code: string | null
           id: string
           name: string
@@ -6851,6 +6950,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           favicon_url?: string | null
+          folder_id?: string | null
           head_tracking_code?: string | null
           id?: string
           name: string
@@ -6864,6 +6964,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           favicon_url?: string | null
+          folder_id?: string | null
           head_tracking_code?: string | null
           id?: string
           name?: string
@@ -6873,6 +6974,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "site_websites_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "site_websites_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -6957,6 +7065,7 @@ export type Database = {
           body: string
           created_at: string
           created_by: string | null
+          folder_id: string | null
           id: string
           merge_fields: Json
           name: string
@@ -6970,6 +7079,7 @@ export type Database = {
           body?: string
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           merge_fields?: Json
           name: string
@@ -6983,6 +7093,7 @@ export type Database = {
           body?: string
           created_at?: string
           created_by?: string | null
+          folder_id?: string | null
           id?: string
           merge_fields?: Json
           name?: string
@@ -6993,6 +7104,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sms_templates_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sms_templates_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -8942,6 +9060,7 @@ export type Database = {
         Args: { p_name: string; p_token: string; p_workspace_type?: string }
         Returns: string
       }
+      accept_platform_terms: { Args: { p_version: string }; Returns: undefined }
       accept_portal_invitation: { Args: { p_token: string }; Returns: string }
       accept_quote: { Args: { p_quote_id: string }; Returns: undefined }
       accept_workspace_invitation: {
@@ -9527,6 +9646,29 @@ export type Database = {
           workspace_type: string
         }[]
       }
+      get_platform_account_holders: {
+        Args: never
+        Returns: {
+          cancel_at_period_end: boolean
+          current_period_end: string
+          display_name: string
+          email: string
+          first_name: string
+          last_name: string
+          last_payment_amount_cents: number
+          last_payment_at: string
+          phone: string
+          plan_name: string
+          seat_count: number
+          stripe_status: string
+          user_id: string
+          workspace_created_at: string
+          workspace_id: string
+          workspace_name: string
+          workspace_status: string
+          workspace_type: string
+        }[]
+      }
       get_platform_staff_directory: {
         Args: never
         Returns: {
@@ -9542,6 +9684,18 @@ export type Database = {
       get_platform_system_credential_secret: {
         Args: { p_id: string }
         Returns: string
+      }
+      get_platform_terms_acceptance_status: {
+        Args: { p_version: string }
+        Returns: {
+          accepted: boolean
+          accepted_at: string
+          display_name: string
+          email: string
+          user_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
       }
       get_portal_client_contact: {
         Args: never
@@ -9621,6 +9775,10 @@ export type Database = {
       get_workspace_tags: {
         Args: { p_workspace_id: string }
         Returns: string[]
+      }
+      has_accepted_platform_terms: {
+        Args: { p_version: string }
+        Returns: boolean
       }
       has_completed_portal_basic_info: { Args: never; Returns: boolean }
       has_config_object_share_access: {
