@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { X, Plus } from "lucide-react";
+import { X, Plus, Check } from "lucide-react";
 import { ensureTagConfirmed } from "@/lib/ensureTag";
 
 export function TagsEditor({
@@ -34,19 +34,32 @@ export function TagsEditor({
     router.refresh();
   }
 
-  async function addTag(e: React.FormEvent) {
+  async function commitTag(raw: string) {
+    const tag = raw.trim();
+    setValue("");
+    setAdding(false);
+    if (!tag || tags.includes(tag)) return;
+    const confirmed = await ensureTagConfirmed(supabase, workspaceId, tag);
+    if (!confirmed) return;
+    await saveTags([...tags, tag]);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const tag = value.trim();
-    if (!tag || tags.includes(tag)) {
-      setValue("");
+    await commitTag(value);
+  }
+
+  // Picking a suggestion from the input's native datalist dropdown fills the
+  // box but doesn't submit the form -- only Enter (handleSubmit) did, so an
+  // existing tag chosen with the mouse had no way to actually get saved.
+  // Clicking away is now a save too (skipped quietly when the box is empty,
+  // i.e. just clicking away with nothing typed), matching the "Add" button.
+  async function handleBlur() {
+    if (!value.trim()) {
       setAdding(false);
       return;
     }
-    const confirmed = await ensureTagConfirmed(supabase, workspaceId, tag);
-    if (!confirmed) return;
-    setValue("");
-    setAdding(false);
-    await saveTags([...tags, tag]);
+    await commitTag(value);
   }
 
   async function removeTag(tag: string) {
@@ -71,16 +84,25 @@ export function TagsEditor({
       ))}
 
       {adding ? (
-        <form onSubmit={addTag} className="inline-flex items-center gap-1">
+        <form onSubmit={handleSubmit} className="inline-flex items-center gap-1">
           <input
             autoFocus
             list={`workspace-tags-${workspaceId}`}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            onBlur={() => !value.trim() && setAdding(false)}
+            onBlur={handleBlur}
             placeholder="Tag name"
             className="w-28 rounded-full border border-border px-2.5 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+          <button
+            type="submit"
+            onMouseDown={(e) => e.preventDefault()}
+            disabled={busy || !value.trim()}
+            aria-label="Save tag"
+            className="rounded-full bg-accent p-1 text-white hover:bg-accent/90 disabled:opacity-40"
+          >
+            <Check size={11} />
+          </button>
           <datalist id={`workspace-tags-${workspaceId}`}>
             {suggestions.filter((s) => !tags.includes(s)).map((s) => (
               <option key={s} value={s} />
