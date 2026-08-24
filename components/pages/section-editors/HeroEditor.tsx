@@ -7,10 +7,12 @@ type HeroConfig = { heading?: string; subheading?: string; background_image_url?
 
 export function HeroEditor({
   workspaceId,
+  websiteId,
   config,
   onChange,
 }: {
   workspaceId: string;
+  websiteId: string;
   config: HeroConfig;
   onChange: (patch: Partial<HeroConfig>) => void;
 }) {
@@ -26,6 +28,7 @@ export function HeroEditor({
       </label>
       <SectionImageUpload
         workspaceId={workspaceId}
+        websiteId={websiteId}
         value={config.background_image_url}
         onChange={(url) => onChange({ background_image_url: url ?? undefined })}
         label="Background image"

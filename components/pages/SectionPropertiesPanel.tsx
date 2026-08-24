@@ -9,15 +9,18 @@ import { LeadFormEditor } from "./section-editors/LeadFormEditor";
 import { CtaButtonEditor } from "./section-editors/CtaButtonEditor";
 import { SpacerEditor } from "./section-editors/SpacerEditor";
 import { FooterEditor } from "./section-editors/FooterEditor";
+import { CustomHtmlEditor } from "./section-editors/CustomHtmlEditor";
 
 export function SectionPropertiesPanel({
   workspaceId,
+  websiteId,
   section,
   onUpdate,
   workspaceServices,
   canAdvanceToNextPage,
 }: {
   workspaceId: string;
+  websiteId: string;
   section: BuilderSection | null;
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
   workspaceServices: WorkspaceServiceOption[];
@@ -39,11 +42,15 @@ export function SectionPropertiesPanel({
     <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">{SECTION_TYPE_LABELS[section.section_type]}</p>
       <div className="mt-3">
-        {section.section_type === "hero" && <HeroEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "hero" && <HeroEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />}
         {section.section_type === "rich_text" && <RichTextEditorSection config={section.config as never} onChange={onChange} />}
-        {section.section_type === "image" && <ImageEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
-        {section.section_type === "text_image" && <TextImageEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
-        {section.section_type === "testimonial" && <TestimonialEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "image" && <ImageEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "text_image" && (
+          <TextImageEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
+        )}
+        {section.section_type === "testimonial" && (
+          <TestimonialEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
+        )}
         {section.section_type === "faq" && <FaqEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "lead_form" && (
           <LeadFormEditor config={section.config as never} onChange={onChange} workspaceServices={workspaceServices} canAdvanceToNextPage={canAdvanceToNextPage} />
@@ -51,6 +58,7 @@ export function SectionPropertiesPanel({
         {section.section_type === "cta_button" && <CtaButtonEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "spacer" && <SpacerEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "footer" && <FooterEditor config={section.config as never} onChange={onChange} />}
+        {section.section_type === "custom_html" && <CustomHtmlEditor config={section.config as never} onChange={onChange} />}
       </div>
     </aside>
   );

@@ -8,7 +8,8 @@ export type SectionType =
   | "lead_form"
   | "cta_button"
   | "spacer"
-  | "footer";
+  | "footer"
+  | "custom_html";
 
 export type BuilderSection = {
   id: string;
@@ -40,6 +41,7 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   cta_button: "CTA button",
   spacer: "Spacer",
   footer: "Footer",
+  custom_html: "Custom HTML",
 };
 
 export const SECTION_TYPES: SectionType[] = [
@@ -53,4 +55,5 @@ export const SECTION_TYPES: SectionType[] = [
   "cta_button",
   "spacer",
   "footer",
+  "custom_html",
 ];

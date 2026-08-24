@@ -16,12 +16,16 @@ const DEBOUNCE_MS = 600;
 
 export function PageBuilder({
   workspaceSlug,
+  websiteId,
+  websiteSlug,
   page,
   initialSections,
   canManage,
   workspaceServices,
 }: {
   workspaceSlug: string;
+  websiteId: string;
+  websiteSlug: string;
   page: BuilderPage;
   initialSections: BuilderSection[];
   canManage: boolean;
@@ -102,13 +106,13 @@ export function PageBuilder({
     }, DEBOUNCE_MS);
   }
 
-  const liveUrl = `/site/${workspaceSlug}/${slug}`;
+  const liveUrl = `/site/${workspaceSlug}/${websiteSlug}/${slug}`;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-surface px-4">
-        <Link href="/pages" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
-          <ArrowLeft size={14} /> Pages
+        <Link href={`/websites/${websiteId}`} className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
+          <ArrowLeft size={14} /> Website
         </Link>
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-4">
           {canManage ? (
@@ -176,6 +180,7 @@ export function PageBuilder({
           {canManage && (
             <SectionPropertiesPanel
               workspaceId={page.workspace_id}
+              websiteId={websiteId}
               section={selectedSection}
               onUpdate={updateSectionConfig}
               workspaceServices={workspaceServices}

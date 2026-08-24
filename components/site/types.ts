@@ -7,6 +7,14 @@ export type SiteBranding = {
   display_name: string | null;
 } | null;
 
+export type SiteWebsiteInfo = {
+  id: string;
+  name: string;
+  favicon_url: string | null;
+  head_tracking_code: string | null;
+  body_tracking_code: string | null;
+};
+
 export type FunnelPageRef = { id: string; slug: string; title: string; position: number };
 export type SiteFunnel = { id: string; name: string; pages: FunnelPageRef[] } | null;
 
@@ -20,7 +28,8 @@ export type SectionType =
   | "lead_form"
   | "cta_button"
   | "spacer"
-  | "footer";
+  | "footer"
+  | "custom_html";
 
 export type SiteSection = {
   id: string;
@@ -33,6 +42,7 @@ export type SiteSection = {
 
 export type SitePageData = {
   workspace_id: string;
+  website: SiteWebsiteInfo;
   page: { id: string; title: string; meta_description: string | null };
   branding: SiteBranding;
   funnel: SiteFunnel;

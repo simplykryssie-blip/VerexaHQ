@@ -11,11 +11,13 @@ import { LeadFormSection } from "./sections/LeadFormSection";
 import { CtaButtonSection } from "./sections/CtaButtonSection";
 import { SpacerSection } from "./sections/SpacerSection";
 import { FooterSection } from "./sections/FooterSection";
+import { CustomHtmlSection } from "./sections/CustomHtmlSection";
 
 export function SectionRenderer({
   section,
   pageId,
   workspaceSlug,
+  websiteSlug,
   funnel,
   accentColor,
   firmName,
@@ -23,6 +25,7 @@ export function SectionRenderer({
   section: SiteSection;
   pageId: string;
   workspaceSlug: string;
+  websiteSlug: string;
   funnel: SiteFunnel;
   accentColor?: string;
   firmName: string | null;
@@ -47,6 +50,7 @@ export function SectionRenderer({
           pageId={pageId}
           sectionId={section.id}
           workspaceSlug={workspaceSlug}
+          websiteSlug={websiteSlug}
           funnel={funnel}
           accentColor={accentColor}
         />
@@ -57,6 +61,8 @@ export function SectionRenderer({
       return <SpacerSection config={section.config as never} />;
     case "footer":
       return <FooterSection config={section.config as never} firmName={firmName} />;
+    case "custom_html":
+      return <CustomHtmlSection config={section.config as never} />;
     default:
       return null;
   }
