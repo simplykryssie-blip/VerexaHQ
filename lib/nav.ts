@@ -24,6 +24,7 @@ import {
   Kanban,
   Tags,
   GraduationCap,
+  Globe,
   CreditCard,
   Wrench,
 } from "lucide-react";
@@ -49,6 +50,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
+  { label: "Pages", href: "/pages", icon: Globe },
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
@@ -75,7 +77,7 @@ export type NavSection = { label: string; items: NavItem[] };
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
-  { label: "Build", itemLabels: ["Pipelines", "Workflows", "Templates"] },
+  { label: "Build", itemLabels: ["Pipelines", "Workflows", "Pages", "Templates"] },
   { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
