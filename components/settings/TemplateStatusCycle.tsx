@@ -25,7 +25,9 @@ export function TemplateStatusCycle({
     | "pricing_rules"
     | "billing_rules"
     | "organizer_templates"
-    | "processes";
+    | "processes"
+    | "site_pages"
+    | "site_funnels";
   id: string;
   status: string;
 }) {
