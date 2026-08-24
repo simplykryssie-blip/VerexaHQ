@@ -19,9 +19,6 @@ export type WidgetType =
   | "quick_actions"
   | "calendar"
   | "recent_activity"
-  | "active_customers"
-  | "upcoming_renewals"
-  | "payment_failures"
   // Reserved in the DB constraint for future modules -- no live data
   // source yet, so nothing renders them today.
   | "returns_due"
@@ -42,9 +39,6 @@ export const IMPLEMENTED_WIDGET_TYPES: WidgetType[] = [
   "quick_actions",
   "calendar",
   "recent_activity",
-  "active_customers",
-  "upcoming_renewals",
-  "payment_failures",
 ];
 
 export function isWidgetType(value: string): value is WidgetType {

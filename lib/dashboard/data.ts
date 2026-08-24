@@ -1,19 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { getRangeBounds, type DashboardRange } from "@/lib/dashboard/range";
 
 export type KpiData = {
-  revenueInRange: number;
+  revenueThisMonth: number;
   openEngagements: number;
   tasksDueToday: number;
   outstandingInvoicesTotal: number;
   outstandingInvoicesCount: number;
   missingDocumentsCount: number;
   openClientMessages: number;
-  activeCustomers: number;
-  upcomingRenewalsCount: number;
-  upcomingRenewalsTotal: number;
-  paymentFailuresOpen: number;
-  paymentFailuresClosed: number;
 };
 
 export type OverdueTask = { id: string; title: string; due_date: string; engagement_id: string | null; client_id: string | null };
@@ -30,20 +24,17 @@ export type DashboardData = {
   reviewItems: ReviewItem[];
   recentActivity: ActivityItem[];
   calendarItems: CalendarItem[];
-  rangeLabel: string;
 };
 
-export async function getDashboardData(workspaceId: string, range: DashboardRange = "month"): Promise<DashboardData> {
+export async function getDashboardData(workspaceId: string): Promise<DashboardData> {
   const supabase = createClient();
-  const { start: rangeStart, end: rangeEnd, label: rangeLabel } = getRangeBounds(range);
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
-  // "Upcoming" renewals look forward from right now through the end of the
-  // selected period, not from the start of that period -- a renewal earlier
-  // this month that already happened isn't "upcoming".
-  const renewalsWindowStart = startOfToday < rangeEnd ? startOfToday : rangeEnd;
 
   const [
     { data: payments },
@@ -53,17 +44,13 @@ export async function getDashboardData(workspaceId: string, range: DashboardRang
     { data: openThreads },
     { data: activity },
     { data: workflowRuns },
-    { count: activeCustomers },
-    { data: upcomingRenewals },
-    { data: failedPayments },
   ] = await Promise.all([
     supabase
       .from("payments")
       .select("amount")
       .eq("workspace_id", workspaceId)
       .eq("status", "succeeded")
-      .gte("payment_date", rangeStart.toISOString())
-      .lt("payment_date", rangeEnd.toISOString()),
+      .gte("payment_date", startOfMonth.toISOString()),
     supabase
       .from("engagements")
       .select("id, service_id")
@@ -88,31 +75,9 @@ export async function getDashboardData(workspaceId: string, range: DashboardRang
       .order("created_at", { ascending: false })
       .limit(10),
     supabase.from("workflow_runs").select("id").eq("workspace_id", workspaceId),
-    supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("lifecycle_status", "active"),
-    supabase
-      .from("recurring_billing")
-      .select("id, amount, next_billing_date")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "active")
-      .gte("next_billing_date", renewalsWindowStart.toISOString().slice(0, 10))
-      .lte("next_billing_date", rangeEnd.toISOString().slice(0, 10)),
-    supabase
-      .from("payments")
-      .select("id, invoice_id, invoices(status)")
-      .eq("workspace_id", workspaceId)
-      .eq("status", "failed")
-      .gte("payment_date", rangeStart.toISOString())
-      .lt("payment_date", rangeEnd.toISOString()),
   ]);
 
-  const revenueInRange = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
-  const upcomingRenewalsTotal = (upcomingRenewals ?? []).reduce((sum, r) => sum + r.amount, 0);
-  // "Open" means the invoice that failed still hasn't been paid off since;
-  // "closed" means a later payment (a retry, usually) cleared it.
-  const paymentFailuresClosed = (failedPayments ?? []).filter(
-    (p) => (p.invoices as unknown as { status: string } | null)?.status === "paid"
-  ).length;
-  const paymentFailuresOpen = (failedPayments ?? []).length - paymentFailuresClosed;
+  const revenueThisMonth = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
 
   const tasks = allTasks ?? [];
   const overdueTasks = tasks.filter((t) => t.due_date && t.due_date < startOfToday.toISOString());
@@ -217,18 +182,13 @@ export async function getDashboardData(workspaceId: string, range: DashboardRang
 
   return {
     kpis: {
-      revenueInRange,
+      revenueThisMonth,
       openEngagements: openEngagementIds.length,
       tasksDueToday: dueTodayTasks.length,
       outstandingInvoicesTotal,
       outstandingInvoicesCount: invoiceRows.length,
       missingDocumentsCount,
       openClientMessages: openThreads?.length ?? 0,
-      activeCustomers: activeCustomers ?? 0,
-      upcomingRenewalsCount: (upcomingRenewals ?? []).length,
-      upcomingRenewalsTotal,
-      paymentFailuresOpen,
-      paymentFailuresClosed,
     },
     overdueTasks: overdueTasks as OverdueTask[],
     dueTodayTasks: dueTodayTasks as OverdueTask[],
@@ -236,6 +196,5 @@ export async function getDashboardData(workspaceId: string, range: DashboardRang
     reviewItems,
     recentActivity: activity ?? [],
     calendarItems,
-    rangeLabel,
   };
 }

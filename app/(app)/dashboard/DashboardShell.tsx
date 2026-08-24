@@ -2,22 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Settings2,
-  Eye,
-  EyeOff,
-  ArrowUp,
-  ArrowDown,
-  DollarSign,
-  Briefcase,
-  Receipt,
-  FileWarning,
-  MessageSquare,
-  ListChecks,
-  Users,
-  RefreshCw,
-  CreditCard,
-} from "lucide-react";
+import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
 import { KpiWidget } from "@/components/widgets/KpiWidget";
@@ -33,7 +18,6 @@ import { OnboardingChecklist, type OnboardingStep } from "@/components/onboardin
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
 import { isWidgetType, type WidgetType } from "@/lib/dashboard/widgets";
-import { DASHBOARD_RANGES, type DashboardRange } from "@/lib/dashboard/range";
 
 export type WidgetRow = { id: string; widget_type: string; title: string | null; display_order: number; is_visible: boolean };
 
@@ -51,7 +35,6 @@ export function DashboardShell({
   workspaceId,
   onboardingSteps,
   seenOnboardingSteps,
-  range,
 }: {
   workspaceName: string;
   /** Only gates the "Invite Staff" quick action (see quickActionPermissions
@@ -66,7 +49,6 @@ export function DashboardShell({
   /** null once dismissed or already computed away -- render nothing. */
   onboardingSteps: OnboardingStep[] | null;
   seenOnboardingSteps: string[];
-  range: DashboardRange;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -129,47 +111,12 @@ export function DashboardShell({
       case "revenue":
         return (
           <KpiWidget
-            title={`Revenue -- ${data.rangeLabel}`}
-            value={money(data.kpis.revenueInRange)}
+            title="Revenue This Month"
+            value={money(data.kpis.revenueThisMonth)}
             icon={DollarSign}
             chip="emerald"
             reportHref="/reports/financial"
           />
-        );
-      case "active_customers":
-        return <KpiWidget title="Active Customers" value={String(data.kpis.activeCustomers)} icon={Users} chip="accent" reportHref="/clients" />;
-      case "upcoming_renewals":
-        return (
-          <KpiWidget
-            title={`Upcoming Renewals -- ${data.rangeLabel}`}
-            value={`${data.kpis.upcomingRenewalsCount} (${money(data.kpis.upcomingRenewalsTotal)})`}
-            icon={RefreshCw}
-            chip="violet"
-            reportHref="/billing"
-          />
-        );
-      case "payment_failures":
-        return (
-          <WidgetShell title={`Payment Failures -- ${data.rangeLabel}`} reportHref="/reports/financial">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-roseSoft text-rose">
-                  <CreditCard size={17} aria-hidden="true" />
-                </span>
-                <p className="text-xs uppercase tracking-wide text-muted">Open</p>
-                <p className={`mt-1 font-display text-2xl font-semibold tabular-nums ${data.kpis.paymentFailuresOpen > 0 ? "text-danger" : "text-ink"}`}>
-                  {data.kpis.paymentFailuresOpen}
-                </p>
-              </div>
-              <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-surfaceMuted text-muted">
-                  <CreditCard size={17} aria-hidden="true" />
-                </span>
-                <p className="text-xs uppercase tracking-wide text-muted">Closed</p>
-                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ink">{data.kpis.paymentFailuresClosed}</p>
-              </div>
-            </div>
-          </WidgetShell>
         );
       case "kpis":
         return (
@@ -239,38 +186,16 @@ export function DashboardShell({
         title="Dashboard"
         description={`Welcome back to ${workspaceName}.`}
         actions={
-          <div className="flex items-center gap-3">
-            <div role="group" aria-label="Date range" className="flex items-center rounded-lg border border-border p-0.5">
-              {DASHBOARD_RANGES.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  aria-pressed={range === r.value}
-                  onClick={() => {
-                    if (r.value === range) return;
-                    const params = new URLSearchParams(window.location.search);
-                    params.set("range", r.value);
-                    router.push(`?${params.toString()}`);
-                  }}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                    range === r.value ? "bg-accent text-white" : "text-slate hover:bg-surfaceMuted"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setCustomizing((v) => !v)}
-              aria-pressed={customizing}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
-              }`}
-            >
-              <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setCustomizing((v) => !v)}
+            aria-pressed={customizing}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
+            }`}
+          >
+            <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
+          </button>
         }
       />
 

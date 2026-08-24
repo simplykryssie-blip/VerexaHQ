@@ -6,14 +6,12 @@ import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
 import { DashboardShell } from "./DashboardShell";
 import type { OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
-import { isDashboardRange } from "@/lib/dashboard/range";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ searchParams }: { searchParams: { range?: string } }) {
+export default async function DashboardPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
-  const range = isDashboardRange(searchParams.range) ? searchParams.range : "month";
 
   const supabase = createClient();
 
@@ -52,7 +50,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
           .eq("dashboard_id", dashboardId)
           .order("display_order")
       : Promise.resolve({ data: [] }),
-    getDashboardData(workspace.id, range),
+    getDashboardData(workspace.id),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
@@ -218,7 +216,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: { 
       workspaceId={workspace.id}
       onboardingSteps={onboardingDismissed ? null : onboardingSteps}
       seenOnboardingSteps={profileRow?.seen_onboarding_steps ?? []}
-      range={range}
     />
   );
 }
