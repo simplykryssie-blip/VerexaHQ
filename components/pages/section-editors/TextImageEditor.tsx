@@ -8,10 +8,12 @@ type TextImageConfig = { heading?: string; html?: string; image_url?: string; im
 
 export function TextImageEditor({
   workspaceId,
+  websiteId,
   config,
   onChange,
 }: {
   workspaceId: string;
+  websiteId: string;
   config: TextImageConfig;
   onChange: (patch: Partial<TextImageConfig>) => void;
 }) {
@@ -27,7 +29,12 @@ export function TextImageEditor({
           <RichTextEditor content={config.html ?? ""} onChange={(html) => onChange({ html })} bare />
         </div>
       </div>
-      <SectionImageUpload workspaceId={workspaceId} value={config.image_url} onChange={(url) => onChange({ image_url: url ?? undefined })} />
+      <SectionImageUpload
+        workspaceId={workspaceId}
+        websiteId={websiteId}
+        value={config.image_url}
+        onChange={(url) => onChange({ image_url: url ?? undefined })}
+      />
       <label className={labelClass}>
         Image position
         <select

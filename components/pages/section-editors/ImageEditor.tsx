@@ -7,16 +7,23 @@ type ImageConfig = { image_url?: string; alt_text?: string; caption?: string; al
 
 export function ImageEditor({
   workspaceId,
+  websiteId,
   config,
   onChange,
 }: {
   workspaceId: string;
+  websiteId: string;
   config: ImageConfig;
   onChange: (patch: Partial<ImageConfig>) => void;
 }) {
   return (
     <div className="space-y-3">
-      <SectionImageUpload workspaceId={workspaceId} value={config.image_url} onChange={(url) => onChange({ image_url: url ?? undefined })} />
+      <SectionImageUpload
+        workspaceId={workspaceId}
+        websiteId={websiteId}
+        value={config.image_url}
+        onChange={(url) => onChange({ image_url: url ?? undefined })}
+      />
       <label className={labelClass}>
         Alt text
         <input value={config.alt_text ?? ""} onChange={(e) => onChange({ alt_text: e.target.value })} className={inputClass} />
