@@ -1807,6 +1807,7 @@ export type Database = {
           itin_last4: string | null
           last_name: string | null
           lifecycle_status: string
+          lost_at: string | null
           lost_reason: string | null
           merged_into_client_id: string | null
           middle_name: string | null
@@ -1858,6 +1859,7 @@ export type Database = {
           itin_last4?: string | null
           last_name?: string | null
           lifecycle_status?: string
+          lost_at?: string | null
           lost_reason?: string | null
           merged_into_client_id?: string | null
           middle_name?: string | null
@@ -1909,6 +1911,7 @@ export type Database = {
           itin_last4?: string | null
           last_name?: string | null
           lifecycle_status?: string
+          lost_at?: string | null
           lost_reason?: string | null
           merged_into_client_id?: string | null
           middle_name?: string | null
@@ -10177,6 +10180,10 @@ export type Database = {
       review_request_corrections: {
         Args: { p_comment: string; p_engagement_share_id: string }
         Returns: undefined
+      }
+      revoke_expired_portal_access: {
+        Args: never
+        Returns: number
       }
       revoke_workspace_user: {
         Args: { p_user_id: string; p_workspace_id: string }
