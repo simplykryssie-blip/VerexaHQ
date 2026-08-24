@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { LEGAL_VERSION } from "@/lib/legal";
 
 export const dynamic = "force-static";
 
@@ -7,7 +8,16 @@ export const metadata: Metadata = {
   description: "The terms governing use of Verexa HQ CRM.",
 };
 
-const EFFECTIVE_DATE = "August 18, 2026";
+// Derived from LEGAL_VERSION (not a separate date) so this page can never
+// drift from what the mandatory acceptance gate actually checks against --
+// bumping LEGAL_VERSION is what makes existing account holders get
+// re-prompted, so the displayed date has to be the same value.
+const EFFECTIVE_DATE = new Date(`${LEGAL_VERSION}T00:00:00Z`).toLocaleDateString("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

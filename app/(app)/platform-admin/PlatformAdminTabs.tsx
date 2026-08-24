@@ -2,6 +2,9 @@ import Link from "next/link";
 
 const TABS = [
   { href: "/platform-admin", label: "Overview", key: "overview" },
+  { href: "/platform-admin/accounts", label: "Accounts", key: "accounts" },
+  { href: "/platform-admin/agreements", label: "Agreements", key: "agreements" },
+  { href: "/platform-admin/review", label: "Review Queue", key: "review" },
   { href: "/platform-admin/billing", label: "Billing", key: "billing" },
   { href: "/platform-admin/systems", label: "Systems", key: "systems" },
 ] as const;
