@@ -10003,7 +10003,11 @@ export type Database = {
         Returns: undefined
       }
       set_organizer_response_review_status: {
-        Args: { p_note?: string; p_response_id: string; p_status: Database["public"]["Enums"]["review_status"] }
+        Args: {
+          p_note?: string
+          p_response_id: string
+          p_status: Database["public"]["Enums"]["review_status"]
+        }
         Returns: undefined
       }
       set_platform_admin: {
@@ -10230,6 +10234,7 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: {
+          cancel_at_period_end: boolean
           card_funding_type: string | null
           created_at: string
           current_period_end: string | null
