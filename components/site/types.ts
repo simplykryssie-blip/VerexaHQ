@@ -20,7 +20,8 @@ export type SectionType =
   | "lead_form"
   | "cta_button"
   | "spacer"
-  | "footer";
+  | "footer"
+  | "custom_html";
 
 export type SiteSection = {
   id: string;

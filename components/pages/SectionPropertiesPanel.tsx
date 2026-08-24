@@ -9,6 +9,7 @@ import { LeadFormEditor } from "./section-editors/LeadFormEditor";
 import { CtaButtonEditor } from "./section-editors/CtaButtonEditor";
 import { SpacerEditor } from "./section-editors/SpacerEditor";
 import { FooterEditor } from "./section-editors/FooterEditor";
+import { CustomHtmlEditor } from "./section-editors/CustomHtmlEditor";
 
 export function SectionPropertiesPanel({
   workspaceId,
@@ -51,6 +52,7 @@ export function SectionPropertiesPanel({
         {section.section_type === "cta_button" && <CtaButtonEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "spacer" && <SpacerEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "footer" && <FooterEditor config={section.config as never} onChange={onChange} />}
+        {section.section_type === "custom_html" && <CustomHtmlEditor config={section.config as never} onChange={onChange} />}
       </div>
     </aside>
   );
