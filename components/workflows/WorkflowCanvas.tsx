@@ -409,6 +409,7 @@ function CanvasInner({
   pipelines,
   staffOptions,
   automationOptions,
+  tagOptions = [],
   onEditTrigger,
   onOpenRun,
 }: {
@@ -430,6 +431,7 @@ function CanvasInner({
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
+  tagOptions?: string[];
   onEditTrigger: () => void;
   onOpenRun: (runId: string) => void;
 }) {
@@ -916,6 +918,7 @@ function CanvasInner({
               pipelines={pipelines}
               staffOptions={staffOptions}
               automationOptions={automationOptions}
+              tagOptions={tagOptions}
               canManage={canManage}
               onSaved={() => {
                 router.refresh();
@@ -946,6 +949,7 @@ function CanvasInner({
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}
+              tagOptions={tagOptions}
               canManage={canManage}
               onSaved={() => router.refresh()}
               onClose={() => setActiveConditionStepId(null)}

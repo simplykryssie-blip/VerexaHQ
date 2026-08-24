@@ -42,20 +42,20 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
     howItWorks: "Once connected, the rest of the app can use them automatically -- e.g. invoices get a real \"Pay now\" link, and appointments can include a Zoom meeting link.",
     howToSetUp: "Go to Settings > Integrations and connect Stripe and/or Zoom. Both are optional and can be set up whenever you're ready.",
   },
-  service: {
-    whatItDoes: "A pipeline is the stages a piece of work moves through -- e.g. \"Info gathered\" -> \"In prep\" -> \"Review\" -> \"Delivered.\" Every engagement you open moves through one.",
-    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or engagement letter to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
-    howToSetUp: "Go to Pipelines, create one, and add its stages. Nothing about opening an engagement requires a service first.",
+  security: {
+    whatItDoes: "Your account password and two-factor authentication protect your login, while the workspace security policy sets password, session, and lockout rules for everyone in your firm.",
+    howItWorks: "Two-factor authentication (an authenticator app code) is checked in addition to your password every time you sign in. The workspace policy applies automatically to every staff member's login -- no per-person setup needed once it's set.",
+    howToSetUp: "Go to Settings > Security, turn on two-factor authentication for your own account, and review the workspace's password, session, and lockout policy.",
   },
   organizer: {
     whatItDoes: "An intake form (organizer) is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
     howItWorks: "Once a client submits it, their answers show up on their engagement automatically, and you can route different forms to different services if one form covers more than one type of work.",
     howToSetUp: "Go to Templates, create a new organizer, add the questions you need, then attach it to a service's stage so it's pre-selected when staff send it from an engagement at that stage.",
   },
-  client: {
-    whatItDoes: "This is your client record -- the person or business you do work for. Everything else (engagements, documents, invoices, messages) lives underneath a client.",
-    howItWorks: "Once a client exists, you can open an engagement for them right away -- attach a pipeline (or a service, if you want billing bundled in) now or later.",
-    howToSetUp: "Go to Contacts, click New Client, and fill in their basic info. You can add a real client or a test one just to see how the workflow feels end to end.",
+  pipeline: {
+    whatItDoes: "A pipeline is the stages a piece of work moves through -- e.g. \"Info gathered\" -> \"In prep\" -> \"Review\" -> \"Delivered.\" Every engagement you open moves through one.",
+    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or engagement letter to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
+    howToSetUp: "Go to Pipelines, create one, and add its stages. Nothing about opening an engagement requires a service first.",
   },
   invite: {
     whatItDoes: "Inviting your team gives staff their own login to this workspace, with a role that controls what they can see and do.",

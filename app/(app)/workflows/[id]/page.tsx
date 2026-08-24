@@ -49,6 +49,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     staffMembers,
     { data: otherAutomations },
     { data: serviceCategoriesRaw },
+    { data: tagRows },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -129,6 +130,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .select("id, name")
         .eq("workspace_id", workspace.id)
         .order("name"),
+      supabase.from("workspace_tags").select("name").eq("workspace_id", workspace.id).order("name"),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -180,6 +182,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
 
   const serviceCategories: TemplateOption[] = serviceCategoriesRaw ?? [];
 
+  const tagOptions: string[] = (tagRows ?? []).map((t) => t.name);
+
   return (
     <>
       <div className="flex items-start justify-between gap-4 border-b border-border bg-surface px-8 py-6">
@@ -213,6 +217,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           pipelines={pipelines}
           staffOptions={staffOptions}
           automationOptions={automationOptions}
+          tagOptions={tagOptions}
           conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
           webhookToken={automation.webhook_token}
         />

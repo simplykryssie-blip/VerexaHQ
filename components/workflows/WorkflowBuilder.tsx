@@ -59,6 +59,7 @@ import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
+import { TagNameInput } from "@/components/workflows/TagNameInput";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
 export type StaffOption = { id: string; display_name: string | null };
@@ -215,6 +216,7 @@ export function StepCard({
   pipelines,
   staffOptions,
   automationOptions,
+  tagOptions = [],
   canManage,
   onSaved,
   hideReorder,
@@ -233,6 +235,7 @@ export function StepCard({
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
+  tagOptions?: string[];
   canManage: boolean;
   onSaved: () => void;
   hideReorder?: boolean;
@@ -1420,10 +1423,11 @@ export function StepCard({
         {(actionType === "add_tag" || actionType === "remove_tag") && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
             Tag
-            <input
+            <TagNameInput
               disabled={!canManage}
               value={(config.tag as string) ?? ""}
-              onChange={(e) => setField("tag", e.target.value)}
+              onChange={(v) => setField("tag", v)}
+              tagOptions={tagOptions}
               className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             />
           </label>
@@ -1564,6 +1568,7 @@ export function WorkflowBuilder({
   pipelines = [],
   staffOptions = [],
   automationOptions = [],
+  tagOptions = [],
   conditions: initialConditions = [],
   webhookToken,
 }: {
@@ -1587,6 +1592,7 @@ export function WorkflowBuilder({
   pipelines?: PipelineOption[];
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
+  tagOptions?: string[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
 }) {
@@ -1664,6 +1670,7 @@ export function WorkflowBuilder({
             pipelines={pipelines}
             staffOptions={staffOptions}
             automationOptions={automationOptions}
+            tagOptions={tagOptions}
             onEditTrigger={() => setTriggerModalOpen(true)}
             onOpenRun={(runId) => setOpenRunId(runId)}
           />
@@ -1698,6 +1705,7 @@ export function WorkflowBuilder({
               organizerTemplates={organizerTemplates}
               services={services}
               pipelines={pipelines}
+              tagOptions={tagOptions}
               webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
               disabled={!canManage}
             />
@@ -1712,6 +1720,7 @@ export function WorkflowBuilder({
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
+                tagOptions={tagOptions}
                 disabled={!canManage}
               />
             </div>

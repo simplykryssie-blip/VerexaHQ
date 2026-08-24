@@ -12,7 +12,7 @@ export default async function WorkflowsPage() {
 
   const supabase = createClient();
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: folders }] =
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: folders }, { data: tagRows }] =
     await Promise.all([
       supabase
         .from("automations")
@@ -29,6 +29,7 @@ export default async function WorkflowsPage() {
         .eq("status", "published")
         .order("name"),
       supabase.from("library_folders").select("id, parent_folder_id, name").eq("workspace_id", workspace.id).eq("item_type", "workflow").order("name"),
+      supabase.from("workspace_tags").select("name").eq("workspace_id", workspace.id).order("name"),
     ]);
 
   const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
@@ -68,6 +69,7 @@ export default async function WorkflowsPage() {
           organizerTemplates={organizerTemplates ?? []}
           services={services ?? []}
           pipelines={pipelines}
+          tagOptions={(tagRows ?? []).map((t) => t.name)}
         />
       </div>
     </>

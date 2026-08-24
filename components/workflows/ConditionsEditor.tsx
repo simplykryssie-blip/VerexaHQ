@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
 import type { StaffOption } from "@/components/workflows/WorkflowBuilder";
+import { TagNameInput } from "@/components/workflows/TagNameInput";
 
 // `join` describes how this condition combines with the one before it in
 // the list (ignored on the first condition) -- evaluated strictly left to
@@ -62,6 +63,7 @@ type ValueKind =
   | "pipeline_stage"
   | "organizer_status"
   | "text"
+  | "tag"
   | "number"
   | "boolean";
 
@@ -145,7 +147,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.lifecycle_status", label: "Lead / client status", group: "Lead & client", valueKind: "lead_stage", ops: LIST_OPS },
   { key: "client.client_type", label: "Client type", group: "Lead & client", valueKind: "select", options: CLIENT_TYPE_OPTIONS, ops: LIST_OPS },
   { key: "client.relationship_manager_id", label: "Assigned staff (lead/client)", group: "Lead & client", valueKind: "staff", ops: ID_OPS },
-  { key: "client.tags", label: "Has tag", group: "Lead & client", valueKind: "text", ops: SELECT_OPS },
+  { key: "client.tags", label: "Has tag", group: "Lead & client", valueKind: "tag", ops: SELECT_OPS },
   { key: "client.service_category_id", label: "Requested category", group: "Lead & client", valueKind: "category", ops: SELECT_OPS },
   { key: "client.service_id", label: "Requested service", group: "Lead & client", valueKind: "service", ops: SELECT_OPS },
   { key: "client.source", label: "Lead source", group: "Lead & client", valueKind: "select", options: CLIENT_SOURCE_OPTIONS, ops: SELECT_OPS },
@@ -186,6 +188,7 @@ function ConditionRow({
   serviceCategories,
   pipelines,
   organizerTemplates,
+  tagOptions,
   disabled,
 }: {
   condition: Condition;
@@ -196,6 +199,7 @@ function ConditionRow({
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
+  tagOptions: string[];
   disabled: boolean;
 }) {
   const meta = fieldMeta(condition.field);
@@ -421,6 +425,10 @@ function ConditionRow({
             <input disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass} placeholder="Value" />
           )}
 
+          {meta.valueKind === "tag" && (
+            <TagNameInput disabled={disabled} value={condition.value} onChange={setValue} tagOptions={tagOptions} placeholder="Tag" className={inputClass} />
+          )}
+
           {meta.valueKind === "number" && (
             <input
               disabled={disabled}
@@ -459,6 +467,7 @@ export function ConditionsEditor({
   serviceCategories,
   pipelines,
   organizerTemplates,
+  tagOptions = [],
   disabled,
 }: {
   conditions: Condition[];
@@ -468,6 +477,7 @@ export function ConditionsEditor({
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
+  tagOptions?: string[];
   disabled?: boolean;
 }) {
   function addCondition() {
@@ -522,6 +532,7 @@ export function ConditionsEditor({
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
+                tagOptions={tagOptions}
                 disabled={Boolean(disabled)}
               />
             </div>
@@ -550,6 +561,7 @@ export function ConditionGroupsEditor({
   serviceCategories,
   pipelines,
   organizerTemplates,
+  tagOptions = [],
   disabled,
 }: {
   groups: ConditionGroup[];
@@ -559,6 +571,7 @@ export function ConditionGroupsEditor({
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
+  tagOptions?: string[];
   disabled?: boolean;
 }) {
   function addGroup() {
@@ -620,6 +633,7 @@ export function ConditionGroupsEditor({
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}
+              tagOptions={tagOptions}
               disabled={disabled}
             />
           </div>

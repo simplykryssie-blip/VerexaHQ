@@ -97,18 +97,17 @@ export default async function DashboardPage() {
   if (!onboardingDismissed) {
     const showEroSteps = canInviteStaff(workspace);
     const [
-      { count: serviceCount },
       { count: organizerCount },
-      { count: clientCount },
+      { count: processCount },
       { count: staffCount },
       { count: pendingInviteCount },
       { count: automationCount },
       { count: customRoleCount },
       { count: connectionCount },
+      { count: securityPolicyCount },
     ] = await Promise.all([
-      supabase.from("services").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
-      supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
+      supabase.from("processes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
       showEroSteps
         ? supabase.from("workspace_users").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id)
         : Promise.resolve({ count: null }),
@@ -126,6 +125,7 @@ export default async function DashboardPage() {
       showEroSteps
         ? supabase.from("firm_connections").select("id", { count: "exact", head: true }).eq("parent_workspace_id", workspace.id)
         : Promise.resolve({ count: null }),
+      supabase.from("workspace_security_policies").select("workspace_id", { count: "exact", head: true }).eq("workspace_id", workspace.id),
     ]);
 
     // A photo is nice-to-have, not a gate -- a name is enough to call the profile "done".
@@ -145,25 +145,11 @@ export default async function DashboardPage() {
       ...(showEroSteps
         ? [
             {
-              key: "invite",
-              label: "Add users",
-              description: "Add staff so they can share the workload.",
-              href: "/settings/users",
-              complete: (staffCount ?? 0) > 1 || (pendingInviteCount ?? 0) > 0,
-            },
-            {
               key: "roles",
               label: "Set roles & permissions",
               description: "Control what each role on your team can see and do.",
               href: "/settings/roles",
               complete: (customRoleCount ?? 0) > 0,
-            },
-            {
-              key: "connections",
-              label: "Send connections",
-              description: "Invite the PTINs you work with to connect to your ERO.",
-              href: "/settings/connections",
-              complete: (connectionCount ?? 0) > 0,
             },
           ]
         : []),
@@ -175,29 +161,47 @@ export default async function DashboardPage() {
         complete: Boolean(onboardingRow?.stripe_connected_account_id),
       },
       {
-        key: "service",
-        label: "Turn on your first service",
-        description: "Choose which services your firm offers and customize the pipeline for each one.",
-        href: "/settings/services",
-        complete: (serviceCount ?? 0) > 0,
+        key: "security",
+        label: "Review your security setup",
+        description: "Set a password policy and turn on two-factor authentication for your own account.",
+        href: "/settings/security",
+        complete: (securityPolicyCount ?? 0) > 0,
       },
+      ...(showEroSteps
+        ? [
+            {
+              key: "invite",
+              label: "Add staff",
+              description: "Add staff so they can share the workload.",
+              href: "/settings/users",
+              complete: (staffCount ?? 0) > 1 || (pendingInviteCount ?? 0) > 0,
+            },
+            {
+              key: "connections",
+              label: "Send connection invites",
+              description: "Invite the PTINs you work with to connect to your ERO.",
+              href: "/settings/connections",
+              complete: (connectionCount ?? 0) > 0,
+            },
+          ]
+        : []),
       {
         key: "organizer",
-        label: "Add a client intake form",
+        label: "Add or create organizers",
         description: "Build the questions clients answer before you start their work.",
         href: "/templates",
         complete: (organizerCount ?? 0) > 0,
       },
       {
-        key: "client",
-        label: "Add your first client",
-        description: "Bring in a real or test client to see the workflow end to end.",
-        href: "/clients",
-        complete: (clientCount ?? 0) > 0,
+        key: "pipeline",
+        label: "Create a pipeline",
+        description: "Build the stages a piece of work moves through, from intake to delivered.",
+        href: "/pipelines",
+        complete: (processCount ?? 0) > 0,
       },
       {
         key: "automations",
-        label: "Set up your automations",
+        label: "Create your automations",
         description: "Decide what happens automatically -- welcome emails, sending an organizer, moving a client into a pipeline.",
         href: "/workflows",
         complete: (automationCount ?? 0) > 0,
