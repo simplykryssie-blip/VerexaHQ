@@ -11,6 +11,12 @@ type LeadFormConfig = {
   fields?: { first_name?: boolean; last_name?: boolean; phone?: boolean };
   services?: { id: string; name: string }[];
   button_label?: string;
+  /** CSS background value for the section itself -- e.g. a dark funnel page can pass a color/gradient so this section doesn't show the page's default white. Omitted everywhere else, so existing pages are unaffected. */
+  background?: string;
+  /** CSS background value for the submit button, overriding the plain accentColor fill -- lets a themed page use the same gradient as its other buttons. */
+  button_background?: string;
+  /** Text color for the submit button -- the default white reads poorly against a bright button_background gradient. */
+  button_text_color?: string;
   on_submit?: {
     action?: "next_page" | "custom_url" | "inline_thank_you";
     custom_url?: string;
@@ -93,15 +99,22 @@ export function LeadFormSection({
 
   if (done) {
     return (
-      <section className="mx-auto max-w-lg px-6 py-16 text-center">
-        <h2 className="text-2xl font-semibold text-ink">{config.on_submit?.thank_you_heading || "Thanks!"}</h2>
-        <p className="mt-2 text-muted">{config.on_submit?.thank_you_body || "We'll be in touch soon."}</p>
+      <section style={config.background ? { background: config.background } : undefined}>
+        <div className="mx-auto max-w-lg px-6 py-16 text-center">
+          <h2 className={config.background ? "text-2xl font-semibold" : "text-2xl font-semibold text-ink"} style={config.background ? { color: "#f1f5f9" } : undefined}>
+            {config.on_submit?.thank_you_heading || "Thanks!"}
+          </h2>
+          <p className={config.background ? "mt-2" : "mt-2 text-muted"} style={config.background ? { color: "#93a3b8" } : undefined}>
+            {config.on_submit?.thank_you_body || "We'll be in touch soon."}
+          </p>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="mx-auto max-w-lg px-6 py-12">
+    <section style={config.background ? { background: config.background } : undefined}>
+      <div className="mx-auto max-w-lg px-6 py-12">
       <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
         {config.heading && <h2 className="text-xl font-semibold text-ink">{config.heading}</h2>}
         {config.subheading && <p className="mt-1 text-sm text-muted">{config.subheading}</p>}
@@ -157,12 +170,16 @@ export function LeadFormSection({
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-            style={{ backgroundColor: accentColor || "#0f172a" }}
+            className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-60"
+            style={{
+              background: config.button_background || accentColor || "#0f172a",
+              color: config.button_text_color || "#ffffff",
+            }}
           >
             {submitting ? "Sending..." : config.button_label || "Submit"}
           </button>
         </form>
+      </div>
       </div>
     </section>
   );

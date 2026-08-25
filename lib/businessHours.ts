@@ -37,11 +37,19 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
+function toIsoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 // `date` is a plain local calendar day (midnight); returns candidate slot
 // start times as Date objects for that day, spaced by `gridMinutes` and
 // each guaranteed to fit a `durationMinutes`-long appointment before
 // closing -- before existing appointments/lead time are subtracted out.
-export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: number, durationMinutes: number): Date[] {
+// `holidays` are 'YYYY-MM-DD' strings (same system_settings shape the
+// business-hours due-date engine reads) -- a holiday closes the day
+// entirely regardless of its normal weekly hours.
+export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: number, durationMinutes: number, holidays: string[] = []): Date[] {
+  if (holidays.includes(toIsoDate(date))) return [];
   const dayKey = WEEKDAYS[date.getDay()];
   const day = hours[dayKey];
   if (!day) return [];

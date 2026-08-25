@@ -58,6 +58,7 @@ type Props = {
   supportedFilingStates: string[];
   initialHours: BusinessHours;
   initialSlotMinutes: number;
+  initialHolidays: string[];
 };
 
 function LabeledInput({
@@ -114,6 +115,7 @@ export function FirmProfileForm({
   supportedFilingStates,
   initialHours,
   initialSlotMinutes,
+  initialHolidays,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -149,6 +151,8 @@ export function FirmProfileForm({
 
   const [hours, setHours] = useState<BusinessHours>(initialHours);
   const [slotMinutes, setSlotMinutes] = useState(initialSlotMinutes);
+  const [holidays, setHolidays] = useState<string[]>(initialHolidays);
+  const [newHoliday, setNewHoliday] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +162,16 @@ export function FirmProfileForm({
       ...prev,
       [day]: patch === null ? null : { ...(prev[day] ?? { start: "09:00", end: "17:00" }), ...patch },
     }));
+  }
+
+  function addHoliday() {
+    if (!newHoliday || holidays.includes(newHoliday)) return;
+    setHolidays((prev) => [...prev, newHoliday].sort());
+    setNewHoliday("");
+  }
+
+  function removeHoliday(date: string) {
+    setHolidays((prev) => prev.filter((d) => d !== date));
   }
 
   async function uploadLogo(file: File) {
@@ -209,7 +223,10 @@ export function FirmProfileForm({
           .upsert({ workspace_id: workspaceId, key: "business_hours", value: hours }, { onConflict: "workspace_id,key" }),
         supabase
           .from("system_settings")
-          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" })
+          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" }),
+        supabase
+          .from("system_settings")
+          .upsert({ workspace_id: workspaceId, key: "holidays", value: holidays }, { onConflict: "workspace_id,key" })
       );
     }
     if (isOwner) {
@@ -578,6 +595,49 @@ export function FirmProfileForm({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-sm font-medium text-ink">Holidays / office closures</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Dates the office is closed regardless of the day of week -- skipped by both due-date calculations and client
+            self-booking.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {holidays.length === 0 && <span className="text-sm text-muted">No holidays added yet.</span>}
+            {holidays.map((date) => (
+              <span
+                key={date}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surfaceMuted px-3 py-1 text-sm text-ink"
+              >
+                {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
+                <button
+                  type="button"
+                  onClick={() => removeHoliday(date)}
+                  aria-label={`Remove ${date}`}
+                  className="text-muted hover:text-danger"
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              type="date"
+              value={newHoliday}
+              onChange={(e) => setNewHoliday(e.target.value)}
+              className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <button
+              type="button"
+              onClick={addHoliday}
+              disabled={!newHoliday}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surfaceMuted disabled:opacity-60"
+            >
+              Add
+            </button>
+          </div>
         </div>
       </SettingsCard>
       )}

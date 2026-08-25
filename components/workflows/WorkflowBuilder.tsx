@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -55,6 +55,9 @@ import {
 } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
+import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
@@ -239,7 +242,13 @@ export function StepCard({
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const [actionType, setActionType] = useState(step.action_type);
+  // business_hours_delay is a real, separate action_type in the DB (its own
+  // scheduling math via compute_business_hours_deadline) but isn't in
+  // ACTION_TYPES -- there's no reason to make staff pick a second "action"
+  // for what reads as the same "Wait / Delay" step, so it's presented as a
+  // toggle on that step instead, and only swapped in at save time.
+  const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
+  const [useBusinessHours, setUseBusinessHours] = useState(step.action_type === "business_hours_delay");
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
   const [delayUnit, setDelayUnit] = useState<"minutes" | "days">(step.action_config?.delay_unit === "days" ? "days" : "minutes");
   const [delayValue, setDelayValue] = useState(() => {
@@ -266,6 +275,11 @@ export function StepCard({
   // Organizer/engagement letter templates need their full builder page to get
   // real content -- point staff at it right after the quick-create stub saves.
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
+  const taskTitleRef = useRef<HTMLInputElement>(null);
+  const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
+  const notificationMessageRef = useRef<HTMLTextAreaElement>(null);
+  const quoteTitleRef = useRef<HTMLInputElement>(null);
+  const quoteNotesRef = useRef<HTMLTextAreaElement>(null);
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -316,12 +330,19 @@ export function StepCard({
     setSaving(true);
     setError(null);
     const isDelay = actionType === "delay";
-    const delayMinutes = isDelay ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
+    const isDurationMode = !config.wait_mode || config.wait_mode === "duration";
+    const savesAsBusinessHours = isDelay && isDurationMode && useBusinessHours;
+    const effectiveActionType = savesAsBusinessHours ? "business_hours_delay" : actionType;
+    const delayMinutes =
+      isDelay && !savesAsBusinessHours ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
+    const configToSave = savesAsBusinessHours
+      ? { hours: (config.hours as string) ?? "24" }
+      : ((isDelay ? { ...config, delay_unit: delayUnit } : config) as never);
     const { error: updateError } = await supabase
       .from("automation_steps")
       .update({
-        action_type: actionType,
-        action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
+        action_type: effectiveActionType,
+        action_config: configToSave as never,
         delay_minutes: delayMinutes,
       })
       .eq("id", step.id);
@@ -418,35 +439,82 @@ export function StepCard({
         )}
 
         {actionType === "delay" && (!config.wait_mode || config.wait_mode === "duration") && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Wait for
-            <div className="flex gap-1.5">
-              <input
-                disabled={!canManage}
-                type="number"
-                min={0}
-                value={delayValue}
-                onChange={(e) => {
-                  setDelayValue(e.target.value);
-                  setSaved(false);
-                }}
-                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-              <select
-                disabled={!canManage}
-                value={delayUnit}
-                onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="minutes">Minutes</option>
-                <option value="days">Days</option>
-              </select>
-            </div>
-            <span className="mt-1 text-[11px] normal-case text-muted">
-              Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle from
-              the step that should finish first, and its bottom handle to whichever step should run once the wait is over.
-            </span>
-          </label>
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Count as
+              <div className="flex gap-4 pt-1">
+                {([
+                  { value: false, label: "Regular time" },
+                  { value: true, label: "Business hours" },
+                ] as const).map((opt) => (
+                  <label key={String(opt.value)} className="flex items-center gap-1.5 text-sm text-ink">
+                    <input
+                      type="radio"
+                      disabled={!canManage}
+                      checked={useBusinessHours === opt.value}
+                      onChange={() => {
+                        setUseBusinessHours(opt.value);
+                        setSaved(false);
+                      }}
+                      className="border-border text-accent focus:ring-accent disabled:opacity-60"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </label>
+
+            {useBusinessHours ? (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Wait for (business hours)
+                <input
+                  disabled={!canManage}
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={(config.hours as string) ?? ""}
+                  onChange={(e) => setField("hours", e.target.value)}
+                  placeholder="24"
+                  className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                />
+                <span className="mt-1 text-[11px] normal-case text-muted">
+                  Only counts hours inside the firm&apos;s configured business hours (Settings &rarr; Firm Profile) -- nights,
+                  weekends, and office closures don&apos;t count toward this wait.
+                </span>
+              </label>
+            ) : (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Wait for
+                <div className="flex gap-1.5">
+                  <input
+                    disabled={!canManage}
+                    type="number"
+                    min={0}
+                    value={delayValue}
+                    onChange={(e) => {
+                      setDelayValue(e.target.value);
+                      setSaved(false);
+                    }}
+                    className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                  />
+                  <select
+                    disabled={!canManage}
+                    value={delayUnit}
+                    onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
+                    className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                <span className="mt-1 text-[11px] normal-case text-muted">
+                  Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle
+                  from the step that should finish first, and its bottom handle to whichever step should run once the wait is
+                  over.
+                </span>
+              </label>
+            )}
+          </>
         )}
 
         {actionType === "delay" && config.wait_mode === "until_date" && (
@@ -639,26 +707,48 @@ export function StepCard({
 
         {actionType === "create_task" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Task title
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Task title</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) => insertAtFieldCursor(taskTitleRef.current, (config.title as string) ?? "", token, (v) => setField("title", v))}
+                  />
+                )}
+              </div>
               <input
+                ref={taskTitleRef}
                 disabled={!canManage}
                 value={(config.title as string) ?? ""}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="Automated task"
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Description
+            </div>
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Description</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) =>
+                      insertAtFieldCursor(taskDescriptionRef.current, (config.description as string) ?? "", token, (v) => setField("description", v))
+                    }
+                  />
+                )}
+              </div>
               <textarea
+                ref={taskDescriptionRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.description as string) ?? ""}
                 onChange={(e) => setField("description", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -1105,16 +1195,28 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Message
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Message</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) =>
+                      insertAtFieldCursor(notificationMessageRef.current, (config.message as string) ?? "", token, (v) => setField("message", v))
+                    }
+                  />
+                )}
+              </div>
               <textarea
+                ref={notificationMessageRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.message as string) ?? ""}
                 onChange={(e) => setField("message", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
           </>
         )}
 
@@ -1316,16 +1418,26 @@ export function StepCard({
 
         {actionType === "create_quote" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Title</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) => insertAtFieldCursor(quoteTitleRef.current, (config.title as string) ?? "", token, (v) => setField("title", v))}
+                  />
+                )}
+              </div>
               <input
+                ref={quoteTitleRef}
                 disabled={!canManage}
                 value={(config.title as string) ?? ""}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="Quote"
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Service
               <select
@@ -1354,16 +1466,26 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Notes
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Notes</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) => insertAtFieldCursor(quoteNotesRef.current, (config.notes as string) ?? "", token, (v) => setField("notes", v))}
+                  />
+                )}
+              </div>
               <textarea
+                ref={quoteNotesRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.notes as string) ?? ""}
                 onChange={(e) => setField("notes", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
           </>
         )}
 
