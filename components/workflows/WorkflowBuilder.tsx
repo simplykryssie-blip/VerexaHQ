@@ -242,7 +242,13 @@ export function StepCard({
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const [actionType, setActionType] = useState(step.action_type);
+  // business_hours_delay is a real, separate action_type in the DB (its own
+  // scheduling math via compute_business_hours_deadline) but isn't in
+  // ACTION_TYPES -- there's no reason to make staff pick a second "action"
+  // for what reads as the same "Wait / Delay" step, so it's presented as a
+  // toggle on that step instead, and only swapped in at save time.
+  const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
+  const [useBusinessHours, setUseBusinessHours] = useState(step.action_type === "business_hours_delay");
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
   const [delayUnit, setDelayUnit] = useState<"minutes" | "days">(step.action_config?.delay_unit === "days" ? "days" : "minutes");
   const [delayValue, setDelayValue] = useState(() => {
@@ -324,12 +330,19 @@ export function StepCard({
     setSaving(true);
     setError(null);
     const isDelay = actionType === "delay";
-    const delayMinutes = isDelay ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
+    const isDurationMode = !config.wait_mode || config.wait_mode === "duration";
+    const savesAsBusinessHours = isDelay && isDurationMode && useBusinessHours;
+    const effectiveActionType = savesAsBusinessHours ? "business_hours_delay" : actionType;
+    const delayMinutes =
+      isDelay && !savesAsBusinessHours ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
+    const configToSave = savesAsBusinessHours
+      ? { hours: (config.hours as string) ?? "24" }
+      : ((isDelay ? { ...config, delay_unit: delayUnit } : config) as never);
     const { error: updateError } = await supabase
       .from("automation_steps")
       .update({
-        action_type: actionType,
-        action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
+        action_type: effectiveActionType,
+        action_config: configToSave as never,
         delay_minutes: delayMinutes,
       })
       .eq("id", step.id);
@@ -426,35 +439,82 @@ export function StepCard({
         )}
 
         {actionType === "delay" && (!config.wait_mode || config.wait_mode === "duration") && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Wait for
-            <div className="flex gap-1.5">
-              <input
-                disabled={!canManage}
-                type="number"
-                min={0}
-                value={delayValue}
-                onChange={(e) => {
-                  setDelayValue(e.target.value);
-                  setSaved(false);
-                }}
-                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-              <select
-                disabled={!canManage}
-                value={delayUnit}
-                onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="minutes">Minutes</option>
-                <option value="days">Days</option>
-              </select>
-            </div>
-            <span className="mt-1 text-[11px] normal-case text-muted">
-              Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle from
-              the step that should finish first, and its bottom handle to whichever step should run once the wait is over.
-            </span>
-          </label>
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Count as
+              <div className="flex gap-4 pt-1">
+                {([
+                  { value: false, label: "Regular time" },
+                  { value: true, label: "Business hours" },
+                ] as const).map((opt) => (
+                  <label key={String(opt.value)} className="flex items-center gap-1.5 text-sm text-ink">
+                    <input
+                      type="radio"
+                      disabled={!canManage}
+                      checked={useBusinessHours === opt.value}
+                      onChange={() => {
+                        setUseBusinessHours(opt.value);
+                        setSaved(false);
+                      }}
+                      className="border-border text-accent focus:ring-accent disabled:opacity-60"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </label>
+
+            {useBusinessHours ? (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Wait for (business hours)
+                <input
+                  disabled={!canManage}
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={(config.hours as string) ?? ""}
+                  onChange={(e) => setField("hours", e.target.value)}
+                  placeholder="24"
+                  className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                />
+                <span className="mt-1 text-[11px] normal-case text-muted">
+                  Only counts hours inside the firm&apos;s configured business hours (Settings &rarr; Firm Profile) -- nights,
+                  weekends, and office closures don&apos;t count toward this wait.
+                </span>
+              </label>
+            ) : (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Wait for
+                <div className="flex gap-1.5">
+                  <input
+                    disabled={!canManage}
+                    type="number"
+                    min={0}
+                    value={delayValue}
+                    onChange={(e) => {
+                      setDelayValue(e.target.value);
+                      setSaved(false);
+                    }}
+                    className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                  />
+                  <select
+                    disabled={!canManage}
+                    value={delayUnit}
+                    onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
+                    className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                <span className="mt-1 text-[11px] normal-case text-muted">
+                  Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle
+                  from the step that should finish first, and its bottom handle to whichever step should run once the wait is
+                  over.
+                </span>
+              </label>
+            )}
+          </>
         )}
 
         {actionType === "delay" && config.wait_mode === "until_date" && (

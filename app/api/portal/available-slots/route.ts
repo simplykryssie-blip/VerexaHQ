@@ -44,9 +44,16 @@ export async function GET(request: Request) {
     .eq("workspace_id", identity.workspaceId)
     .eq("key", "booking_slot_minutes")
     .maybeSingle();
+  const { data: holidaysSetting } = await supabase
+    .from("system_settings")
+    .select("value")
+    .eq("workspace_id", identity.workspaceId)
+    .eq("key", "holidays")
+    .maybeSingle();
 
   const businessHours = (hoursSetting?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
+  const holidays = (holidaysSetting?.value as string[] | undefined) ?? [];
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
 
   const dayStart = new Date(date);
@@ -66,7 +73,7 @@ export async function GET(request: Request) {
   // effort, never blocks booking if a calendar connection can't be reached.
   const externalBusy = await getExternalBusyBlocks(supabase, identity.workspaceId, dayStart.toISOString(), dayEnd.toISOString());
 
-  const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes);
+  const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes, holidays);
   const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], new Date());
 
   return NextResponse.json({ slots: available.map((s) => s.toISOString()), durationMinutes });
