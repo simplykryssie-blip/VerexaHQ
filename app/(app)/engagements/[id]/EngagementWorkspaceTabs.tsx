@@ -18,7 +18,6 @@ import { TaskRow } from "./TaskRow";
 import { AddEngagementNoteForm, EditEngagementNoteForm } from "./AddEngagementNoteForm";
 import { AddTaskForm } from "./AddTaskForm";
 import { StageReviewActions } from "./StageReviewActions";
-import { EfileDecisionActions } from "./EfileDecisionActions";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
@@ -227,7 +226,7 @@ function clientLabel(c: { client_type: string; first_name: string | null; last_n
 
 // -------------------------------------------------------------------- Workflow
 
-export function WorkflowTab({ stages, engagementId, workspaceId }: { stages: StageRow[]; engagementId: string; workspaceId: string }) {
+export function WorkflowTab({ stages }: { stages: StageRow[] }) {
   return (
     <Section title="Workflow stages">
       {stages.length === 0 ? (
@@ -256,13 +255,7 @@ export function WorkflowTab({ stages, engagementId, workspaceId }: { stages: Sta
                   <td className="px-4 py-2 text-slate">{staffName(s.reviewer)}</td>
                   <td className="px-4 py-2 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
                   <td className="px-4 py-2">
-                    {s.status !== "Completed" &&
-                      s.status !== "Skipped" &&
-                      (s.stage_name === "Filed / Awaiting Acceptance" ? (
-                        <EfileDecisionActions stageId={s.id} engagementId={engagementId} workspaceId={workspaceId} />
-                      ) : (
-                        <StageReviewActions stageId={s.id} />
-                      ))}
+                    {s.status !== "Completed" && s.status !== "Skipped" && <StageReviewActions stageId={s.id} />}
                   </td>
                 </tr>
               ))}

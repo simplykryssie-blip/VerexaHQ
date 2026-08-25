@@ -138,7 +138,11 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     { data: canShare },
     { data: activeEroConnection },
   ] = await Promise.all([
-    supabase.from("workflow_runs").select("id, status, started_at, completed_at").eq("engagement_id", engagement.id),
+    supabase
+      .from("pipeline_runs")
+      .select("id, status, started_at, completed_at")
+      .eq("entity_type", "engagement")
+      .eq("entity_id", engagement.id),
     supabase
       .from("tasks")
       .select(
@@ -214,12 +218,12 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
   const [{ data: stages }, { data: slaRows }] = await Promise.all([
     workflowRunIds.length > 0
       ? supabase
-          .from("workflow_stages")
+          .from("pipeline_stages")
           .select(
             `id, stage_name, status, due_date, started_at, completed_at, display_order, process_stage_id,
-            reviewer:user_profiles!workflow_stages_reviewer_id_fkey(id, display_name)`
+            reviewer:user_profiles!pipeline_stages_reviewer_id_fkey(id, display_name)`
           )
-          .in("workflow_run_id", workflowRunIds)
+          .in("pipeline_run_id", workflowRunIds)
           .order("display_order")
       : Promise.resolve({ data: [] as any[] }),
     workflowRunIds.length > 0
@@ -229,7 +233,10 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const slaByStage = new Map((slaRows ?? []).map((s: any) => [s.workflow_stage_id, s.sla_category as string]));
 
-  const stagesWithSla = (stages ?? []).map((s: any) => ({ ...s, sla_category: slaByStage.get(s.id) ?? null }));
+  const stagesWithSla = (stages ?? []).map((s: any) => ({
+    ...s,
+    sla_category: slaByStage.get(s.id) ?? null,
+  }));
 
   const taskIds = (tasks ?? []).map((t) => t.id);
   const { data: dependencies } =

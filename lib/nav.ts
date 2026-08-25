@@ -122,6 +122,17 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
       { label: "Workflows", href: "/workflows" },
     ],
   },
+  // Verexa HQ also runs its own public marketing site, so unlike Tax
+  // Office (genuinely irrelevant to a platform-admin workspace), Websites
+  // stays reachable here too.
+  {
+    label: "Websites",
+    icon: Globe,
+    children: [
+      { label: "Websites", href: "/websites" },
+      { label: "Funnels", href: "/funnels" },
+    ],
+  },
   {
     label: "Templates",
     icon: LayoutTemplate,
