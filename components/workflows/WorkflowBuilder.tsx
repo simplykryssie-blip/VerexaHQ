@@ -272,6 +272,8 @@ export function StepCard({
   const taskTitleRef = useRef<HTMLInputElement>(null);
   const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
   const notificationMessageRef = useRef<HTMLTextAreaElement>(null);
+  const quoteTitleRef = useRef<HTMLInputElement>(null);
+  const quoteNotesRef = useRef<HTMLTextAreaElement>(null);
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -1356,16 +1358,26 @@ export function StepCard({
 
         {actionType === "create_quote" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Title</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) => insertAtFieldCursor(quoteTitleRef.current, (config.title as string) ?? "", token, (v) => setField("title", v))}
+                  />
+                )}
+              </div>
               <input
+                ref={quoteTitleRef}
                 disabled={!canManage}
                 value={(config.title as string) ?? ""}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="Quote"
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Service
               <select
@@ -1394,16 +1406,26 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Notes
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Notes</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) => insertAtFieldCursor(quoteNotesRef.current, (config.notes as string) ?? "", token, (v) => setField("notes", v))}
+                  />
+                )}
+              </div>
               <textarea
+                ref={quoteNotesRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.notes as string) ?? ""}
                 onChange={(e) => setField("notes", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
           </>
         )}
 
