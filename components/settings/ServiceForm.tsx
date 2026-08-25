@@ -83,8 +83,6 @@ export function ServiceForm({
   organizerTemplates,
   documentRequestTemplates,
   documentFolderTemplates,
-  pricingRules,
-  billingRules,
   canManage,
 }: {
   service: ServiceRow;
@@ -93,8 +91,6 @@ export function ServiceForm({
   organizerTemplates: Option[];
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
-  pricingRules: Option[];
-  billingRules: Option[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -112,12 +108,6 @@ export function ServiceForm({
   const [organizerTemplateId, setOrganizerTemplateId] = useState(service.organizer_template_id ?? "");
   const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
-  const [pricingRuleId, setPricingRuleId] = useState(service.pricing_rule_id ?? "");
-  const [billingRuleId, setBillingRuleId] = useState(service.billing_rule_id ?? "");
-  const [defaultPrice, setDefaultPrice] = useState(service.default_price != null ? String(service.default_price) : "");
-  const [estimatedDuration, setEstimatedDuration] = useState(
-    service.estimated_duration_minutes != null ? String(service.estimated_duration_minutes) : ""
-  );
   const [displayOrder, setDisplayOrder] = useState(String(service.display_order));
   const [isBookable, setIsBookable] = useState(service.is_bookable);
   const [isPortalVisible, setIsPortalVisible] = useState(service.is_portal_visible);
@@ -175,10 +165,6 @@ export function ServiceForm({
         organizer_template_id: organizerTemplateId || null,
         document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
-        pricing_rule_id: pricingRuleId || null,
-        billing_rule_id: billingRuleId || null,
-        default_price: defaultPrice.trim() ? Number(defaultPrice) : null,
-        estimated_duration_minutes: estimatedDuration.trim() ? Number(estimatedDuration) : null,
         display_order: Number(displayOrder) || 0,
         is_bookable: isBookable,
         is_portal_visible: isPortalVisible,
@@ -307,41 +293,6 @@ export function ServiceForm({
             noneLabel="No document folder template"
             disabled={!canManage}
           />
-        </label>
-      </div>
-
-      <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pricing &amp; billing</p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <label className={labelClass}>
-            Default price
-            <input
-              type="number"
-              step="0.01"
-              value={defaultPrice}
-              onChange={(e) => markDirty(setDefaultPrice)(e.target.value)}
-              disabled={!canManage}
-              className={inputClass}
-            />
-          </label>
-          <label className={labelClass}>
-            Estimated duration (minutes)
-            <input
-              type="number"
-              value={estimatedDuration}
-              onChange={(e) => markDirty(setEstimatedDuration)(e.target.value)}
-              disabled={!canManage}
-              className={inputClass}
-            />
-          </label>
-        </div>
-        <label className={`${labelClass} mt-3`}>
-          Pricing rule
-          <OptionSelect value={pricingRuleId} onChange={markDirty(setPricingRuleId)} options={pricingRules} noneLabel="No pricing rule" disabled={!canManage} />
-        </label>
-        <label className={`${labelClass} mt-3`}>
-          Billing rule
-          <OptionSelect value={billingRuleId} onChange={markDirty(setBillingRuleId)} options={billingRules} noneLabel="No billing rule" disabled={!canManage} />
         </label>
       </div>
 
