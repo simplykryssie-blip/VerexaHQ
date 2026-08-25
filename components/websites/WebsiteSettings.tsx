@@ -324,6 +324,11 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
             {domainVerified && domainVerifiedAt && (
               <p className="text-[11px] text-muted">Verified {new Date(domainVerifiedAt).toLocaleString()}.</p>
             )}
+            {!domainVerified && (
+              <p className="text-[11px] text-muted">
+                This is also checked automatically every 15 minutes -- no need to keep clicking Verify DNS.
+              </p>
+            )}
 
             {verifyResult && (
               <div className="rounded-lg border border-border bg-canvas p-3">
