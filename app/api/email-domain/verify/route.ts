@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { getResendDomain, verifyResendDomain } from "@/lib/email/domains";
+import { syncResendDomainStatus } from "@/lib/email/domains";
 
 export async function POST() {
   const workspace = await getCurrentWorkspace();
@@ -24,19 +24,18 @@ export async function POST() {
     return NextResponse.json({ error: "No sending domain configured for this workspace." }, { status: 404 });
   }
 
-  await verifyResendDomain(existing.resend_domain_id);
-  const result = await getResendDomain(existing.resend_domain_id);
-  if (!result.ok) {
-    return NextResponse.json({ error: result.reason }, { status: 502 });
+  const sync = await syncResendDomainStatus(existing.resend_domain_id);
+  if (!sync.ok) {
+    return NextResponse.json({ error: sync.reason }, { status: 502 });
   }
 
-  const status = result.data.status === "verified" ? "verified" : result.data.status === "failed" ? "failed" : "pending";
   const { data: row, error } = await supabase
     .from("workspace_email_domains")
     .update({
-      status,
-      dns_records: result.data.records,
-      verified_at: status === "verified" ? new Date().toISOString() : null,
+      domain: sync.data.domain,
+      status: sync.data.status,
+      dns_records: sync.data.dns_records,
+      verified_at: sync.data.status === "verified" ? new Date().toISOString() : null,
     })
     .eq("id", existing.id)
     .select()

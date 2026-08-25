@@ -63,6 +63,14 @@
     {
       "path": "/api/cron/send-pending-portal-invites",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/verify-pending-website-domains",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/verify-pending-email-domains",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

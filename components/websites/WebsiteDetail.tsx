@@ -13,6 +13,9 @@ type Website = {
   favicon_url: string | null;
   head_tracking_code: string | null;
   body_tracking_code: string | null;
+  custom_domain: string | null;
+  domain_verified: boolean;
+  domain_verified_at: string | null;
 };
 
 const TABS = ["pages", "media", "settings"] as const;
