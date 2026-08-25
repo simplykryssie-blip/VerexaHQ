@@ -196,15 +196,21 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   for (const [clientId, names] of requestedServicesByClient) {
     requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
-  const stageNameByClient = new Map<string, string>();
+  // A client can have simultaneous active runs in different pipelines (e.g.
+  // Tax + Bookkeeping at once), so this shows every stage they're currently
+  // on, not just whichever run happens to be returned last.
+  const stageNamesByClient = new Map<string, string[]>();
   for (const run of activeRuns ?? []) {
     const stageName = (run.lead_pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
-    if (stageName) stageNameByClient.set(run.client_id, stageName);
+    if (!stageName) continue;
+    const list = stageNamesByClient.get(run.client_id) ?? [];
+    if (!list.includes(stageName)) list.push(stageName);
+    stageNamesByClient.set(run.client_id, list);
   }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
-    stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
+    stageLabel: c.lifecycle_status === "lead" ? (stageNamesByClient.get(c.id)?.join(", ") ?? null) : null,
   }));
 
   const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""]
