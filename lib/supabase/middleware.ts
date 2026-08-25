@@ -55,6 +55,13 @@ export async function updateSession(request: NextRequest) {
     const audiencePublicPaths = isPortalPath ? PORTAL_PUBLIC_PATHS : STAFF_PUBLIC_PATHS;
     const isPublicPath =
       isApiPath ||
+      // Exact match only -- every path starts with "/", so this can't join
+      // ALWAYS_PUBLIC_PATHS's startsWith list without making everything public.
+      // The bare root now renders its own marketing page for signed-out
+      // visitors (app/page.tsx) and redirects signed-in ones to /dashboard
+      // itself, so it must reach that component instead of being bounced to
+      // /login here first.
+      pathname === "/" ||
       ALWAYS_PUBLIC_PATHS.some((path) => pathname.startsWith(path)) ||
       audiencePublicPaths.some((path) => pathname.startsWith(path));
 
