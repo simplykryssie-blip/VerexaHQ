@@ -123,14 +123,15 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   // at once), each in its own pipeline, so every active run is surfaced
   // rather than assuming there's only ever one.
   const { data: activeLeadRuns } = await supabase
-    .from("lead_pipeline_runs")
-    .select("id, process_id, processes(name), lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(stage_name)")
-    .eq("client_id", client.id)
+    .from("pipeline_runs")
+    .select("id, process_id, processes(name), pipeline_stages!pipeline_runs_current_stage_fkey(stage_name)")
+    .eq("entity_type", "client")
+    .eq("entity_id", client.id)
     .eq("status", "Active");
   const leadPipelines = (activeLeadRuns ?? []).map((run) => ({
     processId: run.process_id,
     processName: (run.processes as unknown as { name?: string } | null)?.name ?? null,
-    stageName: (run.lead_pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name ?? null,
+    stageName: (run.pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name ?? null,
   }));
 
   // Staff need to see not just that an automation touched this lead/client

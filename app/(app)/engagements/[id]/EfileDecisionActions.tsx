@@ -6,11 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
 // Renders in place of the generic StageReviewActions "Approve" button on
-// the "Filed / Awaiting Acceptance" stage only. Recording accepted/rejected
-// here (rather than a plain approve) is what lets
-// advance_workflow_on_stage_completed() skip the "Rejected / Correction
-// Needed" stage for returns that were actually accepted -- without this,
-// every filed return silently passes through a stage labeled "Rejected."
+// whichever stage is flagged process_stages.stage_role = 'efile_decision'.
+// Recording accepted/rejected here (rather than a plain approve) is what lets
+// advance_pipeline_on_stage_completed() skip the stage flagged
+// stage_role = 'efile_rejected' for returns that were actually accepted --
+// without this, every filed return silently passes through a rejection stage.
 export function EfileDecisionActions({
   stageId,
   engagementId,
@@ -48,7 +48,7 @@ export function EfileDecisionActions({
     }
 
     const { error: stageError } = await supabase
-      .from("workflow_stages")
+      .from("pipeline_stages")
       .update({ status: "Completed", completed_at: new Date().toISOString() })
       .eq("id", stageId);
     setPending(false);

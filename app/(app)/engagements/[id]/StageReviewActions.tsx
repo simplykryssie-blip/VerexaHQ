@@ -16,7 +16,7 @@ export function StageReviewActions({ stageId, label = "Approve" }: { stageId: st
     setPending(true);
     setError(null);
     const { error } = await supabase
-      .from("workflow_stages")
+      .from("pipeline_stages")
       .update({ status: "Completed", completed_at: new Date().toISOString() })
       .eq("id", stageId);
     setPending(false);

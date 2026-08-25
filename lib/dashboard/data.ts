@@ -74,7 +74,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(10),
-    supabase.from("workflow_runs").select("id").eq("workspace_id", workspaceId),
+    supabase.from("pipeline_runs").select("id").eq("workspace_id", workspaceId).eq("entity_type", "engagement"),
   ]);
 
   const revenueThisMonth = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
@@ -130,7 +130,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     const { data: queue } = await supabase.from("v_reviewer_queue").select("*").in(
       "workflow_stage_id",
       (
-        await supabase.from("workflow_stages").select("id").in("workflow_run_id", runIds)
+        await supabase.from("pipeline_stages").select("id").in("pipeline_run_id", runIds)
       ).data?.map((s) => s.id) ?? []
     );
     if (queue && queue.length > 0) {

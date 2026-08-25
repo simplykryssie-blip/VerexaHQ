@@ -447,13 +447,6 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
-            foreignKeyName: "automation_execution_logs_workflow_run_id_fkey"
-            columns: ["workflow_run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "automation_execution_logs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -4075,138 +4068,6 @@ export type Database = {
           },
         ]
       }
-      lead_pipeline_runs: {
-        Row: {
-          client_id: string
-          completed_at: string | null
-          created_at: string | null
-          current_stage_id: string | null
-          id: string
-          process_id: string
-          started_at: string | null
-          status: string | null
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          client_id: string
-          completed_at?: string | null
-          created_at?: string | null
-          current_stage_id?: string | null
-          id?: string
-          process_id: string
-          started_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          client_id?: string
-          completed_at?: string | null
-          created_at?: string | null
-          current_stage_id?: string | null
-          id?: string
-          process_id?: string
-          started_at?: string | null
-          status?: string | null
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_pipeline_runs_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_pipeline_runs_current_stage_fkey"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "lead_pipeline_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_pipeline_runs_process_id_fkey"
-            columns: ["process_id"]
-            isOneToOne: false
-            referencedRelation: "processes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_pipeline_runs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lead_pipeline_stages: {
-        Row: {
-          completed_at: string | null
-          created_at: string | null
-          display_order: number
-          id: string
-          lead_pipeline_run_id: string
-          process_stage_id: string
-          stage_name: string
-          started_at: string | null
-          status: Database["public"]["Enums"]["workflow_stage_status"] | null
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string | null
-          display_order: number
-          id?: string
-          lead_pipeline_run_id: string
-          process_stage_id: string
-          stage_name: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string | null
-          display_order?: number
-          id?: string
-          lead_pipeline_run_id?: string
-          process_stage_id?: string
-          stage_name?: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_pipeline_stages_lead_pipeline_run_id_fkey"
-            columns: ["lead_pipeline_run_id"]
-            isOneToOne: false
-            referencedRelation: "lead_pipeline_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_pipeline_stages_process_stage_id_fkey"
-            columns: ["process_stage_id"]
-            isOneToOne: false
-            referencedRelation: "process_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_pipeline_stages_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       learning_courses: {
         Row: {
           created_at: string
@@ -5710,6 +5571,192 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_runs: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          current_stage_id: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          paused_at: string | null
+          process_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_run_status"]
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          paused_at?: string | null
+          process_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"]
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          paused_at?: string | null
+          process_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"]
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_runs_current_stage_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_current_stage_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["workflow_stage_id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_current_stage_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_workflow_sla_status"
+            referencedColumns: ["workflow_stage_id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stages: {
+        Row: {
+          actual_duration: string | null
+          assigned_staff_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          display_order: number
+          due_date: string | null
+          entity_type: string
+          estimated_duration: string | null
+          id: string
+          notes: string | null
+          pipeline_run_id: string
+          process_stage_id: string
+          reviewer_id: string | null
+          sla_status: string | null
+          stage_name: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"]
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actual_duration?: string | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order: number
+          due_date?: string | null
+          entity_type: string
+          estimated_duration?: string | null
+          id?: string
+          notes?: string | null
+          pipeline_run_id: string
+          process_stage_id: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"]
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actual_duration?: string | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order?: number
+          due_date?: string | null
+          entity_type?: string
+          estimated_duration?: string | null
+          id?: string
+          notes?: string | null
+          pipeline_run_id?: string
+          process_stage_id?: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"]
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_assigned_staff_id_fkey"
+            columns: ["assigned_staff_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_pipeline_run_id_fkey"
+            columns: ["pipeline_run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_process_stage_id_fkey"
+            columns: ["process_stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       platform_subscription_plans: {
         Row: {
           base_price_cents: number
@@ -5879,6 +5926,7 @@ export type Database = {
           notify_on_entry: Json
           process_id: string
           reviewer_role_id: string | null
+          stage_role: string | null
           updated_at: string
           warning_threshold: string | null
         }
@@ -5895,6 +5943,7 @@ export type Database = {
           notify_on_entry?: Json
           process_id: string
           reviewer_role_id?: string | null
+          stage_role?: string | null
           updated_at?: string
           warning_threshold?: string | null
         }
@@ -5911,6 +5960,7 @@ export type Database = {
           notify_on_entry?: Json
           process_id?: string
           reviewer_role_id?: string | null
+          stage_role?: string | null
           updated_at?: string
           warning_threshold?: string | null
         }
@@ -7337,27 +7387,6 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
-            foreignKeyName: "tasks_workflow_stage_id_fkey"
-            columns: ["workflow_stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_reviewer_queue"
-            referencedColumns: ["workflow_stage_id"]
-          },
-          {
-            foreignKeyName: "tasks_workflow_stage_id_fkey"
-            columns: ["workflow_stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_workflow_sla_status"
-            referencedColumns: ["workflow_stage_id"]
-          },
-          {
-            foreignKeyName: "tasks_workflow_stage_id_fkey"
-            columns: ["workflow_stage_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_stages"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "tasks_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -7665,207 +7694,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "webhook_events_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_runs: {
-        Row: {
-          cancelled_at: string | null
-          completed_at: string | null
-          created_at: string | null
-          current_stage_id: string | null
-          engagement_id: string
-          id: string
-          paused_at: string | null
-          process_id: string
-          started_at: string | null
-          status: Database["public"]["Enums"]["workflow_run_status"] | null
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          cancelled_at?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          current_stage_id?: string | null
-          engagement_id: string
-          id?: string
-          paused_at?: string | null
-          process_id: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_run_status"] | null
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          cancelled_at?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          current_stage_id?: string | null
-          engagement_id?: string
-          id?: string
-          paused_at?: string | null
-          process_id?: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_run_status"] | null
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_current_stage"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_reviewer_queue"
-            referencedColumns: ["workflow_stage_id"]
-          },
-          {
-            foreignKeyName: "fk_current_stage"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_workflow_sla_status"
-            referencedColumns: ["workflow_stage_id"]
-          },
-          {
-            foreignKeyName: "fk_current_stage"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_runs_engagement_id_fkey"
-            columns: ["engagement_id"]
-            isOneToOne: false
-            referencedRelation: "engagements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_runs_engagement_id_fkey"
-            columns: ["engagement_id"]
-            isOneToOne: false
-            referencedRelation: "v_engagement_progress"
-            referencedColumns: ["engagement_id"]
-          },
-          {
-            foreignKeyName: "workflow_runs_engagement_id_fkey"
-            columns: ["engagement_id"]
-            isOneToOne: false
-            referencedRelation: "v_reviewer_queue"
-            referencedColumns: ["engagement_id"]
-          },
-          {
-            foreignKeyName: "workflow_runs_process_id_fkey"
-            columns: ["process_id"]
-            isOneToOne: false
-            referencedRelation: "processes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_runs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_stages: {
-        Row: {
-          actual_duration: string | null
-          assigned_staff_id: string | null
-          completed_at: string | null
-          created_at: string | null
-          display_order: number
-          due_date: string | null
-          estimated_duration: string | null
-          id: string
-          notes: string | null
-          process_stage_id: string
-          reviewer_id: string | null
-          sla_status: string | null
-          stage_name: string
-          started_at: string | null
-          status: Database["public"]["Enums"]["workflow_stage_status"] | null
-          updated_at: string | null
-          workflow_run_id: string
-          workspace_id: string
-        }
-        Insert: {
-          actual_duration?: string | null
-          assigned_staff_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          display_order: number
-          due_date?: string | null
-          estimated_duration?: string | null
-          id?: string
-          notes?: string | null
-          process_stage_id: string
-          reviewer_id?: string | null
-          sla_status?: string | null
-          stage_name: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
-          updated_at?: string | null
-          workflow_run_id: string
-          workspace_id: string
-        }
-        Update: {
-          actual_duration?: string | null
-          assigned_staff_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          display_order?: number
-          due_date?: string | null
-          estimated_duration?: string | null
-          id?: string
-          notes?: string | null
-          process_stage_id?: string
-          reviewer_id?: string | null
-          sla_status?: string | null
-          stage_name?: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
-          updated_at?: string | null
-          workflow_run_id?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_stages_assigned_staff_id_fkey"
-            columns: ["assigned_staff_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_stages_process_stage_id_fkey"
-            columns: ["process_stage_id"]
-            isOneToOne: false
-            referencedRelation: "process_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_stages_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_stages_workflow_run_id_fkey"
-            columns: ["workflow_run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -8889,14 +8717,14 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "workflow_stages_reviewer_id_fkey"
+            foreignKeyName: "pipeline_stages_reviewer_id_fkey"
             columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "workflow_stages_workspace_id_fkey"
+            foreignKeyName: "pipeline_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -8961,10 +8789,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "workflow_stages_workflow_run_id_fkey"
+            foreignKeyName: "pipeline_stages_pipeline_run_id_fkey"
             columns: ["workflow_run_id"]
             isOneToOne: false
-            referencedRelation: "workflow_runs"
+            referencedRelation: "pipeline_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -9115,9 +8943,10 @@ export type Database = {
         Args: { p_process_id: string; p_stage_name: string }
         Returns: string
       }
-      advance_lead_pipeline_stage: {
+      advance_pipeline_stage: {
         Args: {
-          p_client_id: string
+          p_entity_id: string
+          p_entity_type: string
           p_process_id: string
           p_process_stage_id: string
         }
@@ -9177,13 +9006,6 @@ export type Database = {
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
         Returns: boolean
-      }
-      check_stage_readiness: {
-        Args: { p_workflow_stage_id: string }
-        Returns: {
-          is_ready: boolean
-          missing_requirements: string[]
-        }[]
       }
       compare_config_object_versions: {
         Args: {
@@ -10380,20 +10202,12 @@ export type Database = {
         }
         Returns: Json
       }
-      start_engagement_workflow: {
-        Args: { p_engagement_id: string; p_process_id: string }
-        Returns: string
-      }
       start_internal_message_thread: {
         Args: {
           p_body: string
           p_other_user_id: string
           p_workspace_id: string
         }
-        Returns: string
-      }
-      start_lead_pipeline_run: {
-        Args: { p_client_id: string; p_process_id: string }
         Returns: string
       }
       start_network_message_thread: {
@@ -10407,6 +10221,14 @@ export type Database = {
       start_next_automation_step: {
         Args: { p_run_id: string }
         Returns: undefined
+      }
+      start_pipeline_run: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_process_id: string
+        }
+        Returns: string
       }
       submit_organizer_response: {
         Args: { p_response_id: string }

@@ -25,7 +25,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
 
   const isSystemDefault = !process.workspace_id;
 
-  const [{ data: canManagePipelines }, { data: stages }, { data: tasks }, { data: stageCounts }, { data: leadRunSample }] = await Promise.all([
+  const [{ data: canManagePipelines }, { data: stages }, { data: tasks }, { data: engagementRuns }, { data: leadRunSample }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "pipelines.manage" }),
     supabase.from("process_stages").select("*").eq("process_id", process.id).order("display_order"),
     supabase
@@ -33,8 +33,22 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
       .select("*, process_stages!inner(process_id)")
       .eq("process_stages.process_id", process.id)
       .order("display_order"),
-    supabase.from("engagements").select("current_stage").eq("workflow_id", process.id).not("current_stage", "is", null),
-    supabase.from("lead_pipeline_runs").select("id").eq("process_id", process.id).eq("workspace_id", workspace.id).eq("status", "Active").limit(1),
+    supabase
+      .from("pipeline_runs")
+      .select("pipeline_stages!pipeline_runs_current_stage_fkey(process_stage_id)")
+      .eq("process_id", process.id)
+      .eq("workspace_id", workspace.id)
+      .eq("entity_type", "engagement")
+      .eq("status", "Active")
+      .not("current_stage_id", "is", null),
+    supabase
+      .from("pipeline_runs")
+      .select("id")
+      .eq("process_id", process.id)
+      .eq("workspace_id", workspace.id)
+      .eq("entity_type", "client")
+      .eq("status", "Active")
+      .limit(1),
   ]);
 
   const canEdit = !isSystemDefault && Boolean(canManagePipelines);
@@ -43,32 +57,35 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
   // way any pipeline with active engagements shows its engagement count.
   const isLeadPipeline = (leadRunSample ?? []).length > 0;
 
+  // Keyed by process_stage_id (not stage name) -- a stage rename no longer
+  // silently zeroes out this count.
   const engagementCountsByStage = new Map<string, number>();
-  for (const row of stageCounts ?? []) {
-    const key = (row as { current_stage: string }).current_stage;
-    engagementCountsByStage.set(key, (engagementCountsByStage.get(key) ?? 0) + 1);
+  for (const row of engagementRuns ?? []) {
+    const stageId = (row.pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
+    if (!stageId) continue;
+    engagementCountsByStage.set(stageId, (engagementCountsByStage.get(stageId) ?? 0) + 1);
   }
 
   const leadsByStage: Record<string, { clientId: string; name: string }[]> = {};
   if (isLeadPipeline) {
     const { data: runs } = await supabase
-      .from("lead_pipeline_runs")
-      .select(
-        "lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id), clients(id, first_name, last_name, business_name, client_type)"
-      )
+      .from("pipeline_runs")
+      .select("entity_id, pipeline_stages!pipeline_runs_current_stage_fkey(process_stage_id)")
       .eq("process_id", process.id)
       .eq("workspace_id", workspace.id)
+      .eq("entity_type", "client")
       .eq("status", "Active")
       .not("current_stage_id", "is", null);
+
+    const clientIds = (runs ?? []).map((r) => r.entity_id);
+    const { data: clients } = clientIds.length
+      ? await supabase.from("clients").select("id, first_name, last_name, business_name, client_type").in("id", clientIds)
+      : { data: [] };
+    const clientsById = new Map((clients ?? []).map((c) => [c.id, c]));
+
     for (const r of runs ?? []) {
-      const client = r.clients as unknown as {
-        id: string;
-        first_name: string | null;
-        last_name: string | null;
-        business_name: string | null;
-        client_type: string;
-      } | null;
-      const currentStageId = (r.lead_pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
+      const client = clientsById.get(r.entity_id);
+      const currentStageId = (r.pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
       if (!client || !currentStageId) continue;
       const name =
         client.client_type === "business" && client.business_name

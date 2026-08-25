@@ -109,7 +109,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   const supabase = createClient();
   const isLeadsTab = tab === "leads";
 
-  // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
+  // Leads move through a real Pipeline (pipeline_runs/pipeline_stages)
   // -- the same system "Move the lead to a pipeline stage" and "A lead enters
   // a pipeline stage" already use -- rather than the old flat, uncustomizable
   // lead_stages list. There's no single designated "default" pipeline for
@@ -174,11 +174,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
       : Promise.resolve({ data: [] as never[] }),
     isLeadsTab && clientIds.length > 0
       ? supabase
-          .from("lead_pipeline_runs")
-          .select("client_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(stage_name)")
-          .in("client_id", clientIds)
+          .from("pipeline_runs")
+          .select("entity_id, pipeline_stages!pipeline_runs_current_stage_fkey(stage_name)")
+          .eq("entity_type", "client")
+          .in("entity_id", clientIds)
           .eq("status", "Active")
-      : Promise.resolve({ data: [] as { client_id: string; lead_pipeline_stages: { stage_name: string } | null }[] }),
+      : Promise.resolve({ data: [] as { entity_id: string; pipeline_stages: { stage_name: string } | null }[] }),
   ]);
 
   // Services are "basic" now and a lead can select more than one at once
@@ -201,11 +202,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   // on, not just whichever run happens to be returned last.
   const stageNamesByClient = new Map<string, string[]>();
   for (const run of activeRuns ?? []) {
-    const stageName = (run.lead_pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
+    const stageName = (run.pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
     if (!stageName) continue;
-    const list = stageNamesByClient.get(run.client_id) ?? [];
+    const list = stageNamesByClient.get(run.entity_id) ?? [];
     if (!list.includes(stageName)) list.push(stageName);
-    stageNamesByClient.set(run.client_id, list);
+    stageNamesByClient.set(run.entity_id, list);
   }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,

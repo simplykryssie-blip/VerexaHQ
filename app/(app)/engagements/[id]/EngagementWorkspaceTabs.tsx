@@ -258,7 +258,7 @@ export function WorkflowTab({ stages, engagementId, workspaceId }: { stages: Sta
                   <td className="px-4 py-2">
                     {s.status !== "Completed" &&
                       s.status !== "Skipped" &&
-                      (s.stage_name === "Filed / Awaiting Acceptance" ? (
+                      (s.stage_role === "efile_decision" ? (
                         <EfileDecisionActions stageId={s.id} engagementId={engagementId} workspaceId={workspaceId} />
                       ) : (
                         <StageReviewActions stageId={s.id} />
@@ -1062,6 +1062,7 @@ export type StageRow = {
   completed_at: string | null;
   reviewer: StaffRef;
   sla_category: string | null;
+  stage_role: string | null;
 };
 export type TaskDependency = { id: string; depends_on_task_id: string; depends_on_title: string };
 export type TaskRow = {
