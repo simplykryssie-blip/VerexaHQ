@@ -21,7 +21,10 @@ export function PublicSitePage({
     <div className="min-h-screen bg-white">
       <TrackingScripts headCode={website.head_tracking_code} bodyCode={website.body_tracking_code} />
       {branding?.logo_url && (
-        <header className="border-b border-border px-6 py-4">
+        <header
+          className={website.header_background ? "px-6 py-4" : "border-b border-border px-6 py-4"}
+          style={website.header_background ? { background: website.header_background, borderBottom: "1px solid rgba(255,255,255,0.08)" } : undefined}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={branding.logo_url} alt={branding.display_name ?? page.title} className="h-8 w-auto" />
         </header>

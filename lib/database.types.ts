@@ -6982,6 +6982,7 @@ export type Database = {
           favicon_url: string | null
           folder_id: string | null
           head_tracking_code: string | null
+          header_background: string | null
           id: string
           name: string
           slug: string
@@ -6999,6 +7000,7 @@ export type Database = {
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
+          header_background?: string | null
           id?: string
           name: string
           slug: string
@@ -7016,6 +7018,7 @@ export type Database = {
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
+          header_background?: string | null
           id?: string
           name?: string
           slug?: string
@@ -9927,6 +9930,10 @@ export type Database = {
           p_firm_name: string
           p_firm_phone: string
         }
+        Returns: string
+      }
+      render_merge_fields: {
+        Args: { p_context: Json; p_text: string }
         Returns: string
       }
       reorder_automation_step: {
