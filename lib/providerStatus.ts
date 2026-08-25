@@ -27,3 +27,7 @@ export function isStripeConnectConfigured() {
 export function isZoomConfigured() {
   return !!process.env.ZOOM_CLIENT_ID && !!process.env.ZOOM_CLIENT_SECRET;
 }
+
+export function isVercelDomainAutomationConfigured() {
+  return !!process.env.VERCEL_API_TOKEN;
+}

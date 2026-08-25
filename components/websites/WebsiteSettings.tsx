@@ -41,6 +41,9 @@ type VerifyResult = {
   found: string[];
 };
 
+type OwnershipChallenge = { type: string; domain: string; value: string; reason: string };
+type AttachResult = { automated: boolean; verified?: boolean; verification?: OwnershipChallenge[]; error?: string };
+
 export function WebsiteSettings({ website, canManage }: { website: Website; canManage: boolean }) {
   const router = useRouter();
   const supabase = createClient();
@@ -61,6 +64,23 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
   const [savingDomain, setSavingDomain] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [automated, setAutomated] = useState<boolean | null>(null);
+  const [ownershipChallenge, setOwnershipChallenge] = useState<OwnershipChallenge[] | null>(null);
+
+  // Idempotent -- safe to call on every Connect/Verify click. Attaching a
+  // domain that's already attached to this project just returns its
+  // current state instead of erroring.
+  async function attachDomain(): Promise<AttachResult> {
+    const res = await fetch(`/api/websites/${website.id}/attach-domain`, { method: "POST" });
+    const result = (await res.json().catch(() => null)) as AttachResult | null;
+    if (!result) return { automated: false };
+    setAutomated(result.automated);
+    setOwnershipChallenge(result.verification && result.verification.length > 0 ? result.verification : null);
+    if (!res.ok && result.error) {
+      toast.show(result.error, "error");
+    }
+    return result;
+  }
 
   async function saveDomain() {
     const next = normalizeDomain(domainInput);
@@ -70,8 +90,8 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
       .from("site_websites")
       .update({ custom_domain: next, domain_verified: false, domain_verified_at: null })
       .eq("id", website.id);
-    setSavingDomain(false);
     if (error) {
+      setSavingDomain(false);
       toast.show(error.message.includes("duplicate") ? "That domain is already connected to another website." : error.message, "error");
       return;
     }
@@ -80,11 +100,15 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setDomainVerified(false);
     setDomainVerifiedAt(null);
     setVerifyResult(null);
-    toast.show("Domain saved -- add the DNS record below, then verify.", "success");
+    await attachDomain();
+    setSavingDomain(false);
+    toast.show("Domain saved -- checking DNS...", "success");
+    await verifyDomain();
   }
 
   async function removeDomain() {
     if (!confirm(`Disconnect ${savedDomain}? Visitors on that domain will stop reaching this website.`)) return;
+    await fetch(`/api/websites/${website.id}/attach-domain`, { method: "DELETE" }).catch(() => null);
     const { error } = await supabase
       .from("site_websites")
       .update({ custom_domain: null, domain_verified: false, domain_verified_at: null })
@@ -98,11 +122,13 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     setDomainVerified(false);
     setDomainVerifiedAt(null);
     setVerifyResult(null);
+    setOwnershipChallenge(null);
     toast.show("Domain disconnected", "success");
   }
 
   async function verifyDomain() {
     setVerifying(true);
+    await attachDomain();
     const res = await fetch(`/api/websites/${website.id}/verify-domain`, { method: "POST" });
     const result = await res.json().catch(() => null);
     setVerifying(false);
@@ -331,11 +357,37 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
                 )}
                 {verifyResult.verified && (
                   <p className="mt-2 text-[11px] text-muted">
-                    DNS is pointing correctly. One last step: this domain still needs to be added in the hosting
-                    project (Vercel &rarr; Project Settings &rarr; Domains &rarr; Add &rarr; <span className="font-mono">{savedDomain}</span>)
-                    so SSL can be issued -- ask whoever manages hosting to add it if you don&apos;t have access.
+                    {automated
+                      ? "DNS is pointing correctly and SSL is handled automatically -- this domain is live."
+                      : "DNS is pointing correctly. One last step: this domain still needs to be added in the hosting project (Vercel → Project Settings → Domains → Add → " + savedDomain + ") so SSL can be issued -- ask whoever manages hosting to add it if you don't have access."}
                   </p>
                 )}
+              </div>
+            )}
+
+            {ownershipChallenge && (
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-warning">Ownership verification required</p>
+                <p className="mt-1 text-[11px] text-muted">
+                  This domain is already registered elsewhere on Vercel. Add this TXT record too, to prove you own it:
+                </p>
+                {ownershipChallenge.map((c) => (
+                  <div key={c.value} className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 font-mono text-xs">
+                    <span className="text-muted">TXT</span>
+                    <span className="truncate text-ink">{c.domain}</span>
+                    <span />
+                    <span className="text-muted">Value</span>
+                    <span className="truncate text-ink">{c.value}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(c.value)}
+                      className="justify-self-end text-muted hover:text-accent"
+                      aria-label="Copy value"
+                    >
+                      <Copy size={12} />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

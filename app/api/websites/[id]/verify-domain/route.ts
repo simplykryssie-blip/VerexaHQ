@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import dns from "node:dns/promises";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { authorizedWebsite } from "@/lib/websites/auth";
+import { getDomainConfig } from "@/lib/vercel/domains";
+import { isVercelDomainAutomationConfigured } from "@/lib/providerStatus";
 
 // Vercel's documented apex-domain A record and CNAME target for pointing
 // an external domain at a project. These are stable, publicly-documented
-// values (not project-specific), so no Vercel API access is needed to
-// tell a workspace what to put in their DNS.
+// values (not project-specific), so they're usable for the instructional
+// copy regardless of which verification path below actually runs.
 const VERCEL_APEX_IP = "76.76.21.21";
 const VERCEL_CNAME_TARGET = "cname.vercel-dns.com";
 
@@ -19,59 +21,55 @@ function isApexDomain(domain: string): boolean {
   return domain.split(".").length === 2;
 }
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const workspace = await getCurrentWorkspace();
-  if (!workspace) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
-
-  const supabase = createClient();
-  const { data: canManage } = await supabase.rpc("has_permission", {
-    p_workspace_id: workspace.id,
-    p_permission_key: "site_pages.manage",
-  });
-  if (!canManage) {
-    return NextResponse.json({ error: "You don't have permission to manage this website." }, { status: 403 });
-  }
-
-  const { data: website } = await supabase
-    .from("site_websites")
-    .select("id, workspace_id, custom_domain")
-    .eq("id", params.id)
-    .maybeSingle();
-
-  if (!website || website.workspace_id !== workspace.id) {
-    return NextResponse.json({ error: "Website not found." }, { status: 404 });
-  }
-  if (!website.custom_domain) {
-    return NextResponse.json({ error: "No custom domain set on this website." }, { status: 400 });
-  }
-
-  const domain = website.custom_domain;
-  const apex = isApexDomain(domain);
-  let found: string[] = [];
-  let verified = false;
-
+async function checkViaDns(domain: string, apex: boolean): Promise<{ verified: boolean; found: string[] }> {
   try {
     if (apex) {
-      found = await dns.resolve4(domain);
-      verified = found.includes(VERCEL_APEX_IP);
-    } else {
-      const records = await dns.resolveCname(domain);
-      found = records.map((record) => record.replace(/\.$/, "").toLowerCase());
-      verified = found.includes(VERCEL_CNAME_TARGET);
+      const found = await dns.resolve4(domain);
+      return { verified: found.includes(VERCEL_APEX_IP), found };
     }
+    const records = await dns.resolveCname(domain);
+    const found = records.map((record) => record.replace(/\.$/, "").toLowerCase());
+    return { verified: found.includes(VERCEL_CNAME_TARGET), found };
   } catch {
     // NXDOMAIN / ENODATA / timeout -- no record published yet. This is the
     // normal state while DNS is propagating, not an error to surface.
-    found = [];
-    verified = false;
+    return { verified: false, found: [] };
+  }
+}
+
+export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  const result = await authorizedWebsite(params.id);
+  if ("error" in result) return result.error;
+  if (!result.website.custom_domain) {
+    return NextResponse.json({ error: "No custom domain set on this website." }, { status: 400 });
   }
 
+  const domain = result.website.custom_domain;
+  const apex = isApexDomain(domain);
+
+  // Once the domain automation is on, Vercel's own config check is the
+  // authoritative answer (it reflects what's actually live, not just what
+  // this server's resolver happens to see) -- fall back to a plain DNS
+  // lookup when that automation isn't configured.
+  let verified: boolean;
+  let found: string[];
+  if (isVercelDomainAutomationConfigured()) {
+    const config = await getDomainConfig(domain);
+    if (config.ok) {
+      verified = !config.data.misconfigured;
+      found = config.data.configuredBy ? [config.data.configuredBy] : [];
+    } else {
+      ({ verified, found } = await checkViaDns(domain, apex));
+    }
+  } else {
+    ({ verified, found } = await checkViaDns(domain, apex));
+  }
+
+  const supabase = createClient();
   await supabase
     .from("site_websites")
     .update({ domain_verified: verified, domain_verified_at: verified ? new Date().toISOString() : null })
-    .eq("id", website.id);
+    .eq("id", result.website.id);
 
   return NextResponse.json({
     verified,
