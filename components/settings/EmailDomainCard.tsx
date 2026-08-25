@@ -160,7 +160,8 @@ export function EmailDomainCard({ emailDomain }: { emailDomain: EmailDomain }) {
             </table>
           </div>
           <p className="mt-2 text-[11px] text-muted">
-            DNS changes can take a few minutes to a few hours to propagate before verification succeeds.
+            DNS changes can take a few minutes to a few hours to propagate before verification succeeds. This is
+            also checked automatically every 15 minutes -- no need to keep clicking Check verification.
           </p>
         </div>
       )}

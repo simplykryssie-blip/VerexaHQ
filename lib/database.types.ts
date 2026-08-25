@@ -6938,6 +6938,9 @@ export type Database = {
           body_tracking_code: string | null
           created_at: string
           created_by: string | null
+          custom_domain: string | null
+          domain_verified: boolean
+          domain_verified_at: string | null
           favicon_url: string | null
           folder_id: string | null
           head_tracking_code: string | null
@@ -6952,6 +6955,9 @@ export type Database = {
           body_tracking_code?: string | null
           created_at?: string
           created_by?: string | null
+          custom_domain?: string | null
+          domain_verified?: boolean
+          domain_verified_at?: string | null
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
@@ -6966,6 +6972,9 @@ export type Database = {
           body_tracking_code?: string | null
           created_at?: string
           created_by?: string | null
+          custom_domain?: string | null
+          domain_verified?: boolean
+          domain_verified_at?: string | null
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
@@ -9736,6 +9745,10 @@ export type Database = {
           p_website_slug: string
           p_workspace_slug: string
         }
+        Returns: Json
+      }
+      get_public_site_page_by_domain: {
+        Args: { p_domain: string; p_page_slug: string }
         Returns: Json
       }
       get_quiz_for_taking: { Args: { p_module_id: string }; Returns: Json }

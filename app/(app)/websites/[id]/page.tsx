@@ -14,7 +14,7 @@ export default async function WebsiteDetailRoute({ params }: { params: { id: str
   const [{ data: website }, { data: pages }, { data: canManage }] = await Promise.all([
     supabase
       .from("site_websites")
-      .select("id, workspace_id, name, slug, favicon_url, head_tracking_code, body_tracking_code")
+      .select("id, workspace_id, name, slug, favicon_url, head_tracking_code, body_tracking_code, custom_domain, domain_verified, domain_verified_at")
       .eq("id", params.id)
       .maybeSingle(),
     supabase.from("site_pages").select("id, title, slug, status").eq("website_id", params.id).order("created_at", { ascending: false }),
