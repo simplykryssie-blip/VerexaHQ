@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { BasicInfoForm, type BasicInfoSnapshot } from "@/components/portal/BasicInfoForm";
+import { RequestServiceCard } from "@/components/portal/RequestServiceCard";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function PortalProfilePage() {
             />
           </div>
         </div>
+        <RequestServiceCard requestedServiceIds={(snapshot as BasicInfoSnapshot | null)?.service_ids ?? []} />
       </div>
     </>
   );

@@ -10128,6 +10128,10 @@ export type Database = {
         Args: { p_page_id: string; p_section_ids: string[] }
         Returns: undefined
       }
+      request_portal_service: {
+        Args: { p_service_id: string }
+        Returns: undefined
+      }
       resolve_and_sign_organizer_response: {
         Args: {
           p_client_email: string
@@ -10181,10 +10185,7 @@ export type Database = {
         Args: { p_comment: string; p_engagement_share_id: string }
         Returns: undefined
       }
-      revoke_expired_portal_access: {
-        Args: never
-        Returns: number
-      }
+      revoke_expired_portal_access: { Args: never; Returns: number }
       revoke_workspace_user: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
