@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -55,6 +55,9 @@ import {
 } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
+import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
@@ -266,6 +269,9 @@ export function StepCard({
   // Organizer/engagement letter templates need their full builder page to get
   // real content -- point staff at it right after the quick-create stub saves.
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
+  const taskTitleRef = useRef<HTMLInputElement>(null);
+  const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
+  const notificationMessageRef = useRef<HTMLTextAreaElement>(null);
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -639,26 +645,48 @@ export function StepCard({
 
         {actionType === "create_task" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Task title
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Task title</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) => insertAtFieldCursor(taskTitleRef.current, (config.title as string) ?? "", token, (v) => setField("title", v))}
+                  />
+                )}
+              </div>
               <input
+                ref={taskTitleRef}
                 disabled={!canManage}
                 value={(config.title as string) ?? ""}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="Automated task"
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Description
+            </div>
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Description</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) =>
+                      insertAtFieldCursor(taskDescriptionRef.current, (config.description as string) ?? "", token, (v) => setField("description", v))
+                    }
+                  />
+                )}
+              </div>
               <textarea
+                ref={taskDescriptionRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.description as string) ?? ""}
                 onChange={(e) => setField("description", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -1105,16 +1133,28 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Message
+            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center justify-between">
+                <span>Message</span>
+                {canManage && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
+                    onInsert={(token) =>
+                      insertAtFieldCursor(notificationMessageRef.current, (config.message as string) ?? "", token, (v) => setField("message", v))
+                    }
+                  />
+                )}
+              </div>
               <textarea
+                ref={notificationMessageRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.message as string) ?? ""}
                 onChange={(e) => setField("message", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </label>
+            </div>
           </>
         )}
 

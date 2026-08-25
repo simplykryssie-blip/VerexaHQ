@@ -4,11 +4,26 @@ import { useState } from "react";
 import { Tag } from "lucide-react";
 import { MERGE_FIELD_GROUPS } from "@/lib/mergeFields";
 
+export type MergeFieldPickerGroup = { group: string; fields: { token: string; label: string }[] };
+
 // Click-to-insert, like Jotform's field tags -- staff pick a client/firm
 // detail from this list instead of needing to know or type the {{token}}
 // syntax by hand. Styled to stand out (filled, accent-toned) rather than a
 // plain bordered button, since the whole point is that it gets noticed.
-export function MergeFieldPicker({ onInsert, disabled, label = "Insert client detail" }: { onInsert: (token: string) => void; disabled?: boolean; label?: string }) {
+// `groups` defaults to the engagement-letter/email/SMS template vocabulary;
+// pass a different catalog for a surface backed by a narrower context (e.g.
+// the automation engine's v_context, which doesn't have every field below).
+export function MergeFieldPicker({
+  onInsert,
+  disabled,
+  label = "Insert client detail",
+  groups = MERGE_FIELD_GROUPS,
+}: {
+  onInsert: (token: string) => void;
+  disabled?: boolean;
+  label?: string;
+  groups?: MergeFieldPickerGroup[];
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -26,7 +41,7 @@ export function MergeFieldPicker({ onInsert, disabled, label = "Insert client de
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-y-auto rounded-2xl border border-border bg-surface p-2 shadow-lg">
             <p className="px-2 pb-1.5 text-[11px] text-muted">Click a detail to drop it in -- it&apos;ll fill in automatically when this goes out.</p>
-            {MERGE_FIELD_GROUPS.map((g) => (
+            {groups.map((g) => (
               <div key={g.group} className="mb-2">
                 <p className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted">{g.group}</p>
                 {g.fields.map((f) => (
