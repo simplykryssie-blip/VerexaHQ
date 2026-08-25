@@ -221,8 +221,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
           .from("pipeline_stages")
           .select(
             `id, stage_name, status, due_date, started_at, completed_at, display_order, process_stage_id,
-            reviewer:user_profiles!pipeline_stages_reviewer_id_fkey(id, display_name),
-            process_stages(stage_role)`
+            reviewer:user_profiles!pipeline_stages_reviewer_id_fkey(id, display_name)`
           )
           .in("pipeline_run_id", workflowRunIds)
           .order("display_order")
@@ -236,7 +235,6 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const stagesWithSla = (stages ?? []).map((s: any) => ({
     ...s,
-    stage_role: (s.process_stages as { stage_role: string | null } | null)?.stage_role ?? null,
     sla_category: slaByStage.get(s.id) ?? null,
   }));
 

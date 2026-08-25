@@ -3375,10 +3375,6 @@ export type Database = {
       engagement_tax_details: {
         Row: {
           created_at: string
-          efile_accepted_at: string | null
-          efile_rejected_reason: string | null
-          efile_status: string
-          efile_transmitted_at: string | null
           engagement_id: string
           extension_due_date: string | null
           extension_filed_date: string | null
@@ -3388,6 +3384,7 @@ export type Database = {
           is_amended: boolean
           is_extended: boolean
           original_engagement_id: string | null
+          return_status: string
           return_type: string | null
           tax_year: number | null
           updated_at: string
@@ -3395,10 +3392,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          efile_accepted_at?: string | null
-          efile_rejected_reason?: string | null
-          efile_status?: string
-          efile_transmitted_at?: string | null
           engagement_id: string
           extension_due_date?: string | null
           extension_filed_date?: string | null
@@ -3408,6 +3401,7 @@ export type Database = {
           is_amended?: boolean
           is_extended?: boolean
           original_engagement_id?: string | null
+          return_status?: string
           return_type?: string | null
           tax_year?: number | null
           updated_at?: string
@@ -3415,10 +3409,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          efile_accepted_at?: string | null
-          efile_rejected_reason?: string | null
-          efile_status?: string
-          efile_transmitted_at?: string | null
           engagement_id?: string
           extension_due_date?: string | null
           extension_filed_date?: string | null
@@ -3428,6 +3418,7 @@ export type Database = {
           is_amended?: boolean
           is_extended?: boolean
           original_engagement_id?: string | null
+          return_status?: string
           return_type?: string | null
           tax_year?: number | null
           updated_at?: string
@@ -5926,7 +5917,6 @@ export type Database = {
           notify_on_entry: Json
           process_id: string
           reviewer_role_id: string | null
-          stage_role: string | null
           updated_at: string
           warning_threshold: string | null
         }
@@ -5943,7 +5933,6 @@ export type Database = {
           notify_on_entry?: Json
           process_id: string
           reviewer_role_id?: string | null
-          stage_role?: string | null
           updated_at?: string
           warning_threshold?: string | null
         }
@@ -5960,7 +5949,6 @@ export type Database = {
           notify_on_entry?: Json
           process_id?: string
           reviewer_role_id?: string | null
-          stage_role?: string | null
           updated_at?: string
           warning_threshold?: string | null
         }
@@ -6988,6 +6976,9 @@ export type Database = {
           body_tracking_code: string | null
           created_at: string
           created_by: string | null
+          custom_domain: string | null
+          domain_verified: boolean
+          domain_verified_at: string | null
           favicon_url: string | null
           folder_id: string | null
           head_tracking_code: string | null
@@ -7002,6 +6993,9 @@ export type Database = {
           body_tracking_code?: string | null
           created_at?: string
           created_by?: string | null
+          custom_domain?: string | null
+          domain_verified?: boolean
+          domain_verified_at?: string | null
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
@@ -7016,6 +7010,9 @@ export type Database = {
           body_tracking_code?: string | null
           created_at?: string
           created_by?: string | null
+          custom_domain?: string | null
+          domain_verified?: boolean
+          domain_verified_at?: string | null
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
@@ -8754,15 +8751,14 @@ export type Database = {
       }
       v_tax_season_metrics: {
         Row: {
-          accepted: number | null
           amended: number | null
           extended: number | null
+          filed: number | null
           not_filed: number | null
           open_irs_notices: number | null
-          rejected: number | null
+          ready_to_file: number | null
           tax_year: number | null
           total_returns: number | null
-          transmitted: number | null
           workspace_id: string | null
         }
         Relationships: [
@@ -9383,12 +9379,12 @@ export type Database = {
           client_last_name: string
           client_type: string
           due_date: string
-          efile_status: string
           engagement_id: string
           engagement_number: string
           federal_balance_due: number
           federal_refund_amount: number
           is_extended: boolean
+          return_status: string
           return_type: string
           source_workspace_id: string
           source_workspace_name: string
@@ -9399,17 +9395,16 @@ export type Database = {
       get_ero_tax_year_metrics: {
         Args: { p_workspace_id: string }
         Returns: {
-          accepted: number
           amended: number
           extended: number
+          filed: number
           not_filed: number
           open_irs_notices: number
-          rejected: number
+          ready_to_file: number
           source_workspace_id: string
           source_workspace_name: string
           tax_year: number
           total_returns: number
-          transmitted: number
         }[]
       }
       get_firm_connection_invite_preview: {
@@ -9558,6 +9553,10 @@ export type Database = {
           p_website_slug: string
           p_workspace_slug: string
         }
+        Returns: Json
+      }
+      get_public_site_page_by_domain: {
+        Args: { p_domain: string; p_page_slug: string }
         Returns: Json
       }
       get_quiz_for_taking: { Args: { p_module_id: string }; Returns: Json }
