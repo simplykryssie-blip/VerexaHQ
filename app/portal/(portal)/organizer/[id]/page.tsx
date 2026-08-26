@@ -26,7 +26,9 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
   const [{ data: fields }, { data: answers }, { data: snapshot }] = await Promise.all([
     supabase
       .from("organizer_fields")
-      .select("id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field")
+      .select(
+        "id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width"
+      )
       .eq("organizer_template_id", response.organizer_template_id)
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),

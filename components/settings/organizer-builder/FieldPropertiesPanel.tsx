@@ -24,6 +24,20 @@ const YES_NO_OPTIONS = [
   { label: "No", value: "no" },
 ];
 
+const WIDTH_OPTIONS: { value: BuilderField["layout_width"]; label: string }[] = [
+  { value: "full", label: "Full" },
+  { value: "two_thirds", label: "2/3" },
+  { value: "half", label: "Half" },
+  { value: "third", label: "1/3" },
+];
+
+// Structural field types always span the full row (a section header, page
+// break, content block, or repeating group can't meaningfully share a row
+// with a neighbor) -- the width picker only makes sense for actual
+// question fields, so it's hidden for these rather than offering a control
+// that render-time layout ignores anyway.
+const WIDTH_PICKER_HIDDEN_TYPES = new Set(["section", "page_break", "rich_text", "repeating_section"]);
+
 export function FieldPropertiesPanel({
   field,
   otherTopLevelFields,
@@ -35,7 +49,12 @@ export function FieldPropertiesPanel({
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
+    patch: Partial<
+      Pick<
+        BuilderField,
+        "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+      >
+    >
   ) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
@@ -109,7 +128,12 @@ function PropertiesForm({
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
+    patch: Partial<
+      Pick<
+        BuilderField,
+        "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+      >
+    >
   ) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
@@ -193,6 +217,28 @@ function PropertiesForm({
           />
           Required
         </label>
+      )}
+
+      {!WIDTH_PICKER_HIDDEN_TYPES.has(field.field_type) && (
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Field width</p>
+          <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
+            {WIDTH_OPTIONS.map((opt, i) => (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={readOnly}
+                onClick={() => onUpdate(field.id, { layout_width: opt.value })}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed ${
+                  i > 0 ? "border-l border-border" : ""
+                } ${field.layout_width === opt.value ? "bg-accent text-white" : "bg-surface text-slate hover:bg-surfaceMuted"}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-[11px] text-muted">Half/1/3/2/3 fields sit side by side with neighboring fields of the same size.</p>
+        </div>
       )}
 
       {CLIENT_PROFILE_FIELDS_BY_TYPE[field.field_type] && (

@@ -12,6 +12,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { OrganizerPrintSummary } from "@/components/portal/OrganizerPrintSummary";
 
 const YES_NO_OPTIONS = [
@@ -29,6 +30,7 @@ type FieldRow = {
   parent_field_id: string | null;
   conditional_logic?: unknown;
   client_profile_field?: string | null;
+  layout_width?: string | null;
 };
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
@@ -304,13 +306,14 @@ export function OrganizerForm({
           repeaterRows={repeaterRows}
         />
       )}
-      <div className="print:hidden space-y-4">
+      <div className="print:hidden">
         {pages.length > 1 && (
-          <p className="text-xs font-medium text-muted">
+          <p className="mb-4 text-xs font-medium text-muted">
             Page {currentIndex + 1} of {pages.length}
             {currentPage.title ? ` -- ${currentPage.title}` : ""}
           </p>
         )}
+        <div className="grid grid-cols-12 gap-x-5 gap-y-6">
         {currentPage.fields.map((field) =>
           field.field_type === "repeating_section" ? (
             <RepeatingSectionInput
@@ -337,6 +340,7 @@ export function OrganizerForm({
             />
           )
         )}
+        </div>
       </div>
 
       {!readOnly && (
@@ -412,8 +416,8 @@ function RepeatingSectionInput({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label className="block text-sm font-medium text-ink">
+    <div className="col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
+      <label className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
@@ -421,9 +425,9 @@ function RepeatingSectionInput({
       <div className="mt-3 space-y-3">
         {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-lg border border-border p-3">
+          <div key={index} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
                 {field.label} {index + 1}
               </p>
               {!disabled && (
@@ -432,7 +436,7 @@ function RepeatingSectionInput({
                 </button>
               )}
             </div>
-            <div className="mt-2 space-y-3">
+            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields.map((child) => (
                 <FieldInput
                   key={child.id}
@@ -451,7 +455,7 @@ function RepeatingSectionInput({
       </div>
 
       {!disabled && (
-        <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+        <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-semibold text-accent hover:underline">
           + Add another
         </button>
       )}
@@ -625,18 +629,20 @@ function FieldInput({
   entityId: string;
 }) {
   const options = normalizeOptions(field.options);
+  const inputClass =
+    "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:bg-surfaceMuted disabled:text-muted";
 
   if (field.field_type === "section") {
     return (
-      <div className="border-b border-border pb-1.5 pt-2">
-        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
+        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
         {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
       </div>
     );
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
+      <div className="col-span-12 rounded-xl border border-border bg-surfaceMuted p-4">
         {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
         {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
       </div>
@@ -644,13 +650,13 @@ function FieldInput({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
+    <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
+      <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
 
-      <div className="mt-2">
+      <div className="mt-1.5">
         {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
         ) : field.field_type === "email" ? (
@@ -660,7 +666,7 @@ function FieldInput({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "phone" ? (
           <input
@@ -669,7 +675,7 @@ function FieldInput({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, formatPhone(e.target.value))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "website" ? (
           <input
@@ -679,7 +685,7 @@ function FieldInput({
             disabled={disabled}
             placeholder="https://"
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "yes_no" ? (
           <div className="flex gap-4">
@@ -715,7 +721,7 @@ function FieldInput({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           >
             <option value="">Select...</option>
             {options.map((o, i) => (
@@ -777,7 +783,7 @@ function FieldInput({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "number" ? (
           <input
@@ -786,7 +792,7 @@ function FieldInput({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "currency" ? (
           <input
@@ -796,7 +802,7 @@ function FieldInput({
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
@@ -807,7 +813,7 @@ function FieldInput({
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "address" ? (
           <AddressInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
@@ -818,7 +824,7 @@ function FieldInput({
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         )}
       </div>

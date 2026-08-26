@@ -10,6 +10,7 @@ import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditio
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -26,6 +27,7 @@ type FieldRow = {
   parent_field_id: string | null;
   conditional_logic?: unknown;
   client_profile_field?: string | null;
+  layout_width?: string | null;
 };
 
 type Branding = {
@@ -473,19 +475,21 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
               {currentPage.title ? ` -- ${currentPage.title}` : ""}
             </p>
           )}
-          {currentPage.fields.map((field) =>
-            field.field_type === "repeating_section" ? (
-              <PublicRepeatingSection
-                key={field.id}
-                field={field}
-                childFields={childFieldsByParent.get(field.id) ?? []}
-                rows={repeaterRows[field.id] ?? []}
-                onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
-              />
-            ) : (
-              <PublicFieldInput key={field.id} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
-            )
-          )}
+          <div className="grid grid-cols-12 gap-x-5 gap-y-6">
+            {currentPage.fields.map((field) =>
+              field.field_type === "repeating_section" ? (
+                <PublicRepeatingSection
+                  key={field.id}
+                  field={field}
+                  childFields={childFieldsByParent.get(field.id) ?? []}
+                  rows={repeaterRows[field.id] ?? []}
+                  onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
+                />
+              ) : (
+                <PublicFieldInput key={field.id} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
+              )
+            )}
+          </div>
 
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex items-center gap-2">
@@ -533,8 +537,8 @@ function PublicRepeatingSection({
   onChange: (rows: Record<string, string>[]) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label className="block text-sm font-medium text-ink">
+    <div className="col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
+      <label className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
@@ -542,9 +546,9 @@ function PublicRepeatingSection({
       <div className="mt-3 space-y-3">
         {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-lg border border-border p-3">
+          <div key={index} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
                 {field.label} {index + 1}
               </p>
               <button
@@ -555,7 +559,7 @@ function PublicRepeatingSection({
                 Remove
               </button>
             </div>
-            <div className="mt-2 space-y-3">
+            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields.map((child) => (
                 <PublicFieldInput
                   key={child.id}
@@ -569,7 +573,7 @@ function PublicRepeatingSection({
         ))}
       </div>
 
-      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-semibold text-accent hover:underline">
         + Add another
       </button>
     </div>
@@ -578,18 +582,20 @@ function PublicRepeatingSection({
 
 function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: string; onChange: (fieldId: string, value: string) => void }) {
   const options = normalizeOptions(field.options);
+  const inputClass =
+    "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
 
   if (field.field_type === "section") {
     return (
-      <div className="border-b border-border pb-1.5 pt-2">
-        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
+        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
         {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
       </div>
     );
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
+      <div className="col-span-12 rounded-xl border border-border bg-surfaceMuted p-4">
         {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
         {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
       </div>
@@ -597,13 +603,13 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
+    <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
+      <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
 
-      <div className="mt-2">
+      <div className="mt-1.5">
         {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} />
         ) : field.field_type === "email" ? (
@@ -612,7 +618,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             type="email"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "phone" ? (
           <input
@@ -620,7 +626,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             type="tel"
             value={value}
             onChange={(e) => onChange(field.id, formatPhone(e.target.value))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "website" ? (
           <input
@@ -629,7 +635,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             value={value}
             placeholder="https://"
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "yes_no" ? (
           <div className="flex gap-4">
@@ -655,7 +661,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             <div className="flex items-center gap-2">
               <input
                 placeholder="Type your full name"
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                className={inputClass}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     const target = e.target as HTMLInputElement;
@@ -673,7 +679,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             id={`field-${field.id}`}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           >
             <option value="">Select...</option>
             {options.map((o, i) => (
@@ -731,7 +737,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             type="date"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "number" ? (
           <input
@@ -739,7 +745,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             type="number"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "currency" ? (
           <input
@@ -748,7 +754,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             step="0.01"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
@@ -758,7 +764,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "address" ? (
           <AddressInput value={value} onChange={(v) => onChange(field.id, v)} />
@@ -768,7 +774,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         )}
       </div>

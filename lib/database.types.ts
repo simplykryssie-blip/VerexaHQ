@@ -4985,6 +4985,7 @@ export type Database = {
           id: string
           is_required: boolean
           label: string
+          layout_width: string
           options: Json
           organizer_template_id: string
           parent_field_id: string | null
@@ -5003,6 +5004,7 @@ export type Database = {
           id?: string
           is_required?: boolean
           label: string
+          layout_width?: string
           options?: Json
           organizer_template_id: string
           parent_field_id?: string | null
@@ -5021,6 +5023,7 @@ export type Database = {
           id?: string
           is_required?: boolean
           label?: string
+          layout_width?: string
           options?: Json
           organizer_template_id?: string
           parent_field_id?: string | null

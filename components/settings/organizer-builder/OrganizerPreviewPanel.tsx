@@ -7,6 +7,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import type { BuilderField } from "./types";
 
 const YES_NO_OPTIONS = [
@@ -46,12 +47,12 @@ export function OrganizerPreviewPanel({
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
-      <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-border bg-surface shadow-soft shadow-sm">
+      <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface shadow-soft shadow-sm">
         {bannerImageUrl && currentIndex === 0 && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={bannerImageUrl} alt="" className="w-full object-cover" />
         )}
-        <div className="p-6">
+        <div className="p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>
         <h2 className="mt-1 text-lg font-semibold text-ink">{templateName}</h2>
         {templateDescription && <p className="mt-1 whitespace-pre-line text-sm text-muted">{templateDescription}</p>}
@@ -63,8 +64,8 @@ export function OrganizerPreviewPanel({
           </p>
         )}
 
-        <div className="mt-5 space-y-4">
-          {currentPage.fields.length === 0 && <p className="text-sm text-muted">No fields to show yet.</p>}
+        <div className="mt-5 grid grid-cols-12 gap-x-5 gap-y-6">
+          {currentPage.fields.length === 0 && <p className="col-span-12 text-sm text-muted">No fields to show yet.</p>}
           {currentPage.fields.map((field) =>
             field.field_type === "repeating_section" ? (
               <PreviewRepeatingSection
@@ -121,23 +122,23 @@ function PreviewRepeatingSection({
   onChange: (rows: Record<string, string>[]) => void;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surfaceMuted p-4">
-      <label className="block text-sm font-medium text-ink">
+    <div className="col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
+      <label className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       <div className="mt-3 space-y-3">
         {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-lg border border-border bg-surface p-3">
+          <div key={index} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
                 {field.label} {index + 1}
               </p>
               <button type="button" onClick={() => onChange(rows.filter((_, i) => i !== index))} className="text-xs font-medium text-danger hover:underline">
                 Remove
               </button>
             </div>
-            <div className="mt-2 space-y-2">
+            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields.map((child) => (
                 <PreviewField
                   key={child.id}
@@ -150,7 +151,7 @@ function PreviewRepeatingSection({
           </div>
         ))}
       </div>
-      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-semibold text-accent hover:underline">
         + Add another
       </button>
     </div>
@@ -160,19 +161,19 @@ function PreviewRepeatingSection({
 function PreviewField({ field, value, onChange }: { field: BuilderField; value: string; onChange: (value: string) => void }) {
   const options = normalizeOptions(field.options);
   const inputClass =
-    "w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
+    "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
 
   if (field.field_type === "section") {
     return (
-      <div className="border-b border-border pb-1.5 pt-2">
-        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
+        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
         {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
       </div>
     );
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
+      <div className="col-span-12 rounded-xl border border-border bg-surfaceMuted p-4">
         {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
         {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
       </div>
@@ -180,8 +181,8 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
   }
 
   return (
-    <div>
-      <label className="block text-sm font-medium text-ink">
+    <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
+      <label className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
@@ -198,7 +199,13 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
           <div className="flex gap-4">
             {YES_NO_OPTIONS.map((o) => (
               <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
-                <input type="radio" name={`preview-${field.id}`} checked={value === o.value} onChange={() => onChange(o.value)} />
+                <input
+                  type="radio"
+                  name={`preview-${field.id}`}
+                  checked={value === o.value}
+                  onChange={() => onChange(o.value)}
+                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                />
                 {o.label}
               </label>
             ))}
@@ -220,7 +227,13 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
           <div className="space-y-1.5">
             {options.map((o, i) => (
               <label key={i} className="flex items-center gap-2 text-sm text-slate">
-                <input type="radio" name={`preview-${field.id}`} checked={value === o.value} onChange={() => onChange(o.value)} />
+                <input
+                  type="radio"
+                  name={`preview-${field.id}`}
+                  checked={value === o.value}
+                  onChange={() => onChange(o.value)}
+                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                />
                 {o.label}
               </label>
             ))}
@@ -235,6 +248,7 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
                     type="checkbox"
                     checked={selected.includes(o.value)}
                     onChange={(e) => onChange((e.target.checked ? [...selected, o.value] : selected.filter((v) => v !== o.value)).join(","))}
+                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
                   />
                   {o.label}
                 </label>
@@ -242,7 +256,12 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
             })}
           </div>
         ) : field.field_type === "checkbox" ? (
-          <input type="checkbox" checked={value === "true"} onChange={(e) => onChange(e.target.checked ? "true" : "false")} />
+          <input
+            type="checkbox"
+            checked={value === "true"}
+            onChange={(e) => onChange(e.target.checked ? "true" : "false")}
+            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+          />
         ) : field.field_type === "date" ? (
           <input type="date" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
         ) : field.field_type === "number" ? (

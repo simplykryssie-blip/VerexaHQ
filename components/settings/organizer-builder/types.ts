@@ -13,7 +13,11 @@ export type BuilderField = {
   conditional_logic: unknown;
   client_profile_field: string | null;
   relationship_role: string | null;
+  layout_width: LayoutWidth;
 };
+
+/** JotForm/Cognito-style row-sharing: how much of the row this field occupies. */
+export type LayoutWidth = "full" | "half" | "third" | "two_thirds";
 
 export type BuilderTemplate = {
   id: string;
