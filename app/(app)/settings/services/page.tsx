@@ -37,7 +37,7 @@ export default async function ServicesPage() {
       <SettingsSectionHeader
         icon={Package}
         title="Services"
-        description="What your firm offers -- each service can attach a pipeline, an organizer, and the requirements an engagement of that type needs before it can be released."
+        description="What your firm offers. Each service routes to a pipeline and an organizer -- pricing, document templates, and other details are optional and tucked under Advanced."
       />
       <div className="mt-4">
         <ServiceLibrary workspaceId={workspace.id} services={cards} categories={categoryOptions} canManage={Boolean(canManage)} />
