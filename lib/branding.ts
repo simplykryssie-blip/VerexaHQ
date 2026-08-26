@@ -12,6 +12,10 @@ export type EffectiveBranding = {
   sidebarLogoUrl: string | null;
   /** For the client-facing portal. */
   portalLogoUrl: string | null;
+  /** Small, square, upload-time-generated derivative for the browser tab icon. */
+  faviconUrl: string | null;
+  /** For outgoing transactional emails -- falls back to the business logo, never the owner-avatar fallback (looks odd in an email header). */
+  emailHeaderLogoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
   /** Null means the sidebar keeps its default light background. */
@@ -48,7 +52,9 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
 
   const { data: branding } = await supabase
     .from("branding")
-    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
+    .select(
+      "display_name, sidebar_logo_url, portal_logo_url, logo_url, favicon_url, email_header_logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color"
+    )
     .eq("workspace_id", brandingWorkspaceId)
     .maybeSingle();
 
@@ -57,6 +63,8 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
   let ownBranding: {
     sidebar_logo_url: string | null;
     portal_logo_url: string | null;
+    favicon_url: string | null;
+    email_header_logo_url: string | null;
     primary_color: string | null;
     secondary_color: string | null;
     sidebar_bg_color: string | null;
@@ -65,7 +73,7 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
   if (isWhitelabeledByEro && connection?.allows_branding_override) {
     const { data } = await supabase
       .from("branding")
-      .select("sidebar_logo_url, portal_logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
+      .select("sidebar_logo_url, portal_logo_url, favicon_url, email_header_logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
       .eq("workspace_id", workspaceId)
       .maybeSingle();
     ownBranding = data;
@@ -101,6 +109,11 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     // (including its own owner-avatar fallback), matching the Brand Logo
     // field's "leave blank to reuse" copy.
     portalLogoUrl: ownBranding?.portal_logo_url ?? branding?.portal_logo_url ?? sidebarLogoUrl,
+    faviconUrl: ownBranding?.favicon_url ?? branding?.favicon_url ?? null,
+    // Falls back to the plain business logo, not the sidebar's owner-avatar
+    // fallback -- a personal headshot at the top of a transactional email
+    // reads as a mistake, not a brand.
+    emailHeaderLogoUrl: ownBranding?.email_header_logo_url ?? branding?.email_header_logo_url ?? branding?.logo_url ?? null,
     primaryColor: ownBranding?.primary_color ?? branding?.primary_color ?? null,
     secondaryColor: ownBranding?.secondary_color ?? branding?.secondary_color ?? null,
     sidebarBgColor,

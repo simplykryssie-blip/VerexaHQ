@@ -2,13 +2,98 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, X } from "lucide-react";
+import { ChevronDown, UploadCloud, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { readableTextColor } from "@/lib/color";
+import { processLogoUpload } from "@/lib/logoProcessing";
 
-function LogoUploader({
+async function uploadBlob(supabase: ReturnType<typeof createClient>, workspaceId: string, pathPrefix: string, blob: Blob) {
+  const path = `${workspaceId}/${pathPrefix}-${Date.now()}.png`;
+  const { error } = await supabase.storage.from("branding").upload(path, blob, { upsert: true, contentType: "image/png" });
+  if (error) throw error;
+  return supabase.storage.from("branding").getPublicUrl(path).data.publicUrl;
+}
+
+// The single source of truth every workspace uploads once -- processes the
+// file client-side (trims transparent padding, caps size so nothing gets
+// stretched or pixelated) and derives both the full logo and a square
+// favicon from the same source, instead of asking for two separate files.
+function PrimaryLogoUploader({
+  logo,
+  onChange,
+  onFaviconChange,
+  workspaceId,
+}: {
+  logo: string | null;
+  onChange: (url: string | null) => void;
+  onFaviconChange: (url: string | null) => void;
+  workspaceId: string;
+}) {
+  const supabase = createClient();
+  const toast = useToast();
+  const [uploading, setUploading] = useState(false);
+
+  async function upload(file: File) {
+    setUploading(true);
+    try {
+      const { full, favicon } = await processLogoUpload(file);
+      const [fullUrl, faviconUrl] = await Promise.all([
+        uploadBlob(supabase, workspaceId, "logo", full),
+        uploadBlob(supabase, workspaceId, "favicon", favicon),
+      ]);
+      onChange(fullUrl);
+      onFaviconChange(faviconUrl);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not process this image.", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div>
+      <span className="block text-sm font-medium text-slate">Business logo</span>
+      <div className="mt-1.5 flex items-center gap-3">
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
+          <img src={logo} alt="" className="h-16 w-16 rounded-lg border border-border object-contain p-1" />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted">Logo</div>
+        )}
+        <div className="flex items-center gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
+            <UploadCloud size={13} />
+            {uploading ? "Processing..." : logo ? "Replace" : "Upload"}
+            <input type="file" accept="image/*" disabled={uploading} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="sr-only" />
+          </label>
+          {logo && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange(null);
+                onFaviconChange(null);
+              }}
+              className="text-xs font-medium text-muted hover:text-danger"
+              aria-label="Remove business logo"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="mt-1 text-xs text-muted">
+        Used everywhere -- your staff sidebar, your clients&apos; portal, the browser tab icon, and outgoing emails. Padding and sizing are
+        handled automatically.
+      </p>
+    </div>
+  );
+}
+
+// Advanced-only: a different mark for one specific surface than the
+// business logo above. Still runs through the same trim/resize pipeline.
+function SurfaceLogoUploader({
   label,
   helpText,
   logo,
@@ -29,15 +114,14 @@ function LogoUploader({
 
   async function upload(file: File) {
     setUploading(true);
-    const path = `${workspaceId}/${pathPrefix}-${Date.now()}-${file.name}`;
-    const { error } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
-    setUploading(false);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
+    try {
+      const { full } = await processLogoUpload(file);
+      onChange(await uploadBlob(supabase, workspaceId, pathPrefix, full));
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not process this image.", "error");
+    } finally {
+      setUploading(false);
     }
-    const { data } = supabase.storage.from("branding").getPublicUrl(path);
-    onChange(data.publicUrl);
   }
 
   return (
@@ -45,7 +129,7 @@ function LogoUploader({
       <span className="block text-sm font-medium text-slate">{label}</span>
       <div className="mt-1.5 flex items-center gap-3">
         {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={logo} alt="" className="h-12 w-12 rounded-lg border border-border object-contain" />
         ) : (
           <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted">Logo</div>
@@ -53,7 +137,7 @@ function LogoUploader({
         <div className="flex items-center gap-2">
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
             <UploadCloud size={13} />
-            {uploading ? "Uploading..." : logo ? "Replace" : "Upload"}
+            {uploading ? "Processing..." : logo ? "Replace" : "Upload"}
             <input type="file" accept="image/*" disabled={uploading} onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} className="sr-only" />
           </label>
           {logo && (
@@ -70,13 +154,15 @@ function LogoUploader({
 
 function LivePreview({
   workspaceName,
-  logo,
+  sidebarLogo,
+  portalLogo,
   accent,
   sidebarBg,
   sidebarText,
 }: {
   workspaceName: string;
-  logo: string | null;
+  sidebarLogo: string | null;
+  portalLogo: string | null;
   accent: string;
   sidebarBg: string | null;
   sidebarText: string;
@@ -89,9 +175,9 @@ function LivePreview({
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">Staff sidebar</p>
         <div className="mt-1.5 overflow-hidden rounded-xl border border-border shadow-soft" style={{ backgroundColor: sidebarBgStyle }}>
           <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: sidebarBg ? `${sidebarText}22` : undefined }}>
-            {logo ? (
+            {sidebarLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt="" className="h-5 w-5 rounded object-contain" />
+              <img src={sidebarLogo} alt="" className="h-5 w-5 rounded object-contain" />
             ) : (
               <div className="h-5 w-5 shrink-0 rounded bg-surfaceMuted" />
             )}
@@ -117,9 +203,9 @@ function LivePreview({
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">Client portal</p>
         <div className="mt-1.5 overflow-hidden rounded-xl border border-border bg-surface shadow-soft">
           <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-            {logo ? (
+            {portalLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logo} alt="" className="h-5 w-5 rounded object-contain" />
+              <img src={portalLogo} alt="" className="h-5 w-5 rounded object-contain" />
             ) : (
               <div className="h-5 w-5 shrink-0 rounded bg-surfaceMuted" />
             )}
@@ -143,6 +229,8 @@ export function BrandCenterForm({
   workspaceId,
   workspaceName,
   businessName,
+  logoUrl,
+  faviconUrl,
   sidebarLogoUrl,
   portalLogoUrl,
   primaryColor,
@@ -157,7 +245,12 @@ export function BrandCenterForm({
   workspaceId: string;
   workspaceName: string;
   businessName: string | null;
+  /** The single source-of-truth logo -- everything else falls back to this. */
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  /** Advanced override: a different mark for the staff sidebar than logoUrl. */
   sidebarLogoUrl: string | null;
+  /** Advanced override: a different mark for the client portal than logoUrl. */
   portalLogoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
@@ -175,6 +268,8 @@ export function BrandCenterForm({
   const toast = useToast();
 
   const [bizName, setBizName] = useState(businessName ?? "");
+  const [logo, setLogo] = useState(logoUrl);
+  const [favicon, setFavicon] = useState(faviconUrl);
   const [sidebarLogo, setSidebarLogo] = useState(sidebarLogoUrl);
   const [portalLogo, setPortalLogo] = useState(portalLogoUrl);
   const [primary, setPrimary] = useState(primaryColor);
@@ -182,6 +277,7 @@ export function BrandCenterForm({
   const [customSidebar, setCustomSidebar] = useState(Boolean(sidebarBgColor));
   const [sidebarBg, setSidebarBg] = useState(sidebarBgColor ?? "#0F172A");
   const [textMode, setTextMode] = useState<TextMode>(sidebarTextColor === "#FFFFFF" ? "light" : sidebarTextColor === "#0F172A" ? "dark" : "auto");
+  const [showAdvanced, setShowAdvanced] = useState(Boolean(sidebarLogoUrl || portalLogoUrl));
   const [saving, setSaving] = useState(false);
 
   const editable = isOwner && (!isWhitelabeledByEro || allowsBrandingOverride);
@@ -193,6 +289,8 @@ export function BrandCenterForm({
     const patch: {
       workspace_id: string;
       display_name?: string | null;
+      logo_url: string | null;
+      favicon_url: string | null;
       sidebar_logo_url: string | null;
       portal_logo_url: string | null;
       primary_color: string;
@@ -201,6 +299,8 @@ export function BrandCenterForm({
       sidebar_text_color: string | null;
     } = {
       workspace_id: workspaceId,
+      logo_url: logo,
+      favicon_url: favicon,
       sidebar_logo_url: sidebarLogo,
       portal_logo_url: portalLogo,
       primary_color: primary,
@@ -258,23 +358,42 @@ export function BrandCenterForm({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <LogoUploader
-            label="Sidebar logo"
-            helpText="Shown to your staff, top-left of the dashboard."
-            logo={sidebarLogo}
-            onChange={editable ? setSidebarLogo : () => {}}
-            workspaceId={workspaceId}
-            pathPrefix="sidebar-logo"
-          />
-          <LogoUploader
-            label="Portal logo (optional)"
-            helpText="Shown to clients on their portal. Leave blank to reuse the sidebar logo."
-            logo={portalLogo}
-            onChange={editable ? setPortalLogo : () => {}}
-            workspaceId={workspaceId}
-            pathPrefix="portal-logo"
-          />
+        <PrimaryLogoUploader
+          logo={logo}
+          onChange={editable ? setLogo : () => {}}
+          onFaviconChange={editable ? setFavicon : () => {}}
+          workspaceId={workspaceId}
+        />
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-slate"
+          >
+            <ChevronDown size={12} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            Advanced branding overrides
+          </button>
+          {showAdvanced && (
+            <div className="mt-3 grid grid-cols-1 gap-4 rounded-xl border border-border bg-surfaceMuted p-4 sm:grid-cols-2">
+              <SurfaceLogoUploader
+                label="Sidebar logo override"
+                helpText="Only if the staff sidebar should show a different mark than the business logo above."
+                logo={sidebarLogo}
+                onChange={editable ? setSidebarLogo : () => {}}
+                workspaceId={workspaceId}
+                pathPrefix="sidebar-logo"
+              />
+              <SurfaceLogoUploader
+                label="Portal logo override"
+                helpText="Only if the client portal should show a different mark than the business logo above."
+                logo={portalLogo}
+                onChange={editable ? setPortalLogo : () => {}}
+                workspaceId={workspaceId}
+                pathPrefix="portal-logo"
+              />
+            </div>
+          )}
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-4">
@@ -382,7 +501,8 @@ export function BrandCenterForm({
         <div className="mt-1.5">
           <LivePreview
             workspaceName={bizName || workspaceName}
-            logo={sidebarLogo}
+            sidebarLogo={sidebarLogo ?? logo}
+            portalLogo={portalLogo ?? logo}
             accent={secondary}
             sidebarBg={customSidebar ? sidebarBg : null}
             sidebarText={resolvedSidebarText}

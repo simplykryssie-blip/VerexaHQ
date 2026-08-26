@@ -95,12 +95,32 @@ async function sendOne(
   job: { id: string; workspace_id: string; client_id: string; client_portal_user_id: string }
 ): Promise<"sent" | "failed"> {
   try {
-    const [{ data: portalUser }, { data: workspace }, { data: organizerResponses }] = await Promise.all([
+    const [{ data: portalUser }, { data: workspace }, { data: organizerResponses }, { data: connection }] = await Promise.all([
       supabase.from("client_portal_users").select("invited_email, invited_name, invitation_token").eq("id", job.client_portal_user_id).single(),
       supabase.from("workspaces").select("name, phone, website, mailing_address, primary_contact_email").eq("id", job.workspace_id).single(),
       supabase.from("organizer_responses").select("status, organizer_templates(name)").eq("client_id", job.client_id).neq("status", "completed"),
+      supabase
+        .from("firm_connections")
+        .select("parent_workspace_id, allows_branding_override")
+        .eq("child_workspace_id", job.workspace_id)
+        .eq("relationship_type", "ero_ptin")
+        .eq("status", "active")
+        .maybeSingle(),
     ]);
     if (!portalUser) throw new Error("Portal invitation not found");
+
+    // Same "whitelabeled by an ERO, optionally overridden by the PTIN's own
+    // logo" resolution as getEffectiveBranding -- can't reuse that helper
+    // directly here, since it needs an authenticated request's cookies and
+    // this cron route runs under the service role with no request context.
+    const brandingWorkspaceId = connection?.parent_workspace_id ?? job.workspace_id;
+    const [{ data: eroBranding }, { data: ownBranding }] = await Promise.all([
+      supabase.from("branding").select("email_header_logo_url, logo_url").eq("workspace_id", brandingWorkspaceId).maybeSingle(),
+      connection?.allows_branding_override
+        ? supabase.from("branding").select("email_header_logo_url, logo_url").eq("workspace_id", job.workspace_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const firmLogoUrl = ownBranding?.email_header_logo_url ?? ownBranding?.logo_url ?? eroBranding?.email_header_logo_url ?? eroBranding?.logo_url ?? null;
 
     const { data: template } = await supabase
       .from("email_templates")
@@ -130,6 +150,7 @@ async function sendOne(
         assignedOrganizerNames: (organizerResponses ?? [])
           .map((o: { organizer_templates: { name?: string } | null }) => o.organizer_templates?.name)
           .filter((n): n is string => Boolean(n)),
+        firmLogoUrl,
       }
     );
 

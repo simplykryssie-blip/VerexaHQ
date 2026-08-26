@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
@@ -11,6 +12,16 @@ import { getEffectiveBranding } from "@/lib/branding";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
+
+// Per-workspace favicon: the auto-generated square derivative of a
+// workspace's uploaded business logo, falling back to Verexa's own mark so
+// every workspace still gets a real tab icon before uploading one.
+export async function generateMetadata(): Promise<Metadata> {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return {};
+  const branding = await getEffectiveBranding(workspace.id);
+  return { icons: { icon: branding.faviconUrl ?? "/brand/vmark.png" } };
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const workspace = await getCurrentWorkspace();

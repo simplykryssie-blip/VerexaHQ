@@ -159,7 +159,7 @@ export function Sidebar({
           <div>
             {trimmedLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
+              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "60px", maxWidth: "220px", objectFit: "contain" }} />
             ) : (
               <>
                 <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
