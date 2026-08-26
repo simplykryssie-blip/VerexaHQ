@@ -6,6 +6,7 @@ import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
 import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/organizer/relationshipRoles";
+import { isWidthEligible } from "@/lib/organizer/layoutWidth";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -23,20 +24,6 @@ const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
   { label: "No", value: "no" },
 ];
-
-const WIDTH_OPTIONS: { value: BuilderField["layout_width"]; label: string }[] = [
-  { value: "full", label: "Full" },
-  { value: "two_thirds", label: "2/3" },
-  { value: "half", label: "Half" },
-  { value: "third", label: "1/3" },
-];
-
-// Structural field types always span the full row (a section header, page
-// break, content block, or repeating group can't meaningfully share a row
-// with a neighbor) -- the width picker only makes sense for actual
-// question fields, so it's hidden for these rather than offering a control
-// that render-time layout ignores anyway.
-const WIDTH_PICKER_HIDDEN_TYPES = new Set(["section", "page_break", "rich_text", "repeating_section"]);
 
 export function FieldPropertiesPanel({
   field,
@@ -219,25 +206,28 @@ function PropertiesForm({
         </label>
       )}
 
-      {!WIDTH_PICKER_HIDDEN_TYPES.has(field.field_type) && (
-        <div className="mt-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">Field width</p>
-          <div className="mt-1.5 flex overflow-hidden rounded-lg border border-border">
-            {WIDTH_OPTIONS.map((opt, i) => (
-              <button
-                key={opt.value}
-                type="button"
-                disabled={readOnly}
-                onClick={() => onUpdate(field.id, { layout_width: opt.value })}
-                className={`flex-1 px-2 py-1.5 text-xs font-medium transition disabled:cursor-not-allowed ${
-                  i > 0 ? "border-l border-border" : ""
-                } ${field.layout_width === opt.value ? "bg-accent text-white" : "bg-surface text-slate hover:bg-surfaceMuted"}`}
-              >
-                {opt.label}
-              </button>
-            ))}
+      {isWidthEligible(field.field_type) && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Shrink to half width</p>
+            <p className="mt-0.5 text-[11px] text-muted">Sits side by side with the next half-width field.</p>
           </div>
-          <p className="mt-1 text-[11px] text-muted">Half/1/3/2/3 fields sit side by side with neighboring fields of the same size.</p>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={field.layout_width === "half"}
+            disabled={readOnly}
+            onClick={() => onUpdate(field.id, { layout_width: field.layout_width === "half" ? "full" : "half" })}
+            className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${
+              field.layout_width === "half" ? "border-accent bg-accent" : "border-border bg-border"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                field.layout_width === "half" ? "left-[22px]" : "left-0.5"
+              }`}
+            />
+          </button>
         </div>
       )}
 

@@ -16,8 +16,8 @@ export type BuilderField = {
   layout_width: LayoutWidth;
 };
 
-/** JotForm/Cognito-style row-sharing: how much of the row this field occupies. */
-export type LayoutWidth = "full" | "half" | "third" | "two_thirds";
+/** JotForm-style row-sharing: whether this field shrinks to share its row with a neighbor. */
+export type LayoutWidth = "full" | "half";
 
 export type BuilderTemplate = {
   id: string;
