@@ -11,6 +11,13 @@ import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import type { LibraryFolderRow } from "@/components/library/types";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+
+const WEBSITE_STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  published: "success",
+  archived: "neutral",
+};
 
 export type WebsiteCard = { id: string; name: string; slug: string; status: string; folder_id: string | null; page_count: number };
 
@@ -161,7 +168,7 @@ export function WebsiteLibrary({
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {visibleWebsites.map((w) => (
-                <div key={w.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft">
+                <div key={w.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold text-ink">{w.name}</h3>
                     {canManage && (
@@ -184,7 +191,9 @@ export function WebsiteLibrary({
                     {canManage ? (
                       <TemplateStatusCycle table="site_websites" id={w.id} status={w.status} />
                     ) : (
-                      <span className="rounded-full bg-surfaceMuted px-2.5 py-1 text-xs font-medium capitalize text-muted">{w.status}</span>
+                      <Badge tone={WEBSITE_STATUS_TONE[w.status] ?? "neutral"} className="capitalize">
+                        {w.status}
+                      </Badge>
                     )}
                   </div>
                   {canManage && (

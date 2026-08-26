@@ -8,7 +8,7 @@ import { useToast } from "@/components/Toast";
 const NEXT_STATUS: Record<string, string> = { draft: "published", published: "archived", archived: "draft" };
 const STATUS_STYLE: Record<string, string> = {
   draft: "bg-surfaceMuted text-muted",
-  published: "bg-green-100 text-green-700",
+  published: "bg-success/10 text-success",
   archived: "bg-surfaceMuted text-muted",
 };
 

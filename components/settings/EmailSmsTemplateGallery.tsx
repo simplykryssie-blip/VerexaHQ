@@ -179,7 +179,7 @@ export function EmailSmsTemplateGallery({
                 const isSystem = !t.workspace_id;
                 const tokenCount = mergeFieldCount(`${t.subject ?? ""} ${kind === "email" ? t.body_html ?? "" : t.body ?? ""}`);
                 return (
-                  <div key={t.id} className="flex items-center gap-3 px-4 py-3">
+                  <div key={t.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surfaceMuted">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
                       <Icon size={14} aria-hidden="true" />
                     </span>
