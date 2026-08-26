@@ -65,7 +65,13 @@ function FieldBlock({
     >
       <div className="flex items-center justify-between gap-2 text-sm">
         <span className="min-w-0 truncate font-medium text-ink">
-          ☰ {field.label} {field.is_required && <span className="text-danger">*</span>}
+          ☰{" "}
+          {field.label ? (
+            field.label
+          ) : (
+            <span className="italic text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
+          )}{" "}
+          {field.is_required && <span className="text-danger">*</span>}
         </span>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>

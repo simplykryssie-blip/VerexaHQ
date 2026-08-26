@@ -72,8 +72,8 @@ export const FIELD_TYPE_GROUPS: { group: string; types: { type: OrganizerFieldTy
   {
     group: "Structure",
     types: [
-      { type: "section", label: "Section" },
-      { type: "rich_text", label: "Content" },
+      { type: "section", label: "Heading" },
+      { type: "rich_text", label: "Paragraph" },
       { type: "repeating_section", label: "Repeating section" },
       { type: "page_break", label: "Page break" },
     ],
@@ -84,7 +84,7 @@ export const FIELD_TYPE_LABELS: Record<OrganizerFieldType, string> = Object.from
   FIELD_TYPE_GROUPS.flatMap((g) => g.types.map((t) => [t.type, t.label]))
 ) as Record<OrganizerFieldType, string>;
 
-export const CHOICE_FIELD_TYPES = new Set<OrganizerFieldType>(["dropdown", "radio_button", "multiple_choice"]);
+export const CHOICE_FIELD_TYPES = new Set<OrganizerFieldType>(["dropdown", "radio_button", "multiple_choice", "checkbox"]);
 
 // Structural fields that display content but never collect an answer --
 // same treatment as page_break: never rendered as a question, never

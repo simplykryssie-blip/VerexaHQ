@@ -27,7 +27,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
     supabase
       .from("organizer_fields")
       .select(
-        "id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width"
+        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width"
       )
       .eq("organizer_template_id", response.organizer_template_id)
       .order("display_order"),

@@ -11,6 +11,7 @@ import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -22,6 +23,7 @@ type FieldRow = {
   field_type: string;
   label: string;
   help_text: string | null;
+  body_html?: string | null;
   is_required: boolean;
   options: unknown;
   parent_field_id: string | null;
@@ -52,7 +54,6 @@ type ServiceOption = { id: string; name: string };
 
 function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
   if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
-  if (field.field_type === "checkbox") return value === "true";
   return value.trim() !== "";
 }
 
@@ -595,21 +596,26 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="col-span-12 rounded-xl border border-border bg-surfaceMuted p-4">
-        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
-        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      <div className="col-span-12">
+        <RichTextEditor content={field.body_html ?? ""} editable={false} bare />
       </div>
     );
   }
 
+  const showHeader = !(field.field_type === "checkbox" && !field.label.trim());
+
   return (
     <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
-      <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
-        {field.label} {field.is_required && <span className="text-danger">*</span>}
-      </label>
-      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+      {showHeader && (
+        <>
+          <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
+            {field.label} {field.is_required && <span className="text-danger">*</span>}
+          </label>
+          {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+        </>
+      )}
 
-      <div className="mt-1.5">
+      <div className={showHeader ? "mt-1.5" : ""}>
         {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} />
         ) : field.field_type === "email" ? (
@@ -703,7 +709,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
               </label>
             ))}
           </div>
-        ) : field.field_type === "multiple_choice" ? (
+        ) : field.field_type === "multiple_choice" || field.field_type === "checkbox" ? (
           <div className="space-y-1.5">
             {options.map((o, i) => {
               const selected = value ? value.split(",") : [];
@@ -723,14 +729,6 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
               );
             })}
           </div>
-        ) : field.field_type === "checkbox" ? (
-          <input
-            id={`field-${field.id}`}
-            type="checkbox"
-            checked={value === "true"}
-            onChange={(e) => onChange(field.id, e.target.checked ? "true" : "false")}
-            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-          />
         ) : field.field_type === "date" ? (
           <input
             id={`field-${field.id}`}
@@ -768,13 +766,27 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
           />
         ) : field.field_type === "address" ? (
           <AddressInput value={value} onChange={(v) => onChange(field.id, v)} />
+        ) : field.field_type === "short_text" ? (
+          <input
+            id={`field-${field.id}`}
+            type="text"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className={inputClass}
+          />
         ) : (
           <textarea
             id={`field-${field.id}`}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            rows={2}
-            className={inputClass}
+            rows={3}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = `${el.scrollHeight}px`;
+              }
+            }}
+            className={`${inputClass} resize-none overflow-hidden`}
           />
         )}
       </div>

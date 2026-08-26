@@ -7,6 +7,7 @@ export type BuilderField = {
   field_type: OrganizerFieldType;
   label: string;
   help_text: string | null;
+  body_html: string | null;
   display_order: number;
   is_required: boolean;
   options: unknown;

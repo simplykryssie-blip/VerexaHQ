@@ -7,6 +7,7 @@ import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } fro
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
 import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/organizer/relationshipRoles";
 import { isWidthEligible } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -39,7 +40,7 @@ export function FieldPropertiesPanel({
     patch: Partial<
       Pick<
         BuilderField,
-        "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+        "label" | "help_text" | "body_html" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
       >
     >
   ) => void;
@@ -118,7 +119,7 @@ function PropertiesForm({
     patch: Partial<
       Pick<
         BuilderField,
-        "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+        "label" | "help_text" | "body_html" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
       >
     >
   ) => void;
@@ -169,29 +170,42 @@ function PropertiesForm({
       </div>
       <p className="mt-1 text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</p>
 
-      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
-        Label
-        <input
-          value={label}
-          disabled={readOnly}
-          onChange={(e) => setLabel(e.target.value)}
-          onBlur={() => label !== field.label && onUpdate(field.id, { label })}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-        />
-      </label>
+      {field.field_type === "rich_text" ? (
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Content</p>
+          <div className="mt-1.5">
+            <RichTextEditor content={field.body_html ?? ""} onChange={(html) => onUpdate(field.id, { body_html: html })} editable={!readOnly} bare />
+          </div>
+        </div>
+      ) : field.field_type !== "checkbox" ? (
+        <>
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+            Label
+            <input
+              value={label}
+              disabled={readOnly}
+              onChange={(e) => setLabel(e.target.value)}
+              onBlur={() => label !== field.label && onUpdate(field.id, { label })}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            />
+          </label>
 
-      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
-        Help text
-        <textarea
-          value={helpText}
-          disabled={readOnly}
-          onChange={(e) => setHelpText(e.target.value)}
-          onBlur={() => helpText !== (field.help_text ?? "") && onUpdate(field.id, { help_text: helpText || null })}
-          rows={2}
-          placeholder="Optional guidance shown under the question"
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-        />
-      </label>
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+            Help text
+            <textarea
+              value={helpText}
+              disabled={readOnly}
+              onChange={(e) => setHelpText(e.target.value)}
+              onBlur={() => helpText !== (field.help_text ?? "") && onUpdate(field.id, { help_text: helpText || null })}
+              rows={2}
+              placeholder="Optional guidance shown under the question"
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            />
+          </label>
+        </>
+      ) : (
+        <p className="mt-4 text-[11px] text-muted">Add each checkbox&apos;s text below -- no separate question label needed.</p>
+      )}
 
       {!NON_ANSWERABLE_FIELD_TYPES.has(field.field_type) && (
         <label className="mt-4 flex items-center gap-2 text-sm text-slate">

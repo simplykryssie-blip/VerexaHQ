@@ -8,6 +8,7 @@ import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditio
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import type { BuilderField } from "./types";
 
 const YES_NO_OPTIONS = [
@@ -173,20 +174,25 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="col-span-12 rounded-xl border border-border bg-surfaceMuted p-4">
-        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
-        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      <div className="col-span-12">
+        <RichTextEditor content={field.body_html ?? ""} editable={false} bare />
       </div>
     );
   }
 
+  const showHeader = !(field.field_type === "checkbox" && !field.label.trim());
+
   return (
     <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
-      <label className="block text-sm font-semibold text-ink">
-        {field.label} {field.is_required && <span className="text-danger">*</span>}
-      </label>
-      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
-      <div className="mt-1.5">
+      {showHeader && (
+        <>
+          <label className="block text-sm font-semibold text-ink">
+            {field.label} {field.is_required && <span className="text-danger">*</span>}
+          </label>
+          {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+        </>
+      )}
+      <div className={showHeader ? "mt-1.5" : ""}>
         {field.field_type === "name" ? (
           <NameInput value={value} onChange={onChange} />
         ) : field.field_type === "email" ? (
@@ -238,7 +244,7 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
               </label>
             ))}
           </div>
-        ) : field.field_type === "multiple_choice" ? (
+        ) : field.field_type === "multiple_choice" || field.field_type === "checkbox" ? (
           <div className="space-y-1.5">
             {options.map((o, i) => {
               const selected = value ? value.split(",") : [];
@@ -255,13 +261,6 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
               );
             })}
           </div>
-        ) : field.field_type === "checkbox" ? (
-          <input
-            type="checkbox"
-            checked={value === "true"}
-            onChange={(e) => onChange(e.target.checked ? "true" : "false")}
-            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-          />
         ) : field.field_type === "date" ? (
           <input type="date" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
         ) : field.field_type === "number" ? (
@@ -278,8 +277,21 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
           />
         ) : field.field_type === "address" ? (
           <AddressInput value={value} onChange={onChange} />
+        ) : field.field_type === "short_text" ? (
+          <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
         ) : (
-          <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className={inputClass} />
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={3}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = `${el.scrollHeight}px`;
+              }
+            }}
+            className={`${inputClass} resize-none overflow-hidden`}
+          />
         )}
       </div>
     </div>
