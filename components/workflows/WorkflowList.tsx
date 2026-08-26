@@ -244,9 +244,9 @@ export function WorkflowList({
                   </div>
                 </Link>
                 <div className="flex shrink-0 items-center gap-3">
-                  <span className={`text-xs font-medium ${w.is_enabled && w.step_count > 0 ? "text-success" : "text-muted"}`}>
+                  <Badge tone={w.is_enabled ? (w.step_count === 0 ? "warning" : "success") : "neutral"}>
                     {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
-                  </span>
+                  </Badge>
                   {canManage && (
                     <>
                       <FolderMoveSelect folders={folders} value={w.folder_id} onChange={(folderId) => moveWorkflow(w.id, folderId)} />

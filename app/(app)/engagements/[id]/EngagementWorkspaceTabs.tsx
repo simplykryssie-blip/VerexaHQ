@@ -24,7 +24,7 @@ import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import type { ActionPermissions } from "@/lib/actionPermissions";
-import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
+import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 
@@ -261,12 +261,6 @@ const STAGE_STATUS_TONE: Record<string, BadgeTone> = {
   "In Progress": "accent",
   Completed: "success",
   Skipped: "neutral",
-};
-
-const SHARE_STATUS_TONE: Record<string, BadgeTone> = {
-  pending: "warning",
-  corrections_requested: "danger",
-  approved: "success",
 };
 
 function SlaBadge({ category }: { category: string }) {
@@ -655,7 +649,7 @@ export function ReviewTab({
               <li key={s.id} className="py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-slate">{s.shared_with?.name ?? "Workspace"}</span>
-                  <Badge tone={SHARE_STATUS_TONE[s.status] ?? "neutral"} className="capitalize">
+                  <Badge tone={ENGAGEMENT_SHARE_STATUS_TONE[s.status] ?? "neutral"} className="capitalize">
                     {s.status.replace(/_/g, " ")}
                   </Badge>
                 </div>

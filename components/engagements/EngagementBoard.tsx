@@ -84,7 +84,7 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
                       setDraggingId(e.id);
                     }}
                     onDragEnd={() => setDraggingId(null)}
-                    className={`cursor-grab rounded-lg border border-border bg-surface p-3 shadow-sm transition active:cursor-grabbing ${
+                    className={`cursor-grab rounded-lg border border-border bg-surface p-3 shadow-soft transition hover:shadow-softHover active:cursor-grabbing ${
                       draggingId === e.id ? "opacity-40" : ""
                     }`}
                   >

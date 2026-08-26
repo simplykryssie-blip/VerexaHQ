@@ -38,3 +38,11 @@ export const ENGAGEMENT_PRIORITY_TONE: Record<string, "success" | "warning" | "d
   High: "warning",
   Urgent: "danger",
 };
+
+// Status of an engagement_shares row (a filing shared with a connected ERO
+// for review) -- shared between the engagement detail page and Review Queue.
+export const ENGAGEMENT_SHARE_STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = {
+  pending: "warning",
+  corrections_requested: "danger",
+  approved: "success",
+};
