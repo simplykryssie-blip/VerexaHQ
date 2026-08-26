@@ -48,6 +48,12 @@ type TemplateData = {
 type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 type ServiceOption = { id: string; name: string };
 
+function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
+  if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
+  if (field.field_type === "checkbox") return value === "true";
+  return value.trim() !== "";
+}
+
 // Standalone from OrganizerForm.tsx on purpose: that component persists
 // progress incrementally against an already-created organizer_responses row
 // (responseId) and uploads files to authenticated Storage. Here there's no
@@ -112,6 +118,31 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 
   function setAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  }
+
+  function unmetRequiredOnCurrentPage(): FieldRow[] {
+    return currentPage.fields.filter(
+      (f) => f.is_required && !isFieldAnswered(f, answers[f.id] ?? "", repeaterRows[f.id]?.length)
+    );
+  }
+
+  function goNext() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    setError(null);
+    setPageIndex((i) => i + 1);
+  }
+
+  function submitWithValidation() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    submit();
   }
 
   // Runs when the Contact step completes -- creates the lead (and the
@@ -468,7 +499,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             {isLastPage ? (
               <button
                 type="button"
-                onClick={submit}
+                onClick={submitWithValidation}
                 disabled={submitting}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
               >
@@ -477,7 +508,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             ) : (
               <button
                 type="button"
-                onClick={() => setPageIndex((i) => i + 1)}
+                onClick={goNext}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
               >
                 Next

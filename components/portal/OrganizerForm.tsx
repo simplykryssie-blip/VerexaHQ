@@ -33,6 +33,12 @@ type FieldRow = {
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
 
+function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
+  if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
+  if (field.field_type === "checkbox") return value === "true";
+  return value.trim() !== "";
+}
+
 export function OrganizerForm({
   responseId,
   templateName,
@@ -65,6 +71,7 @@ export function OrganizerForm({
     const type = fieldTypeById.get(fieldId);
     if (type === "address") return coerceAddressAnswerToString(value);
     if (type === "name") return coerceNameAnswerToString(value);
+    if (type === "phone") return formatPhone(String(value));
     return String(value);
   };
 
@@ -238,6 +245,30 @@ export function OrganizerForm({
   const currentPage = pages[currentIndex];
   const isLastPage = currentIndex === pages.length - 1;
 
+  function unmetRequiredOnCurrentPage(): FieldRow[] {
+    return currentPage.fields.filter(
+      (f) => f.is_required && !isFieldAnswered(f, answers[f.id] ?? "", repeaterRows[f.id]?.length)
+    );
+  }
+
+  function goNext() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      toast.show(`Please answer: ${unmet.map((f) => f.label).join(", ")}`, "error");
+      return;
+    }
+    setPageIndex((i) => Math.min(pages.length - 1, i + 1));
+  }
+
+  function submitWithValidation() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      toast.show(`Please answer: ${unmet.map((f) => f.label).join(", ")}`, "error");
+      return;
+    }
+    submit();
+  }
+
   return (
     <div className="space-y-4">
       {justSubmitted && (
@@ -316,7 +347,7 @@ export function OrganizerForm({
           {pages.length > 1 && !isLastPage && (
             <button
               type="button"
-              onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+              onClick={goNext}
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
             >
               Next
@@ -333,7 +364,7 @@ export function OrganizerForm({
           {(pages.length === 1 || isLastPage) && (
             <button
               type="button"
-              onClick={submit}
+              onClick={submitWithValidation}
               disabled={saving || submitting}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
