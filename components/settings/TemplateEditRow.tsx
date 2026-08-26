@@ -76,6 +76,11 @@ export function TemplateEditRow({
 
   const smsLength = smsBody.length;
   const smsSegments = Math.max(1, Math.ceil(smsLength / SMS_SEGMENT_LENGTH) || 1);
+  // Bubble width tracks the longest line instead of staying a fixed box,
+  // so a short "Thanks!" doesn't sit inside the same wide rectangle as a
+  // full paragraph -- clamped so a very long single line still wraps.
+  const smsLongestLine = Math.max(4, ...smsBody.split("\n").map((line) => line.length));
+  const smsBubbleWidthCh = Math.min(smsLongestLine + 2, 44);
 
   async function save() {
     setSaving(true);
@@ -195,7 +200,10 @@ export function TemplateEditRow({
             </div>
             <div className="mt-2 flex justify-end">
               {isSystem ? (
-                <div className="max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-accent px-4 py-2.5 text-sm text-white">
+                <div
+                  className="max-w-[75%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-accent px-4 py-2.5 text-sm text-white"
+                  style={{ width: `${smsBubbleWidthCh}ch` }}
+                >
                   {smsBody || <span className="text-white/70">(empty message)</span>}
                 </div>
               ) : (
@@ -210,7 +218,7 @@ export function TemplateEditRow({
                   rows={1}
                   placeholder="Type your message..."
                   className="max-w-[75%] resize-none overflow-hidden rounded-2xl rounded-br-sm bg-accent px-4 py-2.5 text-sm text-white placeholder:text-white/70 focus:outline-none focus:ring-2 focus:ring-white/30"
-                  style={{ minHeight: "44px", width: "320px" }}
+                  style={{ minHeight: "44px", width: `${smsBubbleWidthCh}ch` }}
                 />
               )}
             </div>

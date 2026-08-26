@@ -903,6 +903,7 @@ function CanvasInner({
             </div>
           ) : selectedStep ? (
             <StepCard
+              key={selectedStep.id}
               workspaceId={workspaceId}
               step={selectedStep}
               index={0}

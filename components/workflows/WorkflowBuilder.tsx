@@ -542,6 +542,15 @@ export function StepCard({
                 </button>
               )}
             </div>
+            {emailOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published email templates yet -- a template stays hidden here until you publish it from{" "}
+                <a href="/automations" target="_blank" rel="noreferrer" className="underline">
+                  Email &amp; SMS
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "email" && (
               <div className="mt-1">
                 <CreateTemplateForm
@@ -604,6 +613,15 @@ export function StepCard({
                 </button>
               )}
             </div>
+            {smsOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published SMS templates yet -- a template stays hidden here until you publish it from{" "}
+                <a href="/automations" target="_blank" rel="noreferrer" className="underline">
+                  Email &amp; SMS
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "sms" && (
               <div className="mt-1">
                 <CreateTemplateForm
@@ -836,6 +854,15 @@ export function StepCard({
               service under Services) -- pick a specific template instead only if this step should always send the
               same organizer regardless of service.
             </span>
+            {organizerOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published organizers yet -- an organizer stays hidden here until you publish it from{" "}
+                <a href="/templates" target="_blank" rel="noreferrer" className="underline">
+                  Form Templates
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "organizer" && (
               <div className="mt-1">
                 <CreateQuickTemplate
@@ -901,6 +928,15 @@ export function StepCard({
                 </button>
               )}
             </div>
+            {engagementLetterOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published engagement letters yet -- a template stays hidden here until you publish it from{" "}
+                <a href="/templates" target="_blank" rel="noreferrer" className="underline">
+                  Form Templates
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "engagement_letter" && (
               <div className="mt-1">
                 <CreateQuickTemplate
