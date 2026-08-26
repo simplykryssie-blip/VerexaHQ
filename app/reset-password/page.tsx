@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -66,9 +67,8 @@ export default function ResetPasswordPage() {
       <form onSubmit={handleSubmit} className={styles.form}>
         <div className={styles.field}>
           <label htmlFor="password">New password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             required
             minLength={8}
             value={password}
@@ -81,9 +81,8 @@ export default function ResetPasswordPage() {
         </div>
         <div className={styles.field}>
           <label htmlFor="confirm_password">Confirm new password</label>
-          <input
+          <PasswordInput
             id="confirm_password"
-            type="password"
             required
             minLength={6}
             value={confirmPassword}

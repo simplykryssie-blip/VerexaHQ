@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -284,9 +285,8 @@ export default function PortalAcceptInvitationPage() {
 
         <div className={styles.field}>
           <label htmlFor="password">{mode === "sign-up" ? "Choose a password" : "Password"}</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             required
             minLength={mode === "sign-up" ? preview.password_min_length : undefined}
             placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
@@ -301,9 +301,8 @@ export default function PortalAcceptInvitationPage() {
         {mode === "sign-up" && (
           <div className={styles.field}>
             <label htmlFor="confirm_password">Confirm password</label>
-            <input
+            <PasswordInput
               id="confirm_password"
-              type="password"
               required
               minLength={preview.password_min_length}
               placeholder="Confirm password"

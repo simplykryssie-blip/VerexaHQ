@@ -7,6 +7,7 @@ import { SignaturePad } from "@/components/SignaturePad";
 import { renderTemplate } from "@/lib/templates/render";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 type TemplateData = {
   template: { id: string; name: string; body_html: string; requires_signature: boolean; banner_image_url: string | null };
@@ -228,21 +229,21 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
               <>
                 <div>
                   <label className="block text-sm font-medium text-ink">Create a password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    wrapperClassName="mt-1"
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <p className="mt-1 text-xs text-muted">{passwordRequirementsHint(minPasswordLength)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-ink">Confirm password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    wrapperClassName="mt-1"
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
               </>

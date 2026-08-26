@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Copy, Trash2, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { PasswordInput } from "@/components/PasswordInput";
 
 type Credential = { id: string; system_name: string; username: string | null; notes: string | null; updated_at: string };
 
@@ -157,8 +158,7 @@ export function SystemCredentialsManager({ credentials }: { credentials: Credent
                 className="rounded-lg border border-border px-3 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
-            <input
-              type="password"
+            <PasswordInput
               value={form.secret}
               onChange={(e) => setForm((f) => ({ ...f, secret: e.target.value }))}
               placeholder={form.id ? "New password (leave blank to keep current)" : "Password"}

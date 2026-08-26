@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -259,8 +260,7 @@ export default function AcceptInvitationPage() {
           className="w-full rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted"
         />
 
-        <input
-          type="password"
+        <PasswordInput
           required
           minLength={mode === "sign-up" ? preview.password_min_length : undefined}
           placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
@@ -278,8 +278,7 @@ export default function AcceptInvitationPage() {
         )}
 
         {mode === "sign-up" && (
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             placeholder="Confirm password"

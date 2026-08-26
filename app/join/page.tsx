@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -371,9 +372,8 @@ export default function JoinPage() {
         </div>
         <div className={styles.field}>
           <label htmlFor="password">Password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             required
             minLength={mode === "sign-up" ? 8 : undefined}
             value={password}
@@ -386,9 +386,8 @@ export default function JoinPage() {
         {mode === "sign-up" && (
           <div className={styles.field}>
             <label htmlFor="confirm_password">Confirm password</label>
-            <input
+            <PasswordInput
               id="confirm_password"
-              type="password"
               required
               minLength={8}
               value={confirmPassword}
