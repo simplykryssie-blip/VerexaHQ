@@ -41,6 +41,7 @@ import {
   BellOff,
   BellRing,
   Milestone,
+  History,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -1642,6 +1643,7 @@ export function WorkflowBuilder({
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
@@ -1683,7 +1685,16 @@ export function WorkflowBuilder({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Steps</h3>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-ink">Steps</h3>
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+          >
+            <History size={14} /> Activity{runs.length > 0 ? ` (${runs.length})` : ""}
+          </button>
+        </div>
         {steps.length === 0 && !canManage ? (
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
         ) : (
@@ -1780,62 +1791,84 @@ export function WorkflowBuilder({
         </div>
       )}
 
-      <CollapsibleSection title="All runs" count={runs.length}>
-        {runs.length === 0 ? (
-          <EmptyState message="This workflow hasn't fired yet." />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-4 py-2 font-medium">Engagement / client</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">Started</th>
-                  <th className="px-4 py-2 font-medium">Completed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {runs.map((r) => (
-                  <tr key={r.id} onClick={() => setOpenRunId(r.id)} className="cursor-pointer hover:bg-surfaceMuted">
-                    <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${
-                          r.status === "running" ? "text-accent" : r.status === "failed" ? "text-danger" : r.status === "completed" ? "text-success" : "text-muted"
-                        }`}
-                      >
-                        {r.status === "running" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
-                    <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CollapsibleSection>
+      {activityOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Activity" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-ink">Activity</h2>
+              <button type="button" onClick={() => setActivityOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
+                <X size={16} />
+              </button>
+            </div>
 
-      {logs.length > 0 && (
-        <CollapsibleSection title="Execution log" count={logs.length}>
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
-            {logs.map((l) => {
-              const data = (l.execution_data ?? {}) as { action_type?: string };
-              return (
-                <li key={l.id} className="flex items-center justify-between gap-2 px-4 py-2">
-                  <span className="text-slate">{data.action_type ?? "step"}</span>
-                  <span className={`text-xs font-medium ${l.status === "completed" ? "text-success" : "text-danger"}`}>
-                    {l.status}
-                    {l.error_message ? `: ${l.error_message}` : ""}
-                  </span>
-                  <span className="text-xs text-muted">{l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </CollapsibleSection>
+            <CollapsibleSection title="Runs" count={runs.length}>
+              {runs.length === 0 ? (
+                <EmptyState message="This workflow hasn't fired yet." />
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                        <th className="px-4 py-2 font-medium">Engagement / client</th>
+                        <th className="px-4 py-2 font-medium">Status</th>
+                        <th className="px-4 py-2 font-medium">Started</th>
+                        <th className="px-4 py-2 font-medium">Completed</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {runs.map((r) => (
+                        <tr
+                          key={r.id}
+                          onClick={() => setOpenRunId(r.id)}
+                          className="cursor-pointer transition-colors hover:bg-surfaceMuted"
+                        >
+                          <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
+                          <td className="px-4 py-2">
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${
+                                r.status === "running" ? "text-accent" : r.status === "failed" ? "text-danger" : r.status === "completed" ? "text-success" : "text-muted"
+                              }`}
+                            >
+                              {r.status === "running" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="border-t border-border bg-surfaceMuted px-4 py-2 text-[11px] text-muted">
+                    Click a run to see its step-by-step execution log.
+                  </p>
+                </div>
+              )}
+            </CollapsibleSection>
+
+            {logs.length > 0 && (
+              <div className="mt-6">
+                <CollapsibleSection title="Other step executions" count={logs.length}>
+                  <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
+                    {logs.map((l) => {
+                      const data = (l.execution_data ?? {}) as { action_type?: string };
+                      return (
+                        <li key={l.id} className="flex items-center justify-between gap-2 px-4 py-2">
+                          <span className="text-slate">{data.action_type ?? "step"}</span>
+                          <span className={`text-xs font-medium ${l.status === "completed" ? "text-success" : "text-danger"}`}>
+                            {l.status}
+                            {l.error_message ? `: ${l.error_message}` : ""}
+                          </span>
+                          <span className="text-xs text-muted">{l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CollapsibleSection>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {openRunId && <RunDetailPanel runId={openRunId} onClose={() => setOpenRunId(null)} />}
