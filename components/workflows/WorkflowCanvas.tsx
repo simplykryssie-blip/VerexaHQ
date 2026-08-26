@@ -27,13 +27,14 @@ import {
   type OnNodeDrag,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Plus, Split, Trash2, X, Zap } from "lucide-react";
+import { Plus, Split, Trash2, X, Zap, MoreVertical, Pencil, Copy, EyeOff, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import {
   StepCard,
   actionIcon,
   ACTION_TYPES,
+  ACTION_CATEGORIES,
   type WorkflowStepRow,
   type WorkflowStepEdgeRow,
   type WorkflowRunRow,
@@ -43,8 +44,123 @@ import {
 } from "@/components/workflows/WorkflowBuilder";
 import { triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { BranchEditor } from "@/components/workflows/BranchEditor";
+import { StepPicker } from "@/components/workflows/StepPicker";
 
-type StepNodeData = { step: WorkflowStepRow; activeRuns: WorkflowRunRow[]; onOpenRun: (runId: string) => void };
+type StepNodeActions = {
+  canManage: boolean;
+  onRename: (stepId: string, name: string | null) => void;
+  onDuplicate: (stepId: string) => void;
+  onToggleEnabled: (stepId: string, enabled: boolean) => void;
+  onDelete: (stepId: string) => void;
+};
+
+type StepNodeData = { step: WorkflowStepRow; activeRuns: WorkflowRunRow[]; onOpenRun: (runId: string) => void; actions: StepNodeActions };
+
+// Shared ⋮ menu for a canvas node -- Rename (inline edit, toggled via
+// onRenameStart so the node itself owns the input/save/cancel UI, since the
+// menu closes as soon as an option is picked), Duplicate, Disable/Enable,
+// Delete. allowDisable is false for condition steps -- "disable" has no
+// well-defined meaning for a branch point (which branch would it take?), so
+// that option is simply not offered there rather than guessing.
+function NodeMenu({
+  isEnabled,
+  allowDisable,
+  onRenameStart,
+  onDuplicate,
+  onToggleEnabled,
+  onDelete,
+}: {
+  isEnabled: boolean;
+  allowDisable: boolean;
+  onRenameStart: () => void;
+  onDuplicate: () => void;
+  onToggleEnabled: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="nodrag relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Step options"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted hover:bg-surfaceMuted hover:text-ink"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <div
+          onMouseLeave={() => setOpen(false)}
+          className="absolute right-0 top-7 z-30 w-40 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onRenameStart();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
+          >
+            <Pencil size={13} /> Rename
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onDuplicate();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
+          >
+            <Copy size={13} /> Duplicate
+          </button>
+          {allowDisable && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onToggleEnabled();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
+            >
+              {isEnabled ? <EyeOff size={13} /> : <Eye size={13} />} {isEnabled ? "Disable" : "Enable"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-xs font-medium text-danger hover:bg-danger/10"
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Inline rename input shared by every node type -- Enter/blur saves,
+// Escape cancels. An empty value saves as null (falls back to the
+// action/condition's default label) rather than persisting an empty string.
+function RenameInput({ initial, onSave, onCancel }: { initial: string; onSave: (value: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(initial);
+  return (
+    <input
+      autoFocus
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onSave(value);
+        if (e.key === "Escape") onCancel();
+      }}
+      onBlur={() => onSave(value)}
+      className="nodrag w-full rounded border border-accent bg-surface px-1.5 py-0.5 text-[13.5px] font-semibold text-ink outline-none"
+    />
+  );
+}
 
 function runInitials(run: WorkflowRunRow) {
   const label = run.client_name ?? run.engagement_number ?? "?";
@@ -126,32 +242,62 @@ function stepKind(actionType: string) {
 }
 
 function ActionNode({ data, selected }: NodeProps & { data: StepNodeData }) {
-  const { step, activeRuns, onOpenRun } = data;
+  const { step, activeRuns, onOpenRun, actions } = data;
+  const [renaming, setRenaming] = useState(false);
   const actionMeta = ACTION_TYPES.find((a) => a.value === step.action_type);
   const kind = stepKind(step.action_type);
+  const displayName = step.display_name?.trim() || actionMeta?.label || step.action_type;
+  const isEnabled = step.is_enabled !== false;
   return (
     <div
-      className={`relative w-64 rounded-2xl border bg-surface px-4 py-3 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-border"}`}
+      // No fixed width: min-w keeps short labels from looking cramped, max-w
+      // keeps a very long custom name from stretching the node absurdly wide
+      // -- text wraps within that range instead of being clipped.
+      className={`relative min-w-[220px] max-w-[320px] rounded-2xl border bg-surface px-4 py-3 shadow-soft ${
+        selected ? "border-accent ring-2 ring-accent/25" : "border-border"
+      } ${isEnabled ? "" : "opacity-55"}`}
     >
       <RunTicker runs={activeRuns} onOpenRun={onOpenRun} />
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]"
           style={{ background: kind.soft, color: kind.color }}
         >
           {actionIcon(step.action_type)}
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-[13.5px] font-semibold text-ink">{actionMeta?.label ?? step.action_type}</p>
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <RenameInput
+              initial={step.display_name ?? ""}
+              onSave={(v) => {
+                setRenaming(false);
+                actions.onRename(step.id, v.trim() || null);
+              }}
+              onCancel={() => setRenaming(false)}
+            />
+          ) : (
+            <p className="break-words text-[13.5px] font-semibold leading-snug text-ink">{displayName}</p>
+          )}
           <div className="mt-0.5 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: kind.color }} />
             <span className="text-[11px] font-medium text-muted">
               {kind.label}
               {step.delay_minutes > 0 ? ` · ${step.delay_minutes}m` : ""}
+              {!isEnabled ? " · Disabled" : ""}
             </span>
           </div>
         </div>
+        {actions.canManage && !renaming && (
+          <NodeMenu
+            isEnabled={isEnabled}
+            allowDisable
+            onRenameStart={() => setRenaming(true)}
+            onDuplicate={() => actions.onDuplicate(step.id)}
+            onToggleEnabled={() => actions.onToggleEnabled(step.id, !isEnabled)}
+            onDelete={() => actions.onDelete(step.id)}
+          />
+        )}
       </div>
       <Handle type="source" position={Position.Bottom} style={handleStyle} className="!bg-muted" />
     </div>
@@ -168,19 +314,32 @@ type ConditionBranchHandle = { id: string; label: string | null; wired: boolean 
 // back to a single generic handle so it can still be wired up directly from
 // the canvas.
 function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { branches: ConditionBranchHandle[] } }) {
-  const branches = data.branches;
+  const { step, branches, actions } = data;
+  const [renaming, setRenaming] = useState(false);
+  const displayName = step.display_name?.trim() || "Condition";
   return (
     <div
-      className={`relative w-80 rounded-2xl border bg-surface px-4 py-3.5 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-[#DDD9FB]"}`}
+      className={`relative min-w-[260px] max-w-[340px] rounded-2xl border bg-surface px-4 py-3.5 shadow-soft ${selected ? "border-accent ring-2 ring-accent/25" : "border-[#DDD9FB]"}`}
     >
       <RunTicker runs={data.activeRuns} onOpenRun={data.onOpenRun} />
       <Handle type="target" position={Position.Top} style={handleStyle} className="!bg-muted" />
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-violetSoft text-violet">
           <Split size={18} />
         </span>
-        <div className="min-w-0">
-          <p className="text-[14px] font-semibold text-ink">Condition</p>
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <RenameInput
+              initial={step.display_name ?? ""}
+              onSave={(v) => {
+                setRenaming(false);
+                actions.onRename(step.id, v.trim() || null);
+              }}
+              onCancel={() => setRenaming(false)}
+            />
+          ) : (
+            <p className="break-words text-[14px] font-semibold leading-snug text-ink">{displayName}</p>
+          )}
           <div className="mt-0.5 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet" />
             <span className="text-[11px] font-medium text-muted">
@@ -188,6 +347,16 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
             </span>
           </div>
         </div>
+        {actions.canManage && !renaming && (
+          <NodeMenu
+            isEnabled
+            allowDisable={false}
+            onRenameStart={() => setRenaming(true)}
+            onDuplicate={() => actions.onDuplicate(step.id)}
+            onToggleEnabled={() => {}}
+            onDelete={() => actions.onDelete(step.id)}
+          />
+        )}
       </div>
       {branches.length > 0 && (
         // One row per branch (not a side-by-side grid) so each branch's full
@@ -222,13 +391,13 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
 
 function TriggerNode({ data }: NodeProps & { data: { summary: string } }) {
   return (
-    <div className="w-64 cursor-pointer rounded-2xl bg-ink px-4 py-3 shadow-soft">
+    <div className="min-w-[220px] max-w-[320px] cursor-pointer rounded-2xl bg-ink px-4 py-3 shadow-soft">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-white/[0.14] text-white">
           <Zap size={16} />
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[13.5px] font-semibold text-white">{data.summary}</p>
+          <p className="break-words text-[13.5px] font-semibold leading-snug text-white">{data.summary}</p>
           <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/60">Trigger</p>
         </div>
       </div>
@@ -275,34 +444,26 @@ function StepEdge({ id, sourceX, sourceY, targetX, targetY, style, markerEnd, da
             {menuOpen && (
               <div
                 onMouseLeave={() => setMenuOpen(false)}
-                className="absolute left-1/2 top-8 z-30 w-56 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
+                className="absolute left-1/2 top-8 z-30 w-[420px] -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
               >
-                <button
-                  type="button"
-                  onClick={() => {
+                <StepPicker
+                  items={ACTION_TYPES}
+                  categories={ACTION_CATEGORIES}
+                  icon={actionIcon}
+                  onSelect={(value) => {
                     setMenuOpen(false);
-                    onInsert("condition");
+                    onInsert(value);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-violetSoft"
-                >
-                  <Split size={14} className="text-violet" /> Condition (if/else)
-                </button>
-                <div className="max-h-64 overflow-y-auto border-t border-border">
-                  {ACTION_TYPES.map((t) => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onInsert(t.value);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
-                    >
-                      <span className="text-accent">{actionIcon(t.value)}</span>
-                      <span className="truncate">{t.label}</span>
-                    </button>
-                  ))}
-                </div>
+                  extraTopItem={{
+                    label: "Condition (if/else)",
+                    icon: <Split size={14} className="text-violet" />,
+                    description: "Branch the workflow based on a condition.",
+                    onSelect: () => {
+                      setMenuOpen(false);
+                      onInsert("condition");
+                    },
+                  }}
+                />
               </div>
             )}
           </div>
@@ -473,7 +634,13 @@ function CanvasInner({
         id: s.id,
         type: s.action_type === "condition" ? "condition" : "action",
         position: s.canvas_x != null && s.canvas_y != null ? { x: s.canvas_x, y: s.canvas_y } : autoLayout.get(s.id) ?? { x: TRUNK_X, y: 140 },
-        data: { step: s, branches, activeRuns: runsByStepId.get(s.id) ?? [], onOpenRun },
+        data: {
+          step: s,
+          branches,
+          activeRuns: runsByStepId.get(s.id) ?? [],
+          onOpenRun,
+          actions: { canManage, onRename: renameStep, onDuplicate: duplicateStep, onToggleEnabled: toggleStepEnabled, onDelete: deleteStep },
+        },
       };
     });
     const triggerNode: Node = {
@@ -486,7 +653,7 @@ function CanvasInner({
     };
     return [triggerNode, ...stepNodes];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [steps, edgeRows, triggerType, triggerConfig, runsByStepId, onOpenRun]);
+  }, [steps, edgeRows, triggerType, triggerConfig, runsByStepId, onOpenRun, canManage]);
 
   const initialEdges: Edge[] = useMemo(() => {
     // A branch with no destination yet (defined via the condition modal,
@@ -655,6 +822,56 @@ function CanvasInner({
     router.refresh();
   }
 
+  async function renameStep(stepId: string, name: string | null) {
+    const { error } = await supabase.from("automation_steps").update({ display_name: name }).eq("id", stepId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function toggleStepEnabled(stepId: string, enabled: boolean) {
+    const { error } = await supabase.from("automation_steps").update({ is_enabled: enabled }).eq("id", stepId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(enabled ? "Step enabled" : "Step disabled", "success");
+    router.refresh();
+  }
+
+  // Places the copy just to the right of the original rather than trying to
+  // auto-wire it into the chain -- inserting a step "between" two others
+  // already has a dedicated, unambiguous interaction (the edge's own "+"),
+  // and a condition step's copy has no branches yet to wire up anyway. The
+  // user drags a connection to/from the copy wherever it belongs.
+  async function duplicateStep(stepId: string) {
+    const original = steps.find((s) => s.id === stepId);
+    if (!original) return;
+    const { data: newStep, error } = await supabase
+      .from("automation_steps")
+      .insert({
+        automation_id: automationId,
+        display_order: steps.length > 0 ? Math.max(...steps.map((s) => s.display_order)) + 1 : 0,
+        action_type: original.action_type,
+        action_config: original.action_config,
+        delay_minutes: original.delay_minutes,
+        display_name: original.display_name ? `${original.display_name} (copy)` : null,
+        canvas_x: (original.canvas_x ?? TRUNK_X) + COLUMN_WIDTH,
+        canvas_y: original.canvas_y ?? 140,
+      } as never)
+      .select("id")
+      .single();
+    if (error || !newStep) {
+      toast.show(error?.message ?? "Could not duplicate this step", "error");
+      return;
+    }
+    toast.show("Step duplicated", "success");
+    setSelectedStepId((newStep as { id: string }).id);
+    router.refresh();
+  }
+
   // Inserts a new step *between* the two steps an existing connector already
   // joins -- the connector's own "+" button, GHL/Tax Nitro's core building
   // interaction. edgeId is either a real automation_step_edges id (rewire
@@ -806,33 +1023,25 @@ function CanvasInner({
               <Plus size={14} /> Add step
             </button>
             {addMenuOpen && (
-              <div className="absolute right-0 mt-1 w-64 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
+              <div className="absolute right-0 mt-1 w-[420px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+                <StepPicker
+                  items={ACTION_TYPES}
+                  categories={ACTION_CATEGORIES}
+                  icon={actionIcon}
+                  onSelect={(value) => {
                     setAddMenuOpen(false);
-                    addStep("condition");
+                    addStep(value);
                   }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-violetSoft"
-                >
-                  <Split size={14} className="text-violet" /> Condition (if/else)
-                </button>
-                <div className="max-h-72 overflow-y-auto border-t border-border">
-                  {ACTION_TYPES.map((t) => (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => {
-                        setAddMenuOpen(false);
-                        addStep(t.value);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink hover:bg-accentSoft"
-                    >
-                      <span className="text-accent">{actionIcon(t.value)}</span>
-                      <span className="truncate">{t.label}</span>
-                    </button>
-                  ))}
-                </div>
+                  extraTopItem={{
+                    label: "Condition (if/else)",
+                    icon: <Split size={14} className="text-violet" />,
+                    description: "Branch the workflow based on a condition.",
+                    onSelect: () => {
+                      setAddMenuOpen(false);
+                      addStep("condition");
+                    },
+                  }}
+                />
               </div>
             )}
           </div>
