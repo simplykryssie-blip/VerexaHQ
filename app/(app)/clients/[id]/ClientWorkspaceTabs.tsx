@@ -46,35 +46,10 @@ import { EditClientProfileForm } from "./EditClientProfileForm";
 import { TagsEditor } from "./TagsEditor";
 import { ServiceInterestControl } from "./ServiceInterestControl";
 import type { ActionPermissions } from "@/lib/actionPermissions";
-
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {action}
-      </div>
-      <div className="px-5 py-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-0.5 text-slate">{value ?? "--"}</dd>
-    </div>
-  );
-}
+import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -498,15 +473,17 @@ export function OverviewTab({
                     showStaffRoles && e.reviewer?.id && e.reviewer.id !== client.default_reviewer?.id;
                   const taxYear = engagementTaxYear(e);
                   return (
-                    <tr key={e.id} className="hover:bg-surfaceMuted">
-                      <td className="px-4 py-2">
+                    <tr key={e.id} className="transition-colors hover:bg-surfaceMuted">
+                      <td className="px-4 py-2.5">
                         <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
                           {e.engagement_number ?? "Engagement"}
                         </Link>
                       </td>
-                      <td className="px-4 py-2 text-slate">{e.services?.name ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate">{e.status}</td>
-                      <td className="px-4 py-2 text-slate">
+                      <td className="px-4 py-2.5 text-slate">{e.services?.name ?? "--"}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge tone={ENGAGEMENT_STATUS_TONE[e.status] ?? "neutral"}>{e.status}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate">
                         {e.assigned_staff?.display_name ?? "Unassigned"}
                         {staffDiffers && (
                           <span className="ml-1 text-xs text-warning" title="Differs from this client's default relationship manager">
@@ -514,7 +491,7 @@ export function OverviewTab({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-slate">
+                      <td className="px-4 py-2.5 text-slate">
                         {e.reviewer?.display_name ?? "--"}
                         {reviewerDiffers && (
                           <span className="ml-1 text-xs text-warning" title="Differs from this client's default reviewer">
@@ -522,9 +499,11 @@ export function OverviewTab({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-slate">{e.priority ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate">{taxYear ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
+                      <td className="px-4 py-2.5">
+                        {e.priority ? <Badge tone={ENGAGEMENT_PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge> : <span className="text-muted">--</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate">{taxYear ?? "--"}</td>
+                      <td className="px-4 py-2.5 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
                     </tr>
                   );
                 })}
@@ -990,8 +969,11 @@ export function BillingTab({
                   {q.quote_number} -- {q.title}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {q.status} -- {money(q.total_amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={BILLING_DOCUMENT_STATUS_TONE[q.status] ?? "neutral"} className="capitalize">
+                      {q.status}
+                    </Badge>
+                    {money(q.total_amount)}
                   </span>
                   {canManageBilling && (
                     <button
@@ -1037,8 +1019,11 @@ export function BillingTab({
                   <div className="flex items-center justify-between">
                     <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
                     <div className="flex items-center gap-3">
-                      <span className="capitalize text-muted">
-                        {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                      <span className="flex items-center gap-2 text-muted">
+                        <Badge tone={BILLING_DOCUMENT_STATUS_TONE[i.status] ?? "neutral"} className="capitalize">
+                          {i.status}
+                        </Badge>
+                        {money(i.total_amount)} ({money(i.amount_paid)} paid)
                       </span>
                       {canManageBilling && i.status !== "paid" && i.status !== "void" && (
                         <button
@@ -1097,8 +1082,11 @@ export function BillingTab({
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {p.status} -- {money(p.amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
+                      {p.status}
+                    </Badge>
+                    {money(p.amount)}
                   </span>
                   {canManageBilling && p.status !== "refunded" && p.stripe_payment_intent_id && (
                     <RefundButton paymentId={p.id} amount={p.amount} />

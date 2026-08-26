@@ -10,6 +10,8 @@ import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureReque
 import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_TONE } from "@/lib/engagementStatus";
 import {
   OverviewTab,
   WorkflowTab,
@@ -153,7 +155,9 @@ export function EngagementWorkspace({
               </a>
             )}
             {engagement.services?.name && <span>{engagement.services.name}</span>}
-            <span className="capitalize">{engagement.status}</span>
+            <Badge tone={ENGAGEMENT_STATUS_TONE[engagement.status] ?? "neutral"} className="capitalize">
+              {engagement.status}
+            </Badge>
             <span>Assigned: {engagement.assigned_staff?.display_name ?? "Unassigned"}</span>
             {showStaffRoles && <span>Reviewer: {engagement.reviewer?.display_name ?? "Unassigned"}</span>}
             {engagement.due_date && <span>Due {new Date(engagement.due_date).toLocaleDateString()}</span>}

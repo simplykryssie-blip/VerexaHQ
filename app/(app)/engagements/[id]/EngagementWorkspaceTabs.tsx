@@ -25,35 +25,8 @@ import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCa
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
-
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {action}
-      </div>
-      <div className="px-5 py-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-0.5 text-slate">{value ?? "--"}</p>
-    </div>
-  );
-}
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -247,15 +220,17 @@ export function WorkflowTab({ stages, engagementId, workspaceId }: { stages: Sta
             </thead>
             <tbody className="divide-y divide-border">
               {stages.map((s) => (
-                <tr key={s.id} className="hover:bg-surfaceMuted">
-                  <td className="px-4 py-2 font-medium text-ink">{s.stage_name}</td>
-                  <td className="px-4 py-2 text-slate">{s.status}</td>
-                  <td className="px-4 py-2">
+                <tr key={s.id} className="transition-colors hover:bg-surfaceMuted">
+                  <td className="px-4 py-2.5 font-medium text-ink">{s.stage_name}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge tone={STAGE_STATUS_TONE[s.status] ?? "neutral"}>{s.status}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5">
                     {s.sla_category && <SlaBadge category={s.sla_category} />}
                   </td>
-                  <td className="px-4 py-2 text-slate">{staffName(s.reviewer)}</td>
-                  <td className="px-4 py-2 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2.5 text-slate">{staffName(s.reviewer)}</td>
+                  <td className="px-4 py-2.5 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
+                  <td className="px-4 py-2.5">
                     {s.status !== "Completed" &&
                       s.status !== "Skipped" &&
                       (s.stage_name === "Filed / Awaiting Acceptance" ? (
@@ -279,6 +254,19 @@ const SLA_TONE: Record<string, BadgeTone> = {
   Completed: "neutral",
   Overdue: "danger",
   Exceeded: "warning",
+};
+
+const STAGE_STATUS_TONE: Record<string, BadgeTone> = {
+  Waiting: "warning",
+  "In Progress": "accent",
+  Completed: "success",
+  Skipped: "neutral",
+};
+
+const SHARE_STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "warning",
+  corrections_requested: "danger",
+  approved: "success",
 };
 
 function SlaBadge({ category }: { category: string }) {
@@ -667,7 +655,9 @@ export function ReviewTab({
               <li key={s.id} className="py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-slate">{s.shared_with?.name ?? "Workspace"}</span>
-                  <span className="capitalize text-muted">{s.status.replace(/_/g, " ")}</span>
+                  <Badge tone={SHARE_STATUS_TONE[s.status] ?? "neutral"} className="capitalize">
+                    {s.status.replace(/_/g, " ")}
+                  </Badge>
                 </div>
                 {reviewActions
                   .filter((r) => r.engagement_share_id === s.id)
@@ -809,8 +799,11 @@ export function BillingTab({
                   {q.quote_number} -- {q.title}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {q.status} -- {money(q.total_amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={BILLING_DOCUMENT_STATUS_TONE[q.status] ?? "neutral"} className="capitalize">
+                      {q.status}
+                    </Badge>
+                    {money(q.total_amount)}
                   </span>
                   {canManageBilling && (
                     <button
@@ -855,8 +848,11 @@ export function BillingTab({
                   <div className="flex items-center justify-between">
                     <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
                     <div className="flex items-center gap-3">
-                      <span className="capitalize text-muted">
-                        {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                      <span className="flex items-center gap-2 text-muted">
+                        <Badge tone={BILLING_DOCUMENT_STATUS_TONE[i.status] ?? "neutral"} className="capitalize">
+                          {i.status}
+                        </Badge>
+                        {money(i.total_amount)} ({money(i.amount_paid)} paid)
                       </span>
                       {canManageBilling && i.status !== "paid" && i.status !== "void" && (
                         <button
@@ -911,8 +907,11 @@ export function BillingTab({
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {p.status} -- {money(p.amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
+                      {p.status}
+                    </Badge>
+                    {money(p.amount)}
                   </span>
                   {canManageBilling && p.status !== "refunded" && p.stripe_payment_intent_id && (
                     <RefundButton paymentId={p.id} amount={p.amount} />

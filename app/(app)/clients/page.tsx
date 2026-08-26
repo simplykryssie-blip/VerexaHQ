@@ -4,10 +4,11 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/Avatar";
 import { NewClientButton } from "./NewClientButton";
 import { TagFilterControl } from "./TagFilterControl";
+import { clientStatusTone } from "@/lib/clientStatus";
 
 export const dynamic = 'force-dynamic';
 
@@ -27,13 +28,6 @@ const CLIENT_STATUS_FILTERS = [
   { value: "inactive", label: "Inactive" },
   { value: "archived", label: "Archived" },
 ];
-
-function statusTone(status: string): BadgeTone {
-  if (status === "lost") return "danger";
-  if (status === "active") return "success";
-  if (status === "archived") return "neutral";
-  return "warning";
-}
 
 function clientDisplayName(c: {
   client_type: string;
@@ -82,7 +76,7 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
     key: "status",
     header: "Status",
     render: (c) => (
-      <Badge tone={statusTone(c.lifecycle_status)} className="capitalize">
+      <Badge tone={clientStatusTone(c.lifecycle_status)} className="capitalize">
         {c.stageLabel ?? c.lifecycle_status.replace(/_/g, " ")}
       </Badge>
     ),

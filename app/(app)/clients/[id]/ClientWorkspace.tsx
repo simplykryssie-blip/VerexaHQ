@@ -12,6 +12,8 @@ import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import { automationActionLabel } from "@/lib/automationLabels";
+import { Badge } from "@/components/ui/Badge";
+import { clientStatusTone } from "@/lib/clientStatus";
 import {
   OverviewTab,
   MessagesTab,
@@ -216,7 +218,9 @@ export function ClientWorkspace({
             <span className="capitalize">{client.client_type}</span>
             {primaryService && <span>{primaryService}</span>}
             {!primaryService && requestedService && <span>Requested: {requestedService}</span>}
-            <span className="capitalize">{client.lifecycle_status}</span>
+            <Badge tone={clientStatusTone(client.lifecycle_status)} className="capitalize">
+              {client.lifecycle_status}
+            </Badge>
             {currentStageName && leadPipeline.processId && (
               <Link href={`/pipelines/${leadPipeline.processId}`} className="text-accent hover:underline">
                 {leadPipeline.processName ?? "Pipeline"}: {currentStageName}
