@@ -193,6 +193,13 @@ export function OrganizerForm({
           p_organizer_response_id: responseId,
           p_organizer_field_id: field.id,
         });
+      } else if (field.client_profile_field === "ssn") {
+        await supabase.rpc("propose_client_sensitive_field", {
+          p_field: "ssn",
+          p_new_value: value,
+          p_organizer_response_id: responseId,
+          p_organizer_field_id: field.id,
+        });
       } else {
         await supabase.rpc("propose_client_contact_field", {
           p_field: field.client_profile_field,

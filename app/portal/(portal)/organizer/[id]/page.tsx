@@ -75,6 +75,10 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 }
 
 function prefillValueFor(clientProfileField: string, snapshot: BasicInfoSnapshot): string | null {
+  // SSN is never prefilled -- it's an encrypted, staff-reveal-gated value.
+  // The client_profile_field='ssn' mapping only proposes a write (subject to
+  // review), it doesn't read one back into the form.
+  if (clientProfileField === "ssn") return null;
   if (clientProfileField === "full_name") {
     if (!snapshot.first_name && !snapshot.last_name) return null;
     return stringifyNameValue({
