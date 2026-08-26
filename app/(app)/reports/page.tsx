@@ -42,7 +42,7 @@ export default async function ReportsPage() {
               <Link
                 key={c.slug}
                 href={`/reports/${c.slug}`}
-                className="flex items-start gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 transition hover:border-accent hover:shadow-sm"
+                className="flex items-start gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 transition hover:border-accent hover:shadow-softHover"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
                   <c.icon size={18} strokeWidth={2} aria-hidden="true" />

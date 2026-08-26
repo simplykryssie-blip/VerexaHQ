@@ -9,6 +9,8 @@ import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
 import { Lock } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { clientStatusTone } from "@/lib/clientStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +87,16 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
       sortValue: (r) => r.clientLabel,
     },
     { key: "type", label: "Type", render: (r) => <span className="capitalize">{r.client_type}</span>, sortValue: (r) => r.client_type },
-    { key: "status", label: "Lifecycle status", render: (r) => <span className="capitalize">{r.lifecycle_status}</span>, sortValue: (r) => r.lifecycle_status },
+    {
+      key: "status",
+      label: "Lifecycle status",
+      render: (r) => (
+        <Badge tone={clientStatusTone(r.lifecycle_status)} className="capitalize">
+          {r.lifecycle_status}
+        </Badge>
+      ),
+      sortValue: (r) => r.lifecycle_status,
+    },
     { key: "created", label: "Added", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
   ];
 
@@ -114,7 +125,9 @@ export default async function ClientsReportPage({ searchParams }: { searchParams
           <ul className="mt-3 space-y-1.5 text-sm">
             {Array.from(byStatus.entries()).map(([status, count]) => (
               <li key={status} className="flex items-center justify-between">
-                <span className="capitalize text-slate">{status}</span>
+                <Badge tone={clientStatusTone(status)} className="capitalize">
+                  {status}
+                </Badge>
                 <span className="font-medium text-ink">{count}</span>
               </li>
             ))}
