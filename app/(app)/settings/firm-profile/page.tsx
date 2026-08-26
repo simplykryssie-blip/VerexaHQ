@@ -95,6 +95,7 @@ export default async function FirmProfilePage() {
             primaryColor={branding?.primary_color ?? "#0F172A"}
             secondaryColor={branding?.secondary_color ?? "#2563EB"}
             isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
+            allowsBrandingOverride={effectiveBranding.allowsBrandingOverride}
             eroName={effectiveBranding.eroName ?? null}
             isOwner={workspace.is_owner}
             isAdmin={Boolean(isAdmin)}

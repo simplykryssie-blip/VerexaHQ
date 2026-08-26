@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 export type EffectiveBranding = {
   brandingWorkspaceId: string;
   isWhitelabeledByEro: boolean;
+  /** True only while isWhitelabeledByEro -- whether the ERO has let this PTIN set its own logo/accent on top. */
+  allowsBrandingOverride: boolean;
   eroName: string | null;
   displayName: string | null;
   /** For the staff dashboard's sidebar. */
@@ -17,15 +19,17 @@ export type EffectiveBranding = {
  * Resolves which workspace's `branding` row should be shown to a given
  * workspace -- staff dashboard and client portal alike. PTINs with an active
  * ero_ptin connection show their ERO's brand instead of their own; their
- * clients see the ERO's brand on the portal too -- neither gets its own
- * Brand Center once connected.
+ * clients see the ERO's brand on the portal too. If the ERO has switched on
+ * `allows_branding_override` for that connection, the PTIN's own logo/color
+ * win where they've set one (everything else -- business info, custom
+ * domain, etc. -- still comes from the ERO).
  */
 export async function getEffectiveBranding(workspaceId: string): Promise<EffectiveBranding> {
   const supabase = createClient();
 
   const { data: connection } = await supabase
     .from("firm_connections")
-    .select("parent_workspace_id, workspaces:parent_workspace_id(name)")
+    .select("parent_workspace_id, allows_branding_override, workspaces:parent_workspace_id(name)")
     .eq("child_workspace_id", workspaceId)
     .eq("relationship_type", "ero_ptin")
     .eq("status", "active")
@@ -43,11 +47,23 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     .eq("workspace_id", brandingWorkspaceId)
     .maybeSingle();
 
+  // If the ERO has allowed it, let the PTIN's own logo/color win over the
+  // inherited ones -- everything else about the ERO's branding stays as-is.
+  let ownBranding: { sidebar_logo_url: string | null; portal_logo_url: string | null; primary_color: string | null; secondary_color: string | null } | null = null;
+  if (isWhitelabeledByEro && connection?.allows_branding_override) {
+    const { data } = await supabase
+      .from("branding")
+      .select("sidebar_logo_url, portal_logo_url, primary_color, secondary_color")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    ownBranding = data;
+  }
+
   // No brand logo uploaded at all -- fall back to the workspace owner's avatar
   // photo rather than showing nothing. Common for solo PTINs whose "brand" is
   // just themselves.
   let ownerAvatarUrl: string | null = null;
-  if (!branding?.sidebar_logo_url && !branding?.portal_logo_url && !branding?.logo_url) {
+  if (!ownBranding?.sidebar_logo_url && !branding?.sidebar_logo_url && !branding?.portal_logo_url && !branding?.logo_url) {
     const { data: owner } = await supabase
       .from("workspace_users")
       .select("user_profiles(avatar_url)")
@@ -57,19 +73,20 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     ownerAvatarUrl = (owner?.user_profiles as unknown as { avatar_url: string | null } | null)?.avatar_url ?? null;
   }
 
-  const sidebarLogoUrl = branding?.sidebar_logo_url ?? branding?.logo_url ?? ownerAvatarUrl;
+  const sidebarLogoUrl = ownBranding?.sidebar_logo_url ?? branding?.sidebar_logo_url ?? branding?.logo_url ?? ownerAvatarUrl;
 
   return {
     brandingWorkspaceId,
     isWhitelabeledByEro,
+    allowsBrandingOverride: Boolean(isWhitelabeledByEro && connection?.allows_branding_override),
     eroName,
     displayName: branding?.display_name ?? null,
     sidebarLogoUrl,
     // Explicit portal logo, else the same brand logo shown on the staff sidebar
     // (including its own owner-avatar fallback), matching the Brand Logo
     // field's "leave blank to reuse" copy.
-    portalLogoUrl: branding?.portal_logo_url ?? sidebarLogoUrl,
-    primaryColor: branding?.primary_color ?? null,
-    secondaryColor: branding?.secondary_color ?? null,
+    portalLogoUrl: ownBranding?.portal_logo_url ?? branding?.portal_logo_url ?? sidebarLogoUrl,
+    primaryColor: ownBranding?.primary_color ?? branding?.primary_color ?? null,
+    secondaryColor: ownBranding?.secondary_color ?? branding?.secondary_color ?? null,
   };
 }

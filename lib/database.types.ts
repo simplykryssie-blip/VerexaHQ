@@ -3699,6 +3699,7 @@ export type Database = {
       }
       firm_connections: {
         Row: {
+          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -3715,6 +3716,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allows_branding_override?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -3731,6 +3733,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allows_branding_override?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string

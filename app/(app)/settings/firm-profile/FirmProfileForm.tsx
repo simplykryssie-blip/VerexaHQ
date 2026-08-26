@@ -45,6 +45,7 @@ type Props = {
   primaryColor: string;
   secondaryColor: string;
   isWhitelabeledByEro: boolean;
+  allowsBrandingOverride: boolean;
   eroName: string | null;
   isOwner: boolean;
   isAdmin: boolean;
@@ -101,6 +102,7 @@ export function FirmProfileForm({
   primaryColor,
   secondaryColor,
   isWhitelabeledByEro,
+  allowsBrandingOverride,
   eroName,
   isOwner,
   isAdmin,
@@ -231,6 +233,15 @@ export function FirmProfileForm({
               primary_color: primary,
               secondary_color: secondary,
             },
+            { onConflict: "workspace_id" }
+          )
+        );
+      } else if (allowsBrandingOverride) {
+        // Logo/color only -- business name, support contact, etc. stay
+        // whatever the ERO has set, this just layers a look on top.
+        writes.push(
+          supabase.from("branding").upsert(
+            { workspace_id: workspaceId, sidebar_logo_url: logo, primary_color: primary, secondary_color: secondary },
             { onConflict: "workspace_id" }
           )
         );
@@ -376,12 +387,21 @@ export function FirmProfileForm({
             </div>
           </div>
 
-          {isWhitelabeledByEro ? (
+          {isWhitelabeledByEro && !allowsBrandingOverride && (
             <p className="mt-4 rounded-lg border border-border bg-surfaceMuted p-3 text-sm text-slate">
               Your logo, colors, and business name are managed by {eroName ?? "your ERO"} -- your staff dashboard and your clients&apos; portal both show
               their branding. If something looks wrong, contact them to have it updated.
             </p>
-          ) : (
+          )}
+
+          {isWhitelabeledByEro && allowsBrandingOverride && (
+            <p className="mt-4 rounded-lg border border-border bg-surfaceMuted p-3 text-sm text-slate">
+              {eroName ?? "Your ERO"} has let you set your own logo and accent color below -- your business name and support contact still come from
+              them.
+            </p>
+          )}
+
+          {(!isWhitelabeledByEro || allowsBrandingOverride) && (
             <>
               <div className="mt-4 flex items-center gap-3">
                 {logo ? (
@@ -410,9 +430,11 @@ export function FirmProfileForm({
                 </div>
               </div>
 
-              <div className="mt-4">
-                <LabeledInput label="Business name" value={bizName} onChange={(e) => setBizName(e.target.value)} />
-              </div>
+              {!isWhitelabeledByEro && (
+                <div className="mt-4">
+                  <LabeledInput label="Business name" value={bizName} onChange={(e) => setBizName(e.target.value)} />
+                </div>
+              )}
 
               <div className="mt-4 grid grid-cols-2 gap-4">
                 <label className="block">

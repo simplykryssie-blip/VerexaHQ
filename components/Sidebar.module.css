@@ -8,11 +8,11 @@
 
   background: var(--rail-bg);
   color: var(--rail-ink);
-  border-right: 1px solid #e7e9ee;
+  border-right: 1px solid #e3e7f0;
 }
 
 .header {
-  border-bottom: 1px solid #e7e9ee;
+  border-bottom: 1px solid #e3e7f0;
 }
 
 .workspaceName {
@@ -29,6 +29,7 @@
 }
 
 .navItem {
+  position: relative;
   color: var(--rail-muted);
   transition:
     background 120ms ease,
@@ -37,21 +38,33 @@
 
 .navItem:hover {
   color: var(--rail-ink);
-  background: #f7f8fa;
+  background: #f4f6fb;
 }
 
 .navItemActive {
+  position: relative;
   color: var(--blue-bright);
   background: var(--blue-bright-soft);
   font-weight: 600;
 }
 
+.navItemActive::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--blue-bright);
+}
+
 .subNav {
-  border-color: #e7e9ee;
+  border-color: #e3e7f0;
 }
 
 .footer {
-  border-top: 1px solid #e7e9ee;
+  border-top: 1px solid #e3e7f0;
 }
 
 .signOut {
@@ -60,11 +73,11 @@
 
 .signOut:hover {
   color: var(--rail-ink);
-  background: #f7f8fa;
+  background: #f4f6fb;
 }
 
 .mobileToggle {
   background: #ffffff;
   color: #1e293b;
-  border: 1px solid #e7e9ee;
+  border: 1px solid #e3e7f0;
 }

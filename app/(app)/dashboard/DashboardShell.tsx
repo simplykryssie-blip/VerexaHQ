@@ -12,6 +12,7 @@ import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
+import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
@@ -123,18 +124,20 @@ export function DashboardShell({
           <WidgetShell title="Engagements & Tasks">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accentSoft text-accent">
+                <IconChip tone="accent" className="mb-3">
                   <Briefcase size={17} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Open Engagements</p>
-                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ink">{data.kpis.openEngagements}</p>
+                <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{data.kpis.openEngagements}</p>
               </div>
               <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amberSoft text-amber">
+                <IconChip tone="amber" className="mb-3">
                   <ListChecks size={17} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Tasks Due Today</p>
-                <p className={`mt-1 font-display text-2xl font-semibold tabular-nums ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}>
+                <p
+                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}
+                >
                   {data.kpis.tasksDueToday}
                 </p>
               </div>

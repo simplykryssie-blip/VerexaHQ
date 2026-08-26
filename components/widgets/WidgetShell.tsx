@@ -13,7 +13,10 @@ export function WidgetShell({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-labelledby={`widget-${title}`} className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+    <section
+      aria-labelledby={`widget-${title}`}
+      className="rounded-2xl border border-border bg-surface p-5 shadow-soft transition hover:shadow-softHover"
+    >
       <div className="flex items-center justify-between">
         <h2 id={`widget-${title}`} className="font-display text-base font-semibold text-ink">
           {title}
