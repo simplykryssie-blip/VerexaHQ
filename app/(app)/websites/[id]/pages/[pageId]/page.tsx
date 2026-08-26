@@ -13,7 +13,9 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
   const [{ data: page }, { data: website }, { data: sections }, { data: canManage }, { data: services }] = await Promise.all([
     supabase
       .from("site_pages")
-      .select("id, workspace_id, website_id, title, slug, meta_description, status, funnel_id")
+      .select(
+        "id, workspace_id, website_id, title, slug, meta_description, status, funnel_id, background_color, custom_css, custom_js, schema_markup"
+      )
       .eq("id", params.pageId)
       .maybeSingle(),
     supabase.from("site_websites").select("id, slug").eq("id", params.id).maybeSingle(),

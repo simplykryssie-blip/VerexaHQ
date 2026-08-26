@@ -6877,12 +6877,16 @@ export type Database = {
       }
       site_pages: {
         Row: {
+          background_color: string | null
           created_at: string
           created_by: string | null
+          custom_css: string | null
+          custom_js: string | null
           funnel_id: string | null
           funnel_position: number | null
           id: string
           meta_description: string | null
+          schema_markup: string | null
           slug: string
           status: string
           title: string
@@ -6891,12 +6895,16 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          background_color?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
+          custom_js?: string | null
           funnel_id?: string | null
           funnel_position?: number | null
           id?: string
           meta_description?: string | null
+          schema_markup?: string | null
           slug: string
           status?: string
           title: string
@@ -6905,12 +6913,16 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          background_color?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
+          custom_js?: string | null
           funnel_id?: string | null
           funnel_position?: number | null
           id?: string
           meta_description?: string | null
+          schema_markup?: string | null
           slug?: string
           status?: string
           title?: string

@@ -26,6 +26,10 @@ export type BuilderPage = {
   meta_description: string | null;
   status: string;
   funnel_id: string | null;
+  background_color: string | null;
+  custom_css: string | null;
+  custom_js: string | null;
+  schema_markup: string | null;
 };
 
 export type WorkspaceServiceOption = { id: string; name: string };

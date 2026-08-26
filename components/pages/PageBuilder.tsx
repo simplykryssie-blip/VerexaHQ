@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -10,6 +10,7 @@ import { SectionPalette } from "./SectionPalette";
 import { SectionCanvas } from "./SectionCanvas";
 import { SectionPropertiesPanel } from "./SectionPropertiesPanel";
 import { SectionPreview } from "./SectionPreview";
+import { PageSettingsPanel } from "./PageSettingsPanel";
 import type { BuilderPage, BuilderSection, SectionType, WorkspaceServiceOption } from "./types";
 
 const DEBOUNCE_MS = 600;
@@ -38,6 +39,9 @@ export function PageBuilder({
   const [sections, setSections] = useState<BuilderSection[]>([...initialSections].sort((a, b) => a.display_order - b.display_order));
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [view, setView] = useState<"build" | "preview">("build");
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState(page.background_color);
+  const [customCss, setCustomCss] = useState(page.custom_css);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId) ?? null;
@@ -133,6 +137,17 @@ export function PageBuilder({
             </a>
           )}
           {canManage && <TemplateStatusCycle table="site_pages" id={page.id} status={page.status} />}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setPageSettingsOpen(true)}
+              title="Page settings"
+              aria-label="Page settings"
+              className="rounded-lg border border-border p-1.5 text-muted hover:border-accent hover:text-accent"
+            >
+              <Settings size={14} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setView((v) => (v === "build" ? "preview" : "build"))}
@@ -159,7 +174,8 @@ export function PageBuilder({
       )}
 
       {view === "preview" ? (
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto" style={{ backgroundColor: backgroundColor || "#ffffff" }}>
+          {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
           {sections
             .slice()
             .sort((a, b) => a.display_order - b.display_order)
@@ -188,6 +204,17 @@ export function PageBuilder({
             />
           )}
         </div>
+      )}
+
+      {pageSettingsOpen && (
+        <PageSettingsPanel
+          page={{ ...page, title, slug }}
+          onClose={() => setPageSettingsOpen(false)}
+          onSaved={(patch) => {
+            setBackgroundColor(patch.background_color);
+            setCustomCss(patch.custom_css);
+          }}
+        />
       )}
     </div>
   );

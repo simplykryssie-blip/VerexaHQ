@@ -43,7 +43,15 @@ export type SiteSection = {
 export type SitePageData = {
   workspace_id: string;
   website: SiteWebsiteInfo;
-  page: { id: string; title: string; meta_description: string | null };
+  page: {
+    id: string;
+    title: string;
+    meta_description: string | null;
+    background_color: string | null;
+    custom_css: string | null;
+    custom_js: string | null;
+    schema_markup: string | null;
+  };
   branding: SiteBranding;
   funnel: SiteFunnel;
   sections: SiteSection[];
