@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Avatar } from "@/components/Avatar";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ResendInvitationButton } from "./ResendInvitationButton";
@@ -13,6 +14,8 @@ import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSe
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
 export const dynamic = 'force-dynamic';
+
+const MEMBER_STATUS_TONE: Record<string, BadgeTone> = { active: "success" };
 
 type MemberRow = {
   id: string;
@@ -117,7 +120,15 @@ export default async function UsersPage() {
         );
       },
     },
-    { key: "status", header: "Status", render: (m) => <span className="capitalize text-slate">{m.status}</span> },
+    {
+      key: "status",
+      header: "Status",
+      render: (m) => (
+        <Badge tone={MEMBER_STATUS_TONE[m.status] ?? "neutral"} className="capitalize">
+          {m.status}
+        </Badge>
+      ),
+    },
     {
       key: "actions",
       header: "",
