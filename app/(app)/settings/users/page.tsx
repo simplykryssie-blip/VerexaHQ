@@ -152,7 +152,7 @@ export default async function UsersPage() {
     <div className="max-w-3xl">
       <SettingsSectionHeader icon={Users} title="Users & Staff" description="Everyone with access to this workspace." />
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
         <DataTable columns={memberColumns} rows={members} emptyMessage="No workspace members found." />
       </div>
 
@@ -181,7 +181,7 @@ export default async function UsersPage() {
       {workspace.is_owner && pendingInvitations.length > 0 && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Pending invitations</h3>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
             <DataTable columns={invitationColumns} rows={pendingInvitations} emptyMessage="No pending invitations." />
           </div>
         </div>

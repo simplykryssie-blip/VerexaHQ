@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Avatar } from "@/components/Avatar";
 import { NewClientButton } from "./NewClientButton";
 import { TagFilterControl } from "./TagFilterControl";
 
@@ -63,11 +64,14 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
     key: "name",
     header: "Name",
     render: (c) => (
-      <div>
-        <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-          {clientDisplayName(c)}
-        </Link>
-        {c.requestedService && <p className="text-xs text-muted">{c.requestedService}</p>}
+      <div className="flex items-center gap-2.5">
+        <Avatar name={clientDisplayName(c)} size="sm" />
+        <div>
+          <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+            {clientDisplayName(c)}
+          </Link>
+          {c.requestedService && <p className="text-xs text-muted">{c.requestedService}</p>}
+        </div>
       </div>
     ),
   },
@@ -266,7 +270,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             <TagFilterControl tags={workspaceTags ?? []} activeTag={tag} baseHref={tagQueryBase} />
           </div>
         )}
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+        <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
           <DataTable
             columns={CLIENT_COLUMNS}
             rows={clientRows}
