@@ -116,7 +116,7 @@ export function DashboardShell({
             value={money(data.kpis.revenueThisMonth)}
             icon={DollarSign}
             chip="emerald"
-            reportHref="/reports/financial"
+            reportHref="/billing"
           />
         );
       case "kpis":
@@ -152,7 +152,7 @@ export function DashboardShell({
             tone={data.kpis.outstandingInvoicesCount > 0 ? "warning" : "default"}
             icon={Receipt}
             chip="rose"
-            reportHref="/reports/financial?filter=outstanding"
+            reportHref="/billing"
           />
         );
       case "missing_documents":
