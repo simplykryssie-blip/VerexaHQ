@@ -91,17 +91,27 @@ async function dispatchOne(
     payload: unknown;
     attempts: number;
     max_attempts: number;
+    entity_type: string | null;
+    entity_id: string | null;
   }
 ): Promise<"sent" | "retry" | "dead"> {
-  const payload = (job.payload ?? {}) as Record<string, unknown>;
+  const basePayload = (job.payload ?? {}) as Record<string, unknown>;
   const workspaceId = job.workspace_id;
 
   try {
+    const clientId = await resolveClientId(supabase, job.entity_type, job.entity_id);
+    const { portalLink, portalInviteLink } = await resolvePortalMergeFields(supabase, clientId);
+    const payload: Record<string, unknown> = { ...basePayload, portal_link: portalLink };
+    if (portalInviteLink) payload.portal_invite_link = portalInviteLink;
+
     if (job.channel === "Email") {
       if (!job.recipient_email) throw new Error("Job has no recipient_email");
       if (!workspaceId) throw new Error("Job has no workspace_id");
       const template = await findEmailTemplate(supabase, workspaceId, job.template_key);
       if (!template) throw new Error(`No published email template for key "${job.template_key}"`);
+      if (!portalInviteLink && referencesToken(template.subject + template.body_html, "portal_invite_link")) {
+        throw new Error("This template uses the portal invite link, but no active, unexpired invitation exists for this client. Send a portal invite first, then retry.");
+      }
 
       const subject = renderTemplate(template.subject, payload);
       const html = renderTemplate(template.body_html, payload);
@@ -125,6 +135,9 @@ async function dispatchOne(
       if (!workspaceId) throw new Error("Job has no workspace_id");
       const template = await findSmsTemplate(supabase, workspaceId, job.template_key);
       if (!template) throw new Error(`No published SMS template for key "${job.template_key}"`);
+      if (!portalInviteLink && referencesToken(template.body, "portal_invite_link")) {
+        throw new Error("This template uses the portal invite link, but no active, unexpired invitation exists for this client. Send a portal invite first, then retry.");
+      }
 
       const body = renderTemplate(template.body, payload);
       const result = await sendSmsViaTwilio({ to: job.recipient_phone, body });
@@ -166,6 +179,49 @@ async function dispatchOne(
       .eq("id", job.id);
     return "retry";
   }
+}
+
+function referencesToken(template: string, token: string) {
+  return new RegExp(`\\{\\{\\s*${token}\\s*\\}\\}`).test(template);
+}
+
+// notification_queue's entity_type/entity_id point at whatever the
+// notification is about -- a client directly, or an engagement (which has
+// its own client). Either way this resolves to the client_id the portal
+// merge fields below need.
+async function resolveClientId(supabase: ReturnType<typeof createServiceClient>, entityType: string | null, entityId: string | null) {
+  if (!entityId) return null;
+  if (entityType === "client") return entityId;
+  if (entityType === "engagement") {
+    const { data } = await supabase.from("engagements").select("client_id").eq("id", entityId).maybeSingle();
+    return data?.client_id ?? null;
+  }
+  return null;
+}
+
+// portal_link always resolves (a generic sign-in page, no dependency on an
+// invite existing). portal_invite_link only resolves when the client has a
+// live, unexpired invitation -- callers must refuse to send a message that
+// references it otherwise, rather than sending a blank/broken link.
+async function resolvePortalMergeFields(supabase: ReturnType<typeof createServiceClient>, clientId: string | null) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  const portalLink = `${appUrl}/portal/login`;
+  if (!clientId) return { portalLink, portalInviteLink: null as string | null };
+
+  const { data: invite } = await supabase
+    .from("client_portal_users")
+    .select("invitation_token, token_expires_at")
+    .eq("client_id", clientId)
+    .eq("status", "invited")
+    .order("invited_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const isLive = invite && (!invite.token_expires_at || new Date(invite.token_expires_at) > new Date());
+  return {
+    portalLink,
+    portalInviteLink: isLive ? `${appUrl}/portal/accept-invitation?token=${invite.invitation_token}` : null,
+  };
 }
 
 async function findEmailTemplate(supabase: ReturnType<typeof createServiceClient>, workspaceId: string, slug: string) {

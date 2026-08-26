@@ -195,7 +195,7 @@ export function OverviewTab({
             >
               View portal
             </Link>
-            <EditClientProfileForm client={client} />
+            <EditClientProfileForm client={client} portalUsers={portalUsers} />
           </div>
         }
       >
