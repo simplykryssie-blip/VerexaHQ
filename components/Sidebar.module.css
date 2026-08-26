@@ -3,16 +3,18 @@
   --rail-ink: #0f172a;
   --rail-muted: #64748b;
   --rail-section: #9aa1ae;
+  --rail-border: #e3e7f0;
+  --rail-hover: #f4f6fb;
   --blue-bright: #0b7fe0;
   --blue-bright-soft: rgba(11, 127, 224, 0.1);
 
   background: var(--rail-bg);
   color: var(--rail-ink);
-  border-right: 1px solid #e3e7f0;
+  border-right: 1px solid var(--rail-border);
 }
 
 .header {
-  border-bottom: 1px solid #e3e7f0;
+  border-bottom: 1px solid var(--rail-border);
 }
 
 .workspaceName {
@@ -38,7 +40,7 @@
 
 .navItem:hover {
   color: var(--rail-ink);
-  background: #f4f6fb;
+  background: var(--rail-hover);
 }
 
 .navItemActive {
@@ -60,11 +62,11 @@
 }
 
 .subNav {
-  border-color: #e3e7f0;
+  border-color: var(--rail-border);
 }
 
 .footer {
-  border-top: 1px solid #e3e7f0;
+  border-top: 1px solid var(--rail-border);
 }
 
 .signOut {
@@ -73,7 +75,7 @@
 
 .signOut:hover {
   color: var(--rail-ink);
-  background: #f4f6fb;
+  background: var(--rail-hover);
 }
 
 .mobileToggle {

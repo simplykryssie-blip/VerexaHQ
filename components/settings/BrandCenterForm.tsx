@@ -6,6 +6,7 @@ import { UploadCloud, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { SettingsCard } from "@/components/settings/SettingsCard";
+import { readableTextColor } from "@/lib/color";
 
 function LogoUploader({
   label,
@@ -71,31 +72,43 @@ function LivePreview({
   workspaceName,
   logo,
   accent,
+  sidebarBg,
+  sidebarText,
 }: {
   workspaceName: string;
   logo: string | null;
   accent: string;
+  sidebarBg: string | null;
+  sidebarText: string;
 }) {
+  const sidebarBgStyle = sidebarBg ?? "#FFFFFF";
+  const sidebarMuted = sidebarBg ? (sidebarText === "#FFFFFF" ? "rgba(255,255,255,0.65)" : "#64748B") : "#64748B";
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">Staff sidebar</p>
-        <div className="mt-1.5 overflow-hidden rounded-xl border border-border bg-surface shadow-soft">
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+        <div className="mt-1.5 overflow-hidden rounded-xl border border-border shadow-soft" style={{ backgroundColor: sidebarBgStyle }}>
+          <div className="flex items-center gap-2 border-b px-3 py-2.5" style={{ borderColor: sidebarBg ? `${sidebarText}22` : undefined }}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} alt="" className="h-5 w-5 rounded object-contain" />
             ) : (
               <div className="h-5 w-5 shrink-0 rounded bg-surfaceMuted" />
             )}
-            <span className="truncate text-xs font-semibold text-ink">{workspaceName}</span>
+            <span className="truncate text-xs font-semibold" style={{ color: sidebarText }}>
+              {workspaceName}
+            </span>
           </div>
           <div className="space-y-1 p-2">
             <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold" style={{ backgroundColor: `${accent}1a`, color: accent }}>
               Dashboard
             </div>
-            <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-muted">Contacts</div>
-            <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-muted">Engagements</div>
+            <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-medium" style={{ color: sidebarMuted }}>
+              Contacts
+            </div>
+            <div className="rounded-lg px-2.5 py-1.5 text-[11px] font-medium" style={{ color: sidebarMuted }}>
+              Engagements
+            </div>
           </div>
         </div>
       </div>
@@ -124,6 +137,8 @@ function LivePreview({
   );
 }
 
+type TextMode = "auto" | "light" | "dark";
+
 export function BrandCenterForm({
   workspaceId,
   workspaceName,
@@ -132,6 +147,8 @@ export function BrandCenterForm({
   portalLogoUrl,
   primaryColor,
   secondaryColor,
+  sidebarBgColor,
+  sidebarTextColor,
   isOwner,
   isWhitelabeledByEro,
   allowsBrandingOverride,
@@ -144,6 +161,10 @@ export function BrandCenterForm({
   portalLogoUrl: string | null;
   primaryColor: string;
   secondaryColor: string;
+  /** Raw stored value -- null means "use the default light sidebar." */
+  sidebarBgColor: string | null;
+  /** Raw stored override -- null means "auto-pick for contrast." */
+  sidebarTextColor: string | null;
   isOwner: boolean;
   isWhitelabeledByEro: boolean;
   allowsBrandingOverride: boolean;
@@ -158,9 +179,14 @@ export function BrandCenterForm({
   const [portalLogo, setPortalLogo] = useState(portalLogoUrl);
   const [primary, setPrimary] = useState(primaryColor);
   const [secondary, setSecondary] = useState(secondaryColor);
+  const [customSidebar, setCustomSidebar] = useState(Boolean(sidebarBgColor));
+  const [sidebarBg, setSidebarBg] = useState(sidebarBgColor ?? "#0F172A");
+  const [textMode, setTextMode] = useState<TextMode>(sidebarTextColor === "#FFFFFF" ? "light" : sidebarTextColor === "#0F172A" ? "dark" : "auto");
   const [saving, setSaving] = useState(false);
 
   const editable = isOwner && (!isWhitelabeledByEro || allowsBrandingOverride);
+  const resolvedSidebarText =
+    textMode === "light" ? "#FFFFFF" : textMode === "dark" ? "#0F172A" : readableTextColor(customSidebar ? sidebarBg : "#FFFFFF");
 
   async function handleSave() {
     setSaving(true);
@@ -171,12 +197,16 @@ export function BrandCenterForm({
       portal_logo_url: string | null;
       primary_color: string;
       secondary_color: string;
+      sidebar_bg_color: string | null;
+      sidebar_text_color: string | null;
     } = {
       workspace_id: workspaceId,
       sidebar_logo_url: sidebarLogo,
       portal_logo_url: portalLogo,
       primary_color: primary,
       secondary_color: secondary,
+      sidebar_bg_color: customSidebar ? sidebarBg : null,
+      sidebar_text_color: customSidebar && textMode !== "auto" ? resolvedSidebarText : null,
     };
     if (!isWhitelabeledByEro) patch.display_name = bizName || null;
     const { error } = await supabase.from("branding").upsert(patch, { onConflict: "workspace_id" });
@@ -249,7 +279,7 @@ export function BrandCenterForm({
 
         <div className="mt-4 grid grid-cols-2 gap-4">
           <label className="block">
-            <span className="block text-sm font-medium text-slate">Accent color</span>
+            <span className="block text-sm font-medium text-slate">Button &amp; accent color</span>
             <div className="mt-1 flex items-center gap-2">
               <input
                 type="color"
@@ -260,7 +290,10 @@ export function BrandCenterForm({
               />
               <span className="font-mono text-xs text-muted">{secondary}</span>
             </div>
-            <span className="mt-1 block text-xs text-muted">Drives your sidebar&apos;s active state and the badges clients see on your portal.</span>
+            <span className="mt-1 block text-xs text-muted">
+              This is your button color everywhere -- every primary button, link, and active nav state, on your staff dashboard and your clients&apos;
+              portal alike.
+            </span>
           </label>
           <label className="block">
             <span className="block text-sm font-medium text-slate">Fallback accent color</span>
@@ -274,26 +307,86 @@ export function BrandCenterForm({
               />
               <span className="font-mono text-xs text-muted">{primary}</span>
             </div>
-            <span className="mt-1 block text-xs text-muted">Only used on public forms if Accent color above is left unset.</span>
+            <span className="mt-1 block text-xs text-muted">Only used on public forms if Button &amp; accent color above is left unset.</span>
           </label>
         </div>
+      </SettingsCard>
 
-        {editable && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="mt-5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save"}
-          </button>
+      <SettingsCard title="Sidebar appearance" description="Recolor the staff sidebar itself, not just its accent.">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={customSidebar}
+          disabled={!editable}
+          onClick={() => setCustomSidebar((v) => !v)}
+          className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${
+            customSidebar ? "border-accent bg-accent" : "border-border bg-border"
+          }`}
+        >
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${customSidebar ? "left-[22px]" : "left-0.5"}`} />
+        </button>
+        <span className="ml-2.5 align-middle text-sm font-medium text-slate">Custom sidebar background</span>
+
+        {customSidebar && (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="block text-sm font-medium text-slate">Background color</span>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={sidebarBg}
+                  disabled={!editable}
+                  onChange={(e) => setSidebarBg(e.target.value)}
+                  className="h-9 w-14 rounded border border-border disabled:opacity-60"
+                />
+                <span className="font-mono text-xs text-muted">{sidebarBg}</span>
+              </div>
+            </label>
+
+            <div>
+              <span className="block text-sm font-medium text-slate">Text</span>
+              <div className="mt-1 flex overflow-hidden rounded-lg border border-border">
+                {(["auto", "light", "dark"] as const).map((mode, i) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={!editable}
+                    onClick={() => setTextMode(mode)}
+                    className={`flex-1 px-2 py-1.5 text-xs font-medium capitalize transition disabled:cursor-not-allowed ${
+                      i > 0 ? "border-l border-border" : ""
+                    } ${textMode === mode ? "bg-accent text-white" : "bg-surface text-slate hover:bg-surfaceMuted"}`}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
+              <span className="mt-1 block text-xs text-muted">Auto picks white or dark text for readability against your background.</span>
+            </div>
+          </div>
         )}
       </SettingsCard>
+
+      {editable && (
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      )}
 
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">Live preview</p>
         <div className="mt-1.5">
-          <LivePreview workspaceName={bizName || workspaceName} logo={sidebarLogo} accent={secondary} />
+          <LivePreview
+            workspaceName={bizName || workspaceName}
+            logo={sidebarLogo}
+            accent={secondary}
+            sidebarBg={customSidebar ? sidebarBg : null}
+            sidebarText={resolvedSidebarText}
+          />
         </div>
       </div>
     </div>

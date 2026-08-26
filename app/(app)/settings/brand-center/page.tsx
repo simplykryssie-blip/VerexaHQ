@@ -15,7 +15,7 @@ export default async function BrandCenterPage() {
   const [{ data: branding }, effectiveBranding] = await Promise.all([
     supabase
       .from("branding")
-      .select("display_name, sidebar_logo_url, portal_logo_url, primary_color, secondary_color")
+      .select("display_name, sidebar_logo_url, portal_logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
     getEffectiveBranding(workspace.id),
@@ -38,6 +38,8 @@ export default async function BrandCenterPage() {
           portalLogoUrl={branding?.portal_logo_url ?? null}
           primaryColor={branding?.primary_color ?? "#0F172A"}
           secondaryColor={branding?.secondary_color ?? "#2563EB"}
+          sidebarBgColor={branding?.sidebar_bg_color ?? null}
+          sidebarTextColor={branding?.sidebar_text_color ?? null}
           isOwner={workspace.is_owner}
           isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
           allowsBrandingOverride={effectiveBranding.allowsBrandingOverride}

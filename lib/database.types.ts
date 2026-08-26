@@ -953,6 +953,7 @@ export type Database = {
           reply_to_email: string | null
           secondary_color: string
           sidebar_logo_url: string | null
+          sidebar_bg_color: string | null
           sidebar_text_color: string | null
           support_email: string | null
           support_phone: string | null
@@ -980,6 +981,7 @@ export type Database = {
           reply_to_email?: string | null
           secondary_color?: string
           sidebar_logo_url?: string | null
+          sidebar_bg_color?: string | null
           sidebar_text_color?: string | null
           support_email?: string | null
           support_phone?: string | null
@@ -1007,6 +1009,7 @@ export type Database = {
           reply_to_email?: string | null
           secondary_color?: string
           sidebar_logo_url?: string | null
+          sidebar_bg_color?: string | null
           sidebar_text_color?: string | null
           support_email?: string | null
           support_phone?: string | null

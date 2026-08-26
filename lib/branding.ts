@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { readableTextColor } from "@/lib/color";
 
 export type EffectiveBranding = {
   brandingWorkspaceId: string;
@@ -13,6 +14,10 @@ export type EffectiveBranding = {
   portalLogoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  /** Null means the sidebar keeps its default light background. */
+  sidebarBgColor: string | null;
+  /** Always set once sidebarBgColor is -- either the workspace's explicit choice, or auto-picked for contrast. */
+  sidebarTextColor: string | null;
 };
 
 /**
@@ -43,17 +48,24 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
 
   const { data: branding } = await supabase
     .from("branding")
-    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color")
+    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
     .eq("workspace_id", brandingWorkspaceId)
     .maybeSingle();
 
   // If the ERO has allowed it, let the PTIN's own logo/color win over the
   // inherited ones -- everything else about the ERO's branding stays as-is.
-  let ownBranding: { sidebar_logo_url: string | null; portal_logo_url: string | null; primary_color: string | null; secondary_color: string | null } | null = null;
+  let ownBranding: {
+    sidebar_logo_url: string | null;
+    portal_logo_url: string | null;
+    primary_color: string | null;
+    secondary_color: string | null;
+    sidebar_bg_color: string | null;
+    sidebar_text_color: string | null;
+  } | null = null;
   if (isWhitelabeledByEro && connection?.allows_branding_override) {
     const { data } = await supabase
       .from("branding")
-      .select("sidebar_logo_url, portal_logo_url, primary_color, secondary_color")
+      .select("sidebar_logo_url, portal_logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
       .eq("workspace_id", workspaceId)
       .maybeSingle();
     ownBranding = data;
@@ -74,6 +86,9 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
   }
 
   const sidebarLogoUrl = ownBranding?.sidebar_logo_url ?? branding?.sidebar_logo_url ?? branding?.logo_url ?? ownerAvatarUrl;
+  const sidebarBgColor = ownBranding?.sidebar_bg_color ?? branding?.sidebar_bg_color ?? null;
+  const sidebarTextColorOverride = ownBranding?.sidebar_text_color ?? branding?.sidebar_text_color ?? null;
+  const sidebarTextColor = sidebarBgColor ? sidebarTextColorOverride ?? readableTextColor(sidebarBgColor) : null;
 
   return {
     brandingWorkspaceId,
@@ -88,5 +103,7 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     portalLogoUrl: ownBranding?.portal_logo_url ?? branding?.portal_logo_url ?? sidebarLogoUrl,
     primaryColor: ownBranding?.primary_color ?? branding?.primary_color ?? null,
     secondaryColor: ownBranding?.secondary_color ?? branding?.secondary_color ?? null,
+    sidebarBgColor,
+    sidebarTextColor,
   };
 }
