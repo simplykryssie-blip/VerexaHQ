@@ -4,6 +4,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap, clientLabel } from "@/lib/documentEntityLabels";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_TONE } from "@/lib/engagementStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -155,7 +157,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((r) => (
-                    <tr key={r.engagementId} className="hover:bg-surfaceMuted">
+                    <tr key={r.engagementId} className="transition-colors hover:bg-surfaceMuted">
                       {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                       <td className="px-4 py-2">
                         <Link href={`/engagements/${r.engagementId}`} className="font-medium text-accent hover:underline">
@@ -166,7 +168,11 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                         {r.returnType ?? "--"} {r.isExtended && <span className="text-xs text-warning">(extended)</span>}
                       </td>
                       <td className="px-4 py-2 text-slate">{r.taxYear ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate capitalize">{r.status}</td>
+                      <td className="px-4 py-2">
+                        <Badge tone={ENGAGEMENT_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+                          {r.status}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-2 text-slate">{EFILE_LABEL[r.efileStatus] ?? r.efileStatus}</td>
                       <td className="px-4 py-2 text-slate">
                         {r.federalRefund ? (
@@ -210,7 +216,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {(rows ?? []).map((r) => {
                 const overdue = r.due_date && new Date(r.due_date) < new Date();
                 return (
-                  <li key={r.workflow_stage_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={r.workflow_stage_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <Link href={`/engagements/${r.engagement_id}`} className="font-medium text-accent hover:underline">
                         {clientLabel(clientById.get(r.client_id ?? "") ?? null)}
@@ -292,7 +298,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {rows.map((n) => {
                 const overdue = n.status === "open" && n.responseDueDate && new Date(n.responseDueDate) < new Date();
                 return (
-                  <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       {n.href ? (
                         <Link href={n.href} className="font-medium text-accent hover:underline">
@@ -376,7 +382,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {rows.map((r) => {
                 const overdue = r.extensionDueDate && new Date(r.extensionDueDate) < new Date();
                 return (
-                  <li key={r.engagementId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={r.engagementId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <Link href={`/engagements/${r.engagementId}`} className="font-medium text-accent hover:underline">
                         {r.clientName}
@@ -475,7 +481,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               </thead>
               <tbody className="divide-y divide-border">
                 {yearRows.map((r) => (
-                  <tr key={r.key} className="hover:bg-surfaceMuted">
+                  <tr key={r.key} className="transition-colors hover:bg-surfaceMuted">
                     {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                     <td className="px-4 py-2 font-medium text-ink">{r.taxYear}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.totalReturns}</td>
