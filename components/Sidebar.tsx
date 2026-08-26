@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba, readableTextColor } from "@/lib/color";
@@ -45,6 +45,7 @@ export function Sidebar({
   showMessages?: boolean;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [switching, setSwitching] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
 
@@ -97,11 +98,24 @@ export function Sidebar({
 
   // Flatten every navigable href (top-level items + group children) so the
   // longest-prefix-match logic works regardless of nesting, and a group's
-  // children can be matched the same way leaf items always were.
+  // children can be matched the same way leaf items always were. A handful
+  // of hrefs (e.g. Contacts' Leads/Individual/Business children) share one
+  // pathname and differ only by query string, so a match there also has to
+  // check that every query param the href asks for is present in the
+  // current URL -- pathname alone can't tell those apart.
   const allHrefs = navItems.flatMap((item) => ("children" in item ? item.children.map((c) => c.href) : [item.href]));
   const activeNavHref = allHrefs
-    .filter((href) => pathname === href || pathname.startsWith(href + "/"))
-    .sort((a, b) => b.length - a.length)[0];
+    .filter((href) => {
+      const [hrefPath, hrefQuery] = href.split("?");
+      if (pathname !== hrefPath && !pathname.startsWith(hrefPath + "/")) return false;
+      if (!hrefQuery) return true;
+      return Array.from(new URLSearchParams(hrefQuery).entries()).every(([key, value]) => searchParams.get(key) === value);
+    })
+    .sort((a, b) => {
+      const aSpecific = a.includes("?") ? 1 : 0;
+      const bSpecific = b.includes("?") ? 1 : 0;
+      return aSpecific !== bSpecific ? bSpecific - aSpecific : b.length - a.length;
+    })[0];
 
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(navItems.filter((item) => "children" in item && item.children.some((c) => c.href === activeNavHref)).map((item) => item.label))

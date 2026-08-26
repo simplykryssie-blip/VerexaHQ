@@ -29,6 +29,12 @@ const CLIENT_STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
+const CLIENT_TYPE_FILTERS = [
+  { value: "", label: "All" },
+  { value: "individual", label: "Individual" },
+  { value: "business", label: "Business" },
+];
+
 function clientDisplayName(c: {
   client_type: string;
   first_name: string | null;
@@ -99,13 +105,22 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
   },
 ];
 
-export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tab?: string; tag?: string } }) {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: { page?: string; status?: string; tab?: string; tag?: string; type?: string };
+}) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
   const supabase = createClient();
   const isLeadsTab = tab === "leads";
+  // The Individual/Business split only applies to the Clients tab -- a lead
+  // hasn't been typed as individual/business yet (that's a client_type
+  // column on the same table, but Leads is scoped by lifecycle_status, not
+  // by this nav-level distinction).
+  const clientType = !isLeadsTab && (searchParams.type === "individual" || searchParams.type === "business") ? searchParams.type : "";
 
   // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
   // -- the same system "Move the lead to a pipeline stage" and "A lead enters
@@ -135,6 +150,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .range(from, to);
   clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
+  if (clientType) clientsQuery = clientsQuery.eq("client_type", clientType);
 
   const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
     clientsQuery,
@@ -205,17 +221,31 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
   }));
 
-  const extraQuery = [tab !== "clients" ? `tab=${tab}` : "", status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""]
+  const extraQuery = [
+    tab !== "clients" ? `tab=${tab}` : "",
+    status ? `status=${status}` : "",
+    tag ? `tag=${encodeURIComponent(tag)}` : "",
+    clientType ? `type=${clientType}` : "",
+  ]
     .filter(Boolean)
     .join("&");
-  const statusQuery = tag ? `&tag=${encodeURIComponent(tag)}` : "";
-  const tagQueryBase = `/clients?tab=${tab}${status ? `&status=${status}` : ""}`;
+  const typeQuery = clientType ? `&type=${clientType}` : "";
+  const statusQuery = `${tag ? `&tag=${encodeURIComponent(tag)}` : ""}${typeQuery}`;
+  const tagQueryBase = `/clients?tab=${tab}${status ? `&status=${status}` : ""}${typeQuery}`;
+
+  const description = isLeadsTab
+    ? "Prospects who haven't engaged yet."
+    : clientType === "individual"
+      ? "Individual clients in your workspace."
+      : clientType === "business"
+        ? "Business clients in your workspace."
+        : "Every client in your workspace.";
 
   return (
     <>
       <PageHeader
         title="Contacts"
-        description={tab === "leads" ? "Prospects who haven't engaged yet." : "Every client in your workspace."}
+        description={description}
         actions={
           canCreate ? (
             <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
@@ -243,6 +273,23 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
               View leads by stage in Pipelines →
             </Link>
           </p>
+        )}
+
+        {!isLeadsTab && (
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">Type</span>
+            {CLIENT_TYPE_FILTERS.map((f) => (
+              <Link
+                key={f.value}
+                href={`/clients?tab=clients${f.value ? `&type=${f.value}` : ""}${status ? `&status=${status}` : ""}${tag ? `&tag=${encodeURIComponent(tag)}` : ""}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  clientType === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
         )}
 
         <div className="mb-2 flex flex-wrap gap-2">

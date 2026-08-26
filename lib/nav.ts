@@ -48,7 +48,15 @@ export type NavItem = NavLeaf | NavGroup;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Contacts", href: "/clients", icon: Users },
+  {
+    label: "Contacts",
+    icon: Users,
+    children: [
+      { label: "Leads", href: "/clients?tab=leads" },
+      { label: "Individual Clients", href: "/clients?tab=clients&type=individual" },
+      { label: "Business Clients", href: "/clients?tab=clients&type=business" },
+    ],
+  },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
@@ -87,9 +95,9 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Messages"] },
+  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 
