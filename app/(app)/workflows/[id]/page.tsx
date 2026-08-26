@@ -53,7 +53,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
   ] = await Promise.all([
       supabase
         .from("automation_steps")
-        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y")
+        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y, display_name, is_enabled")
         .eq("automation_id", automation.id)
         .order("display_order"),
       supabase
@@ -141,6 +141,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     delay_minutes: s.delay_minutes,
     canvas_x: s.canvas_x,
     canvas_y: s.canvas_y,
+    display_name: s.display_name,
+    is_enabled: s.is_enabled,
   }));
 
   const stepEdgeRows: WorkflowStepEdgeRow[] = (stepEdges ?? []).map((e) => ({

@@ -670,8 +670,10 @@ export type Database = {
           canvas_y: number | null
           created_at: string
           delay_minutes: number
+          display_name: string | null
           display_order: number
           id: string
+          is_enabled: boolean
           requires_approval: boolean
           updated_at: string
         }
@@ -684,8 +686,10 @@ export type Database = {
           canvas_y?: number | null
           created_at?: string
           delay_minutes?: number
+          display_name?: string | null
           display_order?: number
           id?: string
+          is_enabled?: boolean
           requires_approval?: boolean
           updated_at?: string
         }
@@ -698,8 +702,10 @@ export type Database = {
           canvas_y?: number | null
           created_at?: string
           delay_minutes?: number
+          display_name?: string | null
           display_order?: number
           id?: string
+          is_enabled?: boolean
           requires_approval?: boolean
           updated_at?: string
         }
