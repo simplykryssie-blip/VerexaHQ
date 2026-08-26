@@ -166,7 +166,7 @@ export default async function PlatformAdminBillingPage() {
                     const lastPayment = lastPaymentByWorkspace.get(s.workspace_id);
                     const card = s.stripe_customer_id ? paymentMethodByCustomer.get(s.stripe_customer_id) : undefined;
                     return (
-                      <tr key={s.workspace_id}>
+                      <tr key={s.workspace_id} className="transition-colors hover:bg-surfaceMuted">
                         <td className="px-5 py-3">
                           <Link href={`/platform-admin/${s.workspace_id}`} className="font-medium text-accent hover:underline">
                             {workspaceNameById.get(s.workspace_id) ?? s.workspace_id}
@@ -237,7 +237,7 @@ export default async function PlatformAdminBillingPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {Array.from(revenueByPlan.values()).map((r) => (
-                  <tr key={r.name}>
+                  <tr key={r.name} className="transition-colors hover:bg-surfaceMuted">
                     <td className="px-5 py-3 text-slate">{r.name}</td>
                     <td className="px-5 py-3 text-slate">{r.workspaceCount}</td>
                     <td className="px-5 py-3 text-slate">{formatCents(r.cents)}</td>
@@ -264,7 +264,7 @@ export default async function PlatformAdminBillingPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {needsAttention.map((s) => (
-                    <tr key={s.workspace_id}>
+                    <tr key={s.workspace_id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3">
                         <Link href={`/platform-admin/${s.workspace_id}`} className="font-medium text-accent hover:underline">
                           {workspaceNameById.get(s.workspace_id) ?? s.workspace_id}
@@ -307,7 +307,7 @@ export default async function PlatformAdminBillingPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {invoices.map((inv) => (
-                    <tr key={inv.id}>
+                    <tr key={inv.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3">
                         <Link href={`/platform-admin/${inv.workspace_id}`} className="font-medium text-accent hover:underline">
                           {workspaceNameById.get(inv.workspace_id) ?? inv.workspace_id}
