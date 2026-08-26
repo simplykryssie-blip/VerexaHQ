@@ -9865,6 +9865,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      validate_automation: {
+        Args: { p_automation_id: string }
+        Returns: {
+          step_order: number
+          action_type: string
+          display_name: string
+          issue: string
+        }[]
+      }
       invite_workspace_user: {
         Args: { p_role_id: string; p_user_id: string; p_workspace_id: string }
         Returns: string

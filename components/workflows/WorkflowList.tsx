@@ -126,6 +126,21 @@ export function WorkflowList({
   }
 
   async function toggleEnabled(id: string, current: boolean) {
+    // Only turning ON needs a check -- pausing an already-broken workflow
+    // is always safe.
+    if (!current) {
+      const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: id });
+      if (validationError) {
+        toast.show(validationError.message, "error");
+        return;
+      }
+      if (issues && issues.length > 0) {
+        const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+        window.alert(`Can't activate this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+        return;
+      }
+    }
+
     const { error } = await supabase.from("automations").update({ is_enabled: !current }).eq("id", id);
     if (error) {
       toast.show(error.message, "error");
