@@ -8,6 +8,7 @@ import { TextImageSection } from "./sections/TextImageSection";
 import { TestimonialSection } from "./sections/TestimonialSection";
 import { FaqSection } from "./sections/FaqSection";
 import { LeadFormSection } from "./sections/LeadFormSection";
+import { OrganizerFormSection } from "./sections/OrganizerFormSection";
 import { CtaButtonSection } from "./sections/CtaButtonSection";
 import { SpacerSection } from "./sections/SpacerSection";
 import { FooterSection } from "./sections/FooterSection";
@@ -55,6 +56,8 @@ export function SectionRenderer({
           accentColor={accentColor}
         />
       );
+    case "organizer_form":
+      return <OrganizerFormSection config={section.config as never} />;
     case "cta_button":
       return <CtaButtonSection config={section.config as never} accentColor={accentColor} />;
     case "spacer":
