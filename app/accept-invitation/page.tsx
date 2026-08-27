@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
@@ -20,7 +20,6 @@ type Preview = {
 };
 
 export default function AcceptInvitationPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const supabase = createClient();
@@ -67,8 +66,11 @@ export default function AcceptInvitationPage() {
       return;
     }
     setAccepted(true);
-    router.push("/dashboard");
-    router.refresh();
+    // Hard navigation, not router.push -- accept_workspace_invitation_by_token
+    // just changed this session's workspace membership, and /dashboard's
+    // server-side workspace lookup needs to see that fresh rather than risk
+    // a stale client-side router cache.
+    window.location.href = "/dashboard";
   }
 
   async function handleAuthSubmit(e: React.FormEvent) {
@@ -150,6 +152,10 @@ export default function AcceptInvitationPage() {
   }
 
   if (preview.status !== "pending") {
+    // Already signed in as the exact person this invite was for -- send
+    // them straight to their workspace instead of a "Back to sign in" link
+    // that makes an already-successful invite look broken.
+    const alreadySignedInAsInvitee = Boolean(currentUserEmail) && currentUserEmail!.toLowerCase() === preview.email.toLowerCase();
     return (
       <Centered center>
         <h1 className="text-xl font-semibold text-ink">
@@ -158,9 +164,15 @@ export default function AcceptInvitationPage() {
         <p className="mt-3 text-sm text-muted">
           This invitation to join {preview.workspace_name} is {preview.status}.
         </p>
-        <Link href="/login" className="mt-6 inline-block text-sm text-accent hover:underline">
-          Back to sign in
-        </Link>
+        {alreadySignedInAsInvitee ? (
+          <Link href="/dashboard" className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
+            Go to your workspace
+          </Link>
+        ) : (
+          <Link href="/login" className="mt-6 inline-block text-sm text-accent hover:underline">
+            Back to sign in
+          </Link>
+        )}
       </Centered>
     );
   }

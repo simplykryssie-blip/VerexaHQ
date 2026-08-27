@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
@@ -47,7 +47,6 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 export default function PortalAcceptInvitationPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const supabase = createClient();
@@ -97,8 +96,12 @@ export default function PortalAcceptInvitationPage() {
       return;
     }
     setAccepted(true);
-    router.push("/portal/dashboard");
-    router.refresh();
+    // A hard navigation, not router.push -- accept_portal_invitation just
+    // flipped this session's portal access from nothing to active, and
+    // /portal/dashboard's server-side getPortalIdentity() check needs to see
+    // that fresh. A client-side push can land on a cached/stale render of
+    // the destination route from before the accept; a full page load can't.
+    window.location.href = "/portal/dashboard";
   }
 
   async function handleAuthSubmit(e: React.FormEvent) {
@@ -174,15 +177,28 @@ export default function PortalAcceptInvitationPage() {
   }
 
   if (preview.status !== "invited") {
+    // If they're already signed in as the exact person this invite was for
+    // (the common case: they just finished the confirm-email redirect and
+    // landed back here, or re-opened the same email link after it already
+    // worked), send them straight into the portal instead of dead-ending on
+    // a "Back to sign in" link that makes an already-successful invite look
+    // broken.
+    const alreadySignedInAsInvitee = Boolean(currentUserEmail) && currentUserEmail!.toLowerCase() === preview.invited_email.toLowerCase();
     return (
       <Shell>
         <h1 className={styles.cardTitle}>{preview.status === "active" ? "Already accepted" : "Invitation no longer valid"}</h1>
         <p className={styles.lede}>
           This invitation to access {preview.client_label}&apos;s portal is {preview.status === "active" ? "already active" : preview.status}.
         </p>
-        <Link href="/portal/login" className={styles.link}>
-          Back to sign in
-        </Link>
+        {alreadySignedInAsInvitee ? (
+          <Link href="/portal/dashboard" className={styles.submit} style={{ textDecoration: "none", textAlign: "center" }}>
+            Go to your portal
+          </Link>
+        ) : (
+          <Link href="/portal/login" className={styles.link}>
+            Back to sign in
+          </Link>
+        )}
       </Shell>
     );
   }
