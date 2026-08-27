@@ -10,7 +10,7 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: page }, { data: website }, { data: sections }, { data: canManage }, { data: services }] = await Promise.all([
+  const [{ data: page }, { data: website }, { data: sections }, { data: canManage }, { data: organizerTemplates }] = await Promise.all([
     supabase
       .from("site_pages")
       .select(
@@ -21,7 +21,7 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
     supabase.from("site_websites").select("id, slug").eq("id", params.id).maybeSingle(),
     supabase.from("site_page_sections").select("id, section_type, display_order, config").eq("page_id", params.pageId).order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "site_pages.manage" }),
-    supabase.from("services").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`).eq("status", "published").order("display_order"),
+    supabase.from("organizer_templates").select("id, name, is_public, public_token").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
   ]);
 
   if (!page || page.workspace_id !== workspace.id || page.website_id !== params.id || !website) notFound();
@@ -34,7 +34,7 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
       page={page}
       initialSections={(sections ?? []) as never}
       canManage={Boolean(canManage)}
-      workspaceServices={services ?? []}
+      organizerTemplates={organizerTemplates ?? []}
     />
   );
 }

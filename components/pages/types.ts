@@ -5,7 +5,7 @@ export type SectionType =
   | "text_image"
   | "testimonial"
   | "faq"
-  | "lead_form"
+  | "organizer_form"
   | "cta_button"
   | "spacer"
   | "footer"
@@ -32,7 +32,7 @@ export type BuilderPage = {
   schema_markup: string | null;
 };
 
-export type WorkspaceServiceOption = { id: string; name: string };
+export type OrganizerTemplateOption = { id: string; name: string; is_public: boolean; public_token: string };
 
 export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   hero: "Hero",
@@ -41,7 +41,7 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   text_image: "Text + image",
   testimonial: "Testimonial",
   faq: "FAQ",
-  lead_form: "Lead form",
+  organizer_form: "Form",
   cta_button: "CTA button",
   spacer: "Spacer",
   footer: "Footer",
@@ -55,7 +55,7 @@ export const SECTION_TYPES: SectionType[] = [
   "image",
   "testimonial",
   "faq",
-  "lead_form",
+  "organizer_form",
   "cta_button",
   "spacer",
   "footer",

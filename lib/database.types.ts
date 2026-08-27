@@ -9194,18 +9194,6 @@ export type Database = {
         }
         Returns: Json
       }
-      capture_public_lead_from_site_page: {
-        Args: {
-          p_email: string
-          p_first_name: string
-          p_last_name: string
-          p_page_id: string
-          p_phone: string
-          p_section_id: string
-          p_service_ids?: string[]
-        }
-        Returns: Json
-      }
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }

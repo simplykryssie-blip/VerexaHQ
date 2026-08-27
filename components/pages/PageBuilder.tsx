@@ -11,7 +11,7 @@ import { SectionCanvas } from "./SectionCanvas";
 import { SectionPropertiesPanel } from "./SectionPropertiesPanel";
 import { SectionPreview } from "./SectionPreview";
 import { PageSettingsPanel } from "./PageSettingsPanel";
-import type { BuilderPage, BuilderSection, SectionType, WorkspaceServiceOption } from "./types";
+import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption } from "./types";
 
 const DEBOUNCE_MS = 600;
 
@@ -22,7 +22,7 @@ export function PageBuilder({
   page,
   initialSections,
   canManage,
-  workspaceServices,
+  organizerTemplates,
 }: {
   workspaceSlug: string;
   websiteId: string;
@@ -30,7 +30,7 @@ export function PageBuilder({
   page: BuilderPage;
   initialSections: BuilderSection[];
   canManage: boolean;
-  workspaceServices: WorkspaceServiceOption[];
+  organizerTemplates: OrganizerTemplateOption[];
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -199,7 +199,7 @@ export function PageBuilder({
               websiteId={websiteId}
               section={selectedSection}
               onUpdate={updateSectionConfig}
-              workspaceServices={workspaceServices}
+              organizerTemplates={organizerTemplates}
               canAdvanceToNextPage={Boolean(page.funnel_id)}
             />
           )}

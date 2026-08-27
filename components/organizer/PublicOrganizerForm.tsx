@@ -53,6 +53,13 @@ type TemplateData = {
 type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 type ServiceOption = { id: string; name: string };
 
+export type OrganizerSubmitConfig = {
+  action?: "next_page" | "custom_url" | "inline_thank_you";
+  custom_url?: string;
+  thank_you_heading?: string;
+  thank_you_body?: string;
+};
+
 function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
   if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
   return value.trim() !== "";
@@ -65,7 +72,20 @@ function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: numb
 // file uploads aren't possible pre-authentication -- different enough of a
 // lifecycle that sharing the component would mean threading a lot of
 // "is this the public flow?" branches through it instead.
-export function PublicOrganizerForm({ token, data }: { token: string; data: TemplateData }) {
+export function PublicOrganizerForm({
+  token,
+  data,
+  onSubmitConfig,
+  onNextPage,
+}: {
+  token: string;
+  data: TemplateData;
+  // Only used when embedded inline on a website page section -- the
+  // standalone /o/[token] route leaves these undefined and gets the
+  // original built-in "Thank you" screen unchanged.
+  onSubmitConfig?: OrganizerSubmitConfig;
+  onNextPage?: () => void;
+}) {
   const supabase = createClient();
   const { template, workspace_name, requires_portal_signup, password_min_length, branding, fields } = data;
   const minPasswordLength = password_min_length ?? 8;
@@ -166,7 +186,10 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       setError("Name and email are required.");
       return;
     }
-    if (selectedServiceIds.length === 0) {
+    // Only required when there's actually something to pick -- a workspace
+    // with no services configured (e.g. a plain contact/signup form embedded
+    // on a marketing site) has nothing to show here at all.
+    if (serviceOptions.length > 0 && selectedServiceIds.length === 0) {
       setError("Let us know what you need help with.");
       return;
     }
@@ -245,6 +268,22 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     setStep("form");
   }
 
+  // Shared by both submit paths below -- honors the embedding section's
+  // configured post-submit action when one was passed in, otherwise falls
+  // back to the original built-in "Thank you" screen unchanged.
+  function finish() {
+    const action = onSubmitConfig?.action ?? "inline_thank_you";
+    if (action === "custom_url" && onSubmitConfig?.custom_url) {
+      window.location.href = onSubmitConfig.custom_url;
+      return;
+    }
+    if (action === "next_page" && onNextPage) {
+      onNextPage();
+      return;
+    }
+    setStep("done");
+  }
+
   async function submit() {
     setSubmitting(true);
     setError(null);
@@ -289,7 +328,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         }).catch(() => {});
       }
       setAccountCreated(true);
-      setStep("done");
+      finish();
       return;
     }
 
@@ -319,14 +358,17 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         // it into Documents can be retried later if this fails.
       });
     }
-    setStep("done");
+    finish();
   }
 
   if (step === "done") {
+    const useCustomCopy = Boolean(onSubmitConfig?.thank_you_heading || onSubmitConfig?.thank_you_body);
     return (
       <div className="mx-auto max-w-md p-8 text-center">
-        <h1 className="text-lg font-semibold text-ink">Thank you</h1>
-        {accountCreated ? (
+        <h1 className="text-lg font-semibold text-ink">{useCustomCopy ? onSubmitConfig?.thank_you_heading || "Thank you" : "Thank you"}</h1>
+        {useCustomCopy ? (
+          <p className="mt-2 text-sm text-muted">{onSubmitConfig?.thank_you_body}</p>
+        ) : accountCreated ? (
           <p className="mt-2 text-sm text-muted">
             Your information was submitted to {workspace_name}. Check your email at {email} to confirm your new client portal account, then log
             in to see your progress.
@@ -429,28 +471,30 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
                 </div>
               </>
             )}
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
-              <p className="mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {serviceOptions.map((s) => (
-                  <label
-                    key={s.id}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                      selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedServiceIds.includes(s.id)}
-                      onChange={() => toggleService(s.id)}
-                      className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                    />
-                    {s.name}
-                  </label>
-                ))}
+            {serviceOptions.length > 0 && (
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
+                <p className="mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {serviceOptions.map((s) => (
+                    <label
+                      key={s.id}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                        selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedServiceIds.includes(s.id)}
+                        onChange={() => toggleService(s.id)}
+                        className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                      />
+                      {s.name}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
           {requires_portal_signup && (
             <p className="mt-2 text-xs text-muted">

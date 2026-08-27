@@ -1,11 +1,11 @@
-import { SECTION_TYPE_LABELS, type BuilderSection, type WorkspaceServiceOption } from "./types";
+import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption } from "./types";
 import { HeroEditor } from "./section-editors/HeroEditor";
 import { RichTextEditorSection } from "./section-editors/RichTextEditorSection";
 import { ImageEditor } from "./section-editors/ImageEditor";
 import { TextImageEditor } from "./section-editors/TextImageEditor";
 import { TestimonialEditor } from "./section-editors/TestimonialEditor";
 import { FaqEditor } from "./section-editors/FaqEditor";
-import { LeadFormEditor } from "./section-editors/LeadFormEditor";
+import { OrganizerFormEditor } from "./section-editors/OrganizerFormEditor";
 import { CtaButtonEditor } from "./section-editors/CtaButtonEditor";
 import { SpacerEditor } from "./section-editors/SpacerEditor";
 import { FooterEditor } from "./section-editors/FooterEditor";
@@ -16,14 +16,14 @@ export function SectionPropertiesPanel({
   websiteId,
   section,
   onUpdate,
-  workspaceServices,
+  organizerTemplates,
   canAdvanceToNextPage,
 }: {
   workspaceId: string;
   websiteId: string;
   section: BuilderSection | null;
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
-  workspaceServices: WorkspaceServiceOption[];
+  organizerTemplates: OrganizerTemplateOption[];
   canAdvanceToNextPage: boolean;
 }) {
   if (!section) {
@@ -52,8 +52,8 @@ export function SectionPropertiesPanel({
           <TestimonialEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
         )}
         {section.section_type === "faq" && <FaqEditor config={section.config as never} onChange={onChange} />}
-        {section.section_type === "lead_form" && (
-          <LeadFormEditor config={section.config as never} onChange={onChange} workspaceServices={workspaceServices} canAdvanceToNextPage={canAdvanceToNextPage} />
+        {section.section_type === "organizer_form" && (
+          <OrganizerFormEditor config={section.config as never} onChange={onChange} organizerTemplates={organizerTemplates} canAdvanceToNextPage={canAdvanceToNextPage} />
         )}
         {section.section_type === "cta_button" && <CtaButtonEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "spacer" && <SpacerEditor config={section.config as never} onChange={onChange} />}
