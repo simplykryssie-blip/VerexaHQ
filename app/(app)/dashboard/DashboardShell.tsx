@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
-import { KpiWidget } from "@/components/widgets/KpiWidget";
+import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
@@ -23,6 +23,15 @@ export type WidgetRow = { id: string; widget_type: string; title: string | null;
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Real percentage change only -- returns undefined (no trend shown) rather
+// than a fabricated number when there's no honest baseline to compare against
+// (equal values, or a previous value of zero where "% change" is undefined).
+function trendFor(current: number, previous: number, suffix: string, sentiment?: "positive" | "negative"): KpiTrend | undefined {
+  if (previous <= 0 || current === previous) return undefined;
+  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
+  return { direction: current > previous ? "up" : "down", label: `${pct}% ${suffix}`, sentiment };
 }
 
 export function DashboardShell({
@@ -116,6 +125,7 @@ export function DashboardShell({
             icon={DollarSign}
             chip="emerald"
             reportHref="/reports/financial"
+            trend={trendFor(data.kpis.revenueThisMonth, data.kpis.revenueLastMonth, "vs last month")}
           />
         );
       case "kpis":
@@ -137,6 +147,19 @@ export function DashboardShell({
                 <p className={`mt-1 font-display text-2xl font-semibold tabular-nums ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}>
                   {data.kpis.tasksDueToday}
                 </p>
+                {(() => {
+                  // Fewer outstanding tasks than yesterday's same bucket is good news, so a
+                  // "down" trend here is positive -- the reverse of revenue's convention.
+                  const trend = trendFor(data.kpis.tasksDueToday, data.kpis.tasksDueYesterday, "vs yesterday", data.kpis.tasksDueToday < data.kpis.tasksDueYesterday ? "positive" : "negative");
+                  if (!trend) return null;
+                  const Icon = trend.direction === "up" ? ArrowUp : ArrowDown;
+                  return (
+                    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${trend.sentiment === "positive" ? "text-success" : "text-danger"}`}>
+                      <Icon size={12} aria-hidden="true" />
+                      {trend.label}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </WidgetShell>

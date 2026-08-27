@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export type KpiData = {
   revenueThisMonth: number;
+  revenueLastMonth: number;
   openEngagements: number;
   tasksDueToday: number;
+  tasksDueYesterday: number;
   outstandingInvoicesTotal: number;
   outstandingInvoicesCount: number;
   missingDocumentsCount: number;
@@ -31,15 +33,21 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
+  const startOfLastMonth = new Date(startOfMonth);
+  startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1);
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
 
   const [
     { data: payments },
+    { data: lastMonthPayments },
     { data: openEngagements },
     { data: allTasks },
+    { count: tasksDueYesterdayCount },
     { data: invoices },
     { data: openThreads },
     { data: activity },
@@ -51,6 +59,15 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .eq("workspace_id", workspaceId)
       .eq("status", "succeeded")
       .gte("payment_date", startOfMonth.toISOString()),
+    // Same-shape query for last calendar month, so "Revenue This Month" can
+    // show a real vs-last-month trend rather than a static number alone.
+    supabase
+      .from("payments")
+      .select("amount")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "succeeded")
+      .gte("payment_date", startOfLastMonth.toISOString())
+      .lt("payment_date", startOfMonth.toISOString()),
     supabase
       .from("engagements")
       .select("id, service_id")
@@ -62,6 +79,15 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .eq("workspace_id", workspaceId)
       .not("due_date", "is", null)
       .neq("status", "completed"),
+    // Same "still outstanding" definition as today's due-today count, just
+    // for yesterday's date bucket -- real comparison, not a fabricated trend.
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .neq("status", "completed")
+      .gte("due_date", startOfYesterday.toISOString())
+      .lt("due_date", startOfToday.toISOString()),
     supabase
       .from("invoices")
       .select("id, invoice_number, client_id, due_date, total_amount, amount_paid, status")
@@ -78,6 +104,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   ]);
 
   const revenueThisMonth = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
+  const revenueLastMonth = (lastMonthPayments ?? []).reduce((sum, p) => sum + p.amount, 0);
 
   const tasks = allTasks ?? [];
   const overdueTasks = tasks.filter((t) => t.due_date && t.due_date < startOfToday.toISOString());
@@ -183,8 +210,10 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   return {
     kpis: {
       revenueThisMonth,
+      revenueLastMonth,
       openEngagements: openEngagementIds.length,
       tasksDueToday: dueTodayTasks.length,
+      tasksDueYesterday: tasksDueYesterdayCount ?? 0,
       outstandingInvoicesTotal,
       outstandingInvoicesCount: invoiceRows.length,
       missingDocumentsCount,
