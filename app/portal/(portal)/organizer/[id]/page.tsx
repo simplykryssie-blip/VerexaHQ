@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
-import { OrganizerForm } from "@/components/portal/OrganizerForm";
+import { OrganizerForm, type OpenItemInfo } from "@/components/portal/OrganizerForm";
 import { InformationRequestBanner } from "@/components/portal/InformationRequestBanner";
 import { stringifyAddressValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import type { BasicInfoSnapshot } from "@/components/portal/BasicInfoForm";
@@ -34,11 +34,40 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
     readOnly ? Promise.resolve({ data: null }) : supabase.rpc("get_portal_client_snapshot"),
     supabase
       .from("organizer_information_requests")
-      .select("id, message, status, created_at")
+      .select(
+        `id, message, status, due_date, tags, created_at,
+         items:organizer_information_request_items(id, organizer_field_id, instance_index, note, status, was_answered_when_flagged, decision_note)`
+      )
       .eq("organizer_response_id", response.id)
+      .neq("status", "draft")
       .neq("status", "resolved")
       .order("created_at", { ascending: false }),
   ]);
+
+  type InfoRequestItemRow = {
+    id: string;
+    organizer_field_id: string;
+    instance_index: number;
+    note: string | null;
+    status: "pending" | "client_responded" | "approved" | "rejected" | "resolved";
+    was_answered_when_flagged: boolean;
+    decision_note: string | null;
+  };
+
+  const openItemsByFieldInstance: Record<string, OpenItemInfo> = {};
+  for (const request of (infoRequests ?? []) as unknown as { items: InfoRequestItemRow[] }[]) {
+    for (const item of request.items ?? []) {
+      if (item.status === "pending" || item.status === "client_responded" || item.status === "rejected") {
+        openItemsByFieldInstance[`${item.organizer_field_id}:${item.instance_index}`] = {
+          id: item.id,
+          note: item.note,
+          status: item.status,
+          wasAnsweredWhenFlagged: item.was_answered_when_flagged,
+          decisionNote: item.decision_note,
+        };
+      }
+    }
+  }
 
   // Mapped fields (client_profile_field set on the builder side) that don't
   // already have an answer get one synthesized from the client's record --
@@ -66,7 +95,9 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         description={readOnly ? "This organizer has been submitted and can no longer be edited." : "Fill in what you can -- you can save progress and come back."}
       />
       <div className="max-w-2xl flex-1 px-8 py-6">
-        <InformationRequestBanner requests={(infoRequests ?? []) as never} />
+        <InformationRequestBanner
+          requests={(infoRequests ?? []).map((r) => ({ id: r.id, message: r.message ?? "", status: r.status as "active" | "viewed" | "responded", due_date: r.due_date, tags: r.tags, created_at: r.created_at }))}
+        />
         <OrganizerForm
           responseId={response.id}
           templateName={templateName}
@@ -76,6 +107,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
           workspaceId={response.workspace_id}
           entityType={response.engagement_id ? "engagement" : "client"}
           entityId={response.engagement_id ?? response.client_id}
+          openItemsByFieldInstance={openItemsByFieldInstance}
         />
       </div>
     </>

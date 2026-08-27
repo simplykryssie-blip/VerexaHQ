@@ -34,6 +34,21 @@ type FieldRow = {
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
 
+/**
+ * A field+instance currently flagged for more information. wasAnsweredWhenFlagged
+ * determines which of the two client-facing flows applies: an unanswered field
+ * reopens for direct edit (nothing to lose), an answered one only accepts a
+ * proposed correction that staff must approve -- the original is never
+ * overwritten directly.
+ */
+export type OpenItemInfo = {
+  id: string;
+  note: string | null;
+  status: "pending" | "client_responded" | "approved" | "rejected" | "resolved";
+  wasAnsweredWhenFlagged: boolean;
+  decisionNote: string | null;
+};
+
 export function OrganizerForm({
   responseId,
   templateName,
@@ -43,6 +58,7 @@ export function OrganizerForm({
   workspaceId,
   entityType,
   entityId,
+  openItemsByFieldInstance = {},
 }: {
   responseId: string;
   templateName: string;
@@ -52,6 +68,7 @@ export function OrganizerForm({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
+  openItemsByFieldInstance?: Record<string, OpenItemInfo>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -104,6 +121,33 @@ export function OrganizerForm({
 
   async function saveAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  }
+
+  // For a field that was unanswered when flagged -- nothing to preserve, so
+  // this writes straight into organizer_response_answers (via a
+  // SECURITY DEFINER RPC, since the response is past the not_started/
+  // in_progress window direct RLS allows) and resolves the flag.
+  async function saveReopenedAnswer(itemId: string, value: string) {
+    const { error } = await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: itemId, p_value: value });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Answer saved.", "success");
+    router.refresh();
+  }
+
+  // For a field that was already answered when flagged -- this never
+  // touches organizer_response_answers directly. Staff must approve it
+  // before the real answer changes.
+  async function proposeCorrection(itemId: string, value: string) {
+    const { error } = await supabase.rpc("propose_organizer_answer_correction", { p_item_id: itemId, p_proposed_value: value });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Correction submitted for review.", "success");
+    router.refresh();
   }
 
   async function saveAll() {
@@ -287,6 +331,9 @@ export function OrganizerForm({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
+              openItemsByFieldInstance={openItemsByFieldInstance}
+              onSaveReopenedAnswer={saveReopenedAnswer}
+              onProposeCorrection={proposeCorrection}
             />
           ) : (
             <FieldInput
@@ -299,6 +346,9 @@ export function OrganizerForm({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
+              openItem={openItemsByFieldInstance[`${field.id}:0`] ?? null}
+              onSaveReopenedAnswer={saveReopenedAnswer}
+              onProposeCorrection={proposeCorrection}
             />
           )
         )}
@@ -359,6 +409,9 @@ function RepeatingSectionInput({
   workspaceId,
   entityType,
   entityId,
+  openItemsByFieldInstance,
+  onSaveReopenedAnswer,
+  onProposeCorrection,
 }: {
   responseId: string;
   field: FieldRow;
@@ -369,6 +422,9 @@ function RepeatingSectionInput({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
+  openItemsByFieldInstance: Record<string, OpenItemInfo>;
+  onSaveReopenedAnswer: (itemId: string, value: string) => Promise<void>;
+  onProposeCorrection: (itemId: string, value: string) => Promise<void>;
 }) {
   function updateRow(index: number, childFieldId: string, value: string) {
     onChange(rows.map((row, i) => (i === index ? { ...row, [childFieldId]: value } : row)));
@@ -411,6 +467,9 @@ function RepeatingSectionInput({
                   workspaceId={workspaceId}
                   entityType={entityType}
                   entityId={entityId}
+                  openItem={openItemsByFieldInstance[`${child.id}:${index}`] ?? null}
+                  onSaveReopenedAnswer={onSaveReopenedAnswer}
+                  onProposeCorrection={onProposeCorrection}
                 />
               ))}
             </div>
@@ -610,6 +669,9 @@ function FieldInput({
   workspaceId,
   entityType,
   entityId,
+  openItem,
+  onSaveReopenedAnswer,
+  onProposeCorrection,
 }: {
   responseId: string;
   field: FieldRow;
@@ -619,9 +681,10 @@ function FieldInput({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
+  openItem?: OpenItemInfo | null;
+  onSaveReopenedAnswer?: (itemId: string, value: string) => Promise<void>;
+  onProposeCorrection?: (itemId: string, value: string) => Promise<void>;
 }) {
-  const options = normalizeOptions(field.options);
-
   if (field.field_type === "section") {
     return (
       <div className="border-b border-border pb-1.5 pt-2">
@@ -639,6 +702,15 @@ function FieldInput({
     );
   }
 
+  // An unanswered field the reviewer flagged reopens for direct edit --
+  // nothing to preserve. An already-answered flagged field never gets
+  // overwritten directly; the client can only propose a correction that
+  // staff must approve.
+  const isReopened = Boolean(openItem) && !openItem!.wasAnsweredWhenFlagged && openItem!.status === "pending";
+  const canProposeCorrection = Boolean(openItem) && openItem!.wasAnsweredWhenFlagged && (openItem!.status === "pending" || openItem!.status === "rejected");
+  const awaitingStaffDecision = Boolean(openItem) && openItem!.wasAnsweredWhenFlagged && openItem!.status === "client_responded";
+  const effectiveDisabled = isReopened ? false : disabled;
+
   return (
     <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
@@ -646,12 +718,139 @@ function FieldInput({
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
 
+      {openItem?.note && (isReopened || canProposeCorrection) && (
+        <p className="mt-1.5 rounded-lg bg-amberSoft px-2.5 py-1.5 text-xs text-amber">Your preparer needs: {openItem.note}</p>
+      )}
+      {openItem?.decisionNote && canProposeCorrection && (
+        <p className="mt-1.5 rounded-lg bg-roseSoft px-2.5 py-1.5 text-xs text-rose">Your last submission wasn&apos;t accepted: {openItem.decisionNote}</p>
+      )}
+
       <div className="mt-2">
-        {field.field_type === "name" ? (
+        <FieldValueInput
+          field={field}
+          value={value}
+          onChange={onChange}
+          disabled={effectiveDisabled}
+          workspaceId={workspaceId}
+          entityType={entityType}
+          entityId={entityId}
+          responseId={responseId}
+        />
+      </div>
+
+      {isReopened && onSaveReopenedAnswer && (
+        <button
+          type="button"
+          onClick={() => onSaveReopenedAnswer(openItem!.id, value)}
+          className="mt-2 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+        >
+          Save answer
+        </button>
+      )}
+
+      {awaitingStaffDecision && <p className="mt-2 text-xs text-accent">Correction submitted -- awaiting review.</p>}
+
+      {canProposeCorrection && onProposeCorrection && (
+        <ProposeCorrectionControl field={field} currentValue={value} workspaceId={workspaceId} entityType={entityType} entityId={entityId} responseId={responseId} onSubmit={(v) => onProposeCorrection(openItem!.id, v)} />
+      )}
+    </div>
+  );
+}
+
+function ProposeCorrectionControl({
+  field,
+  currentValue,
+  workspaceId,
+  entityType,
+  entityId,
+  responseId,
+  onSubmit,
+}: {
+  field: FieldRow;
+  currentValue: string;
+  workspaceId: string;
+  entityType: "client" | "engagement";
+  entityId: string;
+  responseId: string;
+  onSubmit: (value: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draftValue, setDraftValue] = useState(currentValue);
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs font-medium text-accent hover:underline">
+        Propose a correction
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-2 border-t border-border pt-2">
+      <FieldValueInput
+        field={field}
+        value={draftValue}
+        onChange={(_, v) => setDraftValue(v)}
+        disabled={false}
+        workspaceId={workspaceId}
+        entityType={entityType}
+        entityId={entityId}
+        responseId={responseId}
+      />
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={async () => {
+            setSubmitting(true);
+            await onSubmit(draftValue);
+            setSubmitting(false);
+            setOpen(false);
+          }}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {submitting ? "Submitting..." : "Submit correction"}
+        </button>
+        <button type="button" onClick={() => setOpen(false)} disabled={submitting} className="text-xs font-medium text-muted hover:text-ink disabled:opacity-40">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FieldValueInput({
+  responseId,
+  field,
+  value,
+  onChange,
+  disabled,
+  workspaceId,
+  entityType,
+  entityId,
+  idPrefix = "field",
+}: {
+  responseId: string;
+  field: FieldRow;
+  value: string;
+  onChange: (fieldId: string, value: string) => void;
+  disabled: boolean;
+  workspaceId: string;
+  entityType: "client" | "engagement";
+  entityId: string;
+  idPrefix?: string;
+}) {
+  const options = normalizeOptions(field.options);
+  const inputId = `${idPrefix}-${field.id}`;
+
+  return (
+    <>
+      {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
         ) : field.field_type === "email" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="email"
             value={value}
             disabled={disabled}
@@ -660,7 +859,7 @@ function FieldInput({
           />
         ) : field.field_type === "phone" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="tel"
             value={value}
             disabled={disabled}
@@ -669,7 +868,7 @@ function FieldInput({
           />
         ) : field.field_type === "website" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="url"
             value={value}
             disabled={disabled}
@@ -683,7 +882,7 @@ function FieldInput({
               <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
                 <input
                   type="radio"
-                  name={`field-${field.id}`}
+                  name={inputId}
                   checked={value === o.value}
                   disabled={disabled}
                   onChange={() => onChange(field.id, o.value)}
@@ -707,7 +906,7 @@ function FieldInput({
           <SignatureField responseId={responseId} fieldId={field.id} value={value} onChange={onChange} disabled={disabled} />
         ) : field.field_type === "dropdown" ? (
           <select
-            id={`field-${field.id}`}
+            id={inputId}
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
@@ -726,7 +925,7 @@ function FieldInput({
               <label key={i} className="flex items-center gap-2 text-sm text-slate">
                 <input
                   type="radio"
-                  name={`field-${field.id}`}
+                  name={inputId}
                   checked={value === o.value}
                   disabled={disabled}
                   onChange={() => onChange(field.id, o.value)}
@@ -759,7 +958,7 @@ function FieldInput({
           </div>
         ) : field.field_type === "checkbox" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="checkbox"
             checked={value === "true"}
             disabled={disabled}
@@ -768,7 +967,7 @@ function FieldInput({
           />
         ) : field.field_type === "date" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="date"
             value={value}
             disabled={disabled}
@@ -777,7 +976,7 @@ function FieldInput({
           />
         ) : field.field_type === "number" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="number"
             value={value}
             disabled={disabled}
@@ -786,7 +985,7 @@ function FieldInput({
           />
         ) : field.field_type === "currency" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="number"
             step="0.01"
             value={value}
@@ -796,7 +995,7 @@ function FieldInput({
           />
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
-            id={`field-${field.id}`}
+            id={inputId}
             type="text"
             inputMode="numeric"
             value={value}
@@ -809,7 +1008,7 @@ function FieldInput({
           <AddressInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
         ) : (
           <textarea
-            id={`field-${field.id}`}
+            id={inputId}
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
@@ -817,8 +1016,7 @@ function FieldInput({
             className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
           />
         )}
-      </div>
-    </div>
+    </>
   );
 }
 
