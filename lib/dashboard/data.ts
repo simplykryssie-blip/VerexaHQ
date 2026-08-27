@@ -14,7 +14,16 @@ export type KpiData = {
 
 export type OverdueTask = { id: string; title: string; due_date: string; engagement_id: string | null; client_id: string | null };
 export type OverdueInvoice = { id: string; invoice_number: string | null; client_id: string; due_date: string; balance: number };
-export type ReviewItem = { workflow_stage_id: string; stage_name: string; engagement_number: string | null; client_id: string; sla_category: string };
+export type ReviewItem = {
+  workflow_stage_id: string;
+  stage_name: string;
+  engagement_number: string | null;
+  client_id: string;
+  client_name: string;
+  service_name: string | null;
+  sla_category: string;
+  started_at: string | null;
+};
 export type ActivityItem = { id: string; description: string; activity_type: string; created_at: string };
 export type CalendarItem = { id: string; date: string; label: string; href?: string; kind: "engagement" | "task" };
 
@@ -162,19 +171,48 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     );
     if (queue && queue.length > 0) {
       const stageIds = queue.map((q) => q.workflow_stage_id);
-      const { data: slaRows } = await supabase.from("v_workflow_sla_status").select("workflow_stage_id, sla_category").in("workflow_stage_id", stageIds);
+      const clientIds = Array.from(new Set(queue.map((q) => q.client_id).filter((v): v is string => Boolean(v))));
+      const engagementIds = Array.from(new Set(queue.map((q) => q.engagement_id).filter((v): v is string => Boolean(v))));
+      const [{ data: slaRows }, { data: clientRows }, { data: engagementRows }] = await Promise.all([
+        supabase.from("v_workflow_sla_status").select("workflow_stage_id, sla_category").in("workflow_stage_id", stageIds),
+        clientIds.length
+          ? supabase.from("clients").select("id, client_type, first_name, last_name, business_name").in("id", clientIds)
+          : Promise.resolve({ data: [] }),
+        engagementIds.length ? supabase.from("engagements").select("id, service_id").in("id", engagementIds) : Promise.resolve({ data: [] }),
+      ]);
+      const serviceIds = Array.from(new Set((engagementRows ?? []).map((e) => e.service_id).filter((v): v is string => Boolean(v))));
+      const { data: serviceRows } = serviceIds.length
+        ? await supabase.from("services").select("id, name").in("id", serviceIds)
+        : { data: [] as { id: string; name: string }[] };
+
       const slaByStage = new Map((slaRows ?? []).map((s) => [s.workflow_stage_id, s.sla_category as string]));
+      const clientById = new Map((clientRows ?? []).map((c) => [c.id, c]));
+      const serviceIdByEngagement = new Map((engagementRows ?? []).map((e) => [e.id, e.service_id]));
+      const serviceNameById = new Map((serviceRows ?? []).map((s) => [s.id, s.name]));
+
       reviewItems = queue
         .filter((q): q is typeof q & { workflow_stage_id: string; stage_name: string; client_id: string } =>
           Boolean(q.workflow_stage_id && q.stage_name && q.client_id)
         )
-        .map((q) => ({
-          workflow_stage_id: q.workflow_stage_id,
-          stage_name: q.stage_name,
-          engagement_number: q.engagement_number,
-          client_id: q.client_id,
-          sla_category: slaByStage.get(q.workflow_stage_id) ?? "On Track",
-        }));
+        .map((q) => {
+          const client = clientById.get(q.client_id);
+          const clientName = client
+            ? client.client_type === "business" && client.business_name
+              ? client.business_name
+              : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
+            : "Unknown client";
+          const serviceId = q.engagement_id ? serviceIdByEngagement.get(q.engagement_id) : null;
+          return {
+            workflow_stage_id: q.workflow_stage_id,
+            stage_name: q.stage_name,
+            engagement_number: q.engagement_number,
+            client_id: q.client_id,
+            client_name: clientName,
+            service_name: serviceId ? (serviceNameById.get(serviceId) ?? null) : null,
+            sla_category: slaByStage.get(q.workflow_stage_id) ?? "On Track",
+            started_at: q.started_at,
+          };
+        });
     }
   }
 

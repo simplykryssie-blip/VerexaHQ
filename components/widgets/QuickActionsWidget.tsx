@@ -12,13 +12,21 @@ export type QuickActionPermissions = {
   isAdmin: boolean;
 };
 
+const CHIP_CLASSES = {
+  accent: "bg-accentSoft text-accent",
+  emerald: "bg-emeraldSoft text-emerald",
+  violet: "bg-violetSoft text-violet",
+  amber: "bg-amberSoft text-amber",
+  rose: "bg-roseSoft text-rose",
+} as const;
+
 const ACTIONS = [
-  { label: "New Client", href: "/clients", icon: UserPlus, key: "clientsCreate" as const },
-  { label: "New Engagement", href: "/engagements/new", icon: Briefcase, key: "engagementsManage" as const },
-  { label: "Create Invoice", href: "/clients", icon: Receipt, key: "billingManage" as const },
-  { label: "Request Documents", href: "/clients", icon: ClipboardList, key: "documentsRequest" as const },
-  { label: "Schedule Appointment", href: "/calendar", icon: CalendarPlus, key: "appointmentsManage" as const },
-  { label: "Invite Staff", href: "/settings/users", icon: Mail, key: "isAdmin" as const },
+  { label: "New Client", href: "/clients", icon: UserPlus, key: "clientsCreate" as const, chip: "accent" as const },
+  { label: "New Engagement", href: "/engagements/new", icon: Briefcase, key: "engagementsManage" as const, chip: "violet" as const },
+  { label: "Create Invoice", href: "/clients", icon: Receipt, key: "billingManage" as const, chip: "emerald" as const },
+  { label: "Request Documents", href: "/clients", icon: ClipboardList, key: "documentsRequest" as const, chip: "amber" as const },
+  { label: "Schedule Appointment", href: "/calendar", icon: CalendarPlus, key: "appointmentsManage" as const, chip: "rose" as const },
+  { label: "Invite Staff", href: "/settings/users", icon: Mail, key: "isAdmin" as const, chip: "accent" as const },
 ] as const;
 
 export function QuickActionsWidget({ permissions }: { permissions: QuickActionPermissions }) {
@@ -34,9 +42,11 @@ export function QuickActionsWidget({ permissions }: { permissions: QuickActionPe
             <Link
               key={a.label}
               href={a.href}
-              className="flex flex-col items-center gap-1.5 rounded-xl border border-border px-3 py-3 text-center text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+              className="flex flex-col items-center gap-2 rounded-xl border border-border px-3 py-3 text-center text-xs font-medium text-slate transition hover:border-accent"
             >
-              <a.icon size={18} aria-hidden="true" />
+              <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${CHIP_CLASSES[a.chip]}`}>
+                <a.icon size={16} aria-hidden="true" />
+              </span>
               {a.label}
             </Link>
           ))}

@@ -4,11 +4,13 @@ import { ArrowRight } from "lucide-react";
 export function WidgetShell({
   title,
   reportHref,
+  reportLabel = "View report",
   action,
   children,
 }: {
   title: string;
   reportHref?: string;
+  reportLabel?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -26,7 +28,7 @@ export function WidgetShell({
           href={reportHref}
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
         >
-          View report <ArrowRight size={12} aria-hidden="true" />
+          {reportLabel} <ArrowRight size={12} aria-hidden="true" />
         </Link>
       )}
     </section>
