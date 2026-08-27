@@ -38,6 +38,7 @@ export const TRIGGER_TYPES = [
   { value: "appointment.status_changed", label: "An appointment's status changes to", category: "appointments", description: "Fires when an appointment's status changes (booked, confirmed, completed, cancelled, no-show).", keywords: "appointment booked cancelled rescheduled no-show completed status" },
   { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service", category: "tax_workflow", description: "Fires when a client signs their engagement letter.", keywords: "signature signed letter" },
   { value: "document_request.completed", label: "All requested documents are received for a service", category: "documents", description: "Fires once every required document on a request has been received.", keywords: "documents received complete" },
+  { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
   { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage", category: "engagements", description: "Fires when an engagement enters a specific stage of its pipeline.", keywords: "pipeline stage engagement" },
   { value: "lead.created", label: "A new lead is created", category: "contacts_leads", description: "Fires when a new lead is created (staff entry, public form, portal, referral, etc).", keywords: "contact created lead new" },
   { value: "lead.updated", label: "A lead's info is updated", category: "contacts_leads", description: "Fires when a lead's information is changed.", keywords: "contact changed lead updated" },
@@ -130,6 +131,12 @@ export function triggerSummary(
     const serviceId = config.service_id as string | undefined;
     const service = services.find((s) => s.id === serviceId);
     return `When all requested documents are received for "${service?.name ?? "a service"}"`;
+  }
+  if (triggerType === "organizer_information_request.resolved") {
+    const templateId = config.organizer_template_id as string | undefined;
+    if (!templateId) return "When an information request is resolved on any organizer";
+    const template = organizerTemplates.find((t) => t.id === templateId);
+    return `When an information request is resolved on "${template?.name ?? "an organizer"}"`;
   }
   if (triggerType === "engagement.stage_entered") {
     const processId = config.process_id as string | undefined;
@@ -323,6 +330,25 @@ export function TriggerFields({
             <option value="" disabled>
               Choose an organizer template
             </option>
+            {organizerTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {triggerType === "organizer_information_request.resolved" && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Organizer (optional)
+          <select
+            disabled={disabled}
+            value={(config.organizer_template_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ organizer_template_id: e.target.value || undefined })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="">Any organizer template</option>
             {organizerTemplates.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
