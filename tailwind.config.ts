@@ -18,8 +18,11 @@ const config: Config = {
         border: "#E7E9EE",
         muted: "#64748B",
         success: "#16A34A",
+        successSoft: "#E3F4E9",
         warning: "#D97706",
+        warningSoft: "#FAEFE1",
         danger: "#DC2626",
+        dangerSoft: "#FBE5E5",
         // Categorical icon-chip palette -- for tagging *kinds* of things (a
         // stat card's subject, an activity feed row's action type), never
         // status. Kept separate from success/warning/danger, which stay

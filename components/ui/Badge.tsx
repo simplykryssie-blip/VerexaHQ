@@ -1,11 +1,11 @@
 export type BadgeTone = "success" | "warning" | "danger" | "neutral" | "accent";
 
-const DOT_CLASSES: Record<BadgeTone, string> = {
-  success: "bg-success",
-  warning: "bg-warning",
-  danger: "bg-danger",
-  neutral: "bg-muted",
-  accent: "bg-accent",
+const PILL_CLASSES: Record<BadgeTone, string> = {
+  success: "bg-successSoft text-success",
+  warning: "bg-warningSoft text-warning",
+  danger: "bg-dangerSoft text-danger",
+  neutral: "bg-surfaceMuted text-muted",
+  accent: "bg-accentSoft text-accent",
 };
 
 /**
@@ -13,10 +13,7 @@ const DOT_CLASSES: Record<BadgeTone, string> = {
  * attention, danger = problem, neutral = informational. Pick tone from what the
  * status *means*, not from habit -- accent is for "featured/count", not status.
  *
- * Renders as a status dot + label rather than a filled pill -- a colored
- * background reads as a sticker at a glance; a dot reads as a state on a
- * record, which holds up better once a table has more than one of these
- * per row.
+ * Renders as a filled colored pill, matching the reference product mockups.
  */
 export function Badge({
   tone = "neutral",
@@ -28,8 +25,7 @@ export function Badge({
   className?: string;
 }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium text-ink ${className}`}>
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT_CLASSES[tone]}`} aria-hidden="true" />
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PILL_CLASSES[tone]} ${className}`}>
       {children}
     </span>
   );

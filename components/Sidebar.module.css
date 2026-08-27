@@ -1,12 +1,16 @@
 .sidebar {
-  --rail-bg: #ffffff;
-  --rail-ink: #0f172a;
-  --rail-muted: #64748b;
-  --rail-section: #9aa1ae;
-  --rail-border: #e7e9ee;
-  --rail-hover-bg: #f7f8fa;
+  /* Dark rail is now the shipped default (see Sidebar.tsx's DEFAULT_RAIL_BG) --
+     these are belt-and-suspenders fallbacks for the pre-hydration instant;
+     the inline style from React's derivation is what actually applies once
+     mounted, and is the only place these values should be tuned. */
+  --rail-bg: #0f172a;
+  --rail-ink: #ffffff;
+  --rail-muted: rgba(255, 255, 255, 0.72);
+  --rail-section: rgba(255, 255, 255, 0.55);
+  --rail-border: rgba(255, 255, 255, 0.18);
+  --rail-hover-bg: rgba(255, 255, 255, 0.12);
   --blue-bright: #0b7fe0;
-  --blue-bright-soft: rgba(11, 127, 224, 0.1);
+  --blue-bright-soft: rgba(11, 127, 224, 0.18);
 
   background: var(--rail-bg);
   color: var(--rail-ink);

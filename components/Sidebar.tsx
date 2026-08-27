@@ -8,6 +8,7 @@ import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
 import { hexToRgba, getReadableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
+import { Avatar } from "@/components/Avatar";
 import styles from "./Sidebar.module.css";
 
 const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
@@ -15,6 +16,12 @@ const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
   ero_office: "ERO",
   service_bureau: "SB",
 };
+
+// The rail's own default look, used whenever a workspace hasn't set a custom
+// sidebarBgColor -- flows through the exact same getReadableTextColor/hexToRgba
+// derivation a custom color would, rather than relying on separate CSS-module
+// fallbacks, so there is only ever one place this math happens.
+const DEFAULT_RAIL_BG = "#0F172A";
 
 export function Sidebar({
   workspaceName,
@@ -25,12 +32,13 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  currentUser,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  /** Custom sidebar background from Brand Center. Null keeps the default light rail; when set, text/hover/border colors are derived from it automatically (see getReadableTextColor) rather than needing their own stored override. */
+  /** Custom sidebar background from Brand Center. Falls back to DEFAULT_RAIL_BG (dark) when unset; when set, text/hover/border colors are derived from it automatically (see getReadableTextColor) rather than needing their own stored override. */
   sidebarBgColor?: string | null;
   /** True only while the active workspace is Verexa's own is_platform_home
    *  workspace -- swaps the whole nav for the platform-admin tooling instead
@@ -40,6 +48,8 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
+  /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
+  currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
 }) {
   const pathname = usePathname();
   const [switching, setSwitching] = useState(false);
@@ -75,19 +85,23 @@ export function Sidebar({
   const demoWorkspaces = switchableWorkspaces?.filter((w) => !w.isHome) ?? [];
 
   const sidebarStyle: React.CSSProperties = {};
+  const railBg = sidebarBgColor ?? DEFAULT_RAIL_BG;
+  const railTextColor = getReadableTextColor(railBg);
+  const isDarkRail = railTextColor === "#ffffff";
+  (sidebarStyle as Record<string, string>)["--rail-bg"] = railBg;
+  (sidebarStyle as Record<string, string>)["--rail-ink"] = railTextColor;
+  (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(railTextColor, 0.72) ?? railTextColor;
+  (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(railTextColor, 0.55) ?? railTextColor;
+  (sidebarStyle as Record<string, string>)["--rail-border"] = hexToRgba(railTextColor, isDarkRail ? 0.18 : 0.12) ?? railTextColor;
+  (sidebarStyle as Record<string, string>)["--rail-hover-bg"] = hexToRgba(railTextColor, isDarkRail ? 0.12 : 0.06) ?? railTextColor;
+
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
-    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
-  }
-  if (sidebarBgColor) {
-    const textColor = getReadableTextColor(sidebarBgColor);
-    const isDarkBg = textColor === "#ffffff";
-    (sidebarStyle as Record<string, string>)["--rail-bg"] = sidebarBgColor;
-    (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;
-    (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(textColor, 0.72) ?? textColor;
-    (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(textColor, 0.55) ?? textColor;
-    (sidebarStyle as Record<string, string>)["--rail-border"] = hexToRgba(textColor, isDarkBg ? 0.18 : 0.12) ?? textColor;
-    (sidebarStyle as Record<string, string>)["--rail-hover-bg"] = hexToRgba(textColor, isDarkBg ? 0.12 : 0.06) ?? textColor;
+    // A flat 10% tint reads confidently on a light rail but washes out on a
+    // dark one -- bump it the same way --rail-border/--rail-hover-bg already
+    // scale for isDarkRail, so the active-item pill keeps the same visual
+    // weight regardless of rail color.
+    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, isDarkRail ? 0.18 : 0.1) ?? secondaryColor;
   }
 
   // Flatten every navigable href (top-level items + group children) so the
@@ -274,6 +288,17 @@ export function Sidebar({
         )}
 
         <div className={`${styles.footer} px-3 py-4`} style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+          {currentUser && (
+            <div className="mb-2 flex items-center gap-2.5 px-3 pb-3">
+              <Avatar name={currentUser.name} url={currentUser.avatarUrl} size="sm" />
+              <div className="min-w-0">
+                <p className={`${styles.workspaceName} truncate text-sm font-medium`} style={{ color: "var(--rail-ink)" }}>
+                  {currentUser.name ?? "Staff"}
+                </p>
+                {currentUser.roleLabel && <p className={`${styles.workspaceName} truncate text-xs`}>{currentUser.roleLabel}</p>}
+              </div>
+            </div>
+          )}
           <form action="/api/auth/sign-out" method="post">
             <button type="submit" className={`${styles.signOut} w-full rounded-lg px-3 py-2 text-left text-sm font-medium`}>
               Sign out
