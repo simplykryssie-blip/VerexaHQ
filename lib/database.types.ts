@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -943,6 +943,7 @@ export type Database = {
           display_name: string | null
           email_from_name: string | null
           email_header_logo_url: string | null
+          favicon_url: string | null
           logo_url: string | null
           notification_email: string | null
           pdf_header_logo_url: string | null
@@ -951,6 +952,7 @@ export type Database = {
           primary_color: string
           reply_to_email: string | null
           secondary_color: string
+          sidebar_bg_color: string | null
           sidebar_logo_url: string | null
           sidebar_text_color: string | null
           support_email: string | null
@@ -970,6 +972,7 @@ export type Database = {
           display_name?: string | null
           email_from_name?: string | null
           email_header_logo_url?: string | null
+          favicon_url?: string | null
           logo_url?: string | null
           notification_email?: string | null
           pdf_header_logo_url?: string | null
@@ -978,6 +981,7 @@ export type Database = {
           primary_color?: string
           reply_to_email?: string | null
           secondary_color?: string
+          sidebar_bg_color?: string | null
           sidebar_logo_url?: string | null
           sidebar_text_color?: string | null
           support_email?: string | null
@@ -997,6 +1001,7 @@ export type Database = {
           display_name?: string | null
           email_from_name?: string | null
           email_header_logo_url?: string | null
+          favicon_url?: string | null
           logo_url?: string | null
           notification_email?: string | null
           pdf_header_logo_url?: string | null
@@ -1005,6 +1010,7 @@ export type Database = {
           primary_color?: string
           reply_to_email?: string | null
           secondary_color?: string
+          sidebar_bg_color?: string | null
           sidebar_logo_url?: string | null
           sidebar_text_color?: string | null
           support_email?: string | null
@@ -3689,6 +3695,7 @@ export type Database = {
       }
       firm_connections: {
         Row: {
+          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -3705,6 +3712,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allows_branding_override?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -3721,6 +3729,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allows_branding_override?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4843,6 +4852,7 @@ export type Database = {
           id: string
           is_required: boolean
           label: string
+          layout_width: string
           options: Json
           organizer_template_id: string
           parent_field_id: string | null
@@ -4861,6 +4871,7 @@ export type Database = {
           id?: string
           is_required?: boolean
           label: string
+          layout_width?: string
           options?: Json
           organizer_template_id: string
           parent_field_id?: string | null
@@ -4879,6 +4890,7 @@ export type Database = {
           id?: string
           is_required?: boolean
           label?: string
+          layout_width?: string
           options?: Json
           organizer_template_id?: string
           parent_field_id?: string | null
@@ -4903,12 +4915,90 @@ export type Database = {
           },
         ]
       }
+      organizer_information_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          message: string
+          organizer_field_id: string | null
+          organizer_response_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          responded_at: string | null
+          sent_via_email: boolean
+          sent_via_sms: boolean
+          shown_in_portal: boolean
+          status: string
+          viewed_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message: string
+          organizer_field_id?: string | null
+          organizer_response_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responded_at?: string | null
+          sent_via_email?: boolean
+          sent_via_sms?: boolean
+          shown_in_portal?: boolean
+          status?: string
+          viewed_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          message?: string
+          organizer_field_id?: string | null
+          organizer_response_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responded_at?: string | null
+          sent_via_email?: boolean
+          sent_via_sms?: boolean
+          shown_in_portal?: boolean
+          status?: string
+          viewed_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizer_information_requests_organizer_field_id_fkey"
+            columns: ["organizer_field_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_information_requests_organizer_response_id_fkey"
+            columns: ["organizer_response_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_responses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_information_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizer_response_answers: {
         Row: {
           id: string
           instance_index: number
           organizer_field_id: string
           organizer_response_id: string
+          review_note: string | null
+          review_status: Database["public"]["Enums"]["review_status"] | null
           updated_at: string
           value: Json | null
         }
@@ -4917,6 +5007,8 @@ export type Database = {
           instance_index?: number
           organizer_field_id: string
           organizer_response_id: string
+          review_note?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
           updated_at?: string
           value?: Json | null
         }
@@ -4925,6 +5017,8 @@ export type Database = {
           instance_index?: number
           organizer_field_id?: string
           organizer_response_id?: string
+          review_note?: string | null
+          review_status?: Database["public"]["Enums"]["review_status"] | null
           updated_at?: string
           value?: Json | null
         }
@@ -4947,6 +5041,7 @@ export type Database = {
       }
       organizer_responses: {
         Row: {
+          assigned_reviewer_id: string | null
           client_id: string
           created_at: string
           engagement_id: string | null
@@ -4967,6 +5062,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          assigned_reviewer_id?: string | null
           client_id: string
           created_at?: string
           engagement_id?: string | null
@@ -4987,6 +5083,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          assigned_reviewer_id?: string | null
           client_id?: string
           created_at?: string
           engagement_id?: string | null
@@ -6912,12 +7009,16 @@ export type Database = {
       }
       site_pages: {
         Row: {
+          background_color: string | null
           created_at: string
           created_by: string | null
+          custom_css: string | null
+          custom_js: string | null
           funnel_id: string | null
           funnel_position: number | null
           id: string
           meta_description: string | null
+          schema_markup: string | null
           slug: string
           status: string
           title: string
@@ -6926,12 +7027,16 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          background_color?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
+          custom_js?: string | null
           funnel_id?: string | null
           funnel_position?: number | null
           id?: string
           meta_description?: string | null
+          schema_markup?: string | null
           slug: string
           status?: string
           title: string
@@ -6940,12 +7045,16 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          background_color?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
+          custom_js?: string | null
           funnel_id?: string | null
           funnel_position?: number | null
           id?: string
           meta_description?: string | null
+          schema_markup?: string | null
           slug?: string
           status?: string
           title?: string
@@ -8870,6 +8979,7 @@ export type Database = {
       accept_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {
+          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -9133,6 +9243,7 @@ export type Database = {
       create_firm_connection_invite: {
         Args: { p_relationship_type?: string; p_workspace_id: string }
         Returns: {
+          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -9166,6 +9277,17 @@ export type Database = {
           p_recipient_user_id: string
           p_template_key: string
           p_workspace_id: string
+        }
+        Returns: string
+      }
+      create_organizer_information_request: {
+        Args: {
+          p_message: string
+          p_organizer_field_id?: string
+          p_response_id: string
+          p_send_email?: boolean
+          p_send_sms?: boolean
+          p_show_in_portal?: boolean
         }
         Returns: string
       }
@@ -9740,6 +9862,14 @@ export type Database = {
         Args: { p_notification_id: string }
         Returns: undefined
       }
+      mark_organizer_information_request_responded: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      mark_organizer_information_request_viewed: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
       merge_clients: {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
         Returns: undefined
@@ -9865,6 +9995,7 @@ export type Database = {
       redeem_firm_connection_invite: {
         Args: { p_token: string; p_workspace_id: string }
         Returns: {
+          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -9898,6 +10029,7 @@ export type Database = {
       release_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {
+          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -9975,6 +10107,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      resolve_organizer_information_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
       }
       resolve_organizer_response_service: {
         Args: { p_response_id: string }
@@ -10074,6 +10210,14 @@ export type Database = {
       }
       set_my_ptin: {
         Args: { p_clear?: boolean; p_ptin: string }
+        Returns: undefined
+      }
+      set_organizer_answer_review_status: {
+        Args: {
+          p_answer_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["review_status"]
+        }
         Returns: undefined
       }
       set_organizer_response_review_status: {
@@ -10332,6 +10476,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      validate_automation: {
+        Args: { p_automation_id: string }
+        Returns: {
+          action_type: string
+          display_name: string
+          issue: string
+          step_order: number
+        }[]
       }
       withdraw_engagement_share: {
         Args: { p_engagement_share_id: string }
