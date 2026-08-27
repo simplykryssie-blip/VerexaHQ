@@ -460,18 +460,20 @@ function RepeatingSectionInput({
               )}
             </div>
             <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
-              {childFields.map((child) => (
-                <FieldInput
-                  key={child.id}
-                  field={child}
-                  value={row[child.id] ?? ""}
-                  onChange={(fieldId, value) => updateRow(index, fieldId, value)}
-                  disabled={disabled}
-                  workspaceId={workspaceId}
-                  entityType={entityType}
-                  entityId={entityId}
-                />
-              ))}
+              {childFields
+                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .map((child) => (
+                  <FieldInput
+                    key={child.id}
+                    field={child}
+                    value={row[child.id] ?? ""}
+                    onChange={(fieldId, value) => updateRow(index, fieldId, value)}
+                    disabled={disabled}
+                    workspaceId={workspaceId}
+                    entityType={entityType}
+                    entityId={entityId}
+                  />
+                ))}
             </div>
           </div>
         ))}

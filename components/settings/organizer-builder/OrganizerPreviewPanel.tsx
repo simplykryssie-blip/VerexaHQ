@@ -140,7 +140,9 @@ function PreviewRepeatingSection({
               </button>
             </div>
             <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
-              {childFields.map((child) => (
+              {childFields
+                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .map((child) => (
                 <PreviewField
                   key={child.id}
                   field={child}

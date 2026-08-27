@@ -606,14 +606,16 @@ function PublicRepeatingSection({
               </button>
             </div>
             <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
-              {childFields.map((child) => (
-                <PublicFieldInput
-                  key={child.id}
-                  field={child}
-                  value={row[child.id] ?? ""}
-                  onChange={(fieldId, value) => onChange(rows.map((r, i) => (i === index ? { ...r, [fieldId]: value } : r)))}
-                />
-              ))}
+              {childFields
+                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .map((child) => (
+                  <PublicFieldInput
+                    key={child.id}
+                    field={child}
+                    value={row[child.id] ?? ""}
+                    onChange={(fieldId, value) => onChange(rows.map((r, i) => (i === index ? { ...r, [fieldId]: value } : r)))}
+                  />
+                ))}
             </div>
           </div>
         ))}
