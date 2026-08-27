@@ -48,6 +48,7 @@ function entityHref(entityType: string | null, entityId: string | null): string 
   if (!entityType || !entityId) return null;
   if (entityType === "engagement") return `/engagements/${entityId}`;
   if (entityType === "client") return `/clients/${entityId}`;
+  if (entityType === "automation") return `/workflows/${entityId}`;
   return null;
 }
 

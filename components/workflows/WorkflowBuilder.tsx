@@ -41,6 +41,8 @@ import {
   BellRing,
   Milestone,
   History,
+  ShieldCheck,
+  ShieldX,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -73,6 +75,19 @@ export type WorkflowStepRow = {
   delay_minutes: number;
   canvas_x: number | null;
   canvas_y: number | null;
+  requires_approval: boolean;
+  approver_role_id: string | null;
+};
+
+export type RoleOption = { id: string; name: string };
+
+export type PendingApprovalRow = {
+  id: string;
+  created_at: string;
+  step_display_name: string | null;
+  action_type: string;
+  engagement_number: string | null;
+  client_name: string | null;
 };
 
 export type WorkflowStepEdgeRow = {
@@ -215,6 +230,7 @@ export function StepCard({
   staffOptions,
   automationOptions,
   tagOptions = [],
+  roleOptions = [],
   canManage,
   onSaved,
   hideReorder,
@@ -234,6 +250,7 @@ export function StepCard({
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   tagOptions?: string[];
+  roleOptions?: RoleOption[];
   canManage: boolean;
   onSaved: () => void;
   hideReorder?: boolean;
@@ -247,6 +264,8 @@ export function StepCard({
     const mins = step.delay_minutes ?? 0;
     return delayUnit === "days" ? String(mins / 1440) : String(mins);
   });
+  const [requiresApproval, setRequiresApproval] = useState(step.requires_approval);
+  const [approverRoleId, setApproverRoleId] = useState(step.approver_role_id ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -324,6 +343,8 @@ export function StepCard({
         action_type: actionType,
         action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
         delay_minutes: delayMinutes,
+        requires_approval: requiresApproval,
+        approver_role_id: requiresApproval && approverRoleId ? approverRoleId : null,
       })
       .eq("id", step.id);
     setSaving(false);
@@ -1506,6 +1527,46 @@ export function StepCard({
         )}
       </div>
 
+      {actionType !== "condition" && (
+        <div className="mt-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2.5">
+          <label className="flex items-center gap-2 text-xs font-medium text-ink">
+            <input
+              type="checkbox"
+              disabled={!canManage}
+              checked={requiresApproval}
+              onChange={(e) => {
+                setRequiresApproval(e.target.checked);
+                setSaved(false);
+              }}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            <ShieldCheck size={14} className="text-muted" />
+            Require approval before this step runs
+          </label>
+          {requiresApproval && (
+            <label className="mt-2 flex flex-col gap-1 text-xs text-muted">
+              Approver role (leave blank for any workspace admin)
+              <select
+                disabled={!canManage}
+                value={approverRoleId}
+                onChange={(e) => {
+                  setApproverRoleId(e.target.value);
+                  setSaved(false);
+                }}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="">Any workspace admin</option>
+                {roleOptions.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      )}
+
       {canManage && (
         <div className="mt-3 flex items-center gap-3">
           <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
@@ -1559,6 +1620,8 @@ export function WorkflowBuilder({
   staffOptions = [],
   automationOptions = [],
   tagOptions = [],
+  roleOptions = [],
+  pendingApprovals = [],
   conditions: initialConditions = [],
   webhookToken,
 }: {
@@ -1583,6 +1646,8 @@ export function WorkflowBuilder({
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
   tagOptions?: string[];
+  roleOptions?: RoleOption[];
+  pendingApprovals?: PendingApprovalRow[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
 }) {
@@ -1650,6 +1715,27 @@ export function WorkflowBuilder({
     router.refresh();
   }
 
+  async function approvePendingStep(pendingStepId: string) {
+    const { error } = await supabase.rpc("approve_automation_step", { p_pending_step_id: pendingStepId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Approved -- the workflow will continue", "success");
+    router.refresh();
+  }
+
+  async function rejectPendingStep(pendingStepId: string) {
+    const reason = window.prompt("Reason for rejecting this step (optional):") ?? "";
+    const { error } = await supabase.rpc("reject_automation_step", { p_pending_step_id: pendingStepId, p_reason: reason.trim() });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Rejected -- the workflow was cancelled", "success");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -1658,9 +1744,14 @@ export function WorkflowBuilder({
           <button
             type="button"
             onClick={() => setActivityOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+            className="relative inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
           >
             <History size={14} /> Activity{runs.length > 0 ? ` (${runs.length})` : ""}
+            {pendingApprovals.length > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+                {pendingApprovals.length}
+              </span>
+            )}
           </button>
         </div>
         {steps.length === 0 && !canManage ? (
@@ -1686,6 +1777,7 @@ export function WorkflowBuilder({
             staffOptions={staffOptions}
             automationOptions={automationOptions}
             tagOptions={tagOptions}
+            roleOptions={roleOptions}
             onEditTrigger={() => setTriggerModalOpen(true)}
             onOpenRun={(runId) => setOpenRunId(runId)}
           />
@@ -1768,6 +1860,43 @@ export function WorkflowBuilder({
                 <X size={16} />
               </button>
             </div>
+
+            {pendingApprovals.length > 0 && (
+              <div className="mb-6">
+                <CollapsibleSection title="Awaiting approval" count={pendingApprovals.length}>
+                  <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
+                    {pendingApprovals.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                        <div>
+                          <p className="font-medium text-ink">
+                            {p.step_display_name || p.action_type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {p.client_name ?? p.engagement_number ?? "--"} &middot; waiting since {new Date(p.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => approvePendingStep(p.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-success/30 px-2.5 py-1 text-xs font-medium text-success hover:bg-success/10"
+                          >
+                            <ShieldCheck size={13} /> Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => rejectPendingStep(p.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-danger/30 px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10"
+                          >
+                            <ShieldX size={13} /> Reject
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleSection>
+              </div>
+            )}
 
             <CollapsibleSection title="Runs" count={runs.length}>
               {runs.length === 0 ? (
