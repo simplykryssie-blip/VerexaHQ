@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, HelpCircle, X } from "lucide-react";
+import { Check, Flag, HelpCircle, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -12,7 +12,7 @@ import { OrganizerAnswerReveal } from "@/components/organizer/OrganizerAnswerRev
 import { RequestsPanel } from "@/components/documents/RequestsPanel";
 import type { DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "@/components/documents/types";
 import type { ReviewQuestionItem, ReviewQuestionStatus, ReviewSection, OrganizerReviewStatus } from "@/lib/organizer/buildReviewSections";
-import { NeedsInfoModal, type NeedsInfoSection } from "./NeedsInfoModal";
+import { NeedsInfoModal, type NeedsInfoItem } from "./NeedsInfoModal";
 
 type InfoRequestRow = {
   id: string;
@@ -85,27 +85,27 @@ function sectionTone(section: ReviewSection): BadgeTone {
   return "success";
 }
 
-/** Flattens the review sections into the checklist NeedsInfoModal shows, dropping conditionally-hidden questions the client never saw. */
-function buildNeedsInfoSections(sections: ReviewSection[]): NeedsInfoSection[] {
-  return sections
-    .map((s) => {
-      const questions: { key: string; label: string }[] = [];
-      for (const entry of s.entries) {
-        if (entry.kind === "question") {
-          if (entry.item.status === "not_applicable") continue;
-          questions.push({ key: entry.item.fieldId, label: entry.item.label });
-        } else {
-          for (const instance of entry.group.instances) {
-            for (const item of instance.items) {
-              if (item.status === "not_applicable") continue;
-              questions.push({ key: `${item.fieldId}:${instance.index}`, label: `${entry.group.label} ${instance.index + 1} -- ${item.label}` });
+/** Every question currently flagged "Corrections Requested" -- these were saved the moment the reviewer flagged them, not selected here. */
+function buildFlaggedItems(sections: ReviewSection[]): NeedsInfoItem[] {
+  const items: NeedsInfoItem[] = [];
+  for (const s of sections) {
+    for (const entry of s.entries) {
+      if (entry.kind === "question") {
+        if (entry.item.status === "Corrections Requested" && entry.item.answerId) {
+          items.push({ key: entry.item.answerId, label: entry.item.label, note: entry.item.reviewNote ?? "" });
+        }
+      } else {
+        for (const instance of entry.group.instances) {
+          for (const item of instance.items) {
+            if (item.status === "Corrections Requested" && item.answerId) {
+              items.push({ key: item.answerId, label: `${entry.group.label} ${instance.index + 1} -- ${item.label}`, note: item.reviewNote ?? "" });
             }
           }
         }
       }
-      return { id: s.id, label: s.label, questions };
-    })
-    .filter((s) => s.questions.length > 0);
+    }
+  }
+  return items;
 }
 
 export function ReviewWorkspace({
@@ -147,6 +147,7 @@ export function ReviewWorkspace({
 
   const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? "general");
   const [busyResponse, setBusyResponse] = useState(false);
+  const [busyAnswerId, setBusyAnswerId] = useState<string | null>(null);
   const [showNeedsInfoModal, setShowNeedsInfoModal] = useState(false);
   const [assignedReviewerId, setAssignedReviewerId] = useState(response.assignedReviewerId ?? "");
   const [infoRequests, setInfoRequests] = useState(initialInfoRequests);
@@ -156,7 +157,7 @@ export function ReviewWorkspace({
   const [collapsedHidden, setCollapsedHidden] = useState(true);
 
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
-  const needsInfoSections = useMemo(() => buildNeedsInfoSections(sections), [sections]);
+  const flaggedItems = useMemo(() => buildFlaggedItems(sections), [sections]);
 
   const totalAttention = sections.reduce((sum, s) => sum + s.attentionCount, 0);
   const totalVisible = sections.reduce((sum, s) => sum + s.totalVisible, 0);
@@ -173,6 +174,31 @@ export function ReviewWorkspace({
       return;
     }
     toast.show(`Marked ${status}.`, "success");
+    router.refresh();
+  }
+
+  async function flagAnswer(answerId: string, note: string) {
+    setBusyAnswerId(answerId);
+    const { error } = await supabase.rpc("set_organizer_answer_review_status", { p_answer_id: answerId, p_status: "Corrections Requested", p_note: note });
+    setBusyAnswerId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  // "Unflag" just marks the answer Approved again -- the same state an
+  // untouched answer already reads as, so there's no separate "clear" RPC
+  // to maintain.
+  async function unflagAnswer(answerId: string) {
+    setBusyAnswerId(answerId);
+    const { error } = await supabase.rpc("set_organizer_answer_review_status", { p_answer_id: answerId, p_status: "Approved" });
+    setBusyAnswerId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
     router.refresh();
   }
 
@@ -307,7 +333,14 @@ export function ReviewWorkspace({
             <div className="space-y-3">
               {activeSection.entries.map((entry) =>
                 entry.kind === "question" ? (
-                  <QuestionCard key={entry.item.fieldId} item={entry.item} collapsedHidden={collapsedHidden} />
+                  <QuestionCard
+                    key={entry.item.fieldId}
+                    item={entry.item}
+                    collapsedHidden={collapsedHidden}
+                    busy={busyAnswerId === entry.item.answerId}
+                    onFlag={(note) => entry.item.answerId && flagAnswer(entry.item.answerId, note)}
+                    onUnflag={() => entry.item.answerId && unflagAnswer(entry.item.answerId)}
+                  />
                 ) : (
                   <div key={entry.group.fieldId} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">{entry.group.label}</p>
@@ -322,7 +355,15 @@ export function ReviewWorkspace({
                             </p>
                             <div className="space-y-2">
                               {instance.items.map((item) => (
-                                <QuestionCard key={item.fieldId} item={item} compact collapsedHidden={collapsedHidden} />
+                                <QuestionCard
+                                  key={item.fieldId}
+                                  item={item}
+                                  compact
+                                  collapsedHidden={collapsedHidden}
+                                  busy={busyAnswerId === item.answerId}
+                                  onFlag={(note) => item.answerId && flagAnswer(item.answerId, note)}
+                                  onUnflag={() => item.answerId && unflagAnswer(item.answerId)}
+                                />
                               ))}
                             </div>
                           </div>
@@ -385,7 +426,7 @@ export function ReviewWorkspace({
                 disabled={busyResponse}
                 className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
               >
-                <HelpCircle size={12} /> Need Info
+                <HelpCircle size={12} /> Need Info{flaggedItems.length > 0 ? ` (${flaggedItems.length})` : ""}
               </button>
               <button
                 type="button"
@@ -502,7 +543,7 @@ export function ReviewWorkspace({
       </div>
 
       {showNeedsInfoModal && (
-        <NeedsInfoModal sections={needsInfoSections} clientEmail={clientEmail} onClose={() => setShowNeedsInfoModal(false)} onSend={sendInformationRequest} />
+        <NeedsInfoModal items={flaggedItems} clientEmail={clientEmail} onClose={() => setShowNeedsInfoModal(false)} onSend={sendInformationRequest} />
       )}
     </div>
   );
@@ -512,16 +553,30 @@ function QuestionCard({
   item,
   compact = false,
   collapsedHidden,
+  busy,
+  onFlag,
+  onUnflag,
 }: {
   item: ReviewQuestionItem;
   compact?: boolean;
   collapsedHidden: boolean;
+  busy: boolean;
+  onFlag: (note: string) => void;
+  onUnflag: () => void;
 }) {
+  const [flagging, setFlagging] = useState(false);
+  const [note, setNote] = useState("");
+
   if (item.status === "not_applicable" && collapsedHidden) {
     return null;
   }
 
   const isHidden = item.status === "not_applicable";
+  const isFlagged = item.status === "Corrections Requested";
+  // Flagging attaches to an existing answer row -- an unanswered question has
+  // none yet. Those already read as "Unanswered" and belong in the compose
+  // panel's free-form extra item instead, not a per-question flag here.
+  const canFlag = Boolean(item.answerId) && !isHidden;
 
   return (
     <div className={`rounded-2xl border border-border bg-surface shadow-soft ${compact ? "p-3" : "p-4"} ${isHidden ? "opacity-60" : ""}`}>
@@ -551,6 +606,52 @@ function QuestionCard({
       )}
 
       {item.reviewNote && <p className="mt-2 text-xs italic text-muted">&quot;{item.reviewNote}&quot;</p>}
+
+      {canFlag && !isFlagged && !flagging && (
+        <button
+          type="button"
+          onClick={() => setFlagging(true)}
+          disabled={busy}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-amber hover:underline disabled:opacity-40"
+        >
+          <Flag size={11} /> Flag as Needs Info
+        </button>
+      )}
+
+      {canFlag && flagging && (
+        <div className="mt-2 space-y-1.5">
+          <input
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="What's needed for this one?"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                onFlag(note);
+                setFlagging(false);
+                setNote("");
+              }}
+              disabled={busy}
+              className="font-medium text-amber hover:underline disabled:opacity-40"
+            >
+              {busy ? "Saving..." : "Save flag"}
+            </button>
+            <button type="button" onClick={() => setFlagging(false)} disabled={busy} className="font-medium text-muted hover:text-ink disabled:opacity-40">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {canFlag && isFlagged && (
+        <button type="button" onClick={onUnflag} disabled={busy} className="mt-2 text-xs font-medium text-muted hover:text-ink disabled:opacity-40">
+          {busy ? "Saving..." : "Unflag"}
+        </button>
+      )}
     </div>
   );
 }

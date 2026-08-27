@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { Plus, X } from "lucide-react";
 import { Modal } from "@/components/Modal";
 
-export type NeedsInfoSection = { id: string; label: string; questions: { key: string; label: string }[] };
+export type NeedsInfoItem = { key: string; label: string; note: string };
 
-function buildMessage(intro: string, items: { label: string; note: string }[]): string {
+function buildMessage(intro: string, items: NeedsInfoItem[]): string {
   const lines: string[] = [];
   if (intro.trim()) lines.push(intro.trim());
   if (items.length > 0) {
@@ -17,52 +18,52 @@ function buildMessage(intro: string, items: { label: string; note: string }[]): 
   return lines.join("\n");
 }
 
-// One combined message per "Needs Info" send, covering everything the
-// reviewer flags across the whole organizer -- replaces the earlier
-// per-question flow that fired a separate client notification for every
-// item marked "needs info," which was the actual complaint this redesign
-// responds to. Selection + notes + the exact outgoing text all live in one
-// place instead of being scattered across each question's own controls.
+// Pre-populated from whatever the reviewer already flagged on individual
+// question cards while going through the organizer (saved immediately at
+// flag time, not held in this component's own state) -- this is purely the
+// "compile what I've already saved into one message and send it" step, not
+// where selection happens. An extra free-form item covers an ask that isn't
+// tied to any single question (e.g. "please also send your driver's
+// license").
 export function NeedsInfoModal({
-  sections,
+  items: initialItems,
   clientEmail,
   onClose,
   onSend,
 }: {
-  sections: NeedsInfoSection[];
+  items: NeedsInfoItem[];
   clientEmail: string | null;
   onClose: () => void;
   onSend: (message: string, sendEmail: boolean, sendSms: boolean, showInPortal: boolean) => Promise<string | void>;
 }) {
   const [intro, setIntro] = useState("We need a bit more information before we can finish reviewing your organizer:");
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [items, setItems] = useState(initialItems);
+  const [extraLabel, setExtraLabel] = useState("");
   const [sendEmail, setSendEmail] = useState(Boolean(clientEmail));
   const [sendSms, setSendSms] = useState(false);
   const [showInPortal, setShowInPortal] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  const labelByKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const s of sections) for (const q of s.questions) map.set(q.key, q.label);
-    return map;
-  }, [sections]);
+  const preview = buildMessage(intro, items);
 
-  function toggle(key: string) {
-    setSelected((prev) => {
-      const next = { ...prev };
-      if (key in next) delete next[key];
-      else next[key] = "";
-      return next;
-    });
+  function updateNote(key: string, note: string) {
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, note } : it)));
   }
 
-  const selectedItems = Object.entries(selected).map(([key, note]) => ({ label: labelByKey.get(key) ?? key, note }));
-  const preview = buildMessage(intro, selectedItems);
+  function removeItem(key: string) {
+    setItems((prev) => prev.filter((it) => it.key !== key));
+  }
+
+  function addExtraItem() {
+    if (!extraLabel.trim()) return;
+    setItems((prev) => [...prev, { key: `extra-${Date.now()}`, label: extraLabel.trim(), note: "" }]);
+    setExtraLabel("");
+  }
 
   async function handleSend() {
-    if (selectedItems.length === 0 && !intro.trim()) {
-      setError("Select at least one question or add a message.");
+    if (items.length === 0 && !intro.trim()) {
+      setError("Flag at least one question, add an item, or write a message.");
       return;
     }
     setSending(true);
@@ -77,7 +78,7 @@ export function NeedsInfoModal({
   }
 
   return (
-    <Modal title="Request information from client" onClose={onClose} size="xl">
+    <Modal title="Send information request" onClose={onClose} size="xl">
       <div className="grid grid-cols-2 gap-4">
         <div className="min-w-0 space-y-3">
           <label className="block">
@@ -91,35 +92,52 @@ export function NeedsInfoModal({
           </label>
 
           <div>
-            <span className="block text-xs font-medium text-slate">What do you need?</span>
-            <div className="mt-1 max-h-72 space-y-3 overflow-y-auto rounded-lg border border-border p-2">
-              {sections.map((s) => (
-                <div key={s.id}>
-                  <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-muted">{s.label}</p>
-                  <div className="mt-1 space-y-1">
-                    {s.questions.map((q) => {
-                      const isSelected = q.key in selected;
-                      return (
-                        <div key={q.key} className="rounded-lg px-1 py-1">
-                          <label className="flex items-start gap-2 text-sm text-slate">
-                            <input type="checkbox" checked={isSelected} onChange={() => toggle(q.key)} className="mt-0.5 h-3.5 w-3.5 rounded border-border" />
-                            {q.label}
-                          </label>
-                          {isSelected && (
-                            <input
-                              value={selected[q.key]}
-                              onChange={(e) => setSelected((prev) => ({ ...prev, [q.key]: e.target.value }))}
-                              placeholder="What's needed for this one? (optional)"
-                              className="ml-5 mt-1 w-[calc(100%-1.25rem)] rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              {sections.length === 0 && <p className="p-2 text-xs text-muted">No questions to select from.</p>}
+            <span className="block text-xs font-medium text-slate">What&apos;s needed</span>
+            {items.length === 0 ? (
+              <p className="mt-1 rounded-lg border border-dashed border-border p-3 text-xs text-muted">
+                Nothing flagged yet -- go back and flag questions that need more info, or add an item below.
+              </p>
+            ) : (
+              <ul className="mt-1 max-h-64 space-y-2 overflow-y-auto rounded-lg border border-border p-2">
+                {items.map((item) => (
+                  <li key={item.key} className="rounded-lg bg-surfaceMuted p-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-medium text-ink">{item.label}</p>
+                      <button type="button" onClick={() => removeItem(item.key)} aria-label={`Remove ${item.label}`} className="shrink-0 text-muted hover:text-danger">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <input
+                      value={item.note}
+                      onChange={(e) => updateNote(item.key, e.target.value)}
+                      placeholder="What's needed for this one? (optional)"
+                      className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                value={extraLabel}
+                onChange={(e) => setExtraLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addExtraItem();
+                  }
+                }}
+                placeholder="Add something not tied to a specific question..."
+                className="w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                type="button"
+                onClick={addExtraItem}
+                disabled={!extraLabel.trim()}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent disabled:opacity-40"
+              >
+                <Plus size={12} /> Add
+              </button>
             </div>
           </div>
 
