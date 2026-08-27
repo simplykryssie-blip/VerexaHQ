@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
-import { hexToRgba } from "@/lib/color";
+import { hexToRgba, getReadableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
 import styles from "./Sidebar.module.css";
 
@@ -21,6 +21,7 @@ export function Sidebar({
   logoUrl,
   primaryColor,
   secondaryColor,
+  sidebarBgColor,
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
@@ -29,6 +30,8 @@ export function Sidebar({
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** Custom sidebar background from Brand Center. Null keeps the default light rail; when set, text/hover/border colors are derived from it automatically (see getReadableTextColor) rather than needing their own stored override. */
+  sidebarBgColor?: string | null;
   /** True only while the active workspace is Verexa's own is_platform_home
    *  workspace -- swaps the whole nav for the platform-admin tooling instead
    *  of the client-facing CRM nav every other (real or demo) workspace gets. */
@@ -59,17 +62,9 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const trimmedLogoUrl = useTrimmedLogo(logoUrl);
 
-  // primaryColor is unused here now that the sidebar is a light surface --
-  // it's kept in the props/Brand Center settings for a future use (e.g. a
-  // portal accent) rather than driving a colored rail background.
-  //
-  // There's no per-workspace text-color override anymore either: that only
-  // ever made sense back when the rail's own background was a custom color
-  // and could get dark enough to need light text. Now that the sidebar is
-  // always this same light surface, applying a stored override can only
-  // ever make text harder to read against it (a leftover light value renders
-  // as near-invisible on the light background) with no upside, so the app
-  // no longer reads or applies branding.sidebar_text_color at all.
+  // primaryColor is unused here -- it's the "Fallback accent color" shown on
+  // public forms, not the rail. The rail's own background is sidebarBgColor
+  // instead, a dedicated field Brand Center exposes.
   const navItems = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_ITEMS : NAV_ITEMS;
   const navSections = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_SECTIONS : NAV_SECTIONS;
 
@@ -83,6 +78,16 @@ export function Sidebar({
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
     (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
+  }
+  if (sidebarBgColor) {
+    const textColor = getReadableTextColor(sidebarBgColor);
+    const isDarkBg = textColor === "#ffffff";
+    (sidebarStyle as Record<string, string>)["--rail-bg"] = sidebarBgColor;
+    (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;
+    (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(textColor, 0.72) ?? textColor;
+    (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(textColor, 0.55) ?? textColor;
+    (sidebarStyle as Record<string, string>)["--rail-border"] = hexToRgba(textColor, isDarkBg ? 0.18 : 0.12) ?? textColor;
+    (sidebarStyle as Record<string, string>)["--rail-hover-bg"] = hexToRgba(textColor, isDarkBg ? 0.12 : 0.06) ?? textColor;
   }
 
   // Flatten every navigable href (top-level items + group children) so the
