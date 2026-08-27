@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Flag, HelpCircle, X } from "lucide-react";
@@ -11,17 +11,15 @@ import { EmptyState } from "@/components/EmptyState";
 import { OrganizerAnswerReveal } from "@/components/organizer/OrganizerAnswerReveal";
 import { RequestsPanel } from "@/components/documents/RequestsPanel";
 import type { DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "@/components/documents/types";
-import type { ReviewQuestionItem, ReviewQuestionStatus, ReviewSection, OrganizerReviewStatus } from "@/lib/organizer/buildReviewSections";
-import { NeedsInfoModal, type NeedsInfoItem } from "./NeedsInfoModal";
+import type { AwaitingReviewItem, ReviewQuestionItem, ReviewQuestionStatus, ReviewSection, OrganizerReviewStatus } from "@/lib/organizer/buildReviewSections";
+import { NeedsInfoModal, type DraftItem } from "./NeedsInfoModal";
 
 type InfoRequestRow = {
   id: string;
-  organizer_field_id: string | null;
-  message: string;
-  status: "active" | "viewed" | "responded" | "resolved";
-  sent_via_email: boolean;
-  sent_via_sms: boolean;
-  shown_in_portal: boolean;
+  message: string | null;
+  status: "draft" | "active" | "viewed" | "responded" | "resolved";
+  due_date: string | null;
+  tags: string[];
   created_at: string;
   viewed_at: string | null;
   responded_at: string | null;
@@ -85,29 +83,6 @@ function sectionTone(section: ReviewSection): BadgeTone {
   return "success";
 }
 
-/** Every question currently flagged "Corrections Requested" -- these were saved the moment the reviewer flagged them, not selected here. */
-function buildFlaggedItems(sections: ReviewSection[]): NeedsInfoItem[] {
-  const items: NeedsInfoItem[] = [];
-  for (const s of sections) {
-    for (const entry of s.entries) {
-      if (entry.kind === "question") {
-        if (entry.item.status === "Corrections Requested" && entry.item.answerId) {
-          items.push({ key: entry.item.answerId, label: entry.item.label, note: entry.item.reviewNote ?? "" });
-        }
-      } else {
-        for (const instance of entry.group.instances) {
-          for (const item of instance.items) {
-            if (item.status === "Corrections Requested" && item.answerId) {
-              items.push({ key: item.answerId, label: `${entry.group.label} ${instance.index + 1} -- ${item.label}`, note: item.reviewNote ?? "" });
-            }
-          }
-        }
-      }
-    }
-  }
-  return items;
-}
-
 export function ReviewWorkspace({
   workspaceId,
   response,
@@ -117,6 +92,9 @@ export function ReviewWorkspace({
   taxYear,
   sections,
   infoRequests: initialInfoRequests,
+  draftRequestId: initialDraftRequestId,
+  draftItems: initialDraftItems,
+  awaitingReviewItems: initialAwaitingReviewItems,
   notes: initialNotes,
   documentRequests,
   documentRequestTemplates,
@@ -133,6 +111,9 @@ export function ReviewWorkspace({
   taxYear: number | null;
   sections: ReviewSection[];
   infoRequests: InfoRequestRow[];
+  draftRequestId: string | null;
+  draftItems: DraftItem[];
+  awaitingReviewItems: AwaitingReviewItem[];
   notes: NoteRow[];
   documentRequests: DocumentRequestRow[];
   documentRequestTemplates: DocumentRequestTemplateOption[];
@@ -147,17 +128,19 @@ export function ReviewWorkspace({
 
   const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? "general");
   const [busyResponse, setBusyResponse] = useState(false);
-  const [busyAnswerId, setBusyAnswerId] = useState<string | null>(null);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [showNeedsInfoModal, setShowNeedsInfoModal] = useState(false);
   const [assignedReviewerId, setAssignedReviewerId] = useState(response.assignedReviewerId ?? "");
-  const [infoRequests, setInfoRequests] = useState(initialInfoRequests);
+  const [infoRequests] = useState(initialInfoRequests);
+  const [draftRequestId, setDraftRequestId] = useState(initialDraftRequestId);
+  const [draftItems, setDraftItems] = useState(initialDraftItems);
+  const [awaitingReviewItems, setAwaitingReviewItems] = useState(initialAwaitingReviewItems);
   const [noteBody, setNoteBody] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [notes] = useState(initialNotes);
   const [collapsedHidden, setCollapsedHidden] = useState(true);
 
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
-  const flaggedItems = useMemo(() => buildFlaggedItems(sections), [sections]);
 
   const totalAttention = sections.reduce((sum, s) => sum + s.attentionCount, 0);
   const totalVisible = sections.reduce((sum, s) => sum + s.totalVisible, 0);
@@ -177,67 +160,81 @@ export function ReviewWorkspace({
     router.refresh();
   }
 
-  async function flagAnswer(answerId: string, note: string) {
-    setBusyAnswerId(answerId);
-    const { error } = await supabase.rpc("set_organizer_answer_review_status", { p_answer_id: answerId, p_status: "Corrections Requested", p_note: note });
-    setBusyAnswerId(null);
+  async function flagField(fieldId: string, instanceIndex: number, label: string, note: string) {
+    const key = `${fieldId}:${instanceIndex}`;
+    setBusyItemId(key);
+    const { data, error } = await supabase.rpc("flag_organizer_field_for_info", {
+      p_organizer_response_id: response.id,
+      p_organizer_field_id: fieldId,
+      p_instance_index: instanceIndex,
+      p_note: note || undefined,
+    });
+    setBusyItemId(null);
     if (error) {
       toast.show(error.message, "error");
       return;
     }
+    setDraftItems((prev) => {
+      const existing = prev.find((i) => i.id === data);
+      if (existing) return prev.map((i) => (i.id === data ? { ...i, note } : i));
+      return [...prev, { id: data as string, organizer_field_id: fieldId, instance_index: instanceIndex, note, label }];
+    });
     router.refresh();
   }
 
-  // "Unflag" just marks the answer Approved again -- the same state an
-  // untouched answer already reads as, so there's no separate "clear" RPC
-  // to maintain.
-  async function unflagAnswer(answerId: string) {
-    setBusyAnswerId(answerId);
-    const { error } = await supabase.rpc("set_organizer_answer_review_status", { p_answer_id: answerId, p_status: "Approved" });
-    setBusyAnswerId(null);
+  async function unflagItem(itemId: string) {
+    setBusyItemId(itemId);
+    const { error } = await supabase.rpc("unflag_organizer_information_request_item", { p_item_id: itemId });
+    setBusyItemId(null);
     if (error) {
       toast.show(error.message, "error");
       return;
     }
+    setDraftItems((prev) => prev.filter((i) => i.id !== itemId));
     router.refresh();
   }
 
-  async function sendInformationRequest(message: string, sendEmail: boolean, sendSms: boolean, showInPortal: boolean) {
-    const { data, error } = await supabase.rpc("create_organizer_information_request", {
-      p_response_id: response.id,
+  async function sendInformationRequest(message: string, dueDate: string | null, tags: string[], sendEmail: boolean, sendSms: boolean, showInPortal: boolean) {
+    if (!draftRequestId) return "Flag at least one question first.";
+    const { error } = await supabase.rpc("send_organizer_information_request", {
+      p_request_id: draftRequestId,
       p_message: message,
+      p_due_date: dueDate || undefined,
+      p_tags: tags,
       p_send_email: sendEmail,
       p_send_sms: sendSms,
       p_show_in_portal: showInPortal,
     });
     if (error) return error.message;
-    setInfoRequests((prev) => [
-      {
-        id: data as string,
-        organizer_field_id: null,
-        message,
-        status: "active",
-        sent_via_email: sendEmail,
-        sent_via_sms: sendSms,
-        shown_in_portal: showInPortal,
-        created_at: new Date().toISOString(),
-        viewed_at: null,
-        responded_at: null,
-        resolved_at: null,
-      },
-      ...prev,
-    ]);
+    setDraftRequestId(null);
+    setDraftItems([]);
     toast.show("Sent to client.", "success");
     router.refresh();
   }
 
-  async function resolveInfoRequest(id: string) {
-    const { error } = await supabase.rpc("resolve_organizer_information_request", { p_request_id: id });
+  async function approveCorrection(itemId: string) {
+    setBusyItemId(itemId);
+    const { error } = await supabase.rpc("approve_organizer_information_request_item", { p_item_id: itemId });
+    setBusyItemId(null);
     if (error) {
       toast.show(error.message, "error");
       return;
     }
-    setInfoRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "resolved", resolved_at: new Date().toISOString() } : r)));
+    setAwaitingReviewItems((prev) => prev.filter((i) => i.id !== itemId));
+    toast.show("Correction approved.", "success");
+    router.refresh();
+  }
+
+  async function rejectCorrection(itemId: string, decisionNote: string) {
+    setBusyItemId(itemId);
+    const { error } = await supabase.rpc("reject_organizer_information_request_item", { p_item_id: itemId, p_decision_note: decisionNote });
+    setBusyItemId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setAwaitingReviewItems((prev) => prev.filter((i) => i.id !== itemId));
+    toast.show("Correction rejected; the client has been notified.", "success");
     router.refresh();
   }
 
@@ -337,9 +334,9 @@ export function ReviewWorkspace({
                     key={entry.item.fieldId}
                     item={entry.item}
                     collapsedHidden={collapsedHidden}
-                    busy={busyAnswerId === entry.item.answerId}
-                    onFlag={(note) => entry.item.answerId && flagAnswer(entry.item.answerId, note)}
-                    onUnflag={() => entry.item.answerId && unflagAnswer(entry.item.answerId)}
+                    busy={busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId}
+                    onFlag={(note) => flagField(entry.item.fieldId, entry.item.instanceIndex, entry.item.label, note)}
+                    onUnflag={() => entry.item.infoRequestItemId && unflagItem(entry.item.infoRequestItemId)}
                   />
                 ) : (
                   <div key={entry.group.fieldId} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
@@ -360,9 +357,9 @@ export function ReviewWorkspace({
                                   item={item}
                                   compact
                                   collapsedHidden={collapsedHidden}
-                                  busy={busyAnswerId === item.answerId}
-                                  onFlag={(note) => item.answerId && flagAnswer(item.answerId, note)}
-                                  onUnflag={() => item.answerId && unflagAnswer(item.answerId)}
+                                  busy={busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId}
+                                  onFlag={(note) => flagField(item.fieldId, item.instanceIndex, `${entry.group.label} ${instance.index + 1} -- ${item.label}`, note)}
+                                  onUnflag={() => item.infoRequestItemId && unflagItem(item.infoRequestItemId)}
                                 />
                               ))}
                             </div>
@@ -426,7 +423,7 @@ export function ReviewWorkspace({
                 disabled={busyResponse}
                 className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
               >
-                <HelpCircle size={12} /> Need Info{flaggedItems.length > 0 ? ` (${flaggedItems.length})` : ""}
+                <HelpCircle size={12} /> Need Info{draftItems.length > 0 ? ` (${draftItems.length})` : ""}
               </button>
               <button
                 type="button"
@@ -455,26 +452,42 @@ export function ReviewWorkspace({
             </select>
           </div>
 
-          {infoRequests.length > 0 && (
+          {awaitingReviewItems.length > 0 && (
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Awaiting your review</p>
+              <ul className="space-y-2">
+                {awaitingReviewItems.map((item) => (
+                  <AwaitingReviewCard key={item.id} item={item} busy={busyItemId === item.id} onApprove={() => approveCorrection(item.id)} onReject={(note) => rejectCorrection(item.id, note)} />
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {infoRequests.filter((r) => r.status !== "draft").length > 0 && (
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Information requests</p>
               <ul className="space-y-2">
-                {infoRequests.map((r) => (
-                  <li key={r.id} className="rounded-lg border border-border p-2.5 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge tone={r.status === "resolved" ? "success" : r.status === "responded" ? "accent" : "warning"}>
-                        {r.status === "active" ? "Active" : r.status === "viewed" ? "Client viewed" : r.status === "responded" ? "Client responded" : "Resolved"}
-                      </Badge>
-                      <span className="text-muted">{new Date(r.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <p className="mt-1 text-slate">{r.message}</p>
-                    {r.status !== "resolved" && (
-                      <button type="button" onClick={() => resolveInfoRequest(r.id)} className="mt-1 font-medium text-accent hover:underline">
-                        Mark resolved
-                      </button>
-                    )}
-                  </li>
-                ))}
+                {infoRequests
+                  .filter((r) => r.status !== "draft")
+                  .map((r) => (
+                    <li key={r.id} className="rounded-lg border border-border p-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge tone={r.status === "resolved" ? "success" : r.status === "responded" ? "accent" : "warning"}>
+                          {r.status === "active" ? "Active" : r.status === "viewed" ? "Client viewed" : r.status === "responded" ? "Client responded" : "Resolved"}
+                        </Badge>
+                        <span className="text-muted">{new Date(r.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <p className="mt-1 text-slate">{r.message}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {r.due_date && <span className="text-muted">Due {new Date(r.due_date).toLocaleDateString()}</span>}
+                        {r.tags.map((t) => (
+                          <Badge key={t} tone="neutral">
+                            {t}
+                          </Badge>
+                        ))}
+                      </div>
+                    </li>
+                  ))}
               </ul>
             </div>
           )}
@@ -543,7 +556,7 @@ export function ReviewWorkspace({
       </div>
 
       {showNeedsInfoModal && (
-        <NeedsInfoModal items={flaggedItems} clientEmail={clientEmail} onClose={() => setShowNeedsInfoModal(false)} onSend={sendInformationRequest} />
+        <NeedsInfoModal items={draftItems} clientEmail={clientEmail} onClose={() => setShowNeedsInfoModal(false)} onRemove={unflagItem} onSend={sendInformationRequest} />
       )}
     </div>
   );
@@ -572,11 +585,12 @@ function QuestionCard({
   }
 
   const isHidden = item.status === "not_applicable";
-  const isFlagged = item.status === "Corrections Requested";
-  // Flagging attaches to an existing answer row -- an unanswered question has
-  // none yet. Those already read as "Unanswered" and belong in the compose
-  // panel's free-form extra item instead, not a per-question flag here.
-  const canFlag = Boolean(item.answerId) && !isHidden;
+  // The flag is field-scoped, not tied to an existing answer row, so an
+  // unanswered question (including one still needing a document upload)
+  // can be flagged the same as an answered one.
+  const isFlagged = Boolean(item.infoRequestItemId) && item.infoRequestItemStatus === "pending";
+  const isAwaitingClientCorrection = Boolean(item.infoRequestItemId) && item.infoRequestItemStatus === "client_responded";
+  const canFlag = !isHidden && !isAwaitingClientCorrection;
 
   return (
     <div className={`rounded-2xl border border-border bg-surface shadow-soft ${compact ? "p-3" : "p-4"} ${isHidden ? "opacity-60" : ""}`}>
@@ -647,11 +661,79 @@ function QuestionCard({
         </div>
       )}
 
+      {isAwaitingClientCorrection && <p className="mt-2 text-xs text-accent">Client submitted a correction -- review it in Awaiting your review.</p>}
+
       {canFlag && isFlagged && (
         <button type="button" onClick={onUnflag} disabled={busy} className="mt-2 text-xs font-medium text-muted hover:text-ink disabled:opacity-40">
           {busy ? "Saving..." : "Unflag"}
         </button>
       )}
     </div>
+  );
+}
+
+function AwaitingReviewCard({
+  item,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  item: AwaitingReviewItem;
+  busy: boolean;
+  onApprove: () => void;
+  onReject: (note: string) => void;
+}) {
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
+
+  return (
+    <li className="rounded-lg border border-border p-2.5 text-xs">
+      <p className="font-medium text-ink">{item.fieldLabel}</p>
+      {item.note && <p className="mt-0.5 text-muted">Reviewer asked: &quot;{item.note}&quot;</p>}
+      <div className="mt-1.5 space-y-1">
+        <p>
+          <span className="text-muted">Current: </span>
+          {item.currentDisplay || "--"}
+        </p>
+        <p>
+          <span className="text-muted">Proposed: </span>
+          <span className="font-medium text-accent">{item.proposedDisplay || "--"}</span>
+        </p>
+      </div>
+
+      {!rejecting ? (
+        <div className="mt-2 flex items-center gap-3">
+          <button type="button" onClick={onApprove} disabled={busy} className="font-medium text-emerald hover:underline disabled:opacity-40">
+            {busy ? "Saving..." : "Approve"}
+          </button>
+          <button type="button" onClick={() => setRejecting(true)} disabled={busy} className="font-medium text-rose hover:underline disabled:opacity-40">
+            Reject
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-1.5">
+          <input
+            autoFocus
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Why isn't this being accepted?"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => note.trim() && onReject(note.trim())}
+              disabled={busy || !note.trim()}
+              className="font-medium text-rose hover:underline disabled:opacity-40"
+            >
+              {busy ? "Saving..." : "Confirm reject"}
+            </button>
+            <button type="button" onClick={() => setRejecting(false)} disabled={busy} className="font-medium text-muted hover:text-ink disabled:opacity-40">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
