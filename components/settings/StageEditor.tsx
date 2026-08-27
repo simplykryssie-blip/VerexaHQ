@@ -191,8 +191,9 @@ function StageLeads({
   async function move(clientId: string, newStageId: string) {
     if (newStageId === stageId) return;
     setSavingId(clientId);
-    const { error } = await supabase.rpc("advance_lead_pipeline_stage", {
-      p_client_id: clientId,
+    const { error } = await supabase.rpc("advance_pipeline_stage", {
+      p_entity_type: "client",
+      p_entity_id: clientId,
       p_process_id: processId,
       p_process_stage_id: newStageId,
     });

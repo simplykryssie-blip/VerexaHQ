@@ -56,7 +56,6 @@ type ClientRow = {
   lifecycle_status: string;
   tags: string[] | null;
   requestedService?: string | null;
-  stageLabel?: string | null;
 };
 
 const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -83,7 +82,7 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
     header: "Status",
     render: (c) => (
       <Badge tone={clientStatusTone(c.lifecycle_status)} className="capitalize">
-        {c.stageLabel ?? c.lifecycle_status.replace(/_/g, " ")}
+        {c.lifecycle_status.replace(/_/g, " ")}
       </Badge>
     ),
   },
@@ -122,13 +121,6 @@ export default async function ClientsPage({
   // by this nav-level distinction).
   const clientType = !isLeadsTab && (searchParams.type === "individual" || searchParams.type === "business") ? searchParams.type : "";
 
-  // Leads move through a real Pipeline (lead_pipeline_runs/lead_pipeline_stages)
-  // -- the same system "Move the lead to a pipeline stage" and "A lead enters
-  // a pipeline stage" already use -- rather than the old flat, uncustomizable
-  // lead_stages list. There's no single designated "default" pipeline for
-  // leads; any pipeline with active leads shows them on its own page (each
-  // stage card shows its leads, same shape as every other pipeline), so
-  // this page just points at Pipelines rather than a specific one.
   const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
   const statusFilters = isLeadsTab ? [{ value: "", label: "All" }, { value: "lost", label: "Lost" }] : CLIENT_STATUS_FILTERS;
   const status = searchParams.status && statusFilters.some((f) => f.value === searchParams.status) ? searchParams.status : "";
@@ -179,21 +171,12 @@ export default async function ClientsPage({
   })).filter((c) => c.services.length > 0);
 
   const clientIds = (clients ?? []).map((c) => c.id);
-  const [{ data: interests }, { data: activeRuns }] = await Promise.all([
-    clientIds.length > 0
-      ? supabase
-          .from("client_service_interests")
-          .select("client_id, services(name)")
-          .in("client_id", clientIds)
-      : Promise.resolve({ data: [] as never[] }),
-    isLeadsTab && clientIds.length > 0
-      ? supabase
-          .from("lead_pipeline_runs")
-          .select("client_id, lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(stage_name)")
-          .in("client_id", clientIds)
-          .eq("status", "Active")
-      : Promise.resolve({ data: [] as { client_id: string; lead_pipeline_stages: { stage_name: string } | null }[] }),
-  ]);
+  const { data: interests } = clientIds.length > 0
+    ? await supabase
+        .from("client_service_interests")
+        .select("client_id, services(name)")
+        .in("client_id", clientIds)
+    : { data: [] as never[] };
 
   // Services are "basic" now and a lead can select more than one at once
   // (e.g. Bookkeeping + Payroll), so this shows every distinct one they've
@@ -210,15 +193,9 @@ export default async function ClientsPage({
   for (const [clientId, names] of requestedServicesByClient) {
     requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
-  const stageNameByClient = new Map<string, string>();
-  for (const run of activeRuns ?? []) {
-    const stageName = (run.lead_pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
-    if (stageName) stageNameByClient.set(run.client_id, stageName);
-  }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
-    stageLabel: c.lifecycle_status === "lead" ? (stageNameByClient.get(c.id) ?? null) : null,
   }));
 
   const extraQuery = [
@@ -266,14 +243,6 @@ export default async function ClientsPage({
             </Link>
           ))}
         </nav>
-
-        {isLeadsTab && (
-          <p className="mb-3 text-xs text-muted">
-            <Link href="/pipelines" className="font-medium text-accent hover:underline">
-              View leads by stage in Pipelines →
-            </Link>
-          </p>
-        )}
 
         {!isLeadsTab && (
           <div className="mb-2 flex flex-wrap items-center gap-2">

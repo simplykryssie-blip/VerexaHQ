@@ -120,11 +120,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   // No single pipeline is designated "the" lead pipeline anymore -- a lead's
   // stages come from whichever pipeline its own active run actually belongs
-  // to, not a workspace-level default.
+  // to, not a workspace-level default. Client and engagement runs share the
+  // same pipeline_runs/pipeline_stages tables, keyed by entity_type.
   const { data: activeLeadRun } = await supabase
-    .from("lead_pipeline_runs")
-    .select("id, process_id, processes(name), lead_pipeline_stages!lead_pipeline_runs_current_stage_fkey(process_stage_id)")
-    .eq("client_id", client.id)
+    .from("pipeline_runs")
+    .select("id, process_id, processes(name), pipeline_stages!pipeline_runs_current_stage_fkey(process_stage_id)")
+    .eq("entity_type", "client")
+    .eq("entity_id", client.id)
     .eq("status", "Active")
     .maybeSingle();
   const { data: leadPipelineStages } = activeLeadRun
@@ -135,7 +137,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     processName: (activeLeadRun?.processes as unknown as { name?: string } | null)?.name ?? null,
     stages: leadPipelineStages ?? [],
     currentProcessStageId:
-      (activeLeadRun?.lead_pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
+      (activeLeadRun?.pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
   };
 
   // Staff need to see not just that an automation touched this lead/client
