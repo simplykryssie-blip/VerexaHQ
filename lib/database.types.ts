@@ -4915,12 +4915,73 @@ export type Database = {
           },
         ]
       }
+      organizer_information_request_items: {
+        Row: {
+          created_at: string
+          decision_note: string | null
+          id: string
+          instance_index: number
+          note: string | null
+          organizer_field_id: string
+          proposed_value: Json | null
+          request_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          was_answered_when_flagged: boolean
+        }
+        Insert: {
+          created_at?: string
+          decision_note?: string | null
+          id?: string
+          instance_index?: number
+          note?: string | null
+          organizer_field_id: string
+          proposed_value?: Json | null
+          request_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          was_answered_when_flagged: boolean
+        }
+        Update: {
+          created_at?: string
+          decision_note?: string | null
+          id?: string
+          instance_index?: number
+          note?: string | null
+          organizer_field_id?: string
+          proposed_value?: Json | null
+          request_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          was_answered_when_flagged?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizer_information_request_items_organizer_field_id_fkey"
+            columns: ["organizer_field_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organizer_information_request_items_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_information_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizer_information_requests: {
         Row: {
           created_at: string
           created_by: string | null
+          due_date: string | null
           id: string
-          message: string
+          message: string | null
           organizer_field_id: string | null
           organizer_response_id: string
           resolved_at: string | null
@@ -4930,14 +4991,16 @@ export type Database = {
           sent_via_sms: boolean
           shown_in_portal: boolean
           status: string
+          tags: string[]
           viewed_at: string | null
           workspace_id: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
+          due_date?: string | null
           id?: string
-          message: string
+          message?: string | null
           organizer_field_id?: string | null
           organizer_response_id: string
           resolved_at?: string | null
@@ -4947,14 +5010,16 @@ export type Database = {
           sent_via_sms?: boolean
           shown_in_portal?: boolean
           status?: string
+          tags?: string[]
           viewed_at?: string | null
           workspace_id: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
+          due_date?: string | null
           id?: string
-          message?: string
+          message?: string | null
           organizer_field_id?: string | null
           organizer_response_id?: string
           resolved_at?: string | null
@@ -4964,6 +5029,7 @@ export type Database = {
           sent_via_sms?: boolean
           shown_in_portal?: boolean
           status?: string
+          tags?: string[]
           viewed_at?: string | null
           workspace_id?: string
         }
@@ -9079,6 +9145,10 @@ export type Database = {
         Args: { p_notes?: string; p_pending_change_id: string }
         Returns: undefined
       }
+      approve_organizer_information_request_item: {
+        Args: { p_item_id: string }
+        Returns: undefined
+      }
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -9445,6 +9515,15 @@ export type Database = {
       fire_date_reminder_automations: { Args: never; Returns: number }
       fire_invoice_overdue_automations: { Args: never; Returns: number }
       fire_task_overdue_automations: { Args: never; Returns: number }
+      flag_organizer_field_for_info: {
+        Args: {
+          p_instance_index?: number
+          p_note?: string
+          p_organizer_field_id: string
+          p_organizer_response_id: string
+        }
+        Returns: string
+      }
       format_mailing_address: { Args: { p_raw: string }; Returns: string }
       format_organizer_answer: {
         Args: { p_field_type: string; p_value: Json }
@@ -9874,6 +9953,10 @@ export type Database = {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
         Returns: undefined
       }
+      notify_organizer_information_request: {
+        Args: { p_message: string; p_request_id: string }
+        Returns: undefined
+      }
       notify_workspace_admins: {
         Args: {
           p_channels: string[]
@@ -9934,6 +10017,10 @@ export type Database = {
           p_organizer_field_id?: string
           p_organizer_response_id?: string
         }
+        Returns: undefined
+      }
+      propose_organizer_answer_correction: {
+        Args: { p_item_id: string; p_proposed_value: Json }
         Returns: undefined
       }
       record_client_service_interest: {
@@ -10024,6 +10111,10 @@ export type Database = {
       }
       reject_client_pending_change: {
         Args: { p_notes?: string; p_pending_change_id: string }
+        Returns: undefined
+      }
+      reject_organizer_information_request_item: {
+        Args: { p_decision_note: string; p_item_id: string }
         Returns: undefined
       }
       release_firm_connection_billing: {
@@ -10167,6 +10258,22 @@ export type Database = {
           error_detail: string
           passed: boolean
         }[]
+      }
+      save_organizer_reopened_field_answer: {
+        Args: { p_item_id: string; p_value: Json }
+        Returns: undefined
+      }
+      send_organizer_information_request: {
+        Args: {
+          p_due_date?: string
+          p_message: string
+          p_request_id: string
+          p_send_email?: boolean
+          p_send_sms?: boolean
+          p_show_in_portal?: boolean
+          p_tags?: string[]
+        }
+        Returns: undefined
       }
       set_client_address_primary: {
         Args: { p_address_id: string }
@@ -10443,6 +10550,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      unflag_organizer_information_request_item: {
+        Args: { p_item_id: string }
+        Returns: undefined
       }
       upsert_workspace_subscription: {
         Args: {
