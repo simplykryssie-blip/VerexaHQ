@@ -218,7 +218,7 @@ export function EngagementWorkspace({
               <IrsNoticesPanel workspaceId={workspace.id} entityType="engagement" entityId={engagement.id} notices={irsNotices} />
             )}
             {tab === "Workflow" && (
-              <WorkflowTab stages={stages} engagementId={engagement.id} workspaceId={workspace.id} />
+              <WorkflowTab stages={stages} />
             )}
             {tab === "Tasks" && (
               <TasksTab workspaceId={workspace.id} engagementId={engagement.id} tasks={tasks} staffOptions={staffOptions} />

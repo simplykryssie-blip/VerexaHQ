@@ -36,7 +36,7 @@ export default async function PortalEngagementsPage() {
                       <p className="text-xs text-muted">
                         {e.engagement_number}
                         {taxDetail?.tax_year && ` -- Tax year ${taxDetail.tax_year}`}
-                        {taxDetail?.efile_status && taxDetail.efile_status !== "not_filed" && ` -- E-file: ${taxDetail.efile_status.replace("_", " ")}`}
+                        {taxDetail?.efile_status && taxDetail.efile_status !== "not_filed" && ` -- ${taxDetail.efile_status.replace("_", " ")}`}
                       </p>
                     </div>
                     <div className="text-right">

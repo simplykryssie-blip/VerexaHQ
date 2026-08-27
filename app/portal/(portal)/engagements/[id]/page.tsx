@@ -71,7 +71,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
             <span>{engagement.engagement_number}</span>
             <span className="capitalize">{engagement.status}</span>
             {taxDetail?.tax_year && <span>Tax year {taxDetail.tax_year}</span>}
-            {taxDetail?.efile_status && taxDetail.efile_status !== "not_filed" && <span className="capitalize">E-file: {taxDetail.efile_status.replace("_", " ")}</span>}
+            {taxDetail?.efile_status && taxDetail.efile_status !== "not_filed" && <span className="capitalize">{taxDetail.efile_status.replace("_", " ")}</span>}
             {taxDetail?.is_extended && <span>Extended{taxDetail.extension_due_date && ` to ${new Date(taxDetail.extension_due_date).toLocaleDateString()}`}</span>}
             {engagement.due_date && <span>Due {new Date(engagement.due_date).toLocaleDateString()}</span>}
           </div>

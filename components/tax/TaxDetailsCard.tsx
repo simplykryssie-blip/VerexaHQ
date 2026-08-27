@@ -22,7 +22,10 @@ export type TaxDetailRow = {
   updated_at?: string;
 } | null;
 
-const EFILE_STATUSES = ["not_filed", "ready_to_file", "transmitted", "accepted", "rejected", "paper_filed"] as const;
+// This firm doesn't e-file or transmit returns, so the e-file-specific
+// states (transmitted/accepted/rejected) aren't offered -- every return is
+// either not yet filed, ready to file, or paper filed.
+const RETURN_STATUSES = ["not_filed", "ready_to_file", "paper_filed"] as const;
 
 const FILING_STATUSES = [
   { value: "single", label: "Single" },
@@ -71,7 +74,7 @@ export function TaxDetailsCard({
   const [isAmended, setIsAmended] = useState(detail?.is_amended ?? false);
   const [isExtended, setIsExtended] = useState(detail?.is_extended ?? false);
   const [extensionDueDate, setExtensionDueDate] = useState(detail?.extension_due_date ?? "");
-  const [efileStatus, setEfileStatus] = useState(detail?.efile_status ?? "not_filed");
+  const [returnStatus, setReturnStatus] = useState(detail?.efile_status ?? "not_filed");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -85,7 +88,7 @@ export function TaxDetailsCard({
     setIsAmended(detail?.is_amended ?? false);
     setIsExtended(detail?.is_extended ?? false);
     setExtensionDueDate(detail?.extension_due_date ?? "");
-    setEfileStatus(detail?.efile_status ?? "not_filed");
+    setReturnStatus(detail?.efile_status ?? "not_filed");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.updated_at]);
 
@@ -105,9 +108,7 @@ export function TaxDetailsCard({
         is_amended: isAmended,
         is_extended: isExtended,
         extension_due_date: isExtended ? extensionDueDate || null : null,
-        efile_status: efileStatus,
-        ...(efileStatus === "transmitted" && detail?.efile_status !== "transmitted" ? { efile_transmitted_at: new Date().toISOString() } : {}),
-        ...(efileStatus === "accepted" && detail?.efile_status !== "accepted" ? { efile_accepted_at: new Date().toISOString() } : {}),
+        efile_status: returnStatus,
       },
       { onConflict: "engagement_id" }
     );
@@ -181,16 +182,16 @@ export function TaxDetailsCard({
           </select>
         </div>
         <div>
-          <label htmlFor="efile_status" className="block text-xs font-medium text-muted">
-            E-file status
+          <label htmlFor="return_status" className="block text-xs font-medium text-muted">
+            Return status
           </label>
           <select
-            id="efile_status"
-            value={efileStatus}
-            onChange={(e) => setEfileStatus(e.target.value)}
+            id="return_status"
+            value={returnStatus}
+            onChange={(e) => setReturnStatus(e.target.value)}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm capitalize focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           >
-            {EFILE_STATUSES.map((s) => (
+            {RETURN_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {s.replace("_", " ")}
               </option>

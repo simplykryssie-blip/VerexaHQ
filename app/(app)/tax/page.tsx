@@ -150,7 +150,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                     <th className="px-4 py-2 text-left font-medium">Return</th>
                     <th className="px-4 py-2 text-left font-medium">Tax year</th>
                     <th className="px-4 py-2 text-left font-medium">Status</th>
-                    <th className="px-4 py-2 text-left font-medium">E-file</th>
+                    <th className="px-4 py-2 text-left font-medium">Return status</th>
                     <th className="px-4 py-2 text-left font-medium">Refund / Balance</th>
                     <th className="px-4 py-2 text-left font-medium">Due</th>
                   </tr>
