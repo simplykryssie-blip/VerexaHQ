@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Modal } from "@/components/Modal";
 
-export type NeedsInfoItem = { key: string; label: string; note: string };
+export type DraftItem = { id: string; organizer_field_id: string; instance_index: number; note: string; label: string };
 
-function buildMessage(intro: string, items: NeedsInfoItem[]): string {
+function buildMessage(intro: string, items: DraftItem[]): string {
   const lines: string[] = [];
   if (intro.trim()) lines.push(intro.trim());
   if (items.length > 0) {
@@ -21,24 +21,25 @@ function buildMessage(intro: string, items: NeedsInfoItem[]): string {
 // Pre-populated from whatever the reviewer already flagged on individual
 // question cards while going through the organizer (saved immediately at
 // flag time, not held in this component's own state) -- this is purely the
-// "compile what I've already saved into one message and send it" step, not
-// where selection happens. An extra free-form item covers an ask that isn't
-// tied to any single question (e.g. "please also send your driver's
-// license").
+// "compile what I've already flagged into one message, add a due date and
+// tags, and send" step, not where flagging itself happens. Removing an item
+// here actually unflags it on the server, keeping one source of truth.
 export function NeedsInfoModal({
-  items: initialItems,
+  items,
   clientEmail,
   onClose,
+  onRemove,
   onSend,
 }: {
-  items: NeedsInfoItem[];
+  items: DraftItem[];
   clientEmail: string | null;
   onClose: () => void;
-  onSend: (message: string, sendEmail: boolean, sendSms: boolean, showInPortal: boolean) => Promise<string | void>;
+  onRemove: (itemId: string) => void;
+  onSend: (message: string, dueDate: string | null, tags: string[], sendEmail: boolean, sendSms: boolean, showInPortal: boolean) => Promise<string | void>;
 }) {
   const [intro, setIntro] = useState("We need a bit more information before we can finish reviewing your organizer:");
-  const [items, setItems] = useState(initialItems);
-  const [extraLabel, setExtraLabel] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
   const [sendEmail, setSendEmail] = useState(Boolean(clientEmail));
   const [sendSms, setSendSms] = useState(false);
   const [showInPortal, setShowInPortal] = useState(true);
@@ -46,29 +47,19 @@ export function NeedsInfoModal({
   const [sending, setSending] = useState(false);
 
   const preview = buildMessage(intro, items);
-
-  function updateNote(key: string, note: string) {
-    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, note } : it)));
-  }
-
-  function removeItem(key: string) {
-    setItems((prev) => prev.filter((it) => it.key !== key));
-  }
-
-  function addExtraItem() {
-    if (!extraLabel.trim()) return;
-    setItems((prev) => [...prev, { key: `extra-${Date.now()}`, label: extraLabel.trim(), note: "" }]);
-    setExtraLabel("");
-  }
+  const tags = tagsInput
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
 
   async function handleSend() {
-    if (items.length === 0 && !intro.trim()) {
-      setError("Flag at least one question, add an item, or write a message.");
+    if (items.length === 0) {
+      setError("Flag at least one question before sending.");
       return;
     }
     setSending(true);
     setError(null);
-    const result = await onSend(preview, sendEmail, sendSms, showInPortal);
+    const result = await onSend(preview, dueDate || null, tags, sendEmail, sendSms, showInPortal);
     setSending(false);
     if (result) {
       setError(result);
@@ -95,50 +86,44 @@ export function NeedsInfoModal({
             <span className="block text-xs font-medium text-slate">What&apos;s needed</span>
             {items.length === 0 ? (
               <p className="mt-1 rounded-lg border border-dashed border-border p-3 text-xs text-muted">
-                Nothing flagged yet -- go back and flag questions that need more info, or add an item below.
+                Nothing flagged yet -- close this and flag questions from the review cards first.
               </p>
             ) : (
               <ul className="mt-1 max-h-64 space-y-2 overflow-y-auto rounded-lg border border-border p-2">
                 {items.map((item) => (
-                  <li key={item.key} className="rounded-lg bg-surfaceMuted p-2">
+                  <li key={item.id} className="rounded-lg bg-surfaceMuted p-2">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium text-ink">{item.label}</p>
-                      <button type="button" onClick={() => removeItem(item.key)} aria-label={`Remove ${item.label}`} className="shrink-0 text-muted hover:text-danger">
+                      <button type="button" onClick={() => onRemove(item.id)} aria-label={`Remove ${item.label}`} className="shrink-0 text-muted hover:text-danger">
                         <X size={13} />
                       </button>
                     </div>
-                    <input
-                      value={item.note}
-                      onChange={(e) => updateNote(item.key, e.target.value)}
-                      placeholder="What's needed for this one? (optional)"
-                      className="mt-1 w-full rounded-lg border border-border bg-surface px-2 py-1 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                    {item.note && <p className="mt-1 text-xs text-slate">{item.note}</p>}
                   </li>
                 ))}
               </ul>
             )}
-            <div className="mt-2 flex items-center gap-2">
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="block text-xs font-medium text-slate">Due date (optional)</span>
               <input
-                value={extraLabel}
-                onChange={(e) => setExtraLabel(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addExtraItem();
-                  }
-                }}
-                placeholder="Add something not tied to a specific question..."
-                className="w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
-              <button
-                type="button"
-                onClick={addExtraItem}
-                disabled={!extraLabel.trim()}
-                className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent disabled:opacity-40"
-              >
-                <Plus size={12} /> Add
-              </button>
-            </div>
+            </label>
+            <label className="block">
+              <span className="block text-xs font-medium text-slate">Tags (comma separated)</span>
+              <input
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                placeholder="urgent, 1099"
+                className="mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
           </div>
 
           <div className="space-y-2 text-sm">

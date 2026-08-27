@@ -2,7 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
-import { buildReviewSections, type ReviewAnswerRow, type ReviewFieldRow, type ReviewPendingChangeRow } from "@/lib/organizer/buildReviewSections";
+import {
+  buildReviewSections,
+  buildAwaitingReviewItems,
+  type ReviewAnswerRow,
+  type ReviewFieldRow,
+  type ReviewPendingChangeRow,
+  type OpenInfoRequestItemRow,
+} from "@/lib/organizer/buildReviewSections";
 import { ReviewWorkspace } from "./ReviewWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +82,10 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       .eq("status", "pending"),
     supabase
       .from("organizer_information_requests")
-      .select("id, organizer_field_id, message, status, sent_via_email, sent_via_sms, shown_in_portal, created_at, viewed_at, responded_at, resolved_at")
+      .select(
+        `id, message, status, due_date, tags, sent_via_email, sent_via_sms, shown_in_portal, created_at, viewed_at, responded_at, resolved_at,
+         items:organizer_information_request_items(id, organizer_field_id, instance_index, note, status, was_answered_when_flagged, proposed_value, decision_note, created_at, resolved_at)`
+      )
       .eq("organizer_response_id", response.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -110,11 +120,50 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
   const authorIds = Array.from(new Set((noteRows ?? []).map((n) => n.author_id).filter((id): id is string => Boolean(id))));
   const staffById = new Map(staffMembers.map((s) => [s.user_id, s]));
 
+  type InfoRequestItemRow = {
+    id: string;
+    organizer_field_id: string;
+    instance_index: number;
+    note: string | null;
+    status: "pending" | "client_responded" | "approved" | "rejected" | "resolved";
+    was_answered_when_flagged: boolean;
+    proposed_value: unknown;
+    decision_note: string | null;
+    created_at: string;
+    resolved_at: string | null;
+  };
+  type InfoRequestRow = {
+    id: string;
+    message: string | null;
+    status: "draft" | "active" | "viewed" | "responded" | "resolved";
+    due_date: string | null;
+    tags: string[];
+    sent_via_email: boolean;
+    sent_via_sms: boolean;
+    shown_in_portal: boolean;
+    created_at: string;
+    viewed_at: string | null;
+    responded_at: string | null;
+    resolved_at: string | null;
+    items: InfoRequestItemRow[];
+  };
+
+  const infoRequests = (infoRequestRows ?? []) as unknown as InfoRequestRow[];
+  const allItems = infoRequests.flatMap((r) => r.items);
+  const openInfoItems: OpenInfoRequestItemRow[] = allItems
+    .filter((i) => i.status === "pending" || i.status === "client_responded")
+    .map((i) => ({ id: i.id, organizer_field_id: i.organizer_field_id, instance_index: i.instance_index, status: i.status as "pending" | "client_responded", note: i.note }));
+
   const sections = buildReviewSections(
     (fieldRows ?? []) as ReviewFieldRow[],
     (answerRows ?? []) as ReviewAnswerRow[],
-    (pendingChangeRows ?? []) as ReviewPendingChangeRow[]
+    (pendingChangeRows ?? []) as ReviewPendingChangeRow[],
+    openInfoItems
   );
+
+  const awaitingReviewItems = buildAwaitingReviewItems((fieldRows ?? []) as ReviewFieldRow[], (answerRows ?? []) as ReviewAnswerRow[], allItems);
+
+  const draftRequest = infoRequests.find((r) => r.status === "draft") ?? null;
 
   const client = response.clients as unknown as {
     client_type: string;
@@ -151,7 +200,30 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       engagementNumber={engagement?.engagement_number ?? null}
       taxYear={taxYear}
       sections={sections}
-      infoRequests={(infoRequestRows ?? []) as never}
+      infoRequests={infoRequests.map((r) => ({
+        id: r.id,
+        message: r.message,
+        status: r.status,
+        due_date: r.due_date,
+        tags: r.tags,
+        created_at: r.created_at,
+        viewed_at: r.viewed_at,
+        responded_at: r.responded_at,
+        resolved_at: r.resolved_at,
+      }))}
+      draftRequestId={draftRequest?.id ?? null}
+      draftItems={(draftRequest?.items ?? []).map((i) => ({
+        id: i.id,
+        organizer_field_id: i.organizer_field_id,
+        instance_index: i.instance_index,
+        note: i.note ?? "",
+        label: (() => {
+          const field = (fieldRows ?? []).find((f) => f.id === i.organizer_field_id);
+          const parent = field?.parent_field_id ? (fieldRows ?? []).find((f) => f.id === field.parent_field_id) : null;
+          return parent ? `${parent.label} ${i.instance_index + 1} -- ${field?.label ?? "Question"}` : field?.label ?? "Question";
+        })(),
+      }))}
+      awaitingReviewItems={awaitingReviewItems}
       notes={(noteRows ?? []).map((n) => ({ ...n, authorName: n.author_id ? staffById.get(n.author_id)?.display_name ?? "Staff" : "Staff" }))}
       documentRequests={(documentRequestRows ?? []).map((r) => ({
         id: r.id,

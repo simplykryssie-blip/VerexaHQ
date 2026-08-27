@@ -35,11 +35,21 @@ export type ReviewPendingChangeRow = {
   new_value_last4: string | null;
 };
 
+/** A field+instance currently flagged for more information, whether that flag is still an unsent draft or already sent to the client. */
+export type OpenInfoRequestItemRow = {
+  id: string;
+  organizer_field_id: string;
+  instance_index: number;
+  status: "pending" | "client_responded";
+  note: string | null;
+};
+
 /** A per-question status distinct from OrganizerReviewStatus -- the extra values cover states that have no per-answer decision recorded yet. */
 export type ReviewQuestionStatus = "not_applicable" | "unanswered" | "optional_blank" | "needs_review" | OrganizerReviewStatus;
 
 export type ReviewQuestionItem = {
   fieldId: string;
+  instanceIndex: number;
   label: string;
   helpText: string | null;
   fieldType: string;
@@ -50,6 +60,9 @@ export type ReviewQuestionItem = {
   status: ReviewQuestionStatus;
   reviewNote: string | null;
   pendingChange: ReviewPendingChangeRow | null;
+  /** The open (pending/client_responded) organizer_information_request_items row for this field+instance, if any -- drives the inline flag/unflag control. */
+  infoRequestItemId: string | null;
+  infoRequestItemStatus: "pending" | "client_responded" | null;
 };
 
 export type ReviewRepeaterGroup = {
@@ -70,13 +83,13 @@ export type ReviewSection = {
   allDecided: boolean; // no visible item in this section needs attention
 };
 
-function maskLast4(value: unknown): string {
+export function maskLast4(value: unknown): string {
   const digits = String(value ?? "").replace(/\D/g, "");
   const last4 = digits.slice(-4);
   return last4 ? `••• •• ${last4}` : "--";
 }
 
-function formatOrganizerValue(fieldType: string, value: unknown): string {
+export function formatOrganizerValue(fieldType: string, value: unknown): string {
   if (value === undefined || value === null || value === "") return "";
   if (fieldType === "address") return formatAddressValue(value) || "";
   if (fieldType === "name") return formatNameValue(value) || "";
@@ -108,9 +121,14 @@ function questionStatus(
   visible: boolean,
   isRequired: boolean,
   hasAnswer: boolean,
-  reviewStatus: OrganizerReviewStatus | null
+  reviewStatus: OrganizerReviewStatus | null,
+  hasOpenInfoItem: boolean
 ): ReviewQuestionStatus {
   if (!visible) return "not_applicable";
+  // An open information-request item always reads as "Needs info," whether
+  // or not the field has an answer -- this is what lets an unanswered
+  // question (e.g. a missing upload) be flagged and tracked too.
+  if (hasOpenInfoItem) return "Corrections Requested";
   if (!hasAnswer) return isRequired ? "unanswered" : "optional_blank";
   if (reviewStatus) return reviewStatus;
   return "needs_review";
@@ -120,12 +138,15 @@ function buildQuestionItem(
   field: ReviewFieldRow,
   answer: ReviewAnswerRow | undefined,
   visible: boolean,
-  pendingChange: ReviewPendingChangeRow | undefined
+  instanceIndex: number,
+  pendingChange: ReviewPendingChangeRow | undefined,
+  openItem: OpenInfoRequestItemRow | undefined
 ): ReviewQuestionItem {
   const maskable = (field.field_type === "ssn" || field.field_type === "ein") && answer !== undefined && answer.value !== null && answer.value !== "";
   const hasAnswer = answer !== undefined && answer.value !== null && answer.value !== "";
   return {
     fieldId: field.id,
+    instanceIndex,
     label: field.label,
     helpText: field.help_text,
     fieldType: field.field_type,
@@ -133,9 +154,11 @@ function buildQuestionItem(
     answerId: answer?.id ?? null,
     display: maskable ? maskLast4(answer?.value) : formatOrganizerValue(field.field_type, answer?.value),
     maskable,
-    status: questionStatus(visible, field.is_required, hasAnswer, answer?.review_status ?? null),
-    reviewNote: answer?.review_note ?? null,
+    status: questionStatus(visible, field.is_required, hasAnswer, answer?.review_status ?? null, Boolean(openItem)),
+    reviewNote: openItem?.note ?? answer?.review_note ?? null,
     pendingChange: pendingChange ?? null,
+    infoRequestItemId: openItem?.id ?? null,
+    infoRequestItemStatus: openItem?.status ?? null,
   };
 }
 
@@ -154,10 +177,14 @@ const ATTENTION_STATUSES = new Set<ReviewQuestionStatus>(["unanswered", "Correct
 export function buildReviewSections(
   fields: ReviewFieldRow[],
   answers: ReviewAnswerRow[],
-  pendingChanges: ReviewPendingChangeRow[]
+  pendingChanges: ReviewPendingChangeRow[],
+  openInfoItems: OpenInfoRequestItemRow[] = []
 ): ReviewSection[] {
   const sorted = [...fields].sort((a, b) => a.display_order - b.display_order);
   const topLevel = sorted.filter((f) => !f.parent_field_id);
+
+  const openItemByFieldInstance = new Map<string, OpenInfoRequestItemRow>();
+  for (const item of openInfoItems) openItemByFieldInstance.set(`${item.organizer_field_id}:${item.instance_index}`, item);
 
   const topAnswersByField = new Map<string, ReviewAnswerRow>();
   for (const a of answers) {
@@ -212,7 +239,7 @@ export function buildReviewSections(
         const items = children.map((c) => {
           const a = answersByFieldAndInstance.get(`${c.id}:${i}`);
           const childVisible = visible && shouldShowField(parseConditionalLogic(c.conditional_logic), instanceAnswers);
-          const item = buildQuestionItem(c, a, childVisible, pendingByField.get(c.id));
+          const item = buildQuestionItem(c, a, childVisible, i, pendingByField.get(c.id), openItemByFieldInstance.get(`${c.id}:${i}`));
           tallyStatus(childVisible, item.status);
           return item;
         });
@@ -223,11 +250,58 @@ export function buildReviewSections(
     }
 
     const answer = topAnswersByField.get(field.id);
-    const item = buildQuestionItem(field, answer, visible, pendingByField.get(field.id));
+    const item = buildQuestionItem(field, answer, visible, 0, pendingByField.get(field.id), openItemByFieldInstance.get(`${field.id}:0`));
     current.entries.push({ kind: "question", item });
     tallyStatus(visible, item.status);
   }
   sections.push(current);
 
   return sections.filter((s) => s.entries.length > 0);
+}
+
+export type AwaitingReviewItem = {
+  id: string;
+  fieldLabel: string;
+  currentDisplay: string;
+  proposedDisplay: string;
+  note: string | null;
+  createdAt: string;
+};
+
+/** Client-proposed corrections to already-answered questions, awaiting a staff approve/reject decision. */
+export function buildAwaitingReviewItems(
+  fields: ReviewFieldRow[],
+  answers: ReviewAnswerRow[],
+  items: {
+    id: string;
+    organizer_field_id: string;
+    instance_index: number;
+    status: string;
+    was_answered_when_flagged: boolean;
+    proposed_value: unknown;
+    note: string | null;
+    created_at: string;
+  }[]
+): AwaitingReviewItem[] {
+  const fieldsById = new Map(fields.map((f) => [f.id, f]));
+  const answersByFieldAndInstance = new Map<string, ReviewAnswerRow>();
+  for (const a of answers) answersByFieldAndInstance.set(`${a.organizer_field_id}:${a.instance_index}`, a);
+
+  return items
+    .filter((i) => i.status === "client_responded" && i.was_answered_when_flagged)
+    .map((i) => {
+      const field = fieldsById.get(i.organizer_field_id);
+      const fieldType = field?.field_type ?? "short_text";
+      const maskable = fieldType === "ssn" || fieldType === "ein";
+      const currentAnswer = answersByFieldAndInstance.get(`${i.organizer_field_id}:${i.instance_index}`);
+      const parentLabel = field?.parent_field_id ? fieldsById.get(field.parent_field_id)?.label : null;
+      return {
+        id: i.id,
+        fieldLabel: parentLabel ? `${parentLabel} ${i.instance_index + 1} -- ${field?.label ?? "Question"}` : field?.label ?? "Question",
+        currentDisplay: maskable ? maskLast4(currentAnswer?.value) : formatOrganizerValue(fieldType, currentAnswer?.value),
+        proposedDisplay: maskable ? maskLast4(i.proposed_value) : formatOrganizerValue(fieldType, i.proposed_value),
+        note: i.note,
+        createdAt: i.created_at,
+      };
+    });
 }
