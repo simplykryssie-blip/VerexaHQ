@@ -58,12 +58,30 @@ export async function GET(request: Request) {
     .order("scheduled_at", { ascending: true })
     .limit(BATCH_SIZE);
 
+  // Every job re-queried its own staff member's connections one at a time --
+  // batch by the distinct staff_ids actually present in this batch instead.
+  const staffIds = Array.from(new Set((jobs ?? []).map((j) => j.staff_id)));
+  const { data: allConnections } =
+    staffIds.length > 0
+      ? await supabase
+          .from("user_calendar_connections")
+          .select("id, user_id, provider, calendar_id, external_account_email")
+          .in("user_id", staffIds)
+          .eq("status", "connected")
+      : { data: [] as (Connection & { user_id: string })[] };
+  const connectionsByStaffId = new Map<string, Connection[]>();
+  for (const connection of (allConnections ?? []) as (Connection & { user_id: string })[]) {
+    const list = connectionsByStaffId.get(connection.user_id) ?? [];
+    list.push(connection);
+    connectionsByStaffId.set(connection.user_id, list);
+  }
+
   let sent = 0;
   let failed = 0;
   let retried = 0;
 
   for (const job of (jobs ?? []) as Job[]) {
-    const result = await processJob(supabase, job);
+    const result = await processJob(supabase, job, connectionsByStaffId.get(job.staff_id) ?? []);
     if (result === "sent") sent++;
     else if (result === "failed") failed++;
     else retried++;
@@ -72,13 +90,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed, retried });
 }
 
-async function processJob(supabase: ReturnType<typeof createServiceClient>, job: Job): Promise<"sent" | "failed" | "retry"> {
-  const { data: connections } = await supabase
-    .from("user_calendar_connections")
-    .select("id, provider, calendar_id, external_account_email")
-    .eq("user_id", job.staff_id)
-    .eq("status", "connected");
-
+async function processJob(supabase: ReturnType<typeof createServiceClient>, job: Job, connections: Connection[]): Promise<"sent" | "failed" | "retry"> {
   if (!connections || connections.length === 0) {
     await supabase.from("calendar_sync_queue").update({ status: "sent" }).eq("id", job.id);
     return "sent";
@@ -86,7 +98,7 @@ async function processJob(supabase: ReturnType<typeof createServiceClient>, job:
 
   let anyError = false;
   let lastError = "";
-  for (const connection of connections as Connection[]) {
+  for (const connection of connections) {
     const outcome = await syncOneConnection(supabase, job, connection);
     if (outcome.ok === false) {
       anyError = true;

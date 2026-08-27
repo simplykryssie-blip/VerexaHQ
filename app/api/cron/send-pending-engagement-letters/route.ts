@@ -42,17 +42,50 @@ export async function GET(request: Request) {
     return NextResponse.json({ processed: 0, sent: 0, failed: 0, queryError: queryError.message }, { status: 200 });
   }
 
+  // Each job's template/workspace/client lookup is independent of the
+  // others, so fetch all three sets once up front rather than three queries
+  // per job -- a full batch used to cost up to 60 round trips just to read
+  // data every job needs before it can even start rendering.
+  const templateIds = Array.from(new Set((jobs ?? []).map((j) => j.engagement_letter_template_id)));
+  const workspaceIds = Array.from(new Set((jobs ?? []).map((j) => j.workspace_id)));
+  const clientIds = Array.from(new Set((jobs ?? []).map((j) => j.client_id)));
+
+  const [{ data: templates }, { data: workspaces }, { data: clients }] = await Promise.all([
+    templateIds.length > 0
+      ? supabase.from("engagement_letter_templates").select("id, name, body_html, banner_image_url").in("id", templateIds)
+      : Promise.resolve({ data: [] as EngagementLetterTemplateRow[] }),
+    workspaceIds.length > 0
+      ? supabase.from("workspaces").select("id, name").in("id", workspaceIds)
+      : Promise.resolve({ data: [] as WorkspaceRow[] }),
+    clientIds.length > 0
+      ? supabase.from("clients").select("id, first_name, last_name, business_name, primary_email").in("id", clientIds)
+      : Promise.resolve({ data: [] as ClientRow[] }),
+  ]);
+
+  const templateById = new Map((templates ?? []).map((t) => [t.id, t]));
+  const workspaceById = new Map((workspaces ?? []).map((w) => [w.id, w]));
+  const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
+
   let sent = 0;
   let failed = 0;
 
   for (const job of jobs ?? []) {
-    const result = await sendOneWithTimeout(supabase, job);
+    const result = await sendOneWithTimeout(supabase, job, {
+      template: templateById.get(job.engagement_letter_template_id) ?? null,
+      workspace: workspaceById.get(job.workspace_id) ?? null,
+      client: clientById.get(job.client_id) ?? null,
+    });
     if (result === "sent") sent++;
     else failed++;
   }
 
   return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
 }
+
+type EngagementLetterTemplateRow = { id: string; name: string; body_html: string; banner_image_url: string | null };
+type WorkspaceRow = { id: string; name: string | null };
+type ClientRow = { id: string; first_name: string | null; last_name: string | null; business_name: string | null; primary_email: string | null };
+type PrefetchedRows = { template: EngagementLetterTemplateRow | null; workspace: WorkspaceRow | null; client: ClientRow | null };
 
 // See the identical guard in send-pending-portal-invites/route.ts: a hang in
 // rendering/uploading/Storage can otherwise stall a job forever without ever
@@ -62,6 +95,7 @@ export async function GET(request: Request) {
 async function sendOneWithTimeout(
   supabase: ReturnType<typeof createServiceClient>,
   job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  prefetched: PrefetchedRows,
   timeoutMs = 25000
 ): Promise<"sent" | "failed"> {
   let timedOut = false;
@@ -71,7 +105,7 @@ async function sendOneWithTimeout(
       resolve("failed");
     }, timeoutMs);
   });
-  const result = await Promise.race([sendOne(supabase, job), timer]);
+  const result = await Promise.race([sendOne(supabase, job, prefetched), timer]);
   if (timedOut) {
     console.error(`send-pending-engagement-letters: job ${job.id} timed out after ${timeoutMs}ms`);
     await supabase
@@ -89,14 +123,10 @@ async function sendOneWithTimeout(
 
 async function sendOne(
   supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string }
+  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  { template, workspace, client }: PrefetchedRows
 ): Promise<"sent" | "failed"> {
   try {
-    const [{ data: template }, { data: workspace }, { data: client }] = await Promise.all([
-      supabase.from("engagement_letter_templates").select("id, name, body_html, banner_image_url").eq("id", job.engagement_letter_template_id).single(),
-      supabase.from("workspaces").select("name").eq("id", job.workspace_id).single(),
-      supabase.from("clients").select("first_name, last_name, business_name, primary_email").eq("id", job.client_id).single(),
-    ]);
     if (!template) throw new Error("Engagement letter template not found");
 
     const clientName = client?.business_name || [client?.first_name, client?.last_name].filter(Boolean).join(" ") || "";
