@@ -9,6 +9,8 @@ export type InformationRequestRow = {
   id: string;
   message: string;
   status: "active" | "viewed" | "responded" | "resolved";
+  due_date: string | null;
+  tags: string[];
   created_at: string;
 };
 
@@ -45,11 +47,20 @@ export function InformationRequestBanner({ requests: initialRequests }: { reques
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-ink">Your preparer needs more information</p>
               <p className="mt-1 whitespace-pre-wrap text-sm text-slate">{r.message}</p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                {r.due_date && <span className="font-medium text-warning">Due {new Date(r.due_date).toLocaleDateString()}</span>}
+                {r.tags.map((t) => (
+                  <span key={t} className="rounded-full border border-border px-2 py-0.5">
+                    {t}
+                  </span>
+                ))}
+              </div>
               <p className="mt-2 text-xs text-muted">
-                Sent {new Date(r.created_at).toLocaleDateString()} --{" "}
+                Sent {new Date(r.created_at).toLocaleDateString()} -- respond to the flagged questions below, or{" "}
                 <Link href="/portal/messages" className="font-medium text-accent hover:underline">
-                  Reply in Messages
-                </Link>
+                  send a message
+                </Link>{" "}
+                if you have questions.
               </p>
             </div>
           </div>
