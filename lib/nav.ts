@@ -134,6 +134,14 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    label: "Websites",
+    icon: Globe,
+    children: [
+      { label: "Websites", href: "/websites" },
+      { label: "Funnels", href: "/funnels" },
+    ],
+  },
+  {
     label: "Templates",
     icon: LayoutTemplate,
     children: [
