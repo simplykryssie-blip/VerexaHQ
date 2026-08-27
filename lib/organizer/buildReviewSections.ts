@@ -82,8 +82,9 @@ function formatOrganizerValue(fieldType: string, value: unknown): string {
   if (fieldType === "name") return formatNameValue(value) || "";
   if (fieldType === "yes_no") return value === "yes" ? "Yes" : value === "no" ? "No" : String(value);
   if (fieldType === "signature" && typeof value === "object") {
-    const sig = value as { typed_name?: string };
-    return sig.typed_name ? `Signed by ${sig.typed_name}` : "Signed";
+    const sig = value as { typed_name?: string; signature_image_path?: string };
+    if (sig.typed_name) return `Signed by ${sig.typed_name}`;
+    return sig.signature_image_path ? "Signed (drawn signature)" : "Signed";
   }
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (Array.isArray(value)) return value.join(", ");

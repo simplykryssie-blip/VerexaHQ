@@ -15,8 +15,10 @@ function displayValue(fieldType: string, raw: unknown): string {
     return digits.length >= 4 ? `****${digits.slice(-4)}` : "on file";
   }
   if (fieldType === "signature" && typeof raw === "object") {
-    const sig = raw as { typed_name?: string; signed_at?: string };
-    return sig.typed_name ? `Signed by ${sig.typed_name}${sig.signed_at ? ` on ${new Date(sig.signed_at).toLocaleDateString()}` : ""}` : "Signed";
+    const sig = raw as { typed_name?: string; signature_image_path?: string; signed_at?: string };
+    const signedOn = sig.signed_at ? ` on ${new Date(sig.signed_at).toLocaleDateString()}` : "";
+    if (sig.typed_name) return `Signed by ${sig.typed_name}${signedOn}`;
+    return sig.signature_image_path ? `Signed (drawn signature)${signedOn}` : "Signed";
   }
   if (fieldType === "name") return formatNameValue(raw);
   if (fieldType === "address") return formatAddressValue(raw);

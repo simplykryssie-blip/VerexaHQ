@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PaginatedDocument } from "@/components/documents/PaginatedDocument";
-import { SignaturePad } from "@/components/SignaturePad";
+import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
 import { useToast } from "@/components/Toast";
 import { interpolateSample } from "@/lib/mergeFields";
 
@@ -24,6 +24,7 @@ export function EngagementLetterPreview({
 }) {
   const toast = useToast();
   const interpolated = interpolateSample(bodyHtml);
+  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("Jordan Client");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
 
@@ -42,6 +43,8 @@ export function EngagementLetterPreview({
             requiresSignature ? (
               <div className="mt-4 rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <SignaturePad
+                  mode={mode}
+                  onModeChange={setMode}
                   typedName={typedName}
                   onTypedNameChange={setTypedName}
                   onDrawnChange={setDrawnDataUrl}
@@ -51,7 +54,7 @@ export function EngagementLetterPreview({
                   <button
                     type="button"
                     onClick={() => toast.show("This is a preview -- nothing is submitted here.", "info")}
-                    disabled={!typedName.trim() || !drawnDataUrl}
+                    disabled={mode === "typed" ? !typedName.trim() : !drawnDataUrl}
                     className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
                   >
                     Confirm signature

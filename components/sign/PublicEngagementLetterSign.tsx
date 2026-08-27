@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PaginatedDocument } from "@/components/documents/PaginatedDocument";
-import { SignaturePad } from "@/components/SignaturePad";
+import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
 import { renderTemplate } from "@/lib/templates/render";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
@@ -34,6 +34,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -70,23 +71,26 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
   }
 
   async function sign() {
-    if (!typedName.trim() || !drawnDataUrl) return;
+    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
     setSubmitting(true);
     setError(null);
 
-    const res = await fetch(`/api/e/${token}/signature-image`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl: drawnDataUrl }),
-    });
-    const result = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setSubmitting(false);
-      setError(result.error ?? "Could not save your signature.");
-      return;
+    let signatureImagePath: string | undefined;
+    if (mode === "drawn") {
+      const res = await fetch(`/api/e/${token}/signature-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl: drawnDataUrl }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSubmitting(false);
+        setError(result.error ?? "Could not save your signature.");
+        return;
+      }
+      signatureImagePath = result.path as string;
     }
-    const signatureType = "drawn" as const;
-    const signatureImagePath = result.path as string;
+    const signatureType = mode;
 
     if (requires_portal_signup) {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
@@ -273,6 +277,8 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
             <div className="mt-4 rounded-2xl border border-border bg-surface shadow-soft p-4">
               <p className="mb-3 text-xs text-muted">You&apos;ve reached the end of the letter -- sign below to confirm.</p>
               <SignaturePad
+                mode={mode}
+                onModeChange={setMode}
                 typedName={typedName}
                 onTypedNameChange={setTypedName}
                 onDrawnChange={setDrawnDataUrl}
@@ -286,7 +292,7 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
                 <button
                   type="button"
                   onClick={sign}
-                  disabled={submitting || !typedName.trim() || !drawnDataUrl}
+                  disabled={submitting || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
                   className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
                 >
                   {submitting ? "Signing..." : "Confirm signature"}
