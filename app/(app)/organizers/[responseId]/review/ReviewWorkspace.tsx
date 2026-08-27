@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, HelpCircle, X } from "lucide-react";
@@ -12,7 +12,7 @@ import { OrganizerAnswerReveal } from "@/components/organizer/OrganizerAnswerRev
 import { RequestsPanel } from "@/components/documents/RequestsPanel";
 import type { DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "@/components/documents/types";
 import type { ReviewQuestionItem, ReviewQuestionStatus, ReviewSection, OrganizerReviewStatus } from "@/lib/organizer/buildReviewSections";
-import { NeedsInfoModal } from "./NeedsInfoModal";
+import { NeedsInfoModal, type NeedsInfoSection } from "./NeedsInfoModal";
 
 type InfoRequestRow = {
   id: string;
@@ -43,11 +43,15 @@ type ResponseInfo = {
   engagementId: string | null;
 };
 
+// needs_review is an answered question with no explicit per-answer decision
+// -- displayed and treated as Approved by default, per the "everything is
+// fine unless flagged" review model. There is no per-question approve
+// action; this is just how an untouched answer reads.
 const QUESTION_STATUS_LABEL: Record<ReviewQuestionStatus, string> = {
   not_applicable: "Not applicable",
   unanswered: "Unanswered",
   optional_blank: "Not answered",
-  needs_review: "Needs review",
+  needs_review: "Approved",
   Pending: "Pending",
   "In Review": "In review",
   Approved: "Approved",
@@ -59,7 +63,7 @@ const QUESTION_STATUS_TONE: Record<ReviewQuestionStatus, BadgeTone> = {
   not_applicable: "neutral",
   unanswered: "danger",
   optional_blank: "neutral",
-  needs_review: "accent",
+  needs_review: "success",
   Pending: "neutral",
   "In Review": "accent",
   Approved: "success",
@@ -78,8 +82,30 @@ const RESPONSE_STATUS_TONE: Record<OrganizerReviewStatus, BadgeTone> = {
 function sectionTone(section: ReviewSection): BadgeTone {
   if (section.attentionCount > 0) return "danger";
   if (section.totalVisible === 0) return "neutral";
-  if (section.allDecided) return "success";
-  return "accent";
+  return "success";
+}
+
+/** Flattens the review sections into the checklist NeedsInfoModal shows, dropping conditionally-hidden questions the client never saw. */
+function buildNeedsInfoSections(sections: ReviewSection[]): NeedsInfoSection[] {
+  return sections
+    .map((s) => {
+      const questions: { key: string; label: string }[] = [];
+      for (const entry of s.entries) {
+        if (entry.kind === "question") {
+          if (entry.item.status === "not_applicable") continue;
+          questions.push({ key: entry.item.fieldId, label: entry.item.label });
+        } else {
+          for (const instance of entry.group.instances) {
+            for (const item of instance.items) {
+              if (item.status === "not_applicable") continue;
+              questions.push({ key: `${item.fieldId}:${instance.index}`, label: `${entry.group.label} ${instance.index + 1} -- ${item.label}` });
+            }
+          }
+        }
+      }
+      return { id: s.id, label: s.label, questions };
+    })
+    .filter((s) => s.questions.length > 0);
 }
 
 export function ReviewWorkspace({
@@ -120,9 +146,8 @@ export function ReviewWorkspace({
   const toast = useToast();
 
   const [activeSectionId, setActiveSectionId] = useState(sections[0]?.id ?? "general");
-  const [busyAnswerId, setBusyAnswerId] = useState<string | null>(null);
   const [busyResponse, setBusyResponse] = useState(false);
-  const [needsInfoTarget, setNeedsInfoTarget] = useState<{ fieldId: string | null; label: string | null } | null>(null);
+  const [showNeedsInfoModal, setShowNeedsInfoModal] = useState(false);
   const [assignedReviewerId, setAssignedReviewerId] = useState(response.assignedReviewerId ?? "");
   const [infoRequests, setInfoRequests] = useState(initialInfoRequests);
   const [noteBody, setNoteBody] = useState("");
@@ -131,23 +156,13 @@ export function ReviewWorkspace({
   const [collapsedHidden, setCollapsedHidden] = useState(true);
 
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
+  const needsInfoSections = useMemo(() => buildNeedsInfoSections(sections), [sections]);
 
   const totalAttention = sections.reduce((sum, s) => sum + s.attentionCount, 0);
   const totalVisible = sections.reduce((sum, s) => sum + s.totalVisible, 0);
   const docsUploaded = documentRequests.reduce((sum, r) => sum + r.items.filter((i) => i.status !== "pending").length, 0);
   const docsTotal = documentRequests.reduce((sum, r) => sum + r.items.length, 0);
   const activeInfoRequests = infoRequests.filter((r) => r.status === "active" || r.status === "viewed").length;
-
-  async function setAnswerStatus(answerId: string, status: OrganizerReviewStatus) {
-    setBusyAnswerId(answerId);
-    const { error } = await supabase.rpc("set_organizer_answer_review_status", { p_answer_id: answerId, p_status: status });
-    setBusyAnswerId(null);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    router.refresh();
-  }
 
   async function setResponseStatus(status: OrganizerReviewStatus) {
     setBusyResponse(true);
@@ -165,7 +180,6 @@ export function ReviewWorkspace({
     const { data, error } = await supabase.rpc("create_organizer_information_request", {
       p_response_id: response.id,
       p_message: message,
-      p_organizer_field_id: needsInfoTarget?.fieldId ?? undefined,
       p_send_email: sendEmail,
       p_send_sms: sendSms,
       p_show_in_portal: showInPortal,
@@ -174,7 +188,7 @@ export function ReviewWorkspace({
     setInfoRequests((prev) => [
       {
         id: data as string,
-        organizer_field_id: needsInfoTarget?.fieldId ?? null,
+        organizer_field_id: null,
         message,
         status: "active",
         sent_via_email: sendEmail,
@@ -293,15 +307,7 @@ export function ReviewWorkspace({
             <div className="space-y-3">
               {activeSection.entries.map((entry) =>
                 entry.kind === "question" ? (
-                  <QuestionCard
-                    key={entry.item.fieldId}
-                    item={entry.item}
-                    busy={busyAnswerId === entry.item.answerId}
-                    onApprove={() => entry.item.answerId && setAnswerStatus(entry.item.answerId, "Approved")}
-                    onReject={() => entry.item.answerId && setAnswerStatus(entry.item.answerId, "Rejected")}
-                    onNeedsInfo={() => setNeedsInfoTarget({ fieldId: entry.item.fieldId, label: entry.item.label })}
-                    collapsedHidden={collapsedHidden}
-                  />
+                  <QuestionCard key={entry.item.fieldId} item={entry.item} collapsedHidden={collapsedHidden} />
                 ) : (
                   <div key={entry.group.fieldId} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-muted">{entry.group.label}</p>
@@ -316,16 +322,7 @@ export function ReviewWorkspace({
                             </p>
                             <div className="space-y-2">
                               {instance.items.map((item) => (
-                                <QuestionCard
-                                  key={item.fieldId}
-                                  item={item}
-                                  compact
-                                  busy={busyAnswerId === item.answerId}
-                                  onApprove={() => item.answerId && setAnswerStatus(item.answerId, "Approved")}
-                                  onReject={() => item.answerId && setAnswerStatus(item.answerId, "Rejected")}
-                                  onNeedsInfo={() => setNeedsInfoTarget({ fieldId: item.fieldId, label: item.label })}
-                                  collapsedHidden={collapsedHidden}
-                                />
+                                <QuestionCard key={item.fieldId} item={item} compact collapsedHidden={collapsedHidden} />
                               ))}
                             </div>
                           </div>
@@ -384,11 +381,11 @@ export function ReviewWorkspace({
               </button>
               <button
                 type="button"
-                onClick={() => setNeedsInfoTarget({ fieldId: null, label: null })}
+                onClick={() => setShowNeedsInfoModal(true)}
                 disabled={busyResponse}
                 className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
               >
-                <HelpCircle size={12} /> Needs Info
+                <HelpCircle size={12} /> Need Info
               </button>
               <button
                 type="button"
@@ -504,8 +501,8 @@ export function ReviewWorkspace({
         </aside>
       </div>
 
-      {needsInfoTarget !== null && (
-        <NeedsInfoModal fieldLabel={needsInfoTarget.label} clientEmail={clientEmail} onClose={() => setNeedsInfoTarget(null)} onSend={sendInformationRequest} />
+      {showNeedsInfoModal && (
+        <NeedsInfoModal sections={needsInfoSections} clientEmail={clientEmail} onClose={() => setShowNeedsInfoModal(false)} onSend={sendInformationRequest} />
       )}
     </div>
   );
@@ -513,27 +510,18 @@ export function ReviewWorkspace({
 
 function QuestionCard({
   item,
-  busy,
   compact = false,
   collapsedHidden,
-  onApprove,
-  onReject,
-  onNeedsInfo,
 }: {
   item: ReviewQuestionItem;
-  busy: boolean;
   compact?: boolean;
   collapsedHidden: boolean;
-  onApprove: () => void;
-  onReject: () => void;
-  onNeedsInfo: () => void;
 }) {
   if (item.status === "not_applicable" && collapsedHidden) {
     return null;
   }
 
   const isHidden = item.status === "not_applicable";
-  const canDecide = Boolean(item.answerId) && !isHidden;
 
   return (
     <div className={`rounded-2xl border border-border bg-surface shadow-soft ${compact ? "p-3" : "p-4"} ${isHidden ? "opacity-60" : ""}`}>
@@ -563,20 +551,6 @@ function QuestionCard({
       )}
 
       {item.reviewNote && <p className="mt-2 text-xs italic text-muted">&quot;{item.reviewNote}&quot;</p>}
-
-      {!isHidden && (
-        <div className="mt-2 flex items-center gap-3 text-xs">
-          <button type="button" onClick={onApprove} disabled={!canDecide || busy} className="font-medium text-emerald hover:underline disabled:opacity-40">
-            Approve
-          </button>
-          <button type="button" onClick={onNeedsInfo} disabled={busy} className="font-medium text-amber hover:underline disabled:opacity-40">
-            Needs Info
-          </button>
-          <button type="button" onClick={onReject} disabled={!canDecide || busy} className="font-medium text-rose hover:underline disabled:opacity-40">
-            Deny
-          </button>
-        </div>
-      )}
     </div>
   );
 }
