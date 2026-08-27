@@ -55,13 +55,11 @@ export async function POST(request: Request) {
   const templateInfo = signature.engagement_letter_templates as unknown as { name?: string; banner_image_url?: string | null } | null;
   const templateName = templateInfo?.name ?? "Engagement Letter";
   const bannerImageBytes = await fetchImageBytes(templateInfo?.banner_image_url);
-  const pdfBytes = await renderLetterPdf(
-    templateName,
-    signature.resolved_body_html,
-    signature.typed_name ?? signature.signer_name,
-    signatureImageBytes ? { signatureImageBytes, typedName: signature.typed_name ?? "", signedAtLabel: signedAt } : undefined,
-    bannerImageBytes ?? undefined
-  );
+  const signedBy =
+    signatureImageBytes || signature.typed_name
+      ? { signatureImageBytes, typedName: signature.typed_name ?? signature.signer_name, signedAtLabel: signedAt }
+      : undefined;
+  const pdfBytes = await renderLetterPdf(templateName, signature.resolved_body_html, signature.typed_name ?? signature.signer_name, signedBy, bannerImageBytes ?? undefined);
 
   const fileName = `${templateName} (signed).pdf`;
   const path = `${signature.workspace_id}/${signature.client_id}/${Date.now()}-${fileName}`;

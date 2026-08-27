@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, Phone } from "lucide-react";
+import { Mail, Phone, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeOptions, parseAddressValue, parseNameValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
@@ -10,6 +10,7 @@ import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditio
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -446,13 +447,14 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             field.field_type === "repeating_section" ? (
               <PublicRepeatingSection
                 key={field.id}
+                token={token}
                 field={field}
                 childFields={childFieldsByParent.get(field.id) ?? []}
                 rows={repeaterRows[field.id] ?? []}
                 onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
               />
             ) : (
-              <PublicFieldInput key={field.id} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
+              <PublicFieldInput key={field.id} token={token} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
             )
           )}
 
@@ -491,11 +493,13 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 }
 
 function PublicRepeatingSection({
+  token,
   field,
   childFields,
   rows,
   onChange,
 }: {
+  token: string;
   field: FieldRow;
   childFields: FieldRow[];
   rows: Record<string, string>[];
@@ -528,6 +532,7 @@ function PublicRepeatingSection({
               {childFields.map((child) => (
                 <PublicFieldInput
                   key={child.id}
+                  token={token}
                   field={child}
                   value={row[child.id] ?? ""}
                   onChange={(fieldId, value) => onChange(rows.map((r, i) => (i === index ? { ...r, [fieldId]: value } : r)))}
@@ -545,7 +550,94 @@ function PublicRepeatingSection({
   );
 }
 
-function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: string; onChange: (fieldId: string, value: string) => void }) {
+// No session and possibly no client record has even signed up yet at this
+// point, so a drawn signature can't go through a client-side storage RLS
+// insert -- it's uploaded via /api/o/[token]/signature-image (service role)
+// instead, same reasoning as the public engagement-letter signing flow.
+function PublicSignatureField({
+  token,
+  fieldId,
+  value,
+  onChange,
+}: {
+  token: string;
+  fieldId: string;
+  value: string;
+  onChange: (fieldId: string, value: string) => void;
+}) {
+  const [mode, setMode] = useState<SignatureMode>("typed");
+  const [typedName, setTypedName] = useState("");
+  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  let parsed: { typed_name?: string; signature_image_path?: string; signed_at: string } | null = null;
+  try {
+    parsed = value ? JSON.parse(value) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (parsed) {
+    return (
+      <p className="flex items-center gap-1.5 text-sm text-green-700">
+        <PenLine size={14} aria-hidden="true" />
+        {parsed.typed_name ? `Signed by ${parsed.typed_name}` : "Signed (drawn signature)"}
+      </p>
+    );
+  }
+
+  async function sign() {
+    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
+    setError(null);
+
+    if (mode === "typed") {
+      onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }));
+      return;
+    }
+
+    setUploading(true);
+    const res = await fetch(`/api/o/${token}/signature-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: drawnDataUrl }),
+    });
+    const result = await res.json().catch(() => ({}));
+    setUploading(false);
+    if (!res.ok) {
+      setError(result.error ?? "Could not save your signature.");
+      return;
+    }
+    onChange(fieldId, JSON.stringify({ signature_image_path: result.path, signed_at: new Date().toISOString() }));
+  }
+
+  return (
+    <div className="space-y-2">
+      <SignaturePad mode={mode} onModeChange={setMode} typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
+      {error && <p className="text-xs text-danger">{error}</p>}
+      <button
+        type="button"
+        onClick={sign}
+        disabled={uploading || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
+        className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+      >
+        {uploading ? "Saving..." : "Sign"}
+      </button>
+    </div>
+  );
+}
+
+function PublicFieldInput({
+  token,
+  field,
+  value,
+  onChange,
+}: {
+  token: string;
+  field: FieldRow;
+  value: string;
+  onChange: (fieldId: string, value: string) => void;
+}) {
   const options = normalizeOptions(field.options);
 
   if (field.field_type === "section") {
@@ -618,25 +710,7 @@ function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: 
         ) : field.field_type === "file_upload" ? (
           <p className="text-xs text-muted">File uploads aren&apos;t available before you&apos;re a client -- your preparer will follow up separately.</p>
         ) : field.field_type === "signature" ? (
-          value ? (
-            <p className="text-sm text-green-700">Signed by {JSON.parse(value).typed_name}</p>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                placeholder="Type your full name"
-                className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    const target = e.target as HTMLInputElement;
-                    if (target.value.trim()) onChange(field.id, JSON.stringify({ typed_name: target.value.trim(), signed_at: new Date().toISOString() }));
-                  }
-                }}
-                onBlur={(e) => {
-                  if (e.target.value.trim()) onChange(field.id, JSON.stringify({ typed_name: e.target.value.trim(), signed_at: new Date().toISOString() }));
-                }}
-              />
-            </div>
-          )
+          <PublicSignatureField token={token} fieldId={field.id} value={value} onChange={onChange} />
         ) : field.field_type === "dropdown" ? (
           <select
             id={`field-${field.id}`}
