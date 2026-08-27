@@ -18,7 +18,6 @@ import {
   ArrowRightCircle,
   UserCog,
   Bell,
-  GitBranch,
   UserX,
   UserCheck,
   Pencil,
@@ -121,13 +120,12 @@ export const ACTION_TYPES = [
   { value: "send_document_request", label: "Send a document request" },
   { value: "assign_user", label: "Assign staff" },
   { value: "send_notification", label: "Notify a staff member" },
-  { value: "move_lead_stage", label: "Move the lead to a pipeline stage" },
+  { value: "move_pipeline_stage", label: "Move to a pipeline stage" },
   { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service" },
   { value: "mark_lead_lost", label: "Mark the lead lost" },
   { value: "convert_lead_to_client", label: "Convert the lead to an active client" },
   { value: "update_client", label: "Update a client field" },
   { value: "create_client", label: "Create a new client" },
-  { value: "move_engagement_stage", label: "Move the engagement to a pipeline stage" },
   { value: "create_quote", label: "Create a quote" },
   { value: "send_quote", label: "Send the draft quote" },
   { value: "add_tag", label: "Add a tag to the client" },
@@ -181,13 +179,12 @@ export function actionIcon(type: string) {
   if (type === "send_document_request") return <FolderInput size={15} />;
   if (type === "assign_user") return <UserCog size={15} />;
   if (type === "send_notification") return <Bell size={15} />;
-  if (type === "move_lead_stage") return <GitBranch size={15} />;
+  if (type === "move_pipeline_stage") return <Route size={15} />;
   if (type === "move_lead_to_service_pipeline") return <Milestone size={15} />;
   if (type === "mark_lead_lost") return <UserX size={15} />;
   if (type === "convert_lead_to_client") return <UserCheck size={15} />;
   if (type === "update_client") return <Pencil size={15} />;
   if (type === "create_client") return <UserPlus size={15} />;
-  if (type === "move_engagement_stage") return <Route size={15} />;
   if (type === "create_quote") return <DollarSign size={15} />;
   if (type === "send_quote") return <Send size={15} />;
   if (type === "add_tag" || type === "remove_tag") return <Tag size={15} />;
@@ -1158,7 +1155,7 @@ export function StepCard({
           </>
         )}
 
-        {actionType === "move_lead_stage" && (
+        {actionType === "move_pipeline_stage" && (
           <>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Pipeline
@@ -1197,8 +1194,8 @@ export function StepCard({
               </select>
             </label>
             <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-              Moves the lead forward to this stage, completing every stage in between. If the lead isn&apos;t already in a pipeline, it
-              starts one. Moving backward isn&apos;t supported.
+              Moves the client or engagement forward to this stage, completing every stage in between. If it isn&apos;t already in this
+              pipeline, it starts one. Moving backward isn&apos;t supported.
             </p>
           </>
         )}
@@ -1350,50 +1347,6 @@ export function StepCard({
             </label>
             <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
               Matches an existing client by email or phone before creating a new one. New clients start as a lead.
-            </p>
-          </>
-        )}
-
-        {actionType === "move_engagement_stage" && (
-          <>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Pipeline
-              <select
-                disabled={!canManage}
-                value={(config.process_id as string) ?? ""}
-                onChange={(e) => setField("process_id", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="" disabled>
-                  Choose a pipeline
-                </option>
-                {pipelines.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Target stage
-              <select
-                disabled={!canManage || !config.process_id}
-                value={(config.process_stage_id as string) ?? ""}
-                onChange={(e) => setField("process_stage_id", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="" disabled>
-                  Choose a stage
-                </option>
-                {(pipelines.find((p) => p.id === config.process_id)?.stages ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-              Moves the engagement forward to this stage, completing every stage in between. Moving backward isn&apos;t supported.
             </p>
           </>
         )}
@@ -1671,6 +1624,21 @@ export function WorkflowBuilder({
 
   async function toggleEnabled() {
     const next = !enabled;
+    // Only turning ON needs a check -- pausing an already-broken workflow
+    // is always safe. Same gate as the workflow list's own toggle, so a
+    // workflow can't go live from this page without it either.
+    if (next) {
+      const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: automationId });
+      if (validationError) {
+        toast.show(validationError.message, "error");
+        return;
+      }
+      if (issues && issues.length > 0) {
+        const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+        window.alert(`Can't activate this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+        return;
+      }
+    }
     setEnabled(next);
     const { error } = await supabase.from("automations").update({ is_enabled: next }).eq("id", automationId);
     if (error) {

@@ -117,9 +117,8 @@ const STEP_KIND: Record<string, { label: string; color: string; soft: string }> 
   send_organizer_template: { label: "Message", color: "#10B981", soft: "#E3FAF0" },
   send_notification: { label: "Notify", color: "#FB7185", soft: "#FDECEF" },
   change_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
-  move_lead_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
+  move_pipeline_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
   move_lead_to_service_pipeline: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
-  move_engagement_stage: { label: "Pipeline", color: "#0B7FE0", soft: "#E8F3FE" },
 };
 const DEFAULT_STEP_KIND = { label: "Action", color: "#0B7FE0", soft: "#E8F3FE" };
 function stepKind(actionType: string) {
