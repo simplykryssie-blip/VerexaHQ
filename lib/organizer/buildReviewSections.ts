@@ -65,9 +65,9 @@ export type ReviewSection = {
   id: string;
   label: string;
   entries: ReviewSectionEntry[];
-  attentionCount: number; // unanswered required + needs_review + Corrections Requested + Rejected, among visible items
+  attentionCount: number; // unanswered required + Corrections Requested + Rejected, among visible items -- an answered item with no explicit decision is treated as approved by default, not "needs attention"
   totalVisible: number;
-  allDecided: boolean; // every visible, answered item has a terminal per-answer decision (Approved/Rejected)
+  allDecided: boolean; // no visible item in this section needs attention
 };
 
 function maskLast4(value: unknown): string {
@@ -97,6 +97,12 @@ function toComparableString(value: unknown): string {
   return String(value);
 }
 
+// An answered, visible question with no persisted per-answer decision is
+// "needs_review" here only as an internal computed name -- the review
+// workspace displays and treats it as implicitly Approved. Everything is
+// considered fine unless the reviewer explicitly flags it (via the
+// Needs Info compose panel) or the whole response is denied; there is no
+// per-question approve action to click.
 function questionStatus(
   visible: boolean,
   isRequired: boolean,
@@ -132,8 +138,7 @@ function buildQuestionItem(
   };
 }
 
-const ATTENTION_STATUSES = new Set<ReviewQuestionStatus>(["unanswered", "needs_review", "Corrections Requested", "Rejected"]);
-const TERMINAL_STATUSES = new Set<ReviewQuestionStatus>(["Approved", "Rejected", "not_applicable", "optional_blank"]);
+const ATTENTION_STATUSES = new Set<ReviewQuestionStatus>(["unanswered", "Corrections Requested", "Rejected"]);
 
 /**
  * Groups a template's fields into left-nav sections (split on field_type ===
@@ -175,8 +180,10 @@ export function buildReviewSections(
   function tallyStatus(visible: boolean, status: ReviewQuestionStatus) {
     if (!visible || status === "not_applicable") return;
     current.totalVisible += 1;
-    if (ATTENTION_STATUSES.has(status)) current.attentionCount += 1;
-    if (status !== "Approved" && status !== "Rejected") current.allDecided = false;
+    if (ATTENTION_STATUSES.has(status)) {
+      current.attentionCount += 1;
+      current.allDecided = false;
+    }
   }
 
   for (const field of topLevel) {
