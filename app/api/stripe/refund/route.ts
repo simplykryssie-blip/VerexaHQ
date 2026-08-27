@@ -27,6 +27,15 @@ export async function POST(request: Request) {
   if (paymentError || !payment) {
     return NextResponse.json({ error: paymentError?.message ?? "Payment not found" }, { status: 404 });
   }
+
+  const { data: canManageBilling } = await supabase.rpc("has_permission", {
+    p_workspace_id: payment.workspace_id,
+    p_permission_key: "billing.manage",
+  });
+  if (!canManageBilling) {
+    return NextResponse.json({ error: "Not authorized to issue refunds." }, { status: 403 });
+  }
+
   if (!payment.stripe_payment_intent_id) {
     return NextResponse.json({ error: "This payment wasn't collected through Stripe -- refund it manually." }, { status: 400 });
   }
