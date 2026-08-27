@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { OrganizerForm } from "@/components/portal/OrganizerForm";
+import { InformationRequestBanner } from "@/components/portal/InformationRequestBanner";
 import { stringifyAddressValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import type { BasicInfoSnapshot } from "@/components/portal/BasicInfoForm";
 
@@ -23,7 +24,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 
   const readOnly = response.status === "submitted" || response.status === "reviewed";
 
-  const [{ data: fields }, { data: answers }, { data: snapshot }] = await Promise.all([
+  const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequests }] = await Promise.all([
     supabase
       .from("organizer_fields")
       .select("id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field")
@@ -31,6 +32,12 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
     readOnly ? Promise.resolve({ data: null }) : supabase.rpc("get_portal_client_snapshot"),
+    supabase
+      .from("organizer_information_requests")
+      .select("id, message, status, created_at")
+      .eq("organizer_response_id", response.id)
+      .neq("status", "resolved")
+      .order("created_at", { ascending: false }),
   ]);
 
   // Mapped fields (client_profile_field set on the builder side) that don't
@@ -59,6 +66,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         description={readOnly ? "This organizer has been submitted and can no longer be edited." : "Fill in what you can -- you can save progress and come back."}
       />
       <div className="max-w-2xl flex-1 px-8 py-6">
+        <InformationRequestBanner requests={(infoRequests ?? []) as never} />
         <OrganizerForm
           responseId={response.id}
           templateName={templateName}
