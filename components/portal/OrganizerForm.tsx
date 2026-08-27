@@ -115,131 +115,153 @@ export function OrganizerForm({
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   }
 
-  async function saveAll() {
+  // Wrapped in try/finally so an unexpected throw (a network failure, or a
+  // parse error out of parseAddressValue/parseNameValue on unusual input)
+  // can never leave `saving` stuck true -- previously that left the Save
+  // button spinning forever with no toast, since setSaving(false) was only
+  // reached on the normal-completion and clean-.error paths.
+  async function saveAll(): Promise<boolean> {
     setSaving(true);
-    const rows = Object.entries(answers).map(([organizer_field_id, value]) => ({
-      organizer_response_id: responseId,
-      organizer_field_id,
-      value,
-      instance_index: 0,
-    }));
+    try {
+      const rows = Object.entries(answers).map(([organizer_field_id, value]) => ({
+        organizer_response_id: responseId,
+        organizer_field_id,
+        value,
+        instance_index: 0,
+      }));
 
-    for (const repeater of repeaterFields) {
-      const children = childFieldsByParent.get(repeater.id) ?? [];
-      const repRows = repeaterRows[repeater.id] ?? [];
-      for (const child of children) {
-        // Clear out any rows beyond the current count (e.g. a dependent was
-        // removed) so stale answers don't linger under a dropped instance.
-        const { error: deleteError } = await supabase
-          .from("organizer_response_answers")
-          .delete()
-          .eq("organizer_response_id", responseId)
-          .eq("organizer_field_id", child.id)
-          .gte("instance_index", repRows.length);
-        if (deleteError) {
-          toast.show(deleteError.message, "error");
-          setSaving(false);
-          return;
-        }
-        repRows.forEach((row, i) => {
-          if (row[child.id] !== undefined) {
-            rows.push({ organizer_response_id: responseId, organizer_field_id: child.id, value: row[child.id], instance_index: i });
+      for (const repeater of repeaterFields) {
+        const children = childFieldsByParent.get(repeater.id) ?? [];
+        const repRows = repeaterRows[repeater.id] ?? [];
+        for (const child of children) {
+          // Clear out any rows beyond the current count (e.g. a dependent was
+          // removed) so stale answers don't linger under a dropped instance.
+          const { error: deleteError } = await supabase
+            .from("organizer_response_answers")
+            .delete()
+            .eq("organizer_response_id", responseId)
+            .eq("organizer_field_id", child.id)
+            .gte("instance_index", repRows.length);
+          if (deleteError) {
+            toast.show(deleteError.message, "error");
+            return false;
           }
-        });
+          repRows.forEach((row, i) => {
+            if (row[child.id] !== undefined) {
+              rows.push({ organizer_response_id: responseId, organizer_field_id: child.id, value: row[child.id], instance_index: i });
+            }
+          });
+        }
       }
-    }
 
-    if (rows.length > 0) {
-      const { error } = await supabase
-        .from("organizer_response_answers")
-        .upsert(rows, { onConflict: "organizer_response_id,organizer_field_id,instance_index" });
-      if (error) {
-        toast.show(error.message, "error");
-        setSaving(false);
-        return;
+      if (rows.length > 0) {
+        const { error } = await supabase
+          .from("organizer_response_answers")
+          .upsert(rows, { onConflict: "organizer_response_id,organizer_field_id,instance_index" });
+        if (error) {
+          toast.show(error.message, "error");
+          return false;
+        }
       }
-    }
 
-    // Fields the builder tagged as "prefill from client profile" propose
-    // their current value back to the client record -- applied immediately
-    // if the client record has nothing there yet, otherwise queued for
-    // staff approval. Repeater children are never mapped (a repeating
-    // section can't correspond to a single client-record field).
-    for (const field of fields) {
-      if (!field.client_profile_field || repeaterChildIds.has(field.id)) continue;
-      const value = answers[field.id];
-      if (!value) continue;
+      // Fields the builder tagged as "prefill from client profile" propose
+      // their current value back to the client record -- applied immediately
+      // if the client record has nothing there yet, otherwise queued for
+      // staff approval. Repeater children are never mapped (a repeating
+      // section can't correspond to a single client-record field). Errors
+      // here are surfaced but non-fatal to the save itself -- the answers
+      // above are already safely stored regardless.
+      for (const field of fields) {
+        if (!field.client_profile_field || repeaterChildIds.has(field.id)) continue;
+        const value = answers[field.id];
+        if (!value) continue;
 
-      if (field.client_profile_field === "mailing_address") {
-        const parts = parseAddressValue(value);
-        await supabase.rpc("propose_client_mailing_address", {
-          p_street: parts.street,
-          p_city: parts.city,
-          p_state: parts.state,
-          p_zip: parts.zip,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else if (field.client_profile_field === "full_name") {
-        const parts = parseNameValue(value);
-        await supabase.rpc("propose_client_full_name", {
-          p_first_name: parts.first,
-          p_middle_name: parts.middle,
-          p_last_name: parts.last,
-          p_suffix: parts.suffix,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else if (field.client_profile_field === "date_of_birth") {
-        await supabase.rpc("propose_client_date_of_birth", {
-          p_new_value: value,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else if (field.client_profile_field === "ssn") {
-        await supabase.rpc("propose_client_sensitive_field", {
-          p_field: "ssn",
-          p_new_value: value,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else {
-        await supabase.rpc("propose_client_contact_field", {
-          p_field: field.client_profile_field,
-          p_new_value: value,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
+        const result =
+          field.client_profile_field === "mailing_address"
+            ? await (() => {
+                const parts = parseAddressValue(value);
+                return supabase.rpc("propose_client_mailing_address", {
+                  p_street: parts.street,
+                  p_city: parts.city,
+                  p_state: parts.state,
+                  p_zip: parts.zip,
+                  p_organizer_response_id: responseId,
+                  p_organizer_field_id: field.id,
+                });
+              })()
+            : field.client_profile_field === "full_name"
+              ? await (() => {
+                  const parts = parseNameValue(value);
+                  return supabase.rpc("propose_client_full_name", {
+                    p_first_name: parts.first,
+                    p_middle_name: parts.middle,
+                    p_last_name: parts.last,
+                    p_suffix: parts.suffix,
+                    p_organizer_response_id: responseId,
+                    p_organizer_field_id: field.id,
+                  });
+                })()
+              : field.client_profile_field === "date_of_birth"
+                ? await supabase.rpc("propose_client_date_of_birth", {
+                    p_new_value: value,
+                    p_organizer_response_id: responseId,
+                    p_organizer_field_id: field.id,
+                  })
+                : field.client_profile_field === "ssn"
+                  ? await supabase.rpc("propose_client_sensitive_field", {
+                      p_field: "ssn",
+                      p_new_value: value,
+                      p_organizer_response_id: responseId,
+                      p_organizer_field_id: field.id,
+                    })
+                  : await supabase.rpc("propose_client_contact_field", {
+                      p_field: field.client_profile_field,
+                      p_new_value: value,
+                      p_organizer_response_id: responseId,
+                      p_organizer_field_id: field.id,
+                    });
+        if (result.error) toast.show(result.error.message, "error");
       }
-    }
 
-    setSaving(false);
-    toast.show("Progress saved", "success");
-    router.refresh();
+      toast.show("Progress saved", "success");
+      router.refresh();
+      return true;
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not save -- please try again.", "error");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function submit() {
-    await saveAll();
+    const saved = await saveAll();
+    if (!saved) return;
     setSubmitting(true);
-    const { error } = await supabase.rpc("submit_organizer_response", { p_response_id: responseId });
-    setSubmitting(false);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
+    try {
+      const { error } = await supabase.rpc("submit_organizer_response", { p_response_id: responseId });
+      if (error) {
+        toast.show(error.message, "error");
+        return;
+      }
+      fetch("/api/documents/file-organizer-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responseId }),
+      }).catch(() => {
+        // Best-effort -- the submission itself is already recorded; filing
+        // it into Documents can be retried later if this fails.
+      });
+      // A toast alone was easy to miss -- nothing on screen told the client
+      // their organizer actually went through. This blocks on an explicit
+      // "OK" instead, then sends them back to the dashboard rather than
+      // leaving them looking at the (now read-only) form they just finished.
+      setJustSubmitted(true);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not submit -- please try again.", "error");
+    } finally {
+      setSubmitting(false);
     }
-    fetch("/api/documents/file-organizer-response", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ responseId }),
-    }).catch(() => {
-      // Best-effort -- the submission itself is already recorded; filing
-      // it into Documents can be retried later if this fails.
-    });
-    // A toast alone was easy to miss -- nothing on screen told the client
-    // their organizer actually went through. This blocks on an explicit
-    // "OK" instead, then sends them back to the dashboard rather than
-    // leaving them looking at the (now read-only) form they just finished.
-    setJustSubmitted(true);
   }
 
   function backToDashboard() {
