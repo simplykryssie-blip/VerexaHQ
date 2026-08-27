@@ -26,7 +26,7 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
        review_status, review_note, reviewed_at, assigned_reviewer_id,
        organizer_templates(name),
        clients(client_type, first_name, last_name, business_name, primary_email, primary_phone),
-       engagements(id, engagement_number, engagement_tax_details(tax_year))`
+       engagements(id, engagement_number, engagement_tax_details!engagement_tax_details_engagement_id_fkey(tax_year))`
     )
     .eq("id", params.responseId)
     .eq("workspace_id", workspace.id)
