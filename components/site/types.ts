@@ -28,6 +28,7 @@ export type SectionType =
   | "testimonial"
   | "faq"
   | "lead_form"
+  | "organizer_form"
   | "cta_button"
   | "spacer"
   | "footer"
