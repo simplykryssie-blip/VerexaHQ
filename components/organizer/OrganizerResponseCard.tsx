@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, FileCheck, Check, X, HelpCircle } from "lucide-react";
+import { ChevronDown, ChevronRight, FileCheck, Check, X, HelpCircle, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
@@ -51,6 +51,7 @@ export function OrganizerResponseCard({
   const [filing, setFiling] = useState(false);
   const [pickingService, setPickingService] = useState(false);
   const [reviewing, setReviewing] = useState<OrganizerReviewStatus | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   async function setReview(status: OrganizerReviewStatus, notePrompt?: string) {
     let note: string | null = null;
@@ -88,6 +89,25 @@ export function OrganizerResponseCard({
   }
 
   const hasAnswers = response.status === "submitted" || response.status === "reviewed";
+
+  async function removeResponse(e: React.MouseEvent) {
+    e.stopPropagation();
+    const confirmed = window.confirm(
+      hasAnswers
+        ? "This organizer has already been submitted with answers. Removing it will permanently delete those answers. Are you sure?"
+        : "Remove this organizer? The client will no longer see it in their portal."
+    );
+    if (!confirmed) return;
+    setRemoving(true);
+    const { error } = await supabase.from("organizer_responses").delete().eq("id", response.id);
+    setRemoving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Organizer removed.", "success");
+    router.refresh();
+  }
 
   async function fileNow(e: React.MouseEvent) {
     e.stopPropagation();
@@ -140,6 +160,15 @@ export function OrganizerResponseCard({
             {response.status.replace("_", " ")}
             {response.submitted_at && ` -- submitted ${new Date(response.submitted_at).toLocaleDateString()}`}
           </span>
+          <button
+            type="button"
+            onClick={removeResponse}
+            disabled={removing}
+            title="Remove this assigned organizer"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted hover:border-danger hover:text-danger disabled:opacity-60"
+          >
+            <Trash2 size={11} /> {removing ? "Removing..." : "Remove"}
+          </button>
         </span>
       </button>
 
