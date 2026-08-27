@@ -43,7 +43,7 @@ export default async function FirmProfilePage() {
         .single(),
       supabase
         .from("branding")
-        .select("display_name, sidebar_logo_url, primary_color, secondary_color, support_email, support_phone")
+        .select("support_email, support_phone")
         .eq("workspace_id", workspace.id)
         .maybeSingle(),
       supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
@@ -87,16 +87,11 @@ export default async function FirmProfilePage() {
             personalPhone={myProfile?.phone ?? null}
             showPtin={showStaffPtin}
             ptinLast4={myProfile?.ptin_last4 ?? null}
-            businessName={branding?.display_name ?? null}
             website={contact?.website ?? null}
             mailingAddress={contact?.mailing_address ?? null}
             businessPhone={branding?.support_phone ?? contact?.phone ?? null}
             businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
-            logoUrl={branding?.sidebar_logo_url ?? null}
-            primaryColor={branding?.primary_color ?? "#0F172A"}
-            secondaryColor={branding?.secondary_color ?? "#2563EB"}
             isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
-            eroName={effectiveBranding.eroName ?? null}
             isOwner={workspace.is_owner}
             isAdmin={Boolean(isAdmin)}
             canManageSettings={Boolean(canManageSettings)}

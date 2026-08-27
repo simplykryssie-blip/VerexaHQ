@@ -31,3 +31,17 @@ export function hexToRgba(hex: string, alpha: number): string | null {
   const rgb = parseHex(hex);
   return rgb ? `rgba(${rgb.join(", ")}, ${alpha})` : null;
 }
+
+/**
+ * Picks readable ink/white text for an arbitrary hex background using WCAG
+ * relative luminance -- used instead of a separately-stored text-color field
+ * (branding.sidebar_text_color) so a custom nav bar color can never drift out
+ * of sync with its own contrast the way a manually-set override could.
+ */
+export function getReadableTextColor(hex: string): "#0f172a" | "#ffffff" {
+  const rgb = parseHex(hex);
+  if (!rgb) return "#0f172a";
+  const [r, g, b] = rgb.map((c) => c / 255);
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.55 ? "#0f172a" : "#ffffff";
+}

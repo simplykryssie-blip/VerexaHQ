@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadCloud, X } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Avatar } from "@/components/Avatar";
@@ -36,16 +36,11 @@ type Props = {
   personalPhone: string | null;
   showPtin: boolean;
   ptinLast4: string | null;
-  businessName: string | null;
   website: string | null;
   mailingAddress: string | null;
   businessPhone: string | null;
   businessEmail: string | null;
-  logoUrl: string | null;
-  primaryColor: string;
-  secondaryColor: string;
   isWhitelabeledByEro: boolean;
-  eroName: string | null;
   isOwner: boolean;
   isAdmin: boolean;
   canManageSettings: boolean;
@@ -93,16 +88,11 @@ export function FirmProfileForm({
   personalPhone,
   showPtin,
   ptinLast4,
-  businessName,
   website,
   mailingAddress,
   businessPhone,
   businessEmail,
-  logoUrl,
-  primaryColor,
-  secondaryColor,
   isWhitelabeledByEro,
-  eroName,
   isOwner,
   isAdmin,
   canManageSettings,
@@ -131,15 +121,10 @@ export function FirmProfileForm({
   const [ptin, setPtin] = useState("");
   const [clearPtin, setClearPtin] = useState(false);
 
-  const [bizName, setBizName] = useState(businessName ?? "");
   const [bizWebsite, setBizWebsite] = useState(website ?? "");
   const [bizAddress, setBizAddress] = useState(mailingAddress ?? "");
   const [bizPhone, setBizPhone] = useState(businessPhone ?? "");
   const [bizEmail, setBizEmail] = useState(businessEmail ?? "");
-  const [logo, setLogo] = useState(logoUrl);
-  const [uploadingLogo, setUploadingLogo] = useState(false);
-  const [primary, setPrimary] = useState(primaryColor);
-  const [secondary, setSecondary] = useState(secondaryColor);
 
   const [ein, setEin] = useState("");
   const [efin, setEfin] = useState("");
@@ -172,19 +157,6 @@ export function FirmProfileForm({
 
   function removeHoliday(date: string) {
     setHolidays((prev) => prev.filter((d) => d !== date));
-  }
-
-  async function uploadLogo(file: File) {
-    setUploadingLogo(true);
-    const path = `${workspaceId}/sidebar-logo-${Date.now()}-${file.name}`;
-    const { error: uploadErr } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
-    setUploadingLogo(false);
-    if (uploadErr) {
-      toast.show(uploadErr.message, "error");
-      return;
-    }
-    const { data } = supabase.storage.from("branding").getPublicUrl(path);
-    setLogo(data.publicUrl);
   }
 
   async function applyCroppedAvatar(blob: Blob) {
@@ -239,15 +211,7 @@ export function FirmProfileForm({
       if (!isWhitelabeledByEro) {
         writes.push(
           supabase.from("branding").upsert(
-            {
-              workspace_id: workspaceId,
-              display_name: bizName || null,
-              support_phone: bizPhone || null,
-              support_email: bizEmail || null,
-              sidebar_logo_url: logo,
-              primary_color: primary,
-              secondary_color: secondary,
-            },
+            { workspace_id: workspaceId, support_phone: bizPhone || null, support_email: bizEmail || null },
             { onConflict: "workspace_id" }
           )
         );
@@ -393,64 +357,13 @@ export function FirmProfileForm({
             </div>
           </div>
 
-          {isWhitelabeledByEro ? (
-            <p className="mt-4 rounded-lg border border-border bg-surfaceMuted p-3 text-sm text-slate">
-              Your logo, colors, and business name are managed by {eroName ?? "your ERO"} -- your staff dashboard and your clients&apos; portal both show
-              their branding. If something looks wrong, contact them to have it updated.
-            </p>
-          ) : (
-            <>
-              <div className="mt-4 flex items-center gap-3">
-                {logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
-                  <img src={logo} alt="" className="h-12 w-12 rounded-lg border border-border object-contain" />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted">Logo</div>
-                )}
-                <div className="flex items-center gap-2">
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
-                    <UploadCloud size={13} />
-                    {uploadingLogo ? "Uploading..." : logo ? "Replace logo" : "Upload logo"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={uploadingLogo}
-                      onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
-                      className="sr-only"
-                    />
-                  </label>
-                  {logo && (
-                    <button type="button" onClick={() => setLogo(null)} className="text-xs font-medium text-muted hover:text-danger" aria-label="Remove logo">
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <LabeledInput label="Business name" value={bizName} onChange={(e) => setBizName(e.target.value)} />
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="block text-sm font-medium text-slate">Accent color</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input type="color" value={secondary} onChange={(e) => setSecondary(e.target.value)} className="h-9 w-14 rounded border border-border" />
-                    <span className="font-mono text-xs text-muted">{secondary}</span>
-                  </div>
-                  <span className="mt-1 block text-xs text-muted">Drives your sidebar&apos;s active state and the badges clients see on your portal.</span>
-                </label>
-                <label className="block">
-                  <span className="block text-sm font-medium text-slate">Fallback accent color</span>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input type="color" value={primary} onChange={(e) => setPrimary(e.target.value)} className="h-9 w-14 rounded border border-border" />
-                    <span className="font-mono text-xs text-muted">{primary}</span>
-                  </div>
-                  <span className="mt-1 block text-xs text-muted">Only used on public forms if Accent color above is left unset.</span>
-                </label>
-              </div>
-            </>
-          )}
+          <p className="mt-4 text-xs text-muted">
+            Logo, business name, and colors -- including your nav bar -- have moved to{" "}
+            <a href="/settings/brand-center" className="font-medium text-accent hover:underline">
+              Brand Center
+            </a>
+            .
+          </p>
         </SettingsCard>
       )}
 

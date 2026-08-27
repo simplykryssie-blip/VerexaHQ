@@ -11,6 +11,8 @@ export type EffectiveBranding = {
   portalLogoUrl: string | null;
   primaryColor: string | null;
   secondaryColor: string | null;
+  /** Custom sidebar background color, if the workspace has set one -- Sidebar.tsx computes readable text against it automatically. Null keeps the default light rail. */
+  sidebarBgColor: string | null;
 };
 
 /**
@@ -39,7 +41,7 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
 
   const { data: branding } = await supabase
     .from("branding")
-    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color")
+    .select("display_name, sidebar_logo_url, portal_logo_url, logo_url, primary_color, secondary_color, sidebar_bg_color")
     .eq("workspace_id", brandingWorkspaceId)
     .maybeSingle();
 
@@ -71,5 +73,6 @@ export async function getEffectiveBranding(workspaceId: string): Promise<Effecti
     portalLogoUrl: branding?.portal_logo_url ?? sidebarLogoUrl,
     primaryColor: branding?.primary_color ?? null,
     secondaryColor: branding?.secondary_color ?? null,
+    sidebarBgColor: branding?.sidebar_bg_color ?? null,
   };
 }
