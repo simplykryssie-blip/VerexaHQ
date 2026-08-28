@@ -11,13 +11,15 @@ import { QuickActionsWidget, type QuickActionPermissions } from "@/components/wi
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
+import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
+import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
-import { isWidgetType, type WidgetType } from "@/lib/dashboard/widgets";
+import { isWidgetType, WIDE_WIDGET_TYPES, type WidgetType } from "@/lib/dashboard/widgets";
 
 export type WidgetRow = { id: string; widget_type: string; title: string | null; display_order: number; is_visible: boolean };
 
@@ -198,6 +200,10 @@ export function DashboardShell({
         return <CalendarWidget items={data.calendarItems} />;
       case "recent_activity":
         return <RecentActivityWidget items={data.recentActivity} />;
+      case "top_services":
+        return <TopServicesWidget services={data.topServices} />;
+      case "engagement_pipeline":
+        return <EngagementPipelineWidget stages={data.engagementPipeline} />;
       default:
         return null;
     }
@@ -277,7 +283,13 @@ export function DashboardShell({
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((row) => (isWidgetType(row.widget_type) ? <div key={row.id}>{renderWidget(row.widget_type)}</div> : null))}
+          {visible.map((row) =>
+            isWidgetType(row.widget_type) ? (
+              <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
+                {renderWidget(row.widget_type)}
+              </div>
+            ) : null
+          )}
         </div>
       </div>
     </>
