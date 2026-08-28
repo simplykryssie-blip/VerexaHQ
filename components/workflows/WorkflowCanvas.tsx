@@ -361,8 +361,16 @@ function ConditionNode({ data, selected }: NodeProps & { data: StepNodeData & { 
         // just a few characters, making different branches look identical.
         <div className="mt-2.5 flex flex-col gap-1 border-t border-border pt-2 text-[11px] font-medium text-muted">
           {branches.map((b, i) => (
-            <span key={b.id} title={b.label || `Branch ${i + 1}`} className="truncate">
+            <span key={b.id} title={b.label || `Branch ${i + 1}`} className="flex items-center gap-1 truncate">
               <span className="text-violet">{i + 1}.</span> {b.label || `Branch ${i + 1}`}
+              {!b.wired && (
+                // The step this branch pointed to was deleted -- the branch
+                // itself (its label and conditions) survives untouched, it
+                // just has nowhere to go anymore. Without this, the only
+                // sign is a small amber dot on the node's edge, easy to
+                // read as "the branch is gone" rather than "reconnect it."
+                <span className="shrink-0 rounded-full bg-amberSoft px-1.5 py-0.5 text-[10px] font-semibold text-amber">not connected</span>
+              )}
             </span>
           ))}
         </div>
