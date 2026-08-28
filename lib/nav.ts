@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Users,
+  UserPlus,
   Briefcase,
   Calendar,
   FolderOpen,
@@ -47,7 +48,8 @@ export type NavItem = NavLeaf | NavGroup;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Contacts", href: "/clients", icon: Users },
+  { label: "Leads", href: "/leads", icon: UserPlus },
+  { label: "Clients", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
@@ -85,7 +87,7 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
+  { label: "Daily", itemLabels: ["Dashboard", "Leads", "Clients", "Engagements", "Review Queue", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
   { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },

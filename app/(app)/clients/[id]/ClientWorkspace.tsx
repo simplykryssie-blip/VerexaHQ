@@ -205,8 +205,8 @@ export function ClientWorkspace({
   return (
     <>
       <PageHeader
-        backHref="/clients"
-        backLabel="Back to Contacts"
+        backHref={client.lifecycle_status === "lead" || client.lifecycle_status === "lost" ? "/leads" : "/clients"}
+        backLabel={client.lifecycle_status === "lead" || client.lifecycle_status === "lost" ? "Back to Leads" : "Back to Clients"}
         title={displayName(client)}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
