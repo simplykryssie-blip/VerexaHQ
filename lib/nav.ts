@@ -48,15 +48,7 @@ export type NavItem = NavLeaf | NavGroup;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  {
-    label: "Contacts",
-    icon: Users,
-    children: [
-      { label: "Leads", href: "/clients?tab=leads" },
-      { label: "Individual Clients", href: "/clients?tab=clients&type=individual" },
-      { label: "Business Clients", href: "/clients?tab=clients&type=business" },
-    ],
-  },
+  { label: "Contacts", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
