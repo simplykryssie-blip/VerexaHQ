@@ -118,27 +118,23 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: workspaceTags } = await supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id });
 
-  // No single pipeline is designated "the" lead pipeline anymore -- a lead's
-  // stages come from whichever pipeline its own active run actually belongs
-  // to, not a workspace-level default. Client and engagement runs share the
-  // same pipeline_runs/pipeline_stages tables, keyed by entity_type.
-  const { data: activeLeadRun } = await supabase
+  // No single pipeline is designated "the" lead pipeline anymore -- a lead
+  // can have more than one simultaneous active run (e.g. Tax + Bookkeeping
+  // at once), each in its own pipeline, so every active run is surfaced
+  // rather than assuming there's only ever one. A .maybeSingle() query here
+  // would throw once any client had two concurrent active runs, which is an
+  // expected, supported state, not an edge case.
+  const { data: activeLeadRuns } = await supabase
     .from("pipeline_runs")
-    .select("id, process_id, processes(name), pipeline_stages!pipeline_runs_current_stage_fkey(process_stage_id)")
+    .select("id, process_id, processes(name), pipeline_stages!pipeline_runs_current_stage_fkey(stage_name)")
     .eq("entity_type", "client")
     .eq("entity_id", client.id)
-    .eq("status", "Active")
-    .maybeSingle();
-  const { data: leadPipelineStages } = activeLeadRun
-    ? await supabase.from("process_stages").select("id, name").eq("process_id", activeLeadRun.process_id).order("display_order")
-    : { data: [] as { id: string; name: string }[] };
-  const leadPipeline = {
-    processId: activeLeadRun?.process_id ?? null,
-    processName: (activeLeadRun?.processes as unknown as { name?: string } | null)?.name ?? null,
-    stages: leadPipelineStages ?? [],
-    currentProcessStageId:
-      (activeLeadRun?.pipeline_stages as unknown as { process_stage_id?: string } | null)?.process_stage_id ?? null,
-  };
+    .eq("status", "Active");
+  const leadPipelines = (activeLeadRuns ?? []).map((run) => ({
+    processId: run.process_id,
+    processName: (run.processes as unknown as { name?: string } | null)?.name ?? null,
+    stageName: (run.pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name ?? null,
+  }));
 
   // Staff need to see not just that an automation touched this lead/client
   // but where it currently stands -- which automation, which step, and
@@ -510,7 +506,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       complianceDefault={complianceDefault}
       requestedService={requestedService}
       interestedServiceIds={interestedServiceIds}
-      leadPipeline={leadPipeline}
+      leadPipelines={leadPipelines}
       automationStatus={automationStatus}
     />
   );
