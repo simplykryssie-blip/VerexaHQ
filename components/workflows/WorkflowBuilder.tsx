@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -64,6 +64,9 @@ import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 import { TagNameInput } from "@/components/workflows/TagNameInput";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
+import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 
 export type StaffOption = { id: string; display_name: string | null };
 export type AutomationOption = { id: string; name: string };
@@ -232,6 +235,70 @@ export function actionIcon(type: string) {
   if (type === "add_dnd") return <BellOff size={15} />;
   if (type === "remove_dnd") return <BellRing size={15} />;
   return <CheckSquare size={15} />;
+}
+
+// Shared by every free-text step field that execute_automation_step() runs
+// through render_merge_fields() (task/appointment/quote titles & bodies,
+// document request titles, notification messages, notes, portal messages) --
+// a click-to-insert {{token}} picker so staff don't have to know or type the
+// syntax by hand, same UX as the email/SMS template editor. Scoped to
+// AUTOMATION_MERGE_FIELD_GROUPS rather than the full template catalog since
+// that's genuinely all a run's context can resolve.
+function MergeableField({
+  as = "input",
+  label,
+  fieldKey,
+  config,
+  setField,
+  canManage,
+  placeholder,
+  rows,
+}: {
+  as?: "input" | "textarea";
+  label: string;
+  fieldKey: string;
+  config: Record<string, unknown>;
+  setField: (key: string, value: string) => void;
+  canManage: boolean;
+  placeholder?: string;
+  rows?: number;
+}) {
+  const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const value = (config[fieldKey] as string) ?? "";
+  const inputClass = "rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60";
+  return (
+    <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+      <div className="flex items-center justify-between">
+        <span>{label}</span>
+        <MergeFieldPicker
+          label="Insert"
+          disabled={!canManage}
+          groups={AUTOMATION_MERGE_FIELD_GROUPS}
+          onInsert={(token) => insertAtFieldCursor(ref.current, value, token, (v) => setField(fieldKey, v))}
+        />
+      </div>
+      {as === "textarea" ? (
+        <textarea
+          ref={ref as RefObject<HTMLTextAreaElement>}
+          disabled={!canManage}
+          rows={rows ?? 2}
+          value={value}
+          onChange={(e) => setField(fieldKey, e.target.value)}
+          placeholder={placeholder}
+          className={inputClass}
+        />
+      ) : (
+        <input
+          ref={ref as RefObject<HTMLInputElement>}
+          disabled={!canManage}
+          value={value}
+          onChange={(e) => setField(fieldKey, e.target.value)}
+          placeholder={placeholder}
+          className={inputClass}
+        />
+      )}
+    </div>
+  );
 }
 
 export function StepCard({
@@ -796,26 +863,8 @@ export function StepCard({
 
         {actionType === "create_task" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Task title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Automated task"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Description
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.description as string) ?? ""}
-                onChange={(e) => setField("description", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Task title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Automated task" />
+            <MergeableField as="textarea" label="Description" fieldKey="description" config={config} setField={setField} canManage={canManage} />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -859,26 +908,8 @@ export function StepCard({
 
         {actionType === "create_appointment" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Appointment"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Description
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.description as string) ?? ""}
-                onChange={(e) => setField("description", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Appointment" />
+            <MergeableField as="textarea" label="Description" fieldKey="description" config={config} setField={setField} canManage={canManage} />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Days from now
               <input
@@ -1141,16 +1172,7 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Requested documents"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Requested documents" />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -1292,16 +1314,7 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Message
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.message as string) ?? ""}
-                onChange={(e) => setField("message", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField as="textarea" label="Message" fieldKey="message" config={config} setField={setField} canManage={canManage} />
           </>
         )}
 
@@ -1503,16 +1516,7 @@ export function StepCard({
 
         {actionType === "create_quote" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Quote"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Quote" />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Service
               <select
@@ -1541,16 +1545,7 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Notes
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.notes as string) ?? ""}
-                onChange={(e) => setField("notes", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField as="textarea" label="Notes" fieldKey="notes" config={config} setField={setField} canManage={canManage} />
           </>
         )}
 
@@ -1574,16 +1569,7 @@ export function StepCard({
         )}
 
         {actionType === "add_note" && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Note
-            <textarea
-              disabled={!canManage}
-              rows={3}
-              value={(config.body as string) ?? ""}
-              onChange={(e) => setField("body", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            />
-          </label>
+          <MergeableField as="textarea" label="Note" fieldKey="body" config={config} setField={setField} canManage={canManage} rows={3} />
         )}
 
         {actionType === "send_portal_message" && (
@@ -1597,16 +1583,7 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Message
-              <textarea
-                disabled={!canManage}
-                rows={3}
-                value={(config.body as string) ?? ""}
-                onChange={(e) => setField("body", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField as="textarea" label="Message" fieldKey="body" config={config} setField={setField} canManage={canManage} rows={3} />
           </>
         )}
 

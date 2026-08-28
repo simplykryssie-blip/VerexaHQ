@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Search, ChevronDown } from "lucide-react";
 
@@ -56,8 +56,8 @@ export function StepPicker({
   const showExtraTop = Boolean(extraTopItem) && !search.trim() && !activeCategory;
 
   return (
-    <div className="flex h-[420px] w-full overflow-hidden">
-      <div className="flex w-44 shrink-0 flex-col overflow-y-auto border-r border-border bg-surfaceMuted py-2">
+    <div className="flex h-[420px] w-[30rem] max-w-[calc(100vw-2rem)] overflow-hidden">
+      <div className="flex w-40 shrink-0 flex-col overflow-y-auto border-r border-border bg-surfaceMuted py-2">
         <button
           type="button"
           onClick={() => setActiveCategory(null)}
@@ -151,14 +151,25 @@ export function InlineStepPickerField({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const selected = items.find((i) => i.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
   return (
-    <div className="flex flex-col gap-1">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between rounded-lg border border-border px-2 py-1.5 text-left text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+        className="flex w-full items-center justify-between rounded-lg border border-border px-2 py-1.5 text-left text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 text-accent">{icon(value)}</span>
@@ -167,7 +178,14 @@ export function InlineStepPickerField({
         <ChevronDown size={14} className="shrink-0 text-muted" />
       </button>
       {open && (
-        <div className="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+        // Floats above the surrounding layout at its own comfortable width
+        // instead of being squeezed to whatever narrow panel this field
+        // lives in (the step editor's side panel is only ~350px wide,
+        // nowhere near enough room for this picker's two columns -- every
+        // label used to truncate into unreadable fragments). Right-aligned
+        // since that panel sits flush against the right edge of the screen;
+        // opening further right would just run off-screen.
+        <div className="absolute right-0 z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
           <StepPicker
             items={items}
             categories={categories}
