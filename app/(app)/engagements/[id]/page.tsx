@@ -146,7 +146,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase
       .from("tasks")
       .select(
-        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id,
+        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id, visibility,
         assigned_staff:user_profiles!tasks_assigned_staff_id_fkey(id, display_name)`
       )
       .eq("engagement_id", engagement.id)

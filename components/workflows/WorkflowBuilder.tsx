@@ -820,6 +820,18 @@ export function StepCard({
                 ))}
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Visible to
+              <select
+                disabled={!canManage}
+                value={(config.visibility as string) ?? "internal"}
+                onChange={(e) => setField("visibility", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="internal">Staff only</option>
+                <option value="client">Staff and client (shows in portal)</option>
+              </select>
+            </label>
           </>
         )}
 

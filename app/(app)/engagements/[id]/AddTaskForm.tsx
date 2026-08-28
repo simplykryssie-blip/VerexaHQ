@@ -42,6 +42,15 @@ export function AddTaskForm({
           options: staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Staff" })),
         },
         { name: "due_date", label: "Task due date" },
+        {
+          name: "visibility",
+          label: "Visible to",
+          type: "select",
+          options: [
+            { value: "internal", label: "Staff only" },
+            { value: "client", label: "Staff and client (shows in portal)" },
+          ],
+        },
         ...(tasks.length > 0
           ? [
               {
@@ -63,6 +72,7 @@ export function AddTaskForm({
             priority: v.priority || null,
             assigned_staff_id: v.assigned_staff_id || null,
             due_date: v.due_date || null,
+            visibility: v.visibility || "internal",
             status: "pending",
           })
           .select("id")
