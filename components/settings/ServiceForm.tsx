@@ -25,6 +25,7 @@ export type ServiceRow = {
   organizer_template_id: string | null;
   document_request_template_id: string | null;
   document_folder_template_id: string | null;
+  engagement_letter_template_id: string | null;
   pricing_rule_id: string | null;
   billing_rule_id: string | null;
   default_price: number | null;
@@ -83,6 +84,7 @@ export function ServiceForm({
   organizerTemplates,
   documentRequestTemplates,
   documentFolderTemplates,
+  engagementLetterTemplates,
   pricingRules,
   billingRules,
   canManage,
@@ -93,6 +95,7 @@ export function ServiceForm({
   organizerTemplates: Option[];
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
+  engagementLetterTemplates: Option[];
   pricingRules: Option[];
   billingRules: Option[];
   canManage: boolean;
@@ -112,6 +115,7 @@ export function ServiceForm({
   const [organizerTemplateId, setOrganizerTemplateId] = useState(service.organizer_template_id ?? "");
   const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
+  const [engagementLetterTemplateId, setEngagementLetterTemplateId] = useState(service.engagement_letter_template_id ?? "");
   const [pricingRuleId, setPricingRuleId] = useState(service.pricing_rule_id ?? "");
   const [billingRuleId, setBillingRuleId] = useState(service.billing_rule_id ?? "");
   const [defaultPrice, setDefaultPrice] = useState(service.default_price != null ? String(service.default_price) : "");
@@ -138,6 +142,7 @@ export function ServiceForm({
   const hasAdvancedConfig = Boolean(
     documentRequestTemplateId ||
       documentFolderTemplateId ||
+      engagementLetterTemplateId ||
       pricingRuleId ||
       billingRuleId ||
       defaultPrice ||
@@ -192,6 +197,7 @@ export function ServiceForm({
         organizer_template_id: organizerTemplateId || null,
         document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
+        engagement_letter_template_id: engagementLetterTemplateId || null,
         pricing_rule_id: pricingRuleId || null,
         billing_rule_id: billingRuleId || null,
         default_price: defaultPrice.trim() ? Number(defaultPrice) : null,
@@ -338,6 +344,16 @@ export function ServiceForm({
                   onChange={markDirty(setDocumentFolderTemplateId)}
                   options={documentFolderTemplates}
                   noneLabel="No document folder template"
+                  disabled={!canManage}
+                />
+              </label>
+              <label className={`${labelClass} mt-3`}>
+                Engagement letter template
+                <OptionSelect
+                  value={engagementLetterTemplateId}
+                  onChange={markDirty(setEngagementLetterTemplateId)}
+                  options={engagementLetterTemplates}
+                  noneLabel="No engagement letter template"
                   disabled={!canManage}
                 />
               </label>

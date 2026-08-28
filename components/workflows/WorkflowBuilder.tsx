@@ -1087,9 +1087,7 @@ export function StepCard({
                 onChange={(e) => setField("engagement_letter_template_id", e.target.value)}
                 className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               >
-                <option value="" disabled>
-                  Choose an engagement letter template
-                </option>
+                <option value="">Use the engagement&apos;s service&apos;s default letter</option>
                 {engagementLetterOptions.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
