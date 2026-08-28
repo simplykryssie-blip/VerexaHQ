@@ -327,9 +327,15 @@ export function StepCard({
     setSaved(false);
   }
 
-  async function save() {
+  // Accepts an optional config override so a template pick/create can save
+  // the step immediately (see the onSuccess handlers below) instead of
+  // silently relying on stale closure state -- setConfig() doesn't apply
+  // until the next render, so reading `config` right after calling it would
+  // still see the old value.
+  async function save(configOverride?: Record<string, unknown>) {
+    const configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
-      const tag = (config.tag as string | undefined)?.trim();
+      const tag = (configToSave.tag as string | undefined)?.trim();
       if (tag && !(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
     }
 
@@ -341,7 +347,7 @@ export function StepCard({
       .from("automation_steps")
       .update({
         action_type: actionType,
-        action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
+        action_config: (isDelay ? { ...configToSave, delay_unit: delayUnit } : configToSave) as never,
         delay_minutes: delayMinutes,
         requires_approval: requiresApproval,
         approver_role_id: requiresApproval && approverRoleId ? approverRoleId : null,
@@ -578,12 +584,19 @@ export function StepCard({
                   defaultOpen
                   onSuccess={(row) => {
                     setExtraEmailTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
-                    setField("template_slug", row.slug);
+                    const nextConfig = { ...config, template_slug: row.slug };
+                    setConfig(nextConfig);
                     setCreatingTemplateKind(null);
                     setEditingTemplate({
                       kind: "email",
                       row: { id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, subject: "", body_html: "" },
                     });
+                    // The template-body editor that opens next has its own
+                    // separate Save button (for the template row itself) --
+                    // save the step right away so picking/creating a
+                    // template is never lost if the user closes that modal
+                    // without also clicking "Save step" below it.
+                    void save(nextConfig);
                   }}
                 />
               </div>
@@ -649,12 +662,19 @@ export function StepCard({
                   defaultOpen
                   onSuccess={(row) => {
                     setExtraSmsTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
-                    setField("template_slug", row.slug);
+                    const nextConfig = { ...config, template_slug: row.slug };
+                    setConfig(nextConfig);
                     setCreatingTemplateKind(null);
                     setEditingTemplate({
                       kind: "sms",
                       row: { id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, body: "" },
                     });
+                    // The template-body editor that opens next has its own
+                    // separate Save button (for the template row itself) --
+                    // save the step right away so picking/creating a
+                    // template is never lost if the user closes that modal
+                    // without also clicking "Save step" below it.
+                    void save(nextConfig);
                   }}
                 />
               </div>
@@ -1569,7 +1589,7 @@ export function StepCard({
 
       {canManage && (
         <div className="mt-3 flex items-center gap-3">
-          <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
+          <button type="button" onClick={() => save()} disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
             {saving ? "Saving..." : "Save step"}
           </button>
           {saved && !error && <span className="text-xs text-success">Saved.</span>}
