@@ -152,7 +152,7 @@ export const ACTION_TYPES = [
   { value: "create_task", label: "Create a task", category: "tasks", description: "Create a task assigned to a staff member.", keywords: "todo assign" },
   { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
   { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
-  { value: "create_engagement", label: "Create the engagement and start its pipeline", category: "pipeline_engagements", description: "Create the engagement and start its pipeline (organizer-submission workflows only).", keywords: "engagement pipeline start" },
+  { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (organizer-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
   { value: "send_engagement_letter", label: "Send the engagement letter for signature", category: "tax_workflow", description: "Queue the engagement letter for e-signature.", keywords: "signature sign letter" },
   { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
   { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
@@ -1074,8 +1074,9 @@ export function StepCard({
 
         {actionType === "create_engagement" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            Creates an engagement from the service already resolved on the organizer submission that triggered this run, and starts its
-            pipeline. Only works when this step follows an &quot;An organizer is submitted&quot; trigger.
+            Creates an engagement from the service already resolved on the organizer submission that triggered this run. Only works when
+            this step follows an &quot;An organizer is submitted&quot; trigger. This does not put the engagement in a pipeline -- add a
+            &quot;Move to a pipeline stage&quot; step after this one to do that.
           </p>
         )}
 
