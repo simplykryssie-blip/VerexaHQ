@@ -6,6 +6,7 @@ import { FileSignature } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
+import { PublishConfirmModal } from "@/components/settings/PublishConfirmModal";
 import type { LibraryFolderRow } from "@/components/library/types";
 import { slugify } from "@/lib/roleSlug";
 import { useToast } from "@/components/Toast";
@@ -39,6 +40,8 @@ export function EngagementLetterLibrary({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharingCard, setSharingCard] = useState<GalleryCard | null>(null);
+  const [pendingPublish, setPendingPublish] = useState<{ id: string; name: string } | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const cards: GalleryCard[] = templates.map((t) => ({
     id: t.id,
@@ -73,11 +76,13 @@ export function EngagementLetterLibrary({
       const { data, error } = await supabase
         .from("engagement_letter_templates")
         .insert({ workspace_id: workspaceId, name, slug, body_html: "<p></p>", status: "draft" })
-        .select("id")
+        .select("id, name")
         .single();
       if (!error && data) {
         setSaving(false);
-        router.push(`/templates/engagement-letters/${data.id}`);
+        setCreating(false);
+        setName("");
+        setPendingPublish(data as { id: string; name: string });
         return;
       }
       if (error?.code !== "23505") {
@@ -175,6 +180,30 @@ export function EngagementLetterLibrary({
             </div>
           </form>
         </div>
+      )}
+
+      {pendingPublish && (
+        <PublishConfirmModal
+          templateName={pendingPublish.name}
+          publishing={publishing}
+          onSkip={() => {
+            const id = pendingPublish.id;
+            setPendingPublish(null);
+            router.push(`/templates/engagement-letters/${id}`);
+          }}
+          onPublish={async () => {
+            setPublishing(true);
+            const { error } = await supabase.from("engagement_letter_templates").update({ status: "published" }).eq("id", pendingPublish.id);
+            setPublishing(false);
+            if (error) {
+              toast.show(error.message, "error");
+              return;
+            }
+            const id = pendingPublish.id;
+            setPendingPublish(null);
+            router.push(`/templates/engagement-letters/${id}`);
+          }}
+        />
       )}
     </div>
   );

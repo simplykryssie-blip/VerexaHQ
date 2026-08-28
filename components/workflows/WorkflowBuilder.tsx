@@ -746,6 +746,7 @@ export function StepCard({
                   workspaceId={workspaceId}
                   kind="email"
                   defaultOpen
+                  autoPublish
                   onSuccess={(row) => {
                     setExtraEmailTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
                     const nextConfig = { ...config, template_slug: row.slug };
@@ -824,6 +825,7 @@ export function StepCard({
                   workspaceId={workspaceId}
                   kind="sms"
                   defaultOpen
+                  autoPublish
                   onSuccess={(row) => {
                     setExtraSmsTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
                     const nextConfig = { ...config, template_slug: row.slug };
