@@ -68,7 +68,7 @@ import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
 import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 
-export type StaffOption = { id: string; display_name: string | null };
+export type StaffOption = { id: string; display_name: string | null; is_owner?: boolean };
 export type AutomationOption = { id: string; name: string };
 
 export type WorkflowStepRow = {
@@ -1271,9 +1271,23 @@ export function StepCard({
 
         {actionType === "send_notification" && (
           <>
-            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-              Notifies the workspace owner and every active staff member -- no need to pick one person.
-            </p>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Notify
+              <select
+                disabled={!canManage}
+                value={(config.staff_id as string) ?? ""}
+                onChange={(e) => setField("staff_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="">Account owner (default)</option>
+                {staffOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.display_name ?? "Staff"}
+                    {s.is_owner ? " (Owner)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
               Send via
               <div className="flex items-center gap-4 pt-1">
