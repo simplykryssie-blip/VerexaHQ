@@ -12,6 +12,8 @@ import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import { automationActionLabel } from "@/lib/automationLabels";
+import { Badge } from "@/components/ui/Badge";
+import { clientStatusTone } from "@/lib/clientStatus";
 import {
   OverviewTab,
   MessagesTab,
@@ -126,7 +128,7 @@ export function ClientWorkspace({
   complianceDefault,
   requestedService,
   interestedServiceIds,
-  leadPipelines,
+  leadPipeline,
   automationStatus,
 }: {
   workspace: Workspace;
@@ -171,7 +173,7 @@ export function ClientWorkspace({
   complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
   interestedServiceIds: string[];
-  leadPipelines: { processId: string; processName: string | null; stageName: string | null }[];
+  leadPipeline: { processId: string | null; processName: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
   automationStatus: { automationName: string; status: string; stepActionType: string | null; error: string | null } | null;
 }) {
   const [tab, setTab] = useState<Tab>("Details");
@@ -193,6 +195,8 @@ export function ClientWorkspace({
     ...tasks.filter((t) => t.due_date).map((t) => t.due_date as string),
   ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
   const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
+  const currentStageName =
+    client.lifecycle_status === "lead" ? leadPipeline.stages.find((s) => s.id === leadPipeline.currentProcessStageId)?.name : undefined;
   const automationStepLabel = automationStatus ? automationActionLabel(automationStatus.stepActionType) : null;
   const automationStatusText =
     automationStatus &&
@@ -206,7 +210,7 @@ export function ClientWorkspace({
     <>
       <PageHeader
         backHref="/clients"
-        backLabel="Back to Clients"
+        backLabel="Back to Contacts"
         title={displayName(client)}
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
@@ -214,15 +218,14 @@ export function ClientWorkspace({
             <span className="capitalize">{client.client_type}</span>
             {primaryService && <span>{primaryService}</span>}
             {!primaryService && requestedService && <span>Requested: {requestedService}</span>}
-            <span className="capitalize">{client.lifecycle_status}</span>
-            {client.lifecycle_status === "lead" &&
-              leadPipelines.map((pipeline) =>
-                pipeline.stageName ? (
-                  <Link key={pipeline.processId} href={`/pipelines/${pipeline.processId}`} className="text-accent hover:underline">
-                    {pipeline.processName ?? "Pipeline"}: {pipeline.stageName}
-                  </Link>
-                ) : null
-              )}
+            <Badge tone={clientStatusTone(client.lifecycle_status)} className="capitalize">
+              {client.lifecycle_status}
+            </Badge>
+            {currentStageName && leadPipeline.processId && (
+              <Link href={`/pipelines/${leadPipeline.processId}`} className="text-accent hover:underline">
+                {leadPipeline.processName ?? "Pipeline"}: {currentStageName}
+              </Link>
+            )}
             {automationStatusText && (
               <span className={automationStatus?.status === "failed" ? "text-danger" : undefined} title={automationStatus?.error ?? undefined}>
                 Automation: {automationStatusText}

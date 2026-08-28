@@ -7,13 +7,18 @@ export type BuilderField = {
   field_type: OrganizerFieldType;
   label: string;
   help_text: string | null;
+  body_html: string | null;
   display_order: number;
   is_required: boolean;
   options: unknown;
   conditional_logic: unknown;
   client_profile_field: string | null;
   relationship_role: string | null;
+  layout_width: LayoutWidth;
 };
+
+/** JotForm-style row-sharing: whether this field shrinks to share its row with a neighbor. */
+export type LayoutWidth = "full" | "half";
 
 export type BuilderTemplate = {
   id: string;

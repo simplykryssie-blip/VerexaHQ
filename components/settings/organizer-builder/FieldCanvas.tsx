@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import { Columns2 } from "lucide-react";
 import { FIELD_TYPE_LABELS, type OrganizerFieldType } from "@/lib/organizer/fieldTypes";
+import { fieldColSpanClass, isWidthEligible } from "@/lib/organizer/layoutWidth";
 import type { BuilderField } from "./types";
 
 type Lane = string | null; // parent_field_id this drag/drop is scoped to; null = top level
@@ -14,6 +16,8 @@ function FieldBlock({
   onDragOver,
   onDrop,
   isDragging,
+  onToggleWidth,
+  readOnly,
 }: {
   field: BuilderField;
   selected: boolean;
@@ -22,6 +26,8 @@ function FieldBlock({
   onDragOver: (e: React.DragEvent) => void;
   onDrop: () => void;
   isDragging: boolean;
+  onToggleWidth: () => void;
+  readOnly: boolean;
 }) {
   if (field.field_type === "page_break") {
     return (
@@ -31,7 +37,7 @@ function FieldBlock({
         onDragOver={onDragOver}
         onDrop={onDrop}
         onClick={onSelect}
-        className={`flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-2 transition ${
+        className={`col-span-12 flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-2 transition ${
           selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent" : "border-muted/60 hover:border-accent/50"
         }`}
       >
@@ -44,6 +50,8 @@ function FieldBlock({
     );
   }
 
+  const isHalf = field.layout_width === "half";
+
   return (
     <div
       draggable
@@ -51,15 +59,39 @@ function FieldBlock({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onClick={onSelect}
-      className={`cursor-pointer rounded-lg border p-3 transition ${
+      className={`${fieldColSpanClass(field.field_type, field.layout_width)} cursor-pointer rounded-lg border p-3 transition ${
         selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent border-dashed" : "border-border bg-surface hover:border-accent/50"
       }`}
     >
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-ink">
-          ☰ {field.label} {field.is_required && <span className="text-danger">*</span>}
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="min-w-0 truncate font-medium text-ink">
+          ☰{" "}
+          {field.label ? (
+            field.label
+          ) : (
+            <span className="italic text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
+          )}{" "}
+          {field.is_required && <span className="text-danger">*</span>}
         </span>
-        <span className="text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
+          {isWidthEligible(field.field_type) && (
+            <button
+              type="button"
+              disabled={readOnly}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleWidth();
+              }}
+              title={isHalf ? "Half width -- click to make full width" : "Full width -- click to shrink to half"}
+              className={`rounded p-1 transition disabled:cursor-not-allowed ${
+                isHalf ? "bg-accent text-white" : "text-muted hover:bg-surfaceMuted hover:text-ink"
+              }`}
+            >
+              <Columns2 size={13} aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -73,6 +105,7 @@ export function FieldCanvas({
   draggedType,
   onAddField,
   onReorder,
+  onToggleWidth,
   readOnly,
 }: {
   topLevelFields: BuilderField[];
@@ -82,6 +115,7 @@ export function FieldCanvas({
   draggedType: OrganizerFieldType | null;
   onAddField: (type: OrganizerFieldType, parentFieldId: string | null, atIndex: number) => void;
   onReorder: (lane: Lane, fromIndex: number, toIndex: number) => void;
+  onToggleWidth: (fieldId: string) => void;
   readOnly: boolean;
 }) {
   const [draggedField, setDraggedField] = useState<{ id: string; lane: Lane; index: number } | null>(null);
@@ -110,58 +144,64 @@ export function FieldCanvas({
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
-      <div className="mx-auto max-w-2xl space-y-3">
+      <div className="mx-auto max-w-2xl">
         {topLevelFields.length === 0 && (
           <p className="rounded-lg border border-dashed border-border bg-surface p-6 text-center text-sm text-muted">
             No fields yet -- drag one in from the palette to get started.
           </p>
         )}
 
-        {topLevelFields.map((field, index) => (
-          <div key={field.id}>
-            <FieldBlock
-              field={field}
-              selected={selectedFieldId === field.id}
-              onSelect={() => onSelect(field.id)}
-              isDragging={draggedField?.id === field.id}
-              onDragStart={() => !readOnly && setDraggedField({ id: field.id, lane: null, index })}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => !readOnly && handleDropOnField(null, index)}
-            />
+        <div className="grid grid-cols-12 gap-3">
+          {topLevelFields.map((field, index) => (
+            <Fragment key={field.id}>
+              <FieldBlock
+                field={field}
+                selected={selectedFieldId === field.id}
+                onSelect={() => onSelect(field.id)}
+                isDragging={draggedField?.id === field.id}
+                onDragStart={() => !readOnly && setDraggedField({ id: field.id, lane: null, index })}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => !readOnly && handleDropOnField(null, index)}
+                onToggleWidth={() => onToggleWidth(field.id)}
+                readOnly={readOnly}
+              />
 
-            {field.field_type === "repeating_section" && (
-              <div className="ml-6 mt-2 space-y-2 border-l-2 border-border pl-4">
-                {(childrenByParent.get(field.id) ?? []).map((child, childIndex) => (
-                  <FieldBlock
-                    key={child.id}
-                    field={child}
-                    selected={selectedFieldId === child.id}
-                    onSelect={() => onSelect(child.id)}
-                    isDragging={draggedField?.id === child.id}
-                    onDragStart={() => !readOnly && setDraggedField({ id: child.id, lane: field.id, index: childIndex })}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => !readOnly && handleDropOnField(field.id, childIndex)}
-                  />
-                ))}
-                {!readOnly && (
-                  <div
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => handleDropOnLaneEnd(field.id, (childrenByParent.get(field.id) ?? []).length + 1)}
-                    className="rounded-lg border border-dashed border-border p-2 text-center text-xs text-muted"
-                  >
-                    + Drop a field here to add it inside &quot;{field.label}&quot;
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+              {field.field_type === "repeating_section" && (
+                <div className="col-span-12 ml-6 grid grid-cols-12 gap-2 border-l-2 border-border pl-4">
+                  {(childrenByParent.get(field.id) ?? []).map((child, childIndex) => (
+                    <FieldBlock
+                      key={child.id}
+                      field={child}
+                      selected={selectedFieldId === child.id}
+                      onSelect={() => onSelect(child.id)}
+                      isDragging={draggedField?.id === child.id}
+                      onDragStart={() => !readOnly && setDraggedField({ id: child.id, lane: field.id, index: childIndex })}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => !readOnly && handleDropOnField(field.id, childIndex)}
+                      onToggleWidth={() => onToggleWidth(child.id)}
+                      readOnly={readOnly}
+                    />
+                  ))}
+                  {!readOnly && (
+                    <div
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => handleDropOnLaneEnd(field.id, (childrenByParent.get(field.id) ?? []).length + 1)}
+                      className="col-span-12 rounded-lg border border-dashed border-border p-2 text-center text-xs text-muted"
+                    >
+                      + Drop a field here to add it inside &quot;{field.label}&quot;
+                    </div>
+                  )}
+                </div>
+              )}
+            </Fragment>
+          ))}
+        </div>
 
         {!readOnly && (
           <div
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => handleDropOnLaneEnd(null, topLevelFields.length + 1)}
-            className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted"
+            className="mt-3 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted"
           >
             + Drop a field here
           </div>

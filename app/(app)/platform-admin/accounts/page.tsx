@@ -4,6 +4,7 @@ import { Lock, Users2, Mail, Phone } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 import { PlatformAdminTabs } from "../PlatformAdminTabs";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +77,7 @@ export default async function PlatformAccountsPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <Badge tone={r.workspace_status === "suspended" ? "danger" : "success"} className="capitalize">
+                      <Badge tone={WORKSPACE_STATUS_TONE[r.workspace_status] ?? "neutral"} className="capitalize">
                         {r.workspace_status}
                       </Badge>
                       <Link href={`/platform-admin/${r.workspace_id}`} className="text-xs font-medium text-accent hover:underline">

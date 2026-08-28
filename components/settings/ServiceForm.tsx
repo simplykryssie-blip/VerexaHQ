@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -83,6 +83,8 @@ export function ServiceForm({
   organizerTemplates,
   documentRequestTemplates,
   documentFolderTemplates,
+  pricingRules,
+  billingRules,
   canManage,
 }: {
   service: ServiceRow;
@@ -91,6 +93,8 @@ export function ServiceForm({
   organizerTemplates: Option[];
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
+  pricingRules: Option[];
+  billingRules: Option[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -108,6 +112,12 @@ export function ServiceForm({
   const [organizerTemplateId, setOrganizerTemplateId] = useState(service.organizer_template_id ?? "");
   const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
+  const [pricingRuleId, setPricingRuleId] = useState(service.pricing_rule_id ?? "");
+  const [billingRuleId, setBillingRuleId] = useState(service.billing_rule_id ?? "");
+  const [defaultPrice, setDefaultPrice] = useState(service.default_price != null ? String(service.default_price) : "");
+  const [estimatedDuration, setEstimatedDuration] = useState(
+    service.estimated_duration_minutes != null ? String(service.estimated_duration_minutes) : ""
+  );
   const [displayOrder, setDisplayOrder] = useState(String(service.display_order));
   const [isBookable, setIsBookable] = useState(service.is_bookable);
   const [isPortalVisible, setIsPortalVisible] = useState(service.is_portal_visible);
@@ -118,6 +128,23 @@ export function ServiceForm({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Everything below defaults collapsed -- pricing/billing, document
+  // templates, and the requirements checklist aren't part of the core
+  // Service -> Pipeline -> Organizer flow a normal tax professional sets up
+  // day to day, but stay reachable for firms that use them. Auto-opens if
+  // any of them already has something set, so existing configuration isn't
+  // hidden from whoever's looking at it.
+  const hasAdvancedConfig = Boolean(
+    documentRequestTemplateId ||
+      documentFolderTemplateId ||
+      pricingRuleId ||
+      billingRuleId ||
+      defaultPrice ||
+      estimatedDuration ||
+      Object.values(requirements).some(Boolean)
+  );
+  const [showAdvanced, setShowAdvanced] = useState(hasAdvancedConfig);
 
   function markDirty<T>(setter: (v: T) => void) {
     return (v: T) => {
@@ -165,6 +192,10 @@ export function ServiceForm({
         organizer_template_id: organizerTemplateId || null,
         document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
+        pricing_rule_id: pricingRuleId || null,
+        billing_rule_id: billingRuleId || null,
+        default_price: defaultPrice.trim() ? Number(defaultPrice) : null,
+        estimated_duration_minutes: estimatedDuration.trim() ? Number(estimatedDuration) : null,
         display_order: Number(displayOrder) || 0,
         is_bookable: isBookable,
         is_portal_visible: isPortalVisible,
@@ -255,10 +286,10 @@ export function ServiceForm({
       </div>
 
       <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline &amp; templates</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline &amp; organizer</p>
         <p className="mt-1 text-[11px] text-muted">
-          When a client&apos;s most recent service interest resolves to this service, automations that move a lead to its
-          service pipeline use the pipeline set here.
+          When a client selects this service, this is what routes them: the pipeline their engagement moves through, and the
+          organizer they fill out.
         </p>
         <label className={`${labelClass} mt-3`}>
           Pipeline
@@ -274,44 +305,114 @@ export function ServiceForm({
             disabled={!canManage}
           />
         </label>
-        <label className={`${labelClass} mt-3`}>
-          Document request template
-          <OptionSelect
-            value={documentRequestTemplateId}
-            onChange={markDirty(setDocumentRequestTemplateId)}
-            options={documentRequestTemplates}
-            noneLabel="No document request template"
-            disabled={!canManage}
-          />
-        </label>
-        <label className={`${labelClass} mt-3`}>
-          Document folder template
-          <OptionSelect
-            value={documentFolderTemplateId}
-            onChange={markDirty(setDocumentFolderTemplateId)}
-            options={documentFolderTemplates}
-            noneLabel="No document folder template"
-            disabled={!canManage}
-          />
-        </label>
       </div>
 
-      <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Requirements</p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {REQUIREMENT_FIELDS.map((f) => (
-            <label key={f.key} className="flex items-center gap-2 text-sm text-slate">
-              <input
-                type="checkbox"
-                checked={requirements[f.key]}
-                onChange={(e) => markDirty(setRequirements)({ ...requirements, [f.key]: e.target.checked })}
-                disabled={!canManage}
-                className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-              />
-              {f.label}
-            </label>
-          ))}
-        </div>
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-slate"
+        >
+          <ChevronDown size={12} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+          Advanced -- document templates, pricing &amp; billing, requirements
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-3 space-y-4 rounded-xl border border-border bg-surfaceMuted p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Document templates</p>
+              <label className={`${labelClass} mt-3`}>
+                Document request template
+                <OptionSelect
+                  value={documentRequestTemplateId}
+                  onChange={markDirty(setDocumentRequestTemplateId)}
+                  options={documentRequestTemplates}
+                  noneLabel="No document request template"
+                  disabled={!canManage}
+                />
+              </label>
+              <label className={`${labelClass} mt-3`}>
+                Document folder template
+                <OptionSelect
+                  value={documentFolderTemplateId}
+                  onChange={markDirty(setDocumentFolderTemplateId)}
+                  options={documentFolderTemplates}
+                  noneLabel="No document folder template"
+                  disabled={!canManage}
+                />
+              </label>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pricing &amp; billing</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <label className={labelClass}>
+                  Default price
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={defaultPrice}
+                    onChange={(e) => markDirty(setDefaultPrice)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+                <label className={labelClass}>
+                  Estimated duration (minutes)
+                  <input
+                    type="number"
+                    value={estimatedDuration}
+                    onChange={(e) => markDirty(setEstimatedDuration)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <label className={`${labelClass} mt-3`}>
+                Pricing rule
+                <OptionSelect
+                  value={pricingRuleId}
+                  onChange={markDirty(setPricingRuleId)}
+                  options={pricingRules}
+                  noneLabel="No pricing rule"
+                  disabled={!canManage}
+                />
+              </label>
+              <label className={`${labelClass} mt-3`}>
+                Billing rule
+                <OptionSelect
+                  value={billingRuleId}
+                  onChange={markDirty(setBillingRuleId)}
+                  options={billingRules}
+                  noneLabel="No billing rule"
+                  disabled={!canManage}
+                />
+              </label>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Requirements</p>
+              <p className="mt-1 text-[11px] text-muted">
+                Informational only for now -- nothing yet blocks an engagement on these. Longer-term home for this is a
+                pipeline stage&apos;s own requirements, not a flat list here.
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {REQUIREMENT_FIELDS.map((f) => (
+                  <label key={f.key} className="flex items-center gap-2 text-sm text-slate">
+                    <input
+                      type="checkbox"
+                      checked={requirements[f.key]}
+                      onChange={(e) => markDirty(setRequirements)({ ...requirements, [f.key]: e.target.checked })}
+                      disabled={!canManage}
+                      className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                    />
+                    {f.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={sectionClass}>

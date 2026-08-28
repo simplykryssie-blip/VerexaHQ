@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
-import { hexToRgba, getReadableTextColor } from "@/lib/color";
+import { hexToRgba, readableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
-import { Avatar } from "@/components/Avatar";
 import styles from "./Sidebar.module.css";
 
 const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
@@ -17,29 +16,25 @@ const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
   service_bureau: "SB",
 };
 
-// The rail's own default look, used whenever a workspace hasn't set a custom
-// sidebarBgColor -- flows through the exact same getReadableTextColor/hexToRgba
-// derivation a custom color would, rather than relying on separate CSS-module
-// fallbacks, so there is only ever one place this math happens.
-const DEFAULT_RAIL_BG = "#0F172A";
-
 export function Sidebar({
   workspaceName,
   logoUrl,
   primaryColor,
   secondaryColor,
-  sidebarBgColor,
+  bgColor,
+  textColor,
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
-  currentUser,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
-  /** Custom sidebar background from Brand Center. Falls back to DEFAULT_RAIL_BG (dark) when unset; when set, text/hover/border colors are derived from it automatically (see getReadableTextColor) rather than needing their own stored override. */
-  sidebarBgColor?: string | null;
+  /** Custom sidebar background, set in Branding. Null keeps the default light sidebar. */
+  bgColor?: string | null;
+  /** Resolved by getEffectiveBranding() -- either an explicit override or auto-picked for contrast against bgColor. */
+  textColor?: string | null;
   /** True only while the active workspace is Verexa's own is_platform_home
    *  workspace -- swaps the whole nav for the platform-admin tooling instead
    *  of the client-facing CRM nav every other (real or demo) workspace gets. */
@@ -48,10 +43,9 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
-  /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
-  currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [switching, setSwitching] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
 
@@ -72,9 +66,8 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const trimmedLogoUrl = useTrimmedLogo(logoUrl);
 
-  // primaryColor is unused here -- it's the "Fallback accent color" shown on
-  // public forms, not the rail. The rail's own background is sidebarBgColor
-  // instead, a dedicated field Brand Center exposes.
+  // primaryColor is unused here -- kept in the props/Brand Center settings
+  // for the public-form fallback accent, not a sidebar concern.
   const navItems = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_ITEMS : NAV_ITEMS;
   const navSections = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_SECTIONS : NAV_SECTIONS;
 
@@ -85,32 +78,44 @@ export function Sidebar({
   const demoWorkspaces = switchableWorkspaces?.filter((w) => !w.isHome) ?? [];
 
   const sidebarStyle: React.CSSProperties = {};
-  const railBg = sidebarBgColor ?? DEFAULT_RAIL_BG;
-  const railTextColor = getReadableTextColor(railBg);
-  const isDarkRail = railTextColor === "#ffffff";
-  (sidebarStyle as Record<string, string>)["--rail-bg"] = railBg;
-  (sidebarStyle as Record<string, string>)["--rail-ink"] = railTextColor;
-  (sidebarStyle as Record<string, string>)["--rail-muted"] = hexToRgba(railTextColor, 0.72) ?? railTextColor;
-  (sidebarStyle as Record<string, string>)["--rail-section"] = hexToRgba(railTextColor, 0.55) ?? railTextColor;
-  (sidebarStyle as Record<string, string>)["--rail-border"] = hexToRgba(railTextColor, isDarkRail ? 0.18 : 0.12) ?? railTextColor;
-  (sidebarStyle as Record<string, string>)["--rail-hover-bg"] = hexToRgba(railTextColor, isDarkRail ? 0.12 : 0.06) ?? railTextColor;
-
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
-    // A flat 10% tint reads confidently on a light rail but washes out on a
-    // dark one -- bump it the same way --rail-border/--rail-hover-bg already
-    // scale for isDarkRail, so the active-item pill keeps the same visual
-    // weight regardless of rail color.
-    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, isDarkRail ? 0.18 : 0.1) ?? secondaryColor;
+    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
+  }
+  // A custom background always arrives with a resolved text color alongside
+  // it (getEffectiveBranding either uses the workspace's explicit choice or
+  // auto-picks one for contrast) -- never just the background alone, so
+  // this can't render unreadable text.
+  if (bgColor && textColor) {
+    const isDarkBg = readableTextColor(bgColor) === "#FFFFFF";
+    (sidebarStyle as Record<string, string>)["--rail-bg"] = bgColor;
+    (sidebarStyle as Record<string, string>)["--rail-ink"] = textColor;
+    (sidebarStyle as Record<string, string>)["--rail-muted"] = isDarkBg ? "rgba(255, 255, 255, 0.65)" : "#64748b";
+    (sidebarStyle as Record<string, string>)["--rail-section"] = isDarkBg ? "rgba(255, 255, 255, 0.45)" : "#9aa1ae";
+    (sidebarStyle as Record<string, string>)["--rail-border"] = isDarkBg ? "rgba(255, 255, 255, 0.14)" : "#e3e7f0";
+    (sidebarStyle as Record<string, string>)["--rail-hover"] = isDarkBg ? "rgba(255, 255, 255, 0.08)" : "#f4f6fb";
   }
 
   // Flatten every navigable href (top-level items + group children) so the
   // longest-prefix-match logic works regardless of nesting, and a group's
-  // children can be matched the same way leaf items always were.
+  // children can be matched the same way leaf items always were. A handful
+  // of hrefs (e.g. Contacts' Leads/Individual/Business children) share one
+  // pathname and differ only by query string, so a match there also has to
+  // check that every query param the href asks for is present in the
+  // current URL -- pathname alone can't tell those apart.
   const allHrefs = navItems.flatMap((item) => ("children" in item ? item.children.map((c) => c.href) : [item.href]));
   const activeNavHref = allHrefs
-    .filter((href) => pathname === href || pathname.startsWith(href + "/"))
-    .sort((a, b) => b.length - a.length)[0];
+    .filter((href) => {
+      const [hrefPath, hrefQuery] = href.split("?");
+      if (pathname !== hrefPath && !pathname.startsWith(hrefPath + "/")) return false;
+      if (!hrefQuery) return true;
+      return Array.from(new URLSearchParams(hrefQuery).entries()).every(([key, value]) => searchParams.get(key) === value);
+    })
+    .sort((a, b) => {
+      const aSpecific = a.includes("?") ? 1 : 0;
+      const bSpecific = b.includes("?") ? 1 : 0;
+      return aSpecific !== bSpecific ? bSpecific - aSpecific : b.length - a.length;
+    })[0];
 
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(navItems.filter((item) => "children" in item && item.children.some((c) => c.href === activeNavHref)).map((item) => item.label))
@@ -154,7 +159,7 @@ export function Sidebar({
           <div>
             {trimmedLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
+              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "60px", maxWidth: "220px", objectFit: "contain" }} />
             ) : (
               <>
                 <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
@@ -288,17 +293,6 @@ export function Sidebar({
         )}
 
         <div className={`${styles.footer} px-3 py-4`} style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
-          {currentUser && (
-            <div className="mb-2 flex items-center gap-2.5 px-3 pb-3">
-              <Avatar name={currentUser.name} url={currentUser.avatarUrl} size="sm" />
-              <div className="min-w-0">
-                <p className={`${styles.workspaceName} truncate text-sm font-medium`} style={{ color: "var(--rail-ink)" }}>
-                  {currentUser.name ?? "Staff"}
-                </p>
-                {currentUser.roleLabel && <p className={`${styles.workspaceName} truncate text-xs`}>{currentUser.roleLabel}</p>}
-              </div>
-            </div>
-          )}
           <form action="/api/auth/sign-out" method="post">
             <button type="submit" className={`${styles.signOut} w-full rounded-lg px-3 py-2 text-left text-sm font-medium`}>
               Sign out

@@ -9,12 +9,14 @@ export function MyConnectionStatus({
   eroName,
   billingResponsibility,
   sharesCommunicationsIdentity,
+  allowsBrandingOverride,
   canDisconnect,
 }: {
   connectionId: string;
   eroName: string;
   billingResponsibility: string;
   sharesCommunicationsIdentity: boolean;
+  allowsBrandingOverride: boolean;
   canDisconnect: boolean;
 }) {
   const router = useRouter();
@@ -52,6 +54,21 @@ export function MyConnectionStatus({
           <dt className="text-xs uppercase tracking-wide text-muted">Email &amp; SMS</dt>
           <dd className="mt-0.5 text-slate">
             {sharesCommunicationsIdentity ? `Sending under ${eroName}'s identity` : "Using your own"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-muted">Look &amp; feel</dt>
+          <dd className="mt-0.5 text-slate">
+            {allowsBrandingOverride ? (
+              <>
+                You can set your own logo/color in{" "}
+                <a href="/settings/firm-profile" className="font-medium text-accent hover:underline">
+                  Firm Profile
+                </a>
+              </>
+            ) : (
+              `Fully branded by ${eroName}`
+            )}
           </dd>
         </div>
       </dl>

@@ -29,11 +29,10 @@ function formatAnswer(field: FieldRow, value: string | undefined): string {
       return "--";
     }
   }
-  if (field.field_type === "checkbox") return value === "true" ? "Yes" : "No";
   if (field.field_type === "dropdown" || field.field_type === "radio_button") {
     return normalizeOptions(field.options).find((o) => o.value === value)?.label ?? value;
   }
-  if (field.field_type === "multiple_choice") {
+  if (field.field_type === "multiple_choice" || field.field_type === "checkbox") {
     const options = normalizeOptions(field.options);
     return value
       .split(",")

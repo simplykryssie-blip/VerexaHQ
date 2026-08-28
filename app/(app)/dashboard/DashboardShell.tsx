@@ -5,35 +5,25 @@ import { useRouter } from "next/navigation";
 import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/PageHeader";
-import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
+import { KpiWidget } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
-import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
-import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
+import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
 import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
-import { isWidgetType, WIDE_WIDGET_TYPES, type WidgetType } from "@/lib/dashboard/widgets";
+import { isWidgetType, type WidgetType } from "@/lib/dashboard/widgets";
 
 export type WidgetRow = { id: string; widget_type: string; title: string | null; display_order: number; is_visible: boolean };
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-// Real percentage change only -- returns undefined (no trend shown) rather
-// than a fabricated number when there's no honest baseline to compare against
-// (equal values, or a previous value of zero where "% change" is undefined).
-function trendFor(current: number, previous: number, suffix: string, sentiment?: "positive" | "negative"): KpiTrend | undefined {
-  if (previous <= 0 || current === previous) return undefined;
-  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
-  return { direction: current > previous ? "up" : "down", label: `${pct}% ${suffix}`, sentiment };
 }
 
 export function DashboardShell({
@@ -126,8 +116,7 @@ export function DashboardShell({
             value={money(data.kpis.revenueThisMonth)}
             icon={DollarSign}
             chip="emerald"
-            reportHref="/reports/financial"
-            trend={trendFor(data.kpis.revenueThisMonth, data.kpis.revenueLastMonth, "vs last month")}
+            reportHref="/billing"
           />
         );
       case "kpis":
@@ -135,33 +124,22 @@ export function DashboardShell({
           <WidgetShell title="Engagements & Tasks">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accentSoft text-accent">
+                <IconChip tone="accent" className="mb-3">
                   <Briefcase size={17} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Open Engagements</p>
-                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ink">{data.kpis.openEngagements}</p>
+                <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{data.kpis.openEngagements}</p>
               </div>
               <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amberSoft text-amber">
+                <IconChip tone="amber" className="mb-3">
                   <ListChecks size={17} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Tasks Due Today</p>
-                <p className={`mt-1 font-display text-2xl font-semibold tabular-nums ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}>
+                <p
+                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}
+                >
                   {data.kpis.tasksDueToday}
                 </p>
-                {(() => {
-                  // Fewer outstanding tasks than yesterday's same bucket is good news, so a
-                  // "down" trend here is positive -- the reverse of revenue's convention.
-                  const trend = trendFor(data.kpis.tasksDueToday, data.kpis.tasksDueYesterday, "vs yesterday", data.kpis.tasksDueToday < data.kpis.tasksDueYesterday ? "positive" : "negative");
-                  if (!trend) return null;
-                  const Icon = trend.direction === "up" ? ArrowUp : ArrowDown;
-                  return (
-                    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${trend.sentiment === "positive" ? "text-success" : "text-danger"}`}>
-                      <Icon size={12} aria-hidden="true" />
-                      {trend.label}
-                    </p>
-                  );
-                })()}
               </div>
             </div>
           </WidgetShell>
@@ -174,7 +152,7 @@ export function DashboardShell({
             tone={data.kpis.outstandingInvoicesCount > 0 ? "warning" : "default"}
             icon={Receipt}
             chip="rose"
-            reportHref="/reports/financial?filter=outstanding"
+            reportHref="/billing"
           />
         );
       case "missing_documents":
@@ -200,10 +178,6 @@ export function DashboardShell({
         return <CalendarWidget items={data.calendarItems} />;
       case "recent_activity":
         return <RecentActivityWidget items={data.recentActivity} />;
-      case "top_services":
-        return <TopServicesWidget services={data.topServices} />;
-      case "engagement_pipeline":
-        return <EngagementPipelineWidget stages={data.engagementPipeline} />;
       default:
         return null;
     }
@@ -283,13 +257,7 @@ export function DashboardShell({
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((row) =>
-            isWidgetType(row.widget_type) ? (
-              <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
-                {renderWidget(row.widget_type)}
-              </div>
-            ) : null
-          )}
+          {visible.map((row) => (isWidgetType(row.widget_type) ? <div key={row.id}>{renderWidget(row.widget_type)}</div> : null))}
         </div>
       </div>
     </>

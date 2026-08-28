@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Avatar } from "@/components/Avatar";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ResendInvitationButton } from "./ResendInvitationButton";
@@ -13,6 +14,8 @@ import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSe
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
 
 export const dynamic = 'force-dynamic';
+
+const MEMBER_STATUS_TONE: Record<string, BadgeTone> = { active: "success" };
 
 type MemberRow = {
   id: string;
@@ -117,7 +120,15 @@ export default async function UsersPage() {
         );
       },
     },
-    { key: "status", header: "Status", render: (m) => <span className="capitalize text-slate">{m.status}</span> },
+    {
+      key: "status",
+      header: "Status",
+      render: (m) => (
+        <Badge tone={MEMBER_STATUS_TONE[m.status] ?? "neutral"} className="capitalize">
+          {m.status}
+        </Badge>
+      ),
+    },
     {
       key: "actions",
       header: "",
@@ -152,7 +163,7 @@ export default async function UsersPage() {
     <div className="max-w-3xl">
       <SettingsSectionHeader icon={Users} title="Users & Staff" description="Everyone with access to this workspace." />
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
         <DataTable columns={memberColumns} rows={members} emptyMessage="No workspace members found." />
       </div>
 
@@ -181,7 +192,7 @@ export default async function UsersPage() {
       {workspace.is_owner && pendingInvitations.length > 0 && (
         <div className="mt-8">
           <h3 className="text-sm font-semibold text-ink">Pending invitations</h3>
-          <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+          <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
             <DataTable columns={invitationColumns} rows={pendingInvitations} emptyMessage="No pending invitations." />
           </div>
         </div>

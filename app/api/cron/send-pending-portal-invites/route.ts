@@ -43,16 +43,104 @@ export async function GET(request: Request) {
 
   console.log(`send-pending-portal-invites: fetched ${jobs?.length ?? 0} job(s)`, (jobs ?? []).map((j) => j.id));
 
+  const context = await resolveInviteContext(supabase, jobs ?? []);
+
   let sent = 0;
   let failed = 0;
 
   for (const job of jobs ?? []) {
-    const result = await sendOneWithTimeout(supabase, job);
+    const result = await sendOneWithTimeout(supabase, job, context);
     if (result === "sent") sent++;
     else failed++;
   }
 
   return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
+}
+
+type PendingInviteJob = { id: string; workspace_id: string; client_id: string; client_portal_user_id: string };
+type PortalUserRow = { id: string; invited_email: string; invited_name: string | null; invitation_token: string };
+type WorkspaceRow = { id: string; name: string | null; phone: string | null; website: string | null; mailing_address: string | null; primary_contact_email: string | null };
+type OrganizerResponseRow = { client_id: string; organizer_templates: { name?: string } | null };
+type ConnectionRow = { child_workspace_id: string; parent_workspace_id: string; allows_branding_override: boolean };
+type BrandingRow = { workspace_id: string; email_header_logo_url: string | null; logo_url: string | null };
+type EmailTemplateRow = { workspace_id: string | null; subject: string; body_html: string };
+
+type InviteContext = {
+  portalUserById: Map<string, PortalUserRow>;
+  workspaceById: Map<string, WorkspaceRow>;
+  organizerNamesByClientId: Map<string, string[]>;
+  connectionByChildWorkspaceId: Map<string, ConnectionRow>;
+  brandingByWorkspaceId: Map<string, BrandingRow>;
+  templateCandidates: EmailTemplateRow[];
+};
+
+// Every job independently re-fetched its own portal user, workspace,
+// pending organizers, ERO connection, branding (up to twice), and the
+// invite email template -- up to 7 queries per job, run one job at a time.
+// Batches every one of those by the distinct ids actually present in this
+// batch instead.
+async function resolveInviteContext(supabase: ReturnType<typeof createServiceClient>, jobs: PendingInviteJob[]): Promise<InviteContext> {
+  const portalUserIds = Array.from(new Set(jobs.map((j) => j.client_portal_user_id)));
+  const workspaceIds = Array.from(new Set(jobs.map((j) => j.workspace_id)));
+  const clientIds = Array.from(new Set(jobs.map((j) => j.client_id)));
+
+  const [{ data: portalUsers }, { data: workspaces }, { data: organizerResponses }, { data: connections }] = await Promise.all([
+    portalUserIds.length > 0
+      ? supabase.from("client_portal_users").select("id, invited_email, invited_name, invitation_token").in("id", portalUserIds)
+      : Promise.resolve({ data: [] as PortalUserRow[] }),
+    workspaceIds.length > 0
+      ? supabase.from("workspaces").select("id, name, phone, website, mailing_address, primary_contact_email").in("id", workspaceIds)
+      : Promise.resolve({ data: [] as WorkspaceRow[] }),
+    clientIds.length > 0
+      ? supabase.from("organizer_responses").select("client_id, organizer_templates(name)").in("client_id", clientIds).neq("status", "completed")
+      : Promise.resolve({ data: [] as OrganizerResponseRow[] }),
+    workspaceIds.length > 0
+      ? supabase
+          .from("firm_connections")
+          .select("child_workspace_id, parent_workspace_id, allows_branding_override")
+          .in("child_workspace_id", workspaceIds)
+          .eq("relationship_type", "ero_ptin")
+          .eq("status", "active")
+      : Promise.resolve({ data: [] as ConnectionRow[] }),
+  ]);
+
+  const connectionByChildWorkspaceId = new Map(
+    (connections ?? []).filter((c): c is ConnectionRow & { child_workspace_id: string } => Boolean(c.child_workspace_id)).map((c) => [c.child_workspace_id, c])
+  );
+
+  // Branding can be needed for a job's own workspace, or (if it has an ERO
+  // connection) the parent's workspace too -- collect the full set before
+  // the one batched branding fetch.
+  const brandingWorkspaceIds = new Set(workspaceIds);
+  for (const connection of connections ?? []) brandingWorkspaceIds.add(connection.parent_workspace_id);
+
+  const [{ data: brandingRows }, { data: templateCandidates }] = await Promise.all([
+    supabase.from("branding").select("workspace_id, email_header_logo_url, logo_url").in("workspace_id", Array.from(brandingWorkspaceIds)),
+    supabase
+      .from("email_templates")
+      .select("workspace_id, subject, body_html")
+      .eq("slug", "portal-invite-email")
+      .eq("status", "published")
+      .or(`workspace_id.is.null,workspace_id.in.(${workspaceIds.join(",") || "00000000-0000-0000-0000-000000000000"})`),
+  ]);
+
+  const organizerNamesByClientId = new Map<string, string[]>();
+  for (const row of organizerResponses ?? []) {
+    const name = row.organizer_templates?.name;
+    if (!name) continue;
+    const list = organizerNamesByClientId.get(row.client_id) ?? [];
+    list.push(name);
+    organizerNamesByClientId.set(row.client_id, list);
+  }
+
+  return {
+    portalUserById: new Map((portalUsers ?? []).map((p) => [p.id, p])),
+    workspaceById: new Map((workspaces ?? []).map((w) => [w.id, w])),
+    organizerNamesByClientId,
+    connectionByChildWorkspaceId,
+    brandingByWorkspaceId: new Map((brandingRows ?? []).map((b) => [b.workspace_id, b])),
+    templateCandidates: templateCandidates ?? [],
+  };
 }
 
 // A hung fetch to Resend (or any other await in sendOne) can otherwise stall
@@ -64,7 +152,8 @@ export async function GET(request: Request) {
 // if sendOne actually finishes just after the deadline.
 async function sendOneWithTimeout(
   supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; client_id: string; client_portal_user_id: string },
+  job: PendingInviteJob,
+  context: InviteContext,
   timeoutMs = 25000
 ): Promise<"sent" | "failed"> {
   let timedOut = false;
@@ -74,7 +163,7 @@ async function sendOneWithTimeout(
       resolve("failed");
     }, timeoutMs);
   });
-  const result = await Promise.race([sendOne(supabase, job), timer]);
+  const result = await Promise.race([sendOne(supabase, job, context), timer]);
   if (timedOut) {
     console.error(`send-pending-portal-invites: job ${job.id} timed out after ${timeoutMs}ms`);
     await supabase
@@ -90,27 +179,25 @@ async function sendOneWithTimeout(
   return result;
 }
 
-async function sendOne(
-  supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; client_id: string; client_portal_user_id: string }
-): Promise<"sent" | "failed"> {
+async function sendOne(supabase: ReturnType<typeof createServiceClient>, job: PendingInviteJob, context: InviteContext): Promise<"sent" | "failed"> {
   try {
-    const [{ data: portalUser }, { data: workspace }, { data: organizerResponses }] = await Promise.all([
-      supabase.from("client_portal_users").select("invited_email, invited_name, invitation_token").eq("id", job.client_portal_user_id).single(),
-      supabase.from("workspaces").select("name, phone, website, mailing_address, primary_contact_email").eq("id", job.workspace_id).single(),
-      supabase.from("organizer_responses").select("status, organizer_templates(name)").eq("client_id", job.client_id).neq("status", "completed"),
-    ]);
+    const portalUser = context.portalUserById.get(job.client_portal_user_id) ?? null;
+    const workspace = context.workspaceById.get(job.workspace_id) ?? null;
+    const organizerNames = context.organizerNamesByClientId.get(job.client_id) ?? [];
+    const connection = context.connectionByChildWorkspaceId.get(job.workspace_id) ?? null;
     if (!portalUser) throw new Error("Portal invitation not found");
 
-    const { data: template } = await supabase
-      .from("email_templates")
-      .select("subject, body_html")
-      .eq("slug", "portal-invite-email")
-      .eq("status", "published")
-      .or(`workspace_id.is.null,workspace_id.eq.${job.workspace_id}`)
-      .order("workspace_id", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
+    // Same "whitelabeled by an ERO, optionally overridden by the PTIN's own
+    // logo" resolution as getEffectiveBranding -- can't reuse that helper
+    // directly here, since it needs an authenticated request's cookies and
+    // this cron route runs under the service role with no request context.
+    const brandingWorkspaceId = connection?.parent_workspace_id ?? job.workspace_id;
+    const eroBranding = context.brandingByWorkspaceId.get(brandingWorkspaceId) ?? null;
+    const ownBranding = connection?.allows_branding_override ? (context.brandingByWorkspaceId.get(job.workspace_id) ?? null) : null;
+    const firmLogoUrl = ownBranding?.email_header_logo_url ?? ownBranding?.logo_url ?? eroBranding?.email_header_logo_url ?? eroBranding?.logo_url ?? null;
+
+    const template =
+      context.templateCandidates.find((t) => t.workspace_id === job.workspace_id) ?? context.templateCandidates.find((t) => t.workspace_id === null) ?? null;
     if (!template) throw new Error("Portal invite email template is missing");
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -127,9 +214,8 @@ async function sendOne(
         firmWebsite: workspace?.website ?? null,
         firmAddress: workspace?.mailing_address ?? null,
         portalActivationUrl: acceptUrl,
-        assignedOrganizerNames: (organizerResponses ?? [])
-          .map((o: { organizer_templates: { name?: string } | null }) => o.organizer_templates?.name)
-          .filter((n): n is string => Boolean(n)),
+        assignedOrganizerNames: organizerNames,
+        firmLogoUrl,
       }
     );
 

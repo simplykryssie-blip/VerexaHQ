@@ -130,6 +130,12 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     setFields((prev) => prev.map((f) => (f.id === fieldId ? { ...f, ...patch } : f)));
   }
 
+  function toggleFieldWidth(fieldId: string) {
+    const field = fields.find((f) => f.id === fieldId);
+    if (!field) return;
+    updateField(fieldId, { layout_width: field.layout_width === "half" ? "full" : "half" });
+  }
+
   async function deleteField(fieldId: string) {
     // organizer_response_answers.organizer_field_id is a CASCADE foreign key.
     // Unlike deleting a whole template (blocked outright by a NO ACTION FK on
@@ -230,6 +236,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             draggedType={draggedType}
             onAddField={addField}
             onReorder={reorder}
+            onToggleWidth={toggleFieldWidth}
             readOnly={readOnly}
           />
           <FieldPropertiesPanel

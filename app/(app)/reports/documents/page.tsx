@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { Lock } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { DOCUMENT_REQUEST_STATUS_TONE, SIGNATURE_REQUEST_STATUS_TONE } from "@/lib/documentStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -229,7 +231,16 @@ export default async function DocumentsReportPage({
     const columnDefs: ReportColumnDef<Row>[] = [
       { key: "title", label: "Request", render: (r) => r.title, sortValue: (r) => r.title },
       { key: "document", label: "Document", render: (r) => r.document, sortValue: (r) => r.document },
-      { key: "status", label: "Status", render: (r) => <span className="capitalize">{r.status}</span>, sortValue: (r) => r.status },
+      {
+        key: "status",
+        label: "Status",
+        render: (r) => (
+          <Badge tone={SIGNATURE_REQUEST_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+            {r.status}
+          </Badge>
+        ),
+        sortValue: (r) => r.status,
+      },
       { key: "signers", label: "Signed", align: "right", render: (r) => `${r.signed} / ${r.total}`, sortValue: (r) => r.signed },
       { key: "due", label: "Due", render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString() : "--"), sortValue: (r) => r.dueDate ?? "" },
     ];
@@ -343,7 +354,16 @@ export default async function DocumentsReportPage({
       sortValue: (r) => r.entityLabel,
     },
     { key: "title", label: "Request", render: (r) => r.title, sortValue: (r) => r.title },
-    { key: "status", label: "Status", render: (r) => <span className="capitalize">{r.status}</span>, sortValue: (r) => r.status },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => (
+        <Badge tone={DOCUMENT_REQUEST_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+          {r.status}
+        </Badge>
+      ),
+      sortValue: (r) => r.status,
+    },
     { key: "pct", label: "Completion", align: "right", render: (r) => `${r.pct}%`, sortValue: (r) => r.pct },
     { key: "due", label: "Due", render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString() : "--"), sortValue: (r) => r.dueDate ?? "" },
   ];

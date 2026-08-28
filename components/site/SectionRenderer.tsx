@@ -7,7 +7,6 @@ import { ImageSection } from "./sections/ImageSection";
 import { TextImageSection } from "./sections/TextImageSection";
 import { TestimonialSection } from "./sections/TestimonialSection";
 import { FaqSection } from "./sections/FaqSection";
-import { LeadFormSection } from "./sections/LeadFormSection";
 import { OrganizerFormSection } from "./sections/OrganizerFormSection";
 import { CtaButtonSection } from "./sections/CtaButtonSection";
 import { SpacerSection } from "./sections/SpacerSection";
@@ -44,20 +43,10 @@ export function SectionRenderer({
       return <TestimonialSection config={section.config as never} />;
     case "faq":
       return <FaqSection config={section.config as never} />;
-    case "lead_form":
-      return (
-        <LeadFormSection
-          config={section.config as never}
-          pageId={pageId}
-          sectionId={section.id}
-          workspaceSlug={workspaceSlug}
-          websiteSlug={websiteSlug}
-          funnel={funnel}
-          accentColor={accentColor}
-        />
-      );
     case "organizer_form":
-      return <OrganizerFormSection config={section.config as never} />;
+      return (
+        <OrganizerFormSection config={section.config as never} pageId={pageId} workspaceSlug={workspaceSlug} websiteSlug={websiteSlug} funnel={funnel} />
+      );
     case "cta_button":
       return <CtaButtonSection config={section.config as never} accentColor={accentColor} />;
     case "spacer":

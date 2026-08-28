@@ -19,6 +19,9 @@ export type TaxDetailRow = {
   updated_at?: string;
 } | null;
 
+// This firm doesn't e-file or transmit returns, so the e-file-specific
+// states (transmitted/accepted/rejected) aren't offered -- every return is
+// either not yet filed, ready to file, or filed.
 const RETURN_STATUSES = ["not_filed", "ready_to_file", "filed"] as const;
 
 const FILING_STATUSES = [
@@ -177,7 +180,7 @@ export function TaxDetailsCard({
         </div>
         <div>
           <label htmlFor="return_status" className="block text-xs font-medium text-muted">
-            Filing status
+            Return status
           </label>
           <select
             id="return_status"

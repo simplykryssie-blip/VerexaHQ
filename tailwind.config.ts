@@ -14,8 +14,11 @@ const config: Config = {
         accent: "rgb(var(--brand-accent-rgb, 11 127 224) / <alpha-value>)",
         accentSoft: "rgb(var(--brand-accent-soft-rgb, 232 243 254) / <alpha-value>)",
         surface: "#FFFFFF",
-        surfaceMuted: "#F7F8FA",
-        border: "#E7E9EE",
+        // A hair of blue bias instead of a flat gray -- reads as chosen
+        // rather than inherited, and still neutral enough to sit under any
+        // workspace's own accent color.
+        surfaceMuted: "#F4F6FB",
+        border: "#E3E7F0",
         muted: "#64748B",
         success: "#16A34A",
         successSoft: "#E3F4E9",

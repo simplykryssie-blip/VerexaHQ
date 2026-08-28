@@ -3,8 +3,16 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { ScrollText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
 export const dynamic = 'force-dynamic';
+
+const SEVERITY_TONE: Record<string, BadgeTone> = {
+  info: "neutral",
+  warning: "warning",
+  critical: "danger",
+  error: "danger",
+};
 
 export default async function AuditLogsPage() {
   const workspace = await getCurrentWorkspace();
@@ -37,10 +45,14 @@ export default async function AuditLogsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {logs.map((l) => (
-                <tr key={l.id}>
+                <tr key={l.id} className="transition-colors hover:bg-surfaceMuted">
                   <td className="px-5 py-3 text-slate">{l.action}</td>
                   <td className="px-5 py-3 text-slate">{l.entity_type}</td>
-                  <td className="px-5 py-3 capitalize text-slate">{l.severity}</td>
+                  <td className="px-5 py-3">
+                    <Badge tone={SEVERITY_TONE[l.severity] ?? "neutral"} className="capitalize">
+                      {l.severity}
+                    </Badge>
+                  </td>
                   <td className="px-5 py-3 text-xs text-muted">{new Date(l.created_at).toLocaleString()}</td>
                 </tr>
               ))}

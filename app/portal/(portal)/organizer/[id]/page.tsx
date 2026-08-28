@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
-import { OrganizerForm, type OpenItemInfo } from "@/components/portal/OrganizerForm";
+import { OrganizerForm } from "@/components/portal/OrganizerForm";
 import { InformationRequestBanner } from "@/components/portal/InformationRequestBanner";
 import { stringifyAddressValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import type { BasicInfoSnapshot } from "@/components/portal/BasicInfoForm";
@@ -27,47 +27,21 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
   const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequests }] = await Promise.all([
     supabase
       .from("organizer_fields")
-      .select("id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field")
+      .select(
+        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width"
+      )
       .eq("organizer_template_id", response.organizer_template_id)
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
     readOnly ? Promise.resolve({ data: null }) : supabase.rpc("get_portal_client_snapshot"),
     supabase
       .from("organizer_information_requests")
-      .select(
-        `id, message, status, due_date, tags, created_at,
-         items:organizer_information_request_items(id, organizer_field_id, instance_index, note, status, was_answered_when_flagged, decision_note)`
-      )
+      .select("id, message, status, due_date, tags, created_at")
       .eq("organizer_response_id", response.id)
       .neq("status", "draft")
       .neq("status", "resolved")
       .order("created_at", { ascending: false }),
   ]);
-
-  type InfoRequestItemRow = {
-    id: string;
-    organizer_field_id: string;
-    instance_index: number;
-    note: string | null;
-    status: "pending" | "client_responded" | "approved" | "rejected" | "resolved";
-    was_answered_when_flagged: boolean;
-    decision_note: string | null;
-  };
-
-  const openItemsByFieldInstance: Record<string, OpenItemInfo> = {};
-  for (const request of (infoRequests ?? []) as unknown as { items: InfoRequestItemRow[] }[]) {
-    for (const item of request.items ?? []) {
-      if (item.status === "pending" || item.status === "client_responded" || item.status === "rejected") {
-        openItemsByFieldInstance[`${item.organizer_field_id}:${item.instance_index}`] = {
-          id: item.id,
-          note: item.note,
-          status: item.status,
-          wasAnsweredWhenFlagged: item.was_answered_when_flagged,
-          decisionNote: item.decision_note,
-        };
-      }
-    }
-  }
 
   // Mapped fields (client_profile_field set on the builder side) that don't
   // already have an answer get one synthesized from the client's record --
@@ -107,7 +81,6 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
           workspaceId={response.workspace_id}
           entityType={response.engagement_id ? "engagement" : "client"}
           entityId={response.engagement_id ?? response.client_id}
-          openItemsByFieldInstance={openItemsByFieldInstance}
         />
       </div>
     </>
@@ -115,6 +88,10 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 }
 
 function prefillValueFor(clientProfileField: string, snapshot: BasicInfoSnapshot): string | null {
+  // SSN is never prefilled -- it's an encrypted, staff-reveal-gated value.
+  // The client_profile_field='ssn' mapping only proposes a write (subject to
+  // review), it doesn't read one back into the form.
+  if (clientProfileField === "ssn") return null;
   if (clientProfileField === "full_name") {
     if (!snapshot.first_name && !snapshot.last_name) return null;
     return stringifyNameValue({

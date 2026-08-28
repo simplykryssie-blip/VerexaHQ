@@ -18,6 +18,8 @@ export function AuthShell({
   return (
     <div className={`${styles.shell} ${archivo.variable} ${publicSans.variable} ${plexMono.variable}`}>
       <aside className={styles.rail}>
+        <div className={styles.glowA} aria-hidden="true" />
+        <div className={styles.glowB} aria-hidden="true" />
         <div className={styles.mark}>
           <Image src="/brand/vmark.png" alt="" width={35} height={28} className={styles.markGlyph} priority />
           <Image src="/brand/wordmark.png" alt="VerexaHQ" width={155} height={26} className={styles.wordmarkGlyph} priority />

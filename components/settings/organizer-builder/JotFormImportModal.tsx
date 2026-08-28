@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordInput } from "@/components/PasswordInput";
 
 type ImportResult = {
   templateId: string;
@@ -122,8 +123,7 @@ export function JotFormImportModal({
             <p className="text-xs text-muted">
               Connect your firm&apos;s JotForm account first. Find your API key under JotForm &gt; Settings &gt; API.
             </p>
-            <input
-              type="password"
+            <PasswordInput
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="JotForm API key"

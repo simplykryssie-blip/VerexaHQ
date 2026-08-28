@@ -148,7 +148,7 @@ export function TemplateGallery({
           ) : (
             <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
               {filtered.map((c) => (
-                <div key={c.id} className="group flex items-center gap-3 px-4 py-3">
+                <div key={c.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surfaceMuted">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
                     <Icon size={14} aria-hidden="true" />
                   </span>

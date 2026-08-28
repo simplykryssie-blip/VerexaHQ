@@ -6,7 +6,6 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
 import { FirmProfileForm } from "./FirmProfileForm";
-import { getEffectiveBranding } from "@/lib/branding";
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +25,6 @@ export default async function FirmProfilePage() {
     { data: contact },
     { data: branding },
     { data: settings },
-    effectiveBranding,
     { data: myProfile },
     { data: isAdmin },
     { data: canManageSettings },
@@ -41,13 +39,8 @@ export default async function FirmProfilePage() {
         .select("phone, website, mailing_address, primary_contact_email")
         .eq("id", workspace.id)
         .single(),
-      supabase
-        .from("branding")
-        .select("support_email, support_phone")
-        .eq("workspace_id", workspace.id)
-        .maybeSingle(),
+      supabase.from("branding").select("support_email, support_phone").eq("workspace_id", workspace.id).maybeSingle(),
       supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
-      getEffectiveBranding(workspace.id),
       user
         ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
         : Promise.resolve({ data: null }),
@@ -65,7 +58,6 @@ export default async function FirmProfilePage() {
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (settings?.find((s) => s.key === "holidays")?.value as string[] | undefined) ?? [];
 
   return (
     <div className="max-w-2xl">
@@ -91,7 +83,6 @@ export default async function FirmProfilePage() {
             mailingAddress={contact?.mailing_address ?? null}
             businessPhone={branding?.support_phone ?? contact?.phone ?? null}
             businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
-            isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
             isOwner={workspace.is_owner}
             isAdmin={Boolean(isAdmin)}
             canManageSettings={Boolean(canManageSettings)}
@@ -104,7 +95,6 @@ export default async function FirmProfilePage() {
             supportedFilingStates={profile?.supported_filing_states ?? []}
             initialHours={businessHours}
             initialSlotMinutes={slotMinutes}
-            initialHolidays={holidays}
           />
         </div>
       )}

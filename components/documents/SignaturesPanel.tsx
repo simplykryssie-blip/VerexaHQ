@@ -379,7 +379,7 @@ export function SignaturesPanel({
                           </button>
                         </span>
                       ) : (
-                        <span className={`capitalize ${s.status === "declined" ? "text-danger" : "text-green-700"}`}>
+                        <span className={`capitalize ${s.status === "declined" ? "text-danger" : "text-success"}`}>
                           {s.status}
                           {s.signed_at && ` -- ${new Date(s.signed_at).toLocaleDateString()}`}
                         </span>

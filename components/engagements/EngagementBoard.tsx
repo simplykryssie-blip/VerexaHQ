@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
+import { Badge } from "@/components/ui/Badge";
 
 export type BoardEngagement = {
   id: string;
@@ -16,13 +16,6 @@ export type BoardEngagement = {
   due_date: string | null;
   clientLabel: string;
   clientHref: string;
-};
-
-const PRIORITY_TONE: Record<string, BadgeTone> = {
-  Low: "neutral",
-  Medium: "accent",
-  High: "warning",
-  Urgent: "danger",
 };
 
 export function EngagementBoard({ engagements: initial }: { engagements: BoardEngagement[] }) {
@@ -91,7 +84,7 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
                       setDraggingId(e.id);
                     }}
                     onDragEnd={() => setDraggingId(null)}
-                    className={`cursor-grab rounded-lg border border-border bg-surface p-3 shadow-sm transition active:cursor-grabbing ${
+                    className={`cursor-grab rounded-lg border border-border bg-surface p-3 shadow-soft transition hover:shadow-softHover active:cursor-grabbing ${
                       draggingId === e.id ? "opacity-40" : ""
                     }`}
                   >
@@ -104,7 +97,7 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
                       </Link>
                     </p>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      {e.priority && <Badge tone={PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge>}
+                      {e.priority && <Badge tone={ENGAGEMENT_PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge>}
                       {e.due_date && (
                         <span className={`text-[11px] ${overdue ? "font-medium text-danger" : "text-muted"}`}>
                           {new Date(e.due_date).toLocaleDateString()}

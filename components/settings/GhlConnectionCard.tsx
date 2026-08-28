@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { GhlImportPanel } from "./GhlImportPanel";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: string; isConnected: boolean }) {
   const router = useRouter();
@@ -78,12 +79,12 @@ export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: s
           </button>
         ) : (
           <form onSubmit={connect} className="flex flex-wrap items-start gap-2">
-            <input
-              type="password"
+            <PasswordInput
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Private Integration Token"
-              className="w-64 rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              wrapperClassName="w-64"
+              className="w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <input
               value={locationId}

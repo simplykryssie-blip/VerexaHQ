@@ -10,6 +10,8 @@ import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
 import { Lock } from "lucide-react";
 import { clientLabel } from "@/lib/documentEntityLabels";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -93,8 +95,27 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
     },
     { key: "number", label: "Engagement", render: (r) => r.engagement_number ?? "--", sortValue: (r) => r.engagement_number ?? "" },
     { key: "type", label: "Type", render: (r) => r.typeName, sortValue: (r) => r.typeName },
-    { key: "status", label: "Status", render: (r) => <span className="capitalize">{r.status}</span>, sortValue: (r) => r.status },
-    { key: "priority", label: "Priority", render: (r) => r.priority ?? "--", sortValue: (r) => r.priority ?? "" },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => (
+        <Badge tone={ENGAGEMENT_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+          {r.status}
+        </Badge>
+      ),
+      sortValue: (r) => r.status,
+    },
+    {
+      key: "priority",
+      label: "Priority",
+      render: (r) =>
+        r.priority ? (
+          <Badge tone={ENGAGEMENT_PRIORITY_TONE[r.priority] ?? "neutral"}>{r.priority}</Badge>
+        ) : (
+          "--"
+        ),
+      sortValue: (r) => r.priority ?? "",
+    },
     { key: "opened", label: "Opened", render: (r) => (r.open_date ? new Date(r.open_date).toLocaleDateString() : "--"), sortValue: (r) => r.open_date ?? "" },
     {
       key: "turnaround",

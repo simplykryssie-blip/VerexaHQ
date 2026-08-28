@@ -28,6 +28,8 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     { data: organizerTemplates },
     { data: documentRequestTemplates },
     { data: documentFolderTemplates },
+    { data: pricingRules },
+    { data: billingRules },
     { data: canManage },
   ] = await Promise.all([
     supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
@@ -35,6 +37,8 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_request_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_folder_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("pricing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("billing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
   ]);
 
@@ -54,6 +58,8 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
           organizerTemplates={asOptions(organizerTemplates)}
           documentRequestTemplates={asOptions(documentRequestTemplates)}
           documentFolderTemplates={asOptions(documentFolderTemplates)}
+          pricingRules={asOptions(pricingRules)}
+          billingRules={asOptions(billingRules)}
           canManage={Boolean(canManage)}
         />
       </div>

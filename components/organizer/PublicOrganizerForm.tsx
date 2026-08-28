@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mail, Phone, PenLine } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeOptions, parseAddressValue, parseNameValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
@@ -10,7 +10,9 @@ import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditio
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
-import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
+import { PasswordInput } from "@/components/PasswordInput";
+import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -22,11 +24,13 @@ type FieldRow = {
   field_type: string;
   label: string;
   help_text: string | null;
+  body_html?: string | null;
   is_required: boolean;
   options: unknown;
   parent_field_id: string | null;
   conditional_logic?: unknown;
   client_profile_field?: string | null;
+  layout_width?: string | null;
 };
 
 type Branding = {
@@ -49,6 +53,18 @@ type TemplateData = {
 type ServiceCategory = { id: string; name: string; services: { id: string; name: string }[] };
 type ServiceOption = { id: string; name: string };
 
+export type OrganizerSubmitConfig = {
+  action?: "next_page" | "custom_url" | "inline_thank_you";
+  custom_url?: string;
+  thank_you_heading?: string;
+  thank_you_body?: string;
+};
+
+function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
+  if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
+  return value.trim() !== "";
+}
+
 // Standalone from OrganizerForm.tsx on purpose: that component persists
 // progress incrementally against an already-created organizer_responses row
 // (responseId) and uploads files to authenticated Storage. Here there's no
@@ -56,7 +72,20 @@ type ServiceOption = { id: string; name: string };
 // file uploads aren't possible pre-authentication -- different enough of a
 // lifecycle that sharing the component would mean threading a lot of
 // "is this the public flow?" branches through it instead.
-export function PublicOrganizerForm({ token, data }: { token: string; data: TemplateData }) {
+export function PublicOrganizerForm({
+  token,
+  data,
+  onSubmitConfig,
+  onNextPage,
+}: {
+  token: string;
+  data: TemplateData;
+  // Only used when embedded inline on a website page section -- the
+  // standalone /o/[token] route leaves these undefined and gets the
+  // original built-in "Thank you" screen unchanged.
+  onSubmitConfig?: OrganizerSubmitConfig;
+  onNextPage?: () => void;
+}) {
   const supabase = createClient();
   const { template, workspace_name, requires_portal_signup, password_min_length, branding, fields } = data;
   const minPasswordLength = password_min_length ?? 8;
@@ -115,6 +144,31 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   }
 
+  function unmetRequiredOnCurrentPage(): FieldRow[] {
+    return currentPage.fields.filter(
+      (f) => f.is_required && !isFieldAnswered(f, answers[f.id] ?? "", repeaterRows[f.id]?.length)
+    );
+  }
+
+  function goNext() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    setError(null);
+    setPageIndex((i) => i + 1);
+  }
+
+  function submitWithValidation() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    submit();
+  }
+
   // Runs when the Contact step completes -- creates the lead (and the
   // portal account, if this template requires one) immediately, instead of
   // waiting for the whole organizer to be submitted. That way abandoning
@@ -132,7 +186,10 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
       setError("Name and email are required.");
       return;
     }
-    if (selectedServiceIds.length === 0) {
+    // Only required when there's actually something to pick -- a workspace
+    // with no services configured (e.g. a plain contact/signup form embedded
+    // on a marketing site) has nothing to show here at all.
+    if (serviceOptions.length > 0 && selectedServiceIds.length === 0) {
       setError("Let us know what you need help with.");
       return;
     }
@@ -211,6 +268,22 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
     setStep("form");
   }
 
+  // Shared by both submit paths below -- honors the embedding section's
+  // configured post-submit action when one was passed in, otherwise falls
+  // back to the original built-in "Thank you" screen unchanged.
+  function finish() {
+    const action = onSubmitConfig?.action ?? "inline_thank_you";
+    if (action === "custom_url" && onSubmitConfig?.custom_url) {
+      window.location.href = onSubmitConfig.custom_url;
+      return;
+    }
+    if (action === "next_page" && onNextPage) {
+      onNextPage();
+      return;
+    }
+    setStep("done");
+  }
+
   async function submit() {
     setSubmitting(true);
     setError(null);
@@ -255,7 +328,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         }).catch(() => {});
       }
       setAccountCreated(true);
-      setStep("done");
+      finish();
       return;
     }
 
@@ -285,14 +358,17 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
         // it into Documents can be retried later if this fails.
       });
     }
-    setStep("done");
+    finish();
   }
 
   if (step === "done") {
+    const useCustomCopy = Boolean(onSubmitConfig?.thank_you_heading || onSubmitConfig?.thank_you_body);
     return (
       <div className="mx-auto max-w-md p-8 text-center">
-        <h1 className="text-lg font-semibold text-ink">Thank you</h1>
-        {accountCreated ? (
+        <h1 className="text-lg font-semibold text-ink">{useCustomCopy ? onSubmitConfig?.thank_you_heading || "Thank you" : "Thank you"}</h1>
+        {useCustomCopy ? (
+          <p className="mt-2 text-sm text-muted">{onSubmitConfig?.thank_you_body}</p>
+        ) : accountCreated ? (
           <p className="mt-2 text-sm text-muted">
             Your information was submitted to {workspace_name}. Check your email at {email} to confirm your new client portal account, then log
             in to see your progress.
@@ -376,47 +452,49 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
               <>
                 <div>
                   <label className="block text-sm font-medium text-ink">Create a password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    wrapperClassName="mt-1"
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <p className="mt-1 text-xs text-muted">{passwordRequirementsHint(minPasswordLength)}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-ink">Confirm password *</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    wrapperClassName="mt-1"
+                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
               </>
             )}
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
-              <p className="mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {serviceOptions.map((s) => (
-                  <label
-                    key={s.id}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                      selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedServiceIds.includes(s.id)}
-                      onChange={() => toggleService(s.id)}
-                      className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                    />
-                    {s.name}
-                  </label>
-                ))}
+            {serviceOptions.length > 0 && (
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
+                <p className="mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {serviceOptions.map((s) => (
+                    <label
+                      key={s.id}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                        selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedServiceIds.includes(s.id)}
+                        onChange={() => toggleService(s.id)}
+                        className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                      />
+                      {s.name}
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
           {requires_portal_signup && (
             <p className="mt-2 text-xs text-muted">
@@ -443,20 +521,21 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
               {currentPage.title ? ` -- ${currentPage.title}` : ""}
             </p>
           )}
-          {currentPage.fields.map((field) =>
-            field.field_type === "repeating_section" ? (
-              <PublicRepeatingSection
-                key={field.id}
-                token={token}
-                field={field}
-                childFields={childFieldsByParent.get(field.id) ?? []}
-                rows={repeaterRows[field.id] ?? []}
-                onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
-              />
-            ) : (
-              <PublicFieldInput key={field.id} token={token} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
-            )
-          )}
+          <div className="grid grid-cols-12 gap-x-5 gap-y-6">
+            {currentPage.fields.map((field) =>
+              field.field_type === "repeating_section" ? (
+                <PublicRepeatingSection
+                  key={field.id}
+                  field={field}
+                  childFields={childFieldsByParent.get(field.id) ?? []}
+                  rows={repeaterRows[field.id] ?? []}
+                  onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
+                />
+              ) : (
+                <PublicFieldInput key={field.id} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
+              )
+            )}
+          </div>
 
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex items-center gap-2">
@@ -470,7 +549,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             {isLastPage ? (
               <button
                 type="button"
-                onClick={submit}
+                onClick={submitWithValidation}
                 disabled={submitting}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
               >
@@ -479,7 +558,7 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
             ) : (
               <button
                 type="button"
-                onClick={() => setPageIndex((i) => i + 1)}
+                onClick={goNext}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
               >
                 Next
@@ -493,21 +572,19 @@ export function PublicOrganizerForm({ token, data }: { token: string; data: Temp
 }
 
 function PublicRepeatingSection({
-  token,
   field,
   childFields,
   rows,
   onChange,
 }: {
-  token: string;
   field: FieldRow;
   childFields: FieldRow[];
   rows: Record<string, string>[];
   onChange: (rows: Record<string, string>[]) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label className="block text-sm font-medium text-ink">
+    <div className="col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
+      <label className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
@@ -515,9 +592,9 @@ function PublicRepeatingSection({
       <div className="mt-3 space-y-3">
         {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-lg border border-border p-3">
+          <div key={index} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
                 {field.label} {index + 1}
               </p>
               <button
@@ -528,143 +605,64 @@ function PublicRepeatingSection({
                 Remove
               </button>
             </div>
-            <div className="mt-2 space-y-3">
-              {childFields.map((child) => (
-                <PublicFieldInput
-                  key={child.id}
-                  token={token}
-                  field={child}
-                  value={row[child.id] ?? ""}
-                  onChange={(fieldId, value) => onChange(rows.map((r, i) => (i === index ? { ...r, [fieldId]: value } : r)))}
-                />
-              ))}
+            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
+              {childFields
+                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .map((child) => (
+                  <PublicFieldInput
+                    key={child.id}
+                    field={child}
+                    value={row[child.id] ?? ""}
+                    onChange={(fieldId, value) => onChange(rows.map((r, i) => (i === index ? { ...r, [fieldId]: value } : r)))}
+                  />
+                ))}
             </div>
           </div>
         ))}
       </div>
 
-      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-semibold text-accent hover:underline">
         + Add another
       </button>
     </div>
   );
 }
 
-// No session and possibly no client record has even signed up yet at this
-// point, so a drawn signature can't go through a client-side storage RLS
-// insert -- it's uploaded via /api/o/[token]/signature-image (service role)
-// instead, same reasoning as the public engagement-letter signing flow.
-function PublicSignatureField({
-  token,
-  fieldId,
-  value,
-  onChange,
-}: {
-  token: string;
-  fieldId: string;
-  value: string;
-  onChange: (fieldId: string, value: string) => void;
-}) {
-  const [mode, setMode] = useState<SignatureMode>("typed");
-  const [typedName, setTypedName] = useState("");
-  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  let parsed: { typed_name?: string; signature_image_path?: string; signed_at: string } | null = null;
-  try {
-    parsed = value ? JSON.parse(value) : null;
-  } catch {
-    parsed = null;
-  }
-
-  if (parsed) {
-    return (
-      <p className="flex items-center gap-1.5 text-sm text-green-700">
-        <PenLine size={14} aria-hidden="true" />
-        {parsed.typed_name ? `Signed by ${parsed.typed_name}` : "Signed (drawn signature)"}
-      </p>
-    );
-  }
-
-  async function sign() {
-    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
-    setError(null);
-
-    if (mode === "typed") {
-      onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }));
-      return;
-    }
-
-    setUploading(true);
-    const res = await fetch(`/api/o/${token}/signature-image`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl: drawnDataUrl }),
-    });
-    const result = await res.json().catch(() => ({}));
-    setUploading(false);
-    if (!res.ok) {
-      setError(result.error ?? "Could not save your signature.");
-      return;
-    }
-    onChange(fieldId, JSON.stringify({ signature_image_path: result.path, signed_at: new Date().toISOString() }));
-  }
-
-  return (
-    <div className="space-y-2">
-      <SignaturePad mode={mode} onModeChange={setMode} typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
-      {error && <p className="text-xs text-danger">{error}</p>}
-      <button
-        type="button"
-        onClick={sign}
-        disabled={uploading || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
-        className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-      >
-        {uploading ? "Saving..." : "Sign"}
-      </button>
-    </div>
-  );
-}
-
-function PublicFieldInput({
-  token,
-  field,
-  value,
-  onChange,
-}: {
-  token: string;
-  field: FieldRow;
-  value: string;
-  onChange: (fieldId: string, value: string) => void;
-}) {
+function PublicFieldInput({ field, value, onChange }: { field: FieldRow; value: string; onChange: (fieldId: string, value: string) => void }) {
   const options = normalizeOptions(field.options);
+  const inputClass =
+    "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
 
   if (field.field_type === "section") {
     return (
-      <div className="border-b border-border pb-1.5 pt-2">
-        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
+        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
         {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
       </div>
     );
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
-        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
-        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      <div className="col-span-12">
+        <RichTextEditor content={field.body_html ?? ""} editable={false} bare />
       </div>
     );
   }
 
-  return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
-        {field.label} {field.is_required && <span className="text-danger">*</span>}
-      </label>
-      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+  const showHeader = !(field.field_type === "checkbox" && !field.label.trim());
 
-      <div className="mt-2">
+  return (
+    <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
+      {showHeader && (
+        <>
+          <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
+            {field.label} {field.is_required && <span className="text-danger">*</span>}
+          </label>
+          {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+        </>
+      )}
+
+      <div className={showHeader ? "mt-1.5" : ""}>
         {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} />
         ) : field.field_type === "email" ? (
@@ -673,7 +671,7 @@ function PublicFieldInput({
             type="email"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "phone" ? (
           <input
@@ -681,7 +679,7 @@ function PublicFieldInput({
             type="tel"
             value={value}
             onChange={(e) => onChange(field.id, formatPhone(e.target.value))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "website" ? (
           <input
@@ -690,7 +688,7 @@ function PublicFieldInput({
             value={value}
             placeholder="https://"
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "yes_no" ? (
           <div className="flex gap-4">
@@ -710,13 +708,31 @@ function PublicFieldInput({
         ) : field.field_type === "file_upload" ? (
           <p className="text-xs text-muted">File uploads aren&apos;t available before you&apos;re a client -- your preparer will follow up separately.</p>
         ) : field.field_type === "signature" ? (
-          <PublicSignatureField token={token} fieldId={field.id} value={value} onChange={onChange} />
+          value ? (
+            <p className="text-sm text-green-700">Signed by {JSON.parse(value).typed_name}</p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                placeholder="Type your full name"
+                className={inputClass}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const target = e.target as HTMLInputElement;
+                    if (target.value.trim()) onChange(field.id, JSON.stringify({ typed_name: target.value.trim(), signed_at: new Date().toISOString() }));
+                  }
+                }}
+                onBlur={(e) => {
+                  if (e.target.value.trim()) onChange(field.id, JSON.stringify({ typed_name: e.target.value.trim(), signed_at: new Date().toISOString() }));
+                }}
+              />
+            </div>
+          )
         ) : field.field_type === "dropdown" ? (
           <select
             id={`field-${field.id}`}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           >
             <option value="">Select...</option>
             {options.map((o, i) => (
@@ -740,7 +756,7 @@ function PublicFieldInput({
               </label>
             ))}
           </div>
-        ) : field.field_type === "multiple_choice" ? (
+        ) : field.field_type === "multiple_choice" || field.field_type === "checkbox" ? (
           <div className="space-y-1.5">
             {options.map((o, i) => {
               const selected = value ? value.split(",") : [];
@@ -760,21 +776,13 @@ function PublicFieldInput({
               );
             })}
           </div>
-        ) : field.field_type === "checkbox" ? (
-          <input
-            id={`field-${field.id}`}
-            type="checkbox"
-            checked={value === "true"}
-            onChange={(e) => onChange(field.id, e.target.checked ? "true" : "false")}
-            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-          />
         ) : field.field_type === "date" ? (
           <input
             id={`field-${field.id}`}
             type="date"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "number" ? (
           <input
@@ -782,7 +790,7 @@ function PublicFieldInput({
             type="number"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "currency" ? (
           <input
@@ -791,7 +799,7 @@ function PublicFieldInput({
             step="0.01"
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
@@ -801,17 +809,31 @@ function PublicFieldInput({
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            className={inputClass}
           />
         ) : field.field_type === "address" ? (
           <AddressInput value={value} onChange={(v) => onChange(field.id, v)} />
+        ) : field.field_type === "short_text" ? (
+          <input
+            id={`field-${field.id}`}
+            type="text"
+            value={value}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            className={inputClass}
+          />
         ) : (
           <textarea
             id={`field-${field.id}`}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            rows={3}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = `${el.scrollHeight}px`;
+              }
+            }}
+            className={`${inputClass} resize-none overflow-hidden`}
           />
         )}
       </div>

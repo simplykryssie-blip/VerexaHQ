@@ -6,6 +6,8 @@ import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
 import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/organizer/relationshipRoles";
+import { isWidthEligible } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -35,7 +37,12 @@ export function FieldPropertiesPanel({
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
+    patch: Partial<
+      Pick<
+        BuilderField,
+        "label" | "help_text" | "body_html" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+      >
+    >
   ) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
@@ -109,7 +116,12 @@ function PropertiesForm({
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
+    patch: Partial<
+      Pick<
+        BuilderField,
+        "label" | "help_text" | "body_html" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+      >
+    >
   ) => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
@@ -158,29 +170,42 @@ function PropertiesForm({
       </div>
       <p className="mt-1 text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</p>
 
-      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
-        Label
-        <input
-          value={label}
-          disabled={readOnly}
-          onChange={(e) => setLabel(e.target.value)}
-          onBlur={() => label !== field.label && onUpdate(field.id, { label })}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-        />
-      </label>
+      {field.field_type === "rich_text" ? (
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Content</p>
+          <div className="mt-1.5">
+            <RichTextEditor content={field.body_html ?? ""} onChange={(html) => onUpdate(field.id, { body_html: html })} editable={!readOnly} bare />
+          </div>
+        </div>
+      ) : field.field_type !== "checkbox" ? (
+        <>
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+            Label
+            <input
+              value={label}
+              disabled={readOnly}
+              onChange={(e) => setLabel(e.target.value)}
+              onBlur={() => label !== field.label && onUpdate(field.id, { label })}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            />
+          </label>
 
-      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
-        Help text
-        <textarea
-          value={helpText}
-          disabled={readOnly}
-          onChange={(e) => setHelpText(e.target.value)}
-          onBlur={() => helpText !== (field.help_text ?? "") && onUpdate(field.id, { help_text: helpText || null })}
-          rows={2}
-          placeholder="Optional guidance shown under the question"
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-        />
-      </label>
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+            Help text
+            <textarea
+              value={helpText}
+              disabled={readOnly}
+              onChange={(e) => setHelpText(e.target.value)}
+              onBlur={() => helpText !== (field.help_text ?? "") && onUpdate(field.id, { help_text: helpText || null })}
+              rows={2}
+              placeholder="Optional guidance shown under the question"
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            />
+          </label>
+        </>
+      ) : (
+        <p className="mt-4 text-[11px] text-muted">Add each checkbox&apos;s text below -- no separate question label needed.</p>
+      )}
 
       {!NON_ANSWERABLE_FIELD_TYPES.has(field.field_type) && (
         <label className="mt-4 flex items-center gap-2 text-sm text-slate">
@@ -193,6 +218,31 @@ function PropertiesForm({
           />
           Required
         </label>
+      )}
+
+      {isWidthEligible(field.field_type) && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Shrink to half width</p>
+            <p className="mt-0.5 text-[11px] text-muted">Sits side by side with the next half-width field.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={field.layout_width === "half"}
+            disabled={readOnly}
+            onClick={() => onUpdate(field.id, { layout_width: field.layout_width === "half" ? "full" : "half" })}
+            className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${
+              field.layout_width === "half" ? "border-accent bg-accent" : "border-border bg-border"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                field.layout_width === "half" ? "left-[22px]" : "left-0.5"
+              }`}
+            />
+          </button>
+        </div>
       )}
 
       {CLIENT_PROFILE_FIELDS_BY_TYPE[field.field_type] && (

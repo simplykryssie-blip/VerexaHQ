@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
@@ -11,6 +12,16 @@ import { getEffectiveBranding } from "@/lib/branding";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
+
+// Per-workspace favicon: the auto-generated square derivative of a
+// workspace's uploaded business logo, falling back to Verexa's own mark so
+// every workspace still gets a real tab icon before uploading one.
+export async function generateMetadata(): Promise<Metadata> {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return {};
+  const branding = await getEffectiveBranding(workspace.id);
+  return { icons: { icon: branding.faviconUrl ?? "/brand/vmark.png" } };
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const workspace = await getCurrentWorkspace();
@@ -38,9 +49,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: canUseNetworkMessaging },
     { count: teammateCount },
     { data: hasAcceptedTerms },
-    { data: currentProfile },
-    { data: currentMembership },
-    { data: roles },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -61,14 +69,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspace.is_owner
       ? supabase.rpc("has_accepted_platform_terms", { p_version: LEGAL_VERSION })
       : Promise.resolve({ data: true }),
-    // For the sidebar footer / header avatar -- no FK PostgREST can embed
-    // between workspace_users and user_profiles (both independently
-    // reference auth.users), same reason getWorkspaceStaff joins manually.
-    user ? supabase.from("user_profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle() : Promise.resolve({ data: null }),
-    user
-      ? supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    supabase.from("roles").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -98,15 +98,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .sort((a, b) => (a.isHome === b.isHome ? 0 : a.isHome ? -1 : 1) || (DEMO_SORT_ORDER[a.workspaceType] ?? 99) - (DEMO_SORT_ORDER[b.workspaceType] ?? 99));
   }
 
-  const roleName = currentMembership?.role_id ? (roles ?? []).find((r) => r.id === currentMembership.role_id)?.name ?? null : null;
-  const currentUser = user
-    ? {
-        name: currentProfile?.display_name ?? null,
-        avatarUrl: currentProfile?.avatar_url ?? null,
-        roleLabel: workspace.is_owner ? "Owner" : roleName,
-      }
-    : null;
-
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
     const accentRgb = hexToRgbTriplet(branding.secondaryColor);
@@ -131,14 +122,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logoUrl={branding.sidebarLogoUrl}
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
-            sidebarBgColor={branding.sidebarBgColor}
+            bgColor={branding.sidebarBgColor}
+            textColor={branding.sidebarTextColor}
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
-            currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
+            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
             <GlobalClientDraftBanner />
             {children}
           </main>
