@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderPortalInviteEmail } from "@/lib/email/portalInvite";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getEffectiveBranding } from "@/lib/branding";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
 
   const supabase = createClient();
 
-  const [{ data: template }, { data: workspaceRow }, { data: organizerResponses }] = await Promise.all([
+  const [{ data: template }, { data: workspaceRow }, { data: organizerResponses }, branding] = await Promise.all([
     supabase
       .from("email_templates")
       .select("subject, body_html, workspace_id")
@@ -44,6 +45,7 @@ export async function POST(request: Request) {
       .select("status, organizer_templates(name)")
       .eq("client_id", clientId)
       .neq("status", "completed"),
+    getEffectiveBranding(workspace.id),
   ]);
 
   if (!template) {
@@ -65,6 +67,7 @@ export async function POST(request: Request) {
       assignedOrganizerNames: (organizerResponses ?? [])
         .map((o: any) => o.organizer_templates?.name)
         .filter((n: unknown): n is string => Boolean(n)),
+      firmLogoUrl: branding.emailHeaderLogoUrl,
     }
   );
 

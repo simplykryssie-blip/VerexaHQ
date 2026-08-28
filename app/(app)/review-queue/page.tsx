@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ReviewQueueItem } from "./ReviewQueueItem";
 import { ReviewQueueClientChangeItem } from "./ReviewQueueClientChangeItem";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +132,7 @@ export default async function ReviewQueuePage() {
               {resolvedShares.map((s) => {
                 const engagement = s.engagement as unknown as { id: string; engagement_number: string | null; client: Parameters<typeof clientLabel>[0] } | null;
                 return (
-                  <li key={s.id} className="flex items-center justify-between px-4 py-3 text-sm">
+                  <li key={s.id} className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <p className="font-medium text-slate">
                         {clientLabel(engagement?.client ?? null)} {engagement?.engagement_number ? `-- ${engagement.engagement_number}` : ""}
@@ -139,7 +141,9 @@ export default async function ReviewQueuePage() {
                         From {(s.shared_by_workspace as unknown as { name: string } | null)?.name ?? "a connected PTIN"}
                       </p>
                     </div>
-                    <span className="text-xs capitalize text-muted">{s.status.replace(/_/g, " ")}</span>
+                    <Badge tone={ENGAGEMENT_SHARE_STATUS_TONE[s.status] ?? "neutral"} className="capitalize">
+                      {s.status.replace(/_/g, " ")}
+                    </Badge>
                   </li>
                 );
               })}

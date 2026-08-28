@@ -1,16 +1,12 @@
 .sidebar {
-  /* Dark rail is now the shipped default (see Sidebar.tsx's DEFAULT_RAIL_BG) --
-     these are belt-and-suspenders fallbacks for the pre-hydration instant;
-     the inline style from React's derivation is what actually applies once
-     mounted, and is the only place these values should be tuned. */
-  --rail-bg: #0f172a;
-  --rail-ink: #ffffff;
-  --rail-muted: rgba(255, 255, 255, 0.72);
-  --rail-section: rgba(255, 255, 255, 0.55);
-  --rail-border: rgba(255, 255, 255, 0.18);
-  --rail-hover-bg: rgba(255, 255, 255, 0.12);
+  --rail-bg: #ffffff;
+  --rail-ink: #0f172a;
+  --rail-muted: #64748b;
+  --rail-section: #9aa1ae;
+  --rail-border: #e3e7f0;
+  --rail-hover: #f4f6fb;
   --blue-bright: #0b7fe0;
-  --blue-bright-soft: rgba(11, 127, 224, 0.18);
+  --blue-bright-soft: rgba(11, 127, 224, 0.1);
 
   background: var(--rail-bg);
   color: var(--rail-ink);
@@ -35,6 +31,7 @@
 }
 
 .navItem {
+  position: relative;
   color: var(--rail-muted);
   transition:
     background 120ms ease,
@@ -43,13 +40,25 @@
 
 .navItem:hover {
   color: var(--rail-ink);
-  background: var(--rail-hover-bg);
+  background: var(--rail-hover);
 }
 
 .navItemActive {
+  position: relative;
   color: var(--blue-bright);
   background: var(--blue-bright-soft);
   font-weight: 600;
+}
+
+.navItemActive::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--blue-bright);
 }
 
 .subNav {
@@ -66,11 +75,11 @@
 
 .signOut:hover {
   color: var(--rail-ink);
-  background: var(--rail-hover-bg);
+  background: var(--rail-hover);
 }
 
 .mobileToggle {
   background: #ffffff;
   color: #1e293b;
-  border: 1px solid #e7e9ee;
+  border: 1px solid #e3e7f0;
 }

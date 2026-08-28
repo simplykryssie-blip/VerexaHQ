@@ -2,16 +2,23 @@
   --ink: #071729;
   --muted: #476485;
   --border-strong: #b4c1cf;
-  --blue: #0476b0;
-  --blue-bright: #0da9f9;
+  /* Verexa's actual brand gradient, sampled from public/brand/vmark.png --
+     blue leg through teal into the lime highlight. Used only here: this
+     shell serves pre-auth/account-setup pages (staff login, portal login,
+     invites, password reset, MFA) that have no workspace context yet, so
+     it's the one place the platform's own identity applies instead of a
+     branded office's. */
+  --blue: #0071fa;
+  --blue-bright: #3bcefa;
+  --lime: #8ce02e;
   --danger: #c4392b;
   --danger-bg: #fbeae7;
-  --focus: #0476b0;
+  --focus: #0071fa;
 
-  --rail-bg: #071729;
-  --rail-bg-2: #0b2643;
+  --rail-bg: #081226;
+  --rail-bg-2: #0f2c63;
   --rail-ink: #f4f4f6;
-  --rail-muted: #a9b7c6;
+  --rail-muted: #a9b7ce;
 
   --font-display: var(--font-archivo), system-ui, sans-serif;
   --font-body: var(--font-public-sans), system-ui, sans-serif;
@@ -32,7 +39,7 @@
 }
 
 .rail {
-  background: linear-gradient(165deg, var(--rail-bg) 0%, var(--rail-bg-2) 100%);
+  background: radial-gradient(120% 140% at 15% 0%, var(--rail-bg-2) 0%, var(--rail-bg) 55%, #05080f 100%);
   color: var(--rail-ink);
   padding: 40px 36px;
   display: flex;
@@ -42,13 +49,21 @@
   overflow: hidden;
 }
 
-.rail::after {
-  content: "";
+.glowA {
   position: absolute;
-  inset: auto -30% -40% auto;
+  inset: -20% -35% auto auto;
+  width: 65%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(0, 113, 250, 0.4), transparent 70%);
+  pointer-events: none;
+}
+
+.glowB {
+  position: absolute;
+  inset: auto auto -30% -15%;
   width: 60%;
   aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(13, 169, 249, 0.16), transparent 70%);
+  background: radial-gradient(circle, rgba(140, 224, 46, 0.2), transparent 70%);
   pointer-events: none;
 }
 
@@ -56,6 +71,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
 .markGlyph {
@@ -72,16 +89,20 @@
 .railBody {
   max-width: 30ch;
   position: relative;
+  z-index: 1;
 }
 
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--blue-bright);
   margin: 0 0 14px;
+  background: linear-gradient(90deg, var(--blue-bright), var(--lime));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .railHeading {
@@ -108,6 +129,7 @@
   font-size: 12.5px;
   color: var(--rail-muted);
   position: relative;
+  z-index: 1;
 }
 
 .formside {
@@ -164,7 +186,7 @@
   color: var(--ink);
   background: #ffffff;
   border: 1.5px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: 11px;
   padding: 10px 12px;
   transition:
     border-color 120ms ease,
@@ -179,7 +201,7 @@
 .input:focus {
   outline: none;
   border-color: var(--focus);
-  box-shadow: 0 0 0 3px rgba(4, 118, 176, 0.22);
+  box-shadow: 0 0 0 3px rgba(0, 113, 250, 0.18);
 }
 
 .row {
@@ -237,13 +259,14 @@
   font-weight: 700;
   font-size: 14.5px;
   color: #ffffff;
-  background: var(--blue);
+  background: linear-gradient(90deg, var(--blue), #0a8fe0);
   border: none;
-  border-radius: 9px;
+  border-radius: 11px;
   padding: 11px 16px;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 113, 250, 0.15), 0 10px 24px rgba(0, 113, 250, 0.28);
   transition:
-    background 120ms ease,
+    box-shadow 120ms ease,
     transform 80ms ease;
   display: flex;
   align-items: center;
@@ -252,20 +275,22 @@
 }
 
 .submit:hover {
-  background: #036590;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 113, 250, 0.2), 0 16px 32px rgba(0, 113, 250, 0.34);
 }
 
 .submit:active {
-  transform: translateY(1px);
+  transform: translateY(0);
 }
 
 .submit:disabled {
   opacity: 0.7;
   cursor: default;
+  transform: none;
 }
 
 .submit:focus-visible {
-  outline: 3px solid rgba(4, 118, 176, 0.4);
+  outline: 3px solid rgba(0, 113, 250, 0.4);
   outline-offset: 2px;
 }
 

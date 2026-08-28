@@ -14,7 +14,7 @@ export default async function PortalEngagementsPage() {
   const supabase = createClient();
   const { data: engagements } = await supabase
     .from("engagements")
-    .select("id, engagement_number, status, due_date, open_date, services(name), engagement_tax_details(tax_year, return_type, return_status)")
+    .select("id, engagement_number, status, due_date, open_date, services(name), engagement_tax_details(tax_year, return_type, efile_status)")
     .eq("client_id", identity.clientId)
     .order("open_date", { ascending: false });
 
@@ -27,7 +27,7 @@ export default async function PortalEngagementsPage() {
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(engagements ?? []).map((e) => {
-              const taxDetail = (e.engagement_tax_details as unknown as { tax_year: number | null; return_type: string | null; return_status: string } | null);
+              const taxDetail = (e.engagement_tax_details as unknown as { tax_year: number | null; return_type: string | null; efile_status: string } | null);
               return (
                 <li key={e.id}>
                   <Link href={`/portal/engagements/${e.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-surfaceMuted">
@@ -36,7 +36,7 @@ export default async function PortalEngagementsPage() {
                       <p className="text-xs text-muted">
                         {e.engagement_number}
                         {taxDetail?.tax_year && ` -- Tax year ${taxDetail.tax_year}`}
-                        {taxDetail?.return_status && taxDetail.return_status !== "not_filed" && ` -- ${taxDetail.return_status.replace("_", " ")}`}
+                        {taxDetail?.efile_status && taxDetail.efile_status !== "not_filed" && ` -- ${taxDetail.efile_status.replace("_", " ")}`}
                       </p>
                     </div>
                     <div className="text-right">

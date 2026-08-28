@@ -9,6 +9,8 @@ import { ExportButtons } from "@/components/reports/ExportButtons";
 import { EmptyState } from "@/components/EmptyState";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import { Lock } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { BILLING_DOCUMENT_STATUS_TONE } from "@/lib/billingStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +87,16 @@ export default async function BillingReportPage({ searchParams }: { searchParams
       sortValue: (r) => r.clientLabel,
     },
     { key: "quote", label: "Quote", render: (r) => `${r.quote_number ?? "Quote"} -- ${r.title}`, sortValue: (r) => r.quote_number ?? "" },
-    { key: "status", label: "Status", render: (r) => <span className="capitalize">{r.status}</span>, sortValue: (r) => r.status },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => (
+        <Badge tone={BILLING_DOCUMENT_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+          {r.status}
+        </Badge>
+      ),
+      sortValue: (r) => r.status,
+    },
     { key: "amount", label: "Amount", align: "right", render: (r) => money(r.total_amount), sortValue: (r) => r.total_amount },
     { key: "created", label: "Created", render: (r) => new Date(r.created_at).toLocaleDateString(), sortValue: (r) => r.created_at },
   ];

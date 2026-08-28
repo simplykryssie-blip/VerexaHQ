@@ -15,11 +15,17 @@ export type TaxDetailRow = {
   is_extended: boolean;
   extension_filed_date: string | null;
   extension_due_date: string | null;
-  return_status: string;
+  efile_status: string;
+  efile_transmitted_at: string | null;
+  efile_accepted_at: string | null;
+  efile_rejected_reason: string | null;
   updated_at?: string;
 } | null;
 
-const RETURN_STATUSES = ["not_filed", "ready_to_file", "filed"] as const;
+// This firm doesn't e-file or transmit returns, so the e-file-specific
+// states (transmitted/accepted/rejected) aren't offered -- every return is
+// either not yet filed, ready to file, or paper filed.
+const RETURN_STATUSES = ["not_filed", "ready_to_file", "paper_filed"] as const;
 
 const FILING_STATUSES = [
   { value: "single", label: "Single" },
@@ -68,7 +74,7 @@ export function TaxDetailsCard({
   const [isAmended, setIsAmended] = useState(detail?.is_amended ?? false);
   const [isExtended, setIsExtended] = useState(detail?.is_extended ?? false);
   const [extensionDueDate, setExtensionDueDate] = useState(detail?.extension_due_date ?? "");
-  const [returnStatus, setReturnStatus] = useState(detail?.return_status ?? "not_filed");
+  const [returnStatus, setReturnStatus] = useState(detail?.efile_status ?? "not_filed");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -82,7 +88,7 @@ export function TaxDetailsCard({
     setIsAmended(detail?.is_amended ?? false);
     setIsExtended(detail?.is_extended ?? false);
     setExtensionDueDate(detail?.extension_due_date ?? "");
-    setReturnStatus(detail?.return_status ?? "not_filed");
+    setReturnStatus(detail?.efile_status ?? "not_filed");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.updated_at]);
 
@@ -102,7 +108,7 @@ export function TaxDetailsCard({
         is_amended: isAmended,
         is_extended: isExtended,
         extension_due_date: isExtended ? extensionDueDate || null : null,
-        return_status: returnStatus,
+        efile_status: returnStatus,
       },
       { onConflict: "engagement_id" }
     );
@@ -177,7 +183,7 @@ export function TaxDetailsCard({
         </div>
         <div>
           <label htmlFor="return_status" className="block text-xs font-medium text-muted">
-            Filing status
+            Return status
           </label>
           <select
             id="return_status"

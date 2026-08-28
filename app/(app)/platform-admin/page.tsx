@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { ShieldEllipsis, Lock, ShieldAlert, ArrowRight, Users, DollarSign, RefreshCw, CreditCard, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Badge } from "@/components/ui/Badge";
+import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 import { PlatformAdminsManager } from "./PlatformAdminsManager";
 import { PlatformItManager } from "./PlatformItManager";
 import { ProvisionWorkspaceForm } from "./ProvisionWorkspaceForm";
@@ -24,12 +25,6 @@ const WORKSPACE_TYPE_LABELS: Record<string, string> = {
   service_bureau: "Service Bureau",
   multi_office_firm: "Multi-Office Firm",
   platform_admin: "Platform Admin",
-};
-
-const STATUS_TONE: Record<string, BadgeTone> = {
-  active: "success",
-  suspended: "danger",
-  archived: "neutral",
 };
 
 export default async function PlatformAdminPage({ searchParams }: { searchParams: { range?: string } }) {
@@ -222,7 +217,7 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
                   const sub = subscriptionByWorkspace.get(w.id);
                   const planName = sub ? planNameById.get(sub.plan_id) : null;
                   return (
-                    <tr key={w.id} className="hover:bg-surfaceMuted">
+                    <tr key={w.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3">
                         <Link href={`/platform-admin/${w.id}`} className="font-medium text-accent hover:underline">
                           {w.name}
@@ -231,7 +226,7 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
                       <td className="px-5 py-3 text-slate">{ownerNameByWorkspace.get(w.id) ?? <span className="text-muted">--</span>}</td>
                       <td className="px-5 py-3 text-slate">{WORKSPACE_TYPE_LABELS[w.workspace_type] ?? w.workspace_type}</td>
                       <td className="px-5 py-3">
-                        <Badge tone={STATUS_TONE[w.status] ?? "neutral"} className="capitalize">
+                        <Badge tone={WORKSPACE_STATUS_TONE[w.status] ?? "neutral"} className="capitalize">
                           {w.status}
                         </Badge>
                         {w.suspension_reason && <span className="ml-1.5 text-xs text-muted">({w.suspension_reason.replace(/_/g, " ")})</span>}
@@ -270,7 +265,7 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
                 </thead>
                 <tbody className="divide-y divide-border">
                   {staffDirectory.map((s) => (
-                    <tr key={`${s.workspace_id}-${s.user_id}`} className="hover:bg-surfaceMuted">
+                    <tr key={`${s.workspace_id}-${s.user_id}`} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3 text-slate">{s.display_name ?? <span className="text-muted">--</span>}</td>
                       <td className="px-5 py-3 text-slate">{s.email}</td>
                       <td className="px-5 py-3">

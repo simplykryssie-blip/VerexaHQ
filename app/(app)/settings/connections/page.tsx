@@ -20,13 +20,13 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" }),
     supabase
       .from("firm_connections")
-      .select("id, status, billing_responsibility, shares_communications_identity, created_at, workspaces:child_workspace_id(name)")
+      .select("id, status, billing_responsibility, shares_communications_identity, allows_branding_override, created_at, workspaces:child_workspace_id(name)")
       .eq("parent_workspace_id", workspace.id)
       .eq("relationship_type", "ero_ptin")
       .order("created_at", { ascending: false }),
     supabase
       .from("firm_connections")
-      .select("id, status, billing_responsibility, shares_communications_identity, workspaces:parent_workspace_id(name)")
+      .select("id, status, billing_responsibility, shares_communications_identity, allows_branding_override, workspaces:parent_workspace_id(name)")
       .eq("child_workspace_id", workspace.id)
       .eq("relationship_type", "ero_ptin")
       .order("created_at", { ascending: false })
@@ -65,6 +65,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
                     status={c.status}
                     billingResponsibility={c.billing_responsibility}
                     sharesCommunicationsIdentity={c.shares_communications_identity}
+                    allowsBrandingOverride={c.allows_branding_override}
                   />
                 ))}
               </ul>
@@ -95,6 +96,7 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
               eroName={(myConnection.workspaces as unknown as { name: string } | null)?.name ?? "your ERO"}
               billingResponsibility={myConnection.billing_responsibility}
               sharesCommunicationsIdentity={myConnection.shares_communications_identity}
+              allowsBrandingOverride={myConnection.allows_branding_override}
               canDisconnect={Boolean(canManage) && myConnection.billing_responsibility !== "ero"}
             />
           ) : (

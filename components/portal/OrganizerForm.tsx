@@ -12,8 +12,9 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import { OrganizerPrintSummary } from "@/components/portal/OrganizerPrintSummary";
-import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -25,29 +26,21 @@ type FieldRow = {
   field_type: string;
   label: string;
   help_text: string | null;
+  body_html?: string | null;
   is_required: boolean;
   options: unknown;
   parent_field_id: string | null;
   conditional_logic?: unknown;
   client_profile_field?: string | null;
+  layout_width?: string | null;
 };
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
 
-/**
- * A field+instance currently flagged for more information. wasAnsweredWhenFlagged
- * determines which of the two client-facing flows applies: an unanswered field
- * reopens for direct edit (nothing to lose), an answered one only accepts a
- * proposed correction that staff must approve -- the original is never
- * overwritten directly.
- */
-export type OpenItemInfo = {
-  id: string;
-  note: string | null;
-  status: "pending" | "client_responded" | "approved" | "rejected" | "resolved";
-  wasAnsweredWhenFlagged: boolean;
-  decisionNote: string | null;
-};
+function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
+  if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
+  return value.trim() !== "";
+}
 
 export function OrganizerForm({
   responseId,
@@ -58,7 +51,6 @@ export function OrganizerForm({
   workspaceId,
   entityType,
   entityId,
-  openItemsByFieldInstance = {},
 }: {
   responseId: string;
   templateName: string;
@@ -68,7 +60,6 @@ export function OrganizerForm({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
-  openItemsByFieldInstance?: Record<string, OpenItemInfo>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -83,6 +74,7 @@ export function OrganizerForm({
     const type = fieldTypeById.get(fieldId);
     if (type === "address") return coerceAddressAnswerToString(value);
     if (type === "name") return coerceNameAnswerToString(value);
+    if (type === "phone") return formatPhone(String(value));
     return String(value);
   };
 
@@ -123,151 +115,153 @@ export function OrganizerForm({
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
   }
 
-  // For a field that was unanswered when flagged -- nothing to preserve, so
-  // this writes straight into organizer_response_answers (via a
-  // SECURITY DEFINER RPC, since the response is past the not_started/
-  // in_progress window direct RLS allows) and resolves the flag.
-  async function saveReopenedAnswer(itemId: string, value: string) {
-    const { error } = await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: itemId, p_value: value });
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show("Answer saved.", "success");
-    router.refresh();
-  }
-
-  // For a field that was already answered when flagged -- this never
-  // touches organizer_response_answers directly. Staff must approve it
-  // before the real answer changes.
-  async function proposeCorrection(itemId: string, value: string) {
-    const { error } = await supabase.rpc("propose_organizer_answer_correction", { p_item_id: itemId, p_proposed_value: value });
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show("Correction submitted for review.", "success");
-    router.refresh();
-  }
-
-  async function saveAll() {
+  // Wrapped in try/finally so an unexpected throw (a network failure, or a
+  // parse error out of parseAddressValue/parseNameValue on unusual input)
+  // can never leave `saving` stuck true -- previously that left the Save
+  // button spinning forever with no toast, since setSaving(false) was only
+  // reached on the normal-completion and clean-.error paths.
+  async function saveAll(): Promise<boolean> {
     setSaving(true);
-    const rows = Object.entries(answers).map(([organizer_field_id, value]) => ({
-      organizer_response_id: responseId,
-      organizer_field_id,
-      value,
-      instance_index: 0,
-    }));
+    try {
+      const rows = Object.entries(answers).map(([organizer_field_id, value]) => ({
+        organizer_response_id: responseId,
+        organizer_field_id,
+        value,
+        instance_index: 0,
+      }));
 
-    for (const repeater of repeaterFields) {
-      const children = childFieldsByParent.get(repeater.id) ?? [];
-      const repRows = repeaterRows[repeater.id] ?? [];
-      for (const child of children) {
-        // Clear out any rows beyond the current count (e.g. a dependent was
-        // removed) so stale answers don't linger under a dropped instance.
-        const { error: deleteError } = await supabase
-          .from("organizer_response_answers")
-          .delete()
-          .eq("organizer_response_id", responseId)
-          .eq("organizer_field_id", child.id)
-          .gte("instance_index", repRows.length);
-        if (deleteError) {
-          toast.show(deleteError.message, "error");
-          setSaving(false);
-          return;
-        }
-        repRows.forEach((row, i) => {
-          if (row[child.id] !== undefined) {
-            rows.push({ organizer_response_id: responseId, organizer_field_id: child.id, value: row[child.id], instance_index: i });
+      for (const repeater of repeaterFields) {
+        const children = childFieldsByParent.get(repeater.id) ?? [];
+        const repRows = repeaterRows[repeater.id] ?? [];
+        for (const child of children) {
+          // Clear out any rows beyond the current count (e.g. a dependent was
+          // removed) so stale answers don't linger under a dropped instance.
+          const { error: deleteError } = await supabase
+            .from("organizer_response_answers")
+            .delete()
+            .eq("organizer_response_id", responseId)
+            .eq("organizer_field_id", child.id)
+            .gte("instance_index", repRows.length);
+          if (deleteError) {
+            toast.show(deleteError.message, "error");
+            return false;
           }
-        });
+          repRows.forEach((row, i) => {
+            if (row[child.id] !== undefined) {
+              rows.push({ organizer_response_id: responseId, organizer_field_id: child.id, value: row[child.id], instance_index: i });
+            }
+          });
+        }
       }
-    }
 
-    if (rows.length > 0) {
-      const { error } = await supabase
-        .from("organizer_response_answers")
-        .upsert(rows, { onConflict: "organizer_response_id,organizer_field_id,instance_index" });
-      if (error) {
-        toast.show(error.message, "error");
-        setSaving(false);
-        return;
+      if (rows.length > 0) {
+        const { error } = await supabase
+          .from("organizer_response_answers")
+          .upsert(rows, { onConflict: "organizer_response_id,organizer_field_id,instance_index" });
+        if (error) {
+          toast.show(error.message, "error");
+          return false;
+        }
       }
-    }
 
-    // Fields the builder tagged as "prefill from client profile" propose
-    // their current value back to the client record -- applied immediately
-    // if the client record has nothing there yet, otherwise queued for
-    // staff approval. Repeater children are never mapped (a repeating
-    // section can't correspond to a single client-record field).
-    for (const field of fields) {
-      if (!field.client_profile_field || repeaterChildIds.has(field.id)) continue;
-      const value = answers[field.id];
-      if (!value) continue;
+      // Fields the builder tagged as "prefill from client profile" propose
+      // their current value back to the client record -- applied immediately
+      // if the client record has nothing there yet, otherwise queued for
+      // staff approval. Repeater children are never mapped (a repeating
+      // section can't correspond to a single client-record field). Errors
+      // here are surfaced but non-fatal to the save itself -- the answers
+      // above are already safely stored regardless.
+      for (const field of fields) {
+        if (!field.client_profile_field || repeaterChildIds.has(field.id)) continue;
+        const value = answers[field.id];
+        if (!value) continue;
 
-      if (field.client_profile_field === "mailing_address") {
-        const parts = parseAddressValue(value);
-        await supabase.rpc("propose_client_mailing_address", {
-          p_street: parts.street,
-          p_city: parts.city,
-          p_state: parts.state,
-          p_zip: parts.zip,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else if (field.client_profile_field === "full_name") {
-        const parts = parseNameValue(value);
-        await supabase.rpc("propose_client_full_name", {
-          p_first_name: parts.first,
-          p_middle_name: parts.middle,
-          p_last_name: parts.last,
-          p_suffix: parts.suffix,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else if (field.client_profile_field === "date_of_birth") {
-        await supabase.rpc("propose_client_date_of_birth", {
-          p_new_value: value,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
-      } else {
-        await supabase.rpc("propose_client_contact_field", {
-          p_field: field.client_profile_field,
-          p_new_value: value,
-          p_organizer_response_id: responseId,
-          p_organizer_field_id: field.id,
-        });
+        const result =
+          field.client_profile_field === "mailing_address"
+            ? await (() => {
+                const parts = parseAddressValue(value);
+                return supabase.rpc("propose_client_mailing_address", {
+                  p_street: parts.street,
+                  p_city: parts.city,
+                  p_state: parts.state,
+                  p_zip: parts.zip,
+                  p_organizer_response_id: responseId,
+                  p_organizer_field_id: field.id,
+                });
+              })()
+            : field.client_profile_field === "full_name"
+              ? await (() => {
+                  const parts = parseNameValue(value);
+                  return supabase.rpc("propose_client_full_name", {
+                    p_first_name: parts.first,
+                    p_middle_name: parts.middle,
+                    p_last_name: parts.last,
+                    p_suffix: parts.suffix,
+                    p_organizer_response_id: responseId,
+                    p_organizer_field_id: field.id,
+                  });
+                })()
+              : field.client_profile_field === "date_of_birth"
+                ? await supabase.rpc("propose_client_date_of_birth", {
+                    p_new_value: value,
+                    p_organizer_response_id: responseId,
+                    p_organizer_field_id: field.id,
+                  })
+                : field.client_profile_field === "ssn"
+                  ? await supabase.rpc("propose_client_sensitive_field", {
+                      p_field: "ssn",
+                      p_new_value: value,
+                      p_organizer_response_id: responseId,
+                      p_organizer_field_id: field.id,
+                    })
+                  : await supabase.rpc("propose_client_contact_field", {
+                      p_field: field.client_profile_field,
+                      p_new_value: value,
+                      p_organizer_response_id: responseId,
+                      p_organizer_field_id: field.id,
+                    });
+        if (result.error) toast.show(result.error.message, "error");
       }
-    }
 
-    setSaving(false);
-    toast.show("Progress saved", "success");
-    router.refresh();
+      toast.show("Progress saved", "success");
+      router.refresh();
+      return true;
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not save -- please try again.", "error");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function submit() {
-    await saveAll();
+    const saved = await saveAll();
+    if (!saved) return;
     setSubmitting(true);
-    const { error } = await supabase.rpc("submit_organizer_response", { p_response_id: responseId });
-    setSubmitting(false);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
+    try {
+      const { error } = await supabase.rpc("submit_organizer_response", { p_response_id: responseId });
+      if (error) {
+        toast.show(error.message, "error");
+        return;
+      }
+      fetch("/api/documents/file-organizer-response", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responseId }),
+      }).catch(() => {
+        // Best-effort -- the submission itself is already recorded; filing
+        // it into Documents can be retried later if this fails.
+      });
+      // A toast alone was easy to miss -- nothing on screen told the client
+      // their organizer actually went through. This blocks on an explicit
+      // "OK" instead, then sends them back to the dashboard rather than
+      // leaving them looking at the (now read-only) form they just finished.
+      setJustSubmitted(true);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not submit -- please try again.", "error");
+    } finally {
+      setSubmitting(false);
     }
-    fetch("/api/documents/file-organizer-response", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ responseId }),
-    }).catch(() => {
-      // Best-effort -- the submission itself is already recorded; filing
-      // it into Documents can be retried later if this fails.
-    });
-    // A toast alone was easy to miss -- nothing on screen told the client
-    // their organizer actually went through. This blocks on an explicit
-    // "OK" instead, then sends them back to the dashboard rather than
-    // leaving them looking at the (now read-only) form they just finished.
-    setJustSubmitted(true);
   }
 
   function backToDashboard() {
@@ -282,6 +276,30 @@ export function OrganizerForm({
   const currentIndex = Math.min(pageIndex, pages.length - 1);
   const currentPage = pages[currentIndex];
   const isLastPage = currentIndex === pages.length - 1;
+
+  function unmetRequiredOnCurrentPage(): FieldRow[] {
+    return currentPage.fields.filter(
+      (f) => f.is_required && !isFieldAnswered(f, answers[f.id] ?? "", repeaterRows[f.id]?.length)
+    );
+  }
+
+  function goNext() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      toast.show(`Please answer: ${unmet.map((f) => f.label).join(", ")}`, "error");
+      return;
+    }
+    setPageIndex((i) => Math.min(pages.length - 1, i + 1));
+  }
+
+  function submitWithValidation() {
+    const unmet = unmetRequiredOnCurrentPage();
+    if (unmet.length > 0) {
+      toast.show(`Please answer: ${unmet.map((f) => f.label).join(", ")}`, "error");
+      return;
+    }
+    submit();
+  }
 
   return (
     <div className="space-y-4">
@@ -311,18 +329,18 @@ export function OrganizerForm({
           repeaterRows={repeaterRows}
         />
       )}
-      <div className="print:hidden space-y-4">
+      <div className="print:hidden">
         {pages.length > 1 && (
-          <p className="text-xs font-medium text-muted">
+          <p className="mb-4 text-xs font-medium text-muted">
             Page {currentIndex + 1} of {pages.length}
             {currentPage.title ? ` -- ${currentPage.title}` : ""}
           </p>
         )}
+        <div className="grid grid-cols-12 gap-x-5 gap-y-6">
         {currentPage.fields.map((field) =>
           field.field_type === "repeating_section" ? (
             <RepeatingSectionInput
               key={field.id}
-              responseId={responseId}
               field={field}
               childFields={childFieldsByParent.get(field.id) ?? []}
               rows={repeaterRows[field.id] ?? []}
@@ -331,14 +349,10 @@ export function OrganizerForm({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
-              openItemsByFieldInstance={openItemsByFieldInstance}
-              onSaveReopenedAnswer={saveReopenedAnswer}
-              onProposeCorrection={proposeCorrection}
             />
           ) : (
             <FieldInput
               key={field.id}
-              responseId={responseId}
               field={field}
               value={answers[field.id] ?? ""}
               onChange={saveAnswer}
@@ -346,12 +360,10 @@ export function OrganizerForm({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
-              openItem={openItemsByFieldInstance[`${field.id}:0`] ?? null}
-              onSaveReopenedAnswer={saveReopenedAnswer}
-              onProposeCorrection={proposeCorrection}
             />
           )
         )}
+        </div>
       </div>
 
       {!readOnly && (
@@ -369,7 +381,7 @@ export function OrganizerForm({
           {pages.length > 1 && !isLastPage && (
             <button
               type="button"
-              onClick={() => setPageIndex((i) => Math.min(pages.length - 1, i + 1))}
+              onClick={goNext}
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
             >
               Next
@@ -386,7 +398,7 @@ export function OrganizerForm({
           {(pages.length === 1 || isLastPage) && (
             <button
               type="button"
-              onClick={submit}
+              onClick={submitWithValidation}
               disabled={saving || submitting}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
@@ -400,7 +412,6 @@ export function OrganizerForm({
 }
 
 function RepeatingSectionInput({
-  responseId,
   field,
   childFields,
   rows,
@@ -409,11 +420,7 @@ function RepeatingSectionInput({
   workspaceId,
   entityType,
   entityId,
-  openItemsByFieldInstance,
-  onSaveReopenedAnswer,
-  onProposeCorrection,
 }: {
-  responseId: string;
   field: FieldRow;
   childFields: FieldRow[];
   rows: Record<string, string>[];
@@ -422,9 +429,6 @@ function RepeatingSectionInput({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
-  openItemsByFieldInstance: Record<string, OpenItemInfo>;
-  onSaveReopenedAnswer: (itemId: string, value: string) => Promise<void>;
-  onProposeCorrection: (itemId: string, value: string) => Promise<void>;
 }) {
   function updateRow(index: number, childFieldId: string, value: string) {
     onChange(rows.map((row, i) => (i === index ? { ...row, [childFieldId]: value } : row)));
@@ -435,8 +439,8 @@ function RepeatingSectionInput({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label className="block text-sm font-medium text-ink">
+    <div className="col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
+      <label className="block text-sm font-semibold text-ink">
         {field.label} {field.is_required && <span className="text-danger">*</span>}
       </label>
       {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
@@ -444,9 +448,9 @@ function RepeatingSectionInput({
       <div className="mt-3 space-y-3">
         {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
         {rows.map((row, index) => (
-          <div key={index} className="rounded-lg border border-border p-3">
+          <div key={index} className="rounded-xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
                 {field.label} {index + 1}
               </p>
               {!disabled && (
@@ -455,30 +459,28 @@ function RepeatingSectionInput({
                 </button>
               )}
             </div>
-            <div className="mt-2 space-y-3">
-              {childFields.map((child) => (
-                <FieldInput
-                  key={child.id}
-                  responseId={responseId}
-                  field={child}
-                  value={row[child.id] ?? ""}
-                  onChange={(fieldId, value) => updateRow(index, fieldId, value)}
-                  disabled={disabled}
-                  workspaceId={workspaceId}
-                  entityType={entityType}
-                  entityId={entityId}
-                  openItem={openItemsByFieldInstance[`${child.id}:${index}`] ?? null}
-                  onSaveReopenedAnswer={onSaveReopenedAnswer}
-                  onProposeCorrection={onProposeCorrection}
-                />
-              ))}
+            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
+              {childFields
+                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .map((child) => (
+                  <FieldInput
+                    key={child.id}
+                    field={child}
+                    value={row[child.id] ?? ""}
+                    onChange={(fieldId, value) => updateRow(index, fieldId, value)}
+                    disabled={disabled}
+                    workspaceId={workspaceId}
+                    entityType={entityType}
+                    entityId={entityId}
+                  />
+                ))}
             </div>
           </div>
         ))}
       </div>
 
       {!disabled && (
-        <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-medium text-accent hover:underline">
+        <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-semibold text-accent hover:underline">
           + Add another
         </button>
       )}
@@ -582,25 +584,19 @@ function FileUploadField({
 }
 
 function SignatureField({
-  responseId,
   fieldId,
   value,
   onChange,
   disabled,
 }: {
-  responseId: string;
   fieldId: string;
   value: string;
   onChange: (fieldId: string, value: string) => void;
   disabled: boolean;
 }) {
-  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
-  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  let parsed: { typed_name?: string; signature_image_path?: string; signed_at: string } | null = null;
+  let parsed: { typed_name: string; signed_at: string } | null = null;
   try {
     parsed = value ? JSON.parse(value) : null;
   } catch {
@@ -611,7 +607,7 @@ function SignatureField({
     return (
       <p className="flex items-center gap-1.5 text-sm text-green-700">
         <PenLine size={14} aria-hidden="true" />
-        {parsed.typed_name ? `Signed by ${parsed.typed_name}` : "Signed (drawn signature)"} on {new Date(parsed.signed_at).toLocaleDateString()}
+        Signed by {parsed.typed_name} on {new Date(parsed.signed_at).toLocaleDateString()}
       </p>
     );
   }
@@ -620,48 +616,27 @@ function SignatureField({
     return <p className="text-xs text-muted">Not signed.</p>;
   }
 
-  async function sign() {
-    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
-    setError(null);
-
-    if (mode === "typed") {
-      onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }));
-      return;
-    }
-
-    setUploading(true);
-    const res = await fetch(`/api/portal/organizer/${responseId}/signature-image`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ dataUrl: drawnDataUrl }),
-    });
-    const result = await res.json().catch(() => ({}));
-    setUploading(false);
-    if (!res.ok) {
-      setError(result.error ?? "Could not save your signature.");
-      return;
-    }
-    onChange(fieldId, JSON.stringify({ signature_image_path: result.path, signed_at: new Date().toISOString() }));
-  }
-
   return (
-    <div className="space-y-2">
-      <SignaturePad mode={mode} onModeChange={setMode} typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
-      {error && <p className="text-xs text-danger">{error}</p>}
+    <div className="flex items-center gap-2">
+      <input
+        value={typedName}
+        onChange={(e) => setTypedName(e.target.value)}
+        placeholder="Type your full name"
+        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      />
       <button
         type="button"
-        onClick={sign}
-        disabled={uploading || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
-        className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        disabled={!typedName.trim()}
+        onClick={() => onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }))}
+        className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
       >
-        {uploading ? "Saving..." : "Sign"}
+        Sign
       </button>
     </div>
   );
 }
 
 function FieldInput({
-  responseId,
   field,
   value,
   onChange,
@@ -669,11 +644,7 @@ function FieldInput({
   workspaceId,
   entityType,
   entityId,
-  openItem,
-  onSaveReopenedAnswer,
-  onProposeCorrection,
 }: {
-  responseId: string;
   field: FieldRow;
   value: string;
   onChange: (fieldId: string, value: string) => void;
@@ -681,200 +652,70 @@ function FieldInput({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
-  openItem?: OpenItemInfo | null;
-  onSaveReopenedAnswer?: (itemId: string, value: string) => Promise<void>;
-  onProposeCorrection?: (itemId: string, value: string) => Promise<void>;
 }) {
+  const options = normalizeOptions(field.options);
+  const inputClass =
+    "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:bg-surfaceMuted disabled:text-muted";
+
   if (field.field_type === "section") {
     return (
-      <div className="border-b border-border pb-1.5 pt-2">
-        <h3 className="text-base font-semibold text-ink">{field.label}</h3>
+      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
+        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
         {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
       </div>
     );
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="rounded-xl border border-border bg-surfaceMuted p-4">
-        {field.label && <p className="text-sm font-medium text-ink">{field.label}</p>}
-        {field.help_text && <p className={`text-sm text-slate ${field.label ? "mt-1" : ""}`}>{field.help_text}</p>}
+      <div className="col-span-12">
+        <RichTextEditor content={field.body_html ?? ""} editable={false} bare />
       </div>
     );
   }
 
-  // An unanswered field the reviewer flagged reopens for direct edit --
-  // nothing to preserve. An already-answered flagged field never gets
-  // overwritten directly; the client can only propose a correction that
-  // staff must approve.
-  const isReopened = Boolean(openItem) && !openItem!.wasAnsweredWhenFlagged && openItem!.status === "pending";
-  const canProposeCorrection = Boolean(openItem) && openItem!.wasAnsweredWhenFlagged && (openItem!.status === "pending" || openItem!.status === "rejected");
-  const awaitingStaffDecision = Boolean(openItem) && openItem!.wasAnsweredWhenFlagged && openItem!.status === "client_responded";
-  const effectiveDisabled = isReopened ? false : disabled;
+  const showHeader = !(field.field_type === "checkbox" && !field.label.trim());
 
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <label htmlFor={`field-${field.id}`} className="block text-sm font-medium text-ink">
-        {field.label} {field.is_required && <span className="text-danger">*</span>}
-      </label>
-      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
-
-      {openItem?.note && (isReopened || canProposeCorrection) && (
-        <p className="mt-1.5 rounded-lg bg-amberSoft px-2.5 py-1.5 text-xs text-amber">Your preparer needs: {openItem.note}</p>
-      )}
-      {openItem?.decisionNote && canProposeCorrection && (
-        <p className="mt-1.5 rounded-lg bg-roseSoft px-2.5 py-1.5 text-xs text-rose">Your last submission wasn&apos;t accepted: {openItem.decisionNote}</p>
+    <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
+      {showHeader && (
+        <>
+          <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
+            {field.label} {field.is_required && <span className="text-danger">*</span>}
+          </label>
+          {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+        </>
       )}
 
-      <div className="mt-2">
-        <FieldValueInput
-          field={field}
-          value={value}
-          onChange={onChange}
-          disabled={effectiveDisabled}
-          workspaceId={workspaceId}
-          entityType={entityType}
-          entityId={entityId}
-          responseId={responseId}
-        />
-      </div>
-
-      {isReopened && onSaveReopenedAnswer && (
-        <button
-          type="button"
-          onClick={() => onSaveReopenedAnswer(openItem!.id, value)}
-          className="mt-2 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
-        >
-          Save answer
-        </button>
-      )}
-
-      {awaitingStaffDecision && <p className="mt-2 text-xs text-accent">Correction submitted -- awaiting review.</p>}
-
-      {canProposeCorrection && onProposeCorrection && (
-        <ProposeCorrectionControl field={field} currentValue={value} workspaceId={workspaceId} entityType={entityType} entityId={entityId} responseId={responseId} onSubmit={(v) => onProposeCorrection(openItem!.id, v)} />
-      )}
-    </div>
-  );
-}
-
-function ProposeCorrectionControl({
-  field,
-  currentValue,
-  workspaceId,
-  entityType,
-  entityId,
-  responseId,
-  onSubmit,
-}: {
-  field: FieldRow;
-  currentValue: string;
-  workspaceId: string;
-  entityType: "client" | "engagement";
-  entityId: string;
-  responseId: string;
-  onSubmit: (value: string) => Promise<void>;
-}) {
-  const [open, setOpen] = useState(false);
-  const [draftValue, setDraftValue] = useState(currentValue);
-  const [submitting, setSubmitting] = useState(false);
-
-  if (!open) {
-    return (
-      <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs font-medium text-accent hover:underline">
-        Propose a correction
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-2 space-y-2 border-t border-border pt-2">
-      <FieldValueInput
-        field={field}
-        value={draftValue}
-        onChange={(_, v) => setDraftValue(v)}
-        disabled={false}
-        workspaceId={workspaceId}
-        entityType={entityType}
-        entityId={entityId}
-        responseId={responseId}
-      />
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={async () => {
-            setSubmitting(true);
-            await onSubmit(draftValue);
-            setSubmitting(false);
-            setOpen(false);
-          }}
-          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-        >
-          {submitting ? "Submitting..." : "Submit correction"}
-        </button>
-        <button type="button" onClick={() => setOpen(false)} disabled={submitting} className="text-xs font-medium text-muted hover:text-ink disabled:opacity-40">
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FieldValueInput({
-  responseId,
-  field,
-  value,
-  onChange,
-  disabled,
-  workspaceId,
-  entityType,
-  entityId,
-  idPrefix = "field",
-}: {
-  responseId: string;
-  field: FieldRow;
-  value: string;
-  onChange: (fieldId: string, value: string) => void;
-  disabled: boolean;
-  workspaceId: string;
-  entityType: "client" | "engagement";
-  entityId: string;
-  idPrefix?: string;
-}) {
-  const options = normalizeOptions(field.options);
-  const inputId = `${idPrefix}-${field.id}`;
-
-  return (
-    <>
-      {field.field_type === "name" ? (
+      <div className={showHeader ? "mt-1.5" : ""}>
+        {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
         ) : field.field_type === "email" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="email"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "phone" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="tel"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, formatPhone(e.target.value))}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "website" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="url"
             value={value}
             disabled={disabled}
             placeholder="https://"
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "yes_no" ? (
           <div className="flex gap-4">
@@ -882,7 +723,7 @@ function FieldValueInput({
               <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
                 <input
                   type="radio"
-                  name={inputId}
+                  name={`field-${field.id}`}
                   checked={value === o.value}
                   disabled={disabled}
                   onChange={() => onChange(field.id, o.value)}
@@ -903,14 +744,14 @@ function FieldValueInput({
             entityId={entityId}
           />
         ) : field.field_type === "signature" ? (
-          <SignatureField responseId={responseId} fieldId={field.id} value={value} onChange={onChange} disabled={disabled} />
+          <SignatureField fieldId={field.id} value={value} onChange={onChange} disabled={disabled} />
         ) : field.field_type === "dropdown" ? (
           <select
-            id={inputId}
+            id={`field-${field.id}`}
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           >
             <option value="">Select...</option>
             {options.map((o, i) => (
@@ -925,7 +766,7 @@ function FieldValueInput({
               <label key={i} className="flex items-center gap-2 text-sm text-slate">
                 <input
                   type="radio"
-                  name={inputId}
+                  name={`field-${field.id}`}
                   checked={value === o.value}
                   disabled={disabled}
                   onChange={() => onChange(field.id, o.value)}
@@ -935,7 +776,7 @@ function FieldValueInput({
               </label>
             ))}
           </div>
-        ) : field.field_type === "multiple_choice" ? (
+        ) : field.field_type === "multiple_choice" || field.field_type === "checkbox" ? (
           <div className="space-y-1.5">
             {options.map((o, i) => {
               const selected = value ? value.split(",") : [];
@@ -956,67 +797,74 @@ function FieldValueInput({
               );
             })}
           </div>
-        ) : field.field_type === "checkbox" ? (
-          <input
-            id={inputId}
-            type="checkbox"
-            checked={value === "true"}
-            disabled={disabled}
-            onChange={(e) => onChange(field.id, e.target.checked ? "true" : "false")}
-            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-          />
         ) : field.field_type === "date" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="date"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "number" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="number"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "currency" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="number"
             step="0.01"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
-            id={inputId}
+            id={`field-${field.id}`}
             type="text"
             inputMode="numeric"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
           />
         ) : field.field_type === "address" ? (
           <AddressInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
-        ) : (
-          <textarea
-            id={inputId}
+        ) : field.field_type === "short_text" ? (
+          <input
+            id={`field-${field.id}`}
+            type="text"
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(field.id, e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            className={inputClass}
+          />
+        ) : (
+          <textarea
+            id={`field-${field.id}`}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onChange(field.id, e.target.value)}
+            rows={3}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = `${el.scrollHeight}px`;
+              }
+            }}
+            className={`${inputClass} resize-none overflow-hidden`}
           />
         )}
-    </>
+      </div>
+    </div>
   );
 }
 

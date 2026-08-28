@@ -41,6 +41,7 @@ import {
   type MessageTemplateOption,
   type StaffOption,
   type AutomationOption,
+  type RoleOption,
 } from "@/components/workflows/WorkflowBuilder";
 import { triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { BranchEditor } from "@/components/workflows/BranchEditor";
@@ -570,6 +571,7 @@ function CanvasInner({
   staffOptions,
   automationOptions,
   tagOptions = [],
+  roleOptions = [],
   onEditTrigger,
   onOpenRun,
 }: {
@@ -592,6 +594,7 @@ function CanvasInner({
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   tagOptions?: string[];
+  roleOptions?: RoleOption[];
   onEditTrigger: () => void;
   onOpenRun: (runId: string) => void;
 }) {
@@ -1111,6 +1114,7 @@ function CanvasInner({
             </div>
           ) : selectedStep ? (
             <StepCard
+              key={selectedStep.id}
               workspaceId={workspaceId}
               step={selectedStep}
               index={0}
@@ -1127,6 +1131,7 @@ function CanvasInner({
               staffOptions={staffOptions}
               automationOptions={automationOptions}
               tagOptions={tagOptions}
+              roleOptions={roleOptions}
               canManage={canManage}
               onSaved={() => {
                 router.refresh();

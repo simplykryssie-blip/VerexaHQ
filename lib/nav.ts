@@ -29,6 +29,7 @@ import {
   Wrench,
   Package,
   Palette,
+  Receipt,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -47,8 +48,17 @@ export type NavItem = NavLeaf | NavGroup;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Clients", href: "/clients", icon: Users },
+  {
+    label: "Contacts",
+    icon: Users,
+    children: [
+      { label: "Leads", href: "/clients?tab=leads" },
+      { label: "Individual Clients", href: "/clients?tab=clients&type=individual" },
+      { label: "Business Clients", href: "/clients?tab=clients&type=business" },
+    ],
+  },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
+  { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
@@ -85,9 +95,9 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Clients", "Engagements", "Review Queue", "Messages"] },
+  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 
@@ -123,9 +133,6 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
       { label: "Workflows", href: "/workflows" },
     ],
   },
-  // Verexa HQ also runs its own public marketing site, so unlike Tax
-  // Office (genuinely irrelevant to a platform-admin workspace), Websites
-  // stays reachable here too.
   {
     label: "Websites",
     icon: Globe,
@@ -160,7 +167,7 @@ export type SettingsNavItem = {
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
-  { label: "Brand Center", href: "/settings/brand-center", icon: Palette },
+  { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
@@ -177,7 +184,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Brand Center", "Services", "Users & Staff", "Roles & Permissions", "Tags", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags", "Connections"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 

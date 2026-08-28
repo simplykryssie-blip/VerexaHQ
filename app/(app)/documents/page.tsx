@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
+import { IconChip, type IconChipTone } from "@/components/ui/IconChip";
 
 export const dynamic = "force-dynamic";
 
@@ -17,14 +18,26 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function StatCard({ icon: Icon, label, value, href }: { icon: React.ElementType; label: string; value: React.ReactNode; href?: string }) {
+function StatCard({
+  icon: Icon,
+  chip = "accent",
+  label,
+  value,
+  href,
+}: {
+  icon: React.ElementType;
+  chip?: IconChipTone;
+  label: string;
+  value: React.ReactNode;
+  href?: string;
+}) {
   const body = (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
-      <div className="flex items-center gap-2 text-muted">
-        <Icon size={16} aria-hidden="true" />
-        <p className="text-xs uppercase tracking-wide">{label}</p>
-      </div>
-      <p className="mt-1 text-2xl font-semibold text-ink">{value}</p>
+    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:shadow-softHover">
+      <IconChip tone={chip} className="mb-3">
+        <Icon size={17} aria-hidden="true" />
+      </IconChip>
+      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
     </div>
   );
   return href ? <Link href={href}>{body}</Link> : body;
@@ -107,11 +120,11 @@ export default async function DocumentCenterHubPage() {
       />
       <div className="flex-1 space-y-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={FileText} label="Pending requests" value={(openRequests ?? []).length} href="/reports/documents?report=completion" />
-          <StatCard icon={AlertTriangle} label="Missing documents" value={missingDocuments} href="/reports/documents?report=missing" />
-          <StatCard icon={Clock} label="Overdue requests" value={overdueRequests.length} href="/reports/documents?report=missing" />
-          <StatCard icon={PenLine} label="Pending signatures" value={(pendingSignatures ?? []).length} href="/reports/documents?report=signatures" />
-          <StatCard icon={HardDrive} label="Storage used" value={formatSize(totalStorage)} href="/reports/documents?report=storage" />
+          <StatCard icon={FileText} chip="accent" label="Pending requests" value={(openRequests ?? []).length} href="/reports/documents?report=completion" />
+          <StatCard icon={AlertTriangle} chip="rose" label="Missing documents" value={missingDocuments} href="/reports/documents?report=missing" />
+          <StatCard icon={Clock} chip="amber" label="Overdue requests" value={overdueRequests.length} href="/reports/documents?report=missing" />
+          <StatCard icon={PenLine} chip="violet" label="Pending signatures" value={(pendingSignatures ?? []).length} href="/reports/documents?report=signatures" />
+          <StatCard icon={HardDrive} chip="emerald" label="Storage used" value={formatSize(totalStorage)} href="/reports/documents?report=storage" />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -126,7 +139,7 @@ export default async function DocumentCenterHubPage() {
                   const missing = (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length;
                   const overdue = Boolean(r.due_date && new Date(r.due_date) < new Date());
                   return (
-                    <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                    <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-surfaceMuted">
                       <div>
                         <Link href={entity?.href ?? "#"} className="font-medium text-accent hover:underline">
                           {entity?.label ?? "--"}

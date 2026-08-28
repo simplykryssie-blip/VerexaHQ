@@ -9,6 +9,7 @@ import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
 import { useToast } from "@/components/Toast";
+import { US_STATES } from "@/lib/usStates";
 
 const DRAFT_KEY = "new-client-button";
 
@@ -555,13 +556,21 @@ export function NewClientButton({
                       onChange={(e) => setCity(e.target.value)}
                       className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
-                    <input
+                    <select
                       required
-                      placeholder="State"
                       value={state}
                       onChange={(e) => setState(e.target.value)}
                       className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                    >
+                      <option value="" disabled>
+                        State
+                      </option>
+                      {US_STATES.map((s) => (
+                        <option key={s.code} value={s.code}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
                     <input
                       required
                       placeholder="ZIP"

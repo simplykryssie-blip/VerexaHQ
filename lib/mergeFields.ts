@@ -74,7 +74,24 @@ export const MERGE_FIELD_GROUPS: { group: string; fields: MergeFieldDef[] }[] = 
       // portal (a reminder, a status update), as opposed to the dedicated
       // portal-invite-email flow, which has always sent its own tokenized
       // accept-invitation link automatically.
-      { token: "portal_link", label: "Client portal link", kind: "auto", source: "app portal sign-in page", sample: "https://verexahq.com/portal/login" },
+      {
+        token: "portal_link",
+        label: "Portal sign-in link (for returning clients)",
+        kind: "auto",
+        source: "app portal sign-in page",
+        sample: "https://verexahq.com/portal/login",
+      },
+      // The one-time, tokenized accept-invitation link -- only resolves when
+      // the client has a live, unexpired invitation; dispatch-notifications
+      // refuses to send a message that uses this token if no such invitation
+      // exists, rather than sending a broken/empty link.
+      {
+        token: "portal_invite_link",
+        label: "Portal invite link (first-time account setup)",
+        kind: "auto",
+        source: "client_portal_users (requires an active, unexpired invitation)",
+        sample: "https://verexahq.com/portal/accept-invitation?token=...",
+      },
     ],
   },
   {

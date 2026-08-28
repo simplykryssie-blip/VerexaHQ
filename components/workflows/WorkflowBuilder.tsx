@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -18,11 +18,11 @@ import {
   ArrowRightCircle,
   UserCog,
   Bell,
-  GitBranch,
   UserX,
   UserCheck,
   Pencil,
   UserPlus,
+  Route,
   DollarSign,
   Send,
   Tag,
@@ -40,6 +40,9 @@ import {
   BellOff,
   BellRing,
   Milestone,
+  History,
+  ShieldCheck,
+  ShieldX,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -55,11 +58,7 @@ import {
 } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
-import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
-import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
-import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
-import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
 import { TagNameInput } from "@/components/workflows/TagNameInput";
@@ -76,8 +75,19 @@ export type WorkflowStepRow = {
   delay_minutes: number;
   canvas_x: number | null;
   canvas_y: number | null;
-  display_name: string | null;
-  is_enabled: boolean;
+  requires_approval: boolean;
+  approver_role_id: string | null;
+};
+
+export type RoleOption = { id: string; name: string };
+
+export type PendingApprovalRow = {
+  id: string;
+  created_at: string;
+  step_display_name: string | null;
+  action_type: string;
+  engagement_number: string | null;
+  client_name: string | null;
 };
 
 export type WorkflowStepEdgeRow = {
@@ -112,54 +122,37 @@ type WorkflowLogRow = {
 
 export type MessageTemplateOption = { id: string; name: string; slug: string };
 
-// category/description/keywords are display-only metadata for the
-// searchable/categorized step picker (components/workflows/StepPicker.tsx)
-// -- they never touch execution. The engine only ever sees `value` (stored
-// verbatim as automation_steps.action_type); category groupings here can be
-// freely renamed/reshuffled without any migration.
-export const ACTION_CATEGORIES: { key: string; label: string }[] = [
-  { key: "communication", label: "Communication" },
-  { key: "contacts_leads", label: "Contacts & Leads" },
-  { key: "tasks", label: "Tasks" },
-  { key: "appointments", label: "Appointments" },
-  { key: "documents_organizers", label: "Documents & Organizers" },
-  { key: "pipeline_engagements", label: "Pipeline & Engagements" },
-  { key: "billing", label: "Billing" },
-  { key: "tax_workflow", label: "Tax Workflow" },
-  { key: "workflow_control", label: "Workflow Control" },
-];
-
 export const ACTION_TYPES = [
-  { value: "delay", label: "Wait / Delay", category: "workflow_control", description: "Pause before continuing to the next step.", keywords: "wait pause business hours" },
-  { value: "send_email", label: "Send an email", category: "communication", description: "Send a templated email to the client.", keywords: "message mail" },
-  { value: "send_sms", label: "Send a text", category: "communication", description: "Send a templated text message to the client.", keywords: "message sms text" },
-  { value: "create_task", label: "Create a task", category: "tasks", description: "Create a task assigned to a staff member.", keywords: "todo assign" },
-  { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
-  { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
-  { value: "create_engagement", label: "Create the engagement and start its pipeline", category: "pipeline_engagements", description: "Create the engagement and start its pipeline (organizer-submission workflows only).", keywords: "engagement pipeline start" },
-  { value: "send_engagement_letter", label: "Send the engagement letter for signature", category: "tax_workflow", description: "Queue the engagement letter for e-signature.", keywords: "signature sign letter" },
-  { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
-  { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
-  { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
-  { value: "send_notification", label: "Notify a staff member", category: "communication", description: "Notify staff members in-app or by email.", keywords: "alert notify staff" },
-  { value: "move_pipeline_stage", label: "Move to a pipeline stage", category: "pipeline_engagements", description: "Move the client or engagement forward to a specific pipeline stage.", keywords: "stage move pipeline" },
-  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service", category: "pipeline_engagements", description: "Start the pipeline matching the lead's selected service.", keywords: "lead pipeline service" },
-  { value: "mark_lead_lost", label: "Mark the lead lost", category: "contacts_leads", description: "Mark the lead as lost.", keywords: "lost lead close" },
-  { value: "convert_lead_to_client", label: "Convert the lead to an active client", category: "contacts_leads", description: "Convert the lead into an active client.", keywords: "convert lead client" },
-  { value: "update_client", label: "Update a client field", category: "contacts_leads", description: "Update a single field on the client record.", keywords: "edit field update" },
-  { value: "create_client", label: "Create a new client", category: "contacts_leads", description: "Create a new client, or reuse a matching one by email/phone.", keywords: "new client contact" },
-  { value: "create_quote", label: "Create a quote", category: "billing", description: "Create a draft quote.", keywords: "quote estimate billing" },
-  { value: "send_quote", label: "Send the draft quote", category: "billing", description: "Send the most recent draft quote.", keywords: "quote send billing" },
-  { value: "add_tag", label: "Add a tag to the client", category: "contacts_leads", description: "Add a tag to the client.", keywords: "tag label" },
-  { value: "remove_tag", label: "Remove a tag from the client", category: "contacts_leads", description: "Remove a tag from the client.", keywords: "tag label remove" },
-  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)", category: "contacts_leads", description: "Invite the client to the portal (skips if already invited).", keywords: "portal invite" },
-  { value: "add_note", label: "Add an internal note", category: "contacts_leads", description: "Add an internal note to the client or engagement.", keywords: "note internal" },
-  { value: "send_portal_message", label: "Send a portal message", category: "communication", description: "Send a message to the client's portal inbox.", keywords: "message portal" },
-  { value: "start_workflow", label: "Start another workflow", category: "workflow_control", description: "Start another published workflow for this same client or engagement.", keywords: "workflow start chain" },
-  { value: "end_workflow", label: "End this workflow", category: "workflow_control", description: "End this workflow run immediately.", keywords: "stop end exit" },
-  { value: "webhook", label: "Call a webhook", category: "workflow_control", description: "Send the run's data to an external URL.", keywords: "webhook api integration http" },
-  { value: "add_dnd", label: "Opt the client out of SMS/email", category: "communication", description: "Opt the client out of SMS and/or email sends.", keywords: "dnd opt out unsubscribe" },
-  { value: "remove_dnd", label: "Opt the client back into SMS/email", category: "communication", description: "Opt the client back into SMS and/or email sends.", keywords: "dnd opt in resubscribe" },
+  { value: "delay", label: "Wait / Delay" },
+  { value: "send_email", label: "Send an email" },
+  { value: "send_sms", label: "Send a text" },
+  { value: "create_task", label: "Create a task" },
+  { value: "create_appointment", label: "Schedule an appointment (request)" },
+  { value: "send_organizer_template", label: "Push an organizer to the client's portal" },
+  { value: "create_engagement", label: "Create the engagement and start its pipeline" },
+  { value: "send_engagement_letter", label: "Send the engagement letter for signature" },
+  { value: "change_stage", label: "Advance to the next pipeline stage" },
+  { value: "send_document_request", label: "Send a document request" },
+  { value: "assign_user", label: "Assign staff" },
+  { value: "send_notification", label: "Notify a staff member" },
+  { value: "move_pipeline_stage", label: "Move to a pipeline stage" },
+  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service" },
+  { value: "mark_lead_lost", label: "Mark the lead lost" },
+  { value: "convert_lead_to_client", label: "Convert the lead to an active client" },
+  { value: "update_client", label: "Update a client field" },
+  { value: "create_client", label: "Create a new client" },
+  { value: "create_quote", label: "Create a quote" },
+  { value: "send_quote", label: "Send the draft quote" },
+  { value: "add_tag", label: "Add a tag to the client" },
+  { value: "remove_tag", label: "Remove a tag from the client" },
+  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)" },
+  { value: "add_note", label: "Add an internal note" },
+  { value: "send_portal_message", label: "Send a portal message" },
+  { value: "start_workflow", label: "Start another workflow" },
+  { value: "end_workflow", label: "End this workflow" },
+  { value: "webhook", label: "Call a webhook" },
+  { value: "add_dnd", label: "Opt the client out of SMS/email" },
+  { value: "remove_dnd", label: "Opt the client back into SMS/email" },
 ];
 
 const DND_CHANNELS = [
@@ -201,7 +194,7 @@ export function actionIcon(type: string) {
   if (type === "send_document_request") return <FolderInput size={15} />;
   if (type === "assign_user") return <UserCog size={15} />;
   if (type === "send_notification") return <Bell size={15} />;
-  if (type === "move_pipeline_stage") return <GitBranch size={15} />;
+  if (type === "move_pipeline_stage") return <Route size={15} />;
   if (type === "move_lead_to_service_pipeline") return <Milestone size={15} />;
   if (type === "mark_lead_lost") return <UserX size={15} />;
   if (type === "convert_lead_to_client") return <UserCheck size={15} />;
@@ -237,6 +230,7 @@ export function StepCard({
   staffOptions,
   automationOptions,
   tagOptions = [],
+  roleOptions = [],
   canManage,
   onSaved,
   hideReorder,
@@ -256,26 +250,22 @@ export function StepCard({
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   tagOptions?: string[];
+  roleOptions?: RoleOption[];
   canManage: boolean;
   onSaved: () => void;
   hideReorder?: boolean;
 }) {
   const supabase = createClient();
   const toast = useToast();
-  // business_hours_delay is a real, separate action_type in the DB (its own
-  // scheduling math via compute_business_hours_deadline) but isn't in
-  // ACTION_TYPES -- there's no reason to make staff pick a second "action"
-  // for what reads as the same "Wait / Delay" step, so it's presented as a
-  // toggle on that step instead, and only swapped in at save time.
-  const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
-  const [useBusinessHours, setUseBusinessHours] = useState(step.action_type === "business_hours_delay");
-  const [displayName, setDisplayName] = useState(step.display_name ?? "");
+  const [actionType, setActionType] = useState(step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
   const [delayUnit, setDelayUnit] = useState<"minutes" | "days">(step.action_config?.delay_unit === "days" ? "days" : "minutes");
   const [delayValue, setDelayValue] = useState(() => {
     const mins = step.delay_minutes ?? 0;
     return delayUnit === "days" ? String(mins / 1440) : String(mins);
   });
+  const [requiresApproval, setRequiresApproval] = useState(step.requires_approval);
+  const [approverRoleId, setApproverRoleId] = useState(step.approver_role_id ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -296,11 +286,6 @@ export function StepCard({
   // Organizer/engagement letter templates need their full builder page to get
   // real content -- point staff at it right after the quick-create stub saves.
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
-  const taskTitleRef = useRef<HTMLInputElement>(null);
-  const taskDescriptionRef = useRef<HTMLTextAreaElement>(null);
-  const notificationMessageRef = useRef<HTMLTextAreaElement>(null);
-  const quoteTitleRef = useRef<HTMLInputElement>(null);
-  const quoteNotesRef = useRef<HTMLTextAreaElement>(null);
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -351,21 +336,15 @@ export function StepCard({
     setSaving(true);
     setError(null);
     const isDelay = actionType === "delay";
-    const isDurationMode = !config.wait_mode || config.wait_mode === "duration";
-    const savesAsBusinessHours = isDelay && isDurationMode && useBusinessHours;
-    const effectiveActionType = savesAsBusinessHours ? "business_hours_delay" : actionType;
-    const delayMinutes =
-      isDelay && !savesAsBusinessHours ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
-    const configToSave = savesAsBusinessHours
-      ? { hours: (config.hours as string) ?? "24" }
-      : ((isDelay ? { ...config, delay_unit: delayUnit } : config) as never);
+    const delayMinutes = isDelay ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
     const { error: updateError } = await supabase
       .from("automation_steps")
       .update({
-        action_type: effectiveActionType,
-        action_config: configToSave as never,
+        action_type: actionType,
+        action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
         delay_minutes: delayMinutes,
-        display_name: displayName.trim() || null,
+        requires_approval: requiresApproval,
+        approver_role_id: requiresApproval && approverRoleId ? approverRoleId : null,
       })
       .eq("id", step.id);
     setSaving(false);
@@ -425,33 +404,24 @@ export function StepCard({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Step name (optional)
-          <input
-            disabled={!canManage}
-            value={displayName}
-            onChange={(e) => {
-              setDisplayName(e.target.value);
-              setSaved(false);
-            }}
-            placeholder={ACTION_TYPES.find((a) => a.value === actionType)?.label ?? actionType}
-            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          />
-        </label>
-        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+        <label className="flex flex-col gap-1 text-xs text-muted">
           Action
-          <InlineStepPickerField
+          <select
             disabled={!canManage}
             value={actionType}
-            items={ACTION_TYPES}
-            categories={ACTION_CATEGORIES}
-            icon={actionIcon}
-            onChange={(value) => {
-              setActionType(value);
+            onChange={(e) => {
+              setActionType(e.target.value);
               setConfig({});
               setSaved(false);
             }}
-          />
+            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            {ACTION_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </label>
         {actionType === "delay" && (
           <label className="flex flex-col gap-1 text-xs text-muted">
@@ -470,82 +440,35 @@ export function StepCard({
         )}
 
         {actionType === "delay" && (!config.wait_mode || config.wait_mode === "duration") && (
-          <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Count as
-              <div className="flex gap-4 pt-1">
-                {([
-                  { value: false, label: "Regular time" },
-                  { value: true, label: "Business hours" },
-                ] as const).map((opt) => (
-                  <label key={String(opt.value)} className="flex items-center gap-1.5 text-sm text-ink">
-                    <input
-                      type="radio"
-                      disabled={!canManage}
-                      checked={useBusinessHours === opt.value}
-                      onChange={() => {
-                        setUseBusinessHours(opt.value);
-                        setSaved(false);
-                      }}
-                      className="border-border text-accent focus:ring-accent disabled:opacity-60"
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </label>
-
-            {useBusinessHours ? (
-              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-                Wait for (business hours)
-                <input
-                  disabled={!canManage}
-                  type="number"
-                  min={0}
-                  step="0.5"
-                  value={(config.hours as string) ?? ""}
-                  onChange={(e) => setField("hours", e.target.value)}
-                  placeholder="24"
-                  className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-                />
-                <span className="mt-1 text-[11px] normal-case text-muted">
-                  Only counts hours inside the firm&apos;s configured business hours (Settings &rarr; Firm Profile) -- nights,
-                  weekends, and office closures don&apos;t count toward this wait.
-                </span>
-              </label>
-            ) : (
-              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-                Wait for
-                <div className="flex gap-1.5">
-                  <input
-                    disabled={!canManage}
-                    type="number"
-                    min={0}
-                    value={delayValue}
-                    onChange={(e) => {
-                      setDelayValue(e.target.value);
-                      setSaved(false);
-                    }}
-                    className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-                  />
-                  <select
-                    disabled={!canManage}
-                    value={delayUnit}
-                    onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
-                    className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-                  >
-                    <option value="minutes">Minutes</option>
-                    <option value="days">Days</option>
-                  </select>
-                </div>
-                <span className="mt-1 text-[11px] normal-case text-muted">
-                  Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle
-                  from the step that should finish first, and its bottom handle to whichever step should run once the wait is
-                  over.
-                </span>
-              </label>
-            )}
-          </>
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Wait for
+            <div className="flex gap-1.5">
+              <input
+                disabled={!canManage}
+                type="number"
+                min={0}
+                value={delayValue}
+                onChange={(e) => {
+                  setDelayValue(e.target.value);
+                  setSaved(false);
+                }}
+                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+              <select
+                disabled={!canManage}
+                value={delayUnit}
+                onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="minutes">Minutes</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
+            <span className="mt-1 text-[11px] normal-case text-muted">
+              Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle from
+              the step that should finish first, and its bottom handle to whichever step should run once the wait is over.
+            </span>
+          </label>
         )}
 
         {actionType === "delay" && config.wait_mode === "until_date" && (
@@ -638,6 +561,15 @@ export function StepCard({
                 </button>
               )}
             </div>
+            {emailOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published email templates yet -- a template stays hidden here until you publish it from{" "}
+                <a href="/automations" target="_blank" rel="noreferrer" className="underline">
+                  Email &amp; SMS
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "email" && (
               <div className="mt-1">
                 <CreateTemplateForm
@@ -700,6 +632,15 @@ export function StepCard({
                 </button>
               )}
             </div>
+            {smsOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published SMS templates yet -- a template stays hidden here until you publish it from{" "}
+                <a href="/automations" target="_blank" rel="noreferrer" className="underline">
+                  Email &amp; SMS
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "sms" && (
               <div className="mt-1">
                 <CreateTemplateForm
@@ -738,48 +679,26 @@ export function StepCard({
 
         {actionType === "create_task" && (
           <>
-            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              <div className="flex items-center justify-between">
-                <span>Task title</span>
-                {canManage && (
-                  <MergeFieldPicker
-                    label="Insert"
-                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
-                    onInsert={(token) => insertAtFieldCursor(taskTitleRef.current, (config.title as string) ?? "", token, (v) => setField("title", v))}
-                  />
-                )}
-              </div>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Task title
               <input
-                ref={taskTitleRef}
                 disabled={!canManage}
                 value={(config.title as string) ?? ""}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="Automated task"
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </div>
-            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              <div className="flex items-center justify-between">
-                <span>Description</span>
-                {canManage && (
-                  <MergeFieldPicker
-                    label="Insert"
-                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
-                    onInsert={(token) =>
-                      insertAtFieldCursor(taskDescriptionRef.current, (config.description as string) ?? "", token, (v) => setField("description", v))
-                    }
-                  />
-                )}
-              </div>
+            </label>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Description
               <textarea
-                ref={taskDescriptionRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.description as string) ?? ""}
                 onChange={(e) => setField("description", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </div>
+            </label>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -954,6 +873,15 @@ export function StepCard({
               service under Services) -- pick a specific template instead only if this step should always send the
               same organizer regardless of service.
             </span>
+            {organizerOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published organizers yet -- an organizer stays hidden here until you publish it from{" "}
+                <a href="/templates" target="_blank" rel="noreferrer" className="underline">
+                  Form Templates
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "organizer" && (
               <div className="mt-1">
                 <CreateQuickTemplate
@@ -1019,6 +947,15 @@ export function StepCard({
                 </button>
               )}
             </div>
+            {engagementLetterOptions.length === 0 && (
+              <span className="text-[11px] text-warning">
+                No published engagement letters yet -- a template stays hidden here until you publish it from{" "}
+                <a href="/templates" target="_blank" rel="noreferrer" className="underline">
+                  Form Templates
+                </a>
+                , or create one with the + button.
+              </span>
+            )}
             {creatingTemplateKind === "engagement_letter" && (
               <div className="mt-1">
                 <CreateQuickTemplate
@@ -1226,28 +1163,16 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              <div className="flex items-center justify-between">
-                <span>Message</span>
-                {canManage && (
-                  <MergeFieldPicker
-                    label="Insert"
-                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
-                    onInsert={(token) =>
-                      insertAtFieldCursor(notificationMessageRef.current, (config.message as string) ?? "", token, (v) => setField("message", v))
-                    }
-                  />
-                )}
-              </div>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Message
               <textarea
-                ref={notificationMessageRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.message as string) ?? ""}
                 onChange={(e) => setField("message", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </div>
+            </label>
           </>
         )}
 
@@ -1290,8 +1215,8 @@ export function StepCard({
               </select>
             </label>
             <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-              Moves the lead or engagement this automation is running for forward to this stage, completing every stage in between. If
-              it isn&apos;t already on this pipeline, it starts one. Moving backward isn&apos;t supported.
+              Moves the client or engagement forward to this stage, completing every stage in between. If it isn&apos;t already in this
+              pipeline, it starts one. Moving backward isn&apos;t supported.
             </p>
           </>
         )}
@@ -1449,26 +1374,16 @@ export function StepCard({
 
         {actionType === "create_quote" && (
           <>
-            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              <div className="flex items-center justify-between">
-                <span>Title</span>
-                {canManage && (
-                  <MergeFieldPicker
-                    label="Insert"
-                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
-                    onInsert={(token) => insertAtFieldCursor(quoteTitleRef.current, (config.title as string) ?? "", token, (v) => setField("title", v))}
-                  />
-                )}
-              </div>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Title
               <input
-                ref={quoteTitleRef}
                 disabled={!canManage}
                 value={(config.title as string) ?? ""}
                 onChange={(e) => setField("title", e.target.value)}
                 placeholder="Quote"
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </div>
+            </label>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Service
               <select
@@ -1497,26 +1412,16 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              <div className="flex items-center justify-between">
-                <span>Notes</span>
-                {canManage && (
-                  <MergeFieldPicker
-                    label="Insert"
-                    groups={AUTOMATION_MERGE_FIELD_GROUPS}
-                    onInsert={(token) => insertAtFieldCursor(quoteNotesRef.current, (config.notes as string) ?? "", token, (v) => setField("notes", v))}
-                  />
-                )}
-              </div>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Notes
               <textarea
-                ref={quoteNotesRef}
                 disabled={!canManage}
                 rows={2}
                 value={(config.notes as string) ?? ""}
                 onChange={(e) => setField("notes", e.target.value)}
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
-            </div>
+            </label>
           </>
         )}
 
@@ -1622,6 +1527,46 @@ export function StepCard({
         )}
       </div>
 
+      {actionType !== "condition" && (
+        <div className="mt-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2.5">
+          <label className="flex items-center gap-2 text-xs font-medium text-ink">
+            <input
+              type="checkbox"
+              disabled={!canManage}
+              checked={requiresApproval}
+              onChange={(e) => {
+                setRequiresApproval(e.target.checked);
+                setSaved(false);
+              }}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            <ShieldCheck size={14} className="text-muted" />
+            Require approval before this step runs
+          </label>
+          {requiresApproval && (
+            <label className="mt-2 flex flex-col gap-1 text-xs text-muted">
+              Approver role (leave blank for any workspace admin)
+              <select
+                disabled={!canManage}
+                value={approverRoleId}
+                onChange={(e) => {
+                  setApproverRoleId(e.target.value);
+                  setSaved(false);
+                }}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="">Any workspace admin</option>
+                {roleOptions.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      )}
+
       {canManage && (
         <div className="mt-3 flex items-center gap-3">
           <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
@@ -1675,6 +1620,8 @@ export function WorkflowBuilder({
   staffOptions = [],
   automationOptions = [],
   tagOptions = [],
+  roleOptions = [],
+  pendingApprovals = [],
   conditions: initialConditions = [],
   webhookToken,
 }: {
@@ -1699,6 +1646,8 @@ export function WorkflowBuilder({
   staffOptions?: StaffOption[];
   automationOptions?: AutomationOption[];
   tagOptions?: string[];
+  roleOptions?: RoleOption[];
+  pendingApprovals?: PendingApprovalRow[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
 }) {
@@ -1712,6 +1661,7 @@ export function WorkflowBuilder({
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
@@ -1739,6 +1689,21 @@ export function WorkflowBuilder({
 
   async function toggleEnabled() {
     const next = !enabled;
+    // Only turning ON needs a check -- pausing an already-broken workflow
+    // is always safe. Same gate as the workflow list's own toggle, so a
+    // workflow can't go live from this page without it either.
+    if (next) {
+      const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: automationId });
+      if (validationError) {
+        toast.show(validationError.message, "error");
+        return;
+      }
+      if (issues && issues.length > 0) {
+        const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+        window.alert(`Can't activate this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+        return;
+      }
+    }
     setEnabled(next);
     const { error } = await supabase.from("automations").update({ is_enabled: next }).eq("id", automationId);
     if (error) {
@@ -1750,10 +1715,45 @@ export function WorkflowBuilder({
     router.refresh();
   }
 
+  async function approvePendingStep(pendingStepId: string) {
+    const { error } = await supabase.rpc("approve_automation_step", { p_pending_step_id: pendingStepId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Approved -- the workflow will continue", "success");
+    router.refresh();
+  }
+
+  async function rejectPendingStep(pendingStepId: string) {
+    const reason = window.prompt("Reason for rejecting this step (optional):") ?? "";
+    const { error } = await supabase.rpc("reject_automation_step", { p_pending_step_id: pendingStepId, p_reason: reason.trim() });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Rejected -- the workflow was cancelled", "success");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-ink">Steps</h3>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-ink">Steps</h3>
+          <button
+            type="button"
+            onClick={() => setActivityOpen(true)}
+            className="relative inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+          >
+            <History size={14} /> Activity{runs.length > 0 ? ` (${runs.length})` : ""}
+            {pendingApprovals.length > 0 && (
+              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+                {pendingApprovals.length}
+              </span>
+            )}
+          </button>
+        </div>
         {steps.length === 0 && !canManage ? (
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
         ) : (
@@ -1777,6 +1777,7 @@ export function WorkflowBuilder({
             staffOptions={staffOptions}
             automationOptions={automationOptions}
             tagOptions={tagOptions}
+            roleOptions={roleOptions}
             onEditTrigger={() => setTriggerModalOpen(true)}
             onOpenRun={(runId) => setOpenRunId(runId)}
           />
@@ -1850,62 +1851,121 @@ export function WorkflowBuilder({
         </div>
       )}
 
-      <CollapsibleSection title="All runs" count={runs.length}>
-        {runs.length === 0 ? (
-          <EmptyState message="This workflow hasn't fired yet." />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-4 py-2 font-medium">Engagement / client</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2 font-medium">Started</th>
-                  <th className="px-4 py-2 font-medium">Completed</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {runs.map((r) => (
-                  <tr key={r.id} onClick={() => setOpenRunId(r.id)} className="cursor-pointer hover:bg-surfaceMuted">
-                    <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${
-                          r.status === "running" ? "text-accent" : r.status === "failed" ? "text-danger" : r.status === "completed" ? "text-success" : "text-muted"
-                        }`}
-                      >
-                        {r.status === "running" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
-                    <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CollapsibleSection>
+      {activityOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Activity" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
+          <div className="w-full max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-lg">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-ink">Activity</h2>
+              <button type="button" onClick={() => setActivityOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
+                <X size={16} />
+              </button>
+            </div>
 
-      {logs.length > 0 && (
-        <CollapsibleSection title="Execution log" count={logs.length}>
-          <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
-            {logs.map((l) => {
-              const data = (l.execution_data ?? {}) as { action_type?: string };
-              return (
-                <li key={l.id} className="flex items-center justify-between gap-2 px-4 py-2">
-                  <span className="text-slate">{data.action_type ?? "step"}</span>
-                  <span className={`text-xs font-medium ${l.status === "completed" ? "text-success" : "text-danger"}`}>
-                    {l.status}
-                    {l.error_message ? `: ${l.error_message}` : ""}
-                  </span>
-                  <span className="text-xs text-muted">{l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </CollapsibleSection>
+            {pendingApprovals.length > 0 && (
+              <div className="mb-6">
+                <CollapsibleSection title="Awaiting approval" count={pendingApprovals.length}>
+                  <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
+                    {pendingApprovals.map((p) => (
+                      <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                        <div>
+                          <p className="font-medium text-ink">
+                            {p.step_display_name || p.action_type.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {p.client_name ?? p.engagement_number ?? "--"} &middot; waiting since {new Date(p.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => approvePendingStep(p.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-success/30 px-2.5 py-1 text-xs font-medium text-success hover:bg-success/10"
+                          >
+                            <ShieldCheck size={13} /> Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => rejectPendingStep(p.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-danger/30 px-2.5 py-1 text-xs font-medium text-danger hover:bg-danger/10"
+                          >
+                            <ShieldX size={13} /> Reject
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleSection>
+              </div>
+            )}
+
+            <CollapsibleSection title="Runs" count={runs.length}>
+              {runs.length === 0 ? (
+                <EmptyState message="This workflow hasn't fired yet." />
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                        <th className="px-4 py-2 font-medium">Engagement / client</th>
+                        <th className="px-4 py-2 font-medium">Status</th>
+                        <th className="px-4 py-2 font-medium">Started</th>
+                        <th className="px-4 py-2 font-medium">Completed</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {runs.map((r) => (
+                        <tr
+                          key={r.id}
+                          onClick={() => setOpenRunId(r.id)}
+                          className="cursor-pointer transition-colors hover:bg-surfaceMuted"
+                        >
+                          <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
+                          <td className="px-4 py-2">
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${
+                                r.status === "running" ? "text-accent" : r.status === "failed" ? "text-danger" : r.status === "completed" ? "text-success" : "text-muted"
+                              }`}
+                            >
+                              {r.status === "running" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="border-t border-border bg-surfaceMuted px-4 py-2 text-[11px] text-muted">
+                    Click a run to see its step-by-step execution log.
+                  </p>
+                </div>
+              )}
+            </CollapsibleSection>
+
+            {logs.length > 0 && (
+              <div className="mt-6">
+                <CollapsibleSection title="Other step executions" count={logs.length}>
+                  <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
+                    {logs.map((l) => {
+                      const data = (l.execution_data ?? {}) as { action_type?: string };
+                      return (
+                        <li key={l.id} className="flex items-center justify-between gap-2 px-4 py-2">
+                          <span className="text-slate">{data.action_type ?? "step"}</span>
+                          <span className={`text-xs font-medium ${l.status === "completed" ? "text-success" : "text-danger"}`}>
+                            {l.status}
+                            {l.error_message ? `: ${l.error_message}` : ""}
+                          </span>
+                          <span className="text-xs text-muted">{l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CollapsibleSection>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {openRunId && <RunDetailPanel runId={openRunId} onClose={() => setOpenRunId(null)} />}

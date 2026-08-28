@@ -4,6 +4,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap, clientLabel } from "@/lib/documentEntityLabels";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_TONE } from "@/lib/engagementStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +18,13 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-const RETURN_STATUS_LABEL: Record<string, string> = {
+const EFILE_LABEL: Record<string, string> = {
   not_filed: "Not filed",
   ready_to_file: "Ready to file",
-  filed: "Filed",
+  transmitted: "Transmitted",
+  accepted: "Accepted",
+  rejected: "Rejected",
+  paper_filed: "Paper filed",
 };
 
 const EROLike = new Set(["ero_office", "service_bureau"]);
@@ -68,7 +73,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       dueDate: string | null;
       taxYear: number | null;
       returnType: string | null;
-      returnStatus: string;
+      efileStatus: string;
       isExtended: boolean;
       federalRefund: number | null;
       federalBalance: number | null;
@@ -86,7 +91,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         dueDate: r.due_date,
         taxYear: r.tax_year,
         returnType: r.return_type,
-        returnStatus: r.return_status,
+        efileStatus: r.efile_status,
         isExtended: r.is_extended,
         federalRefund: r.federal_refund_amount,
         federalBalance: r.federal_balance_due,
@@ -96,7 +101,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       const { data } = await supabase
         .from("engagement_tax_details")
         .select(
-          "engagement_id, tax_year, return_type, return_status, is_extended, federal_refund_amount, federal_balance_due, engagements(id, engagement_number, status, due_date, client_id, clients(first_name, last_name, business_name, client_type))"
+          "engagement_id, tax_year, return_type, efile_status, is_extended, federal_refund_amount, federal_balance_due, engagements(id, engagement_number, status, due_date, client_id, clients(first_name, last_name, business_name, client_type))"
         )
         .order("tax_year", { ascending: false });
       rows = (data ?? [])
@@ -117,7 +122,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
             dueDate: e.due_date,
             taxYear: r.tax_year,
             returnType: r.return_type,
-            returnStatus: r.return_status,
+            efileStatus: r.efile_status,
             isExtended: r.is_extended,
             federalRefund: r.federal_refund_amount,
             federalBalance: r.federal_balance_due,
@@ -145,14 +150,14 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                     <th className="px-4 py-2 text-left font-medium">Return</th>
                     <th className="px-4 py-2 text-left font-medium">Tax year</th>
                     <th className="px-4 py-2 text-left font-medium">Status</th>
-                    <th className="px-4 py-2 text-left font-medium">Filed</th>
+                    <th className="px-4 py-2 text-left font-medium">Return status</th>
                     <th className="px-4 py-2 text-left font-medium">Refund / Balance</th>
                     <th className="px-4 py-2 text-left font-medium">Due</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((r) => (
-                    <tr key={r.engagementId} className="hover:bg-surfaceMuted">
+                    <tr key={r.engagementId} className="transition-colors hover:bg-surfaceMuted">
                       {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                       <td className="px-4 py-2">
                         <Link href={`/engagements/${r.engagementId}`} className="font-medium text-accent hover:underline">
@@ -163,8 +168,12 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                         {r.returnType ?? "--"} {r.isExtended && <span className="text-xs text-warning">(extended)</span>}
                       </td>
                       <td className="px-4 py-2 text-slate">{r.taxYear ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate capitalize">{r.status}</td>
-                      <td className="px-4 py-2 text-slate">{RETURN_STATUS_LABEL[r.returnStatus] ?? r.returnStatus}</td>
+                      <td className="px-4 py-2">
+                        <Badge tone={ENGAGEMENT_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+                          {r.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2 text-slate">{EFILE_LABEL[r.efileStatus] ?? r.efileStatus}</td>
                       <td className="px-4 py-2 text-slate">
                         {r.federalRefund ? (
                           <span className="text-success">+${Number(r.federalRefund).toLocaleString()}</span>
@@ -207,7 +216,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {(rows ?? []).map((r) => {
                 const overdue = r.due_date && new Date(r.due_date) < new Date();
                 return (
-                  <li key={r.workflow_stage_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={r.workflow_stage_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <Link href={`/engagements/${r.engagement_id}`} className="font-medium text-accent hover:underline">
                         {clientLabel(clientById.get(r.client_id ?? "") ?? null)}
@@ -289,7 +298,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {rows.map((n) => {
                 const overdue = n.status === "open" && n.responseDueDate && new Date(n.responseDueDate) < new Date();
                 return (
-                  <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       {n.href ? (
                         <Link href={n.href} className="font-medium text-accent hover:underline">
@@ -373,7 +382,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {rows.map((r) => {
                 const overdue = r.extensionDueDate && new Date(r.extensionDueDate) < new Date();
                 return (
-                  <li key={r.engagementId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={r.engagementId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <Link href={`/engagements/${r.engagementId}`} className="font-medium text-accent hover:underline">
                         {r.clientName}
@@ -402,8 +411,9 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
     firmName: string | null;
     taxYear: number;
     totalReturns: number;
-    filed: number;
-    readyToFile: number;
+    accepted: number;
+    rejected: number;
+    transmitted: number;
     notFiled: number;
     extended: number;
     amended: number;
@@ -418,8 +428,9 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       firmName: r.source_workspace_id === workspace.id ? "Your firm" : r.source_workspace_name,
       taxYear: r.tax_year,
       totalReturns: r.total_returns,
-      filed: r.filed,
-      readyToFile: r.ready_to_file,
+      accepted: r.accepted,
+      rejected: r.rejected,
+      transmitted: r.transmitted,
       notFiled: r.not_filed,
       extended: r.extended,
       amended: r.amended,
@@ -434,8 +445,9 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         firmName: null,
         taxYear: r.tax_year,
         totalReturns: r.total_returns ?? 0,
-        filed: r.filed ?? 0,
-        readyToFile: r.ready_to_file ?? 0,
+        accepted: r.accepted ?? 0,
+        rejected: r.rejected ?? 0,
+        transmitted: r.transmitted ?? 0,
         notFiled: r.not_filed ?? 0,
         extended: r.extended ?? 0,
         amended: r.amended ?? 0,
@@ -458,8 +470,9 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                   {showsNetworkRollup && <th className="px-4 py-2 text-left font-medium">Firm</th>}
                   <th className="px-4 py-2 text-left font-medium">Tax year</th>
                   <th className="px-4 py-2 text-right font-medium">Total returns</th>
-                  <th className="px-4 py-2 text-right font-medium">Filed</th>
-                  <th className="px-4 py-2 text-right font-medium">Ready to file</th>
+                  <th className="px-4 py-2 text-right font-medium">Accepted</th>
+                  <th className="px-4 py-2 text-right font-medium">Rejected</th>
+                  <th className="px-4 py-2 text-right font-medium">Transmitted</th>
                   <th className="px-4 py-2 text-right font-medium">Not filed</th>
                   <th className="px-4 py-2 text-right font-medium">Extended</th>
                   <th className="px-4 py-2 text-right font-medium">Amended</th>
@@ -468,12 +481,13 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               </thead>
               <tbody className="divide-y divide-border">
                 {yearRows.map((r) => (
-                  <tr key={r.key} className="hover:bg-surfaceMuted">
+                  <tr key={r.key} className="transition-colors hover:bg-surfaceMuted">
                     {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                     <td className="px-4 py-2 font-medium text-ink">{r.taxYear}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.totalReturns}</td>
-                    <td className="px-4 py-2 text-right text-slate">{r.filed}</td>
-                    <td className="px-4 py-2 text-right text-slate">{r.readyToFile}</td>
+                    <td className="px-4 py-2 text-right text-slate">{r.accepted}</td>
+                    <td className="px-4 py-2 text-right text-slate">{r.rejected}</td>
+                    <td className="px-4 py-2 text-right text-slate">{r.transmitted}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.notFiled}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.extended}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.amended}</td>

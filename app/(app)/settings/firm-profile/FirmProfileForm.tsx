@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { UploadCloud } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -40,7 +41,6 @@ type Props = {
   mailingAddress: string | null;
   businessPhone: string | null;
   businessEmail: string | null;
-  isWhitelabeledByEro: boolean;
   isOwner: boolean;
   isAdmin: boolean;
   canManageSettings: boolean;
@@ -53,7 +53,6 @@ type Props = {
   supportedFilingStates: string[];
   initialHours: BusinessHours;
   initialSlotMinutes: number;
-  initialHolidays: string[];
 };
 
 function LabeledInput({
@@ -92,7 +91,6 @@ export function FirmProfileForm({
   mailingAddress,
   businessPhone,
   businessEmail,
-  isWhitelabeledByEro,
   isOwner,
   isAdmin,
   canManageSettings,
@@ -105,7 +103,6 @@ export function FirmProfileForm({
   supportedFilingStates,
   initialHours,
   initialSlotMinutes,
-  initialHolidays,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -136,8 +133,6 @@ export function FirmProfileForm({
 
   const [hours, setHours] = useState<BusinessHours>(initialHours);
   const [slotMinutes, setSlotMinutes] = useState(initialSlotMinutes);
-  const [holidays, setHolidays] = useState<string[]>(initialHolidays);
-  const [newHoliday, setNewHoliday] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,16 +142,6 @@ export function FirmProfileForm({
       ...prev,
       [day]: patch === null ? null : { ...(prev[day] ?? { start: "09:00", end: "17:00" }), ...patch },
     }));
-  }
-
-  function addHoliday() {
-    if (!newHoliday || holidays.includes(newHoliday)) return;
-    setHolidays((prev) => [...prev, newHoliday].sort());
-    setNewHoliday("");
-  }
-
-  function removeHoliday(date: string) {
-    setHolidays((prev) => prev.filter((d) => d !== date));
   }
 
   async function applyCroppedAvatar(blob: Blob) {
@@ -195,10 +180,7 @@ export function FirmProfileForm({
           .upsert({ workspace_id: workspaceId, key: "business_hours", value: hours }, { onConflict: "workspace_id,key" }),
         supabase
           .from("system_settings")
-          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" }),
-        supabase
-          .from("system_settings")
-          .upsert({ workspace_id: workspaceId, key: "holidays", value: holidays }, { onConflict: "workspace_id,key" })
+          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" })
       );
     }
     if (isOwner) {
@@ -208,14 +190,16 @@ export function FirmProfileForm({
           .update({ phone: bizPhone || null, primary_contact_email: bizEmail || null, website: bizWebsite || null, mailing_address: bizAddress || null })
           .eq("id", workspaceId)
       );
-      if (!isWhitelabeledByEro) {
-        writes.push(
-          supabase.from("branding").upsert(
-            { workspace_id: workspaceId, support_phone: bizPhone || null, support_email: bizEmail || null },
-            { onConflict: "workspace_id" }
-          )
-        );
-      }
+      // Support phone/email are read straight off this workspace's own
+      // branding row wherever a client sees them (e.g. public organizer
+      // links) -- unlike the sidebar/portal logo and colors, they're never
+      // cascaded from an ERO, so there's no whitelabeling gate here.
+      writes.push(
+        supabase.from("branding").upsert(
+          { workspace_id: workspaceId, support_phone: bizPhone || null, support_email: bizEmail || null },
+          { onConflict: "workspace_id" }
+        )
+      );
     }
     const results = await Promise.all(writes);
 
@@ -357,11 +341,11 @@ export function FirmProfileForm({
             </div>
           </div>
 
-          <p className="mt-4 text-xs text-muted">
-            Logo, business name, and colors -- including your nav bar -- have moved to{" "}
-            <a href="/settings/brand-center" className="font-medium text-accent hover:underline">
-              Brand Center
-            </a>
+          <p className="mt-4 text-sm text-slate">
+            Manage your logo, colors, and business name in{" "}
+            <Link href="/settings/brand-center" className="font-medium text-accent hover:underline">
+              Branding
+            </Link>
             .
           </p>
         </SettingsCard>
@@ -508,49 +492,6 @@ export function FirmProfileForm({
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="mt-4">
-          <p className="text-sm font-medium text-ink">Holidays / office closures</p>
-          <p className="mt-0.5 text-xs text-muted">
-            Dates the office is closed regardless of the day of week -- skipped by both due-date calculations and client
-            self-booking.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {holidays.length === 0 && <span className="text-sm text-muted">No holidays added yet.</span>}
-            {holidays.map((date) => (
-              <span
-                key={date}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surfaceMuted px-3 py-1 text-sm text-ink"
-              >
-                {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
-                <button
-                  type="button"
-                  onClick={() => removeHoliday(date)}
-                  aria-label={`Remove ${date}`}
-                  className="text-muted hover:text-danger"
-                >
-                  &times;
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="date"
-              value={newHoliday}
-              onChange={(e) => setNewHoliday(e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <button
-              type="button"
-              onClick={addHoliday}
-              disabled={!newHoliday}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surfaceMuted disabled:opacity-60"
-            >
-              Add
-            </button>
-          </div>
         </div>
       </SettingsCard>
       )}

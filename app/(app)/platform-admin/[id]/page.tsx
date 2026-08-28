@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
 import { WorkspaceStatusActions, AssignSubscriptionForm } from "./WorkspaceAdminActions";
+import { Badge } from "@/components/ui/Badge";
+import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -99,7 +101,11 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
           <dl className="mt-3 grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Status</dt>
-              <dd className="mt-0.5 capitalize text-slate">{workspace.status}</dd>
+              <dd className="mt-0.5">
+                <Badge tone={WORKSPACE_STATUS_TONE[workspace.status] ?? "neutral"} className="capitalize">
+                  {workspace.status}
+                </Badge>
+              </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Suspension reason</dt>

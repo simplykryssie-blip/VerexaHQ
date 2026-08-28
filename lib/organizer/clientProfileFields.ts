@@ -6,7 +6,10 @@ import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
 // and, if the client edits it, proposes the change back to the client record
 // (via propose_client_contact_field/propose_client_mailing_address/
 // propose_client_full_name) subject to staff approval when it would overwrite
-// an existing value.
+// an existing value. 'ssn' is the one exception: it always routes through
+// propose_client_sensitive_field and always queues for staff review, even on
+// a currently-blank field -- an encrypted, reveal-gated value is never set
+// from portal input without a human looking at it first.
 export type ClientProfileField =
   | "full_name"
   | "first_name"
@@ -15,7 +18,8 @@ export type ClientProfileField =
   | "primary_email"
   | "primary_phone"
   | "mailing_address"
-  | "date_of_birth";
+  | "date_of_birth"
+  | "ssn";
 
 export const CLIENT_PROFILE_FIELD_LABELS: Record<ClientProfileField, string> = {
   full_name: "Full name",
@@ -26,6 +30,7 @@ export const CLIENT_PROFILE_FIELD_LABELS: Record<ClientProfileField, string> = {
   primary_phone: "Phone",
   mailing_address: "Mailing address",
   date_of_birth: "Date of birth",
+  ssn: "Social Security Number",
 };
 
 // Which client_profile_field options make sense for a given organizer
@@ -42,6 +47,7 @@ export const CLIENT_PROFILE_FIELDS_BY_TYPE: Partial<Record<OrganizerFieldType, C
   short_text: ["business_name"],
   address: ["mailing_address"],
   date: ["date_of_birth"],
+  ssn: ["ssn"],
 };
 
 export function isValidClientProfileField(value: string): value is ClientProfileField {

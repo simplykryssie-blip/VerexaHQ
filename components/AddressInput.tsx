@@ -44,7 +44,7 @@ export function AddressInput({
           <option value="">State</option>
           {US_STATES.map((s) => (
             <option key={s.code} value={s.code}>
-              {s.code}
+              {s.name}
             </option>
           ))}
         </select>

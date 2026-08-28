@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -447,6 +447,13 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
+            foreignKeyName: "automation_execution_logs_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "automation_execution_logs_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -670,10 +677,8 @@ export type Database = {
           canvas_y: number | null
           created_at: string
           delay_minutes: number
-          display_name: string | null
           display_order: number
           id: string
-          is_enabled: boolean
           requires_approval: boolean
           updated_at: string
         }
@@ -686,10 +691,8 @@ export type Database = {
           canvas_y?: number | null
           created_at?: string
           delay_minutes?: number
-          display_name?: string | null
           display_order?: number
           id?: string
-          is_enabled?: boolean
           requires_approval?: boolean
           updated_at?: string
         }
@@ -702,10 +705,8 @@ export type Database = {
           canvas_y?: number | null
           created_at?: string
           delay_minutes?: number
-          display_name?: string | null
           display_order?: number
           id?: string
-          is_enabled?: boolean
           requires_approval?: boolean
           updated_at?: string
         }
@@ -952,8 +953,8 @@ export type Database = {
           primary_color: string
           reply_to_email: string | null
           secondary_color: string
-          sidebar_bg_color: string | null
           sidebar_logo_url: string | null
+          sidebar_bg_color: string | null
           sidebar_text_color: string | null
           support_email: string | null
           support_phone: string | null
@@ -981,8 +982,8 @@ export type Database = {
           primary_color?: string
           reply_to_email?: string | null
           secondary_color?: string
-          sidebar_bg_color?: string | null
           sidebar_logo_url?: string | null
+          sidebar_bg_color?: string | null
           sidebar_text_color?: string | null
           support_email?: string | null
           support_phone?: string | null
@@ -1010,8 +1011,8 @@ export type Database = {
           primary_color?: string
           reply_to_email?: string | null
           secondary_color?: string
-          sidebar_bg_color?: string | null
           sidebar_logo_url?: string | null
+          sidebar_bg_color?: string | null
           sidebar_text_color?: string | null
           support_email?: string | null
           support_phone?: string | null
@@ -3387,6 +3388,10 @@ export type Database = {
       engagement_tax_details: {
         Row: {
           created_at: string
+          efile_accepted_at: string | null
+          efile_rejected_reason: string | null
+          efile_status: string
+          efile_transmitted_at: string | null
           engagement_id: string
           extension_due_date: string | null
           extension_filed_date: string | null
@@ -3396,7 +3401,6 @@ export type Database = {
           is_amended: boolean
           is_extended: boolean
           original_engagement_id: string | null
-          return_status: string
           return_type: string | null
           tax_year: number | null
           updated_at: string
@@ -3404,6 +3408,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          efile_accepted_at?: string | null
+          efile_rejected_reason?: string | null
+          efile_status?: string
+          efile_transmitted_at?: string | null
           engagement_id: string
           extension_due_date?: string | null
           extension_filed_date?: string | null
@@ -3413,7 +3421,6 @@ export type Database = {
           is_amended?: boolean
           is_extended?: boolean
           original_engagement_id?: string | null
-          return_status?: string
           return_type?: string | null
           tax_year?: number | null
           updated_at?: string
@@ -3421,6 +3428,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          efile_accepted_at?: string | null
+          efile_rejected_reason?: string | null
+          efile_status?: string
+          efile_transmitted_at?: string | null
           engagement_id?: string
           extension_due_date?: string | null
           extension_filed_date?: string | null
@@ -3430,7 +3441,6 @@ export type Database = {
           is_amended?: boolean
           is_extended?: boolean
           original_engagement_id?: string | null
-          return_status?: string
           return_type?: string | null
           tax_year?: number | null
           updated_at?: string
@@ -4067,6 +4077,164 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "irs_notices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_runs: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          current_stage_id: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          paused_at: string | null
+          process_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_run_status"]
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          paused_at?: string | null
+          process_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"]
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          paused_at?: string | null
+          process_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"]
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_runs_current_stage_fkey"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stages: {
+        Row: {
+          actual_duration: string | null
+          assigned_staff_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          display_order: number
+          due_date: string | null
+          entity_type: string
+          estimated_duration: string | null
+          id: string
+          notes: string | null
+          pipeline_run_id: string
+          process_stage_id: string
+          reviewer_id: string | null
+          sla_status: string | null
+          stage_name: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"]
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actual_duration?: string | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order: number
+          due_date?: string | null
+          entity_type: string
+          estimated_duration?: string | null
+          id?: string
+          notes?: string | null
+          pipeline_run_id: string
+          process_stage_id: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"]
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actual_duration?: string | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order?: number
+          due_date?: string | null
+          entity_type?: string
+          estimated_duration?: string | null
+          id?: string
+          notes?: string | null
+          pipeline_run_id?: string
+          process_stage_id?: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"]
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_pipeline_run_id_fkey"
+            columns: ["pipeline_run_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_process_stage_id_fkey"
+            columns: ["process_stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -4915,156 +5083,12 @@ export type Database = {
           },
         ]
       }
-      organizer_information_request_items: {
-        Row: {
-          created_at: string
-          decision_note: string | null
-          id: string
-          instance_index: number
-          note: string | null
-          organizer_field_id: string
-          proposed_value: Json | null
-          request_id: string
-          resolved_at: string | null
-          resolved_by: string | null
-          status: string
-          was_answered_when_flagged: boolean
-        }
-        Insert: {
-          created_at?: string
-          decision_note?: string | null
-          id?: string
-          instance_index?: number
-          note?: string | null
-          organizer_field_id: string
-          proposed_value?: Json | null
-          request_id: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: string
-          was_answered_when_flagged: boolean
-        }
-        Update: {
-          created_at?: string
-          decision_note?: string | null
-          id?: string
-          instance_index?: number
-          note?: string | null
-          organizer_field_id?: string
-          proposed_value?: Json | null
-          request_id?: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          status?: string
-          was_answered_when_flagged?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organizer_information_request_items_organizer_field_id_fkey"
-            columns: ["organizer_field_id"]
-            isOneToOne: false
-            referencedRelation: "organizer_fields"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organizer_information_request_items_request_id_fkey"
-            columns: ["request_id"]
-            isOneToOne: false
-            referencedRelation: "organizer_information_requests"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organizer_information_requests: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          due_date: string | null
-          id: string
-          message: string | null
-          organizer_field_id: string | null
-          organizer_response_id: string
-          resolved_at: string | null
-          resolved_by: string | null
-          responded_at: string | null
-          sent_via_email: boolean
-          sent_via_sms: boolean
-          shown_in_portal: boolean
-          status: string
-          tags: string[]
-          viewed_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          due_date?: string | null
-          id?: string
-          message?: string | null
-          organizer_field_id?: string | null
-          organizer_response_id: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          responded_at?: string | null
-          sent_via_email?: boolean
-          sent_via_sms?: boolean
-          shown_in_portal?: boolean
-          status?: string
-          tags?: string[]
-          viewed_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          due_date?: string | null
-          id?: string
-          message?: string | null
-          organizer_field_id?: string | null
-          organizer_response_id?: string
-          resolved_at?: string | null
-          resolved_by?: string | null
-          responded_at?: string | null
-          sent_via_email?: boolean
-          sent_via_sms?: boolean
-          shown_in_portal?: boolean
-          status?: string
-          tags?: string[]
-          viewed_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organizer_information_requests_organizer_field_id_fkey"
-            columns: ["organizer_field_id"]
-            isOneToOne: false
-            referencedRelation: "organizer_fields"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organizer_information_requests_organizer_response_id_fkey"
-            columns: ["organizer_response_id"]
-            isOneToOne: false
-            referencedRelation: "organizer_responses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organizer_information_requests_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organizer_response_answers: {
         Row: {
           id: string
           instance_index: number
           organizer_field_id: string
           organizer_response_id: string
-          review_note: string | null
-          review_status: Database["public"]["Enums"]["review_status"] | null
           updated_at: string
           value: Json | null
         }
@@ -5073,8 +5097,6 @@ export type Database = {
           instance_index?: number
           organizer_field_id: string
           organizer_response_id: string
-          review_note?: string | null
-          review_status?: Database["public"]["Enums"]["review_status"] | null
           updated_at?: string
           value?: Json | null
         }
@@ -5083,8 +5105,6 @@ export type Database = {
           instance_index?: number
           organizer_field_id?: string
           organizer_response_id?: string
-          review_note?: string | null
-          review_status?: Database["public"]["Enums"]["review_status"] | null
           updated_at?: string
           value?: Json | null
         }
@@ -5107,7 +5127,6 @@ export type Database = {
       }
       organizer_responses: {
         Row: {
-          assigned_reviewer_id: string | null
           client_id: string
           created_at: string
           engagement_id: string | null
@@ -5128,7 +5147,6 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          assigned_reviewer_id?: string | null
           client_id: string
           created_at?: string
           engagement_id?: string | null
@@ -5149,7 +5167,6 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          assigned_reviewer_id?: string | null
           client_id?: string
           created_at?: string
           engagement_id?: string | null
@@ -5730,192 +5747,6 @@ export type Database = {
           key?: string
         }
         Relationships: []
-      }
-      pipeline_runs: {
-        Row: {
-          cancelled_at: string | null
-          completed_at: string | null
-          created_at: string | null
-          current_stage_id: string | null
-          entity_id: string
-          entity_type: string
-          id: string
-          paused_at: string | null
-          process_id: string
-          started_at: string | null
-          status: Database["public"]["Enums"]["workflow_run_status"]
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          cancelled_at?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          current_stage_id?: string | null
-          entity_id: string
-          entity_type: string
-          id?: string
-          paused_at?: string | null
-          process_id: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_run_status"]
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          cancelled_at?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          current_stage_id?: string | null
-          entity_id?: string
-          entity_type?: string
-          id?: string
-          paused_at?: string | null
-          process_id?: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_run_status"]
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pipeline_runs_current_stage_fkey"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_runs_current_stage_fkey"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_reviewer_queue"
-            referencedColumns: ["workflow_stage_id"]
-          },
-          {
-            foreignKeyName: "pipeline_runs_current_stage_fkey"
-            columns: ["current_stage_id"]
-            isOneToOne: false
-            referencedRelation: "v_workflow_sla_status"
-            referencedColumns: ["workflow_stage_id"]
-          },
-          {
-            foreignKeyName: "pipeline_runs_process_id_fkey"
-            columns: ["process_id"]
-            isOneToOne: false
-            referencedRelation: "processes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_runs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      pipeline_stages: {
-        Row: {
-          actual_duration: string | null
-          assigned_staff_id: string | null
-          completed_at: string | null
-          created_at: string | null
-          display_order: number
-          due_date: string | null
-          entity_type: string
-          estimated_duration: string | null
-          id: string
-          notes: string | null
-          pipeline_run_id: string
-          process_stage_id: string
-          reviewer_id: string | null
-          sla_status: string | null
-          stage_name: string
-          started_at: string | null
-          status: Database["public"]["Enums"]["workflow_stage_status"]
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          actual_duration?: string | null
-          assigned_staff_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          display_order: number
-          due_date?: string | null
-          entity_type: string
-          estimated_duration?: string | null
-          id?: string
-          notes?: string | null
-          pipeline_run_id: string
-          process_stage_id: string
-          reviewer_id?: string | null
-          sla_status?: string | null
-          stage_name: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_stage_status"]
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          actual_duration?: string | null
-          assigned_staff_id?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          display_order?: number
-          due_date?: string | null
-          entity_type?: string
-          estimated_duration?: string | null
-          id?: string
-          notes?: string | null
-          pipeline_run_id?: string
-          process_stage_id?: string
-          reviewer_id?: string | null
-          sla_status?: string | null
-          stage_name?: string
-          started_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_stage_status"]
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pipeline_stages_assigned_staff_id_fkey"
-            columns: ["assigned_staff_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_stages_pipeline_run_id_fkey"
-            columns: ["pipeline_run_id"]
-            isOneToOne: false
-            referencedRelation: "pipeline_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_stages_process_stage_id_fkey"
-            columns: ["process_stage_id"]
-            isOneToOne: false
-            referencedRelation: "process_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_stages_reviewer_id_fkey"
-            columns: ["reviewer_id"]
-            isOneToOne: false
-            referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "pipeline_stages_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       platform_subscription_plans: {
         Row: {
@@ -7163,7 +6994,6 @@ export type Database = {
           favicon_url: string | null
           folder_id: string | null
           head_tracking_code: string | null
-          header_background: string | null
           id: string
           name: string
           slug: string
@@ -7181,7 +7011,6 @@ export type Database = {
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
-          header_background?: string | null
           id?: string
           name: string
           slug: string
@@ -7199,7 +7028,6 @@ export type Database = {
           favicon_url?: string | null
           folder_id?: string | null
           head_tracking_code?: string | null
-          header_background?: string | null
           id?: string
           name?: string
           slug?: string
@@ -7568,6 +7396,27 @@ export type Database = {
             referencedColumns: ["engagement_id"]
           },
           {
+            foreignKeyName: "tasks_workflow_stage_id_fkey"
+            columns: ["workflow_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["workflow_stage_id"]
+          },
+          {
+            foreignKeyName: "tasks_workflow_stage_id_fkey"
+            columns: ["workflow_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_workflow_sla_status"
+            referencedColumns: ["workflow_stage_id"]
+          },
+          {
+            foreignKeyName: "tasks_workflow_stage_id_fkey"
+            columns: ["workflow_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -7875,6 +7724,207 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "webhook_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string | null
+          current_stage_id: string | null
+          engagement_id: string
+          id: string
+          paused_at: string | null
+          process_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_run_status"] | null
+          updated_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          engagement_id: string
+          id?: string
+          paused_at?: string | null
+          process_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"] | null
+          updated_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          current_stage_id?: string | null
+          engagement_id?: string
+          id?: string
+          paused_at?: string | null
+          process_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_run_status"] | null
+          updated_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_current_stage"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["workflow_stage_id"]
+          },
+          {
+            foreignKeyName: "fk_current_stage"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "v_workflow_sla_status"
+            referencedColumns: ["workflow_stage_id"]
+          },
+          {
+            foreignKeyName: "fk_current_stage"
+            columns: ["current_stage_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_stages: {
+        Row: {
+          actual_duration: string | null
+          assigned_staff_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          display_order: number
+          due_date: string | null
+          estimated_duration: string | null
+          id: string
+          notes: string | null
+          process_stage_id: string
+          reviewer_id: string | null
+          sla_status: string | null
+          stage_name: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at: string | null
+          workflow_run_id: string
+          workspace_id: string
+        }
+        Insert: {
+          actual_duration?: string | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order: number
+          due_date?: string | null
+          estimated_duration?: string | null
+          id?: string
+          notes?: string | null
+          process_stage_id: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workflow_run_id: string
+          workspace_id: string
+        }
+        Update: {
+          actual_duration?: string | null
+          assigned_staff_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          display_order?: number
+          due_date?: string | null
+          estimated_duration?: string | null
+          id?: string
+          notes?: string | null
+          process_stage_id?: string
+          reviewer_id?: string | null
+          sla_status?: string | null
+          stage_name?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["workflow_stage_status"] | null
+          updated_at?: string | null
+          workflow_run_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_stages_assigned_staff_id_fkey"
+            columns: ["assigned_staff_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_process_stage_id_fkey"
+            columns: ["process_stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -8898,14 +8948,14 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pipeline_stages_reviewer_id_fkey"
+            foreignKeyName: "workflow_stages_reviewer_id_fkey"
             columns: ["reviewer_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pipeline_stages_workspace_id_fkey"
+            foreignKeyName: "workflow_stages_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -8935,14 +8985,15 @@ export type Database = {
       }
       v_tax_season_metrics: {
         Row: {
+          accepted: number | null
           amended: number | null
           extended: number | null
-          filed: number | null
           not_filed: number | null
           open_irs_notices: number | null
-          ready_to_file: number | null
+          rejected: number | null
           tax_year: number | null
           total_returns: number | null
+          transmitted: number | null
           workspace_id: string | null
         }
         Relationships: [
@@ -8969,10 +9020,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pipeline_stages_pipeline_run_id_fkey"
+            foreignKeyName: "workflow_stages_workflow_run_id_fkey"
             columns: ["workflow_run_id"]
             isOneToOne: false
-            referencedRelation: "pipeline_runs"
+            referencedRelation: "workflow_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -9045,7 +9096,6 @@ export type Database = {
       accept_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {
-          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -9126,8 +9176,8 @@ export type Database = {
       }
       advance_pipeline_stage: {
         Args: {
-          p_entity_id: string
           p_entity_type: string
+          p_entity_id: string
           p_process_id: string
           p_process_stage_id: string
         }
@@ -9143,10 +9193,6 @@ export type Database = {
       }
       approve_client_pending_change: {
         Args: { p_notes?: string; p_pending_change_id: string }
-        Returns: undefined
-      }
-      approve_organizer_information_request_item: {
-        Args: { p_item_id: string }
         Returns: undefined
       }
       archive_config_object_share: {
@@ -9175,22 +9221,17 @@ export type Database = {
         }
         Returns: Json
       }
-      capture_public_lead_from_site_page: {
-        Args: {
-          p_email: string
-          p_first_name: string
-          p_last_name: string
-          p_page_id: string
-          p_phone: string
-          p_section_id: string
-          p_service_ids?: string[]
-        }
-        Returns: Json
-      }
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
         Returns: boolean
+      }
+      check_stage_readiness: {
+        Args: { p_workflow_stage_id: string }
+        Returns: {
+          is_ready: boolean
+          missing_requirements: string[]
+        }[]
       }
       compare_config_object_versions: {
         Args: {
@@ -9313,7 +9354,6 @@ export type Database = {
       create_firm_connection_invite: {
         Args: { p_relationship_type?: string; p_workspace_id: string }
         Returns: {
-          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -9347,17 +9387,6 @@ export type Database = {
           p_recipient_user_id: string
           p_template_key: string
           p_workspace_id: string
-        }
-        Returns: string
-      }
-      create_organizer_information_request: {
-        Args: {
-          p_message: string
-          p_organizer_field_id?: string
-          p_response_id: string
-          p_send_email?: boolean
-          p_send_sms?: boolean
-          p_show_in_portal?: boolean
         }
         Returns: string
       }
@@ -9515,15 +9544,6 @@ export type Database = {
       fire_date_reminder_automations: { Args: never; Returns: number }
       fire_invoice_overdue_automations: { Args: never; Returns: number }
       fire_task_overdue_automations: { Args: never; Returns: number }
-      flag_organizer_field_for_info: {
-        Args: {
-          p_instance_index?: number
-          p_note?: string
-          p_organizer_field_id: string
-          p_organizer_response_id: string
-        }
-        Returns: string
-      }
       format_mailing_address: { Args: { p_raw: string }; Returns: string }
       format_organizer_answer: {
         Args: { p_field_type: string; p_value: Json }
@@ -9589,12 +9609,12 @@ export type Database = {
           client_last_name: string
           client_type: string
           due_date: string
+          efile_status: string
           engagement_id: string
           engagement_number: string
           federal_balance_due: number
           federal_refund_amount: number
           is_extended: boolean
-          return_status: string
           return_type: string
           source_workspace_id: string
           source_workspace_name: string
@@ -9605,16 +9625,17 @@ export type Database = {
       get_ero_tax_year_metrics: {
         Args: { p_workspace_id: string }
         Returns: {
+          accepted: number
           amended: number
           extended: number
-          filed: number
           not_filed: number
           open_irs_notices: number
-          ready_to_file: number
+          rejected: number
           source_workspace_id: string
           source_workspace_name: string
           tax_year: number
           total_returns: number
+          transmitted: number
         }[]
       }
       get_firm_connection_invite_preview: {
@@ -9862,6 +9883,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      validate_automation: {
+        Args: { p_automation_id: string }
+        Returns: {
+          step_order: number
+          action_type: string
+          display_name: string
+          issue: string
+        }[]
+      }
       invite_workspace_user: {
         Args: { p_role_id: string; p_user_id: string; p_workspace_id: string }
         Returns: string
@@ -9941,20 +9971,8 @@ export type Database = {
         Args: { p_notification_id: string }
         Returns: undefined
       }
-      mark_organizer_information_request_responded: {
-        Args: { p_request_id: string }
-        Returns: undefined
-      }
-      mark_organizer_information_request_viewed: {
-        Args: { p_request_id: string }
-        Returns: undefined
-      }
       merge_clients: {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
-        Returns: undefined
-      }
-      notify_organizer_information_request: {
-        Args: { p_message: string; p_request_id: string }
         Returns: undefined
       }
       notify_workspace_admins: {
@@ -10019,10 +10037,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      propose_organizer_answer_correction: {
-        Args: { p_item_id: string; p_proposed_value: Json }
-        Returns: undefined
-      }
       record_client_service_interest: {
         Args: {
           p_client_id: string
@@ -10082,7 +10096,6 @@ export type Database = {
       redeem_firm_connection_invite: {
         Args: { p_token: string; p_workspace_id: string }
         Returns: {
-          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -10113,14 +10126,9 @@ export type Database = {
         Args: { p_notes?: string; p_pending_change_id: string }
         Returns: undefined
       }
-      reject_organizer_information_request_item: {
-        Args: { p_decision_note: string; p_item_id: string }
-        Returns: undefined
-      }
       release_firm_connection_billing: {
         Args: { p_connection_id: string }
         Returns: {
-          allows_branding_override: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -10161,10 +10169,6 @@ export type Database = {
         }
         Returns: string
       }
-      render_merge_fields: {
-        Args: { p_context: Json; p_text: string }
-        Returns: string
-      }
       reorder_automation_step: {
         Args: { p_direction: string; p_step_id: string }
         Returns: undefined
@@ -10185,10 +10189,6 @@ export type Database = {
         Args: { p_page_id: string; p_section_ids: string[] }
         Returns: undefined
       }
-      request_portal_service: {
-        Args: { p_service_id: string }
-        Returns: undefined
-      }
       resolve_and_sign_organizer_response: {
         Args: {
           p_client_email: string
@@ -10198,10 +10198,6 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
-      }
-      resolve_organizer_information_request: {
-        Args: { p_request_id: string }
-        Returns: undefined
       }
       resolve_organizer_response_service: {
         Args: { p_response_id: string }
@@ -10246,7 +10242,10 @@ export type Database = {
         Args: { p_comment: string; p_engagement_share_id: string }
         Returns: undefined
       }
-      revoke_expired_portal_access: { Args: never; Returns: number }
+      revoke_expired_portal_access: {
+        Args: never
+        Returns: number
+      }
       revoke_workspace_user: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
@@ -10258,22 +10257,6 @@ export type Database = {
           error_detail: string
           passed: boolean
         }[]
-      }
-      save_organizer_reopened_field_answer: {
-        Args: { p_item_id: string; p_value: Json }
-        Returns: undefined
-      }
-      send_organizer_information_request: {
-        Args: {
-          p_due_date?: string
-          p_message: string
-          p_request_id: string
-          p_send_email?: boolean
-          p_send_sms?: boolean
-          p_show_in_portal?: boolean
-          p_tags?: string[]
-        }
-        Returns: undefined
       }
       set_client_address_primary: {
         Args: { p_address_id: string }
@@ -10317,14 +10300,6 @@ export type Database = {
       }
       set_my_ptin: {
         Args: { p_clear?: boolean; p_ptin: string }
-        Returns: undefined
-      }
-      set_organizer_answer_review_status: {
-        Args: {
-          p_answer_id: string
-          p_note?: string
-          p_status: Database["public"]["Enums"]["review_status"]
-        }
         Returns: undefined
       }
       set_organizer_response_review_status: {
@@ -10465,12 +10440,20 @@ export type Database = {
         }
         Returns: Json
       }
+      start_engagement_workflow: {
+        Args: { p_engagement_id: string; p_process_id: string }
+        Returns: string
+      }
       start_internal_message_thread: {
         Args: {
           p_body: string
           p_other_user_id: string
           p_workspace_id: string
         }
+        Returns: string
+      }
+      start_lead_pipeline_run: {
+        Args: { p_client_id: string; p_process_id: string }
         Returns: string
       }
       start_network_message_thread: {
@@ -10484,14 +10467,6 @@ export type Database = {
       start_next_automation_step: {
         Args: { p_run_id: string }
         Returns: undefined
-      }
-      start_pipeline_run: {
-        Args: {
-          p_entity_id: string
-          p_entity_type: string
-          p_process_id: string
-        }
-        Returns: string
       }
       submit_organizer_response: {
         Args: { p_response_id: string }
@@ -10551,10 +10526,6 @@ export type Database = {
         }
         Returns: string
       }
-      unflag_organizer_information_request_item: {
-        Args: { p_item_id: string }
-        Returns: undefined
-      }
       upsert_workspace_subscription: {
         Args: {
           p_plan_id: string
@@ -10587,15 +10558,6 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
-      }
-      validate_automation: {
-        Args: { p_automation_id: string }
-        Returns: {
-          action_type: string
-          display_name: string
-          issue: string
-          step_order: number
-        }[]
       }
       withdraw_engagement_share: {
         Args: { p_engagement_share_id: string }

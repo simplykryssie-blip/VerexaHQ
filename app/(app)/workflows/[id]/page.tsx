@@ -10,6 +10,8 @@ import {
   type WorkflowRunRow,
   type StaffOption,
   type AutomationOption,
+  type RoleOption,
+  type PendingApprovalRow,
 } from "@/components/workflows/WorkflowBuilder";
 import { WorkflowNameEditor } from "@/components/workflows/WorkflowNameEditor";
 import type { PipelineOption, TemplateOption } from "@/components/workflows/TriggerFields";
@@ -50,10 +52,12 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     { data: otherAutomations },
     { data: serviceCategoriesRaw },
     { data: tagRows },
+    { data: rolesRaw },
+    { data: pendingApprovalsRaw },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
-        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y, display_name, is_enabled")
+        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y, requires_approval, approver_role_id")
         .eq("automation_id", automation.id)
         .order("display_order"),
       supabase
@@ -131,6 +135,19 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .eq("workspace_id", workspace.id)
         .order("name"),
       supabase.from("workspace_tags").select("name").eq("workspace_id", workspace.id).order("name"),
+      supabase
+        .from("roles")
+        .select("id, name")
+        .or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`)
+        .order("name"),
+      supabase
+        .from("automation_pending_steps")
+        .select(
+          "id, created_at, automation_steps(display_name, action_type), automation_runs!inner(automation_id, engagements(engagement_number), clients(first_name, last_name, business_name))"
+        )
+        .eq("status", "pending_approval")
+        .eq("automation_runs.automation_id", automation.id)
+        .order("created_at", { ascending: true }),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -141,9 +158,28 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     delay_minutes: s.delay_minutes,
     canvas_x: s.canvas_x,
     canvas_y: s.canvas_y,
-    display_name: s.display_name,
-    is_enabled: s.is_enabled,
+    requires_approval: s.requires_approval,
+    approver_role_id: s.approver_role_id,
   }));
+
+  const roleOptions: RoleOption[] = rolesRaw ?? [];
+
+  const pendingApprovals: PendingApprovalRow[] = (pendingApprovalsRaw ?? []).map((p) => {
+    const step = p.automation_steps as unknown as { display_name: string | null; action_type: string } | null;
+    const run = p.automation_runs as unknown as {
+      engagements: { engagement_number: string | null } | null;
+      clients: { first_name: string | null; last_name: string | null; business_name: string | null } | null;
+    } | null;
+    const client = run?.clients;
+    return {
+      id: p.id,
+      created_at: p.created_at,
+      step_display_name: step?.display_name ?? null,
+      action_type: step?.action_type ?? "step",
+      engagement_number: run?.engagements?.engagement_number ?? null,
+      client_name: client ? client.business_name || [client.first_name, client.last_name].filter(Boolean).join(" ") || null : null,
+    };
+  });
 
   const stepEdgeRows: WorkflowStepEdgeRow[] = (stepEdges ?? []).map((e) => ({
     id: e.id,
@@ -220,6 +256,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           staffOptions={staffOptions}
           automationOptions={automationOptions}
           tagOptions={tagOptions}
+          roleOptions={roleOptions}
+          pendingApprovals={pendingApprovals}
           conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
           webhookToken={automation.webhook_token}
         />

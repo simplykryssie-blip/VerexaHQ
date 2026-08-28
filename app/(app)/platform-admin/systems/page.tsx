@@ -3,7 +3,20 @@ import { Lock, ShieldAlert, ShieldEllipsis, KeyRound } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
+import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 import { PlatformAdminTabs } from "../PlatformAdminTabs";
+import type { BadgeTone } from "@/components/ui/Badge";
+
+// A generic pending/processing/done/failed vocabulary shared loosely across
+// the cron job queues below -- falls back to neutral for anything queue-specific.
+const QUEUE_STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "warning",
+  processing: "accent",
+  processed: "success",
+  sent: "success",
+  completed: "success",
+  failed: "danger",
+};
 import { SystemCredentialsManager } from "./SystemCredentialsManager";
 
 export const dynamic = "force-dynamic";
@@ -125,8 +138,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(calendarCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -140,8 +155,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(notificationCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -155,8 +172,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(portalInviteCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -170,8 +189,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(engagementLetterCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -185,8 +206,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(webhookCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -220,7 +243,7 @@ export default async function PlatformAdminSystemsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {failureRows.map((f) => (
-                    <tr key={f.id} className="hover:bg-surfaceMuted">
+                    <tr key={f.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="whitespace-nowrap px-5 py-3 text-slate">{new Date(f.created_at).toLocaleString()}</td>
                       <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate">{f.source}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-slate">
@@ -258,10 +281,14 @@ export default async function PlatformAdminSystemsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {workspaces.map((w) => (
-                    <tr key={w.id} className="hover:bg-surfaceMuted">
+                    <tr key={w.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3 text-slate">{w.name}</td>
                       <td className="px-5 py-3 text-slate">{w.workspace_type}</td>
-                      <td className="px-5 py-3 text-slate capitalize">{w.status}</td>
+                      <td className="px-5 py-3">
+                        <Badge tone={WORKSPACE_STATUS_TONE[w.status] ?? "neutral"} className="capitalize">
+                          {w.status}
+                        </Badge>
+                      </td>
                       <td className="px-5 py-3 text-slate">{new Date(w.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}

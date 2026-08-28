@@ -11,12 +11,14 @@ export function ConnectedPtinRow({
   status,
   billingResponsibility,
   sharesCommunicationsIdentity,
+  allowsBrandingOverride,
 }: {
   connectionId: string;
   name: string;
   status: string;
   billingResponsibility: string;
   sharesCommunicationsIdentity: boolean;
+  allowsBrandingOverride: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -28,6 +30,20 @@ export function ConnectedPtinRow({
     const { error } = await supabase
       .from("firm_connections")
       .update({ shares_communications_identity: !sharesCommunicationsIdentity })
+      .eq("id", connectionId);
+    setBusy(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function toggleBrandingOverride() {
+    setBusy("branding");
+    const { error } = await supabase
+      .from("firm_connections")
+      .update({ allows_branding_override: !allowsBrandingOverride })
       .eq("id", connectionId);
     setBusy(null);
     if (error) {
@@ -87,6 +103,16 @@ export function ConnectedPtinRow({
             }`}
           >
             {sharesCommunicationsIdentity ? "Sharing your email/SMS" : "Using their own email/SMS"}
+          </button>
+          <button
+            type="button"
+            onClick={toggleBrandingOverride}
+            disabled={busy !== null}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
+              allowsBrandingOverride ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
+            }`}
+          >
+            {allowsBrandingOverride ? "Can set their own logo/color" : "Fully branded by you"}
           </button>
           <button
             type="button"

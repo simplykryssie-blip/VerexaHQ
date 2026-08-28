@@ -27,7 +27,9 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
   const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequests }] = await Promise.all([
     supabase
       .from("organizer_fields")
-      .select("id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field")
+      .select(
+        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width"
+      )
       .eq("organizer_template_id", response.organizer_template_id)
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
@@ -115,6 +117,10 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 }
 
 function prefillValueFor(clientProfileField: string, snapshot: BasicInfoSnapshot): string | null {
+  // SSN is never prefilled -- it's an encrypted, staff-reveal-gated value.
+  // The client_profile_field='ssn' mapping only proposes a write (subject to
+  // review), it doesn't read one back into the form.
+  if (clientProfileField === "ssn") return null;
   if (clientProfileField === "full_name") {
     if (!snapshot.first_name && !snapshot.last_name) return null;
     return stringifyNameValue({

@@ -183,7 +183,7 @@ export function PipelineLibrary({
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((p) => (
-                <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:shadow-softHover">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
                     {canManage && (

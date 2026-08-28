@@ -42,9 +42,9 @@ export function DataTable<T extends { id: string }>({
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-surfaceMuted">
+            <tr key={row.id} className="transition-colors hover:bg-surfaceMuted">
               {columns.map((col) => (
-                <td key={col.key} className={`px-5 py-3 ${col.className ?? ""}`}>
+                <td key={col.key} className={`px-5 py-3.5 ${col.className ?? ""}`}>
                   {col.render(row)}
                 </td>
               ))}
