@@ -26,6 +26,27 @@ export type ReviewItem = {
 };
 export type ActivityItem = { id: string; description: string; activity_type: string; created_at: string };
 export type CalendarItem = { id: string; date: string; label: string; href?: string; kind: "engagement" | "task" };
+export type ServiceEngagementCount = { serviceId: string; name: string; count: number };
+export type PipelineStageCount = { status: string; count: number };
+
+// Mirrors engagements_status_check exactly, minus Archived -- a pipeline
+// strip has no use for a terminal "put away" bucket the way Completed still
+// is one. This is real engagements.status data, not the newer generic
+// pipeline_runs/processes system (which today only has entity_type='client'
+// lead-pipeline rows -- nothing for engagements yet).
+export const ENGAGEMENT_PIPELINE_STATUSES = [
+  "New",
+  "Waiting On Client",
+  "Waiting On Staff",
+  "In Progress",
+  "Waiting On Review",
+  "Corrections Requested",
+  "Approved",
+  "Waiting On Signature",
+  "Waiting On Payment",
+  "Ready To Release",
+  "Completed",
+] as const;
 
 export type DashboardData = {
   kpis: KpiData;
@@ -35,6 +56,8 @@ export type DashboardData = {
   reviewItems: ReviewItem[];
   recentActivity: ActivityItem[];
   calendarItems: CalendarItem[];
+  topServices: ServiceEngagementCount[];
+  engagementPipeline: PipelineStageCount[];
 };
 
 export async function getDashboardData(workspaceId: string): Promise<DashboardData> {
@@ -139,6 +162,31 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   // a specific requested item.
   const openEngagementIds = (openEngagements ?? []).map((e) => e.id);
   const serviceIds = Array.from(new Set((openEngagements ?? []).map((e) => e.service_id).filter((v): v is string => Boolean(v))));
+
+  const [{ data: serviceNameRows }, { data: allEngagementStatuses }] = await Promise.all([
+    serviceIds.length ? supabase.from("services").select("id, name").in("id", serviceIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    supabase.from("engagements").select("status").eq("workspace_id", workspaceId).neq("status", "Archived"),
+  ]);
+
+  const serviceNameById = new Map((serviceNameRows ?? []).map((s) => [s.id, s.name]));
+  const engagementCountByService = new Map<string, number>();
+  for (const e of openEngagements ?? []) {
+    if (!e.service_id) continue;
+    engagementCountByService.set(e.service_id, (engagementCountByService.get(e.service_id) ?? 0) + 1);
+  }
+  const topServices: ServiceEngagementCount[] = Array.from(engagementCountByService.entries())
+    .map(([serviceId, count]) => ({ serviceId, name: serviceNameById.get(serviceId) ?? "Other", count }))
+    .sort((a, b) => b.count - a.count);
+
+  const statusCounts = new Map<string, number>();
+  for (const row of allEngagementStatuses ?? []) {
+    statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+  }
+  const engagementPipeline: PipelineStageCount[] = ENGAGEMENT_PIPELINE_STATUSES.map((status) => ({
+    status,
+    count: statusCounts.get(status) ?? 0,
+  }));
+
   let missingDocumentsCount = 0;
   if (serviceIds.length > 0 && openEngagementIds.length > 0) {
     const { data: services } = await supabase
@@ -263,5 +311,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     reviewItems,
     recentActivity: activity ?? [],
     calendarItems,
+    topServices,
+    engagementPipeline,
   };
 }
