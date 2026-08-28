@@ -216,7 +216,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
-  const staffOptions: StaffOption[] = staffMembers.map((m) => ({ id: m.user_id, display_name: m.display_name }));
+  const staffOptions: StaffOption[] = staffMembers.map((m) => ({ id: m.user_id, display_name: m.display_name, is_owner: m.is_owner }));
 
   const automationOptions: AutomationOption[] = otherAutomations ?? [];
 
