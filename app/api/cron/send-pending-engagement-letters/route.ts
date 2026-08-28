@@ -32,7 +32,7 @@ export async function GET(request: Request) {
 
   const { data: jobs, error: queryError } = await supabase
     .from("pending_engagement_letter_sends")
-    .select("id, workspace_id, engagement_id, client_id, engagement_letter_template_id")
+    .select("id, workspace_id, engagement_id, client_id, engagement_letter_template_id, additional_signer_relationship_type")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
@@ -94,7 +94,14 @@ type PrefetchedRows = { template: EngagementLetterTemplateRow | null; workspace:
 // hang always turns into a real "failed" row instead of silent stagnation.
 async function sendOneWithTimeout(
   supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  job: {
+    id: string;
+    workspace_id: string;
+    engagement_id: string;
+    client_id: string;
+    engagement_letter_template_id: string;
+    additional_signer_relationship_type: string | null;
+  },
   prefetched: PrefetchedRows,
   timeoutMs = 25000
 ): Promise<"sent" | "failed"> {
@@ -123,7 +130,14 @@ async function sendOneWithTimeout(
 
 async function sendOne(
   supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  job: {
+    id: string;
+    workspace_id: string;
+    engagement_id: string;
+    client_id: string;
+    engagement_letter_template_id: string;
+    additional_signer_relationship_type: string | null;
+  },
   { template, workspace, client }: PrefetchedRows
 ): Promise<"sent" | "failed"> {
   try {
@@ -182,6 +196,35 @@ async function sendOne(
         .from("signature_request_signers")
         .insert({ signature_request_id: signatureRequest.id, signer_name: clientName || "Client", signer_email: client?.primary_email ?? null, sign_order: 1 });
       if (signerErr) throw new Error(signerErr.message);
+    }
+
+    if (job.additional_signer_relationship_type) {
+      const { data: relationship } = await supabase
+        .from("client_relationships")
+        .select("related_name, related_client_id")
+        .eq("client_id", job.client_id)
+        .eq("relationship_type", job.additional_signer_relationship_type)
+        .order("display_order")
+        .limit(1)
+        .maybeSingle();
+
+      if (relationship?.related_name) {
+        let relatedEmail: string | null = null;
+        if (relationship.related_client_id) {
+          const { data: relatedClient } = await supabase
+            .from("clients")
+            .select("primary_email")
+            .eq("id", relationship.related_client_id)
+            .maybeSingle();
+          relatedEmail = relatedClient?.primary_email ?? null;
+        }
+        const { error: additionalSignerErr } = await supabase
+          .from("signature_request_signers")
+          .insert({ signature_request_id: signatureRequest.id, signer_name: relationship.related_name, signer_email: relatedEmail, sign_order: 2 });
+        // A missing/failed additional signer shouldn't fail the whole send --
+        // the primary signer's request is already valid and usable.
+        if (additionalSignerErr) console.error(`send-pending-engagement-letters: could not add additional signer for job ${job.id}`, additionalSignerErr);
+      }
     }
 
     const { error: markSentErr } = await supabase

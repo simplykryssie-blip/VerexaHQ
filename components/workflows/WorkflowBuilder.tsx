@@ -1145,6 +1145,32 @@ export function StepCard({
           </label>
         )}
 
+        {actionType === "send_engagement_letter" && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Also request a signature from (optional)
+            <select
+              disabled={!canManage}
+              value={(config.additional_signer_relationship_type as string) ?? ""}
+              onChange={(e) => setField("additional_signer_relationship_type", e.target.value)}
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="">Just the client</option>
+              <option value="spouse">Spouse</option>
+              <option value="dependent">Dependent</option>
+              <option value="parent">Parent</option>
+              <option value="child">Child</option>
+              <option value="owner">Owner</option>
+              <option value="partner">Partner</option>
+              <option value="attorney">Attorney</option>
+              <option value="officer">Officer</option>
+            </select>
+            <span className="text-[11px] text-muted">
+              Looks up the client&apos;s linked contacts (Relationships tab) of this type at send time and adds the first match as a
+              second signer. Does nothing if none is on file.
+            </span>
+          </label>
+        )}
+
         {actionType === "change_stage" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
             Marks the current pipeline stage complete, moving into the next stage -- the engagement&apos;s pipeline if this run has an

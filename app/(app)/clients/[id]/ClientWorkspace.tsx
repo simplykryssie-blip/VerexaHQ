@@ -10,6 +10,7 @@ import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import { automationActionLabel } from "@/lib/automationLabels";
 import { Badge } from "@/components/ui/Badge";
@@ -130,6 +131,7 @@ export function ClientWorkspace({
   interestedServiceIds,
   leadPipelines,
   automationStatus,
+  additionalSigners,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -175,6 +177,7 @@ export function ClientWorkspace({
   interestedServiceIds: string[];
   leadPipelines: { processId: string; processName: string | null; stageName: string | null }[];
   automationStatus: { automationName: string; status: string; stepActionType: string | null; error: string | null } | null;
+  additionalSigners: AdditionalSignerOption[];
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -327,6 +330,7 @@ export function ClientWorkspace({
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
                 canRequestSignatures={permissions.signaturesRequest}
+                additionalSigners={additionalSigners}
               />
             )}
             {tab === "Messages" && (

@@ -10,6 +10,7 @@ import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignat
 import { uploadSignatureImageClient } from "@/lib/documents/uploadSignatureImage";
 import { renderEmail } from "@/lib/email/template";
 import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
@@ -35,6 +36,7 @@ export function SignaturesPanel({
   workspaceId,
   audience = "staff",
   canCreate = true,
+  additionalSigners = [],
 }: {
   signatureRequests: SignatureRequestRow[];
   documents: DocumentRow[];
@@ -47,6 +49,10 @@ export function SignaturesPanel({
   workspaceId: string;
   audience?: Audience;
   canCreate?: boolean;
+  // Linked contacts (spouse, business co-owner, etc.) offered as one-click
+  // "add as signer" options -- e.g. a client filing jointly with a spouse,
+  // or a business needing a second officer's signature.
+  additionalSigners?: AdditionalSignerOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -62,12 +68,20 @@ export function SignaturesPanel({
   // name/email into a bare textarea from scratch.
   const [signersRaw, setSignersRaw] = useState(clientName ? `${clientName}, ${clientEmail ?? ""}` : "");
   const [error, setError] = useState<string | null>(null);
+  const [addedSignerNames, setAddedSignerNames] = useState<Set<string>>(new Set());
   const [signingId, setSigningId] = useState<string | null>(null);
   const [signatureMode, setSignatureMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [signingError, setSigningError] = useState<string | null>(null);
   const [submittingSignature, setSubmittingSignature] = useState(false);
+
+  function addSigner(signer: AdditionalSignerOption) {
+    if (addedSignerNames.has(signer.name)) return;
+    const line = `${signer.name}, ${signer.email ?? ""}`;
+    setSignersRaw((prev) => (prev.trim() ? `${prev.replace(/\n+$/, "")}\n${line}` : line));
+    setAddedSignerNames((prev) => new Set(prev).add(signer.name));
+  }
 
   async function createRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -157,6 +171,7 @@ export function SignaturesPanel({
     setTemplateId("");
     setDueDate("");
     setSignersRaw("");
+    setAddedSignerNames(new Set());
     router.refresh();
   }
 
@@ -327,6 +342,24 @@ export function SignaturesPanel({
                   ? `Pre-filled with ${clientName}. Add another line to include additional signers (e.g. a spouse).`
                   : "This is who the signing link goes to -- add one signer per line."}
               </p>
+              {additionalSigners.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {additionalSigners.map((s) => (
+                    <button
+                      key={s.name}
+                      type="button"
+                      disabled={addedSignerNames.has(s.name)}
+                      onClick={() => addSigner(s)}
+                      className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-accent hover:bg-accentSoft disabled:cursor-default disabled:border-transparent disabled:bg-surfaceMuted disabled:text-muted"
+                      title={s.email ?? "No email on file -- you'll need to add one, or share the signing link directly"}
+                    >
+                      {addedSignerNames.has(s.name) ? "Added: " : "+ "}
+                      {s.name} <span className="capitalize text-muted">({s.label})</span>
+                      {!s.email && !addedSignerNames.has(s.name) && " -- no email"}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">

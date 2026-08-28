@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
+import { getAdditionalSignerOptions } from "@/lib/documents/getAdditionalSignerOptions";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -413,6 +414,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase.from("tax_years").select("year").order("year", { ascending: false }),
   ]);
   const permissions = await loadActionPermissions(supabase, workspace.id);
+  const additionalSigners = engagement.client_id ? await getAdditionalSignerOptions(supabase, engagement.client_id) : [];
 
   return (
     <EngagementWorkspace
@@ -438,6 +440,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       }))}
       engagementLetterTemplates={engagementLetterTemplates ?? []}
       signatureRequests={signatureRequests}
+      additionalSigners={additionalSigners}
       notes={notes ?? []}
       messageThreads={messageThreads ?? []}
       messages={(messages ?? []) as never}
