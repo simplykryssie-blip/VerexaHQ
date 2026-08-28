@@ -15,7 +15,7 @@ import { formatPhone } from "@/lib/phone";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import { OrganizerPrintSummary } from "@/components/portal/OrganizerPrintSummary";
-import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
+import { SignaturePad } from "@/components/SignaturePad";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -605,7 +605,6 @@ function SignatureField({
   onChange: (fieldId: string, value: string) => void;
   disabled: boolean;
 }) {
-  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -633,13 +632,8 @@ function SignatureField({
   }
 
   async function sign() {
-    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
+    if (!typedName.trim() || !drawnDataUrl) return;
     setError(null);
-
-    if (mode === "typed") {
-      onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }));
-      return;
-    }
 
     setUploading(true);
     const res = await fetch(`/api/portal/organizer/${responseId}/signature-image`, {
@@ -653,17 +647,17 @@ function SignatureField({
       setError(result.error ?? "Could not save your signature.");
       return;
     }
-    onChange(fieldId, JSON.stringify({ signature_image_path: result.path, signed_at: new Date().toISOString() }));
+    onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signature_image_path: result.path, signed_at: new Date().toISOString() }));
   }
 
   return (
     <div className="space-y-2">
-      <SignaturePad mode={mode} onModeChange={setMode} typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
+      <SignaturePad typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
       {error && <p className="text-xs text-danger">{error}</p>}
       <button
         type="button"
         onClick={sign}
-        disabled={uploading || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
+        disabled={uploading || !typedName.trim() || !drawnDataUrl}
         className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
       >
         {uploading ? "Saving..." : "Sign"}

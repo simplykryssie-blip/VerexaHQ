@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignatureRequestFromTemplate";
 import { uploadSignatureImageClient } from "@/lib/documents/uploadSignatureImage";
 import { renderEmail } from "@/lib/email/template";
-import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
+import { SignaturePad } from "@/components/SignaturePad";
 import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
@@ -70,7 +70,6 @@ export function SignaturesPanel({
   const [error, setError] = useState<string | null>(null);
   const [addedSignerNames, setAddedSignerNames] = useState<Set<string>>(new Set());
   const [signingId, setSigningId] = useState<string | null>(null);
-  const [signatureMode, setSignatureMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [signingError, setSigningError] = useState<string | null>(null);
@@ -177,7 +176,6 @@ export function SignaturesPanel({
 
   function closeSigningModal() {
     setSigningId(null);
-    setSignatureMode("typed");
     setTypedName("");
     setDrawnDataUrl(null);
     setSigningError(null);
@@ -186,9 +184,9 @@ export function SignaturesPanel({
   async function submitSignature() {
     if (!signingId) return;
     // Staff mode stays typed-only (recording a signature captured in person
-    // or via another channel); portal mode lets the signer pick either.
-    const usingDrawnMode = audience === "portal" && signatureMode === "drawn";
-    if (usingDrawnMode ? !drawnDataUrl : !typedName.trim()) return;
+    // or via another channel); portal mode requires both typed and drawn.
+    const usingDrawnMode = audience === "portal";
+    if (usingDrawnMode ? !typedName.trim() || !drawnDataUrl : !typedName.trim()) return;
     setSigningError(null);
 
     let signatureImagePath: string | undefined;
@@ -214,7 +212,7 @@ export function SignaturesPanel({
     const { error } = await supabase.rpc("record_signature", {
       p_signer_id: signingId,
       p_signature_type: usingDrawnMode ? "drawn" : "typed",
-      p_typed_name: usingDrawnMode ? undefined : typedName.trim(),
+      p_typed_name: typedName.trim(),
       p_signature_image_path: signatureImagePath,
     });
     setSubmittingSignature(false);
@@ -438,8 +436,6 @@ export function SignaturesPanel({
             {audience === "portal" ? (
               <div className="mt-3">
                 <SignaturePad
-                  mode={signatureMode}
-                  onModeChange={setSignatureMode}
                   typedName={typedName}
                   onTypedNameChange={setTypedName}
                   onDrawnChange={setDrawnDataUrl}
@@ -464,7 +460,7 @@ export function SignaturesPanel({
             <button
               type="button"
               onClick={submitSignature}
-              disabled={submittingSignature || (audience === "portal" && signatureMode === "drawn" ? !drawnDataUrl : !typedName.trim())}
+              disabled={submittingSignature || (audience === "portal" ? !typedName.trim() || !drawnDataUrl : !typedName.trim())}
               className="mt-3 w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
               {submittingSignature ? "Signing..." : "Confirm signature"}
