@@ -97,6 +97,15 @@ export default async function AdminAiAgentsPage() {
           </div>
         </div>
 
+        <div className="rounded-2xl border border-border bg-surfaceMuted p-4 text-xs text-muted">
+          <p className="font-medium text-ink">How a run gets started</p>
+          <p className="mt-1">
+            These agents run as Claude Code sessions, not a button that quietly calls an AI API on its own -- ask Claude Code directly (&quot;run the
+            QA agent against the ERO demo workspace&quot;) for an on-demand check, or ask for a scheduled Routine to run one automatically on a
+            cadence. Either way, every run and finding shows up below in real time as it happens.
+          </p>
+        </div>
+
         <div>
           <h2 className="mb-3 font-display text-sm font-semibold text-ink">Agents</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
