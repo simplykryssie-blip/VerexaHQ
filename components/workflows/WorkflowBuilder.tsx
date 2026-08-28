@@ -153,7 +153,7 @@ export const ACTION_TYPES = [
   { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
   { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
   { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (organizer-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
-  { value: "send_engagement_letter", label: "Send the engagement letter for signature", category: "tax_workflow", description: "Queue the engagement letter for e-signature.", keywords: "signature sign letter" },
+  { value: "send_engagement_letter", label: "Send the document for signature", category: "tax_workflow", description: "Queue the document for e-signature.", keywords: "signature sign document letter" },
   { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
   { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
   { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
@@ -1082,7 +1082,7 @@ export function StepCard({
 
         {actionType === "send_engagement_letter" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Engagement letter
+            Document
             <div className="flex gap-1.5">
               <select
                 disabled={!canManage}
@@ -1090,7 +1090,7 @@ export function StepCard({
                 onChange={(e) => setField("engagement_letter_template_id", e.target.value)}
                 className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               >
-                <option value="">Use the engagement&apos;s service&apos;s default letter</option>
+                <option value="">Use the engagement&apos;s service&apos;s default document</option>
                 {engagementLetterOptions.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -1101,7 +1101,7 @@ export function StepCard({
                 <button
                   type="button"
                   onClick={() => setCreatingTemplateKind("engagement_letter")}
-                  title="Create a new engagement letter"
+                  title="Create a new document"
                   className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
                 >
                   <Plus size={14} />
@@ -1110,7 +1110,7 @@ export function StepCard({
             </div>
             {engagementLetterOptions.length === 0 && (
               <span className="text-[11px] text-warning">
-                No published engagement letters yet -- a template stays hidden here until you publish it from{" "}
+                No published documents yet -- a template stays hidden here until you publish it from{" "}
                 <a href="/templates" target="_blank" rel="noreferrer" className="underline">
                   Form Templates
                 </a>

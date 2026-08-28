@@ -112,7 +112,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   }));
 
   const tabs: { key: FormTemplateTabKey; label: string }[] = [
-    { key: "engagement-letter", label: "Engagement Letters" },
+    { key: "engagement-letter", label: "Documents" },
     { key: "organizers", label: "Organizers" },
   ];
 
@@ -121,7 +121,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       <SettingsSectionHeader
         icon={LayoutTemplate}
         title="Form Templates"
-        description="Engagement letter and organizer templates. See Email & SMS in the Templates menu for message templates."
+        description="Document and organizer templates. See Email & SMS in the Templates menu for message templates."
       />
 
       <div className="mt-4">

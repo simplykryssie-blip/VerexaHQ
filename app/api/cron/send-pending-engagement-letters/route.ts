@@ -127,7 +127,7 @@ async function sendOne(
   { template, workspace, client }: PrefetchedRows
 ): Promise<"sent" | "failed"> {
   try {
-    if (!template) throw new Error("Engagement letter template not found");
+    if (!template) throw new Error("Document template not found");
 
     const clientName = client?.business_name || [client?.first_name, client?.last_name].filter(Boolean).join(" ") || "";
     const mergedHtml = renderTemplate(template.body_html, {
@@ -159,7 +159,7 @@ async function sendOne(
         mime_type: "application/pdf",
         file_size_bytes: blob.size,
         visibility: "internal",
-        category: "Engagement Letter",
+        category: "Signed Document",
       })
       .select("id")
       .single();

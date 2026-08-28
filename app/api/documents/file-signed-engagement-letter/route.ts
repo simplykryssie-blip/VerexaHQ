@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   }
 
   const templateInfo = signature.engagement_letter_templates as unknown as { name?: string; banner_image_url?: string | null } | null;
-  const templateName = templateInfo?.name ?? "Engagement Letter";
+  const templateName = templateInfo?.name ?? "Document";
   const bannerImageBytes = await fetchImageBytes(templateInfo?.banner_image_url);
   const signedBy =
     signatureImageBytes || signature.typed_name
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     mime_type: "application/pdf",
     file_size_bytes: blob.size,
     visibility: "client_visible",
-    category: "Engagement Letter",
+    category: "Signed Document",
   });
   if (insertErr) {
     return NextResponse.json({ error: insertErr.message }, { status: 500 });

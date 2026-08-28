@@ -60,7 +60,7 @@ export async function createSignatureRequestFromTemplate({
       file_size_bytes: blob.size,
       uploaded_by: user?.id,
       visibility: "internal",
-      category: "Engagement Letter",
+      category: "Signed Document",
     })
     .select("id")
     .single();

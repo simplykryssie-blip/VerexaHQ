@@ -44,7 +44,7 @@ export type ServiceRow = {
 
 const REQUIREMENT_FIELDS: { key: keyof ServiceRow; label: string }[] = [
   { key: "requires_organizer", label: "Requires an organizer" },
-  { key: "requires_engagement_letter", label: "Requires an engagement letter" },
+  { key: "requires_engagement_letter", label: "Requires a signed document" },
   { key: "requires_documents", label: "Requires documents" },
   { key: "requires_signature", label: "Requires signature" },
   { key: "requires_review", label: "Requires review" },
@@ -348,12 +348,12 @@ export function ServiceForm({
                 />
               </label>
               <label className={`${labelClass} mt-3`}>
-                Engagement letter template
+                Signable document template
                 <OptionSelect
                   value={engagementLetterTemplateId}
                   onChange={markDirty(setEngagementLetterTemplateId)}
                   options={engagementLetterTemplates}
-                  noneLabel="No engagement letter template"
+                  noneLabel="No document template"
                   disabled={!canManage}
                 />
               </label>

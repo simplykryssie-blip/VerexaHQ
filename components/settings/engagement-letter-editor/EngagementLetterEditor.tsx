@@ -70,10 +70,10 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
         <Link href="/templates?tab=engagement-letter" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
-          <ArrowLeft size={14} /> Engagement letters
+          <ArrowLeft size={14} /> Documents
         </Link>
         <div className="text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Engagement letter</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Document</p>
           <p className="text-sm font-semibold text-ink">
             {name} {readOnly && <span className="ml-1 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
           </p>

@@ -11,7 +11,7 @@ export const AUTOMATION_ACTION_LABELS: Record<string, string> = {
   create_appointment: "Schedule an appointment (request)",
   send_organizer_template: "Push an organizer to the client's portal",
   create_engagement: "Create the engagement",
-  send_engagement_letter: "Send the engagement letter for signature",
+  send_engagement_letter: "Send the document for signature",
   change_stage: "Advance to the next pipeline stage",
   send_document_request: "Send a document request",
   assign_user: "Assign staff",

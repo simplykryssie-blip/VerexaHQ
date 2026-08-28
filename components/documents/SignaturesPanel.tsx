@@ -244,7 +244,7 @@ export function SignaturesPanel({
           <form onSubmit={createRequest} className="mt-3 space-y-3">
             <input
               required
-              placeholder="Title (e.g. Engagement letter)"
+              placeholder="Title (e.g. Document)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -268,7 +268,7 @@ export function SignaturesPanel({
             {source === "template" ? (
               templates.length === 0 ? (
                 <p className="text-xs text-muted">
-                  No engagement letter templates are published yet -- add one in Settings &gt; Templates, or switch to Uploaded file.
+                  No document templates are published yet -- add one in Settings &gt; Templates, or switch to Uploaded file.
                 </p>
               ) : (
                 <select

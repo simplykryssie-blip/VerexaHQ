@@ -87,12 +87,12 @@ export function EngagementLetterLibrary({
       }
       if (error?.code !== "23505") {
         setSaving(false);
-        setError(error?.message ?? "Could not create engagement letter.");
+        setError(error?.message ?? "Could not create document.");
         return;
       }
     }
     setSaving(false);
-    setError("Could not create engagement letter -- try a slightly different name.");
+    setError("Could not create document -- try a slightly different name.");
   }
 
   async function deleteTemplate(card: GalleryCard) {
@@ -115,7 +115,7 @@ export function EngagementLetterLibrary({
       toast.show(error.message, "error");
       return;
     }
-    toast.show("Engagement letter deleted", "success");
+    toast.show("Document deleted", "success");
     router.refresh();
   }
 
@@ -128,9 +128,9 @@ export function EngagementLetterLibrary({
         cards={cards}
         icon={FileSignature}
         statusTable="engagement_letter_templates"
-        searchPlaceholder="Search engagement letters..."
-        emptyMessage="No engagement letters match."
-        createTileLabel="Create new engagement letter"
+        searchPlaceholder="Search documents..."
+        emptyMessage="No documents match."
+        createTileLabel="Create new document"
         onCreateClick={() => setCreating(true)}
         onDeleteClick={deleteTemplate}
         onShareClick={downlineWorkspaces.length > 0 ? (card) => setSharingCard(card) : undefined}
@@ -151,7 +151,7 @@ export function EngagementLetterLibrary({
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
           <form onSubmit={createTemplate} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-semibold text-ink">New engagement letter</h2>
+              <h2 className="font-display text-sm font-semibold text-ink">New document</h2>
               <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
                 ×
               </button>
