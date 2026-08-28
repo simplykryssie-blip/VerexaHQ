@@ -4,30 +4,28 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { DataTable } from "@/components/ui/DataTable";
-import { NewClientButton } from "./NewClientButton";
-import { TagFilterControl } from "./TagFilterControl";
-import { CLIENT_COLUMNS, type ClientRow } from "./_shared";
+import { NewClientButton } from "../clients/NewClientButton";
+import { TagFilterControl } from "../clients/TagFilterControl";
+import { CLIENT_COLUMNS, type ClientRow } from "../clients/_shared";
 
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
 
-const CLIENT_LIFECYCLE_STATUSES = ["active", "inactive", "archived"];
+const LEAD_LIFECYCLE_STATUSES = ["lead", "lost"];
 
-const CLIENT_STATUS_FILTERS = [
+const LEAD_STATUS_FILTERS = [
   { value: "", label: "All" },
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-  { value: "archived", label: "Archived" },
+  { value: "lost", label: "Lost" },
 ];
 
-export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tag?: string } }) {
+export default async function LeadsPage({ searchParams }: { searchParams: { page?: string; status?: string; tag?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const supabase = createClient();
 
-  const status = searchParams.status && CLIENT_STATUS_FILTERS.some((f) => f.value === searchParams.status) ? searchParams.status : "";
+  const status = searchParams.status && LEAD_STATUS_FILTERS.some((f) => f.value === searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -44,7 +42,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     .is("merged_into_client_id", null)
     .order("created_at", { ascending: false })
     .range(from, to);
-  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : CLIENT_LIFECYCLE_STATUSES);
+  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : LEAD_LIFECYCLE_STATUSES);
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
   const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
@@ -66,7 +64,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
 
   // Same category -> service grouping shape the public organizer's own
   // "what do you need help with" contact step uses (get_public_service_options),
-  // so staff pick from the exact same choices clients see on their side.
+  // so staff pick from the exact same choices leads see on their side.
   const serviceCategories = (serviceCategoriesRaw ?? []).map((c) => ({
     id: c.id,
     name: c.name,
@@ -74,16 +72,26 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   })).filter((c) => c.services.length > 0);
 
   const clientIds = (clients ?? []).map((c) => c.id);
-  const { data: interests } = clientIds.length > 0
-    ? await supabase
-        .from("client_service_interests")
-        .select("client_id, services(name)")
-        .in("client_id", clientIds)
-    : { data: [] as { client_id: string; services: { name: string } | null }[] };
+  const [{ data: interests }, { data: activeRuns }] = await Promise.all([
+    clientIds.length > 0
+      ? supabase
+          .from("client_service_interests")
+          .select("client_id, services(name)")
+          .in("client_id", clientIds)
+      : Promise.resolve({ data: [] as { client_id: string; services: { name: string } | null }[] }),
+    clientIds.length > 0
+      ? supabase
+          .from("pipeline_runs")
+          .select("entity_id, pipeline_stages!pipeline_runs_current_stage_fkey(stage_name)")
+          .eq("entity_type", "client")
+          .in("entity_id", clientIds)
+          .eq("status", "Active")
+      : Promise.resolve({ data: [] as { entity_id: string; pipeline_stages: { stage_name: string } | null }[] }),
+  ]);
 
-  // Services are "basic" now and a client can select more than one at once
-  // (e.g. Bookkeeping + Payroll), so this shows every distinct one they've
-  // expressed interest in, not just whichever was recorded most recently.
+  // Leads can express interest in more than one service at once (e.g.
+  // Bookkeeping + Payroll), so this shows every distinct one, not just
+  // whichever was recorded most recently.
   const requestedServicesByClient = new Map<string, string[]>();
   for (const interest of interests ?? []) {
     const serviceName = (interest.services as unknown as { name?: string } | null)?.name;
@@ -96,20 +104,32 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   for (const [clientId, names] of requestedServicesByClient) {
     requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
+  // A lead can have simultaneous active runs in different pipelines (e.g.
+  // Tax + Bookkeeping at once), so this shows every stage they're currently
+  // on, not just whichever run happens to be returned last.
+  const stageNamesByClient = new Map<string, string[]>();
+  for (const run of activeRuns ?? []) {
+    const stageName = (run.pipeline_stages as unknown as { stage_name?: string } | null)?.stage_name;
+    if (!stageName) continue;
+    const list = stageNamesByClient.get(run.entity_id) ?? [];
+    if (!list.includes(stageName)) list.push(stageName);
+    stageNamesByClient.set(run.entity_id, list);
+  }
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
+    stageLabel: c.lifecycle_status === "lead" ? (stageNamesByClient.get(c.id)?.join(", ") ?? null) : null,
   }));
 
   const extraQuery = [status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""].filter(Boolean).join("&");
   const statusQuery = tag ? `&tag=${encodeURIComponent(tag)}` : "";
-  const tagQueryBase = `/clients${status ? `?status=${status}` : ""}`;
+  const tagQueryBase = `/leads${status ? `?status=${status}` : ""}`;
 
   return (
     <>
       <PageHeader
-        title="Clients"
-        description="Every client in your workspace."
+        title="Leads"
+        description="Prospects who haven't engaged yet."
         actions={
           canCreate ? (
             <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
@@ -117,11 +137,17 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         }
       />
       <div className="flex-1 px-8 py-6">
+        <p className="mb-3 text-xs text-muted">
+          <Link href="/pipelines" className="font-medium text-accent hover:underline">
+            View leads by stage in Pipelines →
+          </Link>
+        </p>
+
         <div className="mb-2 flex flex-wrap gap-2">
-          {CLIENT_STATUS_FILTERS.map((f) => (
+          {LEAD_STATUS_FILTERS.map((f) => (
             <Link
               key={f.value}
-              href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients${statusQuery}`}
+              href={f.value ? `/leads?status=${f.value}${statusQuery}` : `/leads${statusQuery}`}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
               }`}
@@ -142,8 +168,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             rows={clientRows}
             emptyMessage={
               status
-                ? `No clients with status "${CLIENT_STATUS_FILTERS.find((f) => f.value === status)?.label}".`
-                : "No clients yet. Add your first client to get started."
+                ? `No leads with status "${LEAD_STATUS_FILTERS.find((f) => f.value === status)?.label}".`
+                : "No leads yet."
             }
             emptyAction={
               !status && canCreate ? (
@@ -152,7 +178,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             }
           />
           {clients && clients.length > 0 && (
-            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/clients" extraQuery={extraQuery} />
+            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? clients.length} basePath="/leads" extraQuery={extraQuery} />
           )}
         </div>
       </div>
