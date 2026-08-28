@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, type BusinessHours } from "@/lib/businessHours";
+import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, type BusinessHours, type HolidayRange } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 
 // Mirrors the availability check in available-slots/route.ts and re-runs it
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   const businessHours = (hoursSetting?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (holidaysSetting?.value as string[] | undefined) ?? [];
+  const holidays = (holidaysSetting?.value as HolidayRange[] | undefined) ?? [];
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
 
   const dayStart = new Date(start);

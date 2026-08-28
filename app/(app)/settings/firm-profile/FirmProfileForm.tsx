@@ -14,7 +14,7 @@ import { SettingsCard } from "@/components/settings/SettingsCard";
 import { formatEin, formatEfin, formatPtin } from "@/lib/taxIds";
 import { formatPhone } from "@/lib/phone";
 import { US_STATES, SPECIAL_CERTIFICATION_STATE_CODES } from "@/lib/usStates";
-import { WEEKDAYS, type BusinessHours, type DayHours } from "@/lib/businessHours";
+import { WEEKDAYS, type BusinessHours, type DayHours, type HolidayRange } from "@/lib/businessHours";
 
 const DAY_LABELS: Record<string, string> = {
   sunday: "Sunday",
@@ -53,7 +53,7 @@ type Props = {
   supportedFilingStates: string[];
   initialHours: BusinessHours;
   initialSlotMinutes: number;
-  initialHolidays: string[];
+  initialHolidays: HolidayRange[];
 };
 
 function LabeledInput({
@@ -135,17 +135,23 @@ export function FirmProfileForm({
 
   const [hours, setHours] = useState<BusinessHours>(initialHours);
   const [slotMinutes, setSlotMinutes] = useState(initialSlotMinutes);
-  const [holidays, setHolidays] = useState<string[]>(initialHolidays);
-  const [newHoliday, setNewHoliday] = useState("");
+  const [holidays, setHolidays] = useState<HolidayRange[]>(initialHolidays);
+  const [newHolidayStart, setNewHolidayStart] = useState("");
+  const [newHolidayEnd, setNewHolidayEnd] = useState("");
 
   function addHoliday() {
-    if (!newHoliday || holidays.includes(newHoliday)) return;
-    setHolidays((prev) => [...prev, newHoliday].sort());
-    setNewHoliday("");
+    if (!newHolidayStart) return;
+    // No end date entered -- a single-day closure, same as start.
+    const end = newHolidayEnd && newHolidayEnd >= newHolidayStart ? newHolidayEnd : newHolidayStart;
+    const range = { start: newHolidayStart, end };
+    if (holidays.some((h) => h.start === range.start && h.end === range.end)) return;
+    setHolidays((prev) => [...prev, range].sort((a, b) => a.start.localeCompare(b.start)));
+    setNewHolidayStart("");
+    setNewHolidayEnd("");
   }
 
-  function removeHoliday(date: string) {
-    setHolidays((prev) => prev.filter((d) => d !== date));
+  function removeHoliday(index: number) {
+    setHolidays((prev) => prev.filter((_, i) => i !== index));
   }
 
   const [saving, setSaving] = useState(false);
@@ -519,39 +525,57 @@ export function FirmProfileForm({
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {holidays.length === 0 && <span className="text-sm text-muted">No holidays added yet.</span>}
-            {holidays.map((date) => (
-              <span
-                key={date}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surfaceMuted px-3 py-1 text-sm text-ink"
-              >
-                {new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}
-                <button
-                  type="button"
-                  onClick={() => removeHoliday(date)}
-                  aria-label={`Remove ${date}`}
-                  className="text-muted hover:text-danger"
+            {holidays.map((h, i) => {
+              const startLabel = new Date(`${h.start}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+              const endLabel = new Date(`${h.end}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+              return (
+                <span
+                  key={`${h.start}-${h.end}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surfaceMuted px-3 py-1 text-sm text-ink"
                 >
-                  &times;
-                </button>
-              </span>
-            ))}
+                  {h.start === h.end ? startLabel : `${startLabel} – ${endLabel}`}
+                  <button
+                    type="button"
+                    onClick={() => removeHoliday(i)}
+                    aria-label={`Remove ${startLabel}`}
+                    className="text-muted hover:text-danger"
+                  >
+                    &times;
+                  </button>
+                </span>
+              );
+            })}
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="date"
-              value={newHoliday}
-              onChange={(e) => setNewHoliday(e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              Start
+              <input
+                type="date"
+                value={newHolidayStart}
+                onChange={(e) => setNewHolidayStart(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              End (optional)
+              <input
+                type="date"
+                value={newHolidayEnd}
+                min={newHolidayStart || undefined}
+                onChange={(e) => setNewHolidayEnd(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
             <button
               type="button"
               onClick={addHoliday}
-              disabled={!newHoliday}
+              disabled={!newHolidayStart}
               className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surfaceMuted disabled:opacity-60"
             >
               Add
             </button>
           </div>
+          <p className="mt-1 text-[11px] text-muted">Leave End blank for a single closed day, or set it to close for a span of days.</p>
         </div>
       </SettingsCard>
       )}
