@@ -10,6 +10,16 @@ export type PipelineOption = { id: string; name: string; stages: { id: string; n
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
+// Matches the review_status enum's own labels exactly (set_organizer_response_review_status
+// takes these verbatim) -- displayLabel mirrors the wording already used in ReviewWorkspace.tsx's
+// own REVIEW_STATUS_LABELS so "Rejected"/"Denied" and "Corrections Requested"/"Needs info" read
+// the same way here as they do on the review screen itself.
+export const ORGANIZER_REVIEW_STATUS_OPTIONS = [
+  { value: "Approved", label: "Approved" },
+  { value: "Corrections Requested", label: "Needs info" },
+  { value: "Rejected", label: "Denied" },
+];
+
 // category/description/keywords are display-only metadata for the
 // searchable/categorized trigger picker (components/workflows/StepPicker.tsx)
 // -- they never touch execution. The engine only ever sees `value` (stored
@@ -39,6 +49,7 @@ export const TRIGGER_TYPES = [
   { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service", category: "tax_workflow", description: "Fires when a client signs their engagement letter.", keywords: "signature signed letter" },
   { value: "document_request.completed", label: "All requested documents are received for a service", category: "documents", description: "Fires once every required document on a request has been received.", keywords: "documents received complete" },
   { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
+  { value: "organizer_response.review_decided", label: "A reviewed organizer is approved, denied, or needs info", category: "forms_intake", description: "Fires when a staff reviewer sets an organizer's review decision to a specific status.", keywords: "organizer review approved denied rejected needs info decision" },
   { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage", category: "engagements", description: "Fires when an engagement enters a specific stage of its pipeline.", keywords: "pipeline stage engagement" },
   { value: "lead.created", label: "A new lead is created", category: "contacts_leads", description: "Fires when a new lead is created (staff entry, public form, portal, referral, etc).", keywords: "contact created lead new" },
   { value: "lead.updated", label: "A lead's info is updated", category: "contacts_leads", description: "Fires when a lead's information is changed.", keywords: "contact changed lead updated" },
@@ -83,6 +94,7 @@ const DATE_REMINDER_TRIGGER_TYPES = new Set([
 export function defaultTriggerConfig(triggerType: string): Record<string, unknown> {
   if (triggerType === "engagement.status_changed") return { to_status: ENGAGEMENT_STATUS_OPTIONS[0] };
   if (triggerType === "appointment.status_changed") return { to_status: APPOINTMENT_STATUS_OPTIONS[0] };
+  if (triggerType === "organizer_response.review_decided") return { to_status: ORGANIZER_REVIEW_STATUS_OPTIONS[0].value };
   if (DATE_REMINDER_TRIGGER_TYPES.has(triggerType)) return { direction: "before", days: 3 };
   return {};
 }
@@ -144,6 +156,13 @@ export function triggerSummary(
     const pipeline = pipelines.find((p) => p.id === processId);
     const stage = pipeline?.stages.find((s) => s.id === stageId);
     return `When an engagement enters "${stage?.name ?? "a stage"}" in "${pipeline?.name ?? "a pipeline"}"`;
+  }
+  if (triggerType === "organizer_response.review_decided") {
+    const status = config.to_status as string | undefined;
+    const label = ORGANIZER_REVIEW_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status ?? "?";
+    const templateId = config.organizer_template_id as string | undefined;
+    const template = templateId ? organizerTemplates.find((t) => t.id === templateId) : undefined;
+    return `When "${template?.name ?? "an organizer"}" is reviewed and marked "${label}"`;
   }
   if (triggerType === "lead.created") {
     return "When a new lead is created";
@@ -431,6 +450,42 @@ export function TriggerFields({
             ))}
           </select>
         </label>
+      )}
+
+      {triggerType === "organizer_response.review_decided" && (
+        <>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Decision
+            <select
+              disabled={disabled}
+              value={(config.to_status as string) ?? ""}
+              onChange={(e) => onConfigChange({ ...config, to_status: e.target.value })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              {ORGANIZER_REVIEW_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-muted">
+            Organizer (optional)
+            <select
+              disabled={disabled}
+              value={(config.organizer_template_id as string) ?? ""}
+              onChange={(e) => onConfigChange({ ...config, organizer_template_id: e.target.value || undefined })}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="">Any organizer template</option>
+              {organizerTemplates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
 
       {triggerType === "engagement.stage_entered" && (
