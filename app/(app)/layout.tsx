@@ -49,6 +49,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: canUseNetworkMessaging },
     { count: teammateCount },
     { data: hasAcceptedTerms },
+    { data: currentProfile },
+    { data: currentMembership },
+    { data: roles },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -69,6 +72,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspace.is_owner
       ? supabase.rpc("has_accepted_platform_terms", { p_version: LEGAL_VERSION })
       : Promise.resolve({ data: true }),
+    // For the sidebar footer / header avatar -- no FK PostgREST can embed
+    // between workspace_users and user_profiles (both independently
+    // reference auth.users), same reason getWorkspaceStaff joins manually.
+    user ? supabase.from("user_profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+    user
+      ? supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("roles").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -97,6 +108,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .map((w) => ({ id: w.id, name: w.name, workspaceType: w.workspace_type, isHome: w.is_platform_home, isActive: w.id === workspace.id }))
       .sort((a, b) => (a.isHome === b.isHome ? 0 : a.isHome ? -1 : 1) || (DEMO_SORT_ORDER[a.workspaceType] ?? 99) - (DEMO_SORT_ORDER[b.workspaceType] ?? 99));
   }
+
+  const roleName = currentMembership?.role_id ? (roles ?? []).find((r) => r.id === currentMembership.role_id)?.name ?? null : null;
+  const currentUser = user
+    ? {
+        name: currentProfile?.display_name ?? null,
+        avatarUrl: currentProfile?.avatar_url ?? null,
+        roleLabel: workspace.is_owner ? "Owner" : roleName,
+      }
+    : null;
 
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
@@ -127,9 +147,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
+            currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
+            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
             {children}
           </main>
