@@ -7490,6 +7490,7 @@ export type Database = {
           status: string
           title: string
           updated_at: string | null
+          visibility: string
           workflow_stage_id: string | null
           workspace_id: string
         }
@@ -7509,6 +7510,7 @@ export type Database = {
           status?: string
           title: string
           updated_at?: string | null
+          visibility?: string
           workflow_stage_id?: string | null
           workspace_id: string
         }
@@ -7528,6 +7530,7 @@ export type Database = {
           status?: string
           title?: string
           updated_at?: string | null
+          visibility?: string
           workflow_stage_id?: string | null
           workspace_id?: string
         }
@@ -10285,6 +10288,10 @@ export type Database = {
       }
       set_client_phone_primary: {
         Args: { p_phone_id: string }
+        Returns: undefined
+      }
+      set_client_task_completed: {
+        Args: { p_completed: boolean; p_task_id: string }
         Returns: undefined
       }
       set_config_object_status: {

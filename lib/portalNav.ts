@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Briefcase, FolderOpen, MessageSquare, Receipt, ClipboardList, CalendarClock, Bell, User, History, Handshake } from "lucide-react";
+import { LayoutDashboard, Briefcase, FolderOpen, MessageSquare, Receipt, ClipboardList, CalendarClock, Bell, User, History, Handshake, CheckSquare } from "lucide-react";
 
 export type PortalNavItem = {
   label: string;
@@ -13,6 +13,7 @@ export type PortalNavItem = {
 export const PORTAL_NAV_ITEMS: PortalNavItem[] = [
   { label: "Dashboard", href: "/portal/dashboard", icon: LayoutDashboard },
   { label: "Engagements", href: "/portal/engagements", icon: Briefcase },
+  { label: "Tasks", href: "/portal/tasks", icon: CheckSquare },
   { label: "Quotes", href: "/portal/quotes", icon: Handshake },
   { label: "Documents", href: "/portal/documents", icon: FolderOpen },
   { label: "Messages", href: "/portal/messages", icon: MessageSquare },

@@ -1058,6 +1058,7 @@ export type TaskRow = {
   priority: string | null;
   due_date: string | null;
   completed_at: string | null;
+  visibility: string;
   assigned_staff: StaffRef;
   dependencies: TaskDependency[];
 };
