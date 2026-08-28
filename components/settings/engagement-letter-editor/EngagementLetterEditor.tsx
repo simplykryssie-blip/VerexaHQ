@@ -12,7 +12,9 @@ import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import { EngagementLetterPreview } from "./EngagementLetterPreview";
 import { PublicLinkToggle } from "@/components/settings/PublicLinkToggle";
+import { PdfTemplateEditor } from "./PdfTemplateEditor";
 import { extractMergeFieldTokens } from "@/lib/mergeFields";
+import type { PdfFieldMapping } from "@/lib/documents/renderPdfTemplate";
 
 export type EngagementLetterTemplateRow = {
   id: string;
@@ -27,6 +29,10 @@ export type EngagementLetterTemplateRow = {
   is_public: boolean;
   requires_portal_signup: boolean;
   banner_image_url: string | null;
+  source_type: string;
+  pdf_storage_path: string | null;
+  pdf_field_mode: string | null;
+  pdf_field_mappings: unknown;
 };
 
 export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
@@ -38,6 +44,14 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
   const [bodyHtml, setBodyHtml] = useState(template.body_html);
   const [requiresSignature, setRequiresSignature] = useState(template.requires_signature);
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+  const [sourceType, setSourceType] = useState<"richtext" | "pdf">(template.source_type === "pdf" ? "pdf" : "richtext");
+  const [pdfStoragePath, setPdfStoragePath] = useState(template.pdf_storage_path);
+  const [pdfFieldMode, setPdfFieldMode] = useState<"acroform" | "overlay" | null>(
+    template.pdf_field_mode === "acroform" || template.pdf_field_mode === "overlay" ? template.pdf_field_mode : null
+  );
+  const [pdfFieldMappings, setPdfFieldMappings] = useState<PdfFieldMapping[]>(
+    Array.isArray(template.pdf_field_mappings) ? (template.pdf_field_mappings as PdfFieldMapping[]) : []
+  );
   const [view, setView] = useState<"edit" | "preview">("edit");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -55,6 +69,10 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
         requires_signature: requiresSignature,
         merge_fields: usedTokens,
         banner_image_url: bannerImageUrl,
+        source_type: sourceType,
+        pdf_storage_path: pdfStoragePath,
+        pdf_field_mode: pdfFieldMode,
+        pdf_field_mappings: pdfFieldMappings as never,
       })
       .eq("id", template.id);
     setSaving(false);
@@ -79,7 +97,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {!readOnly && (
+          {!readOnly && sourceType === "richtext" && (
             <PublicLinkToggle
               table="engagement_letter_templates"
               id={template.id}
@@ -91,13 +109,15 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
             />
           )}
           {!readOnly && <TemplateStatusCycle table="engagement_letter_templates" id={template.id} status={template.status} />}
-          <button
-            type="button"
-            onClick={() => setView((v) => (v === "edit" ? "preview" : "edit"))}
-            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
-          >
-            {view === "edit" ? "Preview" : "Back to editor"}
-          </button>
+          {sourceType === "richtext" && (
+            <button
+              type="button"
+              onClick={() => setView((v) => (v === "edit" ? "preview" : "edit"))}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+            >
+              {view === "edit" ? "Preview" : "Back to editor"}
+            </button>
+          )}
           {!readOnly && view === "edit" && (
             <button
               type="button"
@@ -118,7 +138,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
       )}
 
       <div className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
-        {view === "preview" ? (
+        {view === "preview" && sourceType === "richtext" ? (
           <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} />
         ) : (
           <div className="mx-auto max-w-[720px] space-y-4">
@@ -151,41 +171,103 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
               </label>
 
               <div className="mt-4 border-t border-border pt-3">
-                <BannerImageUpload
-                  workspaceId={template.workspace_id ?? ""}
-                  value={bannerImageUrl}
-                  disabled={readOnly}
-                  onChange={(url) => {
-                    setBannerImageUrl(url);
-                    setDirty(true);
-                  }}
-                />
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Content source</p>
+                <div className="flex gap-1 rounded-lg bg-surfaceMuted p-1 text-xs font-medium">
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => {
+                      setSourceType("richtext");
+                      setDirty(true);
+                    }}
+                    className={`flex-1 rounded-md px-2 py-1.5 transition disabled:cursor-default ${
+                      sourceType === "richtext" ? "bg-surface text-accent shadow-sm" : "text-muted"
+                    }`}
+                  >
+                    Rich text
+                  </button>
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => {
+                      setSourceType("pdf");
+                      setDirty(true);
+                    }}
+                    className={`flex-1 rounded-md px-2 py-1.5 transition disabled:cursor-default ${
+                      sourceType === "pdf" ? "bg-surface text-accent shadow-sm" : "text-muted"
+                    }`}
+                  >
+                    Upload PDF
+                  </button>
+                </div>
+                {sourceType === "pdf" && (
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    A PDF-based document can&apos;t use the public self-serve signing link -- send it from an engagement or a workflow
+                    instead.
+                  </p>
+                )}
               </div>
+
+              {sourceType === "richtext" && (
+                <div className="mt-4 border-t border-border pt-3">
+                  <BannerImageUpload
+                    workspaceId={template.workspace_id ?? ""}
+                    value={bannerImageUrl}
+                    disabled={readOnly}
+                    onChange={(url) => {
+                      setBannerImageUrl(url);
+                      setDirty(true);
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
-            <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
-            {bannerImageUrl && (
-              <div className="mx-auto max-w-[720px] overflow-hidden rounded-t-sm">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={bannerImageUrl} alt="" className="w-full object-cover" />
-              </div>
+            {sourceType === "pdf" ? (
+              <PdfTemplateEditor
+                workspaceId={template.workspace_id ?? ""}
+                templateId={template.id}
+                pdfStoragePath={pdfStoragePath}
+                fieldMode={pdfFieldMode}
+                fieldMappings={pdfFieldMappings}
+                disabled={readOnly}
+                onUploaded={(path, mode) => {
+                  setPdfStoragePath(path);
+                  setPdfFieldMode(mode);
+                  setDirty(true);
+                }}
+                onFieldMappingsChange={(mappings) => {
+                  setPdfFieldMappings(mappings);
+                  setDirty(true);
+                }}
+              />
+            ) : (
+              <>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted">Document</p>
+                {bannerImageUrl && (
+                  <div className="mx-auto max-w-[720px] overflow-hidden rounded-t-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+                  </div>
+                )}
+                <RichTextEditor
+                  content={bodyHtml}
+                  editable={!readOnly}
+                  documentStyle
+                  allowPageBreak
+                  onEditorReady={(editor) => (editorRef.current = editor)}
+                  onChange={(html) => {
+                    setBodyHtml(html);
+                    setDirty(true);
+                  }}
+                  toolbarExtra={
+                    !readOnly && <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
+                  }
+                />
+              </>
             )}
-            <RichTextEditor
-              content={bodyHtml}
-              editable={!readOnly}
-              documentStyle
-              allowPageBreak
-              onEditorReady={(editor) => (editorRef.current = editor)}
-              onChange={(html) => {
-                setBodyHtml(html);
-                setDirty(true);
-              }}
-              toolbarExtra={
-                !readOnly && <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
-              }
-            />
 
-            {usedTokens.length > 0 && (
+            {sourceType === "richtext" && usedTokens.length > 0 && (
               <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted">Merge fields used in this letter</p>
                 <p className="mt-1 flex flex-wrap gap-1.5">

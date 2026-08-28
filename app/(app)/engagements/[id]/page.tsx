@@ -321,7 +321,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
-    .select("id, name, body_html, banner_image_url")
+    .select("id, name, body_html, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings")
     .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");

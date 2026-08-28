@@ -13,7 +13,7 @@ export default async function EngagementLetterEditorPage({ params }: { params: {
   const { data: template } = await supabase
     .from("engagement_letter_templates")
     .select(
-      "id, name, slug, status, workspace_id, body_html, requires_signature, merge_fields, public_token, is_public, requires_portal_signup, banner_image_url"
+      "id, name, slug, status, workspace_id, body_html, requires_signature, merge_fields, public_token, is_public, requires_portal_signup, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings"
     )
     .eq("id", params.id)
     .maybeSingle();

@@ -79,4 +79,13 @@ export type ActivityRow = { id: string; description: string; created_at: string 
 
 export type DocumentRequestTemplateOption = { id: string; name: string };
 
-export type EngagementLetterTemplateOption = { id: string; name: string; body_html: string; banner_image_url?: string | null };
+export type EngagementLetterTemplateOption = {
+  id: string;
+  name: string;
+  body_html: string;
+  banner_image_url?: string | null;
+  source_type?: string;
+  pdf_storage_path?: string | null;
+  pdf_field_mode?: string | null;
+  pdf_field_mappings?: unknown;
+};

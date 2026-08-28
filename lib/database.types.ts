@@ -3043,10 +3043,14 @@ export type Database = {
           is_public: boolean
           merge_fields: Json
           name: string
+          pdf_field_mappings: Json
+          pdf_field_mode: string | null
+          pdf_storage_path: string | null
           public_token: string
           requires_portal_signup: boolean
           requires_signature: boolean
           slug: string
+          source_type: string
           status: string
           updated_at: string
           workspace_id: string | null
@@ -3061,10 +3065,14 @@ export type Database = {
           is_public?: boolean
           merge_fields?: Json
           name: string
+          pdf_field_mappings?: Json
+          pdf_field_mode?: string | null
+          pdf_storage_path?: string | null
           public_token?: string
           requires_portal_signup?: boolean
           requires_signature?: boolean
           slug: string
+          source_type?: string
           status?: string
           updated_at?: string
           workspace_id?: string | null
@@ -3079,10 +3087,14 @@ export type Database = {
           is_public?: boolean
           merge_fields?: Json
           name?: string
+          pdf_field_mappings?: Json
+          pdf_field_mode?: string | null
+          pdf_storage_path?: string | null
           public_token?: string
           requires_portal_signup?: boolean
           requires_signature?: boolean
           slug?: string
+          source_type?: string
           status?: string
           updated_at?: string
           workspace_id?: string | null

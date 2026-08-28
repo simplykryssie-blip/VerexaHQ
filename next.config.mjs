@@ -6,6 +6,16 @@ const nextConfig = {
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,
   },
+  webpack: (config) => {
+    // pdfjs-dist's build has a conditional require("canvas") for Node-side
+    // rendering that's never actually reached in the browser (we only ever
+    // load it client-side, for the Document template's click-to-place PDF
+    // field tool) -- webpack still tries to resolve it statically and fails
+    // since "canvas" is a native module we don't install. Aliasing it away
+    // is the standard fix for pdfjs-dist under webpack.
+    config.resolve.alias.canvas = false;
+    return config;
+  },
   experimental: {
     // Every list page in this app is force-dynamic because it reads
     // live workspace data, but Next's client-side Router Cache still
