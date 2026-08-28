@@ -58,6 +58,7 @@ export default async function FirmProfilePage() {
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
+  const holidays = (settings?.find((s) => s.key === "holidays")?.value as string[] | undefined) ?? [];
 
   return (
     <div className="max-w-2xl">
@@ -95,6 +96,7 @@ export default async function FirmProfilePage() {
             supportedFilingStates={profile?.supported_filing_states ?? []}
             initialHours={businessHours}
             initialSlotMinutes={slotMinutes}
+            initialHolidays={holidays}
           />
         </div>
       )}
