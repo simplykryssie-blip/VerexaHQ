@@ -7,6 +7,7 @@ const TABS = [
   { href: "/platform-admin/review", label: "Review Queue", key: "review" },
   { href: "/platform-admin/billing", label: "Billing", key: "billing" },
   { href: "/platform-admin/systems", label: "Systems", key: "systems" },
+  { href: "/platform-admin/ai-agents", label: "AI Agents", key: "ai-agents" },
 ] as const;
 
 // Only rendered on pages an is_platform_admin() viewer can reach -- IT-only

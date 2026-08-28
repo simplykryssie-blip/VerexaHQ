@@ -30,6 +30,7 @@ import {
   Package,
   Palette,
   Receipt,
+  Sparkles,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -109,6 +110,7 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/platform-admin", icon: LayoutDashboard },
   { label: "Billing", href: "/platform-admin/billing", icon: CreditCard },
   { label: "Systems", href: "/platform-admin/systems", icon: Wrench },
+  { label: "AI Agents", href: "/platform-admin/ai-agents", icon: Sparkles },
   // Contacts/Engagements/Review Queue/Messages are the platform-admin
   // equivalents of the client-facing CRM nav's own tabs of the same name --
   // account holders instead of clients, terms/privacy acceptance instead of

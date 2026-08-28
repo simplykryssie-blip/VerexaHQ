@@ -61,6 +61,449 @@ export type Database = {
           },
         ]
       }
+      ai_agent_evidence: {
+        Row: {
+          created_at: string
+          evidence_type: string
+          finding_id: string | null
+          id: string
+          payload: Json
+          run_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          evidence_type: string
+          finding_id?: string | null
+          id?: string
+          payload?: Json
+          run_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          evidence_type?: string
+          finding_id?: string | null
+          id?: string
+          payload?: Json
+          run_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_evidence_finding_id_fkey"
+            columns: ["finding_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_evidence_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_finding_correlations: {
+        Row: {
+          confidence: string | null
+          created_at: string
+          created_by: string | null
+          finding_id_a: string
+          finding_id_b: string
+          id: string
+          relationship: string
+        }
+        Insert: {
+          confidence?: string | null
+          created_at?: string
+          created_by?: string | null
+          finding_id_a: string
+          finding_id_b: string
+          id?: string
+          relationship?: string
+        }
+        Update: {
+          confidence?: string | null
+          created_at?: string
+          created_by?: string | null
+          finding_id_a?: string
+          finding_id_b?: string
+          id?: string
+          relationship?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_finding_correlations_finding_id_a_fkey"
+            columns: ["finding_id_a"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_finding_correlations_finding_id_b_fkey"
+            columns: ["finding_id_b"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_findings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_findings: {
+        Row: {
+          actual_behavior: string | null
+          affected_module: string | null
+          agent_id: string
+          ai_analysis: Json | null
+          category: string
+          created_at: string
+          decision_notes: string | null
+          description: string
+          expected_behavior: string | null
+          fingerprint: string
+          first_detected_at: string
+          id: string
+          last_detected_at: string
+          possible_cause: string | null
+          regression_of: string | null
+          related_record_id: string | null
+          related_record_type: string | null
+          reproduction_steps: Json | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          run_id: string
+          severity: string
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          actual_behavior?: string | null
+          affected_module?: string | null
+          agent_id: string
+          ai_analysis?: Json | null
+          category: string
+          created_at?: string
+          decision_notes?: string | null
+          description: string
+          expected_behavior?: string | null
+          fingerprint: string
+          first_detected_at?: string
+          id?: string
+          last_detected_at?: string
+          possible_cause?: string | null
+          regression_of?: string | null
+          related_record_id?: string | null
+          related_record_type?: string | null
+          reproduction_steps?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          run_id: string
+          severity: string
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          actual_behavior?: string | null
+          affected_module?: string | null
+          agent_id?: string
+          ai_analysis?: Json | null
+          category?: string
+          created_at?: string
+          decision_notes?: string | null
+          description?: string
+          expected_behavior?: string | null
+          fingerprint?: string
+          first_detected_at?: string
+          id?: string
+          last_detected_at?: string
+          possible_cause?: string | null
+          regression_of?: string | null
+          related_record_id?: string | null
+          related_record_type?: string | null
+          reproduction_steps?: Json | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          run_id?: string
+          severity?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_findings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_findings_regression_of_fkey"
+            columns: ["regression_of"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_findings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_findings_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_findings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_run_budgets: {
+        Row: {
+          consumed_ai_calls: number
+          consumed_steps: number
+          hard_stop_reason: string | null
+          hard_stopped_at: string | null
+          max_ai_calls: number
+          max_duration_seconds: number
+          max_steps: number
+          run_id: string
+        }
+        Insert: {
+          consumed_ai_calls?: number
+          consumed_steps?: number
+          hard_stop_reason?: string | null
+          hard_stopped_at?: string | null
+          max_ai_calls?: number
+          max_duration_seconds?: number
+          max_steps?: number
+          run_id: string
+        }
+        Update: {
+          consumed_ai_calls?: number
+          consumed_steps?: number
+          hard_stop_reason?: string | null
+          hard_stopped_at?: string | null
+          max_ai_calls?: number
+          max_duration_seconds?: number
+          max_steps?: number
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_run_budgets_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "ai_agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_run_events: {
+        Row: {
+          created_at: string
+          id: string
+          level: string
+          message: string
+          meta: Json | null
+          run_id: string
+          seq: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level?: string
+          message: string
+          meta?: Json | null
+          run_id: string
+          seq: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level?: string
+          message?: string
+          meta?: Json | null
+          run_id?: string
+          seq?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_run_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_runs: {
+        Row: {
+          agent_id: string
+          ai_analysis: Json | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          initiated_by: string | null
+          objective: string | null
+          run_type: string
+          scope: Json
+          started_at: string
+          status: string
+          summary: Json
+          workspace_id: string
+        }
+        Insert: {
+          agent_id: string
+          ai_analysis?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          initiated_by?: string | null
+          objective?: string | null
+          run_type: string
+          scope?: Json
+          started_at?: string
+          status?: string
+          summary?: Json
+          workspace_id: string
+        }
+        Update: {
+          agent_id?: string
+          ai_analysis?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          initiated_by?: string | null
+          objective?: string | null
+          run_type?: string
+          scope?: Json
+          started_at?: string
+          status?: string
+          summary?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_test_personas: {
+        Row: {
+          auth_user_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          label: string
+          persona_role: string
+          workspace_id: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          persona_role: string
+          workspace_id: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          persona_role?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_test_personas_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agents: {
+        Row: {
+          agent_key: string
+          agent_type: string
+          config: Json
+          created_at: string
+          description: string
+          id: string
+          is_enabled: boolean
+          last_failure_run_at: string | null
+          last_run_at: string | null
+          last_run_id: string | null
+          last_success_run_at: string | null
+          name: string
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          agent_key: string
+          agent_type?: string
+          config?: Json
+          created_at?: string
+          description: string
+          id?: string
+          is_enabled?: boolean
+          last_failure_run_at?: string | null
+          last_run_at?: string | null
+          last_run_id?: string | null
+          last_success_run_at?: string | null
+          name: string
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          agent_key?: string
+          agent_type?: string
+          config?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          is_enabled?: boolean
+          last_failure_run_at?: string | null
+          last_run_at?: string | null
+          last_run_id?: string | null
+          last_success_run_at?: string | null
+          name?: string
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       appointment_external_events: {
         Row: {
           appointment_id: string
@@ -7710,6 +8153,7 @@ export type Database = {
           first_name: string | null
           id: string
           is_platform_admin: boolean
+          is_platform_ai_operator: boolean
           is_platform_it: boolean
           last_name: string | null
           last_seen_at: string | null
@@ -7732,6 +8176,7 @@ export type Database = {
           first_name?: string | null
           id: string
           is_platform_admin?: boolean
+          is_platform_ai_operator?: boolean
           is_platform_it?: boolean
           last_name?: string | null
           last_seen_at?: string | null
@@ -7754,6 +8199,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           is_platform_admin?: boolean
+          is_platform_ai_operator?: boolean
           is_platform_it?: boolean
           last_name?: string | null
           last_seen_at?: string | null
@@ -9165,6 +9611,15 @@ export type Database = {
         Args: { p_pending_step_id: string }
         Returns: undefined
       }
+      append_agent_run_event: {
+        Args: {
+          p_level: string
+          p_message: string
+          p_meta?: Json
+          p_run_id: string
+        }
+        Returns: undefined
+      }
       approve_automation_step: {
         Args: { p_pending_step_id: string }
         Returns: Json
@@ -9181,6 +9636,7 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      can_access_admin_ai: { Args: never; Returns: boolean }
       can_use_network_messaging: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -9229,6 +9685,16 @@ export type Database = {
         }
         Returns: Json
       }
+      complete_agent_run: {
+        Args: {
+          p_ai_analysis?: Json
+          p_error_message?: string
+          p_run_id: string
+          p_status: string
+          p_summary?: Json
+        }
+        Returns: undefined
+      }
       compliance_inactive_users: {
         Args: { p_inactive_since?: string; p_workspace_id: string }
         Returns: {
@@ -9250,6 +9716,36 @@ export type Database = {
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
         Returns: Json
+      }
+      correlate_agent_findings: {
+        Args: {
+          p_confidence?: string
+          p_finding_id_a: string
+          p_finding_id_b: string
+          p_relationship?: string
+        }
+        Returns: undefined
+      }
+      create_agent_finding: {
+        Args: {
+          p_actual_behavior?: string
+          p_affected_module?: string
+          p_agent_key: string
+          p_ai_analysis?: Json
+          p_category: string
+          p_description: string
+          p_expected_behavior?: string
+          p_fingerprint: string
+          p_possible_cause?: string
+          p_related_record_id?: string
+          p_related_record_type?: string
+          p_reproduction_steps?: Json
+          p_run_id: string
+          p_severity: string
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       create_client: {
         Args: {
@@ -9895,6 +10391,10 @@ export type Database = {
         Returns: string
       }
       is_account_locked: { Args: { p_user_id: string }; Returns: boolean }
+      is_ai_sandbox_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       is_notification_enabled: {
         Args: {
           p_channel: string
@@ -9909,6 +10409,7 @@ export type Database = {
         Returns: boolean
       }
       is_platform_admin: { Args: never; Returns: boolean }
+      is_platform_ai_operator: { Args: never; Returns: boolean }
       is_platform_it: { Args: never; Returns: boolean }
       is_portal_accessible_entity_id: {
         Args: { p_entity_id: string }
@@ -10050,6 +10551,16 @@ export type Database = {
       propose_organizer_answer_correction: {
         Args: { p_item_id: string; p_proposed_value: Json }
         Returns: undefined
+      }
+      record_agent_evidence: {
+        Args: {
+          p_evidence_type: string
+          p_finding_id?: string
+          p_payload?: Json
+          p_run_id: string
+          p_storage_path?: string
+        }
+        Returns: string
       }
       record_client_service_interest: {
         Args: {
@@ -10375,6 +10886,14 @@ export type Database = {
         Args: { p_is_platform_admin: boolean; p_user_id: string }
         Returns: undefined
       }
+      set_platform_ai_operator: {
+        Args: { p_is_platform_ai_operator: boolean; p_user_email: string }
+        Returns: undefined
+      }
+      set_platform_ai_operator_by_id: {
+        Args: { p_is_platform_ai_operator: boolean; p_user_id: string }
+        Returns: undefined
+      }
       set_platform_it: {
         Args: { p_is_platform_it: boolean; p_user_email: string }
         Returns: undefined
@@ -10497,6 +11016,16 @@ export type Database = {
         }
         Returns: Json
       }
+      start_agent_run: {
+        Args: {
+          p_agent_key: string
+          p_objective?: string
+          p_run_type: string
+          p_scope?: Json
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       start_internal_message_thread: {
         Args: {
           p_body: string
@@ -10585,6 +11114,14 @@ export type Database = {
       }
       unflag_organizer_information_request_item: {
         Args: { p_item_id: string }
+        Returns: undefined
+      }
+      update_agent_finding_status: {
+        Args: {
+          p_decision_notes?: string
+          p_finding_id: string
+          p_status: string
+        }
         Returns: undefined
       }
       upsert_workspace_subscription: {
