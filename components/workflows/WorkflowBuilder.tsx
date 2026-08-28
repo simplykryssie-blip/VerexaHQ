@@ -61,6 +61,7 @@ import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
+import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 import { TagNameInput } from "@/components/workflows/TagNameInput";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
@@ -124,37 +125,54 @@ type WorkflowLogRow = {
 
 export type MessageTemplateOption = { id: string; name: string; slug: string };
 
+// category/description/keywords are display-only metadata for the
+// searchable/categorized action picker (components/workflows/StepPicker.tsx)
+// -- they never touch execution. The engine only ever sees `value` (stored
+// verbatim as automation_steps.action_type); category groupings here can be
+// freely renamed/reshuffled without any migration.
+export const ACTION_CATEGORIES: { key: string; label: string }[] = [
+  { key: "communication", label: "Communication" },
+  { key: "contacts_leads", label: "Contacts & Leads" },
+  { key: "tasks", label: "Tasks" },
+  { key: "appointments", label: "Appointments" },
+  { key: "documents_organizers", label: "Documents & Organizers" },
+  { key: "pipeline_engagements", label: "Pipeline & Engagements" },
+  { key: "billing", label: "Billing" },
+  { key: "tax_workflow", label: "Tax Workflow" },
+  { key: "workflow_control", label: "Workflow Control" },
+];
+
 export const ACTION_TYPES = [
-  { value: "delay", label: "Wait / Delay" },
-  { value: "send_email", label: "Send an email" },
-  { value: "send_sms", label: "Send a text" },
-  { value: "create_task", label: "Create a task" },
-  { value: "create_appointment", label: "Schedule an appointment (request)" },
-  { value: "send_organizer_template", label: "Push an organizer to the client's portal" },
-  { value: "create_engagement", label: "Create the engagement and start its pipeline" },
-  { value: "send_engagement_letter", label: "Send the engagement letter for signature" },
-  { value: "change_stage", label: "Advance to the next pipeline stage" },
-  { value: "send_document_request", label: "Send a document request" },
-  { value: "assign_user", label: "Assign staff" },
-  { value: "send_notification", label: "Notify a staff member" },
-  { value: "move_pipeline_stage", label: "Move to a pipeline stage" },
-  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service" },
-  { value: "mark_lead_lost", label: "Mark the lead lost" },
-  { value: "convert_lead_to_client", label: "Convert the lead to an active client" },
-  { value: "update_client", label: "Update a client field" },
-  { value: "create_client", label: "Create a new client" },
-  { value: "create_quote", label: "Create a quote" },
-  { value: "send_quote", label: "Send the draft quote" },
-  { value: "add_tag", label: "Add a tag to the client" },
-  { value: "remove_tag", label: "Remove a tag from the client" },
-  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)" },
-  { value: "add_note", label: "Add an internal note" },
-  { value: "send_portal_message", label: "Send a portal message" },
-  { value: "start_workflow", label: "Start another workflow" },
-  { value: "end_workflow", label: "End this workflow" },
-  { value: "webhook", label: "Call a webhook" },
-  { value: "add_dnd", label: "Opt the client out of SMS/email" },
-  { value: "remove_dnd", label: "Opt the client back into SMS/email" },
+  { value: "delay", label: "Wait / Delay", category: "workflow_control", description: "Pause before continuing to the next step.", keywords: "wait pause business hours" },
+  { value: "send_email", label: "Send an email", category: "communication", description: "Send a templated email to the client.", keywords: "message mail" },
+  { value: "send_sms", label: "Send a text", category: "communication", description: "Send a templated text message to the client.", keywords: "message sms text" },
+  { value: "create_task", label: "Create a task", category: "tasks", description: "Create a task assigned to a staff member.", keywords: "todo assign" },
+  { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
+  { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
+  { value: "create_engagement", label: "Create the engagement and start its pipeline", category: "pipeline_engagements", description: "Create the engagement and start its pipeline (organizer-submission workflows only).", keywords: "engagement pipeline start" },
+  { value: "send_engagement_letter", label: "Send the engagement letter for signature", category: "tax_workflow", description: "Queue the engagement letter for e-signature.", keywords: "signature sign letter" },
+  { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
+  { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
+  { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
+  { value: "send_notification", label: "Notify a staff member", category: "communication", description: "Notify staff members in-app or by email.", keywords: "alert notify staff" },
+  { value: "move_pipeline_stage", label: "Move to a pipeline stage", category: "pipeline_engagements", description: "Move the client or engagement forward to a specific pipeline stage.", keywords: "stage move pipeline" },
+  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service", category: "pipeline_engagements", description: "Start the pipeline matching the lead's selected service.", keywords: "lead pipeline service" },
+  { value: "mark_lead_lost", label: "Mark the lead lost", category: "contacts_leads", description: "Mark the lead as lost.", keywords: "lost lead close" },
+  { value: "convert_lead_to_client", label: "Convert the lead to an active client", category: "contacts_leads", description: "Convert the lead into an active client.", keywords: "convert lead client" },
+  { value: "update_client", label: "Update a client field", category: "contacts_leads", description: "Update a single field on the client record.", keywords: "edit field update" },
+  { value: "create_client", label: "Create a new client", category: "contacts_leads", description: "Create a new client, or reuse a matching one by email/phone.", keywords: "new client contact" },
+  { value: "create_quote", label: "Create a quote", category: "billing", description: "Create a draft quote.", keywords: "quote estimate billing" },
+  { value: "send_quote", label: "Send the draft quote", category: "billing", description: "Send the most recent draft quote.", keywords: "quote send billing" },
+  { value: "add_tag", label: "Add a tag to the client", category: "contacts_leads", description: "Add a tag to the client.", keywords: "tag label" },
+  { value: "remove_tag", label: "Remove a tag from the client", category: "contacts_leads", description: "Remove a tag from the client.", keywords: "tag label remove" },
+  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)", category: "contacts_leads", description: "Invite the client to the portal (skips if already invited).", keywords: "portal invite" },
+  { value: "add_note", label: "Add an internal note", category: "contacts_leads", description: "Add an internal note to the client or engagement.", keywords: "note internal" },
+  { value: "send_portal_message", label: "Send a portal message", category: "communication", description: "Send a message to the client's portal inbox.", keywords: "message portal" },
+  { value: "start_workflow", label: "Start another workflow", category: "workflow_control", description: "Start another published workflow for this same client or engagement.", keywords: "workflow start chain" },
+  { value: "end_workflow", label: "End this workflow", category: "workflow_control", description: "End this workflow run immediately.", keywords: "stop end exit" },
+  { value: "webhook", label: "Call a webhook", category: "workflow_control", description: "Send the run's data to an external URL.", keywords: "webhook api integration http" },
+  { value: "add_dnd", label: "Opt the client out of SMS/email", category: "communication", description: "Opt the client out of SMS and/or email sends.", keywords: "dnd opt out unsubscribe" },
+  { value: "remove_dnd", label: "Opt the client back into SMS/email", category: "communication", description: "Opt the client back into SMS and/or email sends.", keywords: "dnd opt in resubscribe" },
 ];
 
 const DND_CHANNELS = [
@@ -424,24 +442,20 @@ export function StepCard({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-muted">
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
           Action
-          <select
+          <InlineStepPickerField
             disabled={!canManage}
             value={actionType}
-            onChange={(e) => {
-              setActionType(e.target.value);
+            items={ACTION_TYPES}
+            categories={ACTION_CATEGORIES}
+            icon={actionIcon}
+            onChange={(value) => {
+              setActionType(value);
               setConfig({});
               setSaved(false);
             }}
-            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          >
-            {ACTION_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         {actionType === "delay" && (
           <label className="flex flex-col gap-1 text-xs text-muted">

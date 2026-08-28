@@ -1,54 +1,75 @@
 "use client";
 
+import { Zap } from "lucide-react";
 import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 import { TagNameInput } from "@/components/workflows/TagNameInput";
+import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 
 export type TemplateOption = { id: string; name: string };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
+// category/description/keywords are display-only metadata for the
+// searchable/categorized trigger picker (components/workflows/StepPicker.tsx)
+// -- they never touch execution. The engine only ever sees `value` (stored
+// verbatim as automations.trigger_type); category groupings here can be
+// freely renamed/reshuffled without any migration.
+export const TRIGGER_CATEGORIES: { key: string; label: string }[] = [
+  { key: "contacts_leads", label: "Contacts & Leads" },
+  { key: "engagements", label: "Engagements" },
+  { key: "forms_intake", label: "Forms & Intake" },
+  { key: "appointments", label: "Appointments" },
+  { key: "documents", label: "Documents" },
+  { key: "tax_workflow", label: "Tax Workflow" },
+  { key: "billing", label: "Payments & Billing" },
+  { key: "tasks", label: "Tasks" },
+  { key: "communication", label: "Communication" },
+  { key: "webhooks_integrations", label: "Webhooks & Integrations" },
+];
+
 export const TRIGGER_TYPES = [
-  { value: "engagement.status_changed", label: "Engagement status changes to" },
-  { value: "organizer.submitted", label: "An organizer is submitted" },
-  { value: "client.tag_added", label: "A tag is added to a client" },
-  { value: "client.portal_created", label: "A client creates a portal account" },
-  { value: "client.service_interest_selected", label: "A client selects a service" },
-  { value: "engagement.created", label: "A new engagement is created for a service" },
-  { value: "appointment.status_changed", label: "An appointment's status changes to" },
-  { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service" },
-  { value: "document_request.completed", label: "All requested documents are received for a service" },
-  { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage" },
-  { value: "lead.created", label: "A new lead is created" },
-  { value: "lead.updated", label: "A lead's info is updated" },
-  { value: "lead.assigned", label: "A lead is assigned to staff" },
-  { value: "lead.stage_entered", label: "A lead enters a pipeline stage" },
-  { value: "lead.status_changed", label: "A lead's status changes to" },
-  { value: "lead.converted_to_client", label: "A lead is converted to a client" },
-  { value: "lead.marked_lost", label: "A lead is marked lost" },
-  { value: "quote.created", label: "A quote is created" },
-  { value: "quote.sent", label: "A quote is sent" },
-  { value: "quote.accepted", label: "A quote is accepted" },
-  { value: "quote.declined", label: "A quote is declined" },
-  { value: "document_request.sent", label: "A document request is sent" },
-  { value: "document.uploaded", label: "A document is uploaded" },
-  { value: "task.created", label: "A task is created" },
-  { value: "task.completed", label: "A task is completed" },
-  { value: "client_message.received", label: "A client sends a message" },
-  { value: "task.overdue", label: "A task becomes overdue" },
-  { value: "webhook.received", label: "A webhook is received" },
-  { value: "engagement.due_date_reminder", label: "An engagement's due date is approaching" },
-  { value: "quote.expiring_reminder", label: "A quote is about to expire" },
-  { value: "client.birthday_reminder", label: "It's near a client's birthday" },
-  { value: "email.opened", label: "A client opens an automated email" },
-  { value: "email.clicked", label: "A client clicks a link in an automated email" },
-  { value: "email.bounced", label: "An automated email bounces" },
-  { value: "sms.delivered", label: "An automated text is delivered" },
-  { value: "sms.failed", label: "An automated text fails to deliver" },
-  { value: "invoice.sent", label: "An invoice is sent" },
-  { value: "invoice.paid", label: "An invoice is paid in full" },
-  { value: "invoice.overdue", label: "An invoice becomes overdue" },
-  { value: "payment_plan.installment_paid", label: "A payment plan installment is paid" },
+  { value: "engagement.status_changed", label: "Engagement status changes to", category: "engagements", description: "Fires when an engagement's status is set to a specific value.", keywords: "status change engagement" },
+  { value: "organizer.submitted", label: "An organizer is submitted", category: "forms_intake", description: "Fires when a client submits an intake organizer.", keywords: "intake form organizer submit" },
+  { value: "client.tag_added", label: "A tag is added to a client", category: "contacts_leads", description: "Fires when a specific tag is added to a client.", keywords: "tag label contact" },
+  { value: "client.portal_created", label: "A client creates a portal account", category: "contacts_leads", description: "Fires when a client accepts their portal invite and creates an account.", keywords: "portal account signup" },
+  { value: "client.service_interest_selected", label: "A client selects a service", category: "contacts_leads", description: "Fires when a client (or lead) selects a service they're interested in.", keywords: "service interest lead" },
+  { value: "engagement.created", label: "A new engagement is created for a service", category: "engagements", description: "Fires when a new engagement is created for a specific service.", keywords: "engagement created new" },
+  { value: "appointment.status_changed", label: "An appointment's status changes to", category: "appointments", description: "Fires when an appointment's status changes (booked, confirmed, completed, cancelled, no-show).", keywords: "appointment booked cancelled rescheduled no-show completed status" },
+  { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service", category: "tax_workflow", description: "Fires when a client signs their engagement letter.", keywords: "signature signed letter" },
+  { value: "document_request.completed", label: "All requested documents are received for a service", category: "documents", description: "Fires once every required document on a request has been received.", keywords: "documents received complete" },
+  { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
+  { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage", category: "engagements", description: "Fires when an engagement enters a specific stage of its pipeline.", keywords: "pipeline stage engagement" },
+  { value: "lead.created", label: "A new lead is created", category: "contacts_leads", description: "Fires when a new lead is created (staff entry, public form, portal, referral, etc).", keywords: "contact created lead new" },
+  { value: "lead.updated", label: "A lead's info is updated", category: "contacts_leads", description: "Fires when a lead's information is changed.", keywords: "contact changed lead updated" },
+  { value: "lead.assigned", label: "A lead is assigned to staff", category: "contacts_leads", description: "Fires when a lead is assigned to a staff member.", keywords: "lead assign staff" },
+  { value: "lead.stage_entered", label: "A lead enters a pipeline stage", category: "contacts_leads", description: "Fires when a lead enters a specific stage of its pipeline.", keywords: "pipeline stage lead opportunity" },
+  { value: "lead.status_changed", label: "A lead's status changes to", category: "contacts_leads", description: "Fires when a lead's status changes (e.g. converted or lost).", keywords: "lead status opportunity" },
+  { value: "lead.converted_to_client", label: "A lead is converted to a client", category: "contacts_leads", description: "Fires when a lead becomes an active client.", keywords: "lead convert client" },
+  { value: "lead.marked_lost", label: "A lead is marked lost", category: "contacts_leads", description: "Fires when a lead is marked lost.", keywords: "lead lost close" },
+  { value: "quote.created", label: "A quote is created", category: "billing", description: "Fires when a quote is created.", keywords: "quote billing estimate" },
+  { value: "quote.sent", label: "A quote is sent", category: "billing", description: "Fires when a quote is sent to the client.", keywords: "quote billing sent" },
+  { value: "quote.accepted", label: "A quote is accepted", category: "billing", description: "Fires when a client accepts a quote.", keywords: "quote billing accepted" },
+  { value: "quote.declined", label: "A quote is declined", category: "billing", description: "Fires when a client declines a quote.", keywords: "quote billing declined" },
+  { value: "document_request.sent", label: "A document request is sent", category: "documents", description: "Fires when a document request is sent to a client.", keywords: "documents request sent" },
+  { value: "document.uploaded", label: "A document is uploaded", category: "documents", description: "Fires when a document is uploaded.", keywords: "documents upload" },
+  { value: "task.created", label: "A task is created", category: "tasks", description: "Fires when a task is created.", keywords: "task new created" },
+  { value: "task.completed", label: "A task is completed", category: "tasks", description: "Fires when a task is marked complete.", keywords: "task done complete" },
+  { value: "client_message.received", label: "A client sends a message", category: "communication", description: "Fires when a client replies or sends a portal message.", keywords: "message reply customer replied" },
+  { value: "task.overdue", label: "A task becomes overdue", category: "tasks", description: "Fires when a task's due date passes with it still open (checked every 6 hours).", keywords: "task overdue late" },
+  { value: "webhook.received", label: "A webhook is received", category: "webhooks_integrations", description: "Fires when an external tool posts JSON to this workflow's webhook URL.", keywords: "webhook inbound integration api zapier" },
+  { value: "engagement.due_date_reminder", label: "An engagement's due date is approaching", category: "engagements", description: "Fires a set number of days before or after an engagement's due date (checked every 6 hours).", keywords: "due date reminder engagement" },
+  { value: "quote.expiring_reminder", label: "A quote is about to expire", category: "billing", description: "Fires a set number of days before a quote expires (checked every 6 hours).", keywords: "quote expiring reminder billing" },
+  { value: "client.birthday_reminder", label: "It's near a client's birthday", category: "contacts_leads", description: "Fires a set number of days before or after a client's birthday (checked every 6 hours).", keywords: "birthday reminder date" },
+  { value: "email.opened", label: "A client opens an automated email", category: "communication", description: "Fires when a client opens an email sent by a workflow.", keywords: "email opened tracking" },
+  { value: "email.clicked", label: "A client clicks a link in an automated email", category: "communication", description: "Fires when a client clicks a link in an email sent by a workflow.", keywords: "email clicked link tracking" },
+  { value: "email.bounced", label: "An automated email bounces", category: "communication", description: "Fires when an email sent by a workflow bounces.", keywords: "email bounced failed" },
+  { value: "sms.delivered", label: "An automated text is delivered", category: "communication", description: "Fires when a text sent by a workflow is delivered.", keywords: "sms text delivered" },
+  { value: "sms.failed", label: "An automated text fails to deliver", category: "communication", description: "Fires when a text sent by a workflow fails to deliver.", keywords: "sms text failed error" },
+  { value: "invoice.sent", label: "An invoice is sent", category: "billing", description: "Fires when an invoice is sent to a client.", keywords: "invoice billing sent" },
+  { value: "invoice.paid", label: "An invoice is paid in full", category: "billing", description: "Fires when an invoice is paid in full.", keywords: "invoice paid payment" },
+  { value: "invoice.overdue", label: "An invoice becomes overdue", category: "billing", description: "Fires when an invoice's due date passes unpaid (checked every 6 hours).", keywords: "invoice overdue late payment" },
+  { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -110,6 +131,12 @@ export function triggerSummary(
     const serviceId = config.service_id as string | undefined;
     const service = services.find((s) => s.id === serviceId);
     return `When all requested documents are received for "${service?.name ?? "a service"}"`;
+  }
+  if (triggerType === "organizer_information_request.resolved") {
+    const templateId = config.organizer_template_id as string | undefined;
+    if (!templateId) return "When an information request is resolved on any organizer";
+    const template = organizerTemplates.find((t) => t.id === templateId);
+    return `When an information request is resolved on "${template?.name ?? "an organizer"}"`;
   }
   if (triggerType === "engagement.stage_entered") {
     const processId = config.process_id as string | undefined;
@@ -242,23 +269,19 @@ export function TriggerFields({
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
   return (
     <div className="grid grid-cols-2 gap-3">
-      <label className="flex flex-col gap-1 text-xs text-muted">
+      <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
         Trigger
-        <select
+        <InlineStepPickerField
           disabled={disabled}
           value={triggerType}
-          onChange={(e) => {
-            onTriggerTypeChange(e.target.value);
-            onConfigChange(defaultTriggerConfig(e.target.value));
+          items={TRIGGER_TYPES}
+          categories={TRIGGER_CATEGORIES}
+          icon={() => <Zap size={14} />}
+          onChange={(value) => {
+            onTriggerTypeChange(value);
+            onConfigChange(defaultTriggerConfig(value));
           }}
-          className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-        >
-          {TRIGGER_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        />
       </label>
 
       {triggerType === "engagement.status_changed" && (
@@ -385,6 +408,25 @@ export function TriggerFields({
             {services.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {triggerType === "organizer_information_request.resolved" && (
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+          Organizer (optional)
+          <select
+            disabled={disabled}
+            value={(config.organizer_template_id as string) ?? ""}
+            onChange={(e) => onConfigChange({ organizer_template_id: e.target.value || undefined })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            <option value="">Any organizer template</option>
+            {organizerTemplates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
               </option>
             ))}
           </select>
