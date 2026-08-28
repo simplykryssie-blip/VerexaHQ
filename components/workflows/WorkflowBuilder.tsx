@@ -279,6 +279,13 @@ export function StepCard({
   const toast = useToast();
   const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
+  // Separate from any action-specific "Title" field below (e.g. create_task's
+  // task title, create_appointment's appointment title) -- those name the
+  // record the step creates. This names the step itself on the canvas/step
+  // list, and applies the same way regardless of action type, unlike those
+  // per-type fields which only exist for the handful of actions whose
+  // underlying record actually has its own title.
+  const [displayName, setDisplayName] = useState(step.display_name ?? "");
   const [delayUnit, setDelayUnit] = useState<"minutes" | "days">(step.action_config?.delay_unit === "days" ? "days" : "minutes");
   const [delayValue, setDelayValue] = useState(() => {
     const mins = step.delay_minutes ?? 0;
@@ -383,6 +390,7 @@ export function StepCard({
         delay_minutes: delayMinutes,
         requires_approval: requiresApproval,
         approver_role_id: requiresApproval && approverRoleId ? approverRoleId : null,
+        display_name: displayName.trim() || null,
       })
       .eq("id", step.id);
     setSaving(false);
@@ -440,6 +448,20 @@ export function StepCard({
           </div>
         )}
       </div>
+
+      <label className="mt-3 flex flex-col gap-1 text-xs text-muted">
+        Step name (optional)
+        <input
+          disabled={!canManage}
+          value={displayName}
+          onChange={(e) => {
+            setDisplayName(e.target.value);
+            setSaved(false);
+          }}
+          placeholder={actionType === "condition" ? "Condition" : ACTION_TYPES.find((a) => a.value === actionType)?.label ?? actionType}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+        />
+      </label>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
