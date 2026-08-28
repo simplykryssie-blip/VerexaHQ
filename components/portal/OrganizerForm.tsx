@@ -15,6 +15,7 @@ import { formatPhone } from "@/lib/phone";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import { OrganizerPrintSummary } from "@/components/portal/OrganizerPrintSummary";
+import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -349,6 +350,7 @@ export function OrganizerForm({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
+              responseId={responseId}
             />
           ) : (
             <FieldInput
@@ -360,6 +362,7 @@ export function OrganizerForm({
               workspaceId={workspaceId}
               entityType={entityType}
               entityId={entityId}
+              responseId={responseId}
             />
           )
         )}
@@ -420,6 +423,7 @@ function RepeatingSectionInput({
   workspaceId,
   entityType,
   entityId,
+  responseId,
 }: {
   field: FieldRow;
   childFields: FieldRow[];
@@ -429,6 +433,7 @@ function RepeatingSectionInput({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
+  responseId: string;
 }) {
   function updateRow(index: number, childFieldId: string, value: string) {
     onChange(rows.map((row, i) => (i === index ? { ...row, [childFieldId]: value } : row)));
@@ -472,6 +477,7 @@ function RepeatingSectionInput({
                     workspaceId={workspaceId}
                     entityType={entityType}
                     entityId={entityId}
+                    responseId={responseId}
                   />
                 ))}
             </div>
@@ -583,20 +589,29 @@ function FileUploadField({
   );
 }
 
+// No client-side Storage RLS insert here either -- goes through
+// /api/portal/organizer/[id]/signature-image (service role) instead, same
+// reasoning as the public organizer form's PublicSignatureField.
 function SignatureField({
+  responseId,
   fieldId,
   value,
   onChange,
   disabled,
 }: {
+  responseId: string;
   fieldId: string;
   value: string;
   onChange: (fieldId: string, value: string) => void;
   disabled: boolean;
 }) {
+  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
+  const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  let parsed: { typed_name: string; signed_at: string } | null = null;
+  let parsed: { typed_name?: string; signature_image_path?: string; signed_at: string } | null = null;
   try {
     parsed = value ? JSON.parse(value) : null;
   } catch {
@@ -607,7 +622,8 @@ function SignatureField({
     return (
       <p className="flex items-center gap-1.5 text-sm text-green-700">
         <PenLine size={14} aria-hidden="true" />
-        Signed by {parsed.typed_name} on {new Date(parsed.signed_at).toLocaleDateString()}
+        {parsed.typed_name ? `Signed by ${parsed.typed_name}` : "Signed (drawn signature)"} on{" "}
+        {new Date(parsed.signed_at).toLocaleDateString()}
       </p>
     );
   }
@@ -616,21 +632,41 @@ function SignatureField({
     return <p className="text-xs text-muted">Not signed.</p>;
   }
 
+  async function sign() {
+    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
+    setError(null);
+
+    if (mode === "typed") {
+      onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }));
+      return;
+    }
+
+    setUploading(true);
+    const res = await fetch(`/api/portal/organizer/${responseId}/signature-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: drawnDataUrl }),
+    });
+    const result = await res.json().catch(() => ({}));
+    setUploading(false);
+    if (!res.ok) {
+      setError(result.error ?? "Could not save your signature.");
+      return;
+    }
+    onChange(fieldId, JSON.stringify({ signature_image_path: result.path, signed_at: new Date().toISOString() }));
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <input
-        value={typedName}
-        onChange={(e) => setTypedName(e.target.value)}
-        placeholder="Type your full name"
-        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-      />
+    <div className="space-y-2">
+      <SignaturePad mode={mode} onModeChange={setMode} typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
+      {error && <p className="text-xs text-danger">{error}</p>}
       <button
         type="button"
-        disabled={!typedName.trim()}
-        onClick={() => onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }))}
-        className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        onClick={sign}
+        disabled={uploading || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
+        className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
       >
-        Sign
+        {uploading ? "Saving..." : "Sign"}
       </button>
     </div>
   );
@@ -644,6 +680,7 @@ function FieldInput({
   workspaceId,
   entityType,
   entityId,
+  responseId,
 }: {
   field: FieldRow;
   value: string;
@@ -652,6 +689,7 @@ function FieldInput({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
+  responseId: string;
 }) {
   const options = normalizeOptions(field.options);
   const inputClass =
@@ -744,7 +782,7 @@ function FieldInput({
             entityId={entityId}
           />
         ) : field.field_type === "signature" ? (
-          <SignatureField fieldId={field.id} value={value} onChange={onChange} disabled={disabled} />
+          <SignatureField responseId={responseId} fieldId={field.id} value={value} onChange={onChange} disabled={disabled} />
         ) : field.field_type === "dropdown" ? (
           <select
             id={`field-${field.id}`}
