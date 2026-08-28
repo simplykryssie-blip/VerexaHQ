@@ -13,7 +13,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
   const supabase = createClient();
   const { data: engagement } = await supabase
     .from("engagements")
-    .select("id, engagement_number, status, due_date, client_id, services(name), engagement_tax_details(tax_year, return_type, is_extended, extension_due_date, efile_status)")
+    .select("id, engagement_number, status, due_date, client_id, services(name), engagement_tax_details(tax_year, return_type, is_extended, extension_due_date, return_status)")
     .eq("id", params.id)
     .eq("client_id", identity.clientId)
     .maybeSingle();
@@ -59,7 +59,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
     return_type: string | null;
     is_extended: boolean;
     extension_due_date: string | null;
-    efile_status: string;
+    return_status: string;
   } | null;
 
   return (
@@ -71,7 +71,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
             <span>{engagement.engagement_number}</span>
             <span className="capitalize">{engagement.status}</span>
             {taxDetail?.tax_year && <span>Tax year {taxDetail.tax_year}</span>}
-            {taxDetail?.efile_status && taxDetail.efile_status !== "not_filed" && <span className="capitalize">{taxDetail.efile_status.replace("_", " ")}</span>}
+            {taxDetail?.return_status && taxDetail.return_status !== "not_filed" && <span className="capitalize">{taxDetail.return_status.replace("_", " ")}</span>}
             {taxDetail?.is_extended && <span>Extended{taxDetail.extension_due_date && ` to ${new Date(taxDetail.extension_due_date).toLocaleDateString()}`}</span>}
             {engagement.due_date && <span>Due {new Date(engagement.due_date).toLocaleDateString()}</span>}
           </div>
