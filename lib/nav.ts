@@ -153,6 +153,22 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
 
 export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", items: PLATFORM_HOME_NAV_ITEMS }];
 
+/**
+ * Shortcuts into the team-management corner of Settings, surfaced as their
+ * own top-level section for an ERO/Service Bureau/multi-office firm --
+ * see isEroManagementTier(). These are the same pages Settings already
+ * lists (Users & Staff, Connections, Firm Profile), just promoted out of a
+ * nested settings sub-nav for a workspace that actually runs a team,
+ * rather than duplicated pages.
+ */
+export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
+  { label: "Team", href: "/settings/users", icon: Users },
+  { label: "Connections", href: "/settings/connections", icon: Link2 },
+  { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
+];
+
+export const ERO_MANAGEMENT_NAV_SECTION: NavSection = { label: "ERO Management", items: ERO_MANAGEMENT_NAV_ITEMS };
+
 export type SettingsNavItem = {
   label: string;
   href: string;
