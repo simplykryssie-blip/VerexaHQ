@@ -7,7 +7,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
-import { IconChip, type IconChipTone } from "@/components/ui/IconChip";
+import { StatTile } from "@/components/ui/StatTile";
+import type { IconChipTone } from "@/components/ui/IconChip";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ function formatSize(bytes: number) {
 }
 
 function StatCard({
-  icon: Icon,
+  icon,
   chip = "accent",
   label,
   value,
@@ -31,15 +32,7 @@ function StatCard({
   value: React.ReactNode;
   href?: string;
 }) {
-  const body = (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:shadow-softHover">
-      <IconChip tone={chip} className="mb-3">
-        <Icon size={17} aria-hidden="true" />
-      </IconChip>
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{value}</p>
-    </div>
-  );
+  const body = <StatTile icon={icon} tone={chip} label={label} value={value} />;
   return href ? <Link href={href}>{body}</Link> : body;
 }
 

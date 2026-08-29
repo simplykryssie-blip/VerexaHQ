@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { HelpCircle } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -24,6 +26,9 @@ export function AppHeader({
       </div>
       <GlobalSearch workspaceId={workspaceId} />
       {userId && <NotificationBell workspaceId={workspaceId} userId={userId} />}
+      <Link href="/support" aria-label="Help & support" className="text-muted transition hover:text-ink">
+        <HelpCircle size={19} aria-hidden="true" />
+      </Link>
       {currentUser && <Avatar name={currentUser.name} url={currentUser.avatarUrl} size="sm" />}
     </header>
   );

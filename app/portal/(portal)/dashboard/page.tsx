@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { getEffectiveBranding } from "@/lib/branding";
 import { EmptyState } from "@/components/EmptyState";
+import { StatTile } from "@/components/ui/StatTile";
+import type { IconChipTone } from "@/components/ui/IconChip";
 import { ENGAGEMENT_PIPELINE_STATUSES } from "@/lib/dashboard/data";
 
 export const dynamic = "force-dynamic";
@@ -264,33 +266,22 @@ export default async function PortalDashboardPage() {
   );
 }
 
-const TONE_CLASSES = {
-  emerald: "bg-emeraldSoft text-emerald",
-  amber: "bg-amberSoft text-amber",
-  violet: "bg-violetSoft text-violet",
-  rose: "bg-roseSoft text-rose",
-} as const;
-
 function StatCard({
-  icon: Icon,
+  icon,
   tone,
   label,
   value,
   href,
 }: {
   icon: React.ElementType;
-  tone: keyof typeof TONE_CLASSES;
+  tone: IconChipTone;
   label: string;
   value: React.ReactNode;
   href: string;
 }) {
   return (
-    <Link href={href} className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
-      <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${TONE_CLASSES[tone]}`}>
-        <Icon size={16} aria-hidden="true" />
-      </div>
-      <p className="mt-3 text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 font-display text-2xl font-semibold text-ink">{value}</p>
+    <Link href={href}>
+      <StatTile icon={icon} tone={tone} label={label} value={value} />
     </Link>
   );
 }

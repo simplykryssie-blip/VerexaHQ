@@ -16,13 +16,16 @@ type Props = {
   pendingOrganizerTemplateIds: string[];
   primaryEmail: string | null;
   permissions: ActionPermissions;
+  /** "button" (default) is the accent pill for the top action bar. "row" is a
+   * plain list row, for reuse inside a Quick Actions card. */
+  variant?: "button" | "row";
 };
 
 // Send Organizer is the one action every workflow touches regardless of
 // which tab staff happen to be on, so it's the only one that stays outside
 // the tabs. Everything else (documents, billing, notes, messaging) now
 // lives in the tab it belongs to.
-export function QuickActions({ clientId, workspaceId, organizerTemplates, pendingOrganizerTemplateIds, primaryEmail, permissions }: Props) {
+export function QuickActions({ clientId, workspaceId, organizerTemplates, pendingOrganizerTemplateIds, primaryEmail, permissions, variant = "button" }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
@@ -38,9 +41,13 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+        className={
+          variant === "row"
+            ? "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-slate transition hover:bg-surfaceMuted hover:text-ink"
+            : "inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+        }
       >
-        <BookOpen size={14} /> Send Organizer
+        <BookOpen size={variant === "row" ? 16 : 14} /> Send Organizer
       </button>
 
       {open && (
