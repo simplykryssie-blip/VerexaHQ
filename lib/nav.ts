@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
+  UserCheck,
   Users,
   Briefcase,
   Calendar,
@@ -164,6 +165,7 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Team", href: "/settings/users", icon: Users },
+  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
 ];
