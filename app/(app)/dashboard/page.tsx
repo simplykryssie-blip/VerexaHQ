@@ -212,6 +212,7 @@ export default async function DashboardPage() {
   return (
     <DashboardShell
       workspaceName={workspace.name}
+      firstName={profileRow?.first_name ?? null}
       isAdmin={workspace.is_owner}
       widgets={mergedWidgets}
       data={data}
