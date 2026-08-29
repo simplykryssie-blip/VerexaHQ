@@ -117,7 +117,14 @@ export function Sidebar({
     // dark one -- bump it the same way the rail-border/rail-hover tokens
     // already scale for isDarkBg, so the active-item pill keeps the same
     // visual weight regardless of rail color.
-    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, isDarkBg ? 0.18 : 0.1) ?? secondaryColor;
+    const softTint = hexToRgba(secondaryColor, isDarkBg ? 0.18 : 0.1) ?? secondaryColor;
+    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = softTint;
+    // A workspace that's picked its own color gets exactly that color as a
+    // flat active-item pill, same as always -- the CSS module's brand
+    // gradient default (blue-to-lime) is only for a workspace that hasn't
+    // customized anything, not blended with an arbitrary chosen color.
+    (sidebarStyle as Record<string, string>)["--nav-active-bg"] = softTint;
+    (sidebarStyle as Record<string, string>)["--nav-active-ink"] = secondaryColor;
   }
   (sidebarStyle as Record<string, string>)["--rail-bg"] = effectiveBg;
   (sidebarStyle as Record<string, string>)["--rail-ink"] = effectiveTextColor;

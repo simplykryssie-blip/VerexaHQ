@@ -7,6 +7,13 @@
   --rail-hover: #f4f6fb;
   --blue-bright: #0b7fe0;
   --blue-bright-soft: rgba(11, 127, 224, 0.1);
+  /* The active-nav-item look. Defaults to the real brand gradient (blue to
+     lime, the two halves of the Verexa mark) -- Sidebar.tsx overrides both
+     to a flat tint of the workspace's own secondaryColor when one is set,
+     so a firm that's customized their sidebar keeps exactly that flat look
+     rather than getting an unrelated color gradient-blended with lime. */
+  --nav-active-bg: linear-gradient(120deg, var(--blue-bright), #a4d22b);
+  --nav-active-ink: #071018;
 
   background: var(--rail-bg);
   color: var(--rail-ink);
@@ -45,8 +52,8 @@
 
 .navItemActive {
   position: relative;
-  color: var(--blue-bright);
-  background: var(--blue-bright-soft);
+  color: var(--nav-active-ink);
+  background: var(--nav-active-bg);
   font-weight: 600;
 }
 
