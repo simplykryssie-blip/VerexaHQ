@@ -24,7 +24,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 
   const readOnly = response.status === "submitted" || response.status === "reviewed";
 
-  const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequests }] = await Promise.all([
+  const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequests }, { data: infoRequestItems }] = await Promise.all([
     supabase
       .from("organizer_fields")
       .select(
@@ -41,6 +41,15 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
       .neq("status", "draft")
       .neq("status", "resolved")
       .order("created_at", { ascending: false }),
+    // Per-field flags -- these are what actually let a client respond to a
+    // specific question even when the rest of the organizer is read-only
+    // (status submitted/reviewed). approved/resolved items are already
+    // reflected in the answer itself, so there's nothing left to show.
+    supabase
+      .from("organizer_information_request_items")
+      .select("id, organizer_field_id, instance_index, note, status, was_answered_when_flagged, decision_note, organizer_information_requests!inner(organizer_response_id)")
+      .eq("organizer_information_requests.organizer_response_id", response.id)
+      .in("status", ["pending", "client_responded", "rejected"]),
   ]);
 
   // Mapped fields (client_profile_field set on the builder side) that don't
@@ -66,7 +75,13 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
     <>
       <PageHeader
         title={templateName}
-        description={readOnly ? "This organizer has been submitted and can no longer be edited." : "Fill in what you can -- you can save progress and come back."}
+        description={
+          readOnly
+            ? (infoRequestItems ?? []).length > 0
+              ? "This organizer has been submitted -- respond to the flagged questions below."
+              : "This organizer has been submitted and can no longer be edited."
+            : "Fill in what you can -- you can save progress and come back."
+        }
       />
       <div className="max-w-2xl flex-1 px-8 py-6">
         <InformationRequestBanner
@@ -81,6 +96,15 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
           workspaceId={response.workspace_id}
           entityType={response.engagement_id ? "engagement" : "client"}
           entityId={response.engagement_id ?? response.client_id}
+          infoRequestItems={(infoRequestItems ?? []).map((i) => ({
+            id: i.id,
+            organizer_field_id: i.organizer_field_id,
+            instance_index: i.instance_index,
+            note: i.note,
+            status: i.status as "pending" | "client_responded" | "rejected",
+            was_answered_when_flagged: i.was_answered_when_flagged,
+            decision_note: i.decision_note,
+          }))}
         />
       </div>
     </>
