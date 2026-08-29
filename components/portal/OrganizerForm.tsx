@@ -88,11 +88,14 @@ export function OrganizerForm({
     return String(value);
   };
   // Inverse of the above, applied right before an answer is written back to
-  // the jsonb answer column so signature/file_upload values are stored as
-  // real objects, not a JSON string nested inside jsonb.
+  // the jsonb answer column so signature/file_upload/name/address values are
+  // stored as real objects, not a JSON string nested inside jsonb.
+  // name/address fall back to a plain string on parse failure, matching
+  // parseNameValue/parseAddressValue's own graceful handling of legacy
+  // pre-structured plain-text answers.
   const answerFromString = (fieldId: string, value: string): Json => {
     const type = fieldTypeById.get(fieldId);
-    if (type === "signature" || type === "file_upload") {
+    if (type === "signature" || type === "file_upload" || type === "name" || type === "address") {
       try {
         return JSON.parse(value) as Json;
       } catch {

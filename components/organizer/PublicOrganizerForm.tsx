@@ -67,15 +67,20 @@ function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: numb
   return value.trim() !== "";
 }
 
-// signature and file_upload fields store a JSON-encoded object in the
-// (otherwise all-string) `answers` map -- see PublicSignatureField and the
-// file_upload branch below. Sent as-is, that string would land in the jsonb
-// answer column as a jsonb *string* (double-encoded), which
-// resolve_and_sign_organizer_response can't read fields out of via ->>. Parse
+// signature, file_upload, name, and address fields all store a JSON-encoded
+// object in the (otherwise all-string) `answers` map -- see
+// PublicSignatureField, the file_upload branch below, and
+// parseNameValue/parseAddressValue in lib/organizer/formatValue.ts. Sent
+// as-is, that string would land in the jsonb answer column as a jsonb
+// *string* (double-encoded), which resolve_and_sign_organizer_response and
+// format_organizer_answer can't read structured fields out of via ->>. Parse
 // it back into a real object here, at the boundary where it's serialized for
 // the RPC, so the database gets the structured value every reader expects.
+// name/address fall back to a plain string on parse failure, matching
+// parseNameValue/parseAddressValue's own graceful handling of legacy
+// pre-structured plain-text answers.
 function toAnswerValue(fieldType: string, value: string): Json {
-  if (fieldType === "signature" || fieldType === "file_upload") {
+  if (fieldType === "signature" || fieldType === "file_upload" || fieldType === "name" || fieldType === "address") {
     try {
       return JSON.parse(value) as Json;
     } catch {
