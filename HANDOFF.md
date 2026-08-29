@@ -6,6 +6,148 @@ system is actually built (schema, auth, permissions, every module), see
 `PLATFORM.md` in this same repo root — that's the living architecture
 reference. This file is just "what happened recently and what's still open."
 
+## Addendum — 2026-08-29: QA agent run, onboarding popup, and a full visual/branding redesign
+
+Five separate pieces of work this session, roughly in the order they happened.
+Everything below is committed, merged into `main`, and the working branch
+(`claude/verexa-schema-mismatch-i8c19u`) was reset to `main` after each merge
+— note this is a **different branch** from `claude/verexa-tax-office-v2-mhd9mo`
+referenced elsewhere in this file; check which one is actually current before
+assuming either is stale.
+
+1. **QA Agent run against the 5 ERO Workspace features (PRs #154–158).**
+   Ran in Demo - ERO Office. Real browser E2E turned out to be impossible in
+   this sandbox — the outbound agent-proxy hard-blocks CONNECT to
+   `daxpavvsotvsyqqntddc.supabase.co` for generic browser/curl traffic
+   (confirmed via `curl http://127.0.0.1:37941/__agentproxy/status`, which
+   lists it under `recentRelayFailures` as `connect_rejected`). Only the
+   dedicated Supabase MCP tool channel can reach that host. Pivoted to
+   RPC/RLS-level verification instead — 0 defects found. All synthetic test
+   data (a fake `auth.users` row, a client/engagement/task fixture set)
+   was created, verified, then fully deleted afterward. **If a future
+   session needs real browser E2E against the live app, expect this same
+   proxy block and plan for RPC-level verification instead, not more time
+   spent trying to route around it.**
+
+2. **Learning Hub visibility: fixed, then explicitly reverted.** The user
+   flagged that Learning Hub shouldn't show on Independent PTIN workspaces.
+   Shipped a fix (PR #159, hide unless connected to an ERO) after confirming
+   via AskUserQuestion that a genuinely-connected demo PTIN needed to keep
+   seeing it. The user then said "Disregard that" — cleanly reverted via
+   `git revert -m 1` (PR #160, merged). **Current live behavior: Learning
+   Hub shows unconditionally for every workspace, same as before either
+   change.** Don't re-attempt this fix without the user asking again.
+
+3. **Staff onboarding checklist → popup.** `components/onboarding/
+   OnboardingChecklist.tsx` no longer renders as an inline banner pinned to
+   the top of the dashboard — it's now a real `Modal` (PR #161). The
+   permanent "Don't show this again" DB-backed dismiss is unchanged; a new
+   local-only `closedForNow` state just lets someone close the popup for
+   the current page load without triggering that permanent dismiss.
+
+4. **A from-scratch visual/branding redesign, in phases, all now shipped:**
+   the user compared Verexa's actual UI unfavorably to SuiteDash ("a space I
+   can create in") vs. TaxNitro ("just boring work") and asked for a real
+   redesign, not a coat of paint. Key discovery that grounded everything
+   below: **`public/brand/vmark.png`** (the real Verexa "V" logo) has a
+   genuine vivid blue-to-lime gradient (`~#0EA5FF` → `~#D4F905`, tempered to
+   `#A4D22B` for UI use) that the live product had never actually used
+   anywhere — every screen was flat single-blue. That gradient, applied as
+   a **default-unless-branded** treatment (any workspace with its own Brand
+   Center `secondaryColor` set keeps a flat tint of that color instead —
+   never gets the gradient forced on, so no white-labeled firm's look
+   changes), is the throughline for every phase below.
+   - **Phase 1 (PR #162):** `tailwind.config.ts` gained `brandLime` (`#A4D22B`)
+     and a warmer `surfaceMuted` (`#F4F6EF`, a sage tint instead of flat
+     gray). Sidebar's active-nav-item pill defaults to the blue-to-lime
+     gradient (`Sidebar.module.css`'s `--nav-active-bg`), falling back to a
+     flat tint of `secondaryColor` when one's set (`Sidebar.tsx`).
+   - **Phase 2 (PR #163):** Dashboard's page header became a dark hero band
+     (`bg-ink`) with a gradient-text personalized greeting ("Welcome back,
+     {first name}") and a real, computed "N things need your attention"
+     subtitle — no fabricated copy. `EngagementPipelineWidget` highlights
+     whichever non-Completed stage currently has the most engagements in it
+     with the same gradient, a real computed signal, not decoration.
+   - **Phase 3 (PR #164):** Client Portal dashboard
+     (`app/portal/(portal)/dashboard/page.tsx`) got the same dark-hero
+     treatment plus a new conic-gradient progress ring showing a **real**
+     stage-based completion percentage for the client's nearest active
+     engagement (derived from `ENGAGEMENT_PIPELINE_STATUSES`' position in
+     the pipeline, same as the dashboard widget), categorical stat tiles,
+     and two action cards (documents / message preparer) using real counts
+     and the actual preparer's name. Portal sidebar's active-nav pill picked
+     up the same gradient-or-flat-tint rule as the staff sidebar.
+   - **Design-system pass (PR #165):** the user shared a Verexa-branded
+     reference mockup (apparently a white-labeled SuiteDash trial — same
+     "VEREXA" branding, purple accent, light sidebar) showing a dashboard +
+     client detail + organizer review layout they liked, and asked for it
+     applied across "the entire look of the CRM," not just the pages shown.
+     Resolved via AskUserQuestion before building: **keep the dark
+     sidebar and dark dashboard hero already shipped** (don't revert to the
+     mockup's light sidebar), and build the promo banner as a **simple
+     static dismissible card, no carousel/rotation/content management**.
+     An inventory pass (two Explore agents) found the app already had most
+     of the mockup's structural pieces (`WidgetShell`, `IconChip`, `Badge`,
+     `SectionCard`, `KpiWidget`, the `TopServicesWidget` donut technique) —
+     this was a consolidation pass, not a rebuild:
+     - New shared primitives under `components/ui/`: **`Tabs`** (one
+       underline tab bar, replacing three near-identical hand-rolled ones in
+       `ClientWorkspace.tsx`/`EngagementWorkspaceTabs.tsx`/`MessagesTabs.tsx`
+       — `MessagesTabs` was deliberately left on its own pill style, it's a
+       filter switcher not a content-section tab bar); **`ProgressBar`**
+       (replaces two private duplicates in `EngagementWorkspaceTabs.tsx` and
+       `components/documents/RequestsPanel.tsx`, adds an opt-in
+       `tone="gradient"` for one intentional highlight per page);
+       **`StatTile`** (replaces local `StatCard` duplicates on
+       `app/(app)/documents/page.tsx` and the portal dashboard);
+       **`Sparkline`** (built, following `TopServicesWidget`'s
+       stroke/`currentColor` SVG technique, but **deliberately left unwired**
+       — neither `lib/dashboard/data.ts` nor `lib/dashboard/
+       businessSnapshot.ts` compute any real day-by-day series anywhere in
+       the codebase, and fabricating one would violate the app's own
+       data-honesty convention for trend indicators, same reasoning as
+       `KpiWidget`'s trend prop).
+     - Clients page (`app/(app)/clients/[id]/ClientWorkspace.tsx` +
+       `ClientWorkspaceTabs.tsx` + `QuickActions.tsx`): Overview tab's three
+       stat tiles now use categorical `IconChip` tones instead of plain
+       numbers; a new progress bar shows the real stage-based completion
+       percent for the client's nearest active engagement with the brand
+       gradient; the right rail's bare `<h3>/<ul>` sections are now
+       `SectionCard`s; two new cards were added — **Quick Actions** (Send
+       Organizer, reusing the real `QuickActions` component via a new
+       `variant="row"` prop, plus Upload Document/Send Message/Create
+       Invoice/Add Note as tab-switch shortcuts) and **Notes** (shows the
+       single most recent note with an Add Note shortcut).
+     - `PromoBanner` (`components/dashboard/PromoBanner.tsx` — this
+       component and its exact copy, "Focus on what matters. We'll handle
+       the rest...", already existed on the dashboard from earlier
+       dashboard-widget work; it just wasn't dismissible) gained a local
+       `useState` dismiss with an X button. `AppHeader.tsx` gained a
+       `HelpCircle` icon linking to `/support`, between the notification
+       bell and avatar.
+   - **Verification method used throughout**: since real browser E2E is
+     blocked (see item 1), every visual phase was checked via a disposable
+     `app/dev-preview-*/page.tsx` route rendering the real component with
+     mock data, temporarily added to `ALWAYS_PUBLIC_PATHS` in
+     `lib/supabase/middleware.ts`, screenshotted with a scratch Playwright
+     install (`executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/
+     chrome'`, `args: ['--headless=new']` — the npm `playwright` package's
+     bundled Chromium revision doesn't match what's pre-installed here) —
+     then fully deleted before committing. **Reuse this exact pattern for
+     any future visual work in this sandbox** rather than re-discovering it.
+
+5. **Explicitly deferred, not started**: Engagements, Billing, Review Queue,
+   and Documents pages were found already close to the new design system in
+   the inventory pass above (most already use `Badge`/`IconChip`/the
+   `rounded-2xl border-border bg-surface shadow-soft` card shell) and are
+   the natural next round if the user wants to keep going on "the entire
+   CRM" — mostly consolidation onto the new `Tabs`/`ProgressBar`/`StatTile`
+   primitives rather than new design work. `EngagementBoard.tsx`,
+   `BillingHub.tsx`, and the Review Queue's `ReviewQueueItem`/
+   `ReviewQueueClientChangeItem` sub-components were flagged by the
+   inventory but not read in depth — read them first before touching that
+   round.
+
 ## Addendum — 2026-08-23: "New Leads Enter CRM" finished
 
 The owner asked for a specific lead-intake automation (trigger on
