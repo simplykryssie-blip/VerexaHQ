@@ -14,12 +14,23 @@ const config: Config = {
         accent: "rgb(var(--brand-accent-rgb, 11 127 224) / <alpha-value>)",
         accentSoft: "rgb(var(--brand-accent-soft-rgb, 232 243 254) / <alpha-value>)",
         surface: "#FFFFFF",
-        // A hair of blue bias instead of a flat gray -- reads as chosen
-        // rather than inherited, and still neutral enough to sit under any
-        // workspace's own accent color.
-        surfaceMuted: "#F4F6FB",
+        // A hair of warmth (a sage bias) instead of a flat gray -- reads as
+        // chosen rather than inherited, and still neutral enough to sit
+        // under any workspace's own accent color. Ties to the green half of
+        // the actual Verexa mark (see brandLime below) the same way the
+        // previous blue-biased value tied to its blue half.
+        surfaceMuted: "#F4F6EF",
         border: "#E3E7F0",
         muted: "#64748B",
+        // The lime-green from the second half of the real Verexa "V" mark
+        // (public/brand/vmark.png), tempered down from the mark's own acid
+        // #D4F905 so it stays legible as a UI color at real sizes rather
+        // than just a glossy logo highlight. Pairs with `accent` (which
+        // already resolves to the mark's blue by default, or a workspace's
+        // own Brand Center color when set) as the second stop of the one
+        // brand gradient -- see Sidebar.module.css's --nav-active-bg for
+        // where that gradient is actually used.
+        brandLime: "#A4D22B",
         success: "#16A34A",
         successSoft: "#E3F4E9",
         warning: "#D97706",
