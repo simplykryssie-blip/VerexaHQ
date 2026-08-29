@@ -32,6 +32,7 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
   }));
 
   const SIGNATURE_GATED_STATUSES = ["Waiting On Payment", "Ready To Release", "Completed"];
+  const PAYMENT_GATED_STATUSES = ["Ready To Release", "Completed"];
 
   async function moveTo(id: string, status: string) {
     const current = engagements.find((e) => e.id === id);
@@ -42,6 +43,16 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
       if (!hasSignedLetter) {
         const proceed = window.confirm(
           `This engagement doesn't have a completed, signed engagement letter on file. Move it to "${status}" anyway?`
+        );
+        if (!proceed) return;
+      }
+    }
+
+    if (PAYMENT_GATED_STATUSES.includes(status)) {
+      const { data: paymentOk } = await supabase.rpc("engagement_meets_payment_requirement", { p_engagement_id: id });
+      if (!paymentOk) {
+        const proceed = window.confirm(
+          `This engagement's service requires payment before release, and there's no paid invoice on file. Move it to "${status}" anyway?`
         );
         if (!proceed) return;
       }

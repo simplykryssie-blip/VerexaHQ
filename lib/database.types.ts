@@ -10015,6 +10015,10 @@ export type Database = {
         Args: { p_engagement_id: string }
         Returns: boolean
       }
+      engagement_meets_payment_requirement: {
+        Args: { p_engagement_id: string }
+        Returns: boolean
+      }
       enqueue_reminder_notifications: { Args: never; Returns: number }
       ensure_default_dashboard: {
         Args: { p_workspace_id: string }
