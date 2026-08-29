@@ -14,6 +14,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import { SignaturePad } from "@/components/SignaturePad";
+import type { Json } from "@/lib/database.types";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -66,6 +67,24 @@ function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: numb
   return value.trim() !== "";
 }
 
+// signature and file_upload fields store a JSON-encoded object in the
+// (otherwise all-string) `answers` map -- see PublicSignatureField and the
+// file_upload branch below. Sent as-is, that string would land in the jsonb
+// answer column as a jsonb *string* (double-encoded), which
+// resolve_and_sign_organizer_response can't read fields out of via ->>. Parse
+// it back into a real object here, at the boundary where it's serialized for
+// the RPC, so the database gets the structured value every reader expects.
+function toAnswerValue(fieldType: string, value: string): Json {
+  if (fieldType === "signature" || fieldType === "file_upload") {
+    try {
+      return JSON.parse(value) as Json;
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
 // Standalone from OrganizerForm.tsx on purpose: that component persists
 // progress incrementally against an already-created organizer_responses row
 // (responseId) and uploads files to authenticated Storage. Here there's no
@@ -95,6 +114,7 @@ export function PublicOrganizerForm({
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
   const topLevelFields = fields.filter((f) => !f.parent_field_id);
+  const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
 
   const [step, setStep] = useState<"contact" | "form" | "done">("contact");
   const [pageIndex, setPageIndex] = useState(0);
@@ -293,13 +313,19 @@ export function PublicOrganizerForm({
     const firstName = nameParts.first.trim();
     const lastName = nameParts.last.trim();
 
-    const rows = Object.entries(answers).map(([field_id, value]) => ({ field_id, value, instance_index: 0 }));
+    const rows = Object.entries(answers).map(([field_id, value]) => ({
+      field_id,
+      value: toAnswerValue(fieldTypeById.get(field_id) ?? "", value),
+      instance_index: 0,
+    }));
     for (const repeater of repeaterFields) {
       const children = childFieldsByParent.get(repeater.id) ?? [];
       const repRows = repeaterRows[repeater.id] ?? [];
       for (const child of children) {
         repRows.forEach((row, i) => {
-          if (row[child.id] !== undefined) rows.push({ field_id: child.id, value: row[child.id], instance_index: i });
+          if (row[child.id] !== undefined) {
+            rows.push({ field_id: child.id, value: toAnswerValue(child.field_type, row[child.id]), instance_index: i });
+          }
         });
       }
     }
