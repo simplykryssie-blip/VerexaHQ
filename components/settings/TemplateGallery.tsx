@@ -59,7 +59,7 @@ export function TemplateGallery({
   folders: LibraryFolderRow[];
   cards: GalleryCard[];
   icon: LucideIcon;
-  statusTable: "organizer_templates" | "engagement_letter_templates";
+  statusTable: "organizer_templates" | "engagement_letter_templates" | "document_request_templates";
   searchPlaceholder: string;
   emptyMessage: string;
   createTileLabel: string;

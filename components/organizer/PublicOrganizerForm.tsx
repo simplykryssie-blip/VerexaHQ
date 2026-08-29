@@ -13,7 +13,8 @@ import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwo
 import { PasswordInput } from "@/components/PasswordInput";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
-import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
+import { SignaturePad } from "@/components/SignaturePad";
+import type { Json } from "@/lib/database.types";
 
 const YES_NO_OPTIONS = [
   { label: "Yes", value: "yes" },
@@ -66,6 +67,29 @@ function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: numb
   return value.trim() !== "";
 }
 
+// signature, file_upload, name, and address fields all store a JSON-encoded
+// object in the (otherwise all-string) `answers` map -- see
+// PublicSignatureField, the file_upload branch below, and
+// parseNameValue/parseAddressValue in lib/organizer/formatValue.ts. Sent
+// as-is, that string would land in the jsonb answer column as a jsonb
+// *string* (double-encoded), which resolve_and_sign_organizer_response and
+// format_organizer_answer can't read structured fields out of via ->>. Parse
+// it back into a real object here, at the boundary where it's serialized for
+// the RPC, so the database gets the structured value every reader expects.
+// name/address fall back to a plain string on parse failure, matching
+// parseNameValue/parseAddressValue's own graceful handling of legacy
+// pre-structured plain-text answers.
+function toAnswerValue(fieldType: string, value: string): Json {
+  if (fieldType === "signature" || fieldType === "file_upload" || fieldType === "name" || fieldType === "address") {
+    try {
+      return JSON.parse(value) as Json;
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
 // Standalone from OrganizerForm.tsx on purpose: that component persists
 // progress incrementally against an already-created organizer_responses row
 // (responseId) and uploads files to authenticated Storage. Here there's no
@@ -95,6 +119,7 @@ export function PublicOrganizerForm({
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
   const topLevelFields = fields.filter((f) => !f.parent_field_id);
+  const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
 
   const [step, setStep] = useState<"contact" | "form" | "done">("contact");
   const [pageIndex, setPageIndex] = useState(0);
@@ -293,13 +318,19 @@ export function PublicOrganizerForm({
     const firstName = nameParts.first.trim();
     const lastName = nameParts.last.trim();
 
-    const rows = Object.entries(answers).map(([field_id, value]) => ({ field_id, value, instance_index: 0 }));
+    const rows = Object.entries(answers).map(([field_id, value]) => ({
+      field_id,
+      value: toAnswerValue(fieldTypeById.get(field_id) ?? "", value),
+      instance_index: 0,
+    }));
     for (const repeater of repeaterFields) {
       const children = childFieldsByParent.get(repeater.id) ?? [];
       const repRows = repeaterRows[repeater.id] ?? [];
       for (const child of children) {
         repRows.forEach((row, i) => {
-          if (row[child.id] !== undefined) rows.push({ field_id: child.id, value: row[child.id], instance_index: i });
+          if (row[child.id] !== undefined) {
+            rows.push({ field_id: child.id, value: toAnswerValue(child.field_type, row[child.id]), instance_index: i });
+          }
         });
       }
     }
@@ -648,7 +679,6 @@ function PublicSignatureField({
   value: string;
   onChange: (fieldId: string, value: string) => void;
 }) {
-  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState("");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -671,13 +701,8 @@ function PublicSignatureField({
   }
 
   async function sign() {
-    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
+    if (!typedName.trim() || !drawnDataUrl) return;
     setError(null);
-
-    if (mode === "typed") {
-      onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signed_at: new Date().toISOString() }));
-      return;
-    }
 
     setUploading(true);
     const res = await fetch(`/api/o/${token}/signature-image`, {
@@ -691,17 +716,17 @@ function PublicSignatureField({
       setError(result.error ?? "Could not save your signature.");
       return;
     }
-    onChange(fieldId, JSON.stringify({ signature_image_path: result.path, signed_at: new Date().toISOString() }));
+    onChange(fieldId, JSON.stringify({ typed_name: typedName.trim(), signature_image_path: result.path, signed_at: new Date().toISOString() }));
   }
 
   return (
     <div className="space-y-2">
-      <SignaturePad mode={mode} onModeChange={setMode} typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
+      <SignaturePad typedName={typedName} onTypedNameChange={setTypedName} onDrawnChange={setDrawnDataUrl} typedLabel="Type your full name" />
       {error && <p className="text-xs text-danger">{error}</p>}
       <button
         type="button"
         onClick={sign}
-        disabled={uploading || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
+        disabled={uploading || !typedName.trim() || !drawnDataUrl}
         className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
       >
         {uploading ? "Saving..." : "Sign"}

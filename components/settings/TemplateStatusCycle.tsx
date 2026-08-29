@@ -25,6 +25,7 @@ export function TemplateStatusCycle({
     | "pricing_rules"
     | "billing_rules"
     | "organizer_templates"
+    | "document_request_templates"
     | "processes"
     | "site_pages"
     | "site_funnels"

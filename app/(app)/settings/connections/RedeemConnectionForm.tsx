@@ -7,6 +7,12 @@ import { useToast } from "@/components/Toast";
 
 type Preview = { ero_name: string; status: string; expires_at: string | null; relationship_type: string };
 
+const PARENT_TIER_LABEL: Record<string, string> = {
+  ero_ptin: "ERO",
+  service_bureau_ero: "Service Bureau",
+  service_bureau_ptin: "Service Bureau",
+};
+
 export function RedeemConnectionForm({ workspaceId, initialToken }: { workspaceId: string; initialToken?: string }) {
   const router = useRouter();
   const supabase = createClient();
@@ -77,7 +83,8 @@ export function RedeemConnectionForm({ workspaceId, initialToken }: { workspaceI
           ) : (
             <>
               <p className="text-slate">
-                Connect to <span className="font-medium text-ink">{preview.ero_name}</span>?
+                Connect to <span className="font-medium text-ink">{preview.ero_name}</span>{" "}
+                <span className="text-muted">({PARENT_TIER_LABEL[preview.relationship_type] ?? "firm"})</span>?
               </p>
               <p className="mt-1 text-xs text-muted">
                 You&apos;ll keep your own workspace and login. You can share client files with them once ready for filing, and only

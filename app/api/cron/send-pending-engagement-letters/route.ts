@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { renderTemplate } from "@/lib/templates/render";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
+import { renderPdfTemplate, type PdfFieldMapping } from "@/lib/documents/renderPdfTemplate";
 import { reportSystemFailure } from "@/lib/systemFailures";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
 
   const { data: jobs, error: queryError } = await supabase
     .from("pending_engagement_letter_sends")
-    .select("id, workspace_id, engagement_id, client_id, engagement_letter_template_id")
+    .select("id, workspace_id, engagement_id, client_id, engagement_letter_template_id, additional_signer_relationship_type")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
@@ -52,7 +53,10 @@ export async function GET(request: Request) {
 
   const [{ data: templates }, { data: workspaces }, { data: clients }] = await Promise.all([
     templateIds.length > 0
-      ? supabase.from("engagement_letter_templates").select("id, name, body_html, banner_image_url").in("id", templateIds)
+      ? (supabase
+          .from("engagement_letter_templates")
+          .select("id, name, body_html, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings")
+          .in("id", templateIds) as unknown as Promise<{ data: EngagementLetterTemplateRow[] | null }>)
       : Promise.resolve({ data: [] as EngagementLetterTemplateRow[] }),
     workspaceIds.length > 0
       ? supabase.from("workspaces").select("id, name").in("id", workspaceIds)
@@ -82,7 +86,16 @@ export async function GET(request: Request) {
   return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
 }
 
-type EngagementLetterTemplateRow = { id: string; name: string; body_html: string; banner_image_url: string | null };
+type EngagementLetterTemplateRow = {
+  id: string;
+  name: string;
+  body_html: string;
+  banner_image_url: string | null;
+  source_type: string;
+  pdf_storage_path: string | null;
+  pdf_field_mode: string | null;
+  pdf_field_mappings: PdfFieldMapping[] | null;
+};
 type WorkspaceRow = { id: string; name: string | null };
 type ClientRow = { id: string; first_name: string | null; last_name: string | null; business_name: string | null; primary_email: string | null };
 type PrefetchedRows = { template: EngagementLetterTemplateRow | null; workspace: WorkspaceRow | null; client: ClientRow | null };
@@ -94,7 +107,14 @@ type PrefetchedRows = { template: EngagementLetterTemplateRow | null; workspace:
 // hang always turns into a real "failed" row instead of silent stagnation.
 async function sendOneWithTimeout(
   supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  job: {
+    id: string;
+    workspace_id: string;
+    engagement_id: string;
+    client_id: string;
+    engagement_letter_template_id: string;
+    additional_signer_relationship_type: string | null;
+  },
   prefetched: PrefetchedRows,
   timeoutMs = 25000
 ): Promise<"sent" | "failed"> {
@@ -123,24 +143,45 @@ async function sendOneWithTimeout(
 
 async function sendOne(
   supabase: ReturnType<typeof createServiceClient>,
-  job: { id: string; workspace_id: string; engagement_id: string; client_id: string; engagement_letter_template_id: string },
+  job: {
+    id: string;
+    workspace_id: string;
+    engagement_id: string;
+    client_id: string;
+    engagement_letter_template_id: string;
+    additional_signer_relationship_type: string | null;
+  },
   { template, workspace, client }: PrefetchedRows
 ): Promise<"sent" | "failed"> {
   try {
-    if (!template) throw new Error("Engagement letter template not found");
+    if (!template) throw new Error("Document template not found");
 
     const clientName = client?.business_name || [client?.first_name, client?.last_name].filter(Boolean).join(" ") || "";
-    const mergedHtml = renderTemplate(template.body_html, {
+    const mergeValues = {
       client_name: clientName,
       firm_name: workspace?.name ?? "",
       firm_address: "",
       firm_phone: "",
-    });
-    // A rendered PDF, not raw HTML -- the signing page only knows how to
-    // preview PDFs and images, and this gives the letter a real, visible
-    // signature line instead of a bare "type your name" box with nothing
-    // to sign underneath it.
-    const pdfBytes = await renderLetterPdf(template.name, mergedHtml, clientName || "Client");
+    };
+
+    let pdfBytes: Uint8Array;
+    if (template.source_type === "pdf" && template.pdf_storage_path && template.pdf_field_mode) {
+      const { data: sourceFile, error: downloadErr } = await supabase.storage.from("document-templates").download(template.pdf_storage_path);
+      if (downloadErr || !sourceFile) throw new Error(downloadErr?.message ?? "Could not load the uploaded PDF for this document");
+      pdfBytes = await renderPdfTemplate({
+        sourceBytes: new Uint8Array(await sourceFile.arrayBuffer()),
+        fieldMode: template.pdf_field_mode as "acroform" | "overlay",
+        fieldMappings: template.pdf_field_mappings ?? [],
+        values: mergeValues,
+      });
+    } else {
+      const mergedHtml = renderTemplate(template.body_html, mergeValues);
+      // A rendered PDF, not raw HTML -- the signing page only knows how to
+      // preview PDFs and images, and this gives the letter a real, visible
+      // signature line instead of a bare "type your name" box with nothing
+      // to sign underneath it.
+      pdfBytes = await renderLetterPdf(template.name, mergedHtml, clientName || "Client");
+    }
 
     const fileName = `${template.name}.pdf`;
     const path = `${job.workspace_id}/${job.engagement_id}/${Date.now()}-${fileName}`;
@@ -159,7 +200,7 @@ async function sendOne(
         mime_type: "application/pdf",
         file_size_bytes: blob.size,
         visibility: "internal",
-        category: "Engagement Letter",
+        category: "Signed Document",
       })
       .select("id")
       .single();
@@ -182,6 +223,35 @@ async function sendOne(
         .from("signature_request_signers")
         .insert({ signature_request_id: signatureRequest.id, signer_name: clientName || "Client", signer_email: client?.primary_email ?? null, sign_order: 1 });
       if (signerErr) throw new Error(signerErr.message);
+    }
+
+    if (job.additional_signer_relationship_type) {
+      const { data: relationship } = await supabase
+        .from("client_relationships")
+        .select("related_name, related_client_id")
+        .eq("client_id", job.client_id)
+        .eq("relationship_type", job.additional_signer_relationship_type)
+        .order("display_order")
+        .limit(1)
+        .maybeSingle();
+
+      if (relationship?.related_name) {
+        let relatedEmail: string | null = null;
+        if (relationship.related_client_id) {
+          const { data: relatedClient } = await supabase
+            .from("clients")
+            .select("primary_email")
+            .eq("id", relationship.related_client_id)
+            .maybeSingle();
+          relatedEmail = relatedClient?.primary_email ?? null;
+        }
+        const { error: additionalSignerErr } = await supabase
+          .from("signature_request_signers")
+          .insert({ signature_request_id: signatureRequest.id, signer_name: relationship.related_name, signer_email: relatedEmail, sign_order: 2 });
+        // A missing/failed additional signer shouldn't fail the whole send --
+        // the primary signer's request is already valid and usable.
+        if (additionalSignerErr) console.error(`send-pending-engagement-letters: could not add additional signer for job ${job.id}`, additionalSignerErr);
+      }
     }
 
     const { error: markSentErr } = await supabase

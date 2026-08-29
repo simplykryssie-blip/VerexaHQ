@@ -54,7 +54,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   },
   pipeline: {
     whatItDoes: "A pipeline is the stages a piece of work moves through -- e.g. \"Info gathered\" -> \"In prep\" -> \"Review\" -> \"Delivered.\" Every engagement you open moves through one.",
-    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or engagement letter to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
+    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or signable document to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
     howToSetUp: "Go to Pipelines, create one, and add its stages. Nothing about opening an engagement requires a service first.",
   },
   invite: {

@@ -172,7 +172,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "engagement.reviewer_id", label: "Assigned reviewer", group: "Engagement", valueKind: "staff", ops: ID_OPS },
   { key: "engagement.process_id", label: "Engagement pipeline", group: "Engagement", valueKind: "select", ops: SELECT_OPS },
   { key: "engagement.process_stage_id", label: "Engagement pipeline stage", group: "Engagement", valueKind: "pipeline_stage", ops: SELECT_OPS },
-  { key: "engagement.engagement_letter_status", label: "Engagement letter status", group: "Engagement", valueKind: "labeled_select", labeledOptions: ENGAGEMENT_LETTER_STATUS_OPTIONS, ops: SELECT_OPS },
+  { key: "engagement.engagement_letter_status", label: "Document signature status", group: "Engagement", valueKind: "labeled_select", labeledOptions: ENGAGEMENT_LETTER_STATUS_OPTIONS, ops: SELECT_OPS },
 
   { key: "quote.status", label: "Quote status", group: "Quote", valueKind: "select", options: QUOTE_STATUS_OPTIONS, ops: LIST_OPS },
   { key: "quote.total_amount", label: "Quote amount", group: "Quote", valueKind: "number", ops: NUMBER_OPS },

@@ -34,7 +34,7 @@ export default async function PipelinesPage() {
     <>
       <PageHeader
         title="Pipelines"
-        description="The stages work moves through, with the right form, document checklist, or engagement letter attached where each one is needed."
+        description="The stages work moves through, with the right form, document checklist, or signable document attached where each one is needed."
       />
       <div className="flex-1 px-8 py-6">
         <PipelineLibrary workspaceId={workspace.id} pipelines={pipelines} folders={folders ?? []} canManage={Boolean(canManage)} />

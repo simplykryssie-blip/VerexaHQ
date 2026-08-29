@@ -17,7 +17,7 @@ const HOW_IT_WORKS: Entry[] = [
   },
   {
     title: "Services",
-    body: "A service is what you sell (\"Individual Tax Return,\" \"Bookkeeping\"). Opening one has three tabs: Details (name, price, category), Stages (the ordered steps its engagements move through, each optionally with an organizer, document request, or engagement-letter template attached), and Board (a live view of which of your clients are currently sitting in which stage -- nothing to configure there, it just reflects what's already happening). Attaching a template to a stage never sends anything automatically -- it just pre-selects the right template when staff use the manual \"Send Organizer\" / \"Request Documents\" / \"Send for Signature\" buttons on an engagement at that stage. To actually automate sending, use Workflows instead -- that's a separate, optional engine, not part of a service.",
+    body: "A service is what you sell (\"Individual Tax Return,\" \"Bookkeeping\"). Opening one has three tabs: Details (name, price, category), Stages (the ordered steps its engagements move through, each optionally with an organizer, document request, or signable document template attached), and Board (a live view of which of your clients are currently sitting in which stage -- nothing to configure there, it just reflects what's already happening). Attaching a template to a stage never sends anything automatically -- it just pre-selects the right template when staff use the manual \"Send Organizer\" / \"Request Documents\" / \"Send for Signature\" buttons on an engagement at that stage. To actually automate sending, use Workflows instead -- that's a separate, optional engine, not part of a service.",
   },
   {
     title: "Workflows (automations)",
@@ -25,7 +25,7 @@ const HOW_IT_WORKS: Entry[] = [
   },
   {
     title: "Documents",
-    body: "Two related but separate things live here: Document Requests (a checklist of files you're asking a client for, tracked as each item gets fulfilled) and Folders (an organizational structure that gets applied to a client automatically once their service starts). E-signatures (engagement letters) are tracked separately in the Signatures panel. All three can be sent manually from an engagement's Quick Actions, or from a stage's pre-filled action button if a template is attached there.",
+    body: "Two related but separate things live here: Document Requests (a checklist of files you're asking a client for, tracked as each item gets fulfilled) and Folders (an organizational structure that gets applied to a client automatically once their service starts). E-signatures (documents) are tracked separately in the Signatures panel. All three can be sent manually from an engagement's Quick Actions, or from a stage's pre-filled action button if a template is attached there.",
   },
   {
     title: "Messages",

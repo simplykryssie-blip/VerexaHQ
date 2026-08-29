@@ -46,7 +46,7 @@ export const TRIGGER_TYPES = [
   { value: "client.service_interest_selected", label: "A client selects a service", category: "contacts_leads", description: "Fires when a client (or lead) selects a service they're interested in.", keywords: "service interest lead" },
   { value: "engagement.created", label: "A new engagement is created for a service", category: "engagements", description: "Fires when a new engagement is created for a specific service.", keywords: "engagement created new" },
   { value: "appointment.status_changed", label: "An appointment's status changes to", category: "appointments", description: "Fires when an appointment's status changes (booked, confirmed, completed, cancelled, no-show).", keywords: "appointment booked cancelled rescheduled no-show completed status" },
-  { value: "engagement_letter.signed", label: "A client signs their engagement letter for a service", category: "tax_workflow", description: "Fires when a client signs their engagement letter.", keywords: "signature signed letter" },
+  { value: "engagement_letter.signed", label: "A client signs their document for a service", category: "tax_workflow", description: "Fires when a client signs their document.", keywords: "signature signed document letter" },
   { value: "document_request.completed", label: "All requested documents are received for a service", category: "documents", description: "Fires once every required document on a request has been received.", keywords: "documents received complete" },
   { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
   { value: "organizer_response.review_decided", label: "A reviewed organizer is approved, denied, or needs info", category: "forms_intake", description: "Fires when a staff reviewer sets an organizer's review decision to a specific status.", keywords: "organizer review approved denied rejected needs info decision" },
@@ -137,7 +137,7 @@ export function triggerSummary(
   if (triggerType === "engagement_letter.signed") {
     const serviceId = config.service_id as string | undefined;
     const service = services.find((s) => s.id === serviceId);
-    return `When a client signs their engagement letter for "${service?.name ?? "a service"}"`;
+    return `When a client signs their document for "${service?.name ?? "a service"}"`;
   }
   if (triggerType === "document_request.completed") {
     const serviceId = config.service_id as string | undefined;

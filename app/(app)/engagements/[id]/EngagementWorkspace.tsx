@@ -7,6 +7,7 @@ import { DeleteEngagementButton } from "./DeleteEngagementButton";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
@@ -94,6 +95,7 @@ export function EngagementWorkspace({
   taxDetail,
   irsNotices,
   taxYears,
+  additionalSigners,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -126,6 +128,7 @@ export function EngagementWorkspace({
   taxDetail: TaxDetailRow;
   irsNotices: IrsNoticeRow[];
   taxYears: number[];
+  additionalSigners: AdditionalSignerOption[];
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -240,6 +243,7 @@ export function EngagementWorkspace({
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
                 canRequestSignatures={permissions.signaturesRequest}
+                additionalSigners={additionalSigners}
               />
             )}
             {tab === "Messages" && (

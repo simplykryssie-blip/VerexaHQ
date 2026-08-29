@@ -8,6 +8,7 @@ import { useToast } from "@/components/Toast";
 export function ConnectedPtinRow({
   connectionId,
   name,
+  tierLabel,
   status,
   billingResponsibility,
   sharesCommunicationsIdentity,
@@ -15,6 +16,7 @@ export function ConnectedPtinRow({
 }: {
   connectionId: string;
   name: string;
+  tierLabel: string;
   status: string;
   billingResponsibility: string;
   sharesCommunicationsIdentity: boolean;
@@ -72,7 +74,7 @@ export function ConnectedPtinRow({
   }
 
   async function disconnect() {
-    if (!confirm(`Disconnect ${name}? They'll keep their own workspace and data, but will no longer be able to share filings with you.`)) return;
+    if (!confirm(`Disconnect ${name} (${tierLabel})? They'll keep their own workspace and data, but will no longer be able to share filings with you.`)) return;
     setBusy("disconnect");
     const res = await fetch(`/api/firm-connections/${connectionId}/disconnect`, { method: "POST" });
     const data = await res.json();
@@ -87,9 +89,11 @@ export function ConnectedPtinRow({
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
       <div>
-        <p className="font-medium text-slate">{name}</p>
+        <p className="font-medium text-slate">
+          {name} <span className="font-normal text-muted">({tierLabel})</span>
+        </p>
         <p className="text-xs capitalize text-muted">
-          {status} {status === "active" && `· ${billingResponsibility === "ero" ? "You cover billing" : "PTIN pays their own way"}`}
+          {status} {status === "active" && `· ${billingResponsibility === "ero" ? "You cover billing" : "They pay their own way"}`}
         </p>
       </div>
       {status === "active" && (

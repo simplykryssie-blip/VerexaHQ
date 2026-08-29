@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { SignaturePad, type SignatureMode } from "@/components/SignaturePad";
+import { SignaturePad } from "@/components/SignaturePad";
 
 type SignRequestData = {
   signer_id: string;
@@ -30,7 +30,6 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
   const [data, setData] = useState(initialData);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [mode, setMode] = useState<SignatureMode>("typed");
   const [typedName, setTypedName] = useState(initialData.signer_name);
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
@@ -49,30 +48,27 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
   }, [token]);
 
   async function sign() {
-    if (mode === "typed" ? !typedName.trim() : !drawnDataUrl) return;
+    if (!typedName.trim() || !drawnDataUrl) return;
     setSubmitting(true);
     setError(null);
 
-    let signatureImagePath: string | undefined;
-    if (mode === "drawn") {
-      const res = await fetch(`/api/sign/${token}/signature-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl: drawnDataUrl }),
-      });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setSubmitting(false);
-        setError(result.error ?? "Could not save your signature.");
-        return;
-      }
-      signatureImagePath = result.path;
+    const res = await fetch(`/api/sign/${token}/signature-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl: drawnDataUrl }),
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setSubmitting(false);
+      setError(result.error ?? "Could not save your signature.");
+      return;
     }
+    const signatureImagePath: string = result.path;
 
     const { error: rpcError } = await supabase.rpc("record_signature_by_token", {
       p_token: token,
-      p_signature_type: mode,
-      p_typed_name: mode === "typed" ? typedName.trim() : undefined,
+      p_signature_type: "drawn",
+      p_typed_name: typedName.trim(),
       p_signature_image_path: signatureImagePath,
     });
     setSubmitting(false);
@@ -146,8 +142,6 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
         {!showDecline ? (
           <>
             <SignaturePad
-              mode={mode}
-              onModeChange={setMode}
               typedName={typedName}
               onTypedNameChange={setTypedName}
               onDrawnChange={setDrawnDataUrl}
@@ -158,7 +152,7 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
               <button
                 type="button"
                 onClick={sign}
-                disabled={submitting || (mode === "typed" ? !typedName.trim() : !drawnDataUrl)}
+                disabled={submitting || !typedName.trim() || !drawnDataUrl}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
               >
                 {submitting ? "Signing..." : "Confirm signature"}

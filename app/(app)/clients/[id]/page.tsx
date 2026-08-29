@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { buildOrganizerResponseDetail, hasOrganizerAnswers } from "@/lib/organizer/buildResponseDetail";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
+import { getAdditionalSignerOptions } from "@/lib/documents/getAdditionalSignerOptions";
 import { ClientWorkspace } from "./ClientWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -294,7 +295,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
-    .select("id, name, body_html, banner_image_url")
+    .select("id, name, body_html, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings")
     .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
@@ -418,6 +419,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const outstandingBalance = ledgerEntries && ledgerEntries.length > 0 ? ledgerEntries[0].balance_after : 0;
   const permissions = await loadActionPermissions(supabase, workspace.id);
+  const additionalSigners = await getAdditionalSignerOptions(supabase, client.id);
 
   const { data: latestInterest } = await supabase
     .from("client_service_interests")
@@ -467,6 +469,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
       documentFolders={documentFolders ?? []}
       documentRequests={documentRequests}
       signatureRequests={signatureRequests}
+      additionalSigners={additionalSigners}
       quotes={(quotes ?? []) as never}
       invoices={(invoices ?? []) as never}
       payments={payments ?? []}
