@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Paperclip, PenLine } from "lucide-react";
+import { CheckCircle2, MessageCircleWarning, Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
@@ -39,9 +39,33 @@ type FieldRow = {
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
 
+export type InfoRequestItemRow = {
+  id: string;
+  organizer_field_id: string;
+  instance_index: number;
+  note: string | null;
+  status: "pending" | "client_responded" | "rejected";
+  was_answered_when_flagged: boolean;
+  decision_note: string | null;
+};
+
 function isFieldAnswered(field: FieldRow, value: string, repeaterRowCount?: number): boolean {
   if (field.field_type === "repeating_section") return (repeaterRowCount ?? 0) > 0;
   return value.trim() !== "";
+}
+
+// Mirrors OrganizerForm's own answerFromString, but keyed directly off a
+// field_type instead of the id->type map that only exists in that closure --
+// FieldInput already has field.field_type on hand wherever it needs this.
+function toOrganizerJsonValue(fieldType: string, value: string): Json {
+  if (fieldType === "signature" || fieldType === "file_upload" || fieldType === "name" || fieldType === "address") {
+    try {
+      return JSON.parse(value) as Json;
+    } catch {
+      return value;
+    }
+  }
+  return value;
 }
 
 export function OrganizerForm({
@@ -53,6 +77,7 @@ export function OrganizerForm({
   workspaceId,
   entityType,
   entityId,
+  infoRequestItems = [],
 }: {
   responseId: string;
   templateName: string;
@@ -62,10 +87,19 @@ export function OrganizerForm({
   workspaceId: string;
   entityType: "client" | "engagement";
   entityId: string;
+  infoRequestItems?: InfoRequestItemRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+
+  // Keyed by "<field id>:<instance index>" so a flagged field stays
+  // actionable (and shows the preparer's note) even while the rest of an
+  // already-submitted organizer is otherwise read-only -- this is the only
+  // way a client can respond once the response has moved past
+  // not_started/in_progress, since that's what the RLS on
+  // organizer_response_answers/organizer_responses locks down at that point.
+  const infoItemsByKey = new Map(infoRequestItems.map((i) => [`${i.organizer_field_id}:${i.instance_index}`, i]));
 
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
@@ -382,6 +416,7 @@ export function OrganizerForm({
               entityType={entityType}
               entityId={entityId}
               responseId={responseId}
+              infoItemsByKey={infoItemsByKey}
             />
           ) : (
             <FieldInput
@@ -394,33 +429,40 @@ export function OrganizerForm({
               entityType={entityType}
               entityId={entityId}
               responseId={responseId}
+              infoRequestItem={infoItemsByKey.get(`${field.id}:0`)}
             />
           )
         )}
         </div>
       </div>
 
-      {!readOnly && (
-        <div className="flex items-center gap-2 pt-2">
-          {pages.length > 1 && (
+      {pages.length > 1 && (
+        <div className="flex items-center gap-2 pt-2 print:hidden">
+          <button
+            type="button"
+            onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+            disabled={currentIndex === 0}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent disabled:opacity-40"
+          >
+            Back
+          </button>
+          {!isLastPage && (
             <button
               type="button"
-              onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
-              disabled={currentIndex === 0}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent disabled:opacity-40"
-            >
-              Back
-            </button>
-          )}
-          {pages.length > 1 && !isLastPage && (
-            <button
-              type="button"
-              onClick={goNext}
+              // Once submitted, there's no "unmet required field" left to
+              // block on -- readOnly navigation just pages through freely so
+              // a flagged field on a later page is actually reachable.
+              onClick={() => (readOnly ? setPageIndex((i) => Math.min(pages.length - 1, i + 1)) : goNext())}
               className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
             >
               Next
             </button>
           )}
+        </div>
+      )}
+
+      {!readOnly && (
+        <div className="flex items-center gap-2 pt-2">
           <button
             type="button"
             onClick={saveAll}
@@ -455,6 +497,7 @@ function RepeatingSectionInput({
   entityType,
   entityId,
   responseId,
+  infoItemsByKey,
 }: {
   field: FieldRow;
   childFields: FieldRow[];
@@ -465,6 +508,7 @@ function RepeatingSectionInput({
   entityType: "client" | "engagement";
   entityId: string;
   responseId: string;
+  infoItemsByKey: Map<string, InfoRequestItemRow>;
 }) {
   function updateRow(index: number, childFieldId: string, value: string) {
     onChange(rows.map((row, i) => (i === index ? { ...row, [childFieldId]: value } : row)));
@@ -509,6 +553,7 @@ function RepeatingSectionInput({
                     entityType={entityType}
                     entityId={entityId}
                     responseId={responseId}
+                    infoRequestItem={infoItemsByKey.get(`${child.id}:${index}`)}
                   />
                 ))}
             </div>
@@ -701,11 +746,12 @@ function FieldInput({
   field,
   value,
   onChange,
-  disabled,
+  disabled: disabledProp,
   workspaceId,
   entityType,
   entityId,
   responseId,
+  infoRequestItem,
 }: {
   field: FieldRow;
   value: string;
@@ -715,7 +761,71 @@ function FieldInput({
   entityType: "client" | "engagement";
   entityId: string;
   responseId: string;
+  infoRequestItem?: InfoRequestItemRow;
 }) {
+  const supabase = createClient();
+  const toast = useToast();
+  const router = useRouter();
+  const [infoBusy, setInfoBusy] = useState(false);
+  const [infoError, setInfoError] = useState<string | null>(null);
+
+  // A flagged field stays editable (and shows the preparer's note) even
+  // when the rest of the organizer is otherwise locked -- see the
+  // infoItemsByKey comment in OrganizerForm for why. Once the client has
+  // submitted a response (status=client_responded) it goes back to
+  // disabled until the preparer approves or rejects it.
+  const isActionable = infoRequestItem?.status === "pending" || infoRequestItem?.status === "rejected";
+  const disabled = isActionable ? false : disabledProp;
+
+  async function submitInfoResponse() {
+    if (!infoRequestItem) return;
+    setInfoBusy(true);
+    setInfoError(null);
+    const jsonValue = toOrganizerJsonValue(field.field_type, value);
+    const { error } = infoRequestItem.was_answered_when_flagged
+      ? await supabase.rpc("propose_organizer_answer_correction", { p_item_id: infoRequestItem.id, p_proposed_value: jsonValue })
+      : await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: infoRequestItem.id, p_value: jsonValue });
+    setInfoBusy(false);
+    if (error) {
+      setInfoError(error.message);
+      return;
+    }
+    toast.show(infoRequestItem.was_answered_when_flagged ? "Correction sent to your preparer" : "Answer saved", "success");
+    router.refresh();
+  }
+
+  const infoPanel = infoRequestItem ? (
+    <div
+      className={`mt-2 rounded-xl border p-3 ${
+        infoRequestItem.status === "client_responded" ? "border-border bg-surfaceMuted" : "border-warning/40 bg-warning/10"
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <MessageCircleWarning size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-ink">Your preparer flagged this question</p>
+          {infoRequestItem.note && <p className="mt-0.5 text-xs text-slate">{infoRequestItem.note}</p>}
+          {infoRequestItem.status === "rejected" && infoRequestItem.decision_note && (
+            <p className="mt-1 text-xs text-danger">Sent back: {infoRequestItem.decision_note}</p>
+          )}
+          {infoRequestItem.status === "client_responded" ? (
+            <p className="mt-1.5 text-xs text-muted">Submitted -- waiting for your preparer to review it.</p>
+          ) : (
+            <button
+              type="button"
+              onClick={submitInfoResponse}
+              disabled={infoBusy || !value.trim()}
+              className="mt-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {infoBusy ? "Submitting..." : infoRequestItem.was_answered_when_flagged ? "Submit correction" : "Submit answer"}
+            </button>
+          )}
+          {infoError && <p className="mt-1 text-xs text-danger">{infoError}</p>}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   const options = normalizeOptions(field.options);
   const inputClass =
     "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 disabled:bg-surfaceMuted disabled:text-muted";
@@ -927,6 +1037,7 @@ function FieldInput({
           />
         )}
       </div>
+      {infoPanel}
     </div>
   );
 }
