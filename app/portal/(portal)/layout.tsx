@@ -77,6 +77,7 @@ export default async function PortalLayout({ children }: { children: React.React
               pendingCount={count ?? 0}
               logoUrl={branding.portalLogoUrl}
               firmName={branding.displayName}
+              accentIsCustom={!!branding.secondaryColor}
             />
           </div>
           <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0 print:overflow-visible print:pt-0">
