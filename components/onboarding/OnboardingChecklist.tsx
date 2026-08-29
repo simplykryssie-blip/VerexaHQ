@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Circle, HelpCircle, X } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
 
@@ -88,10 +88,16 @@ export function OnboardingChecklist({
   const supabase = createClient();
   const [dismissing, setDismissing] = useState(false);
   const [hidden, setHidden] = useState(false);
+  // Closing the popup (the Modal's own Cancel/Escape/backdrop) is local to
+  // this page load, not a permanent dismissal -- it reopens next time the
+  // dashboard loads, same as today, but a staff member without permission
+  // to permanently dismiss (see canDismiss) can still get it off their
+  // screen for the current visit instead of being stuck with it.
+  const [closedForNow, setClosedForNow] = useState(false);
   const [seen, setSeen] = useState<Set<string>>(new Set(seenSteps));
   const [popupStep, setPopupStep] = useState<OnboardingStep | null>(null);
 
-  if (hidden) return null;
+  if (hidden || closedForNow) return null;
 
   const doneCount = steps.filter((s) => s.complete).length;
   const allDone = doneCount === steps.length;
@@ -137,28 +143,10 @@ export function OnboardingChecklist({
   const explainer = popupStep ? STEP_EXPLAINERS[popupStep.key] : null;
 
   return (
-    <div className="mb-4 rounded-2xl border border-border bg-surface shadow-soft p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">{allDone ? "You're all set up" : "Get your firm set up"}</h2>
-          <p className="mt-0.5 text-xs text-muted">
-            {allDone
-              ? "You've completed every setup step. This card won't show again once dismissed."
-              : `${doneCount} of ${steps.length} steps complete`}
-          </p>
-        </div>
-        {canDismiss && (
-          <button
-            type="button"
-            onClick={dismiss}
-            disabled={dismissing}
-            aria-label="Dismiss setup checklist"
-            className="rounded p-1 text-muted hover:text-ink disabled:opacity-50"
-          >
-            <X size={16} />
-          </button>
-        )}
-      </div>
+    <Modal title={allDone ? "You're all set up" : "Get your firm set up"} onClose={() => setClosedForNow(true)} size="xl">
+      <p className="-mt-2 text-xs text-muted">
+        {allDone ? "You've completed every setup step." : `${doneCount} of ${steps.length} steps complete`}
+      </p>
 
       {!allDone && (
         <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surfaceMuted">
@@ -166,7 +154,7 @@ export function OnboardingChecklist({
         </div>
       )}
 
-      <ul className="mt-4 divide-y divide-border">
+      <ul className="mt-4 max-h-[60vh] divide-y divide-border overflow-y-auto">
         {steps.map((step) => (
           <li key={step.key} className="flex items-center justify-between gap-3 py-2.5">
             <div className="flex items-start gap-2.5">
@@ -205,6 +193,14 @@ export function OnboardingChecklist({
         ))}
       </ul>
 
+      {canDismiss && (
+        <div className="mt-4 flex justify-end border-t border-border pt-3">
+          <button type="button" onClick={dismiss} disabled={dismissing} className="text-xs font-medium text-muted hover:text-ink disabled:opacity-50">
+            Don&apos;t show this again
+          </button>
+        </div>
+      )}
+
       {popupStep && explainer && (
         <Modal title={popupStep.label} onClose={() => setPopupStep(null)}>
           <div className="space-y-3 text-sm text-slate">
@@ -235,6 +231,6 @@ export function OnboardingChecklist({
           </div>
         </Modal>
       )}
-    </div>
+    </Modal>
   );
 }
