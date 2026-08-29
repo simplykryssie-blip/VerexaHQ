@@ -10359,6 +10359,13 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      get_workspace_member_emails: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          email: string
+          user_id: string
+        }[]
+      }
       get_workspace_tags: {
         Args: { p_workspace_id: string }
         Returns: string[]
