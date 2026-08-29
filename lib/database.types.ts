@@ -9512,6 +9512,17 @@ export type Database = {
       }
       _organizer_name_text: { Args: { p_value: Json }; Returns: string }
       _organizer_scalar_text: { Args: { p_value: Json }; Returns: string }
+      _propose_client_field_from_organizer_answer: {
+        Args: {
+          p_client_id: string
+          p_client_profile_field: string
+          p_organizer_field_id: string
+          p_organizer_response_id: string
+          p_value: Json
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       accept_config_object_share: {
         Args: { p_share_id: string }
         Returns: string
@@ -10000,6 +10011,10 @@ export type Database = {
       encrypt_client_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_firm_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_zoom_secret: { Args: { p_plaintext: string }; Returns: string }
+      engagement_has_signed_letter: {
+        Args: { p_engagement_id: string }
+        Returns: boolean
+      }
       enqueue_reminder_notifications: { Args: never; Returns: number }
       ensure_default_dashboard: {
         Args: { p_workspace_id: string }

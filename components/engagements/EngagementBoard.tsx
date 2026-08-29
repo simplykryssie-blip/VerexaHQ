@@ -31,9 +31,21 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
     items: engagements.filter((e) => e.status === status),
   }));
 
+  const SIGNATURE_GATED_STATUSES = ["Waiting On Payment", "Ready To Release", "Completed"];
+
   async function moveTo(id: string, status: string) {
     const current = engagements.find((e) => e.id === id);
     if (!current || current.status === status) return;
+
+    if (SIGNATURE_GATED_STATUSES.includes(status)) {
+      const { data: hasSignedLetter } = await supabase.rpc("engagement_has_signed_letter", { p_engagement_id: id });
+      if (!hasSignedLetter) {
+        const proceed = window.confirm(
+          `This engagement doesn't have a completed, signed engagement letter on file. Move it to "${status}" anyway?`
+        );
+        if (!proceed) return;
+      }
+    }
 
     setEngagements((prev) => prev.map((e) => (e.id === id ? { ...e, status } : e)));
 
