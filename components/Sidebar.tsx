@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
-import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
+import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS, ERO_MANAGEMENT_NAV_ITEMS, ERO_MANAGEMENT_NAV_SECTION } from "@/lib/nav";
 import { hexToRgba, readableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
 import { Avatar } from "@/components/Avatar";
@@ -33,6 +33,7 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  showEroManagement,
   currentUser,
 }: {
   workspaceName: string;
@@ -51,6 +52,8 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
+  /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (Team, Connections, ERO Profile) to the main nav. */
+  showEroManagement?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
   currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
 }) {
@@ -78,8 +81,22 @@ export function Sidebar({
 
   // primaryColor is unused here -- kept in the props/Brand Center settings
   // for the public-form fallback accent, not a sidebar concern.
-  const navItems = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_ITEMS : NAV_ITEMS;
-  const navSections = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_SECTIONS : NAV_SECTIONS;
+  // Verexa HQ's own platform-admin nav has no tier concept -- ERO Management
+  // only ever layers onto the regular client-facing nav.
+  const showEro = showEroManagement && !isPlatformHomeWorkspace;
+  const navItems = isPlatformHomeWorkspace
+    ? PLATFORM_HOME_NAV_ITEMS
+    : showEro
+      ? [...NAV_ITEMS, ...ERO_MANAGEMENT_NAV_ITEMS]
+      : NAV_ITEMS;
+  const navSections = isPlatformHomeWorkspace
+    ? PLATFORM_HOME_NAV_SECTIONS
+    : showEro
+      ? (() => {
+          const adminIndex = NAV_SECTIONS.findIndex((s) => s.label === "Admin");
+          return [...NAV_SECTIONS.slice(0, adminIndex), ERO_MANAGEMENT_NAV_SECTION, ...NAV_SECTIONS.slice(adminIndex)];
+        })()
+      : NAV_SECTIONS;
 
   // Verexa HQ CRM is home base, not one more option in a list of demos --
   // it gets its own pinned "back to" link (shown only while elsewhere), and
