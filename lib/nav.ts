@@ -162,6 +162,7 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  * rather than duplicated pages.
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
+  { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Team", href: "/settings/users", icon: Users },
   { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
