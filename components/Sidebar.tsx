@@ -34,6 +34,7 @@ export function Sidebar({
   switchableWorkspaces,
   showMessages,
   showEroManagement,
+  showLearningHub,
   currentUser,
 }: {
   workspaceName: string;
@@ -54,6 +55,8 @@ export function Sidebar({
   showMessages?: boolean;
   /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (Team, Connections, ERO Profile) to the main nav. */
   showEroManagement?: boolean;
+  /** A solo Independent PTIN with no active ERO connection has no training to author (no staff) or receive (no connected firm) -- Learning Hub only appears once either is true. Always true for ERO/SB/multi-office tiers. */
+  showLearningHub?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
   currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
 }) {
@@ -219,7 +222,7 @@ export function Sidebar({
               <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
               <div className="space-y-1">
                 {section.items
-                  .filter((item) => item.label !== "Messages" || showMessages)
+                  .filter((item) => (item.label !== "Messages" || showMessages) && (item.label !== "Learning Hub" || showLearningHub))
                   .map((item) => {
                   const Icon = item.icon;
 
