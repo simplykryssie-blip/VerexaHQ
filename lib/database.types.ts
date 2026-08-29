@@ -2987,6 +2987,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string | null
+          folder_id: string | null
           id: string
           name: string
           slug: string
@@ -2998,6 +2999,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           name: string
           slug: string
@@ -3009,6 +3011,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string | null
+          folder_id?: string | null
           id?: string
           name?: string
           slug?: string
@@ -3017,6 +3020,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "document_request_templates_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "library_folders"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "document_request_templates_workspace_id_fkey"
             columns: ["workspace_id"]
