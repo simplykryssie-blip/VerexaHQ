@@ -9,7 +9,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isIndependentTier } from "@/lib/workspaceCapabilities";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
@@ -53,6 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: currentProfile },
     { data: currentMembership },
     { data: roles },
+    { count: activeParentConnectionCount },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -81,6 +82,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("roles").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`),
+    // Only relevant for a solo PTIN -- ERO/SB/multi-office tiers always get
+    // Learning Hub (they author their own training), so there's nothing to
+    // check for them.
+    isIndependentTier(workspace)
+      ? supabase
+          .from("firm_connections")
+          .select("id", { count: "exact", head: true })
+          .eq("child_workspace_id", workspace.id)
+          .eq("status", "active")
+      : Promise.resolve({ count: 0 }),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -93,6 +104,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
+
+  // A solo PTIN has no staff to train and, absent a connection, no ERO
+  // sharing training with them either -- Learning Hub would just be an
+  // always-empty page for that workspace, so it's hidden until either an
+  // ERO/SB/multi-office tier (always) or an active connection makes it
+  // non-empty.
+  const showLearningHub = !isIndependentTier(workspace) || (activeParentConnectionCount ?? 0) > 0;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
   // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
@@ -149,6 +167,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
             showEroManagement={isEroManagementTier(workspace)}
+            showLearningHub={showLearningHub}
             currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
