@@ -8,6 +8,7 @@ import {
   UserCheck,
   ShieldCheck,
   TrendingUp,
+  Kanban,
 } from "lucide-react";
 
 export type ReportCategory = {
@@ -53,6 +54,12 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
     title: "Staff",
     description: "Assigned workload, task completion rate, and review turnaround by staff member.",
     icon: UserCheck,
+  },
+  {
+    slug: "team-performance",
+    title: "Team Performance",
+    description: "Where each person's engagements sit in the pipeline right now, by stage.",
+    icon: Kanban,
   },
   {
     slug: "compliance",
