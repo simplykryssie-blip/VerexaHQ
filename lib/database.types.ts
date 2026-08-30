@@ -2437,6 +2437,7 @@ export type Database = {
       }
       document_request_item_statuses: {
         Row: {
+          category: string | null
           document_request_id: string
           document_request_item_id: string | null
           fulfilled_by_attachment_id: string | null
@@ -2448,6 +2449,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           document_request_id: string
           document_request_item_id?: string | null
           fulfilled_by_attachment_id?: string | null
@@ -2459,6 +2461,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           document_request_id?: string
           document_request_item_id?: string | null
           fulfilled_by_attachment_id?: string | null

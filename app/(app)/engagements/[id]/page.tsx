@@ -385,7 +385,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .from("document_requests")
     .select(
       `id, title, due_date, status, created_at, document_request_template_id,
-      items:document_request_item_statuses(id, name, is_required, status)`
+      items:document_request_item_statuses(id, name, is_required, status, category)`
     )
     .eq("entity_type", "engagement")
     .eq("entity_id", engagement.id)

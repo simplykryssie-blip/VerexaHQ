@@ -142,6 +142,7 @@ export async function POST(request: Request) {
       organizer_field_id: field.id,
       name: field.document_checklist_name || field.label,
       is_required: field.is_required,
+      category: field.document_checklist_category,
       status: attachmentId ? "uploaded" : "pending",
       fulfilled_by_attachment_id: attachmentId,
     };

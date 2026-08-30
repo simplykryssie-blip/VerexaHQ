@@ -323,7 +323,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .from("document_requests")
     .select(
       `id, title, due_date, status, created_at,
-      items:document_request_item_statuses(id, name, is_required, status)`
+      items:document_request_item_statuses(id, name, is_required, status, category)`
     )
     .eq("entity_type", "client")
     .eq("entity_id", client.id)

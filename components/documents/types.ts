@@ -44,6 +44,7 @@ export type RequestItemRow = {
   name: string;
   is_required: boolean;
   status: "pending" | "uploaded" | "waived";
+  category?: string | null;
 };
 
 export type DocumentRequestRow = {
