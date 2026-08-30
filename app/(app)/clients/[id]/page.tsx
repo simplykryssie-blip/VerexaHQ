@@ -337,7 +337,8 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           .select(
             `id, title, status, due_date, attachment_id, created_at,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token)`
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at,
+              attested_by_profile:user_profiles!signature_request_signers_attested_by_fkey(display_name))`
           )
           .in("attachment_id", documentIds)
           .order("created_at", { ascending: false })
@@ -368,7 +369,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     attachment_id: r.attachment_id,
     attachment_file_name: r.attachment?.file_name ?? "Document",
     created_at: r.created_at,
-    signers: r.signers ?? [],
+    signers: (r.signers ?? []).map((s: any) => ({
+      ...s,
+      attested_by_name: s.attested_by_profile?.display_name ?? null,
+    })),
   }));
 
   const engagementIds = (engagements ?? []).map((e) => e.id);

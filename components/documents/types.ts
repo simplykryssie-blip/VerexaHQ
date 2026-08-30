@@ -63,6 +63,10 @@ export type SignerRow = {
   status: "pending" | "signed" | "declined";
   signed_at: string | null;
   access_token: string;
+  /** Staff presence/identity attestation -- see attest_signature_presence.
+   *  Only populated by the staff-facing loaders; the portal never needs it. */
+  attested_at?: string | null;
+  attested_by_name?: string | null;
 };
 
 export type SignatureRequestRow = {

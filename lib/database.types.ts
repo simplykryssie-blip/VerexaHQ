@@ -6720,6 +6720,8 @@ export type Database = {
       signature_request_signers: {
         Row: {
           access_token: string
+          attested_at: string | null
+          attested_by: string | null
           created_at: string
           decline_reason: string | null
           declined_at: string | null
@@ -6738,6 +6740,8 @@ export type Database = {
         }
         Insert: {
           access_token?: string
+          attested_at?: string | null
+          attested_by?: string | null
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
@@ -6756,6 +6760,8 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          attested_at?: string | null
+          attested_by?: string | null
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
@@ -6773,6 +6779,13 @@ export type Database = {
           user_agent?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "signature_request_signers_attested_by_fkey"
+            columns: ["attested_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "signature_request_signers_signature_request_id_fkey"
             columns: ["signature_request_id"]
@@ -9245,6 +9258,10 @@ export type Database = {
       }
       archive_config_object_share: {
         Args: { p_share_id: string }
+        Returns: undefined
+      }
+      attest_signature_presence: {
+        Args: { p_signer_id: string }
         Returns: undefined
       }
       can_use_network_messaging: {
