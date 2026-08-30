@@ -26,6 +26,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     { data: categories },
     { data: pipelines },
     { data: organizerTemplates },
+    { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: documentFolderTemplates },
     { data: pricingRules },
@@ -35,6 +36,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
     supabase.from("processes").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("engagement_letter_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_request_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_folder_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("pricing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
@@ -56,6 +58,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
           categories={asOptions(categories)}
           pipelines={asOptions(pipelines)}
           organizerTemplates={asOptions(organizerTemplates)}
+          engagementLetterTemplates={asOptions(engagementLetterTemplates)}
           documentRequestTemplates={asOptions(documentRequestTemplates)}
           documentFolderTemplates={asOptions(documentFolderTemplates)}
           pricingRules={asOptions(pricingRules)}

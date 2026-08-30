@@ -6523,6 +6523,7 @@ export type Database = {
           display_order: number
           document_folder_template_id: string | null
           document_request_template_id: string | null
+          engagement_letter_template_id: string | null
           estimated_duration_minutes: number | null
           id: string
           is_bookable: boolean
@@ -6555,6 +6556,7 @@ export type Database = {
           display_order?: number
           document_folder_template_id?: string | null
           document_request_template_id?: string | null
+          engagement_letter_template_id?: string | null
           estimated_duration_minutes?: number | null
           id?: string
           is_bookable?: boolean
@@ -6587,6 +6589,7 @@ export type Database = {
           display_order?: number
           document_folder_template_id?: string | null
           document_request_template_id?: string | null
+          engagement_letter_template_id?: string | null
           estimated_duration_minutes?: number | null
           id?: string
           is_bookable?: boolean
@@ -6636,6 +6639,13 @@ export type Database = {
             columns: ["document_request_template_id"]
             isOneToOne: false
             referencedRelation: "document_request_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_engagement_letter_template_id_fkey"
+            columns: ["engagement_letter_template_id"]
+            isOneToOne: false
+            referencedRelation: "engagement_letter_templates"
             referencedColumns: ["id"]
           },
           {

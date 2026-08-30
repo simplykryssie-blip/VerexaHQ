@@ -23,6 +23,7 @@ export type ServiceRow = {
   service_category_id: string | null;
   process_id: string | null;
   organizer_template_id: string | null;
+  engagement_letter_template_id: string | null;
   document_request_template_id: string | null;
   document_folder_template_id: string | null;
   pricing_rule_id: string | null;
@@ -81,6 +82,7 @@ export function ServiceForm({
   categories,
   pipelines,
   organizerTemplates,
+  engagementLetterTemplates,
   documentRequestTemplates,
   documentFolderTemplates,
   pricingRules,
@@ -91,6 +93,7 @@ export function ServiceForm({
   categories: Option[];
   pipelines: Option[];
   organizerTemplates: Option[];
+  engagementLetterTemplates: Option[];
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
   pricingRules: Option[];
@@ -110,6 +113,7 @@ export function ServiceForm({
   const [categoryId, setCategoryId] = useState(service.service_category_id ?? "");
   const [processId, setProcessId] = useState(service.process_id ?? "");
   const [organizerTemplateId, setOrganizerTemplateId] = useState(service.organizer_template_id ?? "");
+  const [engagementLetterTemplateId, setEngagementLetterTemplateId] = useState(service.engagement_letter_template_id ?? "");
   const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
   const [pricingRuleId, setPricingRuleId] = useState(service.pricing_rule_id ?? "");
@@ -190,6 +194,7 @@ export function ServiceForm({
         service_category_id: categoryId || null,
         process_id: processId || null,
         organizer_template_id: organizerTemplateId || null,
+        engagement_letter_template_id: engagementLetterTemplateId || null,
         document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
         pricing_rule_id: pricingRuleId || null,
@@ -286,10 +291,10 @@ export function ServiceForm({
       </div>
 
       <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline &amp; organizer</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline, organizer &amp; engagement letter</p>
         <p className="mt-1 text-[11px] text-muted">
-          When a client selects this service, this is what routes them: the pipeline their engagement moves through, and the
-          organizer they fill out.
+          When a client selects this service, this is what routes them: the pipeline their engagement moves through, the
+          organizer they fill out, and the engagement letter they sign.
         </p>
         <label className={`${labelClass} mt-3`}>
           Pipeline
@@ -302,6 +307,16 @@ export function ServiceForm({
             onChange={markDirty(setOrganizerTemplateId)}
             options={organizerTemplates}
             noneLabel="No organizer"
+            disabled={!canManage}
+          />
+        </label>
+        <label className={`${labelClass} mt-3`}>
+          Engagement letter
+          <OptionSelect
+            value={engagementLetterTemplateId}
+            onChange={markDirty(setEngagementLetterTemplateId)}
+            options={engagementLetterTemplates}
+            noneLabel="No engagement letter"
             disabled={!canManage}
           />
         </label>
