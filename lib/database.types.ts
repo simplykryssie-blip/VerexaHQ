@@ -8525,6 +8525,8 @@ export type Database = {
       workspaces: {
         Row: {
           allow_connected_ptin_messaging: boolean
+          client_assignment_mode: string
+          client_assignment_staff_pool: string[]
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
@@ -8555,6 +8557,8 @@ export type Database = {
         }
         Insert: {
           allow_connected_ptin_messaging?: boolean
+          client_assignment_mode?: string
+          client_assignment_staff_pool?: string[]
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
@@ -8585,6 +8589,8 @@ export type Database = {
         }
         Update: {
           allow_connected_ptin_messaging?: boolean
+          client_assignment_mode?: string
+          client_assignment_staff_pool?: string[]
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null

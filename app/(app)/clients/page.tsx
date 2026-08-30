@@ -144,22 +144,38 @@ export default async function ClientsPage({
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
   if (clientType) clientsQuery = clientsQuery.eq("client_type", clientType);
 
-  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
-    clientsQuery,
-    supabase
-      .from("services")
-      .select("id, name, service_category_id, service_categories(slug)")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "published")
-      .order("display_order"),
-    supabase
-      .from("service_categories")
-      .select("id, name")
-      .eq("workspace_id", workspace.id)
-      .order("display_order"),
-    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
-    supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
-  ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }, { data: activeMembers }, { data: membership }] =
+    await Promise.all([
+      clientsQuery,
+      supabase
+        .from("services")
+        .select("id, name, service_category_id, service_categories(slug)")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "published")
+        .order("display_order"),
+      supabase
+        .from("service_categories")
+        .select("id, name")
+        .eq("workspace_id", workspace.id)
+        .order("display_order"),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+      supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
+      supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
+      user
+        ? supabase.from("workspace_users").select("is_owner").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+  const isOwner = Boolean(membership?.is_owner);
+  const staffUserIds = (activeMembers ?? []).map((m) => m.user_id);
+  const { data: staffProfiles } = staffUserIds.length
+    ? await supabase.from("user_profiles").select("id, display_name").in("id", staffUserIds)
+    : { data: [] };
+  const staffOptions = staffProfiles ?? [];
 
   // Same category -> service grouping shape the public organizer's own
   // "what do you need help with" contact step uses (get_public_service_options),
@@ -225,7 +241,13 @@ export default async function ClientsPage({
         description={description}
         actions={
           canCreate ? (
-            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
+            <NewClientButton
+              workspaceId={workspace.id}
+              workspaceName={workspace.name}
+              serviceCategories={serviceCategories}
+              isOwner={isOwner}
+              staffOptions={staffOptions}
+            />
           ) : null
         }
       />
@@ -293,7 +315,13 @@ export default async function ClientsPage({
             }
             emptyAction={
               !status && canCreate ? (
-                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
+                <NewClientButton
+              workspaceId={workspace.id}
+              workspaceName={workspace.name}
+              serviceCategories={serviceCategories}
+              isOwner={isOwner}
+              staffOptions={staffOptions}
+            />
               ) : undefined
             }
           />
