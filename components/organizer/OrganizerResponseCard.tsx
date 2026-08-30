@@ -7,7 +7,21 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
 
-export type OrganizerFieldAnswer = { fieldId: string; answerId: string | null; label: string; fieldType: string; display: string; maskable: boolean };
+export type OrganizerFieldAnswer = {
+  fieldId: string;
+  answerId: string | null;
+  label: string;
+  fieldType: string;
+  display: string;
+  maskable: boolean;
+  documentStatus?: string;
+};
+
+const DOCUMENT_STATUS_BADGE: Record<string, { label: string; tone: string }> = {
+  uploaded: { label: "Requested • Received", tone: "bg-emeraldSoft text-emerald" },
+  pending: { label: "Requested • Missing", tone: "bg-amberSoft text-amber" },
+  waived: { label: "Requested • Waived", tone: "bg-surfaceMuted text-muted" },
+};
 export type OrganizerRepeaterGroup = { fieldId: string; label: string; instances: { index: number; fields: OrganizerFieldAnswer[] }[] };
 export type OrganizerReviewStatus = "Pending" | "In Review" | "Approved" | "Rejected" | "Corrections Requested";
 export type OrganizerResponseDetail = {
@@ -256,7 +270,12 @@ export function OrganizerResponseCard({
           {(response.topLevel ?? []).map((f) => (
             <div key={f.fieldId} className="flex items-start justify-between gap-4 text-sm">
               <span className="text-muted">{f.label}</span>
-              <span className="text-right text-slate">
+              <span className="flex items-center gap-2 text-right text-slate">
+                {f.documentStatus && DOCUMENT_STATUS_BADGE[f.documentStatus] && (
+                  <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${DOCUMENT_STATUS_BADGE[f.documentStatus].tone}`}>
+                    {DOCUMENT_STATUS_BADGE[f.documentStatus].label}
+                  </span>
+                )}
                 {f.maskable && f.answerId ? <OrganizerAnswerReveal answerId={f.answerId} masked={f.display} /> : f.display}
               </span>
             </div>

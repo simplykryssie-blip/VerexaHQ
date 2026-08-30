@@ -2443,6 +2443,7 @@ export type Database = {
           id: string
           is_required: boolean
           name: string
+          organizer_field_id: string | null
           status: string
           updated_at: string
         }
@@ -2453,6 +2454,7 @@ export type Database = {
           id?: string
           is_required?: boolean
           name: string
+          organizer_field_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2463,6 +2465,7 @@ export type Database = {
           id?: string
           is_required?: boolean
           name?: string
+          organizer_field_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2486,6 +2489,13 @@ export type Database = {
             columns: ["fulfilled_by_attachment_id"]
             isOneToOne: false
             referencedRelation: "attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_request_item_statuses_organizer_field_id_fkey"
+            columns: ["organizer_field_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_fields"
             referencedColumns: ["id"]
           },
         ]
@@ -2593,6 +2603,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id: string
+          organizer_response_id: string | null
           status: string
           title: string
           updated_at: string
@@ -2606,6 +2617,7 @@ export type Database = {
           entity_id: string
           entity_type?: string
           id?: string
+          organizer_response_id?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -2619,6 +2631,7 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           id?: string
+          organizer_response_id?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -2637,6 +2650,13 @@ export type Database = {
             columns: ["document_request_template_id"]
             isOneToOne: false
             referencedRelation: "document_request_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_requests_organizer_response_id_fkey"
+            columns: ["organizer_response_id"]
+            isOneToOne: true
+            referencedRelation: "organizer_responses"
             referencedColumns: ["id"]
           },
           {
@@ -5015,9 +5035,12 @@ export type Database = {
           conditional_logic: Json
           created_at: string
           display_order: number
+          document_checklist_category: string | null
+          document_checklist_name: string | null
           field_type: string
           help_text: string | null
           id: string
+          include_in_document_checklist: boolean
           is_required: boolean
           label: string
           layout_width: string
@@ -5034,9 +5057,12 @@ export type Database = {
           conditional_logic?: Json
           created_at?: string
           display_order?: number
+          document_checklist_category?: string | null
+          document_checklist_name?: string | null
           field_type: string
           help_text?: string | null
           id?: string
+          include_in_document_checklist?: boolean
           is_required?: boolean
           label: string
           layout_width?: string
@@ -5053,9 +5079,12 @@ export type Database = {
           conditional_logic?: Json
           created_at?: string
           display_order?: number
+          document_checklist_category?: string | null
+          document_checklist_name?: string | null
           field_type?: string
           help_text?: string | null
           id?: string
+          include_in_document_checklist?: boolean
           is_required?: boolean
           label?: string
           layout_width?: string

@@ -6,7 +6,7 @@ import { CheckCircle2, Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
-import { coerceAddressAnswerToString, coerceNameAnswerToString, normalizeOptions, parseAddressValue, parseNameValue } from "@/lib/organizer/formatValue";
+import { answerToString as answerToStringByType, normalizeOptions, parseAddressValue, parseNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
 import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
@@ -70,13 +70,7 @@ export function OrganizerForm({
   const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
 
   const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
-  const answerToString = (fieldId: string, value: unknown): string => {
-    const type = fieldTypeById.get(fieldId);
-    if (type === "address") return coerceAddressAnswerToString(value);
-    if (type === "name") return coerceNameAnswerToString(value);
-    if (type === "phone") return formatPhone(String(value));
-    return String(value);
-  };
+  const answerToString = (fieldId: string, value: unknown): string => answerToStringByType(fieldTypeById.get(fieldId), value);
 
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {};
@@ -251,6 +245,14 @@ export function OrganizerForm({
       }).catch(() => {
         // Best-effort -- the submission itself is already recorded; filing
         // it into Documents can be retried later if this fails.
+      });
+      fetch("/api/documents/sync-organizer-document-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responseId }),
+      }).catch(() => {
+        // Best-effort, same reasoning -- the VA can still see the raw
+        // organizer answers even if this auto-checklist sync fails.
       });
       // A toast alone was easy to miss -- nothing on screen told the client
       // their organizer actually went through. This blocks on an explicit

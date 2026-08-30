@@ -55,7 +55,7 @@ function maskLast4(value: unknown): string {
   return last4 ? `••• •• ${last4}` : "--";
 }
 
-function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow | undefined) {
+function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow | undefined, documentStatus?: string) {
   const maskable = (field.field_type === "ssn" || field.field_type === "ein") && answer !== undefined && answer.value !== null;
   return {
     fieldId: field.id,
@@ -64,10 +64,20 @@ function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow |
     fieldType: field.field_type,
     display: maskable ? maskLast4(answer?.value) : formatOrganizerValue(field.field_type, answer?.value),
     maskable,
+    documentStatus,
   };
 }
 
-function buildOrganizerResponseDetail(responseId: string, templateId: string, allAnswers: OrganizerAnswerRow[], allFields: OrganizerFieldRow[]) {
+// documentStatusByField maps organizer_field_id -> its auto-created document
+// checklist item status, so a tracked file_upload question can show
+// "already requested" right on the answer.
+function buildOrganizerResponseDetail(
+  responseId: string,
+  templateId: string,
+  allAnswers: OrganizerAnswerRow[],
+  allFields: OrganizerFieldRow[],
+  documentStatusByField?: Map<string, string>
+) {
   const templateFields = allFields.filter((f) => f.organizer_template_id === templateId);
   const responseAnswers = allAnswers.filter((a) => a.organizer_response_id === responseId);
 
@@ -76,7 +86,7 @@ function buildOrganizerResponseDetail(responseId: string, templateId: string, al
       (f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break" && f.field_type !== "section" && f.field_type !== "rich_text"
     )
     .sort((a, b) => a.display_order - b.display_order)
-    .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id)));
+    .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id), documentStatusByField?.get(f.id)));
 
   const repeaters = templateFields
     .filter((f) => f.field_type === "repeating_section" && !f.parent_field_id)
@@ -349,9 +359,25 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
         }),
   ]);
 
+  const { data: checklistStatusRows } = await supabase
+    .from("document_request_item_statuses")
+    .select("organizer_field_id, status, document_requests!inner(entity_type, entity_id)")
+    .eq("document_requests.entity_type", "engagement")
+    .eq("document_requests.entity_id", engagement.id)
+    .not("organizer_field_id", "is", null);
+  const documentStatusByField = new Map(
+    (checklistStatusRows ?? []).filter((r) => r.organizer_field_id).map((r) => [r.organizer_field_id as string, r.status])
+  );
+
   const organizerResponsesWithDetail = (organizerResponses ?? []).map((r) => {
     if (r.status !== "submitted" && r.status !== "reviewed") return { ...r, topLevel: undefined, repeaters: undefined };
-    const { topLevel, repeaters } = buildOrganizerResponseDetail(r.id, r.organizer_template_id, organizerAnswerRows ?? [], organizerFieldRows ?? []);
+    const { topLevel, repeaters } = buildOrganizerResponseDetail(
+      r.id,
+      r.organizer_template_id,
+      organizerAnswerRows ?? [],
+      organizerFieldRows ?? [],
+      documentStatusByField
+    );
     return { ...r, topLevel, repeaters };
   });
 
