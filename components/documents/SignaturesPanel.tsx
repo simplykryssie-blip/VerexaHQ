@@ -112,6 +112,7 @@ export function SignaturesPanel({
         entityId,
         template,
         clientName,
+        clientEmail,
         firmName,
         signers,
         title,
