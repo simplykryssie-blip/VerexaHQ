@@ -159,9 +159,11 @@ async function sendOne(
     const clientName = client?.business_name || [client?.first_name, client?.last_name].filter(Boolean).join(" ") || "";
     const mergeValues = {
       client_name: clientName,
+      client_email: client?.primary_email ?? "",
       firm_name: workspace?.name ?? "",
       firm_address: "",
       firm_phone: "",
+      current_date: new Date().toLocaleDateString(),
     };
 
     let pdfBytes: Uint8Array;

@@ -11,6 +11,7 @@ export async function createSignatureRequestFromTemplate({
   entityId,
   template,
   clientName,
+  clientEmail,
   firmName,
   signers,
   title,
@@ -31,6 +32,7 @@ export async function createSignatureRequestFromTemplate({
     pdf_field_mappings?: unknown;
   };
   clientName?: string;
+  clientEmail?: string | null;
   firmName?: string;
   signers: { signer_name: string; signer_email: string | null }[];
   title: string;
@@ -38,9 +40,11 @@ export async function createSignatureRequestFromTemplate({
 }): Promise<{ requestId: string } | { error: string }> {
   const mergeValues = {
     client_name: clientName ?? "",
+    client_email: clientEmail ?? "",
     firm_name: firmName ?? "",
     firm_address: "",
     firm_phone: "",
+    current_date: new Date().toLocaleDateString(),
   };
   // A rendered PDF (not the raw HTML) so the signing page can actually
   // preview it -- it only knows how to render PDFs and images -- and so it
