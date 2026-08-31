@@ -38,9 +38,9 @@ export default async function PartnersPage() {
     <>
       <PageHeader
         title="Partners"
-        description="Contact and business info for the PTINs connected to your firm -- separate from your client Contacts. Manage the connection itself (billing, branding, disconnect) in Settings > Connections."
+        description="Contact and business info for the PTINs connected to your firm -- separate from your client Contacts. Manage the connection itself (billing, branding, disconnect) in Settings > Users & Staff."
         actions={
-          <Link href="/settings/connections" className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
+          <Link href="/settings/users" className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent">
             Manage connections
           </Link>
         }

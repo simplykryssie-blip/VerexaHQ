@@ -18,7 +18,6 @@ import {
   Flag,
   ScrollText,
   Zap,
-  Link2,
   ClipboardCheck,
   LifeBuoy,
   Kanban,
@@ -173,7 +172,6 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
-  { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
@@ -187,7 +185,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
