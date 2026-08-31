@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
+import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -50,6 +51,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { count: teammateCount },
     { count: connectedPartnerCount },
     { data: hasAcceptedTerms },
+    { data: billingCardRows },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -77,6 +79,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspace.is_owner
       ? supabase.rpc("has_accepted_platform_terms", { p_version: LEGAL_VERSION })
       : Promise.resolve({ data: true }),
+    // Only the owner is prompted -- matches who can actually act on it
+    // (FirmProfileForm gates the Stripe/billing fields on isOwner too).
+    workspace.is_owner ? supabase.rpc("needs_billing_card", { p_workspace_id: workspace.id }) : Promise.resolve({ data: null }),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -89,6 +94,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
+  const billingCard = (billingCardRows ?? [])[0] ?? null;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
   // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
@@ -140,6 +146,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
             <GlobalClientDraftBanner />
+            <BillingCardPrompt
+              needed={Boolean(billingCard?.needed)}
+              urgent={Boolean(billingCard?.urgent)}
+              daysUntilPeriodEnd={billingCard?.days_until_period_end ?? null}
+              periodEnd={billingCard?.period_end ?? null}
+            />
             {children}
           </main>
         </div>

@@ -299,6 +299,199 @@ export async function createInvoiceItem({
 }
 
 /**
+ * Hosted, redirect-based card collection for a platform subscription --
+ * mode "setup" saves a payment method against the customer without
+ * charging anything, same Checkout-redirect pattern as createCheckoutSession
+ * above (mode "payment") rather than embedding Stripe Elements client-side.
+ */
+export async function createSetupCheckoutSession({
+  customerId,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  customerId: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string; url: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    mode: "setup",
+    customer: customerId,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "payment_method_types[0]": "card",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string; url: string };
+  return { ok: true, data };
+}
+
+/** Resolves a completed setup Checkout session down to the saved payment method's id. */
+export async function retrieveSetupIntentPaymentMethod(setupIntentId: string): Promise<StripeResult<{ paymentMethodId: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/setup_intents/${setupIntentId}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { payment_method: string | null };
+  if (!data.payment_method) {
+    return { ok: false, reason: "Setup intent has no payment method attached." };
+  }
+  return { ok: true, data: { paymentMethodId: data.payment_method } };
+}
+
+export async function retrieveCardDetails(paymentMethodId: string): Promise<StripeResult<{ brand: string; last4: string; expMonth: number; expYear: number }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/payment_methods/${paymentMethodId}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { card?: { brand: string; last4: string; exp_month: number; exp_year: number } };
+  if (!data.card) {
+    return { ok: false, reason: "Payment method has no card details." };
+  }
+  return { ok: true, data: { brand: data.card.brand, last4: data.card.last4, expMonth: data.card.exp_month, expYear: data.card.exp_year } };
+}
+
+export async function setCustomerDefaultPaymentMethod({
+  customerId,
+  paymentMethodId,
+}: {
+  customerId: string;
+  paymentMethodId: string;
+}): Promise<StripeResult<true>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({ "invoice_settings[default_payment_method]": paymentMethodId });
+  const res = await fetch(`${STRIPE_API}/customers/${customerId}`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  return { ok: true, data: true };
+}
+
+/** Previews what the next renewal invoice would total, without generating a real invoice -- used to know the amount for a pre-cycle charge attempt. */
+export async function previewUpcomingInvoiceAmount(stripeSubscriptionId: string): Promise<StripeResult<{ amountDueCents: number; currency: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const params = new URLSearchParams({ subscription: stripeSubscriptionId });
+  const res = await fetch(`${STRIPE_API}/invoices/upcoming?${params.toString()}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { amount_due: number; currency: string };
+  return { ok: true, data: { amountDueCents: data.amount_due, currency: data.currency } };
+}
+
+/**
+ * Off-session charge against a saved card -- used for the pre-cycle
+ * (3-days-early) dunning attempt, not a customer-present checkout. A
+ * decline surfaces as a non-2xx response with an error payload rather than
+ * a thrown exception.
+ */
+export async function chargeOffSession({
+  customerId,
+  paymentMethodId,
+  amountCents,
+  currency = "usd",
+  description,
+  metadata,
+}: {
+  customerId: string;
+  paymentMethodId: string;
+  amountCents: number;
+  currency?: string;
+  description: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string; status: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+  if (amountCents <= 0) {
+    return { ok: true, data: { id: "zero-amount", status: "succeeded" } };
+  }
+
+  const body = toFormBody({
+    customer: customerId,
+    payment_method: paymentMethodId,
+    amount: amountCents,
+    currency,
+    description,
+    off_session: "true",
+    confirm: "true",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/payment_intents`, { method: "POST", headers: authHeaders(), body });
+  const data = (await res.json().catch(() => ({}))) as { id?: string; status?: string; error?: { message?: string; decline_code?: string } };
+  if (!res.ok || !data.id) {
+    return { ok: false, reason: data.error?.decline_code ?? data.error?.message ?? `Stripe responded with ${res.status}` };
+  }
+  return { ok: true, data: { id: data.id, status: data.status ?? "unknown" } };
+}
+
+/**
+ * Credits a successful early charge to the customer's Stripe balance rather
+ * than trying to suppress or reschedule the subscription's own invoice --
+ * Stripe automatically applies any available balance credit to the next
+ * invoice before charging the card, so the real renewal invoice nets to $0
+ * and every existing subscription webhook keeps working unchanged.
+ */
+export async function createCustomerBalanceCredit({
+  customerId,
+  amountCents,
+  currency = "usd",
+  description,
+}: {
+  customerId: string;
+  amountCents: number;
+  currency?: string;
+  description: string;
+}): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({ amount: -Math.abs(amountCents), currency, description });
+  const res = await fetch(`${STRIPE_API}/customers/${customerId}/balance_transactions`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string };
+  return { ok: true, data };
+}
+
+/**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.
  */

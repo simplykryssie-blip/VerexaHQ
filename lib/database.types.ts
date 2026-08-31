@@ -8376,13 +8376,62 @@ export type Database = {
           },
         ]
       }
+      workspace_billing_charge_attempts: {
+        Row: {
+          amount_cents: number
+          attempted_at: string
+          created_at: string
+          failure_reason: string | null
+          id: string
+          period_end: string
+          status: string
+          stripe_payment_intent_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          attempted_at?: string
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          period_end: string
+          status: string
+          stripe_payment_intent_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          attempted_at?: string
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          period_end?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_billing_charge_attempts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
           card_funding_type: string | null
+          card_last4: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          default_payment_method_id: string | null
           id: string
           locked_plan_snapshot: Json | null
           plan_id: string
@@ -8398,10 +8447,15 @@ export type Database = {
         }
         Insert: {
           cancel_at_period_end?: boolean
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
           card_funding_type?: string | null
+          card_last4?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          default_payment_method_id?: string | null
           id?: string
           locked_plan_snapshot?: Json | null
           plan_id: string
@@ -8417,10 +8471,15 @@ export type Database = {
         }
         Update: {
           cancel_at_period_end?: boolean
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
           card_funding_type?: string | null
+          card_last4?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          default_payment_method_id?: string | null
           id?: string
           locked_plan_snapshot?: Json | null
           plan_id?: string
@@ -9769,6 +9828,16 @@ export type Database = {
           tax_year: number
           total_returns: number
           transmitted: number
+        }[]
+      }
+      needs_billing_card: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          card_last4: string
+          days_until_period_end: number
+          needed: boolean
+          period_end: string
+          urgent: boolean
         }[]
       }
       get_ero_connected_partners: {

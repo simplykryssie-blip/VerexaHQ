@@ -5,6 +5,7 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PlanUsageManager } from "@/components/settings/PlanUsageManager";
+import { BillingCardManager } from "@/components/settings/BillingCardManager";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ export default async function PlanUsagePage() {
   const [{ data: subscription }, { data: meters }, { data: storageFiles }] = await Promise.all([
     supabase
       .from("workspace_subscriptions")
-      .select("stripe_status, platform_subscription_plans(name, email_overage_rate_cents, sms_overage_rate_cents, storage_overage_rate_cents)")
+      .select(
+        "stripe_status, card_brand, card_last4, card_exp_month, card_exp_year, platform_subscription_plans(name, email_overage_rate_cents, sms_overage_rate_cents, storage_overage_rate_cents)"
+      )
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
     supabase.from("workspace_usage_meters").select("resource_type, free_units_granted, free_units_consumed, prepaid_balance").eq("workspace_id", workspace.id),
@@ -47,6 +50,18 @@ export default async function PlanUsagePage() {
             <EmptyState message="This workspace isn't on an active paid plan yet, so usage isn't metered." />
           </div>
         ) : (
+          <>
+          {workspace.is_owner && (
+            <SettingsCard title="Payment method" description="Used for your Verexa subscription and any usage top-ups.">
+              <BillingCardManager
+                cardBrand={subscription.card_brand}
+                cardLast4={subscription.card_last4}
+                cardExpMonth={subscription.card_exp_month}
+                cardExpYear={subscription.card_exp_year}
+              />
+            </SettingsCard>
+          )}
+          <div className="mt-6">
           <SettingsCard title={plan.name} description="Contact Verexa to change plans.">
             <PlanUsageManager
               isOwner={workspace.is_owner}
@@ -70,6 +85,8 @@ export default async function PlanUsagePage() {
               }}
             />
           </SettingsCard>
+          </div>
+          </>
         )}
       </div>
     </div>

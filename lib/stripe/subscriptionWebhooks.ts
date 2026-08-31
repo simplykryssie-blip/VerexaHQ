@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { updateSubscriptionItemPrice } from "@/lib/stripe/client";
+import { updateSubscriptionItemPrice, retrieveSetupIntentPaymentMethod, retrieveCardDetails, setCustomerDefaultPaymentMethod } from "@/lib/stripe/client";
 import type { Database } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
@@ -262,6 +262,47 @@ export async function handleTrialWillEnd(
     })
     .select()
     .single();
+
+  return {};
+}
+
+/**
+ * A workspace admin completed the "Add a card" hosted Setup Checkout
+ * (createSetupCheckoutSession, mode "setup" -- saves a payment method
+ * without charging anything). Resolves the resulting setup intent down to
+ * a payment method, makes it the customer's default so Stripe's own
+ * automatic renewal charge uses it too, and caches display details on
+ * workspace_subscriptions for the billing UI.
+ */
+export async function handleSetupCheckoutCompleted(
+  supabase: ReturnType<typeof createServiceClient>,
+  session: { id: string; customer: string | { id: string }; setup_intent: string | { id: string } | null; metadata?: { workspace_id?: string } }
+): Promise<{ skipped?: string }> {
+  const workspaceId = session.metadata?.workspace_id;
+  if (!workspaceId) return { skipped: "missing workspace_id metadata" };
+  if (!session.setup_intent) return { skipped: "session has no setup_intent" };
+
+  const setupIntentId = typeof session.setup_intent === "string" ? session.setup_intent : session.setup_intent.id;
+  const stripeCustomerId = customerId(session.customer);
+
+  const pmResult = await retrieveSetupIntentPaymentMethod(setupIntentId);
+  if (!pmResult.ok) return { skipped: pmResult.reason };
+
+  const cardResult = await retrieveCardDetails(pmResult.data.paymentMethodId);
+  if (!cardResult.ok) return { skipped: cardResult.reason };
+
+  await setCustomerDefaultPaymentMethod({ customerId: stripeCustomerId, paymentMethodId: pmResult.data.paymentMethodId });
+
+  await supabase
+    .from("workspace_subscriptions")
+    .update({
+      default_payment_method_id: pmResult.data.paymentMethodId,
+      card_brand: cardResult.data.brand,
+      card_last4: cardResult.data.last4,
+      card_exp_month: cardResult.data.expMonth,
+      card_exp_year: cardResult.data.expYear,
+    })
+    .eq("workspace_id", workspaceId);
 
   return {};
 }
