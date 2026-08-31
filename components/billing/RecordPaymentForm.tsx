@@ -22,6 +22,7 @@ export function RecordPaymentForm({
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(balanceDue.toFixed(2));
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
+  const [paymentMethod, setPaymentMethod] = useState<"check" | "cash" | "bank_transfer" | "other">("check");
   const [reference, setReference] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ export function RecordPaymentForm({
       invoice_id: invoiceId,
       amount: amountNum,
       payment_date: paymentDate,
+      payment_method: paymentMethod,
       reference: reference || null,
       recorded_by: user?.id,
     });
@@ -91,6 +93,19 @@ export function RecordPaymentForm({
           onChange={(e) => setPaymentDate(e.target.value)}
           className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
+      </label>
+      <label className="flex flex-col gap-1 text-xs text-muted">
+        Method
+        <select
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value as typeof paymentMethod)}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          <option value="check">Check</option>
+          <option value="cash">Cash</option>
+          <option value="bank_transfer">Bank transfer</option>
+          <option value="other">Other</option>
+        </select>
       </label>
       <label className="flex flex-col gap-1 text-xs text-muted">
         Reference (optional)

@@ -76,6 +76,7 @@ export async function handleCheckoutSessionCompleted(
       invoice_id: invoiceId,
       amount: session.amount_total / 100,
       status: "succeeded",
+      payment_method: "stripe",
       stripe_payment_intent_id: session.payment_intent,
       stripe_checkout_session_id: session.id,
     })
@@ -138,6 +139,7 @@ export async function handlePaymentIntentFailed(
     invoice_id: invoiceId,
     amount: intent.amount / 100,
     status: "failed",
+    payment_method: "stripe",
     stripe_payment_intent_id: intent.id,
     notes: intent.last_payment_error?.message ?? null,
   });

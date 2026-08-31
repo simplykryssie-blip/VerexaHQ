@@ -892,7 +892,10 @@ export function BillingTab({
           <ul className="divide-y divide-border">
             {payments.map((p) => (
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
+                <span className="text-slate">
+                  {new Date(p.payment_date).toLocaleDateString()}
+                  {p.payment_method && ` -- ${PAYMENT_METHOD_LABEL[p.payment_method] ?? p.payment_method}`}
+                </span>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-2 text-muted">
                     <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
@@ -1103,7 +1106,15 @@ export type InvoiceRow = {
   issue_date: string | null;
   notes: string | null;
 };
-export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; stripe_payment_intent_id: string | null };
+export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; payment_method: string | null; stripe_payment_intent_id: string | null };
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  stripe: "Card",
+  check: "Check",
+  cash: "Cash",
+  bank_transfer: "Bank transfer",
+  other: "Other",
+};
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 import type {
   OrganizerFieldAnswer,
