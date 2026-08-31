@@ -30,6 +30,7 @@ import {
   Package,
   Palette,
   Receipt,
+  Handshake,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -73,6 +74,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
+  { label: "Partners", href: "/partners", icon: Handshake },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Learning Hub", href: "/learning", icon: GraduationCap },
@@ -97,7 +99,7 @@ export type NavSection = { label: string; items: NavItem[] };
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Partners", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 

@@ -26,6 +26,7 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  showPartners,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
@@ -43,6 +44,8 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
+  /** Partners is only relevant to an ERO/SB with connections to manage -- an independent PTIN has no one to show there. */
+  showPartners?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -190,6 +193,7 @@ export function Sidebar({
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
+                  .filter((item) => item.label !== "Partners" || showPartners)
                   .map((item) => {
                   const Icon = item.icon;
 

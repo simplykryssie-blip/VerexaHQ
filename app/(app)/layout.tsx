@@ -48,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: isPlatformIt },
     { data: canUseNetworkMessaging },
     { count: teammateCount },
+    { count: connectedPartnerCount },
     { data: hasAcceptedTerms },
   ] = await Promise.all([
     supabase
@@ -64,6 +65,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .select("user_id", { count: "exact", head: true })
       .eq("workspace_id", workspace.id)
       .eq("status", "active"),
+    // Partners is only worth a nav slot once this workspace is actually an
+    // ERO/SB with at least one PTIN connected (or invited) to it.
+    supabase
+      .from("firm_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("parent_workspace_id", workspace.id)
+      .eq("relationship_type", "ero_ptin"),
     // Only a workspace owner needs to accept -- staff are covered under
     // the Firm's own acceptance, same as the Terms' own language.
     workspace.is_owner
@@ -127,6 +135,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
+            showPartners={(connectedPartnerCount ?? 0) > 0}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />

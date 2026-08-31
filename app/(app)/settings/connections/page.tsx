@@ -16,21 +16,15 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
   if (!workspace) return null;
 
   const supabase = createClient();
+  // Both of these go through SECURITY DEFINER RPCs rather than a plain
+  // embedded select -- the other side's workspace name/contact info isn't
+  // visible under workspaces' own RLS (is_workspace_member(id)) unless the
+  // viewer happens to also belong to that workspace, which is only true for
+  // the demo accounts. See get_ero_connected_partners/get_my_ero_connection.
   const [{ data: canManage }, { data: connectedPtins }, { data: myConnectionRows }, { data: workspaceRow }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" }),
-    supabase
-      .from("firm_connections")
-      .select("id, status, billing_responsibility, shares_communications_identity, allows_branding_override, created_at, workspaces:child_workspace_id(name)")
-      .eq("parent_workspace_id", workspace.id)
-      .eq("relationship_type", "ero_ptin")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("firm_connections")
-      .select("id, status, billing_responsibility, shares_communications_identity, allows_branding_override, workspaces:parent_workspace_id(name)")
-      .eq("child_workspace_id", workspace.id)
-      .eq("relationship_type", "ero_ptin")
-      .order("created_at", { ascending: false })
-      .limit(1),
+    supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id }),
+    supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
     supabase.from("workspaces").select("allow_connected_ptin_messaging").eq("id", workspace.id).maybeSingle(),
   ]);
 
@@ -59,9 +53,9 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
               <ul className="divide-y divide-border">
                 {(connectedPtins ?? []).map((c) => (
                   <ConnectedPtinRow
-                    key={c.id}
-                    connectionId={c.id}
-                    name={(c.workspaces as unknown as { name: string } | null)?.name ?? "Pending invite"}
+                    key={c.connection_id}
+                    connectionId={c.connection_id}
+                    name={c.name}
                     status={c.status}
                     billingResponsibility={c.billing_responsibility}
                     sharesCommunicationsIdentity={c.shares_communications_identity}
@@ -92,8 +86,8 @@ export default async function ConnectionsPage({ searchParams }: { searchParams: 
         <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
           {myConnection ? (
             <MyConnectionStatus
-              connectionId={myConnection.id}
-              eroName={(myConnection.workspaces as unknown as { name: string } | null)?.name ?? "your ERO"}
+              connectionId={myConnection.connection_id}
+              eroName={myConnection.name}
               billingResponsibility={myConnection.billing_responsibility}
               sharesCommunicationsIdentity={myConnection.shares_communications_identity}
               allowsBrandingOverride={myConnection.allows_branding_override}

@@ -3736,6 +3736,7 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          notes: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -3753,6 +3754,7 @@ export type Database = {
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
+          notes?: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at?: string | null
@@ -3770,6 +3772,7 @@ export type Database = {
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
+          notes?: string | null
           parent_workspace_id?: string
           relationship_type?: string
           responded_at?: string | null
@@ -9766,6 +9769,39 @@ export type Database = {
           tax_year: number
           total_returns: number
           transmitted: number
+        }[]
+      }
+      get_ero_connected_partners: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          allows_branding_override: boolean
+          billing_responsibility: string
+          child_workspace_id: string
+          connection_id: string
+          created_at: string
+          mailing_address: string
+          name: string
+          notes: string
+          phone: string
+          primary_contact_email: string
+          responded_at: string
+          shares_communications_identity: boolean
+          status: string
+          website: string
+        }[]
+      }
+      get_my_ero_connection: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          allows_branding_override: boolean
+          billing_responsibility: string
+          connection_id: string
+          ero_workspace_id: string
+          name: string
+          phone: string
+          primary_contact_email: string
+          shares_communications_identity: boolean
+          website: string
         }[]
       }
       get_firm_connection_invite_preview: {
