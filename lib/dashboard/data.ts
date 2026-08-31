@@ -130,7 +130,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     const { data: queue } = await supabase.from("v_reviewer_queue").select("*").in(
       "workflow_stage_id",
       (
-        await supabase.from("workflow_stages").select("id").in("workflow_run_id", runIds)
+        await supabase.from("pipeline_stages").select("id").in("pipeline_run_id", runIds)
       ).data?.map((s) => s.id) ?? []
     );
     if (queue && queue.length > 0) {
