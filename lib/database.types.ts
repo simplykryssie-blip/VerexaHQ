@@ -5791,6 +5791,9 @@ export type Database = {
           is_active: boolean
           name: string
           per_seat_price_cents: number
+          signup_free_emails: number
+          signup_free_sms: number
+          signup_free_storage_gb: number
           slug: string
           sms_overage_rate_cents: number
           storage_overage_rate_cents: number
@@ -5808,6 +5811,9 @@ export type Database = {
           is_active?: boolean
           name: string
           per_seat_price_cents?: number
+          signup_free_emails?: number
+          signup_free_sms?: number
+          signup_free_storage_gb?: number
           slug: string
           sms_overage_rate_cents?: number
           storage_overage_rate_cents?: number
@@ -5825,6 +5831,9 @@ export type Database = {
           is_active?: boolean
           name?: string
           per_seat_price_cents?: number
+          signup_free_emails?: number
+          signup_free_sms?: number
+          signup_free_storage_gb?: number
           slug?: string
           sms_overage_rate_cents?: number
           storage_overage_rate_cents?: number
@@ -8478,6 +8487,44 @@ export type Database = {
           },
         ]
       }
+      workspace_usage_meters: {
+        Row: {
+          billed_units_total: number
+          free_units_granted: number
+          granted_at: string
+          id: string
+          resource_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          billed_units_total?: number
+          free_units_granted?: number
+          granted_at?: string
+          id?: string
+          resource_type: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          billed_units_total?: number
+          free_units_granted?: number
+          granted_at?: string
+          id?: string
+          resource_type?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_usage_meters_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_users: {
         Row: {
           created_at: string
@@ -9325,6 +9372,18 @@ export type Database = {
         }
         Returns: string
       }
+      compute_pending_usage_overage: {
+        Args: never
+        Returns: {
+          amount_cents: number
+          currency: string
+          new_billable_units: number
+          new_billed_units_total: number
+          resource_type: string
+          stripe_customer_id: string
+          workspace_id: string
+        }[]
+      }
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
         Returns: Json
@@ -9896,6 +9955,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string[]
       }
+      grant_workspace_usage_meters: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       has_accepted_platform_terms: {
         Args: { p_version: string }
         Returns: boolean
@@ -10155,6 +10218,14 @@ export type Database = {
           p_signature_type: string
           p_token: string
           p_typed_name?: string
+        }
+        Returns: undefined
+      }
+      record_usage_overage_billed: {
+        Args: {
+          p_new_billed_units_total: number
+          p_resource_type: string
+          p_workspace_id: string
         }
         Returns: undefined
       }

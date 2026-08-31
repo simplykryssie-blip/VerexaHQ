@@ -149,6 +149,11 @@ export async function handleSubscriptionCreated(
   // workspace was under -- a past-due pause or a prior cancellation.
   await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
 
+  // One-time only, per grant_workspace_usage_meters -- a workspace that
+  // already has meter rows (e.g. re-subscribing after a cancellation) does
+  // not get a second free bucket.
+  await supabase.rpc("grant_workspace_usage_meters", { p_workspace_id: workspaceId });
+
   return {};
 }
 
