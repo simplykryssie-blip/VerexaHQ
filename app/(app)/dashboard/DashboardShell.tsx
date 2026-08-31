@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { PageHeader } from "@/components/PageHeader";
-import { KpiWidget } from "@/components/widgets/KpiWidget";
+import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
+import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
+import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
 import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
@@ -18,7 +19,7 @@ import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
-import { isWidgetType, type WidgetType } from "@/lib/dashboard/widgets";
+import { isWidgetType, WIDE_WIDGET_TYPES, type WidgetType } from "@/lib/dashboard/widgets";
 
 export type WidgetRow = { id: string; widget_type: string; title: string | null; display_order: number; is_visible: boolean };
 
@@ -26,8 +27,18 @@ function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Real percentage change only -- returns undefined (no trend shown) rather
+// than a fabricated number when there's no honest baseline to compare against
+// (equal values, or a previous value of zero where "% change" is undefined).
+function trendFor(current: number, previous: number, suffix: string, sentiment?: "positive" | "negative"): KpiTrend | undefined {
+  if (previous <= 0 || current === previous) return undefined;
+  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
+  return { direction: current > previous ? "up" : "down", label: `${pct}% ${suffix}`, sentiment };
+}
+
 export function DashboardShell({
   workspaceName,
+  firstName,
   isAdmin,
   widgets,
   data,
@@ -38,6 +49,9 @@ export function DashboardShell({
   seenOnboardingSteps,
 }: {
   workspaceName: string;
+  /** For the greeting hero -- null falls back to the workspace name so a
+   *  staff member who hasn't set their name yet still gets a real greeting. */
+  firstName: string | null;
   /** Only gates the "Invite Staff" quick action (see quickActionPermissions
    *  below) -- widget visibility/order stays per-user (user_widget_preferences),
    *  not admin-only. */
@@ -117,6 +131,7 @@ export function DashboardShell({
             icon={DollarSign}
             chip="emerald"
             reportHref="/billing"
+            trend={trendFor(data.kpis.revenueThisMonth, data.kpis.revenueLastMonth, "vs last month")}
           />
         );
       case "kpis":
@@ -140,6 +155,19 @@ export function DashboardShell({
                 >
                   {data.kpis.tasksDueToday}
                 </p>
+                {(() => {
+                  // Fewer outstanding tasks than yesterday's same bucket is good news, so a
+                  // "down" trend here is positive -- the reverse of revenue's convention.
+                  const trend = trendFor(data.kpis.tasksDueToday, data.kpis.tasksDueYesterday, "vs yesterday", data.kpis.tasksDueToday < data.kpis.tasksDueYesterday ? "positive" : "negative");
+                  if (!trend) return null;
+                  const Icon = trend.direction === "up" ? ArrowUp : ArrowDown;
+                  return (
+                    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${trend.sentiment === "positive" ? "text-success" : "text-danger"}`}>
+                      <Icon size={12} aria-hidden="true" />
+                      {trend.label}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </WidgetShell>
@@ -178,29 +206,48 @@ export function DashboardShell({
         return <CalendarWidget items={data.calendarItems} />;
       case "recent_activity":
         return <RecentActivityWidget items={data.recentActivity} />;
+      case "top_services":
+        return <TopServicesWidget services={data.topServices} />;
+      case "engagement_pipeline":
+        return <EngagementPipelineWidget stages={data.engagementPipeline} />;
       default:
         return null;
     }
   }
 
+  const greetingName = firstName ?? workspaceName;
+  const urgentCount = priorities.length;
+  const heroSub =
+    urgentCount > 0
+      ? `${urgentCount} thing${urgentCount === 1 ? "" : "s"} need${urgentCount === 1 ? "s" : ""} your attention today.`
+      : "Nothing urgent today -- you're caught up.";
+
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description={`Welcome back to ${workspaceName}.`}
-        actions={
+      <div className="relative overflow-hidden border-b border-border px-8 py-9">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandLime opacity-20 blur-3xl"
+        />
+        <div className="relative flex items-start justify-between gap-6">
+          <div>
+            <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">
+              Welcome back, <span className="bg-gradient-to-r from-accent to-brandLime bg-clip-text text-transparent">{greetingName}</span>.
+            </h1>
+            <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
+          </div>
           <button
             type="button"
             onClick={() => setCustomizing((v) => !v)}
             aria-pressed={customizing}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
               customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
             }`}
           >
             <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
           </button>
-        }
-      />
+        </div>
+      </div>
 
       <div className="flex-1 px-8 py-6">
         {onboardingSteps && onboardingSteps.length > 0 && (
@@ -257,7 +304,13 @@ export function DashboardShell({
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((row) => (isWidgetType(row.widget_type) ? <div key={row.id}>{renderWidget(row.widget_type)}</div> : null))}
+          {visible.map((row) =>
+            isWidgetType(row.widget_type) ? (
+              <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
+                {renderWidget(row.widget_type)}
+              </div>
+            ) : null
+          )}
         </div>
       </div>
     </>

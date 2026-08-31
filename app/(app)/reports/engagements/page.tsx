@@ -7,11 +7,13 @@ import { SortableTable } from "@/components/reports/SortableTable";
 import { buildReportTable, type ReportColumnDef } from "@/lib/reports/buildReportTable";
 import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
+import { StaffFilterSelect } from "@/components/reports/StaffFilterSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { Lock } from "lucide-react";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import { Badge } from "@/components/ui/Badge";
 import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +28,15 @@ type EngagementRow = {
   open_date: string | null;
   completed_date: string | null;
   turnaroundDays: number | null;
+  assignedStaffId: string | null;
+  assignedStaffName: string | null;
 };
 
-export default async function EngagementsReportPage({ searchParams }: { searchParams: { q?: string; from?: string; to?: string } }) {
+export default async function EngagementsReportPage({
+  searchParams,
+}: {
+  searchParams: { q?: string; from?: string; to?: string; staff?: string };
+}) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -42,11 +50,18 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
     );
   }
 
-  const { data: engagements } = await supabase
-    .from("engagements")
-    .select("id, engagement_number, status, priority, open_date, completed_date, client_id, clients(first_name, last_name, business_name, client_type), services(name)")
-    .eq("workspace_id", workspace.id)
-    .order("open_date", { ascending: false });
+  const [{ data: engagements }, staff] = await Promise.all([
+    supabase
+      .from("engagements")
+      .select(
+        "id, engagement_number, status, priority, open_date, completed_date, client_id, assigned_staff_id, clients(first_name, last_name, business_name, client_type), services(name)"
+      )
+      .eq("workspace_id", workspace.id)
+      .order("open_date", { ascending: false }),
+    getWorkspaceStaff(supabase, workspace.id),
+  ]);
+  const staffOptions = staff.map((s) => ({ id: s.user_id, display_name: s.display_name }));
+  const staffNameById = new Map(staffOptions.map((s) => [s.id, s.display_name]));
 
   let rows: EngagementRow[] = (engagements ?? []).map((e) => {
     const openMs = e.open_date ? new Date(e.open_date).getTime() : null;
@@ -62,6 +77,8 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
       open_date: e.open_date,
       completed_date: e.completed_date,
       turnaroundDays: completedMs && openMs ? Math.round((completedMs - openMs) / 86_400_000) : null,
+      assignedStaffId: e.assigned_staff_id,
+      assignedStaffName: e.assigned_staff_id ? (staffNameById.get(e.assigned_staff_id) ?? "Unknown") : null,
     };
   });
 
@@ -71,6 +88,8 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
     const q = searchParams.q.toLowerCase();
     rows = rows.filter((r) => r.clientLabel.toLowerCase().includes(q) || r.engagement_number?.toLowerCase().includes(q));
   }
+  if (searchParams.staff === "__unassigned__") rows = rows.filter((r) => !r.assignedStaffId);
+  else if (searchParams.staff) rows = rows.filter((r) => r.assignedStaffId === searchParams.staff);
 
   const byStatus = new Map<string, number>();
   for (const r of rows) byStatus.set(r.status, (byStatus.get(r.status) ?? 0) + 1);
@@ -118,6 +137,12 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
     },
     { key: "opened", label: "Opened", render: (r) => (r.open_date ? new Date(r.open_date).toLocaleDateString() : "--"), sortValue: (r) => r.open_date ?? "" },
     {
+      key: "assignedStaff",
+      label: "Assigned staff",
+      render: (r) => <span className={r.assignedStaffName ? "text-slate" : "text-muted"}>{r.assignedStaffName ?? "Unassigned"}</span>,
+      sortValue: (r) => r.assignedStaffName ?? "",
+    },
+    {
       key: "turnaround",
       label: "Turnaround (days)",
       align: "right",
@@ -135,6 +160,7 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
     Status: r.status,
     Priority: r.priority ?? "",
     Opened: r.open_date ?? "",
+    "Assigned staff": r.assignedStaffName ?? "Unassigned",
     "Turnaround (days)": r.turnaroundDays ?? "",
   }));
 
@@ -142,7 +168,16 @@ export default async function EngagementsReportPage({ searchParams }: { searchPa
     <ReportLayout
       title="Engagements"
       description={`Engagement volume by status and type${avgTurnaround !== null ? ` -- average turnaround ${avgTurnaround} days.` : "."}`}
-      filters={<FilterBar reportKey="engagements" searchPlaceholder="Search client or engagement..." />}
+      filters={
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[280px] flex-1">
+            <FilterBar reportKey="engagements" searchPlaceholder="Search client or engagement..." />
+          </div>
+          <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <StaffFilterSelect staffOptions={staffOptions} />
+          </div>
+        </div>
+      }
       actions={<ExportButtons rows={csvRows} filename="engagements-report" />}
     >
       {chartData.length > 0 && (

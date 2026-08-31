@@ -13,7 +13,7 @@ const CATEGORIES = [
   "W-2",
   "1099",
   "Identification",
-  "Engagement Letter",
+  "Signed Document",
   "Financial Statement",
   "Correspondence",
   "Other",

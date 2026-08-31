@@ -26,6 +26,7 @@ import type { ActionPermissions } from "@/lib/actionPermissions";
 import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -102,9 +103,9 @@ export function OverviewTab({
 
         {progress && (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <ProgressBar label="Overall progress" pct={progress.overall_progress_pct} />
-            <ProgressBar label="Task progress" pct={progress.task_progress_pct} />
-            <ProgressBar label="Document progress" pct={progress.document_progress_pct} />
+            <ProgressStat label="Overall progress" pct={progress.overall_progress_pct} />
+            <ProgressStat label="Task progress" pct={progress.task_progress_pct} />
+            <ProgressStat label="Document progress" pct={progress.document_progress_pct} />
           </div>
         )}
       </Section>
@@ -180,12 +181,12 @@ export function OverviewTab({
   );
 }
 
-function ProgressBar({ label, pct }: { label: string; pct: number }) {
+function ProgressStat({ label, pct }: { label: string; pct: number }) {
   return (
     <div className="rounded-lg border border-border p-3">
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-surfaceMuted">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+      <div className="mt-2">
+        <ProgressBar percent={pct} />
       </div>
       <p className="mt-1 text-xs text-muted">{Math.round(pct)}%</p>
     </div>
@@ -1061,6 +1062,7 @@ export type TaskRow = {
   priority: string | null;
   due_date: string | null;
   completed_at: string | null;
+  visibility: string;
   assigned_staff: StaffRef;
   dependencies: TaskDependency[];
 };

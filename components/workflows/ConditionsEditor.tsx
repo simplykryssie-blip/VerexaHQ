@@ -131,6 +131,15 @@ const ENGAGEMENT_STATUS_OPTIONS = [
   "Archived",
 ];
 const ENGAGEMENT_PRIORITY_OPTIONS = ["Low", "Medium", "High", "Urgent"];
+// Same "no row yet" treatment as organizer/portal status: 'not_sent' means no
+// signature_requests row exists for this engagement's letter at all yet, and
+// a cancelled request also reads as not_sent (nothing currently outstanding).
+const ENGAGEMENT_LETTER_STATUS_OPTIONS = [
+  { value: "not_sent", label: "Not sent" },
+  { value: "pending", label: "Sent, not signed" },
+  { value: "completed", label: "Signed" },
+  { value: "declined", label: "Declined" },
+];
 const ENGAGEMENT_CASE_TYPE_OPTIONS = ["tax_return", "bookkeeping", "payroll", "business_service", "other"];
 const QUOTE_STATUS_OPTIONS = ["draft", "sent", "accepted", "declined"];
 const TASK_STATUS_OPTIONS = ["pending", "in_progress", "completed", "blocked"];
@@ -163,6 +172,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "engagement.reviewer_id", label: "Assigned reviewer", group: "Engagement", valueKind: "staff", ops: ID_OPS },
   { key: "engagement.process_id", label: "Engagement pipeline", group: "Engagement", valueKind: "select", ops: SELECT_OPS },
   { key: "engagement.process_stage_id", label: "Engagement pipeline stage", group: "Engagement", valueKind: "pipeline_stage", ops: SELECT_OPS },
+  { key: "engagement.engagement_letter_status", label: "Document signature status", group: "Engagement", valueKind: "labeled_select", labeledOptions: ENGAGEMENT_LETTER_STATUS_OPTIONS, ops: SELECT_OPS },
 
   { key: "quote.status", label: "Quote status", group: "Quote", valueKind: "select", options: QUOTE_STATUS_OPTIONS, ops: LIST_OPS },
   { key: "quote.total_amount", label: "Quote amount", group: "Quote", valueKind: "number", ops: NUMBER_OPS },

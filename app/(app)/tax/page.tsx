@@ -18,13 +18,10 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
-const EFILE_LABEL: Record<string, string> = {
+const RETURN_STATUS_LABEL: Record<string, string> = {
   not_filed: "Not filed",
   ready_to_file: "Ready to file",
-  transmitted: "Transmitted",
-  accepted: "Accepted",
-  rejected: "Rejected",
-  paper_filed: "Paper filed",
+  filed: "Filed",
 };
 
 const EROLike = new Set(["ero_office", "service_bureau"]);
@@ -73,7 +70,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       dueDate: string | null;
       taxYear: number | null;
       returnType: string | null;
-      efileStatus: string;
+      returnStatus: string;
       isExtended: boolean;
       federalRefund: number | null;
       federalBalance: number | null;
@@ -91,7 +88,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         dueDate: r.due_date,
         taxYear: r.tax_year,
         returnType: r.return_type,
-        efileStatus: r.efile_status,
+        returnStatus: r.return_status,
         isExtended: r.is_extended,
         federalRefund: r.federal_refund_amount,
         federalBalance: r.federal_balance_due,
@@ -101,7 +98,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       const { data } = await supabase
         .from("engagement_tax_details")
         .select(
-          "engagement_id, tax_year, return_type, efile_status, is_extended, federal_refund_amount, federal_balance_due, engagements(id, engagement_number, status, due_date, client_id, clients(first_name, last_name, business_name, client_type))"
+          "engagement_id, tax_year, return_type, return_status, is_extended, federal_refund_amount, federal_balance_due, engagements(id, engagement_number, status, due_date, client_id, clients(first_name, last_name, business_name, client_type))"
         )
         .order("tax_year", { ascending: false });
       rows = (data ?? [])
@@ -122,7 +119,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
             dueDate: e.due_date,
             taxYear: r.tax_year,
             returnType: r.return_type,
-            efileStatus: r.efile_status,
+            returnStatus: r.return_status,
             isExtended: r.is_extended,
             federalRefund: r.federal_refund_amount,
             federalBalance: r.federal_balance_due,
@@ -173,7 +170,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                           {r.status}
                         </Badge>
                       </td>
-                      <td className="px-4 py-2 text-slate">{EFILE_LABEL[r.efileStatus] ?? r.efileStatus}</td>
+                      <td className="px-4 py-2 text-slate">{RETURN_STATUS_LABEL[r.returnStatus] ?? r.returnStatus}</td>
                       <td className="px-4 py-2 text-slate">
                         {r.federalRefund ? (
                           <span className="text-success">+${Number(r.federalRefund).toLocaleString()}</span>
@@ -411,9 +408,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
     firmName: string | null;
     taxYear: number;
     totalReturns: number;
-    accepted: number;
-    rejected: number;
-    transmitted: number;
+    filed: number;
     notFiled: number;
     extended: number;
     amended: number;
@@ -428,9 +423,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       firmName: r.source_workspace_id === workspace.id ? "Your firm" : r.source_workspace_name,
       taxYear: r.tax_year,
       totalReturns: r.total_returns,
-      accepted: r.accepted,
-      rejected: r.rejected,
-      transmitted: r.transmitted,
+      filed: r.filed,
       notFiled: r.not_filed,
       extended: r.extended,
       amended: r.amended,
@@ -445,9 +438,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         firmName: null,
         taxYear: r.tax_year,
         totalReturns: r.total_returns ?? 0,
-        accepted: r.accepted ?? 0,
-        rejected: r.rejected ?? 0,
-        transmitted: r.transmitted ?? 0,
+        filed: r.filed ?? 0,
         notFiled: r.not_filed ?? 0,
         extended: r.extended ?? 0,
         amended: r.amended ?? 0,
@@ -470,9 +461,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                   {showsNetworkRollup && <th className="px-4 py-2 text-left font-medium">Firm</th>}
                   <th className="px-4 py-2 text-left font-medium">Tax year</th>
                   <th className="px-4 py-2 text-right font-medium">Total returns</th>
-                  <th className="px-4 py-2 text-right font-medium">Accepted</th>
-                  <th className="px-4 py-2 text-right font-medium">Rejected</th>
-                  <th className="px-4 py-2 text-right font-medium">Transmitted</th>
+                  <th className="px-4 py-2 text-right font-medium">Filed</th>
                   <th className="px-4 py-2 text-right font-medium">Not filed</th>
                   <th className="px-4 py-2 text-right font-medium">Extended</th>
                   <th className="px-4 py-2 text-right font-medium">Amended</th>
@@ -485,9 +474,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                     {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                     <td className="px-4 py-2 font-medium text-ink">{r.taxYear}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.totalReturns}</td>
-                    <td className="px-4 py-2 text-right text-slate">{r.accepted}</td>
-                    <td className="px-4 py-2 text-right text-slate">{r.rejected}</td>
-                    <td className="px-4 py-2 text-right text-slate">{r.transmitted}</td>
+                    <td className="px-4 py-2 text-right text-slate">{r.filed}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.notFiled}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.extended}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.amended}</td>

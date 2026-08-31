@@ -8,6 +8,7 @@ import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
 import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 import { slugify } from "@/lib/roleSlug";
 
 type Kind = "email" | "sms";
@@ -23,26 +24,6 @@ type TemplateRow = {
 };
 
 const SMS_SEGMENT_LENGTH = 160;
-
-function insertAtFieldCursor(
-  field: HTMLInputElement | HTMLTextAreaElement | null,
-  current: string,
-  text: string,
-  setValue: (v: string) => void
-) {
-  if (!field) {
-    setValue(current + text);
-    return;
-  }
-  const start = field.selectionStart ?? current.length;
-  const end = field.selectionEnd ?? current.length;
-  setValue(current.slice(0, start) + text + current.slice(end));
-  requestAnimationFrame(() => {
-    const pos = start + text.length;
-    field.focus();
-    field.setSelectionRange(pos, pos);
-  });
-}
 
 export function TemplateEditRow({
   kind,

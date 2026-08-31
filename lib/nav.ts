@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
+  UserCheck,
   Users,
   Briefcase,
   Calendar,
@@ -30,6 +31,7 @@ import {
   Palette,
   Receipt,
   Handshake,
+  Sparkles,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -48,15 +50,7 @@ export type NavItem = NavLeaf | NavGroup;
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  {
-    label: "Contacts",
-    icon: Users,
-    children: [
-      { label: "Leads", href: "/clients?tab=leads" },
-      { label: "Individual Clients", href: "/clients?tab=clients&type=individual" },
-      { label: "Business Clients", href: "/clients?tab=clients&type=business" },
-    ],
-  },
+  { label: "Contacts", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
@@ -118,6 +112,7 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/platform-admin", icon: LayoutDashboard },
   { label: "Billing", href: "/platform-admin/billing", icon: CreditCard },
   { label: "Systems", href: "/platform-admin/systems", icon: Wrench },
+  { label: "AI Agents", href: "/platform-admin/ai-agents", icon: Sparkles },
   // Contacts/Engagements/Review Queue/Messages are the platform-admin
   // equivalents of the client-facing CRM nav's own tabs of the same name --
   // account holders instead of clients, terms/privacy acceptance instead of
@@ -159,6 +154,24 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
 ];
 
 export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", items: PLATFORM_HOME_NAV_ITEMS }];
+
+/**
+ * Shortcuts into the team-management corner of Settings, surfaced as their
+ * own top-level section for an ERO/Service Bureau/multi-office firm --
+ * see isEroManagementTier(). These are the same pages Settings already
+ * lists (Users & Staff -- which also holds Connections, folded into the
+ * same page -- and Firm Profile), just promoted out of a nested settings
+ * sub-nav for a workspace that actually runs a team, rather than
+ * duplicated pages.
+ */
+export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
+  { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
+  { label: "Team", href: "/settings/users", icon: Users },
+  { label: "Assignments", href: "/assignments", icon: UserCheck },
+  { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
+];
+
+export const ERO_MANAGEMENT_NAV_SECTION: NavSection = { label: "ERO Management", items: ERO_MANAGEMENT_NAV_ITEMS };
 
 export type SettingsNavItem = {
   label: string;

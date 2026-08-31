@@ -86,8 +86,8 @@ export function PublicEngagementLetterSign({ token, data }: { token: string; dat
       setError(result.error ?? "Could not save your signature.");
       return;
     }
-    const signatureType = "drawn" as const;
-    const signatureImagePath = result.path as string;
+    const signatureImagePath: string = result.path;
+    const signatureType = "drawn";
 
     if (requires_portal_signup) {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({

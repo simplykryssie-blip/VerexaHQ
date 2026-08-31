@@ -25,6 +25,7 @@ type LogRow = {
 
 function actionLabel(actionType: string | null) {
   if (!actionType) return "Step";
+  if (actionType === "business_hours_delay") return "Wait / Delay (business hours)";
   return ACTION_TYPES.find((a) => a.value === actionType)?.label ?? actionType;
 }
 

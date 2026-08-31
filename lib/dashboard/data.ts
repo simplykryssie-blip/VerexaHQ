@@ -2,8 +2,10 @@ import { createClient } from "@/lib/supabase/server";
 
 export type KpiData = {
   revenueThisMonth: number;
+  revenueLastMonth: number;
   openEngagements: number;
   tasksDueToday: number;
+  tasksDueYesterday: number;
   outstandingInvoicesTotal: number;
   outstandingInvoicesCount: number;
   missingDocumentsCount: number;
@@ -12,9 +14,39 @@ export type KpiData = {
 
 export type OverdueTask = { id: string; title: string; due_date: string; engagement_id: string | null; client_id: string | null };
 export type OverdueInvoice = { id: string; invoice_number: string | null; client_id: string; due_date: string; balance: number };
-export type ReviewItem = { workflow_stage_id: string; stage_name: string; engagement_number: string | null; client_id: string; sla_category: string };
+export type ReviewItem = {
+  workflow_stage_id: string;
+  stage_name: string;
+  engagement_number: string | null;
+  client_id: string;
+  client_name: string;
+  service_name: string | null;
+  sla_category: string;
+  started_at: string | null;
+};
 export type ActivityItem = { id: string; description: string; activity_type: string; created_at: string };
 export type CalendarItem = { id: string; date: string; label: string; href?: string; kind: "engagement" | "task" };
+export type ServiceEngagementCount = { serviceId: string; name: string; count: number };
+export type PipelineStageCount = { status: string; count: number };
+
+// Mirrors engagements_status_check exactly, minus Archived -- a pipeline
+// strip has no use for a terminal "put away" bucket the way Completed still
+// is one. This is real engagements.status data, not the newer generic
+// pipeline_runs/processes system (which today only has entity_type='client'
+// lead-pipeline rows -- nothing for engagements yet).
+export const ENGAGEMENT_PIPELINE_STATUSES = [
+  "New",
+  "Waiting On Client",
+  "Waiting On Staff",
+  "In Progress",
+  "Waiting On Review",
+  "Corrections Requested",
+  "Approved",
+  "Waiting On Signature",
+  "Waiting On Payment",
+  "Ready To Release",
+  "Completed",
+] as const;
 
 export type DashboardData = {
   kpis: KpiData;
@@ -24,6 +56,8 @@ export type DashboardData = {
   reviewItems: ReviewItem[];
   recentActivity: ActivityItem[];
   calendarItems: CalendarItem[];
+  topServices: ServiceEngagementCount[];
+  engagementPipeline: PipelineStageCount[];
 };
 
 export async function getDashboardData(workspaceId: string): Promise<DashboardData> {
@@ -31,15 +65,21 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
+  const startOfLastMonth = new Date(startOfMonth);
+  startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1);
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
 
   const [
     { data: payments },
+    { data: lastMonthPayments },
     { data: openEngagements },
     { data: allTasks },
+    { count: tasksDueYesterdayCount },
     { data: invoices },
     { data: openThreads },
     { data: activity },
@@ -51,6 +91,15 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .eq("workspace_id", workspaceId)
       .eq("status", "succeeded")
       .gte("payment_date", startOfMonth.toISOString()),
+    // Same-shape query for last calendar month, so "Revenue This Month" can
+    // show a real vs-last-month trend rather than a static number alone.
+    supabase
+      .from("payments")
+      .select("amount")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "succeeded")
+      .gte("payment_date", startOfLastMonth.toISOString())
+      .lt("payment_date", startOfMonth.toISOString()),
     supabase
       .from("engagements")
       .select("id, service_id")
@@ -62,6 +111,15 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .eq("workspace_id", workspaceId)
       .not("due_date", "is", null)
       .neq("status", "completed"),
+    // Same "still outstanding" definition as today's due-today count, just
+    // for yesterday's date bucket -- real comparison, not a fabricated trend.
+    supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .neq("status", "completed")
+      .gte("due_date", startOfYesterday.toISOString())
+      .lt("due_date", startOfToday.toISOString()),
     supabase
       .from("invoices")
       .select("id, invoice_number, client_id, due_date, total_amount, amount_paid, status")
@@ -78,6 +136,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   ]);
 
   const revenueThisMonth = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
+  const revenueLastMonth = (lastMonthPayments ?? []).reduce((sum, p) => sum + p.amount, 0);
 
   const tasks = allTasks ?? [];
   const overdueTasks = tasks.filter((t) => t.due_date && t.due_date < startOfToday.toISOString());
@@ -103,6 +162,31 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   // a specific requested item.
   const openEngagementIds = (openEngagements ?? []).map((e) => e.id);
   const serviceIds = Array.from(new Set((openEngagements ?? []).map((e) => e.service_id).filter((v): v is string => Boolean(v))));
+
+  const [{ data: serviceNameRows }, { data: allEngagementStatuses }] = await Promise.all([
+    serviceIds.length ? supabase.from("services").select("id, name").in("id", serviceIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    supabase.from("engagements").select("status").eq("workspace_id", workspaceId).neq("status", "Archived"),
+  ]);
+
+  const serviceNameById = new Map((serviceNameRows ?? []).map((s) => [s.id, s.name]));
+  const engagementCountByService = new Map<string, number>();
+  for (const e of openEngagements ?? []) {
+    if (!e.service_id) continue;
+    engagementCountByService.set(e.service_id, (engagementCountByService.get(e.service_id) ?? 0) + 1);
+  }
+  const topServices: ServiceEngagementCount[] = Array.from(engagementCountByService.entries())
+    .map(([serviceId, count]) => ({ serviceId, name: serviceNameById.get(serviceId) ?? "Other", count }))
+    .sort((a, b) => b.count - a.count);
+
+  const statusCounts = new Map<string, number>();
+  for (const row of allEngagementStatuses ?? []) {
+    statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+  }
+  const engagementPipeline: PipelineStageCount[] = ENGAGEMENT_PIPELINE_STATUSES.map((status) => ({
+    status,
+    count: statusCounts.get(status) ?? 0,
+  }));
+
   let missingDocumentsCount = 0;
   if (serviceIds.length > 0 && openEngagementIds.length > 0) {
     const { data: services } = await supabase
@@ -135,19 +219,48 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     );
     if (queue && queue.length > 0) {
       const stageIds = queue.map((q) => q.workflow_stage_id);
-      const { data: slaRows } = await supabase.from("v_workflow_sla_status").select("workflow_stage_id, sla_category").in("workflow_stage_id", stageIds);
+      const clientIds = Array.from(new Set(queue.map((q) => q.client_id).filter((v): v is string => Boolean(v))));
+      const engagementIds = Array.from(new Set(queue.map((q) => q.engagement_id).filter((v): v is string => Boolean(v))));
+      const [{ data: slaRows }, { data: clientRows }, { data: engagementRows }] = await Promise.all([
+        supabase.from("v_workflow_sla_status").select("workflow_stage_id, sla_category").in("workflow_stage_id", stageIds),
+        clientIds.length
+          ? supabase.from("clients").select("id, client_type, first_name, last_name, business_name").in("id", clientIds)
+          : Promise.resolve({ data: [] }),
+        engagementIds.length ? supabase.from("engagements").select("id, service_id").in("id", engagementIds) : Promise.resolve({ data: [] }),
+      ]);
+      const serviceIds = Array.from(new Set((engagementRows ?? []).map((e) => e.service_id).filter((v): v is string => Boolean(v))));
+      const { data: serviceRows } = serviceIds.length
+        ? await supabase.from("services").select("id, name").in("id", serviceIds)
+        : { data: [] as { id: string; name: string }[] };
+
       const slaByStage = new Map((slaRows ?? []).map((s) => [s.workflow_stage_id, s.sla_category as string]));
+      const clientById = new Map((clientRows ?? []).map((c) => [c.id, c]));
+      const serviceIdByEngagement = new Map((engagementRows ?? []).map((e) => [e.id, e.service_id]));
+      const serviceNameById = new Map((serviceRows ?? []).map((s) => [s.id, s.name]));
+
       reviewItems = queue
         .filter((q): q is typeof q & { workflow_stage_id: string; stage_name: string; client_id: string } =>
           Boolean(q.workflow_stage_id && q.stage_name && q.client_id)
         )
-        .map((q) => ({
-          workflow_stage_id: q.workflow_stage_id,
-          stage_name: q.stage_name,
-          engagement_number: q.engagement_number,
-          client_id: q.client_id,
-          sla_category: slaByStage.get(q.workflow_stage_id) ?? "On Track",
-        }));
+        .map((q) => {
+          const client = clientById.get(q.client_id);
+          const clientName = client
+            ? client.client_type === "business" && client.business_name
+              ? client.business_name
+              : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
+            : "Unknown client";
+          const serviceId = q.engagement_id ? serviceIdByEngagement.get(q.engagement_id) : null;
+          return {
+            workflow_stage_id: q.workflow_stage_id,
+            stage_name: q.stage_name,
+            engagement_number: q.engagement_number,
+            client_id: q.client_id,
+            client_name: clientName,
+            service_name: serviceId ? (serviceNameById.get(serviceId) ?? null) : null,
+            sla_category: slaByStage.get(q.workflow_stage_id) ?? "On Track",
+            started_at: q.started_at,
+          };
+        });
     }
   }
 
@@ -183,8 +296,10 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   return {
     kpis: {
       revenueThisMonth,
+      revenueLastMonth,
       openEngagements: openEngagementIds.length,
       tasksDueToday: dueTodayTasks.length,
+      tasksDueYesterday: tasksDueYesterdayCount ?? 0,
       outstandingInvoicesTotal,
       outstandingInvoicesCount: invoiceRows.length,
       missingDocumentsCount,
@@ -196,5 +311,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     reviewItems,
     recentActivity: activity ?? [],
     calendarItems,
+    topServices,
+    engagementPipeline,
   };
 }

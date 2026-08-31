@@ -8,6 +8,7 @@ import { UploadZone } from "./UploadZone";
 import { RequestsPanel } from "./RequestsPanel";
 import { SignaturesPanel } from "./SignaturesPanel";
 import { EmptyState } from "@/components/EmptyState";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type {
   ActivityRow,
   Audience,
@@ -37,6 +38,7 @@ export function DocumentWorkspace({
   audience = "staff",
   canRequestDocuments = true,
   canRequestSignatures = true,
+  additionalSigners = [],
 }: {
   workspaceId: string;
   entityType: EntityType;
@@ -54,6 +56,7 @@ export function DocumentWorkspace({
   audience?: Audience;
   canRequestDocuments?: boolean;
   canRequestSignatures?: boolean;
+  additionalSigners?: AdditionalSignerOption[];
 }) {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [showActivity, setShowActivity] = useState(false);
@@ -156,6 +159,7 @@ export function DocumentWorkspace({
           workspaceId={workspaceId}
           audience={audience}
           canCreate={canRequestSignatures}
+          additionalSigners={additionalSigners}
         />
       </div>
 

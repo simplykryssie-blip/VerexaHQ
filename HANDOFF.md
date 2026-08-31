@@ -78,9 +78,63 @@ half-migrated references if anyone picks this up (search for
 `workflow_run`/`workflow_stage`/`lead_pipeline` outside of migration
 files, the same way this one was found).
 
-No merge attempt has been made since the abort. This needs a deliberate,
-carefully-scoped effort (likely its own dedicated session, not folded into
-unrelated feature work) — not something to attempt piecemeal.
+**Update, same day, second attempt: merge completed.** At the user's
+explicit request ("I want it fully merged and corrected"), re-ran
+`git merge origin/main`, resolved all 10 real conflicts by hand (`lib/
+nav.ts`, `components/Sidebar.tsx`, `app/(app)/layout.tsx`, `app/(app)/
+settings/{connections,users,roles}/page.tsx`, `components/documents/
+RequestsPanel.tsx`, `components/portal/OrganizerForm.tsx`, this file), and
+regenerated `lib/database.types.ts` from scratch via `generate_typescript_types`
+against the live DB rather than hand-merging it (both branches' migrations
+were already live in the one shared database, so a fresh introspection is
+strictly more correct than reconciling two divergent hand-edited copies).
+Key resolution decisions:
+- **Users & Staff + Connections**: main had independently built a richer,
+  3-tier version of Connections (`ero_ptin`/`service_bureau_ero`/
+  `service_bureau_ptin`, not just `ero_ptin`) and a separate, more capable
+  Users page (`getWorkspaceMemberWorkload`, per-user detail pages at
+  `/settings/users/[userId]`) than the 2026-08-31 addendum's merge below
+  had. Re-applied the "combine into one page" decision (below) on top of
+  main's richer components instead of my rougher pre-merge ones -- same
+  page/nav consolidation, better underlying data. This also meant
+  generalizing `get_ero_connected_partners`/`get_my_ero_connection` (the
+  RLS-bug-fix RPCs from the addendum below) to accept all three
+  relationship-type tiers, not just `ero_ptin` -- migration
+  `20260912060000_generalize_connections_rpcs_to_all_tiers.sql`. The
+  Partners page keeps calling the same RPC with no changes (its default
+  arg is still `ero_ptin`-only, matching its narrower ERO-specific scope).
+- **`ERO_MANAGEMENT_NAV_ITEMS`** (main's new nav section for ERO/SB/
+  multi-office workspaces) had its own separate "Connections" entry
+  pointing at `/settings/connections` -- removed, since "Team" now points
+  at the same merged `/settings/users` page.
+- Everything else (RequestsPanel's category-grouping vs. main's shared
+  `ProgressBar`/interactive item rendering; OrganizerForm's
+  `answerToString` vs. main's newly-extracted `lib/organizer/formatValue.ts`
+  helper) resolved by keeping the more complete side and wiring it through
+  the newer shared helper where one existed, not by picking one side
+  wholesale.
+
+**Verification, completed**: a repo-wide sweep for any other
+`workflow_run`/`workflow_stage`/`lead_pipeline` references outside
+migration files found nothing beyond the `lib/dashboard/data.ts` fix
+already logged above. `lib/database.types.ts` was regenerated fresh from
+the live DB (`generate_typescript_types`) rather than hand-merged, since
+both branches' migrations were already applied there. The merge also
+surfaced two genuine duplicate-declaration bugs from a silent (non-
+conflicting) git auto-merge -- both branches had independently built the
+same "engagement letter on services" feature at slightly different nearby
+lines, so git merged both copies in without flagging a conflict. Fixed in
+`components/settings/ServiceForm.tsx` and `app/(app)/settings/services/
+[id]/page.tsx` (duplicate `engagement_letter_template_id`/
+`engagementLetterTemplates` declarations). `npm install` picked up
+`pdfjs-dist`, new on `main` for the PDF template overlay editor. `tsc
+--noEmit`, `eslint .`, and `npm run build` all pass clean across the full
+merged app (every route from both branches builds, including `/partners`,
+`/ero-dashboard`, `/assignments`, `/settings/users/[userId]`,
+`/organizers/[responseId]/review`, `/platform-admin/ai-agents`).
+**Not yet done**: pushing this merge, and a real click-through test in a
+browser (this was a code-level merge verification only) -- check whether
+those happened after this note, since it was written before either.
 
 ## Addendum — 2026-08-31: tax-prep pipeline finishing touches, platform billing dunning, ERO/PTIN Partners directory, Settings consolidation
 

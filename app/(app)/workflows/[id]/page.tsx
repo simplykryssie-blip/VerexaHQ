@@ -57,7 +57,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
   ] = await Promise.all([
       supabase
         .from("automation_steps")
-        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y, requires_approval, approver_role_id")
+        .select("id, display_order, action_type, action_config, delay_minutes, canvas_x, canvas_y, requires_approval, approver_role_id, display_name, is_enabled")
         .eq("automation_id", automation.id)
         .order("display_order"),
       supabase
@@ -160,6 +160,8 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     canvas_y: s.canvas_y,
     requires_approval: s.requires_approval,
     approver_role_id: s.approver_role_id,
+    display_name: s.display_name,
+    is_enabled: s.is_enabled,
   }));
 
   const roleOptions: RoleOption[] = rolesRaw ?? [];
@@ -214,7 +216,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
       .map((s) => ({ id: s.id, name: s.name })),
   }));
 
-  const staffOptions: StaffOption[] = staffMembers.map((m) => ({ id: m.user_id, display_name: m.display_name }));
+  const staffOptions: StaffOption[] = staffMembers.map((m) => ({ id: m.user_id, display_name: m.display_name, is_owner: m.is_owner }));
 
   const automationOptions: AutomationOption[] = otherAutomations ?? [];
 

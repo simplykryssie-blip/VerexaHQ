@@ -14,7 +14,7 @@ import { SettingsCard } from "@/components/settings/SettingsCard";
 import { formatEin, formatEfin, formatPtin } from "@/lib/taxIds";
 import { formatPhone } from "@/lib/phone";
 import { US_STATES, SPECIAL_CERTIFICATION_STATE_CODES } from "@/lib/usStates";
-import { WEEKDAYS, type BusinessHours, type DayHours } from "@/lib/businessHours";
+import { WEEKDAYS, type BusinessHours, type DayHours, type HolidayRange } from "@/lib/businessHours";
 
 const DAY_LABELS: Record<string, string> = {
   sunday: "Sunday",
@@ -53,6 +53,7 @@ type Props = {
   supportedFilingStates: string[];
   initialHours: BusinessHours;
   initialSlotMinutes: number;
+  initialHolidays: HolidayRange[];
 };
 
 function LabeledInput({
@@ -103,6 +104,7 @@ export function FirmProfileForm({
   supportedFilingStates,
   initialHours,
   initialSlotMinutes,
+  initialHolidays,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -133,6 +135,24 @@ export function FirmProfileForm({
 
   const [hours, setHours] = useState<BusinessHours>(initialHours);
   const [slotMinutes, setSlotMinutes] = useState(initialSlotMinutes);
+  const [holidays, setHolidays] = useState<HolidayRange[]>(initialHolidays);
+  const [newHolidayStart, setNewHolidayStart] = useState("");
+  const [newHolidayEnd, setNewHolidayEnd] = useState("");
+
+  function addHoliday() {
+    if (!newHolidayStart) return;
+    // No end date entered -- a single-day closure, same as start.
+    const end = newHolidayEnd && newHolidayEnd >= newHolidayStart ? newHolidayEnd : newHolidayStart;
+    const range = { start: newHolidayStart, end };
+    if (holidays.some((h) => h.start === range.start && h.end === range.end)) return;
+    setHolidays((prev) => [...prev, range].sort((a, b) => a.start.localeCompare(b.start)));
+    setNewHolidayStart("");
+    setNewHolidayEnd("");
+  }
+
+  function removeHoliday(index: number) {
+    setHolidays((prev) => prev.filter((_, i) => i !== index));
+  }
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,7 +200,10 @@ export function FirmProfileForm({
           .upsert({ workspace_id: workspaceId, key: "business_hours", value: hours }, { onConflict: "workspace_id,key" }),
         supabase
           .from("system_settings")
-          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" })
+          .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" }),
+        supabase
+          .from("system_settings")
+          .upsert({ workspace_id: workspaceId, key: "holidays", value: holidays }, { onConflict: "workspace_id,key" })
       );
     }
     if (isOwner) {
@@ -492,6 +515,67 @@ export function FirmProfileForm({
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="mt-4">
+          <p className="text-sm font-medium text-ink">Holidays / office closures</p>
+          <p className="mt-0.5 text-xs text-muted">
+            Dates the office is closed regardless of the day of week -- skipped by both due-date calculations and client
+            self-booking.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {holidays.length === 0 && <span className="text-sm text-muted">No holidays added yet.</span>}
+            {holidays.map((h, i) => {
+              const startLabel = new Date(`${h.start}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+              const endLabel = new Date(`${h.end}T00:00:00`).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+              return (
+                <span
+                  key={`${h.start}-${h.end}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surfaceMuted px-3 py-1 text-sm text-ink"
+                >
+                  {h.start === h.end ? startLabel : `${startLabel} – ${endLabel}`}
+                  <button
+                    type="button"
+                    onClick={() => removeHoliday(i)}
+                    aria-label={`Remove ${startLabel}`}
+                    className="text-muted hover:text-danger"
+                  >
+                    &times;
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              Start
+              <input
+                type="date"
+                value={newHolidayStart}
+                onChange={(e) => setNewHolidayStart(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted">
+              End (optional)
+              <input
+                type="date"
+                value={newHolidayEnd}
+                min={newHolidayStart || undefined}
+                onChange={(e) => setNewHolidayEnd(e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={addHoliday}
+              disabled={!newHolidayStart}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-ink hover:bg-surfaceMuted disabled:opacity-60"
+            >
+              Add
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] text-muted">Leave End blank for a single closed day, or set it to close for a span of days.</p>
         </div>
       </SettingsCard>
       )}

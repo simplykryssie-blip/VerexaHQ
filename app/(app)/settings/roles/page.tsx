@@ -6,10 +6,9 @@ import { SettingsCard } from "@/components/settings/SettingsCard";
 import { RolesManager } from "@/components/settings/RolesManager";
 import { WorkspaceStaffDefaultsForm } from "@/components/settings/WorkspaceStaffDefaultsForm";
 import { ClientAutoAssignmentForm } from "@/components/settings/ClientAutoAssignmentForm";
+import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 
 export const dynamic = "force-dynamic";
-
-const EFIN_WORKSPACE_TYPES = new Set(["ero_office", "service_bureau", "multi_office_firm"]);
 
 export default async function RolesPage() {
   const workspace = await getCurrentWorkspace();
@@ -34,7 +33,7 @@ export default async function RolesPage() {
   // Client-level Relationship manager/Reviewer/Compliance officer only show
   // for an ERO/Service Bureau (see ClientWorkspace.tsx's showStaffRoles) --
   // presetting a default for them makes sense on the exact same workspaces.
-  const showStaffDefaults = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
+  const showStaffDefaults = isEroManagementTier(workspace);
   const [{ data: staffDefaults }, { data: activeMembers }] = showStaffDefaults
     ? await Promise.all([
         supabase

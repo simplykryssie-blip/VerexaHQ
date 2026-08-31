@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { JotFormImportModal } from "@/components/settings/organizer-builder/JotFormImportModal";
 import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
+import { PublishConfirmModal } from "@/components/settings/PublishConfirmModal";
 import type { LibraryFolderRow } from "@/components/library/types";
 import { slugify } from "@/lib/roleSlug";
 import { useToast } from "@/components/Toast";
@@ -45,6 +46,8 @@ export function OrganizerLibrary({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharingCard, setSharingCard] = useState<GalleryCard | null>(null);
+  const [pendingPublish, setPendingPublish] = useState<{ id: string; name: string } | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const cards: GalleryCard[] = templates.map((t) => ({
     id: t.id,
@@ -80,11 +83,14 @@ export function OrganizerLibrary({
       const { data, error } = await supabase
         .from("organizer_templates")
         .insert({ workspace_id: workspaceId, name, slug, description: description || null, status: "draft" })
-        .select("id")
+        .select("id, name")
         .single();
       if (!error && data) {
         setSaving(false);
-        router.push(`/templates/organizers/${data.id}`);
+        setCreating(false);
+        setName("");
+        setDescription("");
+        setPendingPublish(data as { id: string; name: string });
         return;
       }
       if (error?.code !== "23505") {
@@ -196,6 +202,30 @@ export function OrganizerLibrary({
             </div>
           </form>
         </div>
+      )}
+
+      {pendingPublish && (
+        <PublishConfirmModal
+          templateName={pendingPublish.name}
+          publishing={publishing}
+          onSkip={() => {
+            const id = pendingPublish.id;
+            setPendingPublish(null);
+            router.push(`/templates/organizers/${id}`);
+          }}
+          onPublish={async () => {
+            setPublishing(true);
+            const { error } = await supabase.from("organizer_templates").update({ status: "published" }).eq("id", pendingPublish.id);
+            setPublishing(false);
+            if (error) {
+              toast.show(error.message, "error");
+              return;
+            }
+            const id = pendingPublish.id;
+            setPendingPublish(null);
+            router.push(`/templates/organizers/${id}`);
+          }}
+        />
       )}
     </div>
   );

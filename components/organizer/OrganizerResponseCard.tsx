@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, FileCheck, Check, X, HelpCircle, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronRight, FileCheck, ArrowRight, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
@@ -51,6 +52,12 @@ const REVIEW_BADGE_TONE: Record<OrganizerReviewStatus, string> = {
 // Clicking anywhere on the row expands/collapses the answers -- the
 // content was previously only rendered inline with no way to open/close
 // it, which read as "nothing happens when I click this."
+//
+// Full per-question review (approve/deny/needs-info, information-request
+// lifecycle, activity, assignment) lives on its own page --
+// /organizers/[responseId]/review -- so this card only shows a compact
+// status summary + entry point into it, rather than duplicating those
+// actions inline.
 export function OrganizerResponseCard({
   response,
   workspaceServices,
@@ -64,30 +71,7 @@ export function OrganizerResponseCard({
   const [open, setOpen] = useState(false);
   const [filing, setFiling] = useState(false);
   const [pickingService, setPickingService] = useState(false);
-  const [reviewing, setReviewing] = useState<OrganizerReviewStatus | null>(null);
   const [removing, setRemoving] = useState(false);
-
-  async function setReview(status: OrganizerReviewStatus, notePrompt?: string) {
-    let note: string | null = null;
-    if (notePrompt) {
-      const entered = window.prompt(notePrompt);
-      if (entered === null) return; // cancelled -- leave the review status as-is
-      note = entered.trim() || null;
-    }
-    setReviewing(status);
-    const { error } = await supabase.rpc("set_organizer_response_review_status", {
-      p_response_id: response.id,
-      p_status: status,
-      p_note: note ?? undefined,
-    });
-    setReviewing(null);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show(`Marked ${status}.`, "success");
-    router.refresh();
-  }
 
   async function pickService(serviceId: string) {
     if (!serviceId) return;
@@ -236,32 +220,12 @@ export function OrganizerResponseCard({
             </span>
           )}
           {response.review_status && response.review_note && <span className="text-xs text-muted">&quot;{response.review_note}&quot;</span>}
-          <span className="ml-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setReview("Approved")}
-              disabled={reviewing !== null}
-              className="inline-flex items-center gap-1 rounded-full border border-emerald px-2 py-0.5 text-[11px] font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
-            >
-              <Check size={11} /> {reviewing === "Approved" ? "Saving..." : "Approve"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setReview("Corrections Requested", "What's needed from the client?")}
-              disabled={reviewing !== null}
-              className="inline-flex items-center gap-1 rounded-full border border-amber px-2 py-0.5 text-[11px] font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
-            >
-              <HelpCircle size={11} /> {reviewing === "Corrections Requested" ? "Saving..." : "Needs Info"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setReview("Rejected", "Reason for denying (optional):")}
-              disabled={reviewing !== null}
-              className="inline-flex items-center gap-1 rounded-full border border-rose px-2 py-0.5 text-[11px] font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
-            >
-              <X size={11} /> {reviewing === "Rejected" ? "Saving..." : "Deny"}
-            </button>
-          </span>
+          <Link
+            href={`/organizers/${response.id}/review`}
+            className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            Review <ArrowRight size={12} />
+          </Link>
         </div>
       )}
 

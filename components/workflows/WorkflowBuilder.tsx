@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -61,10 +61,14 @@ import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate";
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
+import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 import { TagNameInput } from "@/components/workflows/TagNameInput";
 import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
+import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 
-export type StaffOption = { id: string; display_name: string | null };
+export type StaffOption = { id: string; display_name: string | null; is_owner?: boolean };
 export type AutomationOption = { id: string; name: string };
 
 export type WorkflowStepRow = {
@@ -77,6 +81,8 @@ export type WorkflowStepRow = {
   canvas_y: number | null;
   requires_approval: boolean;
   approver_role_id: string | null;
+  display_name: string | null;
+  is_enabled: boolean;
 };
 
 export type RoleOption = { id: string; name: string };
@@ -122,37 +128,54 @@ type WorkflowLogRow = {
 
 export type MessageTemplateOption = { id: string; name: string; slug: string };
 
+// category/description/keywords are display-only metadata for the
+// searchable/categorized action picker (components/workflows/StepPicker.tsx)
+// -- they never touch execution. The engine only ever sees `value` (stored
+// verbatim as automation_steps.action_type); category groupings here can be
+// freely renamed/reshuffled without any migration.
+export const ACTION_CATEGORIES: { key: string; label: string }[] = [
+  { key: "communication", label: "Communication" },
+  { key: "contacts_leads", label: "Contacts & Leads" },
+  { key: "tasks", label: "Tasks" },
+  { key: "appointments", label: "Appointments" },
+  { key: "documents_organizers", label: "Documents & Organizers" },
+  { key: "pipeline_engagements", label: "Pipeline & Engagements" },
+  { key: "billing", label: "Billing" },
+  { key: "tax_workflow", label: "Tax Workflow" },
+  { key: "workflow_control", label: "Workflow Control" },
+];
+
 export const ACTION_TYPES = [
-  { value: "delay", label: "Wait / Delay" },
-  { value: "send_email", label: "Send an email" },
-  { value: "send_sms", label: "Send a text" },
-  { value: "create_task", label: "Create a task" },
-  { value: "create_appointment", label: "Schedule an appointment (request)" },
-  { value: "send_organizer_template", label: "Push an organizer to the client's portal" },
-  { value: "create_engagement", label: "Create the engagement and start its pipeline" },
-  { value: "send_engagement_letter", label: "Send the engagement letter for signature" },
-  { value: "change_stage", label: "Advance to the next pipeline stage" },
-  { value: "send_document_request", label: "Send a document request" },
-  { value: "assign_user", label: "Assign staff" },
-  { value: "send_notification", label: "Notify a staff member" },
-  { value: "move_pipeline_stage", label: "Move to a pipeline stage" },
-  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service" },
-  { value: "mark_lead_lost", label: "Mark the lead lost" },
-  { value: "convert_lead_to_client", label: "Convert the lead to an active client" },
-  { value: "update_client", label: "Update a client field" },
-  { value: "create_client", label: "Create a new client" },
-  { value: "create_quote", label: "Create a quote" },
-  { value: "send_quote", label: "Send the draft quote" },
-  { value: "add_tag", label: "Add a tag to the client" },
-  { value: "remove_tag", label: "Remove a tag from the client" },
-  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)" },
-  { value: "add_note", label: "Add an internal note" },
-  { value: "send_portal_message", label: "Send a portal message" },
-  { value: "start_workflow", label: "Start another workflow" },
-  { value: "end_workflow", label: "End this workflow" },
-  { value: "webhook", label: "Call a webhook" },
-  { value: "add_dnd", label: "Opt the client out of SMS/email" },
-  { value: "remove_dnd", label: "Opt the client back into SMS/email" },
+  { value: "delay", label: "Wait / Delay", category: "workflow_control", description: "Pause before continuing to the next step.", keywords: "wait pause business hours" },
+  { value: "send_email", label: "Send an email", category: "communication", description: "Send a templated email to the client.", keywords: "message mail" },
+  { value: "send_sms", label: "Send a text", category: "communication", description: "Send a templated text message to the client.", keywords: "message sms text" },
+  { value: "create_task", label: "Create a task", category: "tasks", description: "Create a task assigned to a staff member.", keywords: "todo assign" },
+  { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
+  { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
+  { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (organizer-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
+  { value: "send_engagement_letter", label: "Send the document for signature", category: "tax_workflow", description: "Queue the document for e-signature.", keywords: "signature sign document letter" },
+  { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
+  { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
+  { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
+  { value: "send_notification", label: "Notify a staff member", category: "communication", description: "Notify staff members in-app or by email.", keywords: "alert notify staff" },
+  { value: "move_pipeline_stage", label: "Move to a pipeline stage", category: "pipeline_engagements", description: "Move the client or engagement forward to a specific pipeline stage.", keywords: "stage move pipeline" },
+  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service", category: "pipeline_engagements", description: "Start the pipeline matching the lead's selected service.", keywords: "lead pipeline service" },
+  { value: "mark_lead_lost", label: "Mark the lead lost", category: "contacts_leads", description: "Mark the lead as lost.", keywords: "lost lead close" },
+  { value: "convert_lead_to_client", label: "Convert the lead to an active client", category: "contacts_leads", description: "Convert the lead into an active client.", keywords: "convert lead client" },
+  { value: "update_client", label: "Update a client field", category: "contacts_leads", description: "Update a single field on the client record.", keywords: "edit field update" },
+  { value: "create_client", label: "Create a new client", category: "contacts_leads", description: "Create a new client, or reuse a matching one by email/phone.", keywords: "new client contact" },
+  { value: "create_quote", label: "Create a quote", category: "billing", description: "Create a draft quote.", keywords: "quote estimate billing" },
+  { value: "send_quote", label: "Send the draft quote", category: "billing", description: "Send the most recent draft quote.", keywords: "quote send billing" },
+  { value: "add_tag", label: "Add a tag to the client", category: "contacts_leads", description: "Add a tag to the client.", keywords: "tag label" },
+  { value: "remove_tag", label: "Remove a tag from the client", category: "contacts_leads", description: "Remove a tag from the client.", keywords: "tag label remove" },
+  { value: "invite_to_portal", label: "Invite client to portal (skips if already invited)", category: "contacts_leads", description: "Invite the client to the portal (skips if already invited).", keywords: "portal invite" },
+  { value: "add_note", label: "Add an internal note", category: "contacts_leads", description: "Add an internal note to the client or engagement.", keywords: "note internal" },
+  { value: "send_portal_message", label: "Send a portal message", category: "communication", description: "Send a message to the client's portal inbox.", keywords: "message portal" },
+  { value: "start_workflow", label: "Start another workflow", category: "workflow_control", description: "Start another published workflow for this same client or engagement.", keywords: "workflow start chain" },
+  { value: "end_workflow", label: "End this workflow", category: "workflow_control", description: "End this workflow run immediately.", keywords: "stop end exit" },
+  { value: "webhook", label: "Call a webhook", category: "workflow_control", description: "Send the run's data to an external URL.", keywords: "webhook api integration http" },
+  { value: "add_dnd", label: "Opt the client out of SMS/email", category: "communication", description: "Opt the client out of SMS and/or email sends.", keywords: "dnd opt out unsubscribe" },
+  { value: "remove_dnd", label: "Opt the client back into SMS/email", category: "communication", description: "Opt the client back into SMS and/or email sends.", keywords: "dnd opt in resubscribe" },
 ];
 
 const DND_CHANNELS = [
@@ -214,6 +237,70 @@ export function actionIcon(type: string) {
   return <CheckSquare size={15} />;
 }
 
+// Shared by every free-text step field that execute_automation_step() runs
+// through render_merge_fields() (task/appointment/quote titles & bodies,
+// document request titles, notification messages, notes, portal messages) --
+// a click-to-insert {{token}} picker so staff don't have to know or type the
+// syntax by hand, same UX as the email/SMS template editor. Scoped to
+// AUTOMATION_MERGE_FIELD_GROUPS rather than the full template catalog since
+// that's genuinely all a run's context can resolve.
+function MergeableField({
+  as = "input",
+  label,
+  fieldKey,
+  config,
+  setField,
+  canManage,
+  placeholder,
+  rows,
+}: {
+  as?: "input" | "textarea";
+  label: string;
+  fieldKey: string;
+  config: Record<string, unknown>;
+  setField: (key: string, value: string) => void;
+  canManage: boolean;
+  placeholder?: string;
+  rows?: number;
+}) {
+  const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const value = (config[fieldKey] as string) ?? "";
+  const inputClass = "rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60";
+  return (
+    <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+      <div className="flex items-center justify-between">
+        <span>{label}</span>
+        <MergeFieldPicker
+          label="Insert"
+          disabled={!canManage}
+          groups={AUTOMATION_MERGE_FIELD_GROUPS}
+          onInsert={(token) => insertAtFieldCursor(ref.current, value, token, (v) => setField(fieldKey, v))}
+        />
+      </div>
+      {as === "textarea" ? (
+        <textarea
+          ref={ref as RefObject<HTMLTextAreaElement>}
+          disabled={!canManage}
+          rows={rows ?? 2}
+          value={value}
+          onChange={(e) => setField(fieldKey, e.target.value)}
+          placeholder={placeholder}
+          className={inputClass}
+        />
+      ) : (
+        <input
+          ref={ref as RefObject<HTMLInputElement>}
+          disabled={!canManage}
+          value={value}
+          onChange={(e) => setField(fieldKey, e.target.value)}
+          placeholder={placeholder}
+          className={inputClass}
+        />
+      )}
+    </div>
+  );
+}
+
 export function StepCard({
   workspaceId,
   step,
@@ -257,13 +344,25 @@ export function StepCard({
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const [actionType, setActionType] = useState(step.action_type);
+  const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
+  // Separate from any action-specific "Title" field below (e.g. create_task's
+  // task title, create_appointment's appointment title) -- those name the
+  // record the step creates. This names the step itself on the canvas/step
+  // list, and applies the same way regardless of action type, unlike those
+  // per-type fields which only exist for the handful of actions whose
+  // underlying record actually has its own title.
+  const [displayName, setDisplayName] = useState(step.display_name ?? "");
   const [delayUnit, setDelayUnit] = useState<"minutes" | "days">(step.action_config?.delay_unit === "days" ? "days" : "minutes");
   const [delayValue, setDelayValue] = useState(() => {
     const mins = step.delay_minutes ?? 0;
     return delayUnit === "days" ? String(mins / 1440) : String(mins);
   });
+  // business_hours_delay is a real, separate action_type in the DB (its own
+  // scheduling math via compute_business_hours_deadline) but isn't in
+  // ACTION_TYPES -- it's presented as a mode of the regular "Wait / Delay"
+  // action instead, since the two only differ in how the wait is counted.
+  const [useBusinessHours, setUseBusinessHours] = useState(step.action_type === "business_hours_delay");
   const [requiresApproval, setRequiresApproval] = useState(step.requires_approval);
   const [approverRoleId, setApproverRoleId] = useState(step.approver_role_id ?? "");
   const [saving, setSaving] = useState(false);
@@ -327,24 +426,38 @@ export function StepCard({
     setSaved(false);
   }
 
-  async function save() {
+  // Accepts an optional config override so a template pick/create can save
+  // the step immediately (see the onSuccess handlers below) instead of
+  // silently relying on stale closure state -- setConfig() doesn't apply
+  // until the next render, so reading `config` right after calling it would
+  // still see the old value.
+  async function save(configOverride?: Record<string, unknown>) {
+    const configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
-      const tag = (config.tag as string | undefined)?.trim();
+      const tag = (configToSave.tag as string | undefined)?.trim();
       if (tag && !(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
     }
 
     setSaving(true);
     setError(null);
     const isDelay = actionType === "delay";
-    const delayMinutes = isDelay ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
+    const isDurationMode = !configToSave.wait_mode || configToSave.wait_mode === "duration";
+    const savesAsBusinessHours = isDelay && isDurationMode && useBusinessHours;
+    const effectiveActionType = savesAsBusinessHours ? "business_hours_delay" : actionType;
+    const delayMinutes =
+      isDelay && !savesAsBusinessHours ? Math.round(delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0) : 0;
+    const finalConfig = savesAsBusinessHours
+      ? { hours: (configToSave.hours as string) ?? "24" }
+      : ((isDelay ? { ...configToSave, delay_unit: delayUnit } : configToSave) as never);
     const { error: updateError } = await supabase
       .from("automation_steps")
       .update({
-        action_type: actionType,
-        action_config: (isDelay ? { ...config, delay_unit: delayUnit } : config) as never,
+        action_type: effectiveActionType,
+        action_config: finalConfig as never,
         delay_minutes: delayMinutes,
         requires_approval: requiresApproval,
         approver_role_id: requiresApproval && approverRoleId ? approverRoleId : null,
+        display_name: displayName.trim() || null,
       })
       .eq("id", step.id);
     setSaving(false);
@@ -403,25 +516,35 @@ export function StepCard({
         )}
       </div>
 
+      <label className="mt-3 flex flex-col gap-1 text-xs text-muted">
+        Step name (optional)
+        <input
+          disabled={!canManage}
+          value={displayName}
+          onChange={(e) => {
+            setDisplayName(e.target.value);
+            setSaved(false);
+          }}
+          placeholder={actionType === "condition" ? "Condition" : ACTION_TYPES.find((a) => a.value === actionType)?.label ?? actionType}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+        />
+      </label>
+
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-muted">
+        <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
           Action
-          <select
+          <InlineStepPickerField
             disabled={!canManage}
             value={actionType}
-            onChange={(e) => {
-              setActionType(e.target.value);
+            items={ACTION_TYPES}
+            categories={ACTION_CATEGORIES}
+            icon={actionIcon}
+            onChange={(value) => {
+              setActionType(value);
               setConfig({});
               setSaved(false);
             }}
-            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          >
-            {ACTION_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+          />
         </label>
         {actionType === "delay" && (
           <label className="flex flex-col gap-1 text-xs text-muted">
@@ -440,35 +563,82 @@ export function StepCard({
         )}
 
         {actionType === "delay" && (!config.wait_mode || config.wait_mode === "duration") && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Wait for
-            <div className="flex gap-1.5">
-              <input
-                disabled={!canManage}
-                type="number"
-                min={0}
-                value={delayValue}
-                onChange={(e) => {
-                  setDelayValue(e.target.value);
-                  setSaved(false);
-                }}
-                className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-              <select
-                disabled={!canManage}
-                value={delayUnit}
-                onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              >
-                <option value="minutes">Minutes</option>
-                <option value="days">Days</option>
-              </select>
-            </div>
-            <span className="mt-1 text-[11px] normal-case text-muted">
-              Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle from
-              the step that should finish first, and its bottom handle to whichever step should run once the wait is over.
-            </span>
-          </label>
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Count as
+              <div className="flex gap-4 pt-1">
+                {([
+                  { value: false, label: "Regular time" },
+                  { value: true, label: "Business hours" },
+                ] as const).map((opt) => (
+                  <label key={String(opt.value)} className="flex items-center gap-1.5 text-sm text-ink">
+                    <input
+                      type="radio"
+                      disabled={!canManage}
+                      checked={useBusinessHours === opt.value}
+                      onChange={() => {
+                        setUseBusinessHours(opt.value);
+                        setSaved(false);
+                      }}
+                      className="border-border text-accent focus:ring-accent disabled:opacity-60"
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </label>
+
+            {useBusinessHours ? (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Wait for (business hours)
+                <input
+                  disabled={!canManage}
+                  type="number"
+                  min={0}
+                  step="0.5"
+                  value={(config.hours as string) ?? ""}
+                  onChange={(e) => setField("hours", e.target.value)}
+                  placeholder="24"
+                  className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                />
+                <span className="mt-1 text-[11px] normal-case text-muted">
+                  Only counts hours inside the firm&apos;s configured business hours (Settings &rarr; Firm Profile) -- nights,
+                  weekends, and office closures don&apos;t count toward this wait.
+                </span>
+              </label>
+            ) : (
+              <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+                Wait for
+                <div className="flex gap-1.5">
+                  <input
+                    disabled={!canManage}
+                    type="number"
+                    min={0}
+                    value={delayValue}
+                    onChange={(e) => {
+                      setDelayValue(e.target.value);
+                      setSaved(false);
+                    }}
+                    className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                  />
+                  <select
+                    disabled={!canManage}
+                    value={delayUnit}
+                    onChange={(e) => changeDelayUnit(e.target.value as "minutes" | "days")}
+                    className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="days">Days</option>
+                  </select>
+                </div>
+                <span className="mt-1 text-[11px] normal-case text-muted">
+                  Wire this step&apos;s connections on the diagram to control what it waits before or after -- drag its top handle
+                  from the step that should finish first, and its bottom handle to whichever step should run once the wait is
+                  over.
+                </span>
+              </label>
+            )}
+          </>
         )}
 
         {actionType === "delay" && config.wait_mode === "until_date" && (
@@ -576,14 +746,22 @@ export function StepCard({
                   workspaceId={workspaceId}
                   kind="email"
                   defaultOpen
+                  autoPublish
                   onSuccess={(row) => {
                     setExtraEmailTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
-                    setField("template_slug", row.slug);
+                    const nextConfig = { ...config, template_slug: row.slug };
+                    setConfig(nextConfig);
                     setCreatingTemplateKind(null);
                     setEditingTemplate({
                       kind: "email",
                       row: { id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, subject: "", body_html: "" },
                     });
+                    // The template-body editor that opens next has its own
+                    // separate Save button (for the template row itself) --
+                    // save the step right away so picking/creating a
+                    // template is never lost if the user closes that modal
+                    // without also clicking "Save step" below it.
+                    void save(nextConfig);
                   }}
                 />
               </div>
@@ -647,14 +825,22 @@ export function StepCard({
                   workspaceId={workspaceId}
                   kind="sms"
                   defaultOpen
+                  autoPublish
                   onSuccess={(row) => {
                     setExtraSmsTemplates((prev) => [...prev, { id: row.id, name: row.name, slug: row.slug }]);
-                    setField("template_slug", row.slug);
+                    const nextConfig = { ...config, template_slug: row.slug };
+                    setConfig(nextConfig);
                     setCreatingTemplateKind(null);
                     setEditingTemplate({
                       kind: "sms",
                       row: { id: row.id, name: row.name, status: "draft", workspace_id: workspaceId, body: "" },
                     });
+                    // The template-body editor that opens next has its own
+                    // separate Save button (for the template row itself) --
+                    // save the step right away so picking/creating a
+                    // template is never lost if the user closes that modal
+                    // without also clicking "Save step" below it.
+                    void save(nextConfig);
                   }}
                 />
               </div>
@@ -679,26 +865,8 @@ export function StepCard({
 
         {actionType === "create_task" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Task title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Automated task"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Description
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.description as string) ?? ""}
-                onChange={(e) => setField("description", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Task title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Automated task" />
+            <MergeableField as="textarea" label="Description" fieldKey="description" config={config} setField={setField} canManage={canManage} />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -725,31 +893,25 @@ export function StepCard({
                 ))}
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Visible to
+              <select
+                disabled={!canManage}
+                value={(config.visibility as string) ?? "internal"}
+                onChange={(e) => setField("visibility", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="internal">Staff only</option>
+                <option value="client">Staff and client (shows in portal)</option>
+              </select>
+            </label>
           </>
         )}
 
         {actionType === "create_appointment" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Appointment"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Description
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.description as string) ?? ""}
-                onChange={(e) => setField("description", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Appointment" />
+            <MergeableField as="textarea" label="Description" fieldKey="description" config={config} setField={setField} canManage={canManage} />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Days from now
               <input
@@ -912,14 +1074,15 @@ export function StepCard({
 
         {actionType === "create_engagement" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            Creates an engagement from the service already resolved on the organizer submission that triggered this run, and starts its
-            pipeline. Only works when this step follows an &quot;An organizer is submitted&quot; trigger.
+            Creates an engagement from the service already resolved on the organizer submission that triggered this run. Only works when
+            this step follows an &quot;An organizer is submitted&quot; trigger. This does not put the engagement in a pipeline -- add a
+            &quot;Move to a pipeline stage&quot; step after this one to do that.
           </p>
         )}
 
         {actionType === "send_engagement_letter" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Engagement letter
+            Document
             <div className="flex gap-1.5">
               <select
                 disabled={!canManage}
@@ -927,9 +1090,7 @@ export function StepCard({
                 onChange={(e) => setField("engagement_letter_template_id", e.target.value)}
                 className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               >
-                <option value="" disabled>
-                  Choose an engagement letter template
-                </option>
+                <option value="">Use the engagement&apos;s service&apos;s default document</option>
                 {engagementLetterOptions.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -940,7 +1101,7 @@ export function StepCard({
                 <button
                   type="button"
                   onClick={() => setCreatingTemplateKind("engagement_letter")}
-                  title="Create a new engagement letter"
+                  title="Create a new document"
                   className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
                 >
                   <Plus size={14} />
@@ -949,7 +1110,7 @@ export function StepCard({
             </div>
             {engagementLetterOptions.length === 0 && (
               <span className="text-[11px] text-warning">
-                No published engagement letters yet -- a template stays hidden here until you publish it from{" "}
+                No published documents yet -- a template stays hidden here until you publish it from{" "}
                 <a href="/templates" target="_blank" rel="noreferrer" className="underline">
                   Form Templates
                 </a>
@@ -984,6 +1145,32 @@ export function StepCard({
           </label>
         )}
 
+        {actionType === "send_engagement_letter" && (
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+            Also request a signature from (optional)
+            <select
+              disabled={!canManage}
+              value={(config.additional_signer_relationship_type as string) ?? ""}
+              onChange={(e) => setField("additional_signer_relationship_type", e.target.value)}
+              className="w-full rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+            >
+              <option value="">Just the client</option>
+              <option value="spouse">Spouse</option>
+              <option value="dependent">Dependent</option>
+              <option value="parent">Parent</option>
+              <option value="child">Child</option>
+              <option value="owner">Owner</option>
+              <option value="partner">Partner</option>
+              <option value="attorney">Attorney</option>
+              <option value="officer">Officer</option>
+            </select>
+            <span className="text-[11px] text-muted">
+              Looks up the client&apos;s linked contacts (Relationships tab) of this type at send time and adds the first match as a
+              second signer. Does nothing if none is on file.
+            </span>
+          </label>
+        )}
+
         {actionType === "change_stage" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
             Marks the current pipeline stage complete, moving into the next stage -- the engagement&apos;s pipeline if this run has an
@@ -1012,16 +1199,7 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Requested documents"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Requested documents" />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Due in (days)
               <input
@@ -1120,9 +1298,23 @@ export function StepCard({
 
         {actionType === "send_notification" && (
           <>
-            <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-              Notifies the workspace owner and every active staff member -- no need to pick one person.
-            </p>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Notify
+              <select
+                disabled={!canManage}
+                value={(config.staff_id as string) ?? ""}
+                onChange={(e) => setField("staff_id", e.target.value)}
+                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              >
+                <option value="">Account owner (default)</option>
+                {staffOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.display_name ?? "Staff"}
+                    {s.is_owner ? " (Owner)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="col-span-2 flex flex-col gap-1 text-xs text-muted">
               Send via
               <div className="flex items-center gap-4 pt-1">
@@ -1163,16 +1355,7 @@ export function StepCard({
                 ))}
               </select>
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Message
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.message as string) ?? ""}
-                onChange={(e) => setField("message", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField as="textarea" label="Message" fieldKey="message" config={config} setField={setField} canManage={canManage} />
           </>
         )}
 
@@ -1374,16 +1557,7 @@ export function StepCard({
 
         {actionType === "create_quote" && (
           <>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Title
-              <input
-                disabled={!canManage}
-                value={(config.title as string) ?? ""}
-                onChange={(e) => setField("title", e.target.value)}
-                placeholder="Quote"
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField label="Title" fieldKey="title" config={config} setField={setField} canManage={canManage} placeholder="Quote" />
             <label className="flex flex-col gap-1 text-xs text-muted">
               Service
               <select
@@ -1412,16 +1586,7 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Notes
-              <textarea
-                disabled={!canManage}
-                rows={2}
-                value={(config.notes as string) ?? ""}
-                onChange={(e) => setField("notes", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField as="textarea" label="Notes" fieldKey="notes" config={config} setField={setField} canManage={canManage} />
           </>
         )}
 
@@ -1445,16 +1610,7 @@ export function StepCard({
         )}
 
         {actionType === "add_note" && (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Note
-            <textarea
-              disabled={!canManage}
-              rows={3}
-              value={(config.body as string) ?? ""}
-              onChange={(e) => setField("body", e.target.value)}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            />
-          </label>
+          <MergeableField as="textarea" label="Note" fieldKey="body" config={config} setField={setField} canManage={canManage} rows={3} />
         )}
 
         {actionType === "send_portal_message" && (
@@ -1468,16 +1624,7 @@ export function StepCard({
                 className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
               />
             </label>
-            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-              Message
-              <textarea
-                disabled={!canManage}
-                rows={3}
-                value={(config.body as string) ?? ""}
-                onChange={(e) => setField("body", e.target.value)}
-                className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-              />
-            </label>
+            <MergeableField as="textarea" label="Message" fieldKey="body" config={config} setField={setField} canManage={canManage} rows={3} />
           </>
         )}
 
@@ -1569,7 +1716,7 @@ export function StepCard({
 
       {canManage && (
         <div className="mt-3 flex items-center gap-3">
-          <button type="button" onClick={save} disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
+          <button type="button" onClick={() => save()} disabled={saving} className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60">
             {saving ? "Saving..." : "Save step"}
           </button>
           {saved && !error && <span className="text-xs text-success">Saved.</span>}

@@ -14,25 +14,19 @@ export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
 
-const CONTACT_TABS = [
-  { key: "clients", label: "Clients" },
-  { key: "leads", label: "Leads" },
-] as const;
-type ContactTab = (typeof CONTACT_TABS)[number]["key"];
+// Every lifecycle status in one combined list -- leads, lost leads, and
+// active/inactive/archived clients all live together with no sub-tabs by
+// status or type. Individual vs business is already visible via the Type
+// column, so no separate filter for that either.
+const ALL_LIFECYCLE_STATUSES = ["lead", "active", "inactive", "lost", "archived"];
 
-const CLIENT_LIFECYCLE_STATUSES = ["active", "inactive", "archived"];
-
-const CLIENT_STATUS_FILTERS = [
+const STATUS_FILTERS = [
   { value: "", label: "All" },
+  { value: "lead", label: "Lead" },
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
+  { value: "lost", label: "Lost" },
   { value: "archived", label: "Archived" },
-];
-
-const CLIENT_TYPE_FILTERS = [
-  { value: "", label: "All" },
-  { value: "individual", label: "Individual" },
-  { value: "business", label: "Business" },
 ];
 
 function clientDisplayName(c: {
@@ -104,26 +98,13 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
   },
 ];
 
-export default async function ClientsPage({
-  searchParams,
-}: {
-  searchParams: { page?: string; status?: string; tab?: string; tag?: string; type?: string };
-}) {
+export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tag?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
-  const tab: ContactTab = searchParams.tab === "leads" ? "leads" : "clients";
   const supabase = createClient();
-  const isLeadsTab = tab === "leads";
-  // The Individual/Business split only applies to the Clients tab -- a lead
-  // hasn't been typed as individual/business yet (that's a client_type
-  // column on the same table, but Leads is scoped by lifecycle_status, not
-  // by this nav-level distinction).
-  const clientType = !isLeadsTab && (searchParams.type === "individual" || searchParams.type === "business") ? searchParams.type : "";
 
-  const lifecycleScope = isLeadsTab ? ["lead", "lost"] : CLIENT_LIFECYCLE_STATUSES;
-  const statusFilters = isLeadsTab ? [{ value: "", label: "All" }, { value: "lost", label: "Lost" }] : CLIENT_STATUS_FILTERS;
-  const status = searchParams.status && statusFilters.some((f) => f.value === searchParams.status) ? searchParams.status : "";
+  const status = searchParams.status && STATUS_FILTERS.some((f) => f.value === searchParams.status) ? searchParams.status : "";
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
@@ -140,9 +121,8 @@ export default async function ClientsPage({
     .is("merged_into_client_id", null)
     .order("created_at", { ascending: false })
     .range(from, to);
-  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : lifecycleScope);
+  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : ALL_LIFECYCLE_STATUSES);
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
-  if (clientType) clientsQuery = clientsQuery.eq("client_type", clientType);
 
   const {
     data: { user },
@@ -192,11 +172,11 @@ export default async function ClientsPage({
         .from("client_service_interests")
         .select("client_id, services(name)")
         .in("client_id", clientIds)
-    : { data: [] as never[] };
+    : { data: [] as { client_id: string; services: { name: string } | null }[] };
 
-  // Services are "basic" now and a lead can select more than one at once
-  // (e.g. Bookkeeping + Payroll), so this shows every distinct one they've
-  // expressed interest in, not just whichever was recorded most recently.
+  // A client can express interest in more than one service at once (e.g.
+  // Bookkeeping + Payroll), so this shows every distinct one, not just
+  // whichever was recorded most recently.
   const requestedServicesByClient = new Map<string, string[]>();
   for (const interest of interests ?? []) {
     const serviceName = (interest.services as unknown as { name?: string } | null)?.name;
@@ -214,31 +194,15 @@ export default async function ClientsPage({
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
   }));
 
-  const extraQuery = [
-    tab !== "clients" ? `tab=${tab}` : "",
-    status ? `status=${status}` : "",
-    tag ? `tag=${encodeURIComponent(tag)}` : "",
-    clientType ? `type=${clientType}` : "",
-  ]
-    .filter(Boolean)
-    .join("&");
-  const typeQuery = clientType ? `&type=${clientType}` : "";
-  const statusQuery = `${tag ? `&tag=${encodeURIComponent(tag)}` : ""}${typeQuery}`;
-  const tagQueryBase = `/clients?tab=${tab}${status ? `&status=${status}` : ""}${typeQuery}`;
-
-  const description = isLeadsTab
-    ? "Prospects who haven't engaged yet."
-    : clientType === "individual"
-      ? "Individual clients in your workspace."
-      : clientType === "business"
-        ? "Business clients in your workspace."
-        : "Every client in your workspace.";
+  const extraQuery = [status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""].filter(Boolean).join("&");
+  const statusQuery = tag ? `&tag=${encodeURIComponent(tag)}` : "";
+  const tagQueryBase = `/clients${status ? `?status=${status}` : ""}`;
 
   return (
     <>
       <PageHeader
         title="Contacts"
-        description={description}
+        description="Every client and lead in your workspace."
         actions={
           canCreate ? (
             <NewClientButton
@@ -252,42 +216,11 @@ export default async function ClientsPage({
         }
       />
       <div className="flex-1 px-8 py-6">
-        <nav className="mb-4 flex gap-1 border-b border-border">
-          {CONTACT_TABS.map((t) => (
-            <Link
-              key={t.key}
-              href={`/clients?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                tab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-
-        {!isLeadsTab && (
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted">Type</span>
-            {CLIENT_TYPE_FILTERS.map((f) => (
-              <Link
-                key={f.value}
-                href={`/clients?tab=clients${f.value ? `&type=${f.value}` : ""}${status ? `&status=${status}` : ""}${tag ? `&tag=${encodeURIComponent(tag)}` : ""}`}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                  clientType === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
-                }`}
-              >
-                {f.label}
-              </Link>
-            ))}
-          </div>
-        )}
-
         <div className="mb-2 flex flex-wrap gap-2">
-          {statusFilters.map((f) => (
+          {STATUS_FILTERS.map((f) => (
             <Link
               key={f.value}
-              href={f.value ? `/clients?tab=${tab}&status=${f.value}${statusQuery}` : `/clients?tab=${tab}${statusQuery}`}
+              href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients${statusQuery}`}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
               }`}
@@ -308,10 +241,8 @@ export default async function ClientsPage({
             rows={clientRows}
             emptyMessage={
               status
-                ? `No ${tab} with status "${statusFilters.find((f) => f.value === status)?.label}".`
-                : tab === "leads"
-                  ? "No leads yet."
-                  : "No clients yet. Add your first client to get started."
+                ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".`
+                : "No clients yet. Add your first client to get started."
             }
             emptyAction={
               !status && canCreate ? (

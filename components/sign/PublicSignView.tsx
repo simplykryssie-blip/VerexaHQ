@@ -63,12 +63,13 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       setError(result.error ?? "Could not save your signature.");
       return;
     }
+    const signatureImagePath: string = result.path;
 
     const { error: rpcError } = await supabase.rpc("record_signature_by_token", {
       p_token: token,
       p_signature_type: "drawn",
       p_typed_name: typedName.trim(),
-      p_signature_image_path: result.path,
+      p_signature_image_path: signatureImagePath,
     });
     setSubmitting(false);
     if (rpcError) {

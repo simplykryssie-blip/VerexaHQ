@@ -10,9 +10,13 @@ import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import { automationActionLabel } from "@/lib/automationLabels";
+import { FileUp, MessageSquare, Receipt as ReceiptIcon, NotebookPen } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { SectionCard } from "@/components/ui/SectionCard";
+import { Tabs } from "@/components/ui/Tabs";
 import { clientStatusTone } from "@/lib/clientStatus";
 import {
   OverviewTab,
@@ -128,8 +132,9 @@ export function ClientWorkspace({
   complianceDefault,
   requestedService,
   interestedServiceIds,
-  leadPipeline,
+  leadPipelines,
   automationStatus,
+  additionalSigners,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -173,8 +178,9 @@ export function ClientWorkspace({
   complianceDefault: { id: string; display_name: string | null } | null;
   requestedService: string | null;
   interestedServiceIds: string[];
-  leadPipeline: { processId: string | null; processName: string | null; stages: { id: string; name: string }[]; currentProcessStageId: string | null };
+  leadPipelines: { processId: string; processName: string | null; stageName: string | null }[];
   automationStatus: { automationName: string; status: string; stepActionType: string | null; error: string | null } | null;
+  additionalSigners: AdditionalSignerOption[];
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -195,8 +201,7 @@ export function ClientWorkspace({
     ...tasks.filter((t) => t.due_date).map((t) => t.due_date as string),
   ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
   const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
-  const currentStageName =
-    client.lifecycle_status === "lead" ? leadPipeline.stages.find((s) => s.id === leadPipeline.currentProcessStageId)?.name : undefined;
+  const mostRecentNote = [...notes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
   const automationStepLabel = automationStatus ? automationActionLabel(automationStatus.stepActionType) : null;
   const automationStatusText =
     automationStatus &&
@@ -221,11 +226,14 @@ export function ClientWorkspace({
             <Badge tone={clientStatusTone(client.lifecycle_status)} className="capitalize">
               {client.lifecycle_status}
             </Badge>
-            {currentStageName && leadPipeline.processId && (
-              <Link href={`/pipelines/${leadPipeline.processId}`} className="text-accent hover:underline">
-                {leadPipeline.processName ?? "Pipeline"}: {currentStageName}
-              </Link>
-            )}
+            {client.lifecycle_status === "lead" &&
+              leadPipelines.map((pipeline) =>
+                pipeline.stageName ? (
+                  <Link key={pipeline.processId} href={`/pipelines/${pipeline.processId}`} className="text-accent hover:underline">
+                    {pipeline.processName ?? "Pipeline"}: {pipeline.stageName}
+                  </Link>
+                ) : null
+              )}
             {automationStatusText && (
               <span className={automationStatus?.status === "failed" ? "text-danger" : undefined} title={automationStatus?.error ?? undefined}>
                 Automation: {automationStatusText}
@@ -260,20 +268,9 @@ export function ClientWorkspace({
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
-          <nav className="flex gap-1 overflow-x-auto border-b border-border bg-surface px-8">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ${
-                  tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </nav>
+          <div className="border-b border-border bg-surface px-8">
+            <Tabs tabs={TABS.map((t) => ({ id: t, label: t }))} active={tab} onChange={(id) => setTab(id as Tab)} />
+          </div>
 
           <div className="px-8 py-6">
             {tab === "Details" && (
@@ -326,6 +323,7 @@ export function ClientWorkspace({
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
                 canRequestSignatures={permissions.signaturesRequest}
+                additionalSigners={additionalSigners}
               />
             )}
             {tab === "Messages" && (
@@ -359,44 +357,115 @@ export function ClientWorkspace({
           </div>
         </div>
 
-        <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-border bg-surface p-5 lg:block">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Upcoming tasks</h3>
-          {tasks.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">Nothing due.</p>
-          ) : (
-            <ul className="mt-2 space-y-2">
-              {tasks.slice(0, 5).map((t) => (
-                <li key={t.id} className="text-sm text-slate">
-                  {t.title}
-                  {t.due_date && <span className="ml-1 text-xs text-muted">({new Date(t.due_date).toLocaleDateString()})</span>}
-                </li>
-              ))}
-            </ul>
-          )}
+        <aside className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-border bg-surfaceMuted p-4 lg:block">
+          <SectionCard title="Quick Actions">
+            <div className="-mx-2 flex flex-col">
+              <QuickActions
+                clientId={client.id}
+                workspaceId={workspace.id}
+                organizerTemplates={organizerTemplates}
+                pendingOrganizerTemplateIds={pendingOrganizerTemplateIds}
+                primaryEmail={client.primary_email}
+                permissions={permissions}
+                variant="row"
+              />
+              <button
+                type="button"
+                onClick={() => setTab("Documents")}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-slate transition hover:bg-surfaceMuted hover:text-ink"
+              >
+                <FileUp size={16} aria-hidden="true" /> Upload Document
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("Messages")}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-slate transition hover:bg-surfaceMuted hover:text-ink"
+              >
+                <MessageSquare size={16} aria-hidden="true" /> Send Message
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("Billing")}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-slate transition hover:bg-surfaceMuted hover:text-ink"
+              >
+                <ReceiptIcon size={16} aria-hidden="true" /> Create Invoice
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("Notes")}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm font-medium text-slate transition hover:bg-surfaceMuted hover:text-ink"
+              >
+                <NotebookPen size={16} aria-hidden="true" /> Add Note
+              </button>
+            </div>
+          </SectionCard>
 
-          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted">Next due date</h3>
-          <p className="mt-2 text-sm text-slate">{upcoming ? new Date(upcoming).toLocaleDateString() : "None scheduled"}</p>
+          <SectionCard title="Upcoming tasks">
+            {tasks.length === 0 ? (
+              <p className="text-sm text-muted">Nothing due.</p>
+            ) : (
+              <ul className="space-y-2">
+                {tasks.slice(0, 5).map((t) => (
+                  <li key={t.id} className="text-sm text-slate">
+                    {t.title}
+                    {t.due_date && <span className="ml-1 text-xs text-muted">({new Date(t.due_date).toLocaleDateString()})</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
 
-          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted">Missing documents</h3>
-          <p className="mt-2 text-sm text-slate">{missingDocuments}</p>
+          <SectionCard title="At a glance">
+            <dl className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <dt className="text-muted">Next due date</dt>
+                <dd className="font-medium text-ink">{upcoming ? new Date(upcoming).toLocaleDateString() : "None scheduled"}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted">Missing documents</dt>
+                <dd className="font-medium text-ink">{missingDocuments}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted">Outstanding balance</dt>
+                <dd className="font-medium text-ink">
+                  ${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </dd>
+              </div>
+            </dl>
+          </SectionCard>
 
-          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted">Outstanding balance</h3>
-          <p className="mt-2 text-sm text-slate">
-            ${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
+          <SectionCard
+            title="Notes"
+            action={
+              <button type="button" onClick={() => setTab("Notes")} className="text-xs font-medium text-accent hover:underline">
+                Add Note
+              </button>
+            }
+          >
+            {mostRecentNote ? (
+              <div>
+                {mostRecentNote.subject && <p className="text-sm font-medium text-ink">{mostRecentNote.subject}</p>}
+                <p className="mt-1 line-clamp-3 text-sm text-slate">{mostRecentNote.body}</p>
+                <p className="mt-1.5 text-xs text-muted">{new Date(mostRecentNote.created_at).toLocaleDateString()}</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">No notes yet.</p>
+            )}
+          </SectionCard>
 
-          <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-muted">Recent activity</h3>
-          {timeline.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">Nothing yet.</p>
-          ) : (
-            <ul className="mt-2 space-y-2">
-              {timeline.slice(0, 5).map((a) => (
-                <li key={a.id} className="text-sm text-slate">
-                  {a.description}
-                </li>
-              ))}
-            </ul>
-          )}
+          <SectionCard title="Recent activity">
+            {timeline.length === 0 ? (
+              <p className="text-sm text-muted">Nothing yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {timeline.slice(0, 5).map((a) => (
+                  <li key={a.id} className="text-sm text-slate">
+                    {a.description}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
         </aside>
       </div>
     </>

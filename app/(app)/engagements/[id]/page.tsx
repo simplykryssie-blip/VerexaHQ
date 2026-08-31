@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
+import { getAdditionalSignerOptions } from "@/lib/documents/getAdditionalSignerOptions";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -156,7 +157,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase
       .from("tasks")
       .select(
-        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id,
+        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id, visibility,
         assigned_staff:user_profiles!tasks_assigned_staff_id_fkey(id, display_name)`
       )
       .eq("engagement_id", engagement.id)
@@ -243,7 +244,10 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const slaByStage = new Map((slaRows ?? []).map((s: any) => [s.workflow_stage_id, s.sla_category as string]));
 
-  const stagesWithSla = (stages ?? []).map((s: any) => ({ ...s, sla_category: slaByStage.get(s.id) ?? null }));
+  const stagesWithSla = (stages ?? []).map((s: any) => ({
+    ...s,
+    sla_category: slaByStage.get(s.id) ?? null,
+  }));
 
   const taskIds = (tasks ?? []).map((t) => t.id);
   const { data: dependencies } =
@@ -327,7 +331,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
-    .select("id, name, body_html, banner_image_url")
+    .select("id, name, body_html, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings")
     .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
@@ -440,6 +444,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase.from("tax_years").select("year").order("year", { ascending: false }),
   ]);
   const permissions = await loadActionPermissions(supabase, workspace.id);
+  const additionalSigners = engagement.client_id ? await getAdditionalSignerOptions(supabase, engagement.client_id) : [];
 
   return (
     <EngagementWorkspace
@@ -465,6 +470,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       }))}
       engagementLetterTemplates={engagementLetterTemplates ?? []}
       signatureRequests={signatureRequests}
+      additionalSigners={additionalSigners}
       notes={notes ?? []}
       messageThreads={messageThreads ?? []}
       messages={(messages ?? []) as never}

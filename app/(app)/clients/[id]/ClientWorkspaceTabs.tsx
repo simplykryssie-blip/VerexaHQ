@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Briefcase, CheckSquare, Receipt } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -48,8 +49,16 @@ import { ServiceInterestControl } from "./ServiceInterestControl";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 import { Badge } from "@/components/ui/Badge";
-import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
+import { StatTile } from "@/components/ui/StatTile";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+
+// Mirrors lib/dashboard/data.ts's ENGAGEMENT_PIPELINE_STATUSES (which can't be
+// imported here -- it pulls in a server-only Supabase client, breaking this
+// client component's build) -- same real engagements.status list, minus the
+// terminal "put away" Archived bucket a progress bar has no use for.
+const ENGAGEMENT_PIPELINE_STATUSES = ENGAGEMENT_STATUS_OPTIONS.filter((s) => s !== "Archived");
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -160,22 +169,42 @@ export function OverviewTab({
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
   const recentNotes = [...notes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
 
+  // The open engagement closest to needing attention -- nearest due date, or
+  // the first open one if none have a due date yet -- is what the highlighted
+  // progress bar below speaks to.
+  const primaryEngagement =
+    [...openEngagements].sort((a, b) => {
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    })[0] ?? null;
+  const primaryStatusIndex = primaryEngagement
+    ? ENGAGEMENT_PIPELINE_STATUSES.indexOf(primaryEngagement.status as (typeof ENGAGEMENT_PIPELINE_STATUSES)[number])
+    : -1;
+  const primaryProgressPercent = primaryStatusIndex >= 0 ? Math.round((primaryStatusIndex / (ENGAGEMENT_PIPELINE_STATUSES.length - 1)) * 100) : null;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Current engagements</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{openEngagements.length}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Open tasks</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{openTasks.length}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Outstanding balance</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
-        </div>
+        <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+        <StatTile icon={CheckSquare} tone="amber" label="Open tasks" value={openTasks.length} />
+        <StatTile icon={Receipt} tone="rose" label="Outstanding balance" value={money(outstandingBalance)} />
       </div>
+
+      {primaryEngagement && primaryProgressPercent !== null && (
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-ink">
+              {primaryEngagement.services?.name ?? "Engagement"} &mdash; {primaryEngagement.status}
+            </p>
+            <p className="text-sm font-semibold text-ink">{primaryProgressPercent}%</p>
+          </div>
+          <div className="mt-2">
+            <ProgressBar percent={primaryProgressPercent} tone="gradient" />
+          </div>
+        </div>
+      )}
 
       <Section
         title="Identifying info"

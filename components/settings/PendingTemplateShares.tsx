@@ -15,7 +15,7 @@ export type PendingShare = {
 
 const OBJECT_TYPE_LABEL: Record<PendingShare["objectType"], string> = {
   organizer_templates: "organizer",
-  engagement_letter_templates: "engagement letter",
+  engagement_letter_templates: "document",
 };
 
 export function PendingTemplateShares({ shares }: { shares: PendingShare[] }) {

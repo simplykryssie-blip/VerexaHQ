@@ -8,13 +8,14 @@ import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { renderEmail } from "@/lib/email/template";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import type { Audience, DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "./types";
 
-function ProgressBar({ done, total }: { done: number; total: number }) {
+function RequestProgressBar({ done, total }: { done: number; total: number }) {
   const pct = total === 0 ? 100 : Math.round((done / total) * 100);
   return (
-    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surfaceMuted">
-      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+    <div className="mt-1">
+      <ProgressBar percent={pct} size="sm" />
     </div>
   );
 }
@@ -189,7 +190,7 @@ export function RequestsPanel({
                     {r.due_date && ` -- due ${new Date(r.due_date).toLocaleDateString()}`}
                   </span>
                 </div>
-                <ProgressBar done={done} total={r.items.length} />
+                <RequestProgressBar done={done} total={r.items.length} />
                 {(() => {
                   const hasCategories = r.items.some((i) => i.category?.trim());
                   const groups = hasCategories ? groupByCategory(r.items) : [{ category: "", items: r.items }];

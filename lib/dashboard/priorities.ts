@@ -15,7 +15,7 @@ export type PriorityItem = {
  * later, it should still be able to produce a ranked list shaped like
  * PriorityItem[] so callers (the widget) don't have to change.
  */
-export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
+export function computeTodaysPriorities(data: DashboardData, limit = 5): PriorityItem[] {
   const items: PriorityItem[] = [];
 
   for (const t of data.overdueTasks) {
@@ -70,5 +70,5 @@ export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
     });
   }
 
-  return items.sort((a, b) => b.weight - a.weight).slice(0, 5);
+  return items.sort((a, b) => b.weight - a.weight).slice(0, limit);
 }

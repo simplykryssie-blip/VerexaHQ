@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, Handshake } from "lucide-react";
+import { ClipboardList, Handshake, MessageCircleWarning } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
@@ -14,7 +14,7 @@ export default async function PortalLayout({ children }: { children: React.React
   if (!identity) redirect("/portal/login");
 
   const supabase = createClient();
-  const [{ count }, branding, { data: pendingOrganizers }, { data: pendingQuotes }] = await Promise.all([
+  const [{ count }, branding, { data: pendingOrganizers }, { data: pendingQuotes }, { data: myOrganizerResponses }] = await Promise.all([
     supabase
       .from("notification_queue")
       .select("id", { count: "exact", head: true })
@@ -33,7 +33,20 @@ export default async function PortalLayout({ children }: { children: React.React
       .eq("client_id", identity.clientId)
       .eq("status", "sent")
       .order("created_at", { ascending: true }),
+    supabase.from("organizer_responses").select("id").eq("client_id", identity.clientId),
   ]);
+
+  const myOrganizerResponseIds = (myOrganizerResponses ?? []).map((r) => r.id);
+  const { data: organizerInfoRequests } =
+    myOrganizerResponseIds.length > 0
+      ? await supabase
+          .from("organizer_information_requests")
+          .select("id, organizer_response_id")
+          .in("organizer_response_id", myOrganizerResponseIds)
+          .in("status", ["active", "viewed"])
+          .order("created_at", { ascending: true })
+      : { data: [] as { id: string; organizer_response_id: string }[] };
+  const infoRequestsAwaitingResponse = organizerInfoRequests ?? [];
 
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
@@ -64,6 +77,7 @@ export default async function PortalLayout({ children }: { children: React.React
               pendingCount={count ?? 0}
               logoUrl={branding.portalLogoUrl}
               firmName={branding.displayName}
+              accentIsCustom={!!branding.secondaryColor}
             />
           </div>
           <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0 print:overflow-visible print:pt-0">
@@ -87,6 +101,17 @@ export default async function PortalLayout({ children }: { children: React.React
                 {pending.length === 1
                   ? `You have an organizer to complete: ${firstPendingName ?? "Organizer"} -- start it now`
                   : `You have ${pending.length} organizers to complete -- start them now`}
+              </Link>
+            )}
+            {infoRequestsAwaitingResponse.length > 0 && (
+              <Link
+                href={infoRequestsAwaitingResponse.length === 1 ? `/portal/organizer/${infoRequestsAwaitingResponse[0].organizer_response_id}` : "/portal/organizer"}
+                className="sticky top-0 z-20 flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm font-medium text-ink hover:bg-warning/20 print:hidden"
+              >
+                <MessageCircleWarning size={15} className="shrink-0 text-warning" aria-hidden="true" />
+                {infoRequestsAwaitingResponse.length === 1
+                  ? "Your preparer needs more information on your organizer -- view details"
+                  : `Your preparer needs more information on ${infoRequestsAwaitingResponse.length} organizers -- view details`}
               </Link>
             )}
             {children}

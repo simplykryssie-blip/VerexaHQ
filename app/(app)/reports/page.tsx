@@ -5,10 +5,10 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
-// Staff productivity is a multi-preparer concept -- not meaningful for a
-// solo PTIN practice, so it's greyed out (visible, not clickable) there
-// instead of just being one more empty report.
-const STAFF_REPORT_SLUG = "staff-productivity";
+// Staff productivity and team performance are both multi-preparer concepts --
+// not meaningful for a solo PTIN practice, so they're greyed out (visible,
+// not clickable) there instead of just being one more empty report.
+const MULTI_PREPARER_REPORT_SLUGS = new Set(["staff-productivity", "team-performance"]);
 
 export default async function ReportsPage() {
   const workspace = await getCurrentWorkspace();
@@ -20,7 +20,7 @@ export default async function ReportsPage() {
       <div className="flex-1 px-8 py-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {REPORT_CATEGORIES.map((c) => {
-            const disabled = hideStaffReport && c.slug === STAFF_REPORT_SLUG;
+            const disabled = hideStaffReport && MULTI_PREPARER_REPORT_SLUGS.has(c.slug);
             if (disabled) {
               return (
                 <div

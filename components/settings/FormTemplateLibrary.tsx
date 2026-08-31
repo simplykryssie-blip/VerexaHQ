@@ -4,22 +4,25 @@ import { LayoutTemplate } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
+import { DocumentRequestLibrary, type DocumentRequestTemplateCard } from "@/components/settings/document-request-editor/DocumentRequestLibrary";
 import { PendingTemplateShares, type PendingShare } from "@/components/settings/PendingTemplateShares";
 import type { DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
 
-export type FormTemplateTabKey = "engagement-letter" | "organizers";
+export type FormTemplateTabKey = "engagement-letter" | "organizers" | "document-requests";
 
 // Split out from the old generic TemplateLibrary so this route's bundle never
 // pulls in the Email/SMS composer's Tiptap dependency -- see EmailSmsLibrary
 // for that side.
 export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { workspaceId: string; activeTabParam?: string }) {
-  const activeTab: FormTemplateTabKey = activeTabParam === "organizers" ? "organizers" : "engagement-letter";
+  const activeTab: FormTemplateTabKey =
+    activeTabParam === "organizers" ? "organizers" : activeTabParam === "document-requests" ? "document-requests" : "engagement-letter";
   const isOrganizers = activeTab === "organizers";
+  const isDocumentRequests = activeTab === "document-requests";
 
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
 
-  const { data: engagementLetterTemplates } = !isOrganizers
+  const { data: engagementLetterTemplates } = !isOrganizers && !isDocumentRequests
     ? await supabase
         .from("engagement_letter_templates")
         .select("id, name, status, workspace_id, folder_id, requires_signature, merge_fields")
@@ -58,6 +61,34 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       folder_id: t.folder_id,
       topLevelFieldCount: fieldsForTemplate.filter((f) => !f.parent_field_id).length,
       totalFieldCount: fieldsForTemplate.length,
+    };
+  });
+
+  const { data: documentRequestTemplates } = isDocumentRequests
+    ? await supabase
+        .from("document_request_templates")
+        .select("id, name, description, status, workspace_id, folder_id")
+        .or(orFilter)
+        .order("name")
+    : { data: null };
+
+  const documentRequestTemplateIds = (documentRequestTemplates ?? []).map((t) => t.id);
+  const { data: documentRequestItems } =
+    isDocumentRequests && documentRequestTemplateIds.length > 0
+      ? await supabase.from("document_request_items").select("id, document_request_template_id, is_required").in("document_request_template_id", documentRequestTemplateIds)
+      : { data: [] as { id: string; document_request_template_id: string; is_required: boolean }[] };
+
+  const documentRequestCards: DocumentRequestTemplateCard[] = (documentRequestTemplates ?? []).map((t) => {
+    const itemsForTemplate = (documentRequestItems ?? []).filter((i) => i.document_request_template_id === t.id);
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      status: t.status,
+      workspace_id: t.workspace_id,
+      folder_id: t.folder_id,
+      itemCount: itemsForTemplate.length,
+      requiredCount: itemsForTemplate.filter((i) => i.is_required).length,
     };
   });
 
@@ -112,8 +143,9 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   }));
 
   const tabs: { key: FormTemplateTabKey; label: string }[] = [
-    { key: "engagement-letter", label: "Engagement Letters" },
+    { key: "engagement-letter", label: "Documents" },
     { key: "organizers", label: "Organizers" },
+    { key: "document-requests", label: "Document Requests" },
   ];
 
   return (
@@ -121,7 +153,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       <SettingsSectionHeader
         icon={LayoutTemplate}
         title="Form Templates"
-        description="Engagement letter and organizer templates. See Email & SMS in the Templates menu for message templates."
+        description="Document and organizer templates. See Email & SMS in the Templates menu for message templates."
       />
 
       <div className="mt-4">
@@ -150,6 +182,8 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
             isJotformConnected={Boolean(jotformConnected)}
             downlineWorkspaces={downlineWorkspaces}
           />
+        ) : isDocumentRequests ? (
+          <DocumentRequestLibrary workspaceId={workspaceId} templates={documentRequestCards} folders={folders ?? []} />
         ) : (
           <EngagementLetterLibrary
             workspaceId={workspaceId}

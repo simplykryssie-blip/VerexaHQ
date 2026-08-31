@@ -20,8 +20,11 @@ function formatAnswer(field: FieldRow, value: string | undefined): string {
   }
   if (field.field_type === "signature") {
     try {
-      const parsed = JSON.parse(value) as { typed_name?: string; signed_at?: string };
-      return parsed.typed_name ? `Signed by ${parsed.typed_name} on ${new Date(parsed.signed_at ?? "").toLocaleDateString()}` : "--";
+      const parsed = JSON.parse(value) as { typed_name?: string; signature_image_path?: string; signed_at?: string };
+      const signedOn = parsed.signed_at ? ` on ${new Date(parsed.signed_at).toLocaleDateString()}` : "";
+      if (parsed.typed_name) return `Signed by ${parsed.typed_name}${signedOn}`;
+      if (parsed.signature_image_path) return `Signed (drawn signature)${signedOn}`;
+      return "--";
     } catch {
       return "--";
     }

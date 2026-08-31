@@ -32,16 +32,33 @@ export const DEFAULT_BUSINESS_HOURS: BusinessHours = {
 export const DEFAULT_SLOT_MINUTES = 30;
 export const BOOKING_WINDOW_DAYS = 14;
 
+// A single-day closure is start === end; a span (e.g. the week between
+// Christmas and New Year's) covers every date from start through end
+// inclusive. Both are 'YYYY-MM-DD'.
+export type HolidayRange = { start: string; end: string };
+
 function timeToMinutes(t: string): number {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
+}
+
+function toIsoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function isHoliday(isoDate: string, holidays: HolidayRange[]): boolean {
+  return holidays.some((h) => isoDate >= h.start && isoDate <= h.end);
 }
 
 // `date` is a plain local calendar day (midnight); returns candidate slot
 // start times as Date objects for that day, spaced by `gridMinutes` and
 // each guaranteed to fit a `durationMinutes`-long appointment before
 // closing -- before existing appointments/lead time are subtracted out.
-export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: number, durationMinutes: number): Date[] {
+// `holidays` are the same system_settings shape the business-hours due-date
+// engine reads -- a date falling in any range closes the day entirely
+// regardless of its normal weekly hours.
+export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: number, durationMinutes: number, holidays: HolidayRange[] = []): Date[] {
+  if (isHoliday(toIsoDate(date), holidays)) return [];
   const dayKey = WEEKDAYS[date.getDay()];
   const day = hours[dayKey];
   if (!day) return [];

@@ -18,6 +18,18 @@ const WORKSPACE_TYPE_LABELS: Record<string, string> = {
   platform_admin: "Platform Admin",
 };
 
+const CHILD_TIER_LABEL: Record<string, string> = {
+  ero_ptin: "PTIN",
+  service_bureau_ero: "ERO",
+  service_bureau_ptin: "PTIN",
+};
+
+const PARENT_TIER_LABEL: Record<string, string> = {
+  ero_ptin: "ERO",
+  service_bureau_ero: "Service Bureau",
+  service_bureau_ptin: "Service Bureau",
+};
+
 function money(cents: number | null) {
   if (cents == null) return "--";
   return `$${(cents / 100).toFixed(2)}`;
@@ -73,12 +85,12 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         .from("firm_connections")
         .select("id, status, relationship_type, workspaces:child_workspace_id(id, name)")
         .eq("parent_workspace_id", workspace.id)
-        .eq("relationship_type", "ero_ptin"),
+        .in("relationship_type", ["ero_ptin", "service_bureau_ero", "service_bureau_ptin"]),
       supabase
         .from("firm_connections")
         .select("id, status, relationship_type, workspaces:parent_workspace_id(id, name)")
         .eq("child_workspace_id", workspace.id)
-        .eq("relationship_type", "ero_ptin"),
+        .in("relationship_type", ["ero_ptin", "service_bureau_ero", "service_bureau_ptin"]),
       supabase.from("platform_subscription_plans").select("id, name").eq("is_active", true).order("name"),
     ]);
 
@@ -258,14 +270,16 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
                 {(asParent ?? []).map((c) => (
                   <li key={c.id} className="flex items-center justify-between px-5 py-3">
                     <span className="text-slate">
-                      Connected PTIN: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}
+                      Connected {CHILD_TIER_LABEL[c.relationship_type] ?? "firm"}: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}
                     </span>
                     <span className="text-xs capitalize text-muted">{c.status}</span>
                   </li>
                 ))}
                 {(asChild ?? []).map((c) => (
                   <li key={c.id} className="flex items-center justify-between px-5 py-3">
-                    <span className="text-slate">Connected to ERO: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}</span>
+                    <span className="text-slate">
+                      Connected to {PARENT_TIER_LABEL[c.relationship_type] ?? "firm"}: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}
+                    </span>
                     <span className="text-xs capitalize text-muted">{c.status}</span>
                   </li>
                 ))}

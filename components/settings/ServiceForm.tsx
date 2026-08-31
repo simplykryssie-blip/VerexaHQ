@@ -44,7 +44,7 @@ export type ServiceRow = {
 
 const REQUIREMENT_FIELDS: { key: keyof ServiceRow; label: string }[] = [
   { key: "requires_organizer", label: "Requires an organizer" },
-  { key: "requires_engagement_letter", label: "Requires an engagement letter" },
+  { key: "requires_engagement_letter", label: "Requires a signed document" },
   { key: "requires_documents", label: "Requires documents" },
   { key: "requires_signature", label: "Requires signature" },
   { key: "requires_review", label: "Requires review" },
@@ -142,6 +142,7 @@ export function ServiceForm({
   const hasAdvancedConfig = Boolean(
     documentRequestTemplateId ||
       documentFolderTemplateId ||
+      engagementLetterTemplateId ||
       pricingRuleId ||
       billingRuleId ||
       defaultPrice ||
@@ -353,6 +354,16 @@ export function ServiceForm({
                   onChange={markDirty(setDocumentFolderTemplateId)}
                   options={documentFolderTemplates}
                   noneLabel="No document folder template"
+                  disabled={!canManage}
+                />
+              </label>
+              <label className={`${labelClass} mt-3`}>
+                Signable document template
+                <OptionSelect
+                  value={engagementLetterTemplateId}
+                  onChange={markDirty(setEngagementLetterTemplateId)}
+                  options={engagementLetterTemplates}
+                  noneLabel="No document template"
                   disabled={!canManage}
                 />
               </label>

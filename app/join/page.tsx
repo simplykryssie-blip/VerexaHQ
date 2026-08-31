@@ -108,10 +108,15 @@ export default function JoinPage() {
     // -- accept_firm_connection_invite validates the token is still a real,
     // pending, unexpired invite before creating anything, so this can't be
     // used to spin up an unconnected workspace the way calling
-    // create_workspace directly could.
+    // create_workspace directly could. The new workspace's type must match
+    // the tier the invite is actually for -- a service_bureau_ero invite is
+    // onboarding a brand-new ERO office, not a PTIN, even though the RPC's
+    // own default (independent_ptin) covers the far more common ero_ptin/
+    // service_bureau_ptin cases correctly on its own.
     const { data: newWorkspaceId, error: acceptError } = await supabase.rpc("accept_firm_connection_invite", {
       p_token: token,
       p_name: name,
+      p_workspace_type: preview?.relationship_type === "service_bureau_ero" ? "ero_office" : "independent_ptin",
     });
     if (acceptError || !newWorkspaceId) {
       setConnecting(false);
