@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { verifyStripeSignature } from "@/lib/stripe/client";
 import { createServiceClient } from "@/lib/supabase/service";
-import { handleCheckoutSessionCompleted, handlePaymentIntentFailed, markWebhookFailed, markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
+import {
+  handleCheckoutSessionCompleted,
+  handleUsageTopupCheckoutCompleted,
+  handlePaymentIntentFailed,
+  markWebhookFailed,
+  markWebhookProcessed,
+} from "@/lib/stripe/handleCheckoutCompleted";
 import {
   handleSubscriptionCreated,
   handleSubscriptionUpdated,
@@ -42,9 +48,12 @@ export async function POST(request: Request) {
         id: string;
         payment_intent: string;
         amount_total: number;
-        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string };
+        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; type?: string; resource_type?: string; units?: string };
       };
-      const result = await handleCheckoutSessionCompleted(supabase, session);
+      const result =
+        session.metadata?.type === "usage_topup"
+          ? await handleUsageTopupCheckoutCompleted(supabase, session)
+          : await handleCheckoutSessionCompleted(supabase, session);
       await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });

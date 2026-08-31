@@ -1,10 +1,24 @@
 import { isSmsConfigured } from "@/lib/providerStatus";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export type SendSmsResult = { sent: boolean; reason?: string; error?: string; id?: string };
 
-export async function sendSmsViaTwilio({ to, body }: { to: string; body: string }): Promise<SendSmsResult> {
+export async function sendSmsViaTwilio({ to, body, workspaceId }: { to: string; body: string; workspaceId?: string }): Promise<SendSmsResult> {
   if (!isSmsConfigured()) {
     return { sent: false, reason: "SMS provider is not configured for this environment." };
+  }
+
+  // Same free-bucket-then-prepaid-balance draw as sendEmailViaResend --
+  // see that function for the full rationale. A workspace never granted
+  // either (not on a paid plan) passes through unmetered.
+  let reservedSource: string | null = null;
+  if (workspaceId) {
+    const supabase = createServiceClient();
+    const { data: reservation } = await supabase.rpc("reserve_usage_unit", { p_workspace_id: workspaceId, p_resource_type: "sms" }).single();
+    if (!reservation?.allowed) {
+      return { sent: false, reason: "This workspace's SMS balance is used up. Purchase a top-up to keep sending." };
+    }
+    reservedSource = reservation.source;
   }
 
   const accountSid = process.env.TWILIO_ACCOUNT_SID!;
@@ -21,6 +35,10 @@ export async function sendSmsViaTwilio({ to, body }: { to: string; body: string 
   });
 
   if (!res.ok) {
+    if (workspaceId && reservedSource) {
+      const supabase = createServiceClient();
+      await supabase.rpc("refund_usage_unit", { p_workspace_id: workspaceId, p_resource_type: "sms", p_source: reservedSource });
+    }
     const text = await res.text().catch(() => "");
     return { sent: false, error: `Twilio responded with ${res.status}: ${text}` };
   }

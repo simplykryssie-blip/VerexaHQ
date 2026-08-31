@@ -38,7 +38,10 @@ export async function createCheckoutSession({
   successUrl: string;
   cancelUrl: string;
   metadata: Record<string, string>;
-  connectedAccountId: string;
+  // Omit for a platform-level charge (Verexa charging the workspace itself,
+  // e.g. a usage top-up) -- only set this for a Connect direct charge on a
+  // workspace's own connected account (its client paying its invoice).
+  connectedAccountId?: string;
 }): Promise<StripeResult<{ id: string; url: string }>> {
   if (!isStripeConfigured()) {
     return { ok: false, reason: "Stripe is not configured for this environment." };

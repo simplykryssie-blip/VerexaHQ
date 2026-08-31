@@ -4,8 +4,32 @@ type CheckoutSession = {
   id: string;
   payment_intent: string;
   amount_total: number;
-  metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string };
+  metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; type?: string; resource_type?: string; units?: string };
 };
+
+/**
+ * A workspace paying Verexa in advance for extra email/SMS/storage capacity
+ * -- the platform-level counterpart to handleCheckoutSessionCompleted below
+ * (which is a workspace's own client paying that workspace's invoice).
+ * Credited only once Stripe confirms payment, never before, so nothing is
+ * ever given out unpaid.
+ */
+export async function handleUsageTopupCheckoutCompleted(
+  supabase: ReturnType<typeof createServiceClient>,
+  session: CheckoutSession
+): Promise<{ skipped: string } | { skipped: undefined }> {
+  const workspaceId = session.metadata?.workspace_id;
+  const resourceType = session.metadata?.resource_type;
+  const units = session.metadata?.units ? Number(session.metadata.units) : undefined;
+
+  if (!workspaceId || !resourceType || !units) {
+    return { skipped: "missing usage top-up metadata" };
+  }
+
+  await supabase.rpc("credit_prepaid_balance", { p_workspace_id: workspaceId, p_resource_type: resourceType, p_units: units });
+
+  return { skipped: undefined };
+}
 
 /**
  * Shared by both the platform webhook and the Connect webhook, since a

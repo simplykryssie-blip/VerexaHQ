@@ -35,6 +35,21 @@ export async function sendEmailViaResend({
     return { sent: false, reason: "Email provider is not configured for this environment." };
   }
 
+  const supabase = createServiceClient();
+
+  // Draws one unit from the workspace's free bucket, then its prepaid
+  // balance -- a workspace never granted either (not on a paid plan) passes
+  // through unmetered. Reserved before the actual send so nothing goes out
+  // unpaid; refunded below if the send itself fails.
+  let reservedSource: string | null = null;
+  if (workspaceId) {
+    const { data: reservation } = await supabase.rpc("reserve_usage_unit", { p_workspace_id: workspaceId, p_resource_type: "email" }).single();
+    if (!reservation?.allowed) {
+      return { sent: false, reason: "This workspace's email balance is used up. Purchase a top-up to keep sending." };
+    }
+    reservedSource = reservation.source;
+  }
+
   let fromAddress = process.env.EMAIL_FROM_ADDRESS || SYSTEM_SENDERS[sender];
 
   // A firm that's verified its own sending domain (Settings > Integrations)
@@ -43,7 +58,6 @@ export async function sendEmailViaResend({
   // rather than "noreply@verexahq.com". Falls back silently to the system
   // default if nothing's configured or verification hasn't completed yet.
   if (workspaceId) {
-    const supabase = createServiceClient();
     const { data: customDomain } = await supabase
       .from("workspace_email_domains")
       .select("domain, from_local_part, status")
@@ -73,6 +87,9 @@ export async function sendEmailViaResend({
   });
 
   if (!res.ok) {
+    if (workspaceId && reservedSource) {
+      await supabase.rpc("refund_usage_unit", { p_workspace_id: workspaceId, p_resource_type: "email", p_source: reservedSource });
+    }
     const text = await res.text().catch(() => "");
     return { sent: false, error: `Resend responded with ${res.status}: ${text}` };
   }

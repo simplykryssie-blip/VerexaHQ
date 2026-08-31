@@ -8489,28 +8489,31 @@ export type Database = {
       }
       workspace_usage_meters: {
         Row: {
-          billed_units_total: number
+          free_units_consumed: number
           free_units_granted: number
           granted_at: string
           id: string
+          prepaid_balance: number
           resource_type: string
           updated_at: string
           workspace_id: string
         }
         Insert: {
-          billed_units_total?: number
+          free_units_consumed?: number
           free_units_granted?: number
           granted_at?: string
           id?: string
+          prepaid_balance?: number
           resource_type: string
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          billed_units_total?: number
+          free_units_consumed?: number
           free_units_granted?: number
           granted_at?: string
           id?: string
+          prepaid_balance?: number
           resource_type?: string
           updated_at?: string
           workspace_id?: string
@@ -9345,6 +9348,10 @@ export type Database = {
           missing_requirements: string[]
         }[]
       }
+      check_storage_capacity: {
+        Args: { p_additional_bytes: number; p_workspace_id: string }
+        Returns: boolean
+      }
       compare_config_object_versions: {
         Args: {
           p_id: string
@@ -9371,18 +9378,6 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
-      }
-      compute_pending_usage_overage: {
-        Args: never
-        Returns: {
-          amount_cents: number
-          currency: string
-          new_billable_units: number
-          new_billed_units_total: number
-          resource_type: string
-          stripe_customer_id: string
-          workspace_id: string
-        }[]
       }
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
@@ -9553,6 +9548,14 @@ export type Database = {
       create_workspace_tag: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
+      }
+      credit_prepaid_balance: {
+        Args: {
+          p_resource_type: string
+          p_units: number
+          p_workspace_id: string
+        }
+        Returns: undefined
       }
       current_workspace_ids: { Args: never; Returns: string[] }
       debug_whoami: { Args: never; Returns: string }
@@ -10221,14 +10224,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      record_usage_overage_billed: {
-        Args: {
-          p_new_billed_units_total: number
-          p_resource_type: string
-          p_workspace_id: string
-        }
-        Returns: undefined
-      }
       redeem_firm_connection_invite: {
         Args: { p_token: string; p_workspace_id: string }
         Returns: {
@@ -10253,6 +10248,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      refund_usage_unit: {
+        Args: {
+          p_resource_type: string
+          p_source: string
+          p_workspace_id: string
+        }
+        Returns: undefined
       }
       reject_automation_step: {
         Args: { p_pending_step_id: string; p_reason: string }
@@ -10324,6 +10327,13 @@ export type Database = {
       reorder_site_page_sections: {
         Args: { p_page_id: string; p_section_ids: string[] }
         Returns: undefined
+      }
+      reserve_usage_unit: {
+        Args: { p_resource_type: string; p_workspace_id: string }
+        Returns: {
+          allowed: boolean
+          source: string
+        }[]
       }
       resolve_and_sign_organizer_response: {
         Args: {

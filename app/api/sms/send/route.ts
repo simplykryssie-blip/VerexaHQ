@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendSmsViaTwilio } from "@/lib/sms/twilio";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { getCurrentWorkspace } from "@/lib/workspace";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -23,7 +24,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, sent: false, error: "to and body are required" }, { status: 400 });
   }
 
-  const result = await sendSmsViaTwilio({ to, body });
+  const workspace = await getCurrentWorkspace();
+  const result = await sendSmsViaTwilio({ to, body, ...(workspace ? { workspaceId: workspace.id } : {}) });
   if (result.reason === undefined) {
     await recordProviderCheck("sms", result.sent, result.error);
   }
