@@ -39,6 +39,49 @@ this document describes without checking which branch you're actually on.
 **This needs a human decision (merge direction, or keep separate) before
 either branch is trusted as "the" current state — flag it, don't guess.**
 
+**Update, same day, after a first investigation pass**: attempted the git
+merge (`main` → `claude/verexa-remove-services-vaqbfx`), hit 9 real file
+conflicts (Users/Connections/Sidebar/nav and friends), and aborted rather
+than resolve them blind once it became clear the scope was much bigger
+than a settings page — `main` has done a full "unified pipeline tracking"
+schema cutover (new `pipeline_runs`/`pipeline_stages` tables; `main`
+**dropped** `lead_pipeline_runs`, `lead_pipeline_stages`, `workflow_runs`,
+`workflow_stages` outright, migration
+`20260825163000_unified_pipeline_cutover.sql`), removed the e-file
+transmission feature, rebuilt the organizer review workspace, added a
+document request template builder, AI operator admin tooling, and more —
+roughly 90 migrations' worth of real architectural work, not just the
+5-item redesign addendum.
+
+**Confirmed against the live database** (one shared Supabase project,
+`daxpavvsotvsyqqntddc`, across every branch): the cutover migration has
+actually run — `lead_pipeline_runs`/`lead_pipeline_stages`/`workflow_runs`/
+`workflow_stages` are gone, only `pipeline_runs`/`pipeline_stages` exist
+now. `main`'s reviewer-queue views (`v_reviewer_queue`,
+`v_workflow_sla_status`) still exist and still expose a
+`workflow_stage_id` column name for backward compatibility, so most code
+built against the old naming still reads fine through those views.
+
+**One real, confirmed bug this caused, found and fixed**:
+`lib/dashboard/data.ts`'s `getDashboardData()` (loaded on every Dashboard
+page view) was already half-migrated *before this divergence was even
+discovered* — it queried the new `pipeline_runs` table for
+`workflowRuns`/`entity_type='engagement'`, but the review-queue stage
+lookup right below it still queried the old, now-nonexistent
+`workflow_stages` table by `workflow_run_id`. That query would fail on
+every single Dashboard load. Fixed (repointed at
+`pipeline_stages`/`pipeline_run_id`) and pushed separately from this
+handoff-doc work. **This means `claude/verexa-remove-services-vaqbfx`'s
+own internal consistency was already compromised before the Aug 27
+divergence was even a factor** — worth a broader sweep for other
+half-migrated references if anyone picks this up (search for
+`workflow_run`/`workflow_stage`/`lead_pipeline` outside of migration
+files, the same way this one was found).
+
+No merge attempt has been made since the abort. This needs a deliberate,
+carefully-scoped effort (likely its own dedicated session, not folded into
+unrelated feature work) — not something to attempt piecemeal.
+
 ## Addendum — 2026-08-31: tax-prep pipeline finishing touches, platform billing dunning, ERO/PTIN Partners directory, Settings consolidation
 
 Branch: `claude/verexa-remove-services-vaqbfx` (forked from `main` at
