@@ -11054,6 +11054,10 @@ export type Database = {
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
       reveal_client_itin: { Args: { p_client_id: string }; Returns: string }
+      reveal_client_pending_change_value: {
+        Args: { p_pending_change_id: string }
+        Returns: string
+      }
       reveal_client_relationship_ssn: {
         Args: { p_relationship_id: string }
         Returns: string

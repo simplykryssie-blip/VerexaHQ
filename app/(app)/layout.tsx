@@ -56,6 +56,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: currentProfile },
     { data: currentMembership },
     { data: roles },
+    { count: pendingClientChangeCount },
+    { count: submittedOrganizerCount },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -94,6 +96,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("roles").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`),
+    // Powers the Review Queue nav item's red dot. Doesn't include cross-firm
+    // engagement_shares (an ERO/SB-only, permission-gated section on that
+    // page) -- checking that permission on every single page load isn't
+    // worth it just for a dot; the two most common cases (client-submitted
+    // info changes, submitted organizers) cover it for everyone else.
+    supabase.from("client_pending_changes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "pending"),
+    supabase.from("organizer_responses").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "submitted"),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -174,6 +183,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
             showPartners={(connectedPartnerCount ?? 0) > 0}
+            reviewQueueHasItems={(pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0}
             showEroManagement={isEroManagementTier(workspace)}
             currentUser={currentUser}
           />
