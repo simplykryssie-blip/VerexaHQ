@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderPortalInviteEmail } from "@/lib/email/portalInvite";
 import { reportSystemFailure, isAccountLevelResendError } from "@/lib/systemFailures";
+import { getAppUrl } from "@/lib/appUrl";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -200,9 +201,7 @@ async function sendOne(supabase: ReturnType<typeof createServiceClient>, job: Pe
       context.templateCandidates.find((t) => t.workspace_id === job.workspace_id) ?? context.templateCandidates.find((t) => t.workspace_id === null) ?? null;
     if (!template) throw new Error("Portal invite email template is missing");
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!appUrl) throw new Error("NEXT_PUBLIC_APP_URL is not configured");
-    const acceptUrl = `${appUrl}/portal/accept-invitation?token=${portalUser.invitation_token}`;
+    const acceptUrl = `${getAppUrl()}/portal/accept-invitation?token=${portalUser.invitation_token}`;
 
     const { subject, html } = renderPortalInviteEmail(
       { subject: template.subject, body: template.body_html },
