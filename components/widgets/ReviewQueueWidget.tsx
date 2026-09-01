@@ -29,10 +29,12 @@ export function ReviewQueueWidget({ items }: { items: ReviewItem[] }) {
             // picks the pill's urgency tone (overdue/exceeded reads as a
             // problem, everything else as a routine in-progress state).
             const tone: BadgeTone = item.sla_category === "Overdue" || item.sla_category === "Exceeded" ? "warning" : "accent";
+            const organizerResponseId = item.workflow_stage_id.startsWith("organizer:") ? item.workflow_stage_id.slice("organizer:".length) : null;
+            const href = organizerResponseId ? `/organizers/${organizerResponseId}/review` : `/clients/${item.client_id}`;
             return (
               <li key={item.workflow_stage_id} className="flex items-start gap-3">
                 <Avatar name={item.client_name} url={null} size="sm" />
-                <Link href={`/clients/${item.client_id}`} className="min-w-0 flex-1 hover:underline">
+                <Link href={href} className="min-w-0 flex-1 hover:underline">
                   <p className="truncate text-sm font-medium text-ink">{item.client_name}</p>
                   <p className="truncate text-xs text-muted">{item.service_name ?? item.engagement_number ?? "Engagement"}</p>
                 </Link>

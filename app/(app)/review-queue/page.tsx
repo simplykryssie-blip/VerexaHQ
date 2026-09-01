@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
@@ -24,6 +25,24 @@ export default async function ReviewQueuePage() {
     p_workspace_id: workspace.id,
     p_permission_key: "engagements.share",
   });
+  const { data: canReviewOrganizers } = await supabase.rpc("has_permission", {
+    p_workspace_id: workspace.id,
+    p_permission_key: "organizers.review",
+  });
+
+  // Leads submit their intake organizer before an engagement exists (the
+  // New Tax Service Lead Enters CRM flow sends it, then waits for it back),
+  // so this can't ride along with engagement_shares/pipeline stages below --
+  // it's the only surface a submitted-but-not-yet-reviewed lead organizer
+  // shows up on anywhere in the app.
+  const { data: submittedOrganizers } = canReviewOrganizers
+    ? await supabase
+        .from("organizer_responses")
+        .select("id, submitted_at, organizer_templates(name), clients(client_type, first_name, last_name, business_name)")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "submitted")
+        .order("submitted_at", { ascending: false })
+    : { data: [] as { id: string; submitted_at: string | null; organizer_templates: { name: string } | null; clients: Parameters<typeof clientLabel>[0] }[] };
 
   const { data: shares } = await supabase
     .from("engagement_shares")
@@ -93,6 +112,29 @@ export default async function ReviewQueuePage() {
             </ul>
           )}
         </section>
+
+        {canReviewOrganizers && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Organizers awaiting review</h2>
+            {(submittedOrganizers ?? []).length === 0 ? (
+              <EmptyState message="No submitted organizers waiting on your review." />
+            ) : (
+              <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
+                {(submittedOrganizers ?? []).map((o) => (
+                  <li key={o.id}>
+                    <Link href={`/organizers/${o.id}/review`} className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
+                      <div>
+                        <p className="font-medium text-slate">{clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0])}</p>
+                        <p className="text-xs text-muted">{(o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer"}</p>
+                      </div>
+                      <span className="text-xs text-muted">{o.submitted_at ? new Date(o.submitted_at).toLocaleDateString() : ""}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         {canReviewShares && (
         <section>

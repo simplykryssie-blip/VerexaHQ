@@ -50,6 +50,7 @@ type ClientRow = {
   lifecycle_status: string;
   tags: string[] | null;
   requestedService?: string | null;
+  needsReview?: boolean;
 };
 
 const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -60,9 +61,16 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
       <div className="flex items-center gap-2.5">
         <Avatar name={clientDisplayName(c)} size="sm" />
         <div>
-          <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-            {clientDisplayName(c)}
-          </Link>
+          <div className="flex items-center gap-1.5">
+            <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+              {clientDisplayName(c)}
+            </Link>
+            {c.needsReview && (
+              <Badge tone="warning" className="shrink-0">
+                Submitted -- needs review
+              </Badge>
+            )}
+          </div>
           {c.requestedService && <p className="text-xs text-muted">{c.requestedService}</p>}
         </div>
       </div>
@@ -198,8 +206,17 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   for (const [clientId, names] of requestedServicesByClient) {
     requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
+
+  // Nothing else on this list tells staff a client submitted something --
+  // the only way to notice was opening every client one at a time.
+  const { data: submittedOrganizers } = clientIds.length > 0
+    ? await supabase.from("organizer_responses").select("client_id").in("client_id", clientIds).eq("status", "submitted")
+    : { data: [] as { client_id: string }[] };
+  const clientsNeedingReview = new Set((submittedOrganizers ?? []).map((o) => o.client_id));
+
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
+    needsReview: clientsNeedingReview.has(c.id),
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
   }));
 
