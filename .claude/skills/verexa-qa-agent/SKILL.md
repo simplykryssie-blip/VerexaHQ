@@ -23,8 +23,8 @@ This skill assumes you are running inside a Claude Code session with:
 ## Hard safety boundary -- read this first
 
 **You may only ever operate against a workspace where `workspaces.is_demo =
-true`.** As of this writing that's `Demo - ERO Office`, `Demo - Service
-Bureau`, and `Summit Tax & Financial Services`. Confirm with:
+true`.** Workspace names drift (they get renamed) -- always confirm the
+current set with the query below rather than trusting a name listed here.
 
 ```sql
 select id, name from public.workspaces where is_demo = true;
@@ -216,13 +216,77 @@ app, a needed persona didn't exist) -- not merely because you found defects.
 Finding defects is success for a QA run; the run's own `status` describes
 whether *the QA agent completed its work*, not whether the product passed.
 
-## Cleaning up synthetic data
+## Cleaning up synthetic data -- mandatory, every run, no exceptions
 
-If you created throwaway rows (a synthetic `signature_requests` +
-`signature_request_signers` + `attachments` chain, a test client, etc.) purely
-to exercise an RPC, delete them after recording the finding/evidence unless
-the row itself *is* the evidence someone should review by hand. Don't leave
-a trail of junk records in the demo workspaces.
+The demo workspaces must be empty of work/test data between runs -- staff use
+them to demo and test the real product, and leftover synthetic clients,
+engagements, appointments, etc. from a QA run get mistaken for a bug (or
+worse, real data that didn't get deleted). **Every row you create during a
+run must be deleted before you call `complete_agent_run`.** There is no
+"leave it as evidence" exception anymore: if a finding needs supporting
+detail, put it in `record_agent_evidence`'s `p_payload` (the actual field
+values, the RPC's response, the error message) or `p_reproduction_steps` on
+the finding -- not in a live row you leave behind for someone to go look at.
+A human reviewing a finding reads the evidence payload, not the demo
+workspace's client list.
+
+Track every id you create as you go (clients, engagements, and anything
+under them) in a scratch list. At the end of the run, delete everything in
+that list in this order -- deepest dependents first, matching the actual FK
+graph (verified live, not assumed; re-check `information_schema.columns` if
+a table's linking column isn't obvious -- several of these are polymorphic
+`entity_id`/`entity_type` pairs rather than a direct `client_id`/
+`engagement_id` column, which is easy to get wrong):
+
+```sql
+do $$
+declare
+  v_client_ids uuid[] := array[<your synthetic client ids>];
+  v_engagement_ids uuid[] := array[<your synthetic engagement ids>];
+  v_response_ids uuid[];
+begin
+  select array_agg(id) into v_response_ids from organizer_responses where client_id = any(v_client_ids) or engagement_id = any(v_engagement_ids);
+
+  delete from automation_execution_logs where workflow_run_id in (select id from automation_runs where client_id = any(v_client_ids) or engagement_id = any(v_engagement_ids));
+  delete from automation_pending_steps where run_id in (select id from automation_runs where client_id = any(v_client_ids) or engagement_id = any(v_engagement_ids));
+  delete from automation_runs where client_id = any(v_client_ids) or engagement_id = any(v_engagement_ids);
+  delete from organizer_information_request_items where request_id in (select id from organizer_information_requests where organizer_response_id = any(v_response_ids));
+  delete from organizer_information_requests where organizer_response_id = any(v_response_ids);
+  delete from organizer_response_answers where organizer_response_id = any(v_response_ids);
+  delete from organizer_responses where id = any(v_response_ids);
+  delete from messages where thread_id in (select id from message_threads where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids));
+  delete from message_threads where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids);
+  delete from pipeline_stages where pipeline_run_id in (select id from pipeline_runs where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids));
+  delete from pipeline_runs where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids);
+  delete from pending_portal_invites where client_id = any(v_client_ids);
+  delete from client_portal_users where client_id = any(v_client_ids);
+  delete from attachments where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids);
+  delete from notes where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids);
+  delete from activity_log where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids);
+  delete from client_service_interests where client_id = any(v_client_ids);
+  delete from client_addresses where client_id = any(v_client_ids);
+  delete from client_contacts where client_id = any(v_client_ids);
+  delete from client_emails where client_id = any(v_client_ids);
+  delete from client_phones where client_id = any(v_client_ids);
+  delete from client_relationships where client_id = any(v_client_ids) or related_client_id = any(v_client_ids);
+  delete from tasks where client_id = any(v_client_ids) or engagement_id = any(v_engagement_ids);
+  delete from appointments where client_id = any(v_client_ids) or engagement_id = any(v_engagement_ids);
+  delete from signature_request_signers where signature_request_id in (select id from signature_requests where attachment_id in (select id from attachments where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids)));
+  delete from signature_requests where attachment_id in (select id from attachments where entity_id = any(v_client_ids) or entity_id = any(v_engagement_ids));
+  delete from engagements where id = any(v_engagement_ids);
+  delete from clients where id = any(v_client_ids);
+end $$;
+```
+
+This won't cover every table in every scenario (e.g. anything you created
+outside the client/engagement graph -- a standalone automation, a template,
+a site page). Use the same principle for those: whatever you inserted,
+delete it, following its actual FK dependents first. Before calling
+`complete_agent_run`, run a verification query confirming zero rows remain
+for every id you created -- the same way you'd confirm a fix, don't just
+assume the deletes worked. If a delete fails partway through, fix the error
+and re-run the cleanup block before finishing -- don't complete the run with
+known leftover data.
 
 ## Reporting back
 
