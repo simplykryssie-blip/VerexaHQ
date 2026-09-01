@@ -151,7 +151,16 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     ]);
 
   const isOwner = Boolean(membership?.is_owner);
-  const staffUserIds = (activeMembers ?? []).map((m) => m.user_id);
+  // Only the owner ever sees the "assign to" picker (below), so whenever it
+  // renders, the current viewer IS the account holder -- naming them
+  // directly instead of a generic "Me" makes the default assignment
+  // unambiguous.
+  const { data: currentProfile } = user ? await supabase.from("user_profiles").select("display_name").eq("id", user.id).maybeSingle() : { data: null };
+  const accountHolderName = currentProfile?.display_name ?? "Me";
+  // Excludes the current viewer -- the picker's own default option already
+  // covers "assign to me" (see NewClientButton), so listing them again by
+  // name here just duplicates that choice under two different labels.
+  const staffUserIds = (activeMembers ?? []).map((m) => m.user_id).filter((id) => id !== user?.id);
   const { data: staffProfiles } = staffUserIds.length
     ? await supabase.from("user_profiles").select("id, display_name").in("id", staffUserIds)
     : { data: [] };
@@ -211,6 +220,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
               serviceCategories={serviceCategories}
               isOwner={isOwner}
               staffOptions={staffOptions}
+              accountHolderName={accountHolderName}
             />
           ) : null
         }
@@ -252,6 +262,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
               serviceCategories={serviceCategories}
               isOwner={isOwner}
               staffOptions={staffOptions}
+              accountHolderName={accountHolderName}
             />
               ) : undefined
             }

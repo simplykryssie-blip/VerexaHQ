@@ -72,15 +72,20 @@ export function NewClientButton({
   serviceCategories,
   isOwner = false,
   staffOptions = [],
+  accountHolderName = "Me",
 }: {
   workspaceId: string;
   workspaceName: string;
   serviceCategories: ServiceCategory[];
   /** Only the account owner gets an "assign to" choice -- any other staff
    *  member adding a client is always assigned to themselves automatically
-   *  (see the auto-assign trigger on clients), no picker needed. */
+   *  (see resolve_client_relationship_manager), no picker needed. */
   isOwner?: boolean;
   staffOptions?: StaffOption[];
+  /** The current viewer's own name -- whenever this picker renders, the
+   *  viewer IS the account holder, so the default option is labeled with
+   *  their real name instead of a generic "Me". */
+  accountHolderName?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -492,7 +497,7 @@ export function NewClientButton({
                     onChange={(e) => setAssignToStaffId(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   >
-                    <option value="">Me</option>
+                    <option value="">{accountHolderName} (default)</option>
                     {staffOptions.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.display_name ?? "Staff"}
