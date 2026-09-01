@@ -141,10 +141,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (accentSoftRgb) (brandVars as Record<string, string>)["--brand-accent-soft-rgb"] = accentSoftRgb;
   }
   // Second stop of the Dashboard hero's gradient (see brandGradientTo in
-  // tailwind.config.ts) -- reuses Brand Center's fallback accent color so
-  // the gradient is workspace-configurable without a new branding field.
-  if (branding.primaryColor) {
-    const gradientToRgb = hexToRgbTriplet(branding.primaryColor);
+  // tailwind.config.ts) -- a lightened tint of the SAME accent color, not an
+  // independently-chosen second color. Two unrelated brand colors (e.g. an
+  // indigo accent paired with an amber fallback color) can blend into a
+  // muddy middle when used as gradient stops; tinting one color toward white
+  // guarantees the gradient always stays in the same hue family and reads
+  // clean, for any workspace's accent choice.
+  if (branding.secondaryColor) {
+    const gradientToRgb = lightenHexToRgbTriplet(branding.secondaryColor, 0.45);
     if (gradientToRgb) (brandVars as Record<string, string>)["--brand-gradient-to-rgb"] = gradientToRgb;
   }
 
