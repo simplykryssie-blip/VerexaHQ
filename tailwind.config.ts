@@ -31,6 +31,12 @@ const config: Config = {
         // brand gradient -- see Sidebar.module.css's --nav-active-bg for
         // where that gradient is actually used.
         brandLime: "#A4D22B",
+        // Second stop of the Dashboard hero's "Welcome back" gradient --
+        // workspace-configurable via Brand Center's fallback accent color
+        // (see --brand-gradient-to-rgb in app/(app)/layout.tsx), falling
+        // back to the same brandLime hex above for any workspace that
+        // hasn't set one.
+        brandGradientTo: "rgb(var(--brand-gradient-to-rgb, 164 210 43) / <alpha-value>)",
         success: "#16A34A",
         successSoft: "#E3F4E9",
         warning: "#D97706",
