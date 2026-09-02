@@ -241,6 +241,7 @@ export function BrandCenterForm({
   isWhitelabeledByEro,
   allowsBrandingOverride,
   eroName,
+  platformAdminOverride,
 }: {
   workspaceId: string;
   workspaceName: string;
@@ -262,6 +263,8 @@ export function BrandCenterForm({
   isWhitelabeledByEro: boolean;
   allowsBrandingOverride: boolean;
   eroName: string | null;
+  /** Platform admin viewing one of the demo workspaces -- bypasses the owner-only and ERO-whitelabel-lock checks below. */
+  platformAdminOverride: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -280,7 +283,7 @@ export function BrandCenterForm({
   const [showAdvanced, setShowAdvanced] = useState(Boolean(sidebarLogoUrl || portalLogoUrl));
   const [saving, setSaving] = useState(false);
 
-  const editable = isOwner && (!isWhitelabeledByEro || allowsBrandingOverride);
+  const editable = platformAdminOverride || (isOwner && (!isWhitelabeledByEro || allowsBrandingOverride));
   const resolvedSidebarText =
     textMode === "light" ? "#FFFFFF" : textMode === "dark" ? "#0F172A" : readableTextColor(customSidebar ? sidebarBg : "#FFFFFF");
 

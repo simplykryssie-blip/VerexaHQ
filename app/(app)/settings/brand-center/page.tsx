@@ -12,14 +12,25 @@ export default async function BrandCenterPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: branding }, effectiveBranding] = await Promise.all([
+  const [{ data: branding }, effectiveBranding, { data: isPlatformAdmin }, { data: workspaceRow }] = await Promise.all([
     supabase
       .from("branding")
       .select("display_name, logo_url, favicon_url, sidebar_logo_url, portal_logo_url, primary_color, secondary_color, sidebar_bg_color, sidebar_text_color")
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
     getEffectiveBranding(workspace.id),
+    supabase.rpc("is_platform_admin"),
+    supabase.from("workspaces").select("is_demo").eq("id", workspace.id).single(),
   ]);
+
+  // Demo workspaces are each owned by their own fake persona (Monica Jones,
+  // Jade Monroe, ...) so the demo's real day-to-day account -- a platform
+  // admin, not that persona -- is only ever an Admin there and would
+  // otherwise see every branding control correctly disabled by the
+  // owner-only check below. Platform admins get a bypass, scoped to demo
+  // workspaces only so this never loosens who can edit a real firm's
+  // branding.
+  const platformAdminOverride = Boolean(isPlatformAdmin) && Boolean(workspaceRow?.is_demo);
 
   return (
     <div className="max-w-2xl">
@@ -46,6 +57,7 @@ export default async function BrandCenterPage() {
           isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
           allowsBrandingOverride={effectiveBranding.allowsBrandingOverride}
           eroName={effectiveBranding.eroName ?? null}
+          platformAdminOverride={platformAdminOverride}
         />
       </div>
     </div>
