@@ -9,9 +9,18 @@ import { presentNotification, type NotificationRow } from "@/lib/notifications/p
 export const dynamic = 'force-dynamic';
 
 // Every (event_type, channel) pair actually gated by is_notification_enabled()
-// for staff recipients. signature_due and the create_notification()-driven
-// engagement events aren't gated at all today, so they have no row here.
+// for staff recipients. signature_due and ENGAGEMENT_* aren't gated at all
+// today, so they have no row here.
 const PREFERENCE_ROWS = [
+  // These fire automatically the moment the thing happens -- no Workflow to
+  // build, nothing to configure. Bell icon only (In-App).
+  { eventType: "DOCUMENT_REQUEST_COMPLETED", channel: "In-App", label: "A client finishes sending requested documents", description: "Notifies you the moment every document you asked for has come in." },
+  { eventType: "ORGANIZER_SUBMITTED", channel: "In-App", label: "A client submits their intake form", description: "Notifies your firm's owners/admins that a client finished their organizer and it's ready to review." },
+  { eventType: "ORGANIZER_REVIEWED", channel: "In-App", label: "A client's intake form gets reviewed", description: "Notifies you once a staff member approves or requests changes on a client's submitted organizer." },
+  { eventType: "PAYMENT_RECEIVED", channel: "In-App", label: "A payment comes in", description: "Notifies you any time a payment (any amount, any method) is recorded for one of your clients." },
+  { eventType: "INVOICE_PAID", channel: "In-App", label: "An invoice is fully paid off", description: "Notifies you when an invoice's balance hits zero." },
+  // Everything below are timed reminders sent by email/text ahead of a
+  // deadline, not "something just happened" notices.
   { eventType: "workflow_stage_due", channel: "Email", label: "Workflow stage due soon (Email)", description: "A stage assigned to you is due within 2 days." },
   { eventType: "workflow_stage_due", channel: "SMS", label: "Workflow stage due soon (SMS)", description: "Text version of the above." },
   { eventType: "appointment_reminder", channel: "Email", label: "Appointment reminder (Email)", description: "An appointment assigned to you starts within a day." },
@@ -48,7 +57,7 @@ export default async function NotificationsPage() {
   return (
     <div className="max-w-2xl space-y-8">
       <div>
-        <SettingsSectionHeader icon={Bell} title="Reminder preferences" description="Choose which automated reminders you receive by email. On by default." />
+        <SettingsSectionHeader icon={Bell} title="Notification preferences" description="Choose what automatically notifies you -- bell alerts and email/text reminders. Everything is on by default; turn off anything you don't want." />
         {workspace ? (
           <div className="mt-4 divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {PREFERENCE_ROWS.map((row) => (
