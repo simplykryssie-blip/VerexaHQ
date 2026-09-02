@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return { icons: { icon: branding.faviconUrl ?? "/brand/vmark.png" } };
 }
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const workspace = await getCurrentWorkspace();
 
   if (!workspace) {
@@ -157,6 +157,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {children}
           </main>
         </div>
+        {modal}
       </ToastProvider>
     </div>
   );
