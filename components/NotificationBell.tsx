@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
 import { IconButton } from "@/components/ui/IconButton";
-import { Card } from "@/components/ui/Card";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -15,7 +15,7 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -33,16 +33,6 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
     const interval = setInterval(load, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [load]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
@@ -73,7 +63,7 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
       </IconButton>
 
       {open && (
-        <Card padded={false} className="absolute right-0 top-full z-30 mt-2 w-80 shadow-lg">
+        <DropdownPanel className="right-0 top-full mt-2 w-80">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <p className="text-sm font-semibold text-ink">Notifications</p>
             {unreadCount > 0 && (
@@ -107,7 +97,7 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
               </ul>
             )}
           </div>
-        </Card>
+        </DropdownPanel>
       )}
     </div>
   );

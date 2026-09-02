@@ -9,7 +9,6 @@ import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import type { LibraryFolderRow } from "@/components/library/types";
@@ -41,11 +40,15 @@ export function PipelineLibrary({
   pipelines,
   folders,
   canManage,
+  creating,
+  onCreatingChange,
 }: {
   workspaceId: string;
   pipelines: PipelineCard[];
   folders: LibraryFolderRow[];
   canManage: boolean;
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -53,7 +56,6 @@ export function PipelineLibrary({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -165,11 +167,6 @@ export function PipelineLibrary({
               </option>
             ))}
           </select>
-          {canManage && (
-            <Button onClick={() => setCreating(true)} className="ml-auto">
-              + New pipeline
-            </Button>
-          )}
         </div>
 
         {deleteError && <p className="mt-2 text-sm text-danger">{deleteError}</p>}
@@ -245,7 +242,7 @@ export function PipelineLibrary({
             <form onSubmit={createPipeline} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-sm font-semibold text-ink">New pipeline</h2>
-                <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
+                <button type="button" onClick={() => onCreatingChange(false)} className="text-lg text-muted hover:text-ink">
                   &times;
                 </button>
               </div>
@@ -261,7 +258,7 @@ export function PipelineLibrary({
                 {error && <p className="text-sm text-danger">{error}</p>}
               </div>
               <div className="mt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
+                <button type="button" onClick={() => onCreatingChange(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
                   Cancel
                 </button>
                 <button

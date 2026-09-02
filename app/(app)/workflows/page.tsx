@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
-import { WorkflowList, type WorkflowRow } from "@/components/workflows/WorkflowList";
+import { WorkflowsPageClient } from "@/components/workflows/WorkflowsPageClient";
+import type { WorkflowRow } from "@/components/workflows/WorkflowList";
 import type { PipelineOption } from "@/components/workflows/TriggerFields";
 
 export const dynamic = "force-dynamic";
@@ -55,23 +55,15 @@ export default async function WorkflowsPage() {
   }));
 
   return (
-    <>
-      <PageHeader
-        title="Workflows"
-        description="Automate what happens when something changes on an engagement -- send an email or text, create a task, after a status change."
-      />
-      <div className="flex-1 px-8 py-6">
-        <WorkflowList
-          workspaceId={workspace.id}
-          workflows={rows}
-          folders={folders ?? []}
-          canManage={Boolean(canManage)}
-          organizerTemplates={organizerTemplates ?? []}
-          services={services ?? []}
-          pipelines={pipelines}
-          tagOptions={(tagRows ?? []).map((t) => t.name)}
-        />
-      </div>
-    </>
+    <WorkflowsPageClient
+      workspaceId={workspace.id}
+      workflows={rows}
+      folders={folders ?? []}
+      canManage={Boolean(canManage)}
+      organizerTemplates={organizerTemplates ?? []}
+      services={services ?? []}
+      pipelines={pipelines}
+      tagOptions={(tagRows ?? []).map((t) => t.name)}
+    />
   );
 }

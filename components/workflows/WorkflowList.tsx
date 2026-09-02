@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Plus, Trash2, Zap } from "lucide-react";
+import { Copy, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -51,6 +51,8 @@ export function WorkflowList({
   services = [],
   pipelines = [],
   tagOptions = [],
+  open,
+  onOpenChange,
 }: {
   workspaceId: string;
   workflows: WorkflowRow[];
@@ -60,11 +62,12 @@ export function WorkflowList({
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
   tagOptions?: string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState("engagement.status_changed");
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed"));
@@ -121,6 +124,7 @@ export function WorkflowList({
       setError(insertError.message);
       return;
     }
+    onOpenChange(false);
     toast.show("Workflow created", "success");
     router.push(`/workflows/${data.id}`);
   }
@@ -195,14 +199,6 @@ export function WorkflowList({
         rootLabel="All Workflows"
       />
       <div className="min-w-0 flex-1 space-y-4">
-        {canManage && (
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => setOpen((v) => !v)}>
-              <Plus size={14} /> New workflow
-            </Button>
-          </div>
-        )}
-
         {open && (
           <form onSubmit={create} className="space-y-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
             <label className="flex flex-col gap-1 text-xs text-muted">
@@ -227,7 +223,7 @@ export function WorkflowList({
             />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="tertiary" size="sm" onClick={() => setOpen(false)}>
+              <Button type="button" variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" size="sm" disabled={saving}>

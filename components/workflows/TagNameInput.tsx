@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 // A combobox over the workspace's existing tags -- click the field to see
 // every current tag in a real, clickable dropdown (not a browser datalist,
@@ -28,17 +29,8 @@ export function TagNameInput({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
   const listId = useId();
-
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
 
   const q = value.trim().toLowerCase();
   const filtered = q ? tagOptions.filter((t) => t.toLowerCase().includes(q)) : tagOptions;
@@ -72,7 +64,7 @@ export function TagNameInput({
         </button>
       </div>
       {open && !disabled && (
-        <div className="absolute z-20 mt-1 max-h-48 w-full min-w-[10rem] overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg">
+        <DropdownPanel className="mt-1 max-h-48 w-full min-w-[10rem] overflow-y-auto p-1">
           {filtered.length === 0 && !q && <p className="px-2.5 py-2 text-xs text-muted">No tags yet.</p>}
           {filtered.map((t) => (
             <button
@@ -98,7 +90,7 @@ export function TagNameInput({
               + Add &quot;{value.trim()}&quot;
             </button>
           )}
-        </div>
+        </DropdownPanel>
       )}
     </div>
   );

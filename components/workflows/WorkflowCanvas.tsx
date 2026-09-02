@@ -44,6 +44,7 @@ import {
 } from "@/components/workflows/WorkflowBuilder";
 import { triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import { BranchEditor } from "@/components/workflows/BranchEditor";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 type StepNodeActions = {
   canManage: boolean;
@@ -77,8 +78,9 @@ function NodeMenu({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
   return (
-    <div className="nodrag relative" onClick={(e) => e.stopPropagation()}>
+    <div ref={menuRef} className="nodrag relative" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -88,10 +90,7 @@ function NodeMenu({
         <MoreVertical size={14} />
       </button>
       {open && (
-        <div
-          onMouseLeave={() => setOpen(false)}
-          className="absolute right-0 top-7 z-30 w-40 overflow-hidden rounded-lg border border-border bg-surface shadow-lg"
-        >
+        <DropdownPanel className="right-0 top-7 w-40 overflow-hidden">
           <button
             type="button"
             onClick={() => {
@@ -134,7 +133,7 @@ function NodeMenu({
           >
             <Trash2 size={13} /> Delete
           </button>
-        </div>
+        </DropdownPanel>
       )}
     </div>
   );
