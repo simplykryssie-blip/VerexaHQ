@@ -109,6 +109,7 @@ export function MfaSetup() {
             Scan this QR code with an authenticator app (Google Authenticator, Authy, 1Password).
           </p>
           {qrCode && (
+            // eslint-disable-next-line @next/next/no-img-element -- data: SVG URI from Supabase's MFA enroll response, not an optimizable remote asset
             <img
               src={qrCode}
               alt="Scan with your authenticator app"

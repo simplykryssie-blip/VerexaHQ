@@ -58,7 +58,7 @@ export default async function DashboardPage() {
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
     supabase.from("workspaces").select("onboarding_dismissed_at, stripe_connected_account_id").eq("id", workspace.id).maybeSingle(),
     user
-      ? supabase.from("user_profiles").select("seen_onboarding_steps, first_name, avatar_url").eq("id", user.id).maybeSingle()
+      ? supabase.from("user_profiles").select("seen_onboarding_steps, first_name, display_name, avatar_url").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -212,7 +212,7 @@ export default async function DashboardPage() {
   return (
     <DashboardShell
       workspaceName={workspace.name}
-      firstName={profileRow?.first_name ?? null}
+      greetingName={profileRow?.display_name ?? profileRow?.first_name ?? null}
       isAdmin={workspace.is_owner}
       widgets={mergedWidgets}
       data={data}

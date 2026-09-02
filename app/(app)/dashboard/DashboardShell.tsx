@@ -55,7 +55,7 @@ function trendFor(current: number, previous: number, suffix: string, sentiment?:
 
 export function DashboardShell({
   workspaceName,
-  firstName,
+  greetingName,
   isAdmin,
   widgets,
   data,
@@ -66,9 +66,10 @@ export function DashboardShell({
   seenOnboardingSteps,
 }: {
   workspaceName: string;
-  /** For the greeting hero -- null falls back to the workspace name so a
-   *  staff member who hasn't set their name yet still gets a real greeting. */
-  firstName: string | null;
+  /** For the greeting hero -- the same display_name shown in the sidebar, so
+   *  the two never disagree. Null falls back to the workspace name so a
+   *  staff member who hasn't set one yet still gets a real greeting. */
+  greetingName: string | null;
   /** Only gates the "Invite Staff" quick action (see quickActionPermissions
    *  below) -- widget visibility/order stays per-user (user_widget_preferences),
    *  not admin-only. */
@@ -236,7 +237,7 @@ export function DashboardShell({
     }
   }
 
-  const greetingName = firstName ?? workspaceName;
+  const resolvedGreetingName = greetingName ?? workspaceName;
   const urgentCount = priorities.length;
   const heroSub =
     urgentCount > 0
@@ -253,7 +254,7 @@ export function DashboardShell({
         <div className="relative flex items-start justify-between gap-6">
           <div>
             <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">
-              Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{greetingName}</span>.
+              Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{resolvedGreetingName}</span>.
             </h1>
             <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
           </div>
