@@ -47,6 +47,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
+import { Badge } from "@/components/ui/Badge";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import {
   ConditionsEditor,
@@ -2068,14 +2069,15 @@ export function WorkflowBuilder({
                         >
                           <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
                           <td className="px-4 py-2">
-                            <span
-                              className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${
-                                r.status === "running" ? "text-accent" : r.status === "failed" ? "text-danger" : r.status === "completed" ? "text-success" : "text-muted"
-                              }`}
+                            <Badge
+                              tone={
+                                r.status === "running" ? "accent" : r.status === "failed" ? "danger" : r.status === "completed" ? "success" : "neutral"
+                              }
+                              className="inline-flex items-center gap-1.5 capitalize"
                             >
                               {r.status === "running" && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />}
                               {r.status}
-                            </span>
+                            </Badge>
                           </td>
                           <td className="px-4 py-2 text-slate">{new Date(r.started_at).toLocaleString()}</td>
                           <td className="px-4 py-2 text-slate">{r.completed_at ? new Date(r.completed_at).toLocaleString() : "--"}</td>
@@ -2099,10 +2101,10 @@ export function WorkflowBuilder({
                       return (
                         <li key={l.id} className="flex items-center justify-between gap-2 px-4 py-2">
                           <span className="text-slate">{data.action_type ?? "step"}</span>
-                          <span className={`text-xs font-medium ${l.status === "completed" ? "text-success" : "text-danger"}`}>
+                          <Badge tone={l.status === "completed" ? "success" : "danger"}>
                             {l.status}
                             {l.error_message ? `: ${l.error_message}` : ""}
-                          </span>
+                          </Badge>
                           <span className="text-xs text-muted">{l.executed_at ? new Date(l.executed_at).toLocaleString() : ""}</span>
                         </li>
                       );

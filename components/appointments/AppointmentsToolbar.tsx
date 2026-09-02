@@ -185,7 +185,7 @@ export function AppointmentsToolbar({
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
               {clientDropdownOpen && matchingClients.length > 0 && (
-                <ul className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-md">
+                <ul className="absolute z-10 mt-1 w-full rounded-lg bg-surface shadow-md">
                   {matchingClients.map((c) => (
                     <li key={c.id}>
                       <button

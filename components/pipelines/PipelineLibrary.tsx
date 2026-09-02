@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import type { LibraryFolderRow } from "@/components/library/types";
@@ -165,13 +166,9 @@ export function PipelineLibrary({
             ))}
           </select>
           {canManage && (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-            >
+            <Button onClick={() => setCreating(true)} className="ml-auto">
               + New pipeline
-            </button>
+            </Button>
           )}
         </div>
 
