@@ -7,6 +7,7 @@ import { Pager } from "@/components/Pager";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import { EngagementBoard, type BoardEngagement } from "@/components/engagements/EngagementBoard";
 import { Badge } from "@/components/ui/Badge";
+import { buttonClasses } from "@/components/ui/Button";
 import { Avatar } from "@/components/Avatar";
 import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
 
@@ -67,10 +68,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
         description="The actual work you're doing for clients -- one engagement per service per client, each moving through its own pipeline."
         actions={
           canCreate ? (
-            <Link
-              href="/engagements/new"
-              className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-            >
+            <Link href="/engagements/new" className={buttonClasses()}>
               + New Engagement
             </Link>
           ) : null

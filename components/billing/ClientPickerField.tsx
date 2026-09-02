@@ -80,7 +80,7 @@ export function ClientPickerField({
         className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
       />
       {results.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-softHover">
+        <ul className="absolute z-10 mt-1 w-full rounded-lg bg-surface shadow-softHover">
           {results.map((c) => (
             <li key={c.id}>
               <button
