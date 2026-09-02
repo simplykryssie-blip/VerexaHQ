@@ -5,16 +5,26 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
+type PendingInstallment = { id: string; installment_number: number; amount: number; due_date: string };
+
 export function RecordPaymentForm({
   invoiceId,
   workspaceId,
   clientId,
   balanceDue,
+  pendingInstallments = [],
 }: {
   invoiceId: string;
   workspaceId: string;
   clientId: string;
   balanceDue: number;
+  /** Open (status = 'pending') payment_plans rows for this invoice, if any --
+   * lets staff mark a manual payment as satisfying a specific installment.
+   * Without this, a manually-recorded payment only ever updates the invoice
+   * (via apply_payment_to_invoice()); nothing links it to a payment plan, so
+   * payment_plan.installment_paid can never fire for a manual payment --
+   * only Stripe Checkout's webhook did that. */
+  pendingInstallments?: PendingInstallment[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -24,8 +34,15 @@ export function RecordPaymentForm({
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState<"check" | "cash" | "bank_transfer" | "other">("check");
   const [reference, setReference] = useState("");
+  const [installmentId, setInstallmentId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  function selectInstallment(id: string) {
+    setInstallmentId(id);
+    const installment = pendingInstallments.find((p) => p.id === id);
+    if (installment) setAmount(installment.amount.toFixed(2));
+  }
 
   async function record(e: React.FormEvent) {
     e.preventDefault();
@@ -41,22 +58,42 @@ export function RecordPaymentForm({
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { error: insertError } = await supabase.from("payments").insert({
-      workspace_id: workspaceId,
-      client_id: clientId,
-      invoice_id: invoiceId,
-      amount: amountNum,
-      payment_date: paymentDate,
-      payment_method: paymentMethod,
-      reference: reference || null,
-      recorded_by: user?.id,
-    });
+    const { data: payment, error: insertError } = await supabase
+      .from("payments")
+      .insert({
+        workspace_id: workspaceId,
+        client_id: clientId,
+        invoice_id: invoiceId,
+        amount: amountNum,
+        payment_date: paymentDate,
+        payment_method: paymentMethod,
+        reference: reference || null,
+        recorded_by: user?.id,
+      })
+      .select("id")
+      .single();
 
-    setSaving(false);
-    if (insertError) {
-      setError(insertError.message);
+    if (insertError || !payment) {
+      setSaving(false);
+      setError(insertError?.message ?? "Could not record the payment.");
       return;
     }
+
+    if (installmentId) {
+      const { error: linkError } = await supabase.rpc("apply_manual_payment_to_installment", {
+        p_payment_id: payment.id,
+        p_payment_plan_id: installmentId,
+      });
+      if (linkError) {
+        setSaving(false);
+        toast.show(`Payment recorded, but couldn't mark the installment paid: ${linkError.message}`, "error");
+        setOpen(false);
+        router.refresh();
+        return;
+      }
+    }
+
+    setSaving(false);
     toast.show("Payment recorded", "success");
     setOpen(false);
     router.refresh();
@@ -72,6 +109,25 @@ export function RecordPaymentForm({
 
   return (
     <form onSubmit={record} className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surfaceMuted p-3">
+      {pendingInstallments.length > 0 && (
+        <label className="flex flex-col gap-1 text-xs text-muted">
+          Apply to
+          <select
+            value={installmentId}
+            onChange={(e) => selectInstallment(e.target.value)}
+            className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            <option value="">General payment</option>
+            {pendingInstallments
+              .sort((a, b) => a.installment_number - b.installment_number)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  Installment {p.installment_number} -- ${p.amount.toFixed(2)}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
       <label className="flex flex-col gap-1 text-xs text-muted">
         Amount
         <input

@@ -1088,6 +1088,7 @@ export function BillingTab({
                         workspaceId={workspaceId}
                         clientId={clientId}
                         balanceDue={i.total_amount - i.amount_paid}
+                        pendingInstallments={plans.filter((p) => p.status === "pending")}
                       />
                       {plans.length === 0 && (
                         <CreatePaymentPlanForm invoiceId={i.id} workspaceId={workspaceId} balanceDue={i.total_amount - i.amount_paid} />
