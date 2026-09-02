@@ -5,6 +5,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BATCH_SIZE = 50;
+// Rows are processed serially and each RPC call's latency is unbounded, so a
+// full batch can exceed maxDuration. Stop with headroom to spare and leave
+// the rest at 'pending_delay' -- they're picked up again on the next tick,
+// so this is just as safe as finishing the batch, only spread over more runs.
+const DEADLINE_MS = 45_000;
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -39,9 +44,16 @@ export async function GET(request: Request) {
     .order("scheduled_for", { ascending: true })
     .limit(BATCH_SIZE);
 
+  const startedAt = Date.now();
   let processed = 0;
   let stillWaiting = 0;
+  let deferred = 0;
   for (const row of pending ?? []) {
+    if (Date.now() - startedAt > DEADLINE_MS) {
+      deferred = (pending?.length ?? 0) - processed - stillWaiting;
+      console.log(`run-pending-automation-steps: stopping early with ${deferred} row(s) left for the next tick`);
+      break;
+    }
     const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
     if (shouldAdvance === false) {
       stillWaiting++;
@@ -52,5 +64,5 @@ export async function GET(request: Request) {
     processed++;
   }
 
-  return NextResponse.json({ processed, stillWaiting });
+  return NextResponse.json({ processed, stillWaiting, deferred });
 }

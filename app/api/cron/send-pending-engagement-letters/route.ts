@@ -9,6 +9,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BATCH_SIZE = 20;
+// Jobs are processed serially and each one is individually allowed up to
+// sendOneWithTimeout's 25s, so a full batch of slow jobs can still exceed
+// maxDuration. Stop with headroom to spare and leave the rest at 'pending'
+// -- they're picked up again on the next tick, same as any job that just
+// hasn't reached the front of the queue yet.
+const DEADLINE_MS = 45_000;
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -70,10 +76,17 @@ export async function GET(request: Request) {
   const workspaceById = new Map((workspaces ?? []).map((w) => [w.id, w]));
   const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
 
+  const startedAt = Date.now();
   let sent = 0;
   let failed = 0;
+  let deferred = 0;
 
   for (const job of jobs ?? []) {
+    if (Date.now() - startedAt > DEADLINE_MS) {
+      deferred = (jobs?.length ?? 0) - sent - failed;
+      console.log(`send-pending-engagement-letters: stopping early with ${deferred} job(s) left for the next tick`);
+      break;
+    }
     const result = await sendOneWithTimeout(supabase, job, {
       template: templateById.get(job.engagement_letter_template_id) ?? null,
       workspace: workspaceById.get(job.workspace_id) ?? null,
@@ -83,7 +96,7 @@ export async function GET(request: Request) {
     else failed++;
   }
 
-  return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
+  return NextResponse.json({ processed: sent + failed, sent, failed, deferred });
 }
 
 type EngagementLetterTemplateRow = {

@@ -9,6 +9,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BATCH_SIZE = 20;
+// Same reasoning as send-pending-engagement-letters: jobs run serially with
+// their own per-job timeout guard, so a full batch of slow sends can still
+// exceed maxDuration. Stop with headroom to spare and leave the rest at
+// 'pending' for the next tick.
+const DEADLINE_MS = 45_000;
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -46,16 +51,23 @@ export async function GET(request: Request) {
 
   const context = await resolveInviteContext(supabase, jobs ?? []);
 
+  const startedAt = Date.now();
   let sent = 0;
   let failed = 0;
+  let deferred = 0;
 
   for (const job of jobs ?? []) {
+    if (Date.now() - startedAt > DEADLINE_MS) {
+      deferred = (jobs?.length ?? 0) - sent - failed;
+      console.log(`send-pending-portal-invites: stopping early with ${deferred} job(s) left for the next tick`);
+      break;
+    }
     const result = await sendOneWithTimeout(supabase, job, context);
     if (result === "sent") sent++;
     else failed++;
   }
 
-  return NextResponse.json({ processed: jobs?.length ?? 0, sent, failed });
+  return NextResponse.json({ processed: sent + failed, sent, failed, deferred });
 }
 
 type PendingInviteJob = { id: string; workspace_id: string; client_id: string; client_portal_user_id: string };
