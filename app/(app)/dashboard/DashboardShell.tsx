@@ -2,8 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
+import Link from "next/link";
+import {
+  Settings2,
+  Eye,
+  EyeOff,
+  ArrowUp,
+  ArrowDown,
+  DollarSign,
+  Briefcase,
+  Receipt,
+  FileWarning,
+  MessageSquare,
+  ListChecks,
+  Plus,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/Button";
 import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
@@ -12,6 +27,8 @@ import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget"
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
 import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
 import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
+import { StageBreakdownWidget } from "@/components/widgets/StageBreakdownWidget";
+import { DeadlineRiskWidget } from "@/components/widgets/DeadlineRiskWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
 import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
@@ -210,6 +227,10 @@ export function DashboardShell({
         return <TopServicesWidget services={data.topServices} />;
       case "engagement_pipeline":
         return <EngagementPipelineWidget stages={data.engagementPipeline} />;
+      case "stage_breakdown":
+        return <StageBreakdownWidget stages={data.engagementPipeline} />;
+      case "deadline_risk":
+        return <DeadlineRiskWidget items={data.deadlineRisk} />;
       default:
         return null;
     }
@@ -236,16 +257,23 @@ export function DashboardShell({
             </h1>
             <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
           </div>
-          <button
-            type="button"
-            onClick={() => setCustomizing((v) => !v)}
-            aria-pressed={customizing}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-              customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
-            }`}
-          >
-            <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomizing((v) => !v)}
+              aria-pressed={customizing}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
+              }`}
+            >
+              <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
+            </button>
+            <Link href="/engagements/new">
+              <Button size="sm">
+                <Plus size={14} aria-hidden="true" /> New Engagement
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 

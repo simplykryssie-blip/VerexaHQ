@@ -28,6 +28,20 @@ export type ActivityItem = { id: string; description: string; activity_type: str
 export type CalendarItem = { id: string; date: string; label: string; href?: string; kind: "engagement" | "task" };
 export type ServiceEngagementCount = { serviceId: string; name: string; count: number };
 export type PipelineStageCount = { status: string; count: number };
+export type DeadlineRiskItem = {
+  id: string;
+  engagement_number: string | null;
+  client_id: string;
+  client_name: string;
+  due_date: string;
+  status: string;
+  daysRemaining: number;
+};
+
+// How close to its due date an engagement has to be (or how far past it)
+// before it counts as at risk -- generous enough to be useful without
+// flagging half the pipeline every day.
+const DEADLINE_RISK_WINDOW_DAYS = 7;
 
 // Mirrors engagements_status_check exactly, minus Archived -- a pipeline
 // strip has no use for a terminal "put away" bucket the way Completed still
@@ -58,6 +72,7 @@ export type DashboardData = {
   calendarItems: CalendarItem[];
   topServices: ServiceEngagementCount[];
   engagementPipeline: PipelineStageCount[];
+  deadlineRisk: DeadlineRiskItem[];
 };
 
 export async function getDashboardData(workspaceId: string): Promise<DashboardData> {
@@ -326,6 +341,48 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     ...(calTasks ?? []).map((t) => ({ id: t.id, date: t.due_date as string, label: t.title, kind: "task" as const })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  // Deadline risk: still-open engagements whose due date has already passed
+  // or falls within the window -- real dates already on the record, not a
+  // predicted/AI-scored risk. Ordered soonest-due (most overdue) first.
+  const riskWindowEnd = new Date(startOfToday);
+  riskWindowEnd.setDate(riskWindowEnd.getDate() + DEADLINE_RISK_WINDOW_DAYS);
+
+  const { data: riskEngagements } = await supabase
+    .from("engagements")
+    .select("id, engagement_number, client_id, due_date, status")
+    .eq("workspace_id", workspaceId)
+    .not("due_date", "is", null)
+    .not("status", "in", '("Completed","Archived")')
+    .lte("due_date", riskWindowEnd.toISOString())
+    .order("due_date")
+    .limit(8);
+
+  const riskClientIds = Array.from(new Set((riskEngagements ?? []).map((e) => e.client_id).filter((v): v is string => Boolean(v))));
+  const { data: riskClientRows } = riskClientIds.length
+    ? await supabase.from("clients").select("id, client_type, first_name, last_name, business_name").in("id", riskClientIds)
+    : { data: [] as { id: string; client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }[] };
+  const riskClientById = new Map((riskClientRows ?? []).map((c) => [c.id, c]));
+
+  const deadlineRisk: DeadlineRiskItem[] = (riskEngagements ?? [])
+    .filter((e): e is typeof e & { client_id: string; due_date: string } => Boolean(e.client_id && e.due_date))
+    .map((e) => {
+      const client = riskClientById.get(e.client_id);
+      const clientName = client
+        ? client.client_type === "business" && client.business_name
+          ? client.business_name
+          : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
+        : "Unknown client";
+      return {
+        id: e.id,
+        engagement_number: e.engagement_number,
+        client_id: e.client_id,
+        client_name: clientName,
+        due_date: e.due_date,
+        status: e.status,
+        daysRemaining: Math.round((new Date(e.due_date).getTime() - startOfToday.getTime()) / (24 * 60 * 60 * 1000)),
+      };
+    });
+
   return {
     kpis: {
       revenueThisMonth,
@@ -346,5 +403,6 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     calendarItems,
     topServices,
     engagementPipeline,
+    deadlineRisk,
   };
 }

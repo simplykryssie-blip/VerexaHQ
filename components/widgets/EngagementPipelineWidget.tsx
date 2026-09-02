@@ -1,10 +1,12 @@
 import { Workflow } from "lucide-react";
 import { WidgetShell } from "./WidgetShell";
 import { EmptyState } from "./EmptyState";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import type { PipelineStageCount } from "@/lib/dashboard/data";
 
 export function EngagementPipelineWidget({ stages }: { stages: PipelineStageCount[] }) {
   const total = stages.reduce((sum, s) => sum + s.count, 0);
+  const max = Math.max(...stages.map((s) => s.count), 1);
   // The stage with the most engagements sitting in it right now -- a real,
   // computed signal (not decoration) worth calling out since it's usually
   // where work is backing up. Only among non-"Completed" stages, and only
@@ -19,28 +21,15 @@ export function EngagementPipelineWidget({ stages }: { stages: PipelineStageCoun
       {total === 0 ? (
         <EmptyState icon={Workflow} message="No engagements yet." />
       ) : (
-        <div className="-mx-1 flex gap-2 overflow-x-auto pb-1">
-          {stages.map((stage) => {
-            const isBusiest = stage.status === busiestStatus;
-            return (
-              <div
-                key={stage.status}
-                className={`flex min-w-[130px] flex-1 shrink-0 flex-col rounded-xl border px-3 py-2.5 ${
-                  isBusiest ? "border-transparent bg-gradient-to-br from-accent to-brandLime" : "border-border bg-surfaceMuted"
-                }`}
-              >
-                <p className={`truncate text-xs font-medium ${isBusiest ? "text-ink/70" : "text-muted"}`}>{stage.status}</p>
-                <p
-                  className={`mt-1 font-display text-xl font-semibold tabular-nums ${
-                    isBusiest ? "text-ink" : stage.count > 0 ? "text-ink" : "text-muted"
-                  }`}
-                >
-                  {stage.count > 0 ? stage.count : "-"}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+        <ul className="space-y-2">
+          {stages.map((stage) => (
+            <li key={stage.status} className="flex items-center gap-3">
+              <span className="w-40 shrink-0 truncate text-xs font-medium text-muted">{stage.status}</span>
+              <ProgressBar percent={(stage.count / max) * 100} tone={stage.status === busiestStatus ? "gradient" : "accent"} size="sm" />
+              <span className="w-6 shrink-0 text-right text-xs font-semibold tabular-nums text-ink">{stage.count || "-"}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </WidgetShell>
   );
