@@ -290,9 +290,25 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
       : Promise.resolve({ data: [] as { id: string; organizer_template_id: string; label: string; field_type: string; parent_field_id: string | null; display_order: number }[] }),
   ]);
 
+  const { data: checklistStatusRows } = await supabase
+    .from("document_request_item_statuses")
+    .select("organizer_field_id, status, document_requests!inner(entity_type, entity_id)")
+    .eq("document_requests.entity_type", "client")
+    .eq("document_requests.entity_id", client.id)
+    .not("organizer_field_id", "is", null);
+  const documentStatusByField = new Map(
+    (checklistStatusRows ?? []).filter((r) => r.organizer_field_id).map((r) => [r.organizer_field_id as string, r.status])
+  );
+
   const organizerResponsesWithDetail = (organizerResponses ?? []).map((r) => {
     if (!hasOrganizerAnswers(r.status)) return { ...r, topLevel: undefined, repeaters: undefined };
-    const { topLevel, repeaters } = buildOrganizerResponseDetail(r.id, r.organizer_template_id, organizerAnswerRows ?? [], organizerFieldRows ?? []);
+    const { topLevel, repeaters } = buildOrganizerResponseDetail(
+      r.id,
+      r.organizer_template_id,
+      organizerAnswerRows ?? [],
+      organizerFieldRows ?? [],
+      documentStatusByField
+    );
     return { ...r, topLevel, repeaters };
   });
 
@@ -307,7 +323,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     .from("document_requests")
     .select(
       `id, title, due_date, status, created_at,
-      items:document_request_item_statuses(id, name, is_required, status)`
+      items:document_request_item_statuses(id, name, is_required, status, category)`
     )
     .eq("entity_type", "client")
     .eq("entity_id", client.id)
@@ -321,7 +337,8 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
           .select(
             `id, title, status, due_date, attachment_id, created_at,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token)`
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at,
+              attested_by_profile:user_profiles!signature_request_signers_attested_by_fkey(display_name))`
           )
           .in("attachment_id", documentIds)
           .order("created_at", { ascending: false })
@@ -352,7 +369,10 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     attachment_id: r.attachment_id,
     attachment_file_name: r.attachment?.file_name ?? "Document",
     created_at: r.created_at,
-    signers: r.signers ?? [],
+    signers: (r.signers ?? []).map((s: any) => ({
+      ...s,
+      attested_by_name: s.attested_by_profile?.display_name ?? null,
+    })),
   }));
 
   const engagementIds = (engagements ?? []).map((e) => e.id);

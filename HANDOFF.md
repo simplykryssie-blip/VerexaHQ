@@ -6,6 +6,211 @@ system is actually built (schema, auth, permissions, every module), see
 `PLATFORM.md` in this same repo root — that's the living architecture
 reference. This file is just "what happened recently and what's still open."
 
+## ⚠️ Branch divergence, discovered 2026-08-31 — read this before trusting anything below
+
+This file's addenda describe work done on **two different branches that
+have not been merged into each other**:
+
+- The 2026-08-29 addendum immediately below happened on
+  `claude/verexa-schema-mismatch-i8c19u`, merged into **`main`**.
+- The 2026-08-31 addendum (further down, newest-first) happened on
+  **`claude/verexa-remove-services-vaqbfx`**, which forked from `main` at
+  commit `1d50a9e` (2026-08-27) and was never merged back.
+
+As of 2026-08-31: `main` has **111 commits** (89 touching real app
+code/migrations) that `claude/verexa-remove-services-vaqbfx` does not have
+— including the entire 2026-08-29 redesign addendum below, plus whatever
+else shipped on `main` in that window that has no addendum entry at all
+(111 commits is far more than the 5 items documented on 2026-08-29 — this
+file does not have full coverage of everything on `main` since 08-27).
+Conversely, `claude/verexa-remove-services-vaqbfx` has **22 commits** `main`
+does not have (the 2026-08-31 addendum's work: tax-prep pipeline
+finishing touches, platform billing dunning, the ERO/PTIN Partners
+directory, Settings consolidation).
+
+**Practical consequence**: if `main` is still what deploys to production
+(per the push/merge policy documented further down in this file — confirm
+that policy is still in force, don't assume), then **none of the
+2026-08-31 addendum's work is live**, and conversely the redesign work
+described in the 2026-08-29 addendum is **not present in
+`claude/verexa-remove-services-vaqbfx`'s code** even though it's described
+in this same file. Don't assume either branch's file tree matches what
+this document describes without checking which branch you're actually on.
+**This needs a human decision (merge direction, or keep separate) before
+either branch is trusted as "the" current state — flag it, don't guess.**
+
+**Update, same day, after a first investigation pass**: attempted the git
+merge (`main` → `claude/verexa-remove-services-vaqbfx`), hit 9 real file
+conflicts (Users/Connections/Sidebar/nav and friends), and aborted rather
+than resolve them blind once it became clear the scope was much bigger
+than a settings page — `main` has done a full "unified pipeline tracking"
+schema cutover (new `pipeline_runs`/`pipeline_stages` tables; `main`
+**dropped** `lead_pipeline_runs`, `lead_pipeline_stages`, `workflow_runs`,
+`workflow_stages` outright, migration
+`20260825163000_unified_pipeline_cutover.sql`), removed the e-file
+transmission feature, rebuilt the organizer review workspace, added a
+document request template builder, AI operator admin tooling, and more —
+roughly 90 migrations' worth of real architectural work, not just the
+5-item redesign addendum.
+
+**Confirmed against the live database** (one shared Supabase project,
+`daxpavvsotvsyqqntddc`, across every branch): the cutover migration has
+actually run — `lead_pipeline_runs`/`lead_pipeline_stages`/`workflow_runs`/
+`workflow_stages` are gone, only `pipeline_runs`/`pipeline_stages` exist
+now. `main`'s reviewer-queue views (`v_reviewer_queue`,
+`v_workflow_sla_status`) still exist and still expose a
+`workflow_stage_id` column name for backward compatibility, so most code
+built against the old naming still reads fine through those views.
+
+**One real, confirmed bug this caused, found and fixed**:
+`lib/dashboard/data.ts`'s `getDashboardData()` (loaded on every Dashboard
+page view) was already half-migrated *before this divergence was even
+discovered* — it queried the new `pipeline_runs` table for
+`workflowRuns`/`entity_type='engagement'`, but the review-queue stage
+lookup right below it still queried the old, now-nonexistent
+`workflow_stages` table by `workflow_run_id`. That query would fail on
+every single Dashboard load. Fixed (repointed at
+`pipeline_stages`/`pipeline_run_id`) and pushed separately from this
+handoff-doc work. **This means `claude/verexa-remove-services-vaqbfx`'s
+own internal consistency was already compromised before the Aug 27
+divergence was even a factor** — worth a broader sweep for other
+half-migrated references if anyone picks this up (search for
+`workflow_run`/`workflow_stage`/`lead_pipeline` outside of migration
+files, the same way this one was found).
+
+**Update, same day, second attempt: merge completed.** At the user's
+explicit request ("I want it fully merged and corrected"), re-ran
+`git merge origin/main`, resolved all 10 real conflicts by hand (`lib/
+nav.ts`, `components/Sidebar.tsx`, `app/(app)/layout.tsx`, `app/(app)/
+settings/{connections,users,roles}/page.tsx`, `components/documents/
+RequestsPanel.tsx`, `components/portal/OrganizerForm.tsx`, this file), and
+regenerated `lib/database.types.ts` from scratch via `generate_typescript_types`
+against the live DB rather than hand-merging it (both branches' migrations
+were already live in the one shared database, so a fresh introspection is
+strictly more correct than reconciling two divergent hand-edited copies).
+Key resolution decisions:
+- **Users & Staff + Connections**: main had independently built a richer,
+  3-tier version of Connections (`ero_ptin`/`service_bureau_ero`/
+  `service_bureau_ptin`, not just `ero_ptin`) and a separate, more capable
+  Users page (`getWorkspaceMemberWorkload`, per-user detail pages at
+  `/settings/users/[userId]`) than the 2026-08-31 addendum's merge below
+  had. Re-applied the "combine into one page" decision (below) on top of
+  main's richer components instead of my rougher pre-merge ones -- same
+  page/nav consolidation, better underlying data. This also meant
+  generalizing `get_ero_connected_partners`/`get_my_ero_connection` (the
+  RLS-bug-fix RPCs from the addendum below) to accept all three
+  relationship-type tiers, not just `ero_ptin` -- migration
+  `20260912060000_generalize_connections_rpcs_to_all_tiers.sql`. The
+  Partners page keeps calling the same RPC with no changes (its default
+  arg is still `ero_ptin`-only, matching its narrower ERO-specific scope).
+- **`ERO_MANAGEMENT_NAV_ITEMS`** (main's new nav section for ERO/SB/
+  multi-office workspaces) had its own separate "Connections" entry
+  pointing at `/settings/connections` -- removed, since "Team" now points
+  at the same merged `/settings/users` page.
+- Everything else (RequestsPanel's category-grouping vs. main's shared
+  `ProgressBar`/interactive item rendering; OrganizerForm's
+  `answerToString` vs. main's newly-extracted `lib/organizer/formatValue.ts`
+  helper) resolved by keeping the more complete side and wiring it through
+  the newer shared helper where one existed, not by picking one side
+  wholesale.
+
+**Verification, completed**: a repo-wide sweep for any other
+`workflow_run`/`workflow_stage`/`lead_pipeline` references outside
+migration files found nothing beyond the `lib/dashboard/data.ts` fix
+already logged above. `lib/database.types.ts` was regenerated fresh from
+the live DB (`generate_typescript_types`) rather than hand-merged, since
+both branches' migrations were already applied there. The merge also
+surfaced two genuine duplicate-declaration bugs from a silent (non-
+conflicting) git auto-merge -- both branches had independently built the
+same "engagement letter on services" feature at slightly different nearby
+lines, so git merged both copies in without flagging a conflict. Fixed in
+`components/settings/ServiceForm.tsx` and `app/(app)/settings/services/
+[id]/page.tsx` (duplicate `engagement_letter_template_id`/
+`engagementLetterTemplates` declarations). `npm install` picked up
+`pdfjs-dist`, new on `main` for the PDF template overlay editor. `tsc
+--noEmit`, `eslint .`, and `npm run build` all pass clean across the full
+merged app (every route from both branches builds, including `/partners`,
+`/ero-dashboard`, `/assignments`, `/settings/users/[userId]`,
+`/organizers/[responseId]/review`, `/platform-admin/ai-agents`).
+**Not yet done**: pushing this merge, and a real click-through test in a
+browser (this was a code-level merge verification only) -- check whether
+those happened after this note, since it was written before either.
+
+## Addendum — 2026-08-31: tax-prep pipeline finishing touches, platform billing dunning, ERO/PTIN Partners directory, Settings consolidation
+
+Branch: `claude/verexa-remove-services-vaqbfx` (forked from `main` at
+`1d50a9e`, 2026-08-27 — see the divergence warning above, this branch was
+never merged back into `main`). Roughly in order:
+
+1. **Tax-prep pipeline finishing touches**: built out the previously-empty
+   post-conversion prep pipeline (5 stages), added a status-tag lifecycle
+   across the pipeline, made new-client relationship-manager assignment
+   actually real, added an ERO Review decline path with its own
+   disengagement email, untangled the Missing Info workflow canvas and
+   gave its reminder chain explicit Yes/No branches, added staff
+   presence/identity attestation before in-person signing, auto-derived
+   document checklists from organizer file uploads (grouped by category),
+   added organizer rename UI and surfaced the engagement letter on
+   services.
+2. **Platform billing**: seeded Verexa's own subscription plans
+   (`platform_subscription_plans`: Solo/Team/Firm), built real
+   usage-overage billing (one-time free bucket + monthly Stripe charge for
+   email/SMS/storage overage — replaced an earlier arrears-billing attempt
+   after explicit correction: "no, prepaid top-ups, not arrears"), added
+   `payment_method` (stripe/check/cash/bank_transfer/other) to manual
+   payment recording, and documented the missing
+   `STRIPE_CONNECT_CLIENT_ID` in `.env.local.example`.
+3. **New: platform-wide card-on-file + pre-cycle billing dunning.**
+   Previously billing-failure handling was 100% reactive (Stripe
+   auto-charges on the renewal date, runs its own Smart Retries, Verexa
+   only suspends once Stripe marks a subscription "unpaid"). Now: a Setup
+   Checkout flow collects a saved card
+   (`workspace_subscriptions.default_payment_method_id` + cached
+   brand/last4/exp), an in-app modal (`BillingCardPrompt`, gated by a new
+   `needs_billing_card` RPC) prompts for a card once a workspace is
+   responsible for its own billing with none on file, and a new hourly
+   cron (`/api/cron/check-billing-cycles`, using true America/Chicago
+   calendar dates so day boundaries land on true CST/CDT midnight
+   year-round) reminds at 5 days out, attempts an off-session charge at 3
+   days out (final retry at day 0, credited to the Stripe customer's
+   balance rather than double-charging on the real renewal invoice — see
+   `createCustomerBalanceCredit` in `lib/stripe/client.ts` for why that's
+   safe), and suspends the workspace if nothing succeeded once the cycle
+   ends — independent of how long Stripe's own retries would otherwise
+   take. **Not yet exercised against a real Stripe subscription** — no
+   workspace currently has a live `workspace_subscriptions` row with a
+   real `stripe_customer_id`.
+4. **ERO demo rebuild for a live demo**: refreshed the PTIN demo workspace
+   (Summit Tax & Financial Services) from MKB's live config, seeded an
+   active `firm_connections` row + real tax-return data, renamed the ERO
+   demo workspace to "Ascend Tax Office," and built it a full
+   recruiting/onboarding pipeline (application organizer with a
+   conditionally-shown "already on Verexa?" branch, a signature-required
+   partnership agreement, a 7-stage process, 7 stage-triggered
+   automations). **Deliberately human-in-the-loop, not fully automatic**,
+   for two real engine limitations found along the way: the condition
+   system can't branch on a specific organizer answer's value, and
+   `create_engagement`/`send_engagement_letter`'s automation actions only
+   work on an `organizer.submitted`-triggered run with a resolved
+   service — a mechanism with zero real production usage before this.
+5. **Fixed a real cross-workspace bug** found while building the item
+   below: the connected-partner name lookup (both directions — an ERO
+   seeing a PTIN's name, a PTIN seeing their ERO's name) went through a
+   plain embedded select that only resolves if the viewer happens to also
+   be a member of the other workspace (true for the demo accounts sharing
+   one owner, false for any real separately-owned pair) — would silently
+   show "Pending invite"/"your ERO" for a genuinely active connection.
+   Fixed with two new `SECURITY DEFINER` RPCs,
+   `get_ero_connected_partners` and `get_my_ero_connection`.
+6. **New: ERO/PTIN Partners directory** (`/partners`, nav-gated to
+   workspaces with at least one `ero_ptin` connection) — a dedicated area,
+   separate from the Contacts tab, showing each connected PTIN's business
+   contact info (live from their own Firm Profile) plus a free-text notes
+   field the ERO maintains privately (`firm_connections.notes`).
+7. **Settings consolidation**: merged Connections into Users & Staff — one
+   page, one nav item (`/settings/users`). `/settings/connections` now
+   redirects there (preserving `?token=`) rather than 404ing.
+
 ## Addendum — 2026-08-29: QA agent run, onboarding popup, and a full visual/branding redesign
 
 Five separate pieces of work this session, roughly in the order they happened.
@@ -896,6 +1101,27 @@ un-promoted previews.
      own dedicated login(s) or she demos from her own platform-admin
      access, and whether a demo workspace should be visually/behaviorally
      marked as such anywhere staff or a prospect could see it.
-- No other known gaps as of this session. If picking this back up, ask the
-  user what's next rather than assuming — she drives this by describing
-  real usage friction, not by a pre-written roadmap.
+- No other known gaps as of the 2026-08-13/29 sessions on `main`. If
+  picking this back up, ask the user what's next rather than assuming —
+  she drives this by describing real usage friction, not by a pre-written
+  roadmap.
+- **Open as of the 2026-08-31 session on `claude/verexa-remove-services-vaqbfx`** (see that addendum near the top of this file):
+  1. **Real Stripe keys still need to be added** — both the platform
+     subscription keys and the Stripe Connect keys (`STRIPE_SECRET_KEY`,
+     `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_CLIENT_ID`, and the Connect
+     webhook secret) into Vercel's environment variables. The user asked
+     for instructions on how to do this; nothing else is blocking it on
+     the code side — Connect OAuth, the checkout/webhook flows, and the
+     new billing dunning system are all built and just waiting on real
+     keys. Until then, `isStripeConfigured()` gates every Stripe call off
+     cleanly (no crashes, just skipped).
+  2. **Meeting with her IT person about system monitoring** — mentioned
+     once early in a prior session, never followed up. Still open.
+  3. **Minor, not requested**: no "record a payment" action exists
+     directly on the top-level Billing hub (`/billing`) — only
+     per-invoice, from a Client or Engagement page. Low priority.
+  4. **The branch-divergence problem itself** (see the warning near the
+     top of this file) is the biggest open item — it needs a human
+     decision on merge direction before either branch can be trusted as
+     current, and before any more work piles up on either side making
+     reconciliation harder.

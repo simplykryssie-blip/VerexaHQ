@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
+import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -49,10 +50,14 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { data: isPlatformIt },
     { data: canUseNetworkMessaging },
     { count: teammateCount },
+    { count: connectedPartnerCount },
     { data: hasAcceptedTerms },
+    { data: billingCardRows },
     { data: currentProfile },
     { data: currentMembership },
     { data: roles },
+    { count: pendingClientChangeCount },
+    { count: submittedOrganizerCount },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -68,11 +73,21 @@ export default async function AppLayout({ children, modal }: { children: React.R
       .select("user_id", { count: "exact", head: true })
       .eq("workspace_id", workspace.id)
       .eq("status", "active"),
+    // Partners is only worth a nav slot once this workspace is actually an
+    // ERO/SB with at least one PTIN connected (or invited) to it.
+    supabase
+      .from("firm_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("parent_workspace_id", workspace.id)
+      .eq("relationship_type", "ero_ptin"),
     // Only a workspace owner needs to accept -- staff are covered under
     // the Firm's own acceptance, same as the Terms' own language.
     workspace.is_owner
       ? supabase.rpc("has_accepted_platform_terms", { p_version: LEGAL_VERSION })
       : Promise.resolve({ data: true }),
+    // Only the owner is prompted -- matches who can actually act on it
+    // (FirmProfileForm gates the Stripe/billing fields on isOwner too).
+    workspace.is_owner ? supabase.rpc("needs_billing_card", { p_workspace_id: workspace.id }) : Promise.resolve({ data: null }),
     // For the sidebar footer / header avatar -- no FK PostgREST can embed
     // between workspace_users and user_profiles (both independently
     // reference auth.users), same reason getWorkspaceStaff joins manually.
@@ -81,6 +96,13 @@ export default async function AppLayout({ children, modal }: { children: React.R
       ? supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("roles").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`),
+    // Powers the Review Queue nav item's red dot. Doesn't include cross-firm
+    // engagement_shares (an ERO/SB-only, permission-gated section on that
+    // page) -- checking that permission on every single page load isn't
+    // worth it just for a dot; the two most common cases (client-submitted
+    // info changes, submitted organizers) cover it for everyone else.
+    supabase.from("client_pending_changes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "pending"),
+    supabase.from("organizer_responses").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "submitted"),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -93,6 +115,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
+  const billingCard = (billingCardRows ?? [])[0] ?? null;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
   // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
@@ -126,6 +149,17 @@ export default async function AppLayout({ children, modal }: { children: React.R
     if (accentRgb) (brandVars as Record<string, string>)["--brand-accent-rgb"] = accentRgb;
     if (accentSoftRgb) (brandVars as Record<string, string>)["--brand-accent-soft-rgb"] = accentSoftRgb;
   }
+  // Second stop of the Dashboard hero's gradient (see brandGradientTo in
+  // tailwind.config.ts) -- a lightened tint of the SAME accent color, not an
+  // independently-chosen second color. Two unrelated brand colors (e.g. an
+  // indigo accent paired with an amber fallback color) can blend into a
+  // muddy middle when used as gradient stops; tinting one color toward white
+  // guarantees the gradient always stays in the same hue family and reads
+  // clean, for any workspace's accent choice.
+  if (branding.secondaryColor) {
+    const gradientToRgb = lightenHexToRgbTriplet(branding.secondaryColor, 0.45);
+    if (gradientToRgb) (brandVars as Record<string, string>)["--brand-gradient-to-rgb"] = gradientToRgb;
+  }
 
   return (
     <div style={brandVars}>
@@ -148,12 +182,20 @@ export default async function AppLayout({ children, modal }: { children: React.R
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
+            showPartners={(connectedPartnerCount ?? 0) > 0}
+            reviewQueueHasItems={(pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0}
             showEroManagement={isEroManagementTier(workspace)}
             currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
+            <BillingCardPrompt
+              needed={Boolean(billingCard?.needed)}
+              urgent={Boolean(billingCard?.urgent)}
+              daysUntilPeriodEnd={billingCard?.days_until_period_end ?? null}
+              periodEnd={billingCard?.period_end ?? null}
+            />
             {children}
           </main>
         </div>

@@ -1,7 +1,10 @@
+import Link from "next/link";
+import { FileCheck2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { Avatar } from "@/components/Avatar";
 import { ReviewQueueItem } from "./ReviewQueueItem";
 import { ReviewQueueClientChangeItem } from "./ReviewQueueClientChangeItem";
 import { Badge } from "@/components/ui/Badge";
@@ -24,6 +27,24 @@ export default async function ReviewQueuePage() {
     p_workspace_id: workspace.id,
     p_permission_key: "engagements.share",
   });
+  const { data: canReviewOrganizers } = await supabase.rpc("has_permission", {
+    p_workspace_id: workspace.id,
+    p_permission_key: "organizers.review",
+  });
+
+  // Leads submit their intake organizer before an engagement exists (the
+  // New Tax Service Lead Enters CRM flow sends it, then waits for it back),
+  // so this can't ride along with engagement_shares/pipeline stages below --
+  // it's the only surface a submitted-but-not-yet-reviewed lead organizer
+  // shows up on anywhere in the app.
+  const { data: submittedOrganizers } = canReviewOrganizers
+    ? await supabase
+        .from("organizer_responses")
+        .select("id, submitted_at, organizer_templates(name), clients(client_type, first_name, last_name, business_name)")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "submitted")
+        .order("submitted_at", { ascending: false })
+    : { data: [] as { id: string; submitted_at: string | null; organizer_templates: { name: string } | null; clients: Parameters<typeof clientLabel>[0] }[] };
 
   const { data: shares } = await supabase
     .from("engagement_shares")
@@ -53,7 +74,7 @@ export default async function ReviewQueuePage() {
   const { data: pendingClientChanges } = await supabase
     .from("client_pending_changes")
     .select(
-      "id, batch_id, client_id, target_table, target_column, old_value, new_value, new_value_last4, created_at, clients(client_type, first_name, last_name, business_name)"
+      "id, batch_id, client_id, target_table, target_column, old_value, new_value, new_value_last4, created_at, source, organizer_response_id, clients(client_type, first_name, last_name, business_name)"
     )
     .eq("workspace_id", workspace.id)
     .eq("status", "pending")
@@ -63,6 +84,16 @@ export default async function ReviewQueuePage() {
   for (const row of pendingClientChanges ?? []) {
     clientChangeBatches.set(row.batch_id, [...(clientChangeBatches.get(row.batch_id) ?? []), row]);
   }
+
+  // Ties the two sections together -- an organizer submission that also
+  // proposed profile changes (SSN, DOB, address...) shows up in both places;
+  // each side gets a pointer to the other instead of looking unrelated.
+  const organizerResponseIdsWithChanges = new Set(
+    (pendingClientChanges ?? []).map((r) => r.organizer_response_id).filter((v): v is string => Boolean(v))
+  );
+  const organizerResponseIdByBatch = new Map(
+    (pendingClientChanges ?? []).filter((r) => r.organizer_response_id).map((r) => [r.batch_id, r.organizer_response_id as string])
+  );
 
   return (
     <>
@@ -80,6 +111,7 @@ export default async function ReviewQueuePage() {
                   batchId={batchId}
                   clientName={clientLabel((rows?.[0]?.clients as unknown as Parameters<typeof clientLabel>[0]) ?? null)}
                   clientId={rows?.[0]?.client_id ?? ""}
+                  organizerResponseId={organizerResponseIdByBatch.get(batchId) ?? null}
                   changes={(rows ?? []).map((r) => ({
                     id: r.id,
                     targetTable: r.target_table,
@@ -93,6 +125,46 @@ export default async function ReviewQueuePage() {
             </ul>
           )}
         </section>
+
+        {canReviewOrganizers && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Organizers submitted</h2>
+            {(submittedOrganizers ?? []).length === 0 ? (
+              <EmptyState message="No submitted organizers waiting on your review." />
+            ) : (
+              <ul className="space-y-3">
+                {(submittedOrganizers ?? []).map((o) => {
+                  const name = clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0]);
+                  const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer";
+                  const hasLinkedChanges = organizerResponseIdsWithChanges.has(o.id);
+                  return (
+                    <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-sm shadow-soft">
+                      <Avatar name={name} url={null} size="sm" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-ink">{name}</p>
+                        <p className="text-xs text-muted">
+                          Submitted {templateName}
+                          {o.submitted_at ? ` on ${new Date(o.submitted_at).toLocaleDateString()}` : ""}
+                        </p>
+                        {hasLinkedChanges && (
+                          <p className="mt-1 flex items-center gap-1 text-xs text-accent">
+                            <FileCheck2 size={12} aria-hidden="true" /> Also proposed profile changes -- see Client info changes below
+                          </p>
+                        )}
+                      </div>
+                      <Link
+                        href={`/organizers/${o.id}/review`}
+                        className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+                      >
+                        Review
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
 
         {canReviewShares && (
         <section>

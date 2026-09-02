@@ -6,7 +6,7 @@ import { CheckCircle2, MessageCircleWarning, Paperclip, PenLine } from "lucide-r
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
-import { coerceAddressAnswerToString, coerceNameAnswerToString, normalizeOptions, parseAddressValue, parseNameValue } from "@/lib/organizer/formatValue";
+import { answerToString as answerToStringByType, normalizeOptions, parseAddressValue, parseNameValue } from "@/lib/organizer/formatValue";
 import { AddressInput } from "@/components/AddressInput";
 import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
@@ -106,20 +106,18 @@ export function OrganizerForm({
   const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
 
   const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
+  // Delegates address/name/phone to the shared helper; signature and
+  // file_upload keep a JSON-encoded string in local state (see
+  // PublicSignatureField / the file_upload uploader) so a stored value can
+  // come back either as that same string (legacy double-encoded rows) or as
+  // a real object (once saveAll stops double-encoding) -- normalize both to
+  // the string shape the rest of this component expects.
   const answerToString = (fieldId: string, value: unknown): string => {
     const type = fieldTypeById.get(fieldId);
-    if (type === "address") return coerceAddressAnswerToString(value);
-    if (type === "name") return coerceNameAnswerToString(value);
-    if (type === "phone") return formatPhone(String(value));
-    // signature and file_upload keep a JSON-encoded string in local state
-    // (see PublicSignatureField / the file_upload uploader) so a stored
-    // value can come back either as that same string (legacy double-encoded
-    // rows) or as a real object (once saveAll stops double-encoding) --
-    // normalize both to the string shape the rest of this component expects.
     if (type === "signature" || type === "file_upload") {
       return typeof value === "string" ? value : JSON.stringify(value);
     }
-    return String(value);
+    return answerToStringByType(type, value);
   };
   // Inverse of the above, applied right before an answer is written back to
   // the jsonb answer column so signature/file_upload/name/address values are
@@ -317,6 +315,14 @@ export function OrganizerForm({
       }).catch(() => {
         // Best-effort -- the submission itself is already recorded; filing
         // it into Documents can be retried later if this fails.
+      });
+      fetch("/api/documents/sync-organizer-document-checklist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ responseId }),
+      }).catch(() => {
+        // Best-effort, same reasoning -- the VA can still see the raw
+        // organizer answers even if this auto-checklist sync fails.
       });
       // A toast alone was easy to miss -- nothing on screen told the client
       // their organizer actually went through. This blocks on an explicit

@@ -33,8 +33,10 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  showPartners,
   showEroManagement,
   currentUser,
+  reviewQueueHasItems,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
@@ -52,10 +54,14 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
-  /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (Team, Connections, ERO Profile) to the main nav. */
+  /** Partners is only relevant to an ERO/SB with connections to manage -- an independent PTIN has no one to show there. */
+  showPartners?: boolean;
+  /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (Team -- which also holds Connections -- Assignments, ERO Profile) to the main nav. */
   showEroManagement?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
   currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
+  /** True when anything is sitting in Review Queue -- client info changes, submitted organizers, or (for an ERO/SB) shared engagements awaiting a decision -- shown as a small dot on the nav item so staff don't have to open the page to find out. */
+  reviewQueueHasItems?: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -227,6 +233,7 @@ export function Sidebar({
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
+                  .filter((item) => item.label !== "Partners" || showPartners)
                   .map((item) => {
                   const Icon = item.icon;
 
@@ -272,7 +279,12 @@ export function Sidebar({
                       href={item.href}
                       className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
                     >
-                      <Icon size={18} strokeWidth={2} className="shrink-0" />
+                      <span className="relative shrink-0">
+                        <Icon size={18} strokeWidth={2} />
+                        {item.label === "Review Queue" && reviewQueueHasItems && (
+                          <span aria-label="Items waiting on review" className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-danger" style={{ boxShadow: `0 0 0 2px ${effectiveBg}` }} />
+                        )}
+                      </span>
                       {item.label}
                     </Link>
                   );

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
@@ -26,17 +27,41 @@ function flattenOrder(topLevelIds: string[], childOrderByParent: Map<string, str
 
 export function OrganizerBuilder({ template, initialFields, readOnly }: { template: BuilderTemplate; initialFields: BuilderField[]; readOnly: boolean }) {
   const supabase = createClient();
+  const router = useRouter();
   const toast = useToast();
   const [fields, setFields] = useState<BuilderField[]>(initialFields);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedType, setDraggedType] = useState<OrganizerFieldType | null>(null);
   const [view, setView] = useState<"build" | "preview">("build");
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+  const [name, setName] = useState(template.name);
+  const [renamingName, setRenamingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(template.name);
+  const [savingName, setSavingName] = useState(false);
 
   async function updateBanner(url: string | null) {
     setBannerImageUrl(url);
     const { error } = await supabase.from("organizer_templates").update({ banner_image_url: url }).eq("id", template.id);
     if (error) toast.show(error.message, "error");
+  }
+
+  async function saveName() {
+    const trimmed = nameDraft.trim();
+    if (!trimmed || trimmed === name) {
+      setRenamingName(false);
+      setNameDraft(name);
+      return;
+    }
+    setSavingName(true);
+    const { error } = await supabase.from("organizer_templates").update({ name: trimmed }).eq("id", template.id);
+    setSavingName(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setName(trimmed);
+    setRenamingName(false);
+    router.refresh();
   }
 
   const topLevelFields = sortByOrder(fields.filter((f) => !f.parent_field_id));
@@ -174,9 +199,40 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
         </Link>
         <div className="text-center">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Organizer builder</p>
-          <p className="text-sm font-semibold text-ink">
-            {template.name} {readOnly && <span className="ml-1 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
-          </p>
+          {renamingName ? (
+            <div className="flex items-center justify-center gap-1.5">
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveName()}
+                disabled={savingName}
+                className="rounded-lg border border-border px-2 py-0.5 text-center text-sm font-semibold text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+              />
+              <button type="button" onClick={saveName} disabled={savingName} className="text-xs font-medium text-accent hover:underline">
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingName(false);
+                  setNameDraft(name);
+                }}
+                className="text-xs text-muted hover:text-ink"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-ink">
+              {name} {readOnly && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
+              {!readOnly && (
+                <button type="button" onClick={() => setRenamingName(true)} className="text-muted hover:text-ink" aria-label="Rename organizer">
+                  <Pencil size={12} />
+                </button>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {!readOnly && (
@@ -219,7 +275,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
 
       {view === "preview" ? (
         <OrganizerPreviewPanel
-          templateName={template.name}
+          templateName={name}
           templateDescription={template.description}
           topLevelFields={topLevelFields}
           childrenByParent={childrenByParent}

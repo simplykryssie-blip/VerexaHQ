@@ -252,7 +252,7 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       }
 
       const body = renderTemplate(template.body, payload);
-      const result = await sendSmsViaTwilio({ to: job.recipient_phone, body });
+      const result = await sendSmsViaTwilio({ to: job.recipient_phone, body, workspaceId });
       if (result.reason === undefined) await recordProviderCheck("sms", result.sent, result.error);
 
       await supabase.from("sms_log").insert({

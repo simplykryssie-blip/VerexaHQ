@@ -2879,32 +2879,38 @@ export type Database = {
       }
       document_request_item_statuses: {
         Row: {
+          category: string | null
           document_request_id: string
           document_request_item_id: string | null
           fulfilled_by_attachment_id: string | null
           id: string
           is_required: boolean
           name: string
+          organizer_field_id: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          category?: string | null
           document_request_id: string
           document_request_item_id?: string | null
           fulfilled_by_attachment_id?: string | null
           id?: string
           is_required?: boolean
           name: string
+          organizer_field_id?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          category?: string | null
           document_request_id?: string
           document_request_item_id?: string | null
           fulfilled_by_attachment_id?: string | null
           id?: string
           is_required?: boolean
           name?: string
+          organizer_field_id?: string | null
           status?: string
           updated_at?: string
         }
@@ -2928,6 +2934,13 @@ export type Database = {
             columns: ["fulfilled_by_attachment_id"]
             isOneToOne: false
             referencedRelation: "attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_request_item_statuses_organizer_field_id_fkey"
+            columns: ["organizer_field_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_fields"
             referencedColumns: ["id"]
           },
         ]
@@ -3045,6 +3058,7 @@ export type Database = {
           entity_id: string
           entity_type: string
           id: string
+          organizer_response_id: string | null
           status: string
           title: string
           updated_at: string
@@ -3058,6 +3072,7 @@ export type Database = {
           entity_id: string
           entity_type?: string
           id?: string
+          organizer_response_id?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -3071,6 +3086,7 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           id?: string
+          organizer_response_id?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -3089,6 +3105,13 @@ export type Database = {
             columns: ["document_request_template_id"]
             isOneToOne: false
             referencedRelation: "document_request_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_requests_organizer_response_id_fkey"
+            columns: ["organizer_response_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_responses"
             referencedColumns: ["id"]
           },
           {
@@ -4168,6 +4191,7 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          notes: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -4185,6 +4209,7 @@ export type Database = {
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
+          notes?: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at?: string | null
@@ -4202,6 +4227,7 @@ export type Database = {
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
+          notes?: string | null
           parent_workspace_id?: string
           relationship_type?: string
           responded_at?: string | null
@@ -5312,9 +5338,12 @@ export type Database = {
           conditional_logic: Json
           created_at: string
           display_order: number
+          document_checklist_category: string | null
+          document_checklist_name: string | null
           field_type: string
           help_text: string | null
           id: string
+          include_in_document_checklist: boolean
           is_required: boolean
           label: string
           layout_width: string
@@ -5331,9 +5360,12 @@ export type Database = {
           conditional_logic?: Json
           created_at?: string
           display_order?: number
+          document_checklist_category?: string | null
+          document_checklist_name?: string | null
           field_type: string
           help_text?: string | null
           id?: string
+          include_in_document_checklist?: boolean
           is_required?: boolean
           label: string
           layout_width?: string
@@ -5350,9 +5382,12 @@ export type Database = {
           conditional_logic?: Json
           created_at?: string
           display_order?: number
+          document_checklist_category?: string | null
+          document_checklist_name?: string | null
           field_type?: string
           help_text?: string | null
           id?: string
+          include_in_document_checklist?: boolean
           is_required?: boolean
           label?: string
           layout_width?: string
@@ -5955,6 +5990,7 @@ export type Database = {
           invoice_id: string | null
           notes: string | null
           payment_date: string
+          payment_method: string | null
           payment_method_id: string | null
           recorded_by: string | null
           reference: string | null
@@ -5973,6 +6009,7 @@ export type Database = {
           invoice_id?: string | null
           notes?: string | null
           payment_date?: string
+          payment_method?: string | null
           payment_method_id?: string | null
           recorded_by?: string | null
           reference?: string | null
@@ -5991,6 +6028,7 @@ export type Database = {
           invoice_id?: string | null
           notes?: string | null
           payment_date?: string
+          payment_method?: string | null
           payment_method_id?: string | null
           recorded_by?: string | null
           reference?: string | null
@@ -6396,6 +6434,9 @@ export type Database = {
           is_active: boolean
           name: string
           per_seat_price_cents: number
+          signup_free_emails: number
+          signup_free_sms: number
+          signup_free_storage_gb: number
           slug: string
           sms_overage_rate_cents: number
           storage_overage_rate_cents: number
@@ -6413,6 +6454,9 @@ export type Database = {
           is_active?: boolean
           name: string
           per_seat_price_cents?: number
+          signup_free_emails?: number
+          signup_free_sms?: number
+          signup_free_storage_gb?: number
           slug: string
           sms_overage_rate_cents?: number
           storage_overage_rate_cents?: number
@@ -6430,6 +6474,9 @@ export type Database = {
           is_active?: boolean
           name?: string
           per_seat_price_cents?: number
+          signup_free_emails?: number
+          signup_free_sms?: number
+          signup_free_storage_gb?: number
           slug?: string
           sms_overage_rate_cents?: number
           storage_overage_rate_cents?: number
@@ -7325,6 +7372,8 @@ export type Database = {
       signature_request_signers: {
         Row: {
           access_token: string
+          attested_at: string | null
+          attested_by: string | null
           created_at: string
           decline_reason: string | null
           declined_at: string | null
@@ -7343,6 +7392,8 @@ export type Database = {
         }
         Insert: {
           access_token?: string
+          attested_at?: string | null
+          attested_by?: string | null
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
@@ -7361,6 +7412,8 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          attested_at?: string | null
+          attested_by?: string | null
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
@@ -7378,6 +7431,13 @@ export type Database = {
           user_agent?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "signature_request_signers_attested_by_fkey"
+            columns: ["attested_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "signature_request_signers_signature_request_id_fkey"
             columns: ["signature_request_id"]
@@ -8366,6 +8426,50 @@ export type Database = {
           },
         ]
       }
+      workspace_billing_charge_attempts: {
+        Row: {
+          amount_cents: number
+          attempted_at: string
+          created_at: string
+          failure_reason: string | null
+          id: string
+          period_end: string
+          status: string
+          stripe_payment_intent_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          attempted_at?: string
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          period_end: string
+          status: string
+          stripe_payment_intent_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          attempted_at?: string
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          period_end?: string
+          status?: string
+          stripe_payment_intent_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_billing_charge_attempts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_email_domains: {
         Row: {
           created_at: string
@@ -8743,10 +8847,15 @@ export type Database = {
       workspace_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
           card_funding_type: string | null
+          card_last4: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          default_payment_method_id: string | null
           id: string
           locked_plan_snapshot: Json | null
           plan_id: string
@@ -8762,10 +8871,15 @@ export type Database = {
         }
         Insert: {
           cancel_at_period_end?: boolean
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
           card_funding_type?: string | null
+          card_last4?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          default_payment_method_id?: string | null
           id?: string
           locked_plan_snapshot?: Json | null
           plan_id: string
@@ -8781,10 +8895,15 @@ export type Database = {
         }
         Update: {
           cancel_at_period_end?: boolean
+          card_brand?: string | null
+          card_exp_month?: number | null
+          card_exp_year?: number | null
           card_funding_type?: string | null
+          card_last4?: string | null
           created_at?: string
           current_period_end?: string | null
           current_period_start?: string | null
+          default_payment_method_id?: string | null
           id?: string
           locked_plan_snapshot?: Json | null
           plan_id?: string
@@ -8857,6 +8976,47 @@ export type Database = {
           },
         ]
       }
+      workspace_usage_meters: {
+        Row: {
+          free_units_consumed: number
+          free_units_granted: number
+          granted_at: string
+          id: string
+          prepaid_balance: number
+          resource_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          free_units_consumed?: number
+          free_units_granted?: number
+          granted_at?: string
+          id?: string
+          prepaid_balance?: number
+          resource_type: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          free_units_consumed?: number
+          free_units_granted?: number
+          granted_at?: string
+          id?: string
+          prepaid_balance?: number
+          resource_type?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_usage_meters_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_users: {
         Row: {
           created_at: string
@@ -8917,6 +9077,8 @@ export type Database = {
       workspaces: {
         Row: {
           allow_connected_ptin_messaging: boolean
+          client_assignment_mode: string
+          client_assignment_staff_pool: string[]
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
@@ -8947,6 +9109,8 @@ export type Database = {
         }
         Insert: {
           allow_connected_ptin_messaging?: boolean
+          client_assignment_mode?: string
+          client_assignment_staff_pool?: string[]
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
@@ -8977,6 +9141,8 @@ export type Database = {
         }
         Update: {
           allow_connected_ptin_messaging?: boolean
+          client_assignment_mode?: string
+          client_assignment_staff_pool?: string[]
           created_at?: string
           created_by?: string | null
           default_compliance_officer_id?: string | null
@@ -9548,6 +9714,7 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          notes: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -9657,6 +9824,10 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      attest_signature_presence: {
+        Args: { p_signer_id: string }
+        Returns: undefined
+      }
       can_access_admin_ai: { Args: never; Returns: boolean }
       can_use_network_messaging: {
         Args: { p_workspace_id: string }
@@ -9695,6 +9866,10 @@ export type Database = {
       check_login_lockout: { Args: { p_email: string }; Returns: Json }
       check_rate_limit: {
         Args: { p_key: string; p_max_hits: number; p_window_seconds: number }
+        Returns: boolean
+      }
+      check_storage_capacity: {
+        Args: { p_additional_bytes: number; p_workspace_id: string }
         Returns: boolean
       }
       compare_config_object_versions: {
@@ -9866,6 +10041,7 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          notes: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -9945,6 +10121,14 @@ export type Database = {
       create_workspace_tag: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
+      }
+      credit_prepaid_balance: {
+        Args: {
+          p_resource_type: string
+          p_units: number
+          p_workspace_id: string
+        }
+        Returns: undefined
       }
       current_workspace_ids: { Args: never; Returns: string[] }
       debug_whoami: { Args: never; Returns: string }
@@ -10105,6 +10289,26 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_ero_connected_partners: {
+        Args: { p_relationship_types?: string[]; p_workspace_id: string }
+        Returns: {
+          allows_branding_override: boolean
+          billing_responsibility: string
+          child_workspace_id: string
+          connection_id: string
+          created_at: string
+          mailing_address: string
+          name: string
+          notes: string
+          phone: string
+          primary_contact_email: string
+          relationship_type: string
+          responded_at: string
+          shares_communications_identity: boolean
+          status: string
+          website: string
+        }[]
+      }
       get_ero_extensions: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -10214,6 +10418,21 @@ export type Database = {
           name: string
           workspace_id: string
           workspace_type: string
+        }[]
+      }
+      get_my_ero_connection: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          allows_branding_override: boolean
+          billing_responsibility: string
+          connection_id: string
+          ero_workspace_id: string
+          name: string
+          phone: string
+          primary_contact_email: string
+          relationship_type: string
+          shares_communications_identity: boolean
+          website: string
         }[]
       }
       get_my_workspaces: {
@@ -10370,6 +10589,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string[]
       }
+      grant_workspace_usage_meters: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       has_accepted_platform_terms: {
         Args: { p_version: string }
         Returns: boolean
@@ -10518,6 +10741,16 @@ export type Database = {
         Args: { p_duplicate_client_id: string; p_primary_client_id: string }
         Returns: undefined
       }
+      needs_billing_card: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          card_last4: string
+          days_until_period_end: number
+          needed: boolean
+          period_end: string
+          urgent: boolean
+        }[]
+      }
       notify_organizer_information_request: {
         Args: { p_message: string; p_request_id: string }
         Returns: undefined
@@ -10665,6 +10898,7 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          notes: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -10679,6 +10913,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      refund_usage_unit: {
+        Args: {
+          p_resource_type: string
+          p_source: string
+          p_workspace_id: string
+        }
+        Returns: undefined
       }
       reject_automation_step: {
         Args: { p_pending_step_id: string; p_reason: string }
@@ -10703,6 +10945,7 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          notes: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -10764,6 +11007,13 @@ export type Database = {
         Args: { p_service_id: string }
         Returns: undefined
       }
+      reserve_usage_unit: {
+        Args: { p_resource_type: string; p_workspace_id: string }
+        Returns: {
+          allowed: boolean
+          source: string
+        }[]
+      }
       resolve_and_sign_organizer_response: {
         Args: {
           p_client_email: string
@@ -10772,6 +11022,10 @@ export type Database = {
           p_template_id: string
           p_workspace_id: string
         }
+        Returns: string
+      }
+      resolve_client_relationship_manager: {
+        Args: { p_creator_user_id?: string; p_workspace_id: string }
         Returns: string
       }
       resolve_organizer_information_request: {
@@ -10800,6 +11054,10 @@ export type Database = {
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
       reveal_client_itin: { Args: { p_client_id: string }; Returns: string }
+      reveal_client_pending_change_value: {
+        Args: { p_pending_change_id: string }
+        Returns: string
+      }
       reveal_client_relationship_ssn: {
         Args: { p_relationship_id: string }
         Returns: string
@@ -10968,6 +11226,8 @@ export type Database = {
         }
         Returns: {
           allow_connected_ptin_messaging: boolean
+          client_assignment_mode: string
+          client_assignment_staff_pool: string[]
           created_at: string
           created_by: string | null
           default_compliance_officer_id: string | null
@@ -11169,10 +11429,15 @@ export type Database = {
         }
         Returns: {
           cancel_at_period_end: boolean
+          card_brand: string | null
+          card_exp_month: number | null
+          card_exp_year: number | null
           card_funding_type: string | null
+          card_last4: string | null
           created_at: string
           current_period_end: string | null
           current_period_start: string | null
+          default_payment_method_id: string | null
           id: string
           locked_plan_snapshot: Json | null
           plan_id: string

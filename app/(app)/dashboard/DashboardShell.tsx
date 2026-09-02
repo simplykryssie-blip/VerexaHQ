@@ -227,12 +227,12 @@ export function DashboardShell({
       <div className="relative overflow-hidden border-b border-border px-8 py-9">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandLime opacity-20 blur-3xl"
+          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandGradientTo opacity-20 blur-3xl"
         />
         <div className="relative flex items-start justify-between gap-6">
           <div>
             <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">
-              Welcome back, <span className="bg-gradient-to-r from-accent to-brandLime bg-clip-text text-transparent">{greetingName}</span>.
+              Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{greetingName}</span>.
             </h1>
             <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
           </div>

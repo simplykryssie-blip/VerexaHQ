@@ -55,8 +55,17 @@ export type BillingPaymentRow = {
   status: string;
   amount: number;
   payment_date: string;
+  payment_method: string | null;
   client_id: string;
   client_name: string;
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  stripe: "Card",
+  check: "Check",
+  cash: "Cash",
+  bank_transfer: "Bank transfer",
+  other: "Other",
 };
 
 const TABS = ["Quotes", "Invoices", "Payments"] as const;
@@ -258,7 +267,10 @@ export function BillingHub({
                     <Link href={`/clients/${p.client_id}`} className="font-medium text-accent hover:underline">
                       {p.client_name}
                     </Link>
-                    <p className="text-xs text-muted">{new Date(p.payment_date).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted">
+                      {new Date(p.payment_date).toLocaleDateString()}
+                      {p.payment_method && ` -- ${PAYMENT_METHOD_LABEL[p.payment_method] ?? p.payment_method}`}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">

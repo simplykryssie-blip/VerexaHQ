@@ -19,7 +19,6 @@ import {
   Flag,
   ScrollText,
   Zap,
-  Link2,
   ClipboardCheck,
   LifeBuoy,
   Kanban,
@@ -31,6 +30,7 @@ import {
   Package,
   Palette,
   Receipt,
+  Handshake,
   Sparkles,
 } from "lucide-react";
 
@@ -67,6 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
+  { label: "Partners", href: "/partners", icon: Handshake },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Learning Hub", href: "/learning", icon: GraduationCap },
@@ -91,7 +92,7 @@ export type NavSection = { label: string; items: NavItem[] };
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Partners", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 
@@ -158,15 +159,15 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  * Shortcuts into the team-management corner of Settings, surfaced as their
  * own top-level section for an ERO/Service Bureau/multi-office firm --
  * see isEroManagementTier(). These are the same pages Settings already
- * lists (Users & Staff, Connections, Firm Profile), just promoted out of a
- * nested settings sub-nav for a workspace that actually runs a team,
- * rather than duplicated pages.
+ * lists (Users & Staff -- which also holds Connections, folded into the
+ * same page -- and Firm Profile), just promoted out of a nested settings
+ * sub-nav for a workspace that actually runs a team, rather than
+ * duplicated pages.
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Team", href: "/settings/users", icon: Users },
   { label: "Assignments", href: "/assignments", icon: UserCheck },
-  { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
 ];
 
@@ -180,10 +181,10 @@ export type SettingsNavItem = {
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
-  { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
@@ -197,7 +198,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags", "Connections"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 

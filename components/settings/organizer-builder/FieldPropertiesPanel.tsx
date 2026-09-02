@@ -40,7 +40,18 @@ export function FieldPropertiesPanel({
     patch: Partial<
       Pick<
         BuilderField,
-        "label" | "help_text" | "body_html" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+        | "label"
+        | "help_text"
+        | "body_html"
+        | "is_required"
+        | "options"
+        | "conditional_logic"
+        | "client_profile_field"
+        | "relationship_role"
+        | "layout_width"
+        | "include_in_document_checklist"
+        | "document_checklist_name"
+        | "document_checklist_category"
       >
     >
   ) => void;
@@ -119,7 +130,18 @@ function PropertiesForm({
     patch: Partial<
       Pick<
         BuilderField,
-        "label" | "help_text" | "body_html" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role" | "layout_width"
+        | "label"
+        | "help_text"
+        | "body_html"
+        | "is_required"
+        | "options"
+        | "conditional_logic"
+        | "client_profile_field"
+        | "relationship_role"
+        | "layout_width"
+        | "include_in_document_checklist"
+        | "document_checklist_name"
+        | "document_checklist_category"
       >
     >
   ) => void;
@@ -128,6 +150,8 @@ function PropertiesForm({
 }) {
   const [label, setLabel] = useState(field.label);
   const [helpText, setHelpText] = useState(field.help_text ?? "");
+  const [checklistName, setChecklistName] = useState(field.document_checklist_name ?? "");
+  const [checklistCategory, setChecklistCategory] = useState(field.document_checklist_category ?? "");
   const options = normalizeOptions(field.options);
   const showIf = parseConditionalLogic(field.conditional_logic).show_if ?? null;
 
@@ -218,6 +242,59 @@ function PropertiesForm({
           />
           Required
         </label>
+      )}
+
+      {field.field_type === "file_upload" && (
+        <div className="mt-4 border-t border-border pt-4">
+          <label className="flex items-center gap-2 text-sm text-slate">
+            <input
+              type="checkbox"
+              checked={field.include_in_document_checklist}
+              disabled={readOnly}
+              onChange={(e) => onUpdate(field.id, { include_in_document_checklist: e.target.checked })}
+              className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            />
+            Add to document checklist when submitted
+          </label>
+          <p className="mt-1 text-xs text-muted">
+            When the client submits, this becomes a checklist item automatically -- already checked off if they uploaded
+            something here, left open if they didn&apos;t. Skipped entirely if this question was hidden for them.
+          </p>
+
+          {field.include_in_document_checklist && (
+            <div className="mt-3 space-y-3">
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Checklist name (optional)
+                <input
+                  value={checklistName}
+                  disabled={readOnly}
+                  onChange={(e) => setChecklistName(e.target.value)}
+                  onBlur={() =>
+                    checklistName !== (field.document_checklist_name ?? "") &&
+                    onUpdate(field.id, { document_checklist_name: checklistName || null })
+                  }
+                  placeholder={field.label}
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+                />
+                <span className="mt-1 block text-[11px] normal-case text-muted">Defaults to the question label above.</span>
+              </label>
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Category (optional)
+                <input
+                  value={checklistCategory}
+                  disabled={readOnly}
+                  onChange={(e) => setChecklistCategory(e.target.value)}
+                  onBlur={() =>
+                    checklistCategory !== (field.document_checklist_category ?? "") &&
+                    onUpdate(field.id, { document_checklist_category: checklistCategory || null })
+                  }
+                  placeholder="e.g. Income"
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+                />
+              </label>
+            </div>
+          )}
+        </div>
       )}
 
       {isWidthEligible(field.field_type) && (

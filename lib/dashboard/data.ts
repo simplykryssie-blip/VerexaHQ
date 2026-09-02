@@ -264,6 +264,39 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     }
   }
 
+  // v_reviewer_queue only covers engagement-level pipeline stages -- a lead
+  // who submits their intake organizer before an engagement exists (the
+  // normal path: New Tax Service Lead Enters CRM sends the organizer, then
+  // waits for it back, before any engagement is created) was invisible here
+  // even though it's exactly the kind of thing this widget exists for.
+  const { data: submittedOrganizers } = await supabase
+    .from("organizer_responses")
+    .select(
+      "id, client_id, submitted_at, organizer_templates(name), resolved_service_id, services(name), clients(client_type, first_name, last_name, business_name)"
+    )
+    .eq("workspace_id", workspaceId)
+    .eq("status", "submitted")
+    .order("submitted_at", { ascending: false });
+
+  for (const o of submittedOrganizers ?? []) {
+    const client = o.clients as unknown as { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null } | null;
+    const clientName = client
+      ? client.client_type === "business" && client.business_name
+        ? client.business_name
+        : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
+      : "Unknown client";
+    reviewItems.push({
+      workflow_stage_id: `organizer:${o.id}`,
+      stage_name: "Organizer Submitted",
+      engagement_number: null,
+      client_id: o.client_id,
+      client_name: clientName,
+      service_name: (o.services as unknown as { name: string } | null)?.name ?? (o.organizer_templates as unknown as { name: string } | null)?.name ?? null,
+      sla_category: "On Track",
+      started_at: o.submitted_at,
+    });
+  }
+
   const [{ data: calEngagements }, { data: calTasks }] = await Promise.all([
     supabase
       .from("engagements")

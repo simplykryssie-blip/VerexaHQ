@@ -180,7 +180,7 @@ export default async function DashboardPage() {
               key: "connections",
               label: "Send connection invites",
               description: "Invite the PTINs you work with to connect to your ERO.",
-              href: "/settings/connections",
+              href: "/settings/users",
               complete: (connectionCount ?? 0) > 0,
             },
           ]

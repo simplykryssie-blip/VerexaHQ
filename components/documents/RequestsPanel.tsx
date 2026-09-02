@@ -20,6 +20,25 @@ function RequestProgressBar({ done, total }: { done: number; total: number }) {
   );
 }
 
+const UNCATEGORIZED = "Other";
+
+/** Groups items by category, keeping first-seen category order; items with no category fall under "Other" at the end. */
+function groupByCategory<T extends { category?: string | null }>(items: T[]): { category: string; items: T[] }[] {
+  const order: string[] = [];
+  const byCategory = new Map<string, T[]>();
+  for (const item of items) {
+    const category = item.category?.trim() || UNCATEGORIZED;
+    if (!byCategory.has(category)) {
+      order.push(category);
+      byCategory.set(category, []);
+    }
+    byCategory.get(category)!.push(item);
+  }
+  const ordered = order.filter((c) => c !== UNCATEGORIZED);
+  if (byCategory.has(UNCATEGORIZED)) ordered.push(UNCATEGORIZED);
+  return ordered.map((category) => ({ category, items: byCategory.get(category)! }));
+}
+
 export function RequestsPanel({
   requests,
   templates,
@@ -172,36 +191,51 @@ export function RequestsPanel({
                   </span>
                 </div>
                 <RequestProgressBar done={done} total={r.items.length} />
-                <ul className="mt-2 space-y-1 text-xs text-muted">
-                  {r.items.map((item) => (
-                    <li key={item.id} className="flex items-center justify-between gap-2">
-                      <span>
-                        {item.name} {item.is_required && <span className="text-muted">(required)</span>}
-                      </span>
-                      {item.status === "pending" ? (
-                        <span className="flex shrink-0 items-center gap-2">
-                          <label className="flex cursor-pointer items-center gap-1 text-accent hover:underline">
-                            <Paperclip size={12} aria-hidden="true" />
-                            {uploadingItemId === item.id ? "Uploading..." : "Upload"}
-                            <input
-                              type="file"
-                              className="sr-only"
-                              disabled={uploadingItemId !== null}
-                              onChange={(e) => e.target.files?.[0] && uploadForItem(item.id, e.target.files[0])}
-                            />
-                          </label>
-                          {audience === "staff" && (
-                            <button type="button" onClick={() => markReceived(item.id)} className="text-muted hover:text-accent hover:underline">
-                              Mark received
-                            </button>
+                {(() => {
+                  const hasCategories = r.items.some((i) => i.category?.trim());
+                  const groups = hasCategories ? groupByCategory(r.items) : [{ category: "", items: r.items }];
+                  return (
+                    <div className="mt-2 space-y-2">
+                      {groups.map((group) => (
+                        <div key={group.category || "__flat"}>
+                          {group.category && (
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{group.category}</p>
                           )}
-                        </span>
-                      ) : (
-                        <span className="capitalize">{item.status}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                          <ul className="mt-1 space-y-1 text-xs text-muted">
+                            {group.items.map((item) => (
+                              <li key={item.id} className="flex items-center justify-between gap-2">
+                                <span>
+                                  {item.name} {item.is_required && <span className="text-muted">(required)</span>}
+                                </span>
+                                {item.status === "pending" ? (
+                                  <span className="flex shrink-0 items-center gap-2">
+                                    <label className="flex cursor-pointer items-center gap-1 text-accent hover:underline">
+                                      <Paperclip size={12} aria-hidden="true" />
+                                      {uploadingItemId === item.id ? "Uploading..." : "Upload"}
+                                      <input
+                                        type="file"
+                                        className="sr-only"
+                                        disabled={uploadingItemId !== null}
+                                        onChange={(e) => e.target.files?.[0] && uploadForItem(item.id, e.target.files[0])}
+                                      />
+                                    </label>
+                                    {audience === "staff" && (
+                                      <button type="button" onClick={() => markReceived(item.id)} className="text-muted hover:text-accent hover:underline">
+                                        Mark received
+                                      </button>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="capitalize">{item.status}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </li>
             );
           })}

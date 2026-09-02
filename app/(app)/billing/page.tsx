@@ -49,7 +49,7 @@ export default async function BillingPage() {
       .order("issue_date", { ascending: false }),
     supabase
       .from("payments")
-      .select("id, status, amount, payment_date, client_id, clients(first_name, last_name, business_name, client_type)")
+      .select("id, status, amount, payment_date, payment_method, client_id, clients(first_name, last_name, business_name, client_type)")
       .eq("workspace_id", workspace.id)
       .order("payment_date", { ascending: false })
       .limit(200),
@@ -95,6 +95,7 @@ export default async function BillingPage() {
     status: p.status,
     amount: p.amount,
     payment_date: p.payment_date,
+    payment_method: p.payment_method,
     client_id: p.client_id,
     client_name: clientLabel(p.clients as never),
   }));

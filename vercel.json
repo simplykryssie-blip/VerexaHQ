@@ -9,6 +9,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/check-billing-cycles",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/check-stale-automation-queues",
       "schedule": "*/15 * * * *"
     },

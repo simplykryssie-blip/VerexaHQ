@@ -50,6 +50,7 @@ type ClientRow = {
   lifecycle_status: string;
   tags: string[] | null;
   requestedService?: string | null;
+  needsReview?: boolean;
 };
 
 const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -60,9 +61,16 @@ const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
       <div className="flex items-center gap-2.5">
         <Avatar name={clientDisplayName(c)} size="sm" />
         <div>
-          <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
-            {clientDisplayName(c)}
-          </Link>
+          <div className="flex items-center gap-1.5">
+            <Link href={`/clients/${c.id}`} className="font-medium text-accent hover:underline">
+              {clientDisplayName(c)}
+            </Link>
+            {c.needsReview && (
+              <Badge tone="warning" className="shrink-0">
+                Submitted -- needs review
+              </Badge>
+            )}
+          </div>
           {c.requestedService && <p className="text-xs text-muted">{c.requestedService}</p>}
         </div>
       </div>
@@ -124,22 +132,47 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : ALL_LIFECYCLE_STATUSES);
   if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
 
-  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }] = await Promise.all([
-    clientsQuery,
-    supabase
-      .from("services")
-      .select("id, name, service_category_id, service_categories(slug)")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "published")
-      .order("display_order"),
-    supabase
-      .from("service_categories")
-      .select("id, name")
-      .eq("workspace_id", workspace.id)
-      .order("display_order"),
-    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
-    supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
-  ]);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }, { data: activeMembers }, { data: membership }] =
+    await Promise.all([
+      clientsQuery,
+      supabase
+        .from("services")
+        .select("id, name, service_category_id, service_categories(slug)")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "published")
+        .order("display_order"),
+      supabase
+        .from("service_categories")
+        .select("id, name")
+        .eq("workspace_id", workspace.id)
+        .order("display_order"),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+      supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
+      supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
+      user
+        ? supabase.from("workspace_users").select("is_owner").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+  const isOwner = Boolean(membership?.is_owner);
+  // Only the owner ever sees the "assign to" picker (below), so whenever it
+  // renders, the current viewer IS the account holder -- naming them
+  // directly instead of a generic "Me" makes the default assignment
+  // unambiguous.
+  const { data: currentProfile } = user ? await supabase.from("user_profiles").select("display_name").eq("id", user.id).maybeSingle() : { data: null };
+  const accountHolderName = currentProfile?.display_name ?? "Me";
+  // Excludes the current viewer -- the picker's own default option already
+  // covers "assign to me" (see NewClientButton), so listing them again by
+  // name here just duplicates that choice under two different labels.
+  const staffUserIds = (activeMembers ?? []).map((m) => m.user_id).filter((id) => id !== user?.id);
+  const { data: staffProfiles } = staffUserIds.length
+    ? await supabase.from("user_profiles").select("id, display_name").in("id", staffUserIds)
+    : { data: [] };
+  const staffOptions = staffProfiles ?? [];
 
   // Same category -> service grouping shape the public organizer's own
   // "what do you need help with" contact step uses (get_public_service_options),
@@ -173,8 +206,17 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
   for (const [clientId, names] of requestedServicesByClient) {
     requestedServiceLabelByClient.set(clientId, names.join(", "));
   }
+
+  // Nothing else on this list tells staff a client submitted something --
+  // the only way to notice was opening every client one at a time.
+  const { data: submittedOrganizers } = clientIds.length > 0
+    ? await supabase.from("organizer_responses").select("client_id").in("client_id", clientIds).eq("status", "submitted")
+    : { data: [] as { client_id: string }[] };
+  const clientsNeedingReview = new Set((submittedOrganizers ?? []).map((o) => o.client_id));
+
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
+    needsReview: clientsNeedingReview.has(c.id),
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
   }));
 
@@ -189,7 +231,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         description="Every client and lead in your workspace."
         actions={
           canCreate ? (
-            <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
+            <NewClientButton
+              workspaceId={workspace.id}
+              workspaceName={workspace.name}
+              serviceCategories={serviceCategories}
+              isOwner={isOwner}
+              staffOptions={staffOptions}
+              accountHolderName={accountHolderName}
+            />
           ) : null
         }
       />
@@ -224,7 +273,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
             }
             emptyAction={
               !status && canCreate ? (
-                <NewClientButton workspaceId={workspace.id} workspaceName={workspace.name} serviceCategories={serviceCategories} />
+                <NewClientButton
+              workspaceId={workspace.id}
+              workspaceName={workspace.name}
+              serviceCategories={serviceCategories}
+              isOwner={isOwner}
+              staffOptions={staffOptions}
+              accountHolderName={accountHolderName}
+            />
               ) : undefined
             }
           />

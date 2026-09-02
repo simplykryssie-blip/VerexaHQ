@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PenLine, X, Link as LinkIcon } from "lucide-react";
+import { PenLine, X, Link as LinkIcon, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -232,6 +232,24 @@ export function SignaturesPanel({
     toast.show("Signing link copied -- send it to anyone, no account needed", "success");
   }
 
+  // IRS Pub 1345 requires identity verification before a document like an
+  // 8879 can be e-signed -- either the signer is physically present with a
+  // staff member who's confirmed who they are, or the process uses real
+  // identity-proofing (KBA) for a remote signer. This app doesn't have KBA
+  // yet, so the "present + verified" path is gated behind an explicit
+  // attestation instead of assuming presence just because staff is the one
+  // opening the signing flow.
+  async function attestPresence(signerId: string) {
+    if (!window.confirm("Confirm: you are physically present with this signer and have verified their identity.")) return;
+    const { error } = await supabase.rpc("attest_signature_presence", { p_signer_id: signerId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Identity confirmed", "success");
+    router.refresh();
+  }
+
   async function decline(signerId: string) {
     const reason = window.prompt("Reason for declining (optional):") ?? undefined;
     const { error } = await supabase.rpc("decline_signature", { p_signer_id: signerId, p_reason: reason || undefined });
@@ -387,33 +405,51 @@ export function SignaturesPanel({
                 </div>
                 <ul className="mt-2 space-y-1.5">
                   {r.signers.map((s) => (
-                    <li key={s.id} className="flex items-center justify-between text-xs">
-                      <span className="text-slate">
-                        {s.signer_name} {s.signer_email && <span className="text-muted">({s.signer_email})</span>}
-                      </span>
-                      {s.status === "pending" ? (
-                        <span className="flex items-center gap-2">
-                          {audience === "staff" && (
+                    <li key={s.id} className="flex flex-col gap-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate">
+                          {s.signer_name} {s.signer_email && <span className="text-muted">({s.signer_email})</span>}
+                        </span>
+                        {s.status === "pending" ? (
+                          audience === "staff" && !s.attested_at ? (
                             <button
                               type="button"
-                              onClick={() => copySigningLink(s.access_token)}
-                              className="flex items-center gap-1 text-accent hover:underline"
-                              title="Copy a public signing link -- no account needed"
+                              onClick={() => attestPresence(s.id)}
+                              className="flex items-center gap-1 font-medium text-amber hover:underline"
+                              title="Required before you can hand off a signing link or record this signature"
                             >
-                              <LinkIcon size={12} /> Copy link
+                              <ShieldCheck size={12} /> Confirm identity to unlock signing
                             </button>
-                          )}
-                          <button type="button" onClick={() => setSigningId(s.id)} className="flex items-center gap-1 text-accent hover:underline">
-                            <PenLine size={12} /> {audience === "portal" ? "Sign now" : "Mark signed"}
-                          </button>
-                          <button type="button" onClick={() => decline(s.id)} className="text-danger hover:underline">
-                            Decline
-                          </button>
-                        </span>
-                      ) : (
-                        <span className={`capitalize ${s.status === "declined" ? "text-danger" : "text-success"}`}>
-                          {s.status}
-                          {s.signed_at && ` -- ${new Date(s.signed_at).toLocaleDateString()}`}
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              {audience === "staff" && (
+                                <button
+                                  type="button"
+                                  onClick={() => copySigningLink(s.access_token)}
+                                  className="flex items-center gap-1 text-accent hover:underline"
+                                  title="Copy a public signing link -- no account needed"
+                                >
+                                  <LinkIcon size={12} /> Copy link
+                                </button>
+                              )}
+                              <button type="button" onClick={() => setSigningId(s.id)} className="flex items-center gap-1 text-accent hover:underline">
+                                <PenLine size={12} /> {audience === "portal" ? "Sign now" : "Mark signed"}
+                              </button>
+                              <button type="button" onClick={() => decline(s.id)} className="text-danger hover:underline">
+                                Decline
+                              </button>
+                            </span>
+                          )
+                        ) : (
+                          <span className={`capitalize ${s.status === "declined" ? "text-danger" : "text-success"}`}>
+                            {s.status}
+                            {s.signed_at && ` -- ${new Date(s.signed_at).toLocaleDateString()}`}
+                          </span>
+                        )}
+                      </div>
+                      {audience === "staff" && s.attested_at && (
+                        <span className="text-[11px] text-muted">
+                          Identity confirmed{s.attested_by_name ? ` by ${s.attested_by_name}` : ""} -- {new Date(s.attested_at).toLocaleString()}
                         </span>
                       )}
                     </li>

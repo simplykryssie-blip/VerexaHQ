@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { verifyStripeSignature } from "@/lib/stripe/client";
 import { createServiceClient } from "@/lib/supabase/service";
-import { handleCheckoutSessionCompleted, handlePaymentIntentFailed, markWebhookFailed, markWebhookProcessed } from "@/lib/stripe/handleCheckoutCompleted";
+import {
+  handleCheckoutSessionCompleted,
+  handleUsageTopupCheckoutCompleted,
+  handlePaymentIntentFailed,
+  markWebhookFailed,
+  markWebhookProcessed,
+} from "@/lib/stripe/handleCheckoutCompleted";
 import {
   handleSubscriptionCreated,
   handleSubscriptionUpdated,
@@ -9,6 +15,7 @@ import {
   handleTrialWillEnd,
   handleInvoicePaymentSucceeded,
   handleInvoicePaymentFailed,
+  handleSetupCheckoutCompleted,
 } from "@/lib/stripe/subscriptionWebhooks";
 
 export async function POST(request: Request) {
@@ -40,11 +47,19 @@ export async function POST(request: Request) {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as {
         id: string;
+        mode?: string;
+        customer?: string | { id: string };
+        setup_intent?: string | { id: string } | null;
         payment_intent: string;
         amount_total: number;
-        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string };
+        metadata?: { invoice_id?: string; payment_plan_id?: string; workspace_id?: string; type?: string; resource_type?: string; units?: string };
       };
-      const result = await handleCheckoutSessionCompleted(supabase, session);
+      const result =
+        session.mode === "setup"
+          ? await handleSetupCheckoutCompleted(supabase, session as Parameters<typeof handleSetupCheckoutCompleted>[1])
+          : session.metadata?.type === "usage_topup"
+            ? await handleUsageTopupCheckoutCompleted(supabase, session)
+            : await handleCheckoutSessionCompleted(supabase, session);
       await markWebhookProcessed(supabase, logRow?.id, session.metadata?.workspace_id);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });

@@ -32,8 +32,7 @@ const COLUMN_LABELS: Record<string, string> = {
 // primary_email/primary_phone/street/city/state/zip approving adds a new
 // primary entry on the client's contact card and keeps the old one as a
 // secondary rather than erasing it -- staff can retag or delete either
-// afterward from the client profile. ssn's new_value is encrypted
-// ciphertext, never safe to render directly; show only the masked last 4.
+// afterward from the client profile.
 function displayValue(change: ChangeRow, value: string | null) {
   if (change.targetColumn === "ssn") {
     return value ? `Ending in ${value}` : "(on file)";
@@ -41,21 +40,74 @@ function displayValue(change: ChangeRow, value: string | null) {
   return value || "(blank)";
 }
 
+// A masked last-4 can't tell staff whether a real change happened -- e.g. a
+// client editing the first 3-5 digits keeps the same last 4, and "Ending in
+// 1234" -> "Ending in 1234" looks like nothing changed at all. Each side
+// reveals independently, decrypted on demand (never preloaded): the old
+// value is whatever's still on the client record right now (nothing's been
+// applied yet), the new value comes from the pending change's own ciphertext.
+function SsnRevealValue({ reveal, fallback }: { reveal: () => Promise<string>; fallback: string }) {
+  const [value, setValue] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleClick() {
+    if (value) {
+      setValue(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setValue(await reveal());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reveal this value");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className="font-mono">{value ?? fallback}</span>
+      <button type="button" disabled={loading} onClick={handleClick} className="text-accent hover:underline disabled:opacity-60">
+        {loading ? "..." : value ? "Hide" : "Reveal"}
+      </button>
+      {error && <span className="text-danger">{error}</span>}
+    </span>
+  );
+}
+
 export function ReviewQueueClientChangeItem({
   batchId,
   clientId,
   clientName,
+  organizerResponseId,
   changes,
 }: {
   batchId: string;
   clientId: string;
   clientName: string;
+  /** Set when these changes came in as part of a submitted organizer, not a standalone portal edit -- links back to the fuller organizer review. */
+  organizerResponseId?: string | null;
   changes: ChangeRow[];
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
+
+  async function revealOldSsn() {
+    const { data, error } = await supabase.rpc("reveal_client_ssn", { p_client_id: clientId });
+    if (error) throw new Error(error.message);
+    return data as string;
+  }
+
+  async function revealNewSsn(pendingChangeId: string) {
+    const { data, error } = await supabase.rpc("reveal_client_pending_change_value", { p_pending_change_id: pendingChangeId });
+    if (error) throw new Error(error.message);
+    return data as string;
+  }
 
   async function approveAll() {
     setBusy("approve");
@@ -92,7 +144,18 @@ export function ReviewQueueClientChangeItem({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-medium text-ink">{clientName}</p>
-          <p className="text-xs text-muted">Submitted via the client portal</p>
+          <p className="text-xs text-muted">
+            {organizerResponseId ? (
+              <>
+                Submitted with an organizer --{" "}
+                <Link href={`/organizers/${organizerResponseId}/review`} className="text-accent hover:underline">
+                  view organizer
+                </Link>
+              </>
+            ) : (
+              "Submitted via the client portal"
+            )}
+          </p>
           {clientId && (
             <Link href={`/clients/${clientId}`} className="mt-1 inline-block text-xs text-accent hover:underline">
               View client
@@ -123,8 +186,17 @@ export function ReviewQueueClientChangeItem({
         {changes.map((c) => (
           <li key={c.id} className="text-xs text-slate">
             <span className="font-medium text-ink">{COLUMN_LABELS[c.targetColumn] ?? c.targetColumn}:</span>{" "}
-            {displayValue(c, c.oldValue)} <span className="text-muted">→</span>{" "}
-            {c.targetColumn === "ssn" ? displayValue(c, c.newValueLast4) : c.newValue}
+            {c.targetColumn === "ssn" ? (
+              <>
+                <SsnRevealValue reveal={revealOldSsn} fallback={displayValue(c, c.oldValue)} />
+                <span className="text-muted"> → </span>
+                <SsnRevealValue reveal={() => revealNewSsn(c.id)} fallback={displayValue(c, c.newValueLast4)} />
+              </>
+            ) : (
+              <>
+                {displayValue(c, c.oldValue)} <span className="text-muted">→</span> {c.newValue}
+              </>
+            )}
           </li>
         ))}
       </ul>
