@@ -42,18 +42,21 @@ export function ServiceLibrary({
   services,
   categories,
   canManage,
+  creating,
+  onCreatingChange,
 }: {
   workspaceId: string;
   services: ServiceCard[];
   categories: ServiceCategoryOption[];
   canManage: boolean;
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -84,6 +87,7 @@ export function ServiceLibrary({
         .single();
       if (!insertError && data) {
         setSaving(false);
+        onCreatingChange(false);
         router.push(`/settings/services/${data.id}`);
         return;
       }
@@ -130,15 +134,6 @@ export function ServiceLibrary({
             </option>
           ))}
         </select>
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-          >
-            + New service
-          </button>
-        )}
       </div>
 
       <div className="mt-4">
@@ -192,7 +187,7 @@ export function ServiceLibrary({
           <form onSubmit={createService} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-sm font-semibold text-ink">New service</h2>
-              <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
+              <button type="button" onClick={() => onCreatingChange(false)} className="text-lg text-muted hover:text-ink">
                 &times;
               </button>
             </div>
@@ -227,7 +222,7 @@ export function ServiceLibrary({
               {error && <p className="text-sm text-danger">{error}</p>}
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
+              <button type="button" onClick={() => onCreatingChange(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
                 Cancel
               </button>
               <button

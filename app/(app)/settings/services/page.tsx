@@ -1,8 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
-import { ServiceLibrary, type ServiceCard, type ServiceCategoryOption } from "@/components/settings/ServiceLibrary";
-import { Package } from "lucide-react";
+import { ServicesPageClient } from "@/components/settings/ServicesPageClient";
+import type { ServiceCard, ServiceCategoryOption } from "@/components/settings/ServiceLibrary";
 
 export const dynamic = "force-dynamic";
 
@@ -33,15 +32,6 @@ export default async function ServicesPage() {
   const categoryOptions: ServiceCategoryOption[] = categories ?? [];
 
   return (
-    <div className="max-w-4xl">
-      <SettingsSectionHeader
-        icon={Package}
-        title="Services"
-        description="What your firm offers. Each service routes to a pipeline and an organizer -- pricing, document templates, and other details are optional and tucked under Advanced."
-      />
-      <div className="mt-4">
-        <ServiceLibrary workspaceId={workspace.id} services={cards} categories={categoryOptions} canManage={Boolean(canManage)} />
-      </div>
-    </div>
+    <ServicesPageClient workspaceId={workspace.id} services={cards} categories={categoryOptions} canManage={Boolean(canManage)} />
   );
 }
