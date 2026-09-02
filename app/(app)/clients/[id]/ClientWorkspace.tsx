@@ -6,7 +6,6 @@ import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import Link from "next/link";
-import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import type { PaymentPlanRow } from "@/components/billing/PaymentPlanList";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
@@ -16,13 +15,9 @@ import { automationActionLabel } from "@/lib/automationLabels";
 import { FileUp, MessageSquare, Receipt as ReceiptIcon, NotebookPen } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { Tabs } from "@/components/ui/Tabs";
 import { clientStatusTone } from "@/lib/clientStatus";
+import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
 import {
-  OverviewTab,
-  MessagesTab,
-  BillingTab,
-  NotesTab,
   type ContactRow,
   type AddressRow,
   type EmailRow,
@@ -74,68 +69,11 @@ type ClientRow = {
 
 type LedgerEntry = { id: string; balance_after: number; created_at: string };
 
-const TABS = [
-  "Details",
-  "Documents",
-  "Messages",
-  "Billing",
-  "Notes",
-] as const;
-
-type Tab = (typeof TABS)[number];
-
-function displayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
-}
-
-export function ClientWorkspace({
-  workspace,
-  client,
-  contacts,
-  addresses,
-  emails,
-  phones,
-  workspaceTags,
-  relationships,
-  portalUsers,
-  pendingPortalInvites,
-  engagements,
-  notes,
-  documents,
-  documentFolders,
-  documentRequests,
-  signatureRequests,
-  quotes,
-  invoices,
-  payments,
-  ledgerEntries,
-  outstandingBalance,
-  messageThreads,
-  messages,
-  timeline,
-  tasks,
-  requestedDocumentCount,
-  documentRequestTemplates,
-  organizerTemplates,
-  pendingOrganizerTemplateIds,
-  organizerResponses,
-  workspaceServices,
-  engagementLetterTemplates,
-  permissions,
-  paymentPlansByInvoice,
-  appointments,
-  staffOptions,
-  accountHolder,
-  rmDefault,
-  reviewerDefault,
-  complianceDefault,
-  requestedService,
-  interestedServiceIds,
-  leadPipelines,
-  automationStatus,
-  additionalSigners,
-}: {
+// The full data shape both the full-page client view and the Quick-View
+// drawer (app/(app)/@modal/(.)clients/[id]/page.tsx) need -- getClientWorkspaceData
+// returns exactly this, so both surfaces stay wired to the same one set of
+// queries instead of two copies drifting apart.
+export type ClientWorkspaceProps = {
   workspace: Workspace;
   permissions: ActionPermissions;
   paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
@@ -181,8 +119,57 @@ export function ClientWorkspace({
   leadPipelines: { processId: string; processName: string | null; stageName: string | null }[];
   automationStatus: { automationName: string; status: string; stepActionType: string | null; error: string | null } | null;
   additionalSigners: AdditionalSignerOption[];
-}) {
-  const [tab, setTab] = useState<Tab>("Details");
+};
+
+export function ClientWorkspace(props: ClientWorkspaceProps) {
+  const {
+  workspace,
+  client,
+  contacts,
+  addresses,
+  emails,
+  phones,
+  workspaceTags,
+  relationships,
+  portalUsers,
+  pendingPortalInvites,
+  engagements,
+  notes,
+  documents,
+  documentFolders,
+  documentRequests,
+  signatureRequests,
+  quotes,
+  invoices,
+  payments,
+  ledgerEntries,
+  outstandingBalance,
+  messageThreads,
+  messages,
+  timeline,
+  tasks,
+  requestedDocumentCount,
+  documentRequestTemplates,
+  organizerTemplates,
+  pendingOrganizerTemplateIds,
+  organizerResponses,
+  workspaceServices,
+  engagementLetterTemplates,
+  permissions,
+  paymentPlansByInvoice,
+  appointments,
+  staffOptions,
+  accountHolder,
+  rmDefault,
+  reviewerDefault,
+  complianceDefault,
+  requestedService,
+  interestedServiceIds,
+  leadPipelines,
+  automationStatus,
+  additionalSigners,
+  } = props;
+  const [tab, setTab] = useState<ClientTab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
@@ -268,95 +255,8 @@ export function ClientWorkspace({
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
-          <div className="border-b border-border bg-surface px-8">
-            <Tabs tabs={TABS.map((t) => ({ id: t, label: t }))} active={tab} onChange={(id) => setTab(id as Tab)} />
-          </div>
-
-          <div className="px-8 py-6">
-            {tab === "Details" && (
-              <OverviewTab
-                client={client}
-                workspaceId={workspace.id}
-                showStaffRoles={showStaffRoles}
-                canEditSensitive={permissions.clientsEditSensitive}
-                contacts={contacts}
-                addresses={addresses}
-                emails={emails}
-                phones={phones}
-                workspaceTags={workspaceTags}
-                portalUsers={portalUsers}
-                pendingPortalInvites={pendingPortalInvites}
-                relationships={relationships}
-                staffOptions={staffOptions}
-                accountHolder={accountHolder}
-                rmDefault={rmDefault}
-                reviewerDefault={reviewerDefault}
-                complianceDefault={complianceDefault}
-                engagements={engagements}
-                tasks={tasks}
-                appointments={appointments}
-                invoices={invoices}
-                notes={notes}
-                outstandingBalance={outstandingBalance}
-                organizerResponses={organizerResponses}
-                workspaceServices={workspaceServices}
-                interestedServiceIds={interestedServiceIds}
-                onCreateInvoice={() => setTab("Billing")}
-                onShowNotes={() => setTab("Notes")}
-                onCreateNote={() => setTab("Notes")}
-              />
-            )}
-            {tab === "Documents" && (
-              <DocumentWorkspace
-                workspaceId={workspace.id}
-                entityType="client"
-                entityId={client.id}
-                folders={documentFolders}
-                documents={documents}
-                requests={documentRequests}
-                requestTemplates={documentRequestTemplates}
-                signatureRequests={signatureRequests}
-                signatureTemplates={engagementLetterTemplates}
-                clientName={displayName(client)}
-                clientEmail={client.primary_email}
-                firmName={workspace.name}
-                activity={timeline}
-                canRequestDocuments={permissions.documentsRequest}
-                canRequestSignatures={permissions.signaturesRequest}
-                additionalSigners={additionalSigners}
-              />
-            )}
-            {tab === "Messages" && (
-              <MessagesTab
-                workspaceId={workspace.id}
-                clientId={client.id}
-                primaryEmail={client.primary_email}
-                primaryPhone={client.primary_phone}
-                permissions={permissions}
-                threads={messageThreads}
-                messages={messages}
-                onViewDocumentRequests={() => setTab("Documents")}
-              />
-            )}
-            {tab === "Billing" && (
-              <BillingTab
-                clientId={client.id}
-                clientName={displayName(client)}
-                workspaceName={workspace.name}
-                quotes={quotes}
-                invoices={invoices}
-                payments={payments}
-                outstandingBalance={outstandingBalance}
-                workspaceId={workspace.id}
-                paymentPlansByInvoice={paymentPlansByInvoice}
-                canManageBilling={permissions.billingManage}
-                workspaceServices={workspaceServices}
-              />
-            )}
-            {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}
-          </div>
+          <ClientTabsBody {...props} tab={tab} onTabChange={setTab} />
         </div>
-
         <aside className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-border bg-surfaceMuted p-4 lg:block">
           <SectionCard title="Quick Actions" accent="accent">
             <div className="-mx-2 flex flex-col">
