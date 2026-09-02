@@ -7,8 +7,10 @@ import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
 import { ReviewQueueItem } from "./ReviewQueueItem";
 import { ReviewQueueClientChangeItem } from "./ReviewQueueClientChangeItem";
+import { ReviewQueueDocumentItem } from "./ReviewQueueDocumentItem";
 import { Badge } from "@/components/ui/Badge";
 import { ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
+import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,22 @@ export default async function ReviewQueuePage() {
     p_workspace_id: workspace.id,
     p_permission_key: "organizers.review",
   });
+  const { data: canReviewDocuments } = await supabase.rpc("has_permission", {
+    p_workspace_id: workspace.id,
+    p_permission_key: "documents.view",
+  });
+
+  const { data: completedDocumentRequests } = canReviewDocuments
+    ? await supabase
+        .from("document_requests")
+        .select("id, title, entity_type, entity_id, updated_at")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "completed")
+        .is("reviewed_at", null)
+        .order("updated_at", { ascending: false })
+    : { data: [] as { id: string; title: string; entity_type: string; entity_id: string; updated_at: string }[] };
+
+  const documentEntityLabels = await buildEntityLabelMap(supabase, completedDocumentRequests ?? []);
 
   // Leads submit their intake organizer before an engagement exists (the
   // New Tax Service Lead Enters CRM flow sends it, then waits for it back),
@@ -159,6 +177,31 @@ export default async function ReviewQueuePage() {
                         Review
                       </Link>
                     </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {canReviewDocuments && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Documents submitted</h2>
+            {(completedDocumentRequests ?? []).length === 0 ? (
+              <EmptyState message="No completed document requests waiting on your review." />
+            ) : (
+              <ul className="space-y-3">
+                {(completedDocumentRequests ?? []).map((r) => {
+                  const entity = documentEntityLabels.get(`${r.entity_type}:${r.entity_id}`);
+                  return (
+                    <ReviewQueueDocumentItem
+                      key={r.id}
+                      documentRequestId={r.id}
+                      title={r.title}
+                      entityLabel={entity?.label ?? "Client"}
+                      entityHref={entity?.href ?? "#"}
+                      completedAt={r.updated_at}
+                    />
                   );
                 })}
               </ul>

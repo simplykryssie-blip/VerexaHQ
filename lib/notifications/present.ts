@@ -35,6 +35,11 @@ const TITLES: Record<string, (p: Payload) => string> = {
     const organizer = str(p, "organizer_template_name", "an organizer");
     return client ? `${client} submitted ${organizer}` : `${organizer} was submitted`;
   },
+  DOCUMENT_REQUEST_COMPLETED: (p) => {
+    const client = str(p, "client_name").trim();
+    const title = str(p, "request_title", "a document request");
+    return client ? `${client} completed "${title}"` : `"${title}" was completed`;
+  },
   automation: (p) => {
     const message = str(p, "message").trim();
     if (message) return message;

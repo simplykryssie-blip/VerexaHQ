@@ -3059,6 +3059,8 @@ export type Database = {
           entity_type: string
           id: string
           organizer_response_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           status: string
           title: string
           updated_at: string
@@ -3073,6 +3075,8 @@ export type Database = {
           entity_type?: string
           id?: string
           organizer_response_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -3087,6 +3091,8 @@ export type Database = {
           entity_type?: string
           id?: string
           organizer_response_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -10719,6 +10725,10 @@ export type Database = {
       }
       mark_document_request_item_received: {
         Args: { p_item_status_id: string }
+        Returns: undefined
+      }
+      mark_document_request_reviewed: {
+        Args: { p_document_request_id: string }
         Returns: undefined
       }
       mark_lesson_complete: {

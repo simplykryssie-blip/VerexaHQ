@@ -47,7 +47,7 @@ export const TRIGGER_TYPES = [
   { value: "engagement.created", label: "A new engagement is created for a service", category: "engagements", description: "Fires when a new engagement is created for a specific service.", keywords: "engagement created new" },
   { value: "appointment.status_changed", label: "An appointment's status changes to", category: "appointments", description: "Fires when an appointment's status changes (booked, confirmed, completed, cancelled, no-show).", keywords: "appointment booked cancelled rescheduled no-show completed status" },
   { value: "engagement_letter.signed", label: "A client signs their document for a service", category: "tax_workflow", description: "Fires when a client signs their document.", keywords: "signature signed document letter" },
-  { value: "document_request.completed", label: "All requested documents are received for a service", category: "documents", description: "Fires once every required document on a request has been received.", keywords: "documents received complete" },
+  { value: "document_request.completed", label: "All requested documents are received", category: "documents", description: "Fires once every required document on a request has been received, for any service or a specific one.", keywords: "documents received complete" },
   { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
   { value: "organizer_response.review_decided", label: "A reviewed organizer is approved, denied, or needs info", category: "forms_intake", description: "Fires when a staff reviewer sets an organizer's review decision to a specific status.", keywords: "organizer review approved denied rejected needs info decision" },
   { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage", category: "engagements", description: "Fires when an engagement enters a specific stage of its pipeline.", keywords: "pipeline stage engagement" },
@@ -141,8 +141,8 @@ export function triggerSummary(
   }
   if (triggerType === "document_request.completed") {
     const serviceId = config.service_id as string | undefined;
-    const service = services.find((s) => s.id === serviceId);
-    return `When all requested documents are received for "${service?.name ?? "a service"}"`;
+    const service = serviceId ? services.find((s) => s.id === serviceId) : undefined;
+    return `When all requested documents are received${service ? ` for "${service.name}"` : ""}`;
   }
   if (triggerType === "organizer_information_request.resolved") {
     const templateId = config.organizer_template_id as string | undefined;
@@ -414,16 +414,14 @@ export function TriggerFields({
 
       {triggerType === "document_request.completed" && (
         <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Service
+          Service (optional)
           <select
             disabled={disabled}
             value={(config.service_id as string) ?? ""}
-            onChange={(e) => onConfigChange({ service_id: e.target.value })}
+            onChange={(e) => onConfigChange({ service_id: e.target.value || undefined })}
             className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           >
-            <option value="" disabled>
-              Choose a service
-            </option>
+            <option value="">Any service</option>
             {services.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
