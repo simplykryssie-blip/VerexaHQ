@@ -10,6 +10,7 @@ import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignat
 import { uploadSignatureImageClient } from "@/lib/documents/uploadSignatureImage";
 import { renderEmail } from "@/lib/email/template";
 import { SignaturePad } from "@/components/SignaturePad";
+import { Badge } from "@/components/ui/Badge";
 import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
@@ -441,10 +442,10 @@ export function SignaturesPanel({
                             </span>
                           )
                         ) : (
-                          <span className={`capitalize ${s.status === "declined" ? "text-danger" : "text-success"}`}>
+                          <Badge tone={s.status === "declined" ? "danger" : "success"} className="capitalize">
                             {s.status}
                             {s.signed_at && ` -- ${new Date(s.signed_at).toLocaleDateString()}`}
-                          </span>
+                          </Badge>
                         )}
                       </div>
                       {audience === "staff" && s.attested_at && (
