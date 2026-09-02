@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Search, ChevronDown } from "lucide-react";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 export type StepPickerItem = {
   value: string;
@@ -151,17 +152,8 @@ export function InlineStepPickerField({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
   const selected = items.find((i) => i.value === value);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [open]);
 
   return (
     <div ref={containerRef} className="relative">
@@ -185,7 +177,7 @@ export function InlineStepPickerField({
         // label used to truncate into unreadable fragments). Right-aligned
         // since that panel sits flush against the right edge of the screen;
         // opening further right would just run off-screen.
-        <div className="absolute right-0 z-30 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-lg">
+        <DropdownPanel className="right-0 mt-1 overflow-hidden">
           <StepPicker
             items={items}
             categories={categories}
@@ -196,7 +188,7 @@ export function InlineStepPickerField({
               onChange(v);
             }}
           />
-        </div>
+        </DropdownPanel>
       )}
     </div>
   );

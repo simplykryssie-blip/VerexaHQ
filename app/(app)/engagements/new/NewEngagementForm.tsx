@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { UserPlus } from "lucide-react";
@@ -9,6 +9,7 @@ import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/client
 import { renderEmail } from "@/lib/email/template";
 import { formatPhone } from "@/lib/phone";
 import { caseTypeFromCategorySlug } from "@/lib/caseType";
+import { ClientSearchField as SharedClientSearchField, clientSearchResultLabel, type ClientSearchResult } from "@/components/clients/ClientSearchField";
 
 const DRAFT_KEY = "new-engagement-inline";
 
@@ -21,20 +22,14 @@ type InlineDraft = {
   phone: string;
 };
 
-type ClientOption = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  business_name: string | null;
-  client_type: string;
-  primary_email?: string | null;
-};
+type ClientOption = ClientSearchResult;
 
-function clientLabel(c: ClientOption) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
-}
+const clientLabel = clientSearchResultLabel;
 
+// Wraps the shared search-and-select field with this flow's own "no match --
+// create a new client" panel (name/email/phone, dedup check, draft-resume
+// after viewing a matched existing client) -- business logic specific to
+// engagement creation, not part of the shared search field itself.
 function ClientSearchField({
   workspaceId,
   selected,
@@ -45,8 +40,6 @@ function ClientSearchField({
   onSelect: (client: ClientOption | null) => void;
 }) {
   const supabase = createClient();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ClientOption[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newClientType, setNewClientType] = useState<"individual" | "business">("individual");
   const [newFirstName, setNewFirstName] = useState("");
@@ -57,7 +50,6 @@ function ClientSearchField({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<{ matchedOn: string[]; existingClientId: string } | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -78,34 +70,6 @@ function ClientSearchField({
     router.replace("/engagements/new");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
-
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
-    const timeout = setTimeout(async () => {
-      const { data } = await supabase
-        .from("clients")
-        .select("id, first_name, last_name, business_name, client_type, primary_email")
-        .eq("workspace_id", workspaceId)
-        .is("merged_into_client_id", null)
-        .or(`first_name.ilike.%${query}%,last_name.ilike.%${query}%,business_name.ilike.%${query}%`)
-        .limit(8);
-      setResults((data as ClientOption[]) ?? []);
-    }, 200);
-    return () => clearTimeout(timeout);
-  }, [query, workspaceId, supabase]);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setResults([]);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
 
   async function createClientInline(e: React.FormEvent) {
     e.preventDefault();
@@ -162,46 +126,11 @@ function ClientSearchField({
     clearClientDraft(DRAFT_KEY);
   }
 
-  if (selected) {
-    return (
-      <div className="mt-1 flex items-center justify-between rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm">
-        <span className="font-medium text-ink">{clientLabel(selected)}</span>
-        <button type="button" onClick={() => onSelect(null)} className="text-xs font-medium text-accent hover:underline">
-          Change
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div ref={containerRef} className="relative">
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search clients by name..."
-        className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-      />
-      {results.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-sm">
-          {results.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(c);
-                  setQuery("");
-                  setResults([]);
-                }}
-                className="block w-full px-3 py-2 text-left text-sm text-slate hover:bg-surfaceMuted"
-              >
-                {clientLabel(c)}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="mt-1">
+      <SharedClientSearchField workspaceId={workspaceId} selected={selected} onSelect={onSelect} placeholder="Search clients by name..." />
 
-      {!showCreate ? (
+      {!selected && !showCreate && (
         <button
           type="button"
           onClick={() => setShowCreate(true)}
@@ -209,7 +138,8 @@ function ClientSearchField({
         >
           <UserPlus size={13} /> No match -- create a new client
         </button>
-      ) : (
+      )}
+      {!selected && showCreate && (
         <div className="mt-2 space-y-2 rounded-lg border border-border bg-surfaceMuted p-3">
           <div className="flex gap-2">
             {(["individual", "business"] as const).map((t) => (

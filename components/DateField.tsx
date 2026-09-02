@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -38,24 +39,13 @@ export function DateField({
   const [pending, setPending] = useState<string | null>(value);
   const [cursor, setCursor] = useState(() => (value ? parseDateKey(value) : new Date()));
   const [saving, setSaving] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   useEffect(() => {
     if (!open) return;
     setPending(value);
     setCursor(value ? parseDateKey(value) : new Date());
   }, [open, value]);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
 
   const days = useMemo(() => {
     const year = cursor.getFullYear();
@@ -100,7 +90,7 @@ export function DateField({
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-72 rounded-2xl border border-border bg-surface p-3 shadow-lg">
+        <DropdownPanel className="mt-1 w-72 p-3">
           <div className="flex items-center justify-between pb-2">
             <button
               type="button"
@@ -174,7 +164,7 @@ export function DateField({
               </button>
             </div>
           </div>
-        </div>
+        </DropdownPanel>
       )}
     </div>
   );
