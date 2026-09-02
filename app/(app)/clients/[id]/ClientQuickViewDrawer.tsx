@@ -36,13 +36,13 @@ function relativeTime(iso: string): string {
 export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
   const router = useRouter();
   const [tab, setTab] = useState<ClientTab>("Details");
-  const { client, engagements, tasks, documents, requestedDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace } = props;
+  const { client, engagements, tasks, missingDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace } = props;
 
   const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
   const currentServiceName = openEngagement
     ? (openEngagement as unknown as { services?: { name: string } | null }).services?.name ?? "Untitled engagement"
     : "None active";
-  const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
+  const missingDocuments = missingDocumentCount;
   const openTasksCount = tasks.length;
   const nextAppointment = appointments[0];
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;

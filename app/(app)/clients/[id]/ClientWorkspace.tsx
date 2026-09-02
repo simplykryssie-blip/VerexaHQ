@@ -101,7 +101,7 @@ export type ClientWorkspaceProps = {
   messages: MessageRow[];
   timeline: ActivityRow[];
   tasks: TaskRow[];
-  requestedDocumentCount: number;
+  missingDocumentCount: number;
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
   pendingOrganizerTemplateIds: string[];
@@ -148,7 +148,7 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
   messages,
   timeline,
   tasks,
-  requestedDocumentCount,
+  missingDocumentCount,
   documentRequestTemplates,
   organizerTemplates,
   pendingOrganizerTemplateIds,
@@ -187,7 +187,6 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
     ...engagements.filter((e) => e.due_date).map((e) => e.due_date as string),
     ...tasks.filter((t) => t.due_date).map((t) => t.due_date as string),
   ].sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
-  const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
   const mostRecentNote = [...notes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
   const automationStepLabel = automationStatus ? automationActionLabel(automationStatus.stepActionType) : null;
   const automationStatusText =
@@ -323,7 +322,7 @@ export function ClientWorkspace(props: ClientWorkspaceProps) {
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-muted">Missing documents</dt>
-                <dd className="font-medium text-ink">{missingDocuments}</dd>
+                <dd className="font-medium text-ink">{missingDocumentCount}</dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-muted">Outstanding balance</dt>
