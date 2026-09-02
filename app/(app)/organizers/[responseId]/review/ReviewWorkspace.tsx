@@ -160,7 +160,7 @@ export function ReviewWorkspace({
     router.refresh();
   }
 
-  async function flagField(fieldId: string, instanceIndex: number, label: string, note: string) {
+  async function flagField(fieldId: string, instanceIndex: number, label: string, note: string): Promise<boolean> {
     const key = `${fieldId}:${instanceIndex}`;
     setBusyItemId(key);
     const { data, error } = await supabase.rpc("flag_organizer_field_for_info", {
@@ -172,14 +172,16 @@ export function ReviewWorkspace({
     setBusyItemId(null);
     if (error) {
       toast.show(error.message, "error");
-      return;
+      return false;
     }
     setDraftItems((prev) => {
       const existing = prev.find((i) => i.id === data);
       if (existing) return prev.map((i) => (i.id === data ? { ...i, note } : i));
       return [...prev, { id: data as string, organizer_field_id: fieldId, instance_index: instanceIndex, note, label }];
     });
+    toast.show("Flagged for review.", "success");
     router.refresh();
+    return true;
   }
 
   async function unflagItem(itemId: string) {
@@ -574,7 +576,7 @@ function QuestionCard({
   compact?: boolean;
   collapsedHidden: boolean;
   busy: boolean;
-  onFlag: (note: string) => void;
+  onFlag: (note: string) => Promise<boolean>;
   onUnflag: () => void;
 }) {
   const [flagging, setFlagging] = useState(false);
@@ -644,10 +646,17 @@ function QuestionCard({
           <div className="flex items-center gap-3 text-xs">
             <button
               type="button"
-              onClick={() => {
-                onFlag(note);
-                setFlagging(false);
-                setNote("");
+              onClick={async () => {
+                const savedNote = note;
+                const ok = await onFlag(savedNote);
+                // Only dismiss the input once the save is confirmed -- closing
+                // it unconditionally made a failed (or even a slow) save look
+                // identical to nothing happening at all, since there was no
+                // other feedback the click had done anything.
+                if (ok) {
+                  setFlagging(false);
+                  setNote("");
+                }
               }}
               disabled={busy}
               className="font-medium text-amber hover:underline disabled:opacity-40"
