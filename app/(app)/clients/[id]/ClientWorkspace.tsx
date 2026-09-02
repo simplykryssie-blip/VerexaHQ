@@ -358,7 +358,7 @@ export function ClientWorkspace({
         </div>
 
         <aside className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-border bg-surfaceMuted p-4 lg:block">
-          <SectionCard title="Quick Actions">
+          <SectionCard title="Quick Actions" accent="accent">
             <div className="-mx-2 flex flex-col">
               <QuickActions
                 clientId={client.id}
@@ -400,7 +400,7 @@ export function ClientWorkspace({
             </div>
           </SectionCard>
 
-          <SectionCard title="Upcoming tasks">
+          <SectionCard title="Upcoming tasks" accent="amber">
             {tasks.length === 0 ? (
               <p className="text-sm text-muted">Nothing due.</p>
             ) : (
@@ -436,6 +436,7 @@ export function ClientWorkspace({
 
           <SectionCard
             title="Notes"
+            accent="violet"
             action={
               <button type="button" onClick={() => setTab("Notes")} className="text-xs font-medium text-accent hover:underline">
                 Add Note
