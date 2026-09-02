@@ -408,33 +408,27 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     tasks = taskRows ?? [];
   }
 
-  // Best-effort "missing documents" estimate: requested items come from each
-  // engagement's service document-request template; there's no FK tying a
-  // specific attachment to a specific requested item, so this is a count
-  // comparison, not an exact per-item match.
-  let requestedDocumentCount = 0;
-  const serviceIds = Array.from(
-    new Set(
-      (engagements ?? [])
-        .map((e) => (e as unknown as { service_id?: string }).service_id)
-        .filter((v): v is string => Boolean(v))
-    )
-  );
-  if (serviceIds.length > 0) {
-    const { data: services } = await supabase
-      .from("services")
-      .select("id, document_request_template_id")
-      .in("id", serviceIds)
-      .not("document_request_template_id", "is", null);
-    const templateIds = (services ?? []).map((s) => s.document_request_template_id).filter((v): v is string => Boolean(v));
-    if (templateIds.length > 0) {
-      const { count } = await supabase
-        .from("document_request_items")
-        .select("id", { count: "exact", head: true })
-        .in("document_request_template_id", templateIds);
-      requestedDocumentCount = count ?? 0;
-    }
-  }
+  // Real pending-item count on this client's open document requests
+  // (entity_type='client') and their engagements' (entity_type='engagement')
+  // -- the same document_requests/document_request_item_statuses pair the
+  // Documents report and portal already read. This used to instead compare
+  // a service's document-request *template* item count against a raw
+  // attachment count, which only reflected a service's catalog definition,
+  // not any actual request sent to this client (so a real ad-hoc or
+  // organizer-driven request, with no service template involved, never
+  // counted here).
+  const { count: missingDocumentCountRaw } = await supabase
+    .from("document_request_item_statuses")
+    .select("id, document_requests!inner(entity_type, entity_id, status)", { count: "exact", head: true })
+    .eq("document_requests.status", "open")
+    .eq("status", "pending")
+    .or(
+      [`entity_id.eq.${client.id}`, engagementIds.length > 0 ? `entity_id.in.(${engagementIds.join(",")})` : null]
+        .filter(Boolean)
+        .join(","),
+      { referencedTable: "document_requests" }
+    );
+  const missingDocumentCount = missingDocumentCountRaw ?? 0;
 
   const timeline = [...(clientActivity ?? []), ...(engagementActivity ?? [])].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -501,7 +495,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     messages: threadMessages ?? [],
     timeline,
     tasks,
-    requestedDocumentCount,
+    missingDocumentCount,
     organizerTemplates: organizerTemplates ?? [],
     pendingOrganizerTemplateIds,
     organizerResponses: organizerResponsesWithDetail.map((o: any) => ({

@@ -171,10 +171,6 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       balance: i.total_amount - i.amount_paid,
     }));
 
-  // Best-effort workspace-wide missing-document estimate, same approximation
-  // documented on the Client Workspace: requested-via-service-template count
-  // vs. uploaded attachment count, with no FK tying a specific attachment to
-  // a specific requested item.
   const openEngagementIds = (openEngagements ?? []).map((e) => e.id);
   const serviceIds = Array.from(new Set((openEngagements ?? []).map((e) => e.service_id).filter((v): v is string => Boolean(v))));
 
@@ -202,26 +198,20 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     count: statusCounts.get(status) ?? 0,
   }));
 
-  let missingDocumentsCount = 0;
-  if (serviceIds.length > 0 && openEngagementIds.length > 0) {
-    const { data: services } = await supabase
-      .from("services")
-      .select("id, document_request_template_id")
-      .in("id", serviceIds)
-      .not("document_request_template_id", "is", null);
-    const templateIds = (services ?? []).map((s) => s.document_request_template_id).filter((v): v is string => Boolean(v));
-    if (templateIds.length > 0) {
-      const [{ count: requestedCount }, { count: uploadedCount }] = await Promise.all([
-        supabase.from("document_request_items").select("id", { count: "exact", head: true }).in("document_request_template_id", templateIds),
-        supabase
-          .from("attachments")
-          .select("id", { count: "exact", head: true })
-          .eq("entity_type", "engagement")
-          .in("entity_id", openEngagementIds),
-      ]);
-      missingDocumentsCount = Math.max((requestedCount ?? 0) - (uploadedCount ?? 0), 0);
-    }
-  }
+  // Real per-item fulfillment status on open document requests -- not an
+  // estimate. document_requests/document_request_item_statuses is the same
+  // table pair the Documents report and portal already use; this used to
+  // instead compare a service's document-request *template* item count
+  // against a raw attachment count, which only ever reflected a service's
+  // catalog definition, not any actual request sent to a specific client or
+  // engagement (so a real ad-hoc or organizer-driven request, with no
+  // service template involved at all, never showed up here).
+  const { count: missingDocumentsCount } = await supabase
+    .from("document_request_item_statuses")
+    .select("id, document_requests!inner(workspace_id, status)", { count: "exact", head: true })
+    .eq("document_requests.workspace_id", workspaceId)
+    .eq("document_requests.status", "open")
+    .eq("status", "pending");
 
   let reviewItems: ReviewItem[] = [];
   const runIds = (workflowRuns ?? []).map((r) => r.id);
@@ -392,7 +382,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       tasksDueYesterday: tasksDueYesterdayCount ?? 0,
       outstandingInvoicesTotal,
       outstandingInvoicesCount: invoiceRows.length,
-      missingDocumentsCount,
+      missingDocumentsCount: missingDocumentsCount ?? 0,
       openClientMessages: openThreads?.length ?? 0,
     },
     overdueTasks: overdueTasks as OverdueTask[],

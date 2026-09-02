@@ -20,13 +20,13 @@ type Insights = {
 };
 
 function computeInsights(props: ClientWorkspaceProps): Insights {
-  const { tasks, invoices, engagements, timeline, messages, workspaceServices, requestedDocumentCount, documents } = props;
+  const { tasks, invoices, engagements, timeline, messages, workspaceServices, missingDocumentCount } = props;
   const now = Date.now();
   const DAY = 24 * 60 * 60 * 1000;
 
   const overdueTasks = tasks.filter((t) => t.due_date && new Date(t.due_date).getTime() < now).length;
   const overdueInvoices = invoices.filter((i) => i.status !== "paid" && i.due_date && new Date(i.due_date).getTime() < now).length;
-  const missingDocuments = Math.max(requestedDocumentCount - documents.length, 0);
+  const missingDocuments = missingDocumentCount;
   const hasOpenEngagement = engagements.some((e) => e.status !== "Completed" && e.status !== "Archived");
 
   const lastContactAt = [...timeline.map((t) => t.created_at), ...messages.map((m) => m.created_at)].sort(
