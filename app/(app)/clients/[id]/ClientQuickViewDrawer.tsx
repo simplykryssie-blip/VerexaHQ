@@ -12,6 +12,7 @@ import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { clientStatusTone } from "@/lib/clientStatus";
 import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
+import { ClientInsightWidgets } from "./ClientInsightWidgets";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 
 function relativeTime(iso: string): string {
@@ -159,6 +160,8 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
           <StatTile icon={MessageCircle} tone="emerald" label="Last message" value={lastMessage ? relativeTime(lastMessage.created_at) : "No messages"} />
           <StatTile icon={Contact} tone="accent" label="Client type" value={<span className="capitalize">{client.client_type}</span>} />
         </div>
+
+        <ClientInsightWidgets {...props} />
 
         <ClientTabsBody {...props} tab={tab} onTabChange={setTab} />
 
