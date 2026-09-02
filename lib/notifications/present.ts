@@ -40,6 +40,21 @@ const TITLES: Record<string, (p: Payload) => string> = {
     const title = str(p, "request_title", "a document request");
     return client ? `${client} completed "${title}"` : `"${title}" was completed`;
   },
+  ORGANIZER_REVIEWED: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    const status = str(p, "review_status", "reviewed");
+    return `${client}'s organizer was ${status.toLowerCase()}`;
+  },
+  PAYMENT_RECEIVED: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    const amount = str(p, "amount");
+    return amount ? `${client} paid $${amount}` : `A payment was received from ${client}`;
+  },
+  INVOICE_PAID: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    const invoiceNumber = str(p, "invoice_number");
+    return invoiceNumber ? `Invoice ${invoiceNumber} for ${client} is fully paid` : `${client}'s invoice is fully paid`;
+  },
   automation: (p) => {
     const message = str(p, "message").trim();
     if (message) return message;
