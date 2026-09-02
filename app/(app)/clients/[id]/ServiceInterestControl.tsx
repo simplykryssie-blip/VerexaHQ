@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, ClipboardList } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 /** Records a service interest against an already-existing client -- the
  * New Client modal's Services picker only ever covers interest expressed
@@ -34,6 +35,7 @@ export function ServiceInterestControl({
   const [open, setOpen] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   if (services.length === 0) return null;
 
@@ -56,7 +58,7 @@ export function ServiceInterestControl({
   }
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -65,30 +67,27 @@ export function ServiceInterestControl({
         <ClipboardList size={13} aria-hidden="true" /> Service interests
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-1 w-64 rounded-2xl border border-border bg-surface p-2 shadow-lg">
-            <p className="px-2 pb-1.5 text-[11px] text-muted">Select a service this client has expressed interest in.</p>
-            {services.map((s) => {
-              const active = interestedServiceIds.includes(s.id);
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  disabled={active || savingId === s.id}
-                  onClick={() => addInterest(s.id, s.name)}
-                  className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${
-                    active ? "text-accent" : "text-slate hover:bg-surfaceMuted disabled:opacity-60"
-                  }`}
-                >
-                  <span>{s.name}</span>
-                  {active && <Check size={13} aria-hidden="true" />}
-                </button>
-              );
-            })}
-            {error && <p className="px-2 pt-1 text-[11px] text-danger">{error}</p>}
-          </div>
-        </>
+        <DropdownPanel className="left-0 mt-1 w-64 p-2">
+          <p className="px-2 pb-1.5 text-[11px] text-muted">Select a service this client has expressed interest in.</p>
+          {services.map((s) => {
+            const active = interestedServiceIds.includes(s.id);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                disabled={active || savingId === s.id}
+                onClick={() => addInterest(s.id, s.name)}
+                className={`flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                  active ? "text-accent" : "text-slate hover:bg-surfaceMuted disabled:opacity-60"
+                }`}
+              >
+                <span>{s.name}</span>
+                {active && <Check size={13} aria-hidden="true" />}
+              </button>
+            );
+          })}
+          {error && <p className="px-2 pt-1 text-[11px] text-danger">{error}</p>}
+        </DropdownPanel>
       )}
     </div>
   );

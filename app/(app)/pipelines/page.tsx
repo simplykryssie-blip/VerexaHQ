@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
-import { PipelineLibrary, type PipelineCard } from "@/components/pipelines/PipelineLibrary";
+import { PipelinesPageClient } from "@/components/pipelines/PipelinesPageClient";
+import type { PipelineCard } from "@/components/pipelines/PipelineLibrary";
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +31,6 @@ export default async function PipelinesPage() {
   }));
 
   return (
-    <>
-      <PageHeader
-        title="Pipelines"
-        description="The stages work moves through, with the right form, document checklist, or signable document attached where each one is needed."
-      />
-      <div className="flex-1 px-8 py-6">
-        <PipelineLibrary workspaceId={workspace.id} pipelines={pipelines} folders={folders ?? []} canManage={Boolean(canManage)} />
-      </div>
-    </>
+    <PipelinesPageClient workspaceId={workspace.id} pipelines={pipelines} folders={folders ?? []} canManage={Boolean(canManage)} />
   );
 }

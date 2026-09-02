@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Tag } from "lucide-react";
 import { MERGE_FIELD_GROUPS } from "@/lib/mergeFields";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 export type MergeFieldPickerGroup = { group: string; fields: { token: string; label: string }[] };
 
@@ -25,9 +26,10 @@ export function MergeFieldPicker({
   groups?: MergeFieldPickerGroup[];
 }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         disabled={disabled}
@@ -37,31 +39,28 @@ export function MergeFieldPicker({
         <Tag size={12} aria-hidden="true" /> {label}
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-72 max-h-80 overflow-y-auto rounded-2xl bg-surface p-2 shadow-lg">
-            <p className="px-2 pb-1.5 text-[11px] text-muted">Click a detail to drop it in -- it&apos;ll fill in automatically when this goes out.</p>
-            {groups.map((g) => (
-              <div key={g.group} className="mb-2">
-                <p className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted">{g.group}</p>
-                {g.fields.map((f) => (
-                  <button
-                    key={f.token}
-                    type="button"
-                    onClick={() => {
-                      onInsert(`{{${f.token}}}`);
-                      setOpen(false);
-                    }}
-                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs text-slate hover:bg-surfaceMuted"
-                  >
-                    <span>{f.label}</span>
-                    <code className="text-[10px] text-muted">{`{{${f.token}}}`}</code>
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
+        <DropdownPanel className="right-0 mt-1 w-72 max-h-80 overflow-y-auto p-2">
+          <p className="px-2 pb-1.5 text-[11px] text-muted">Click a detail to drop it in -- it&apos;ll fill in automatically when this goes out.</p>
+          {groups.map((g) => (
+            <div key={g.group} className="mb-2">
+              <p className="px-2 text-[10px] font-semibold uppercase tracking-wide text-muted">{g.group}</p>
+              {g.fields.map((f) => (
+                <button
+                  key={f.token}
+                  type="button"
+                  onClick={() => {
+                    onInsert(`{{${f.token}}}`);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs text-slate hover:bg-surfaceMuted"
+                >
+                  <span>{f.label}</span>
+                  <code className="text-[10px] text-muted">{`{{${f.token}}}`}</code>
+                </button>
+              ))}
+            </div>
+          ))}
+        </DropdownPanel>
       )}
     </div>
   );

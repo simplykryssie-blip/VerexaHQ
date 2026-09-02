@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 import type { ClientOption, EngagementOption, StaffOption } from "./types";
 
 export type AppointmentFilter = "upcoming" | "past" | "all";
@@ -51,6 +52,7 @@ export function AppointmentsToolbar({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [creatingZoomMeeting, setCreatingZoomMeeting] = useState(false);
+  const clientDropdownRef = useDropdownDismiss<HTMLDivElement>(clientDropdownOpen, () => setClientDropdownOpen(false));
 
   const filteredEngagements = useMemo(() => (clientId ? engagements.filter((e) => e.client_id === clientId) : engagements), [engagements, clientId]);
   const matchingClients = useMemo(() => {
@@ -167,7 +169,7 @@ export function AppointmentsToolbar({
               onChange={(e) => setTitle(e.target.value)}
               className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:col-span-2"
             />
-            <div className="relative">
+            <div ref={clientDropdownRef} className="relative">
               <input
                 type="text"
                 placeholder="Search clients..."
@@ -181,28 +183,29 @@ export function AppointmentsToolbar({
                   }
                 }}
                 onFocus={() => setClientDropdownOpen(true)}
-                onBlur={() => setTimeout(() => setClientDropdownOpen(false), 100)}
                 className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
               {clientDropdownOpen && matchingClients.length > 0 && (
-                <ul className="absolute z-10 mt-1 w-full rounded-lg bg-surface shadow-md">
-                  {matchingClients.map((c) => (
-                    <li key={c.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setClientId(c.id);
-                          setClientQuery(c.label);
-                          setEngagementId("");
-                          setClientDropdownOpen(false);
-                        }}
-                        className="block w-full px-3 py-2 text-left text-sm text-slate hover:bg-surfaceMuted"
-                      >
-                        {c.label}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <DropdownPanel className="mt-1 w-full">
+                  <ul>
+                    {matchingClients.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setClientId(c.id);
+                            setClientQuery(c.label);
+                            setEngagementId("");
+                            setClientDropdownOpen(false);
+                          }}
+                          className="block w-full px-3 py-2 text-left text-sm text-slate hover:bg-surfaceMuted"
+                        >
+                          {c.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </DropdownPanel>
               )}
             </div>
             <select
