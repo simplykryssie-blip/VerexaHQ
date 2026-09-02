@@ -1,12 +1,45 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { Columns2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Columns2 } from "lucide-react";
 import { FIELD_TYPE_LABELS, type OrganizerFieldType } from "@/lib/organizer/fieldTypes";
 import { fieldColSpanClass, isWidthEligible } from "@/lib/organizer/layoutWidth";
 import type { BuilderField } from "./types";
 
 type Lane = string | null; // parent_field_id this drag/drop is scoped to; null = top level
+
+function MoveButtons({ canMoveUp, canMoveDown, onMoveUp, onMoveDown }: { canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void }) {
+  return (
+    <div className="flex shrink-0 flex-col">
+      <button
+        type="button"
+        disabled={!canMoveUp}
+        onClick={(e) => {
+          e.stopPropagation();
+          onMoveUp();
+        }}
+        title="Move up"
+        aria-label="Move field up"
+        className="rounded p-0.5 text-muted transition hover:bg-surfaceMuted hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <ChevronUp size={13} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        disabled={!canMoveDown}
+        onClick={(e) => {
+          e.stopPropagation();
+          onMoveDown();
+        }}
+        title="Move down"
+        aria-label="Move field down"
+        className="rounded p-0.5 text-muted transition hover:bg-surfaceMuted hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <ChevronDown size={13} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
 
 function FieldBlock({
   field,
@@ -18,6 +51,10 @@ function FieldBlock({
   isDragging,
   onToggleWidth,
   readOnly,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
 }: {
   field: BuilderField;
   selected: boolean;
@@ -28,6 +65,10 @@ function FieldBlock({
   isDragging: boolean;
   onToggleWidth: () => void;
   readOnly: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   if (field.field_type === "page_break") {
     return (
@@ -41,6 +82,7 @@ function FieldBlock({
           selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent" : "border-muted/60 hover:border-accent/50"
         }`}
       >
+        {!readOnly && <MoveButtons canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />}
         <span className="h-px flex-1 border-t border-dashed border-current text-muted" aria-hidden="true" />
         <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">
           ✂ Page break{field.label && field.label !== "New question" ? ` -- ${field.label}` : ""}
@@ -64,15 +106,17 @@ function FieldBlock({
       }`}
     >
       <div className="flex items-center justify-between gap-2 text-sm">
-        <span className="min-w-0 truncate font-medium text-ink">
-          ☰{" "}
-          {field.label ? (
-            field.label
-          ) : (
-            <span className="italic text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
-          )}{" "}
-          {field.is_required && <span className="text-danger">*</span>}
-        </span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {!readOnly && <MoveButtons canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />}
+          <span className="min-w-0 truncate font-medium text-ink">
+            {field.label ? (
+              field.label
+            ) : (
+              <span className="italic text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
+            )}{" "}
+            {field.is_required && <span className="text-danger">*</span>}
+          </span>
+        </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</span>
           {isWidthEligible(field.field_type) && (
@@ -105,6 +149,7 @@ export function FieldCanvas({
   draggedType,
   onAddField,
   onReorder,
+  onMoveField,
   onToggleWidth,
   readOnly,
 }: {
@@ -115,6 +160,7 @@ export function FieldCanvas({
   draggedType: OrganizerFieldType | null;
   onAddField: (type: OrganizerFieldType, parentFieldId: string | null, atIndex: number) => void;
   onReorder: (lane: Lane, fromIndex: number, toIndex: number) => void;
+  onMoveField: (lane: Lane, index: number, direction: -1 | 1) => void;
   onToggleWidth: (fieldId: string) => void;
   readOnly: boolean;
 }) {
@@ -164,11 +210,15 @@ export function FieldCanvas({
                 onDrop={() => !readOnly && handleDropOnField(null, index)}
                 onToggleWidth={() => onToggleWidth(field.id)}
                 readOnly={readOnly}
+                canMoveUp={index > 0}
+                canMoveDown={index < topLevelFields.length - 1}
+                onMoveUp={() => onMoveField(null, index, -1)}
+                onMoveDown={() => onMoveField(null, index, 1)}
               />
 
               {field.field_type === "repeating_section" && (
                 <div className="col-span-12 ml-6 grid grid-cols-12 gap-2 border-l-2 border-border pl-4">
-                  {(childrenByParent.get(field.id) ?? []).map((child, childIndex) => (
+                  {(childrenByParent.get(field.id) ?? []).map((child, childIndex, children) => (
                     <FieldBlock
                       key={child.id}
                       field={child}
@@ -180,6 +230,10 @@ export function FieldCanvas({
                       onDrop={() => !readOnly && handleDropOnField(field.id, childIndex)}
                       onToggleWidth={() => onToggleWidth(child.id)}
                       readOnly={readOnly}
+                      canMoveUp={childIndex > 0}
+                      canMoveDown={childIndex < children.length - 1}
+                      onMoveUp={() => onMoveField(field.id, childIndex, -1)}
+                      onMoveDown={() => onMoveField(field.id, childIndex, 1)}
                     />
                   ))}
                   {!readOnly && (

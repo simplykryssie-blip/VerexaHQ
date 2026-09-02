@@ -128,6 +128,25 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     }
   }
 
+  // Tap-to-add: inserts right after whatever's selected (in that field's own
+  // lane) instead of always appending to the very end -- the double-click
+  // fallback this replaces only ever appended, and double-click/double-tap
+  // isn't a reliable gesture on touch devices in the first place.
+  function addFieldFromPalette(type: OrganizerFieldType) {
+    if (selectedField) {
+      const lane = selectedField.parent_field_id;
+      const laneIds = currentLaneIds(lane);
+      const selIndex = laneIds.indexOf(selectedField.id);
+      addField(type, lane, selIndex === -1 ? laneIds.length : selIndex + 1);
+    } else {
+      addField(type, null, topLevelFields.length);
+    }
+  }
+
+  function moveField(lane: string | null, index: number, direction: -1 | 1) {
+    reorder(lane, index, index + direction);
+  }
+
   async function reorder(lane: string | null, fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return;
     const laneIds = currentLaneIds(lane);
@@ -283,7 +302,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
         />
       ) : (
         <div className="flex flex-1 overflow-hidden">
-          {!readOnly && <FieldPalette onAdd={(type) => addField(type, null, topLevelFields.length)} onDragType={setDraggedType} />}
+          {!readOnly && <FieldPalette onAdd={addFieldFromPalette} onDragType={setDraggedType} hasSelection={Boolean(selectedField)} />}
           <FieldCanvas
             topLevelFields={topLevelFields}
             childrenByParent={childrenByParent}
@@ -292,6 +311,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             draggedType={draggedType}
             onAddField={addField}
             onReorder={reorder}
+            onMoveField={moveField}
             onToggleWidth={toggleFieldWidth}
             readOnly={readOnly}
           />
