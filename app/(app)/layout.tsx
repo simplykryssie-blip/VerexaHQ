@@ -14,6 +14,7 @@ import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
+import { ModalSlotGate } from "@/components/ModalSlotGate";
 
 // Per-workspace favicon: the auto-generated square derivative of a
 // workspace's uploaded business logo, falling back to Verexa's own mark so
@@ -199,7 +200,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             {children}
           </main>
         </div>
-        {modal}
+        <ModalSlotGate>{modal}</ModalSlotGate>
       </ToastProvider>
     </div>
   );
