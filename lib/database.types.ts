@@ -9814,6 +9814,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      apply_manual_payment_to_installment: {
+        Args: { p_payment_id: string; p_payment_plan_id: string }
+        Returns: undefined
+      }
       approve_automation_step: {
         Args: { p_pending_step_id: string }
         Returns: Json
