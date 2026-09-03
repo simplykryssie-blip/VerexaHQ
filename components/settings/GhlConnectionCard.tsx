@@ -26,6 +26,23 @@ export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: s
       return;
     }
     setConnecting(true);
+
+    // Verify against GoHighLevel's own API before saving anything -- a bad
+    // token or Location ID (e.g. an email address pasted in by mistake)
+    // used to save silently and only fail later, when someone tried to
+    // actually import contacts.
+    const verifyRes = await fetch("/api/ghl/verify-connection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: apiKey.trim(), locationId: locationId.trim() }),
+    });
+    const verifyData = (await verifyRes.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!verifyRes.ok || !verifyData?.ok) {
+      setConnecting(false);
+      setError(verifyData?.error ?? "Could not verify this connection with GoHighLevel.");
+      return;
+    }
+
     const { error: rpcError } = await supabase.rpc("set_workspace_ghl_connection", {
       p_workspace_id: workspaceId,
       p_api_key: apiKey.trim(),
