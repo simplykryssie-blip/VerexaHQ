@@ -485,20 +485,35 @@ export function OrganizerForm({
     router.refresh();
   }
 
+  // A staff-flagged question stays visible even when its own conditional
+  // logic would otherwise hide it -- that's the entire point of being able
+  // to flag a conditionally-hidden question (see ReviewWorkspace). The
+  // condition it depends on may not evaluate true yet: a correction that
+  // would flip it is only ever a *proposed* value until approved (see
+  // propose_organizer_answer_correction -- it never touches
+  // organizer_response_answers), so gating visibility on the live
+  // conditional-logic result would hide the very question the client
+  // needs to answer to make that correction land.
   const topLevelFields = fields
     .filter((f) => !f.parent_field_id)
-    .filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+    .filter((f) => infoItemsByKey.has(`${f.id}:0`) || shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
   // Required fields that are only visible/required because of how a
   // flagged field was answered -- staff never flagged these directly (no
   // organizer_information_request_items row exists for them), but they
   // still need an answer before the client's corrections can be
-  // considered complete. Only kicks in during an active correction pass;
-  // outside of one there's no "Submit changes" flow for these to feed
-  // into anyway. "Unanswered when the page loaded" is what marks a field
-  // as belonging here rather than being pre-existing content nothing
-  // asked the client to touch.
+  // considered complete. Gated on infoRequestItems (not actionableInfoItems)
+  // -- the underlying information request stays open, and the RPC below
+  // still has somewhere to attach a new item, for as long as ANY item on
+  // it is non-terminal (pending/client_responded/rejected), even after
+  // every originally-flagged question has been answered. Gating on
+  // actionableInfoItems instead cut this off the moment the last flagged
+  // question was answered, right when answering it could reveal yet
+  // another conditional-required field -- exactly the case this exists
+  // for. "Unanswered when the page loaded" is what marks a field as
+  // belonging here rather than being pre-existing content nothing asked
+  // the client to touch.
   const dynamicRequiredFields =
-    actionableInfoItems.length > 0
+    infoRequestItems.length > 0
       ? topLevelFields.filter((f) => {
           if (!f.is_required) return false;
           if (infoItemsByKey.has(`${f.id}:0`)) return false;
