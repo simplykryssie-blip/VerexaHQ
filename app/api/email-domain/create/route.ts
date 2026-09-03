@@ -16,9 +16,20 @@ export async function POST(request: Request) {
   }
 
   const { domain } = (await request.json()) as { domain?: string };
-  const cleanDomain = domain?.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
-  if (!cleanDomain || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(cleanDomain)) {
-    return NextResponse.json({ error: "Enter a valid domain, e.g. yourfirm.com" }, { status: 400 });
+  const rawDomain = domain?.trim().toLowerCase() ?? "";
+  const cleanDomain = rawDomain.replace(/^https?:\/\//, "").split("/")[0];
+
+  if (!cleanDomain) {
+    return NextResponse.json({ error: "Enter a domain, e.g. yourfirm.com" }, { status: 400 });
+  }
+  if (cleanDomain.includes("@")) {
+    return NextResponse.json({ error: "That looks like an email address. Enter just the domain, e.g. yourfirm.com, not an email address." }, { status: 400 });
+  }
+  if (/\s/.test(rawDomain)) {
+    return NextResponse.json({ error: "A domain can't contain spaces, e.g. yourfirm.com." }, { status: 400 });
+  }
+  if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(cleanDomain)) {
+    return NextResponse.json({ error: "Enter a valid domain, e.g. yourfirm.com -- no spaces, @ symbols, or extra text." }, { status: 400 });
   }
 
   const { data: existing } = await supabase.from("workspace_email_domains").select("id").eq("workspace_id", workspace.id).maybeSingle();
