@@ -12,6 +12,7 @@ import {
 } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 import { getBookingSettings } from "@/lib/bookingSettings";
+import { resolveBookedMeeting } from "@/lib/zoom/bookingMeeting";
 
 // Mirrors the availability check in available-slots/route.ts and re-runs it
 // server-side rather than trusting the slot the client posted back --
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const { data: service } = await supabase
     .from("services")
     .select(
-      "id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url"
+      "id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id"
     )
     .eq("id", serviceId)
     .maybeSingle();
@@ -93,6 +94,15 @@ export async function POST(request: Request) {
   }
 
   const end = new Date(start.getTime() + durationMinutes * 60000);
+  const { location, meetingUrl } = await resolveBookedMeeting(supabase, {
+    locationType: service.booking_location_type,
+    staticMeetingUrl: service.booking_meeting_url,
+    staffId: null,
+    zoomHostUserId: service.zoom_host_user_id,
+    topic: service.name,
+    startTimeIso: start.toISOString(),
+    durationMinutes,
+  });
 
   const { data: appointment, error } = await supabase
     .from("appointments")
@@ -102,8 +112,8 @@ export async function POST(request: Request) {
       staff_id: null,
       title: `${service.name} (client-booked)`,
       description: null,
-      location: service.booking_location_type === "link" ? service.booking_meeting_url : "We'll call you",
-      meeting_url: service.booking_location_type === "link" ? service.booking_meeting_url : null,
+      location,
+      meeting_url: meetingUrl,
       start_at: start.toISOString(),
       end_at: end.toISOString(),
       status: "scheduled",

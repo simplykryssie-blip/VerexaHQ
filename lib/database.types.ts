@@ -7240,6 +7240,7 @@ export type Database = {
           tags: string[]
           updated_at: string
           workspace_id: string | null
+          zoom_host_user_id: string | null
         }
         Insert: {
           allowed_weekdays?: number[] | null
@@ -7278,6 +7279,7 @@ export type Database = {
           tags?: string[]
           updated_at?: string
           workspace_id?: string | null
+          zoom_host_user_id?: string | null
         }
         Update: {
           allowed_weekdays?: number[] | null
@@ -7316,6 +7318,7 @@ export type Database = {
           tags?: string[]
           updated_at?: string
           workspace_id?: string | null
+          zoom_host_user_id?: string | null
         }
         Relationships: [
           {
