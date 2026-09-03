@@ -343,7 +343,10 @@ export function OrganizerForm({
 
   const topLevelFields = fields
     .filter((f) => !f.parent_field_id)
-    .filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+    // A flagged field must stay visible even if its own conditional logic
+    // would otherwise hide it -- the preparer's flag is what the client is
+    // here to respond to, and it can't disappear on them.
+    .filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers) || infoItemsByKey.has(`${f.id}:0`));
   const pages = splitIntoPages(topLevelFields);
   const currentIndex = Math.min(pageIndex, pages.length - 1);
   const currentPage = pages[currentIndex];
@@ -547,7 +550,10 @@ function RepeatingSectionInput({
             </div>
             <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields
-                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .filter(
+                  (child) =>
+                    shouldShowField(parseConditionalLogic(child.conditional_logic), row) || infoItemsByKey.has(`${child.id}:${index}`)
+                )
                 .map((child) => (
                   <FieldInput
                     key={child.id}
