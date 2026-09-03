@@ -8607,6 +8607,7 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          grant_platform_it: boolean
           id: string
           invited_by: string | null
           role_id: string
@@ -8621,6 +8622,7 @@ export type Database = {
           created_at?: string
           email: string
           expires_at?: string
+          grant_platform_it?: boolean
           id?: string
           invited_by?: string | null
           role_id: string
@@ -8635,6 +8637,7 @@ export type Database = {
           created_at?: string
           email?: string
           expires_at?: string
+          grant_platform_it?: boolean
           id?: string
           invited_by?: string | null
           role_id?: string
@@ -10113,6 +10116,7 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          grant_platform_it: boolean
           id: string
           invited_by: string | null
           role_id: string
@@ -10399,6 +10403,7 @@ export type Database = {
           account_exists: boolean
           email: string
           expires_at: string
+          grant_platform_it: boolean
           password_min_length: number
           role_name: string
           status: string
@@ -10599,6 +10604,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string[]
       }
+      grant_or_invite_platform_it: { Args: { p_email: string }; Returns: Json }
       grant_workspace_usage_meters: {
         Args: { p_workspace_id: string }
         Returns: undefined

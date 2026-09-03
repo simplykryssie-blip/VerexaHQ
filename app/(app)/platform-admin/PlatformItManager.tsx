@@ -14,19 +14,44 @@ export function PlatformItManager({ itUsers }: { itUsers: ItUser[] }) {
   const toast = useToast();
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pendingInvite, setPendingInvite] = useState<{ email: string; acceptUrl: string } | null>(null);
 
   async function grant() {
     if (!email.trim()) return;
     setSaving(true);
-    const { error } = await supabase.rpc("set_platform_it", { p_user_email: email.trim(), p_is_platform_it: true });
+    setPendingInvite(null);
+
+    // Someone who's never logged into VerexaHQ has no auth.users row to flip
+    // a flag on, so this can't just be an RPC call anymore -- it goes through
+    // a route that emails a real invite (join Verexa's home workspace,
+    // granting IT access on acceptance) whenever the email doesn't exist yet.
+    const res = await fetch("/api/platform-it-invitations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim() }),
+    });
+    const data = await res.json().catch(() => null);
     setSaving(false);
-    if (error) {
-      toast.show(error.message, "error");
+
+    if (!res.ok) {
+      toast.show(data?.error ?? "Could not grant IT access", "error");
       return;
     }
+
+    const sentEmail = email.trim();
     setEmail("");
-    toast.show(`${email.trim()} now has IT tools access`, "success");
-    router.refresh();
+
+    if (data.granted) {
+      toast.show(`${sentEmail} now has IT tools access`, "success");
+      router.refresh();
+      return;
+    }
+
+    if (data.email?.sent) {
+      toast.show(`Invitation emailed to ${sentEmail}`, "success");
+    } else {
+      setPendingInvite({ email: sentEmail, acceptUrl: data.acceptUrl });
+    }
   }
 
   async function revoke(itUser: ItUser) {
@@ -75,6 +100,15 @@ export function PlatformItManager({ itUsers }: { itUsers: ItUser[] }) {
           Grant IT access
         </button>
       </div>
+      {pendingInvite && (
+        <div className="mt-3 rounded-lg bg-surfaceMuted p-3 text-sm text-slate">
+          <p>
+            Invitation created for {pendingInvite.email}, but email delivery isn&apos;t configured yet -- share this link
+            with them directly:
+          </p>
+          <p className="mt-1 break-all font-mono text-xs text-accent">{pendingInvite.acceptUrl}</p>
+        </div>
+      )}
     </div>
   );
 }
