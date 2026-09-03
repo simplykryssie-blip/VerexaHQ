@@ -7204,7 +7204,10 @@ export type Database = {
       }
       services: {
         Row: {
+          allowed_weekdays: number[] | null
           billing_rule_id: string | null
+          booking_location_type: string
+          booking_meeting_url: string | null
           cloned_from_service_id: string | null
           created_at: string
           created_by: string | null
@@ -7229,6 +7232,8 @@ export type Database = {
           requires_payment_before_release: boolean
           requires_review: boolean
           requires_signature: boolean
+          season_end: string | null
+          season_start: string | null
           service_category_id: string | null
           slug: string
           status: string
@@ -7237,7 +7242,10 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
+          booking_location_type?: string
+          booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7262,6 +7270,8 @@ export type Database = {
           requires_payment_before_release?: boolean
           requires_review?: boolean
           requires_signature?: boolean
+          season_end?: string | null
+          season_start?: string | null
           service_category_id?: string | null
           slug: string
           status?: string
@@ -7270,7 +7280,10 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
+          booking_location_type?: string
+          booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7295,6 +7308,8 @@ export type Database = {
           requires_payment_before_release?: boolean
           requires_review?: boolean
           requires_signature?: boolean
+          season_end?: string | null
+          season_start?: string | null
           service_category_id?: string | null
           slug?: string
           status?: string
@@ -7891,6 +7906,47 @@ export type Database = {
           },
           {
             foreignKeyName: "sms_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_time_off: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          start_date: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          start_date: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          start_date?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_time_off_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -8607,6 +8663,7 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          grant_platform_it: boolean
           id: string
           invited_by: string | null
           role_id: string
@@ -8621,6 +8678,7 @@ export type Database = {
           created_at?: string
           email: string
           expires_at?: string
+          grant_platform_it?: boolean
           id?: string
           invited_by?: string | null
           role_id: string
@@ -8635,6 +8693,7 @@ export type Database = {
           created_at?: string
           email?: string
           expires_at?: string
+          grant_platform_it?: boolean
           id?: string
           invited_by?: string | null
           role_id?: string
@@ -10113,6 +10172,7 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          grant_platform_it: boolean
           id: string
           invited_by: string | null
           role_id: string
@@ -10399,6 +10459,7 @@ export type Database = {
           account_exists: boolean
           email: string
           expires_at: string
+          grant_platform_it: boolean
           password_min_length: number
           role_name: string
           status: string
@@ -10599,6 +10660,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string[]
       }
+      grant_or_invite_platform_it: { Args: { p_email: string }; Returns: Json }
       grant_workspace_usage_meters: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -11105,6 +11167,14 @@ export type Database = {
           error_detail: string
           passed: boolean
         }[]
+      }
+      save_organizer_dynamic_required_answer: {
+        Args: {
+          p_organizer_field_id: string
+          p_response_id: string
+          p_value: Json
+        }
+        Returns: undefined
       }
       save_organizer_reopened_field_answer: {
         Args: { p_item_id: string; p_value: Json }
