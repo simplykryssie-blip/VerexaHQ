@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
+import { getBookingSettings } from "@/lib/bookingSettings";
 
 // Public, unauthenticated -- resolves a firm's booking link (by workspace
 // slug) to what the page needs to render: the firm's name, its bookable
@@ -45,9 +46,12 @@ export async function GET(request: Request) {
     }
   }
 
+  const { windowDays } = await getBookingSettings(supabase, workspace.id);
+
   return NextResponse.json({
     workspaceName: workspace.name,
     services: services ?? [],
     staff,
+    windowDays,
   });
 }

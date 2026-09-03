@@ -2,7 +2,7 @@
 
 import { ChevronUp, ChevronDown, Trash2 } from "lucide-react";
 import { SectionPreview } from "./SectionPreview";
-import { SECTION_TYPE_LABELS, type BuilderSection } from "./types";
+import { SECTION_TYPE_LABELS, type BuilderSection, type BookableServiceOption, type StaffOption } from "./types";
 
 export function SectionCanvas({
   sections,
@@ -11,6 +11,8 @@ export function SectionCanvas({
   onMove,
   onDelete,
   accentColor,
+  services,
+  staff,
 }: {
   sections: BuilderSection[];
   selectedSectionId: string | null;
@@ -18,6 +20,8 @@ export function SectionCanvas({
   onMove: (id: string, direction: "up" | "down") => void;
   onDelete: (id: string) => void;
   accentColor?: string;
+  services?: BookableServiceOption[];
+  staff?: StaffOption[];
 }) {
   if (sections.length === 0) {
     return (
@@ -79,7 +83,7 @@ export function SectionCanvas({
               </div>
             </div>
             <div className="pointer-events-none">
-              <SectionPreview section={section} accentColor={accentColor} />
+              <SectionPreview section={section} accentColor={accentColor} services={services} staff={staff} />
             </div>
           </div>
         ))}

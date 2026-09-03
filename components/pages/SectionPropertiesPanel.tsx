@@ -1,4 +1,4 @@
-import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption } from "./types";
+import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption, type BookableServiceOption, type StaffOption } from "./types";
 import { HeroEditor } from "./section-editors/HeroEditor";
 import { RichTextEditorSection } from "./section-editors/RichTextEditorSection";
 import { ImageEditor } from "./section-editors/ImageEditor";
@@ -6,6 +6,7 @@ import { TextImageEditor } from "./section-editors/TextImageEditor";
 import { TestimonialEditor } from "./section-editors/TestimonialEditor";
 import { FaqEditor } from "./section-editors/FaqEditor";
 import { OrganizerFormEditor } from "./section-editors/OrganizerFormEditor";
+import { BookingWidgetEditor } from "./section-editors/BookingWidgetEditor";
 import { CtaButtonEditor } from "./section-editors/CtaButtonEditor";
 import { SpacerEditor } from "./section-editors/SpacerEditor";
 import { FooterEditor } from "./section-editors/FooterEditor";
@@ -17,6 +18,8 @@ export function SectionPropertiesPanel({
   section,
   onUpdate,
   organizerTemplates,
+  bookableServices,
+  staff,
   canAdvanceToNextPage,
 }: {
   workspaceId: string;
@@ -24,6 +27,8 @@ export function SectionPropertiesPanel({
   section: BuilderSection | null;
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
   organizerTemplates: OrganizerTemplateOption[];
+  bookableServices: BookableServiceOption[];
+  staff: StaffOption[];
   canAdvanceToNextPage: boolean;
 }) {
   if (!section) {
@@ -54,6 +59,9 @@ export function SectionPropertiesPanel({
         {section.section_type === "faq" && <FaqEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "organizer_form" && (
           <OrganizerFormEditor config={section.config as never} onChange={onChange} organizerTemplates={organizerTemplates} canAdvanceToNextPage={canAdvanceToNextPage} />
+        )}
+        {section.section_type === "booking_widget" && (
+          <BookingWidgetEditor config={section.config as never} onChange={onChange} services={bookableServices} staff={staff} />
         )}
         {section.section_type === "cta_button" && <CtaButtonEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "spacer" && <SpacerEditor config={section.config as never} onChange={onChange} />}

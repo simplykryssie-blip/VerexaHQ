@@ -40,6 +40,7 @@ export function PublicBookingFlow({
   staffId,
   staffName,
   windowDays,
+  embedded = false,
 }: {
   workspaceSlug: string;
   workspaceName: string;
@@ -48,6 +49,10 @@ export function PublicBookingFlow({
   staffId: string | null;
   staffName: string | null;
   windowDays: number;
+  /** Renders as a plain card sized to its container, without the full-page
+   * centered layout -- for embedding inside a Websites/Funnels page section,
+   * which already provides its own page chrome and background. */
+  embedded?: boolean;
 }) {
   const preselected = preselectedServiceId ? services.find((s) => s.id === preselectedServiceId) ?? null : null;
 
@@ -115,7 +120,7 @@ export function PublicBookingFlow({
 
   if (services.length === 0) {
     return (
-      <Centered>
+      <Centered embedded={embedded}>
         <h1 className="text-lg font-semibold text-ink">Nothing available to book right now</h1>
         <p className="mt-2 text-sm text-muted">Please contact {workspaceName} directly to schedule.</p>
       </Centered>
@@ -123,7 +128,7 @@ export function PublicBookingFlow({
   }
 
   return (
-    <Centered wide>
+    <Centered wide embedded={embedded}>
       <h1 className="text-lg font-semibold text-ink">
         Book with {workspaceName}
         {staffName ? ` -- ${staffName}` : ""}
@@ -253,10 +258,10 @@ export function PublicBookingFlow({
   );
 }
 
-function Centered({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4 py-10">
-      <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8`}>{children}</div>
-    </div>
+function Centered({ children, wide = false, embedded = false }: { children: React.ReactNode; wide?: boolean; embedded?: boolean }) {
+  const card = (
+    <div className={`w-full ${wide ? "max-w-lg" : "max-w-sm"} rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8`}>{children}</div>
   );
+  if (embedded) return <div className="mx-auto flex justify-center px-4 py-8">{card}</div>;
+  return <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4 py-10">{card}</div>;
 }
