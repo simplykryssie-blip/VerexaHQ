@@ -6,6 +6,17 @@ import { Check, ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { WEEKDAYS, type BusinessHours } from "@/lib/businessHours";
+
+const WEEKDAY_LABELS: Record<keyof BusinessHours, string> = {
+  sunday: "Sun",
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+};
 
 const inputClass = "mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -33,6 +44,9 @@ export type ServiceRow = {
   display_order: number;
   is_bookable: boolean;
   is_portal_visible: boolean;
+  season_start: string | null;
+  season_end: string | null;
+  allowed_weekdays: number[] | null;
   requires_organizer: boolean;
   requires_engagement_letter: boolean;
   requires_documents: boolean;
@@ -125,6 +139,9 @@ export function ServiceForm({
   const [displayOrder, setDisplayOrder] = useState(String(service.display_order));
   const [isBookable, setIsBookable] = useState(service.is_bookable);
   const [isPortalVisible, setIsPortalVisible] = useState(service.is_portal_visible);
+  const [seasonStart, setSeasonStart] = useState(service.season_start ?? "");
+  const [seasonEnd, setSeasonEnd] = useState(service.season_end ?? "");
+  const [allowedWeekdays, setAllowedWeekdays] = useState<number[]>(service.allowed_weekdays ?? []);
   const [requirements, setRequirements] = useState(
     Object.fromEntries(REQUIREMENT_FIELDS.map((f) => [f.key, Boolean(service[f.key])])) as Record<string, boolean>
   );
@@ -158,6 +175,11 @@ export function ServiceForm({
     };
   }
 
+  function toggleWeekday(dayIndex: number) {
+    setAllowedWeekdays((prev) => (prev.includes(dayIndex) ? prev.filter((d) => d !== dayIndex) : [...prev, dayIndex].sort()));
+    setDirty(true);
+  }
+
   async function addCategory(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = newCategoryName.trim();
@@ -184,8 +206,14 @@ export function ServiceForm({
   }
 
   async function save() {
-    setSaving(true);
     setError(null);
+    const trimmedSeasonStart = seasonStart.trim();
+    const trimmedSeasonEnd = seasonEnd.trim();
+    if (Boolean(trimmedSeasonStart) !== Boolean(trimmedSeasonEnd)) {
+      setError("Set both a start and end date for the booking season, or leave both blank.");
+      return;
+    }
+    setSaving(true);
     const { error: updateError } = await supabase
       .from("services")
       .update({
@@ -205,6 +233,9 @@ export function ServiceForm({
         display_order: Number(displayOrder) || 0,
         is_bookable: isBookable,
         is_portal_visible: isPortalVisible,
+        season_start: trimmedSeasonStart || null,
+        season_end: trimmedSeasonEnd || null,
+        allowed_weekdays: allowedWeekdays.length > 0 ? allowedWeekdays : null,
         ...requirements,
       })
       .eq("id", service.id);
@@ -465,6 +496,61 @@ export function ServiceForm({
             Visible in the public/portal service picker
           </label>
         </div>
+
+        {isBookable && (
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink">Booking window</p>
+            <p className="mt-1 text-[11px] text-muted">
+              Leave blank to keep this bookable year-round on any day the firm is open. Set a season for something like
+              tax review (e.g. Jan 1 - Apr 15) -- it turns off automatically outside that window and comes back next
+              year on its own.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className={labelClass}>
+                Season starts (MM-DD)
+                <input
+                  placeholder="01-01"
+                  pattern="\d{2}-\d{2}"
+                  value={seasonStart}
+                  onChange={(e) => markDirty(setSeasonStart)(e.target.value)}
+                  disabled={!canManage}
+                  className={inputClass}
+                />
+              </label>
+              <label className={labelClass}>
+                Season ends (MM-DD)
+                <input
+                  placeholder="04-15"
+                  pattern="\d{2}-\d{2}"
+                  value={seasonEnd}
+                  onChange={(e) => markDirty(setSeasonEnd)(e.target.value)}
+                  disabled={!canManage}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+            <p className={`${labelClass} mt-3`}>Allowed days</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((day, i) => (
+                <button
+                  key={day}
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => toggleWeekday(i)}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                    allowedWeekdays.includes(i) ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  {WEEKDAY_LABELS[day]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted">
+              {allowedWeekdays.length === 0 ? "No day restriction -- bookable any day the firm is open." : "Only bookable on the days selected above."}
+            </p>
+          </div>
+        )}
+
         <label className={`${labelClass} mt-3 max-w-[10rem]`}>
           Display order
           <input

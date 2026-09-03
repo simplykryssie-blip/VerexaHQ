@@ -32,6 +32,7 @@ import {
   Receipt,
   Handshake,
   Sparkles,
+  CalendarOff,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -188,6 +189,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
+  { label: "Availability", href: "/settings/availability", icon: CalendarOff },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
@@ -197,7 +199,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Personal", itemLabels: ["Security", "Notifications"] },
+  { label: "Personal", itemLabels: ["Security", "Availability", "Notifications"] },
   { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];

@@ -42,12 +42,49 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
-function toIsoDate(date: Date): string {
+export function toIsoDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+// Shared by firm-wide holidays and per-staff time off -- both are just a
+// list of inclusive [start, end] 'YYYY-MM-DD' spans checked the same way.
+export function isDateInAnyRange(isoDate: string, ranges: { start: string; end: string }[]): boolean {
+  return ranges.some((r) => isoDate >= r.start && isoDate <= r.end);
+}
+
 export function isHoliday(isoDate: string, holidays: HolidayRange[]): boolean {
-  return holidays.some((h) => isoDate >= h.start && isoDate <= h.end);
+  return isDateInAnyRange(isoDate, holidays);
+}
+
+// A service's own booking window, e.g. "only Jan 1 - Apr 15" for a tax
+// season -- month/day only ('MM-DD'), so it recurs every year without
+// anyone having to remember to update it. Handles a window that wraps
+// across the new year (e.g. "11-01" to "02-28"). Both null (the default
+// for every existing service) means no seasonal restriction at all.
+export function isDateInSeason(isoDate: string, seasonStart: string | null, seasonEnd: string | null): boolean {
+  if (!seasonStart || !seasonEnd) return true;
+  const monthDay = isoDate.slice(5);
+  return seasonStart <= seasonEnd ? monthDay >= seasonStart && monthDay <= seasonEnd : monthDay >= seasonStart || monthDay <= seasonEnd;
+}
+
+// A service restricted to specific weekdays (e.g. "Tuesdays and Thursdays
+// only" for ERO onboarding), independent of which days the firm is
+// generally open. Null/empty means every day the firm is open is fine.
+export function isWeekdayAllowedForService(date: Date, allowedWeekdays: number[] | null): boolean {
+  if (!allowedWeekdays || allowedWeekdays.length === 0) return true;
+  return allowedWeekdays.includes(date.getDay());
+}
+
+export type ServiceAvailabilityRules = {
+  seasonStart: string | null;
+  seasonEnd: string | null;
+  allowedWeekdays: number[] | null;
+};
+
+// Combines a service's seasonal window and allowed-weekday rules into the
+// one check the booking routes need before even looking at the day's hours.
+export function isServiceBookableOnDate(date: Date, rules: ServiceAvailabilityRules): boolean {
+  return isDateInSeason(toIsoDate(date), rules.seasonStart, rules.seasonEnd) && isWeekdayAllowedForService(date, rules.allowedWeekdays);
 }
 
 // `date` is a plain local calendar day (midnight); returns candidate slot

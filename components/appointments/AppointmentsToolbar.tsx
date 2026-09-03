@@ -6,6 +6,7 @@ import { CalendarPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
+import { isDateInAnyRange } from "@/lib/businessHours";
 import type { ClientOption, EngagementOption, StaffOption } from "./types";
 
 export type AppointmentFilter = "upcoming" | "past" | "all";
@@ -19,6 +20,7 @@ export function AppointmentsToolbar({
   clients,
   engagements,
   staff,
+  staffTimeOff,
   canManage,
   currentUserId,
   filter,
@@ -28,6 +30,7 @@ export function AppointmentsToolbar({
   clients: ClientOption[];
   engagements: EngagementOption[];
   staff: StaffOption[];
+  staffTimeOff: { user_id: string; start_date: string; end_date: string }[];
   canManage: boolean;
   currentUserId: string | null;
   filter: AppointmentFilter;
@@ -55,6 +58,17 @@ export function AppointmentsToolbar({
   const clientDropdownRef = useDropdownDismiss<HTMLDivElement>(clientDropdownOpen, () => setClientDropdownOpen(false));
 
   const filteredEngagements = useMemo(() => (clientId ? engagements.filter((e) => e.client_id === clientId) : engagements), [engagements, clientId]);
+  // Warning only, not a hard block -- a firm sometimes needs to schedule
+  // around someone's time off deliberately, so this just makes sure whoever
+  // is booking sees it before they do.
+  const timeOffWarning = useMemo(() => {
+    if (!staffId || !startAt) return null;
+    const isoDate = startAt.slice(0, 10);
+    const conflict = staffTimeOff.some((t) => t.user_id === staffId && isDateInAnyRange(isoDate, [{ start: t.start_date, end: t.end_date }]));
+    if (!conflict) return null;
+    const name = staff.find((s) => s.id === staffId)?.label ?? "This staff member";
+    return `${name} has marked this day as time off.`;
+  }, [staffId, startAt, staffTimeOff, staff]);
   const matchingClients = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
     if (!q) return clients.slice(0, 8);
@@ -287,6 +301,7 @@ export function AppointmentsToolbar({
               Visible to the client in their portal
             </label>
           </div>
+          {timeOffWarning && <p className="mt-2 text-sm text-warning">{timeOffWarning}</p>}
           {error && <p className="mt-2 text-sm text-danger">{error}</p>}
           <button
             type="submit"

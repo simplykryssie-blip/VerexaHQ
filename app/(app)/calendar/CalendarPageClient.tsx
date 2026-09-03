@@ -17,6 +17,7 @@ export function CalendarPageClient({
   clients,
   engagements,
   staff,
+  staffTimeOff,
   canManage,
   currentUserId,
 }: {
@@ -26,6 +27,7 @@ export function CalendarPageClient({
   clients: ClientOption[];
   engagements: EngagementOption[];
   staff: StaffOption[];
+  staffTimeOff: { user_id: string; start_date: string; end_date: string }[];
   canManage: boolean;
   currentUserId: string | null;
 }) {
@@ -38,6 +40,7 @@ export function CalendarPageClient({
         clients={clients}
         engagements={engagements}
         staff={staff}
+        staffTimeOff={staffTimeOff}
         canManage={canManage}
         currentUserId={currentUserId}
         filter={filter}

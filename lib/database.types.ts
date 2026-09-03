@@ -7204,6 +7204,7 @@ export type Database = {
       }
       services: {
         Row: {
+          allowed_weekdays: number[] | null
           billing_rule_id: string | null
           cloned_from_service_id: string | null
           created_at: string
@@ -7229,6 +7230,8 @@ export type Database = {
           requires_payment_before_release: boolean
           requires_review: boolean
           requires_signature: boolean
+          season_end: string | null
+          season_start: string | null
           service_category_id: string | null
           slug: string
           status: string
@@ -7237,6 +7240,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
@@ -7262,6 +7266,8 @@ export type Database = {
           requires_payment_before_release?: boolean
           requires_review?: boolean
           requires_signature?: boolean
+          season_end?: string | null
+          season_start?: string | null
           service_category_id?: string | null
           slug: string
           status?: string
@@ -7270,6 +7276,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
@@ -7295,6 +7302,8 @@ export type Database = {
           requires_payment_before_release?: boolean
           requires_review?: boolean
           requires_signature?: boolean
+          season_end?: string | null
+          season_start?: string | null
           service_category_id?: string | null
           slug?: string
           status?: string
@@ -7891,6 +7900,47 @@ export type Database = {
           },
           {
             foreignKeyName: "sms_templates_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_time_off: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          start_date: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          start_date: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          start_date?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_time_off_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, type BusinessHours, type HolidayRange } from "@/lib/businessHours";
+import {
+  DEFAULT_BUSINESS_HOURS,
+  DEFAULT_SLOT_MINUTES,
+  slotsForDay,
+  filterAvailableSlots,
+  isServiceBookableOnDate,
+  type BusinessHours,
+  type HolidayRange,
+} from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 
 // Reads services.is_bookable, system_settings, and every appointment on the
@@ -25,11 +33,14 @@ export async function GET(request: Request) {
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, is_bookable, workspace_id, estimated_duration_minutes")
+    .select("id, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays")
     .eq("id", serviceId)
     .maybeSingle();
   if (!service || service.workspace_id !== identity.workspaceId || !service.is_bookable) {
     return NextResponse.json({ error: "This service isn't bookable." }, { status: 404 });
+  }
+  if (!isServiceBookableOnDate(date, { seasonStart: service.season_start, seasonEnd: service.season_end, allowedWeekdays: service.allowed_weekdays })) {
+    return NextResponse.json({ slots: [], durationMinutes: service.estimated_duration_minutes ?? DEFAULT_SLOT_MINUTES });
   }
 
   const { data: hoursSetting } = await supabase
