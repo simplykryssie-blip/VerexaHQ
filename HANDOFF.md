@@ -214,13 +214,36 @@ entries the deletes themselves generated. Verified zero remaining rows
 for all of it, including a workspace-wide `clients` count.
 
 **F-05 (make the critical-path suite actually runnable) — in progress,
-currently blocked.** The user created a dedicated, empty Supabase test
-project for this (`verexahq-test`, ref `vnyxoubbnuyzywlqmhlh`, org
-`awcioqmvramifkuxfccm` — a different org than production's
-`daxpavvsotvsyqqntddc`, in org `nmkuapcamjwfrnulutkd`). Plan was: apply
-every file in `supabase/migrations/` (385 files) to it, then set
-`NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` for it in
-`.env.local`/CI.
+currently blocked on the missing-baseline issue below (org-access problem
+is resolved, see update at the bottom of this section).** The user
+originally created a dedicated Supabase test project for this under a
+*different* Supabase account than the one this app normally uses —
+`verexahq-test`, ref `vnyxoubbnuyzywlqmhlh`, org `awcioqmvramifkuxfccm`.
+That turned out to belong to an entirely separate Supabase login (not
+`mkbfinancialgroup@gmail.com`, the account that owns production), which
+is why the Supabase MCP connector kept flipping between seeing one org or
+the other and never both — **that project is now orphaned and should be
+deleted directly from whichever Supabase login it's under, once the user
+tracks that login down; nothing else depends on it.** A replacement was
+created in the *correct* org instead: **`verexahq-test`, ref
+`uzdlqioslnqqikiouksg`, org `nmkuapcamjwfrnulutkd`** (same org and region,
+`us-east-2`, as production) — confirmed reachable and schema-empty (0
+migrations, 0 tables) as of 2026-09-03. Use this ref going forward, not
+the old one.
+
+Plan: rather than replaying all 385 incremental migration files on top of
+a reconstructed pre-`20260805230613` baseline (see why that baseline is
+missing below), the simpler and more robust approach is to take a single
+full schema-only snapshot of production's *current* live schema (which
+already incorporates every migration ever applied) and apply that one
+snapshot directly to the fresh test project — no replay needed. A
+background agent was dispatched mid-session to generate that snapshot via
+read-only SQL introspection against production (no pg_dump/psql access
+available, so it's using Postgres's own catalog-reflection functions —
+`pg_get_functiondef`, `pg_get_constraintdef`, etc.); check whether
+`supabase/migrations/00000000000000_baseline_schema_snapshot_for_fresh_
+projects.sql` exists and was committed, or whether that agent's result
+is still pending / needs to be picked up.
 
 **Real, confirmed blocker found while attempting this — the migrations
 folder cannot build the schema from scratch.** Verified independently
@@ -245,43 +268,36 @@ migration file. There's no `schema.sql`/`pg_dump` baseline anywhere in the
 repo either — `lib/database.types.ts` exists but is generated TS types
 only (no constraints/RLS/functions/triggers), not a usable substitute.
 
-**What unblocks this**: someone with real access to production
-(`daxpavvsotvsyqqntddc`) needs to generate a schema-only dump (e.g.
-`supabase db pull` or `pg_dump --schema-only`) and commit it as a baseline
-migration dated before `20260805230613`. Once that exists, the rest of
-the 385 migrations should apply on top of it without issue (no
-`CREATE INDEX CONCURRENTLY`/`REINDEX CONCURRENTLY`/bare
-`ALTER TYPE ... ADD VALUE` in any of them — checked — so batching many
-files into one `apply_migration` transaction is safe). `verexahq-test`
-itself is confirmed still completely empty (0 migrations, 0 tables) —
-nothing was left half-applied.
-
-**Separately, this session's own Supabase MCP access became unreliable
-partway through**: the connector was originally scoped to org
-`nmkuapcamjwfrnulutkd` (production + the unrelated `Full-service-CRM`
-project), then the user reconnected it to pick up `verexahq-test`'s org
-(`awcioqmvramifkuxfccm`) — which meant production dropped out of reach
-entirely (both orgs were never visible at once). A later reconnect
-attempt aimed at getting both orgs simultaneously left the Supabase MCP
-server in a broken state for the rest of this session (`ListConnectors`
-reported it "connected" at the account level, but no `mcp__Supabase__*`
-tools would load via `ToolSearch` for the remainder of the session — likely
-a live MCP binding not picking up a mid-session reauth). **Whoever picks
-this up should start a fresh session so the Supabase connector binds
-clean, then check `mcp__Supabase__list_projects` shows both the
-production org and `verexahq-test`'s org before doing anything else.**
+**Org-access problem: resolved.** Earlier in this session the Supabase MCP
+connector kept flipping between seeing production's org
+(`nmkuapcamjwfrnulutkd`) and the orphaned test project's org
+(`awcioqmvramifkuxfccm`), never both, and a reconnect attempt aimed at
+fixing that left the connector reporting "connected" via `ListConnectors`
+while `mcp__Supabase__*` tools still wouldn't load via `ToolSearch` for a
+while. That's moot now — since the replacement `verexahq-test`
+(`uzdlqioslnqqikiouksg`) was created directly inside production's own org,
+there's no more org-switching needed; a normal Supabase MCP connection to
+this account reaches both projects at once. If a future session somehow
+can't see both `daxpavvsotvsyqqntddc` and `uzdlqioslnqqikiouksg` via
+`mcp__Supabase__list_projects`, something regressed — don't assume it's
+expected.
 
 **Still open / next steps for F-05, in order:**
-1. New session: confirm Supabase access covers both orgs.
-2. Generate a schema-only baseline dump of production, commit it as a
-   migration dated before `20260805230613`.
-3. Apply all 385 migrations (+ new baseline) to `vnyxoubbnuyzywlqmhlh` in
-   batches (no need to redo the investigation above — the "no
-   CONCURRENTLY/bare ADD VALUE" check already passed).
-4. Verify schema parity against production (`list_tables` on both,
+1. Confirm/pick up the baseline-snapshot agent's result — either
+   `supabase/migrations/00000000000000_baseline_schema_snapshot_for_fresh_
+   projects.sql` already exists and was committed (check git log), or
+   generate it fresh using the same read-only-introspection approach
+   against `daxpavvsotvsyqqntddc` if it doesn't.
+2. Apply that single snapshot file to `uzdlqioslnqqikiouksg`
+   (`verexahq-test`) via `apply_migration`. Expect this to need a round or
+   two of fixing errors on first apply (object-ordering issues are likely
+   — the snapshot was generated via SQL introspection without a live
+   target to test against, see the agent's own reported risk areas) — that
+   is normal, not a sign the approach is wrong.
+3. Verify schema parity against production (`list_tables` on both,
    `get_advisors` sanity check on the test project).
-5. Set `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` for the test
-   project in `.env.local` and CI secrets, confirm
+4. Set `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` for
+   `uzdlqioslnqqikiouksg` in `.env.local` and CI secrets, confirm
    `tests/critical-paths.test.ts` actually passes against it (it currently
    correctly fails, since those env vars aren't set anywhere yet).
 
