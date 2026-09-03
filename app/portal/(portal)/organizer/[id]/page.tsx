@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { PageHeader } from "@/components/PageHeader";
 import { OrganizerForm } from "@/components/portal/OrganizerForm";
-import { InformationRequestBanner } from "@/components/portal/InformationRequestBanner";
 import { stringifyAddressValue, stringifyNameValue } from "@/lib/organizer/formatValue";
 import type { BasicInfoSnapshot } from "@/components/portal/BasicInfoForm";
 
@@ -24,7 +23,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 
   const readOnly = response.status === "submitted" || response.status === "reviewed";
 
-  const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequests }, { data: infoRequestItems }] = await Promise.all([
+  const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequestItems }] = await Promise.all([
     supabase
       .from("organizer_fields")
       .select(
@@ -34,17 +33,14 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
     readOnly ? Promise.resolve({ data: null }) : supabase.rpc("get_portal_client_snapshot"),
-    supabase
-      .from("organizer_information_requests")
-      .select("id, message, status, due_date, tags, created_at")
-      .eq("organizer_response_id", response.id)
-      .neq("status", "draft")
-      .neq("status", "resolved")
-      .order("created_at", { ascending: false }),
     // Per-field flags -- these are what actually let a client respond to a
     // specific question even when the rest of the organizer is read-only
     // (status submitted/reviewed). approved/resolved items are already
-    // reflected in the answer itself, so there's nothing left to show.
+    // reflected in the answer itself, so there's nothing left to show. The
+    // banner listing the original flagged-request message lives only in
+    // the sitewide sticky banner now -- once a client is on this page
+    // actually answering questions, the live checklist below (built from
+    // these items) is what matters, not the static text.
     supabase
       .from("organizer_information_request_items")
       .select("id, organizer_field_id, instance_index, note, status, was_answered_when_flagged, decision_note, organizer_information_requests!inner(organizer_response_id)")
@@ -84,9 +80,6 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         }
       />
       <div className="max-w-2xl flex-1 px-8 py-6">
-        <InformationRequestBanner
-          requests={(infoRequests ?? []).map((r) => ({ id: r.id, message: r.message ?? "", status: r.status as "active" | "viewed" | "responded", due_date: r.due_date, tags: r.tags, created_at: r.created_at }))}
-        />
         <OrganizerForm
           responseId={response.id}
           templateName={templateName}

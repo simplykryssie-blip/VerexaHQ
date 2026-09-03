@@ -59,6 +59,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { data: roles },
     { count: pendingClientChangeCount },
     { count: submittedOrganizerCount },
+    { count: respondedOrganizerItemCount },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -100,10 +101,18 @@ export default async function AppLayout({ children, modal }: { children: React.R
     // Powers the Review Queue nav item's red dot. Doesn't include cross-firm
     // engagement_shares (an ERO/SB-only, permission-gated section on that
     // page) -- checking that permission on every single page load isn't
-    // worth it just for a dot; the two most common cases (client-submitted
-    // info changes, submitted organizers) cover it for everyone else.
+    // worth it just for a dot; the three most common cases (client-submitted
+    // info changes, submitted organizers, client responses to flagged
+    // organizer questions) cover it for everyone else.
     supabase.from("client_pending_changes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "pending"),
     supabase.from("organizer_responses").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "submitted"),
+    // organizer_information_request_items has no workspace_id of its own --
+    // scoped through the parent request, same as review-queue's own query.
+    supabase
+      .from("organizer_information_request_items")
+      .select("id, organizer_information_requests!inner(workspace_id)", { count: "exact", head: true })
+      .eq("status", "client_responded")
+      .eq("organizer_information_requests.workspace_id", workspace.id),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -184,7 +193,9 @@ export default async function AppLayout({ children, modal }: { children: React.R
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
             showPartners={(connectedPartnerCount ?? 0) > 0}
-            reviewQueueHasItems={(pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0}
+            reviewQueueHasItems={
+              (pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0 || (respondedOrganizerItemCount ?? 0) > 0
+            }
             showEroManagement={isEroManagementTier(workspace)}
             currentUser={currentUser}
           />

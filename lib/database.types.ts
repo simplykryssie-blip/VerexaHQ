@@ -10831,6 +10831,10 @@ export type Database = {
         Args: { p_message: string; p_request_id: string }
         Returns: undefined
       }
+      notify_staff_organizer_information_responded: {
+        Args: { p_item_count: number; p_response_id: string }
+        Returns: undefined
+      }
       notify_workspace_admins: {
         Args: {
           p_channels: string[]
@@ -11167,6 +11171,14 @@ export type Database = {
           error_detail: string
           passed: boolean
         }[]
+      }
+      save_organizer_dynamic_required_answer: {
+        Args: {
+          p_organizer_field_id: string
+          p_response_id: string
+          p_value: Json
+        }
+        Returns: undefined
       }
       save_organizer_reopened_field_answer: {
         Args: { p_item_id: string; p_value: Json }

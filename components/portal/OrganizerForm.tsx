@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, MessageCircleWarning, Paperclip, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -100,10 +100,16 @@ export function OrganizerForm({
   // not_started/in_progress, since that's what the RLS on
   // organizer_response_answers/organizer_responses locks down at that point.
   const infoItemsByKey = new Map(infoRequestItems.map((i) => [`${i.organizer_field_id}:${i.instance_index}`, i]));
+  // Items the client can still act on -- client_responded is already sent
+  // and awaiting the preparer's decision, so it's excluded from both the
+  // "still needs an answer" validation and the batch submit below.
+  const actionableInfoItems = infoRequestItems.filter((i) => i.status === "pending" || i.status === "rejected");
+  const fieldLabelById = new Map(fields.map((f) => [f.id, f.label]));
 
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
   const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
+  const childToParentId = new Map(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => [c.id, r.id])));
 
   const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
   // Delegates address/name/phone to the shared helper; signature and
@@ -169,6 +175,155 @@ export function OrganizerForm({
   const [submitting, setSubmitting] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [submittingFlags, setSubmittingFlags] = useState(false);
+  const [justSubmittedFlags, setJustSubmittedFlags] = useState(false);
+
+  // A lightweight local draft, separate from the real save/submit RPCs --
+  // typing into a flagged field only updates React state until "Submit
+  // changes" is clicked, so without this a refresh (accidental, or from
+  // impatience during a slow submit) would silently wipe everything not
+  // yet sent. Restored once on mount rather than in the useState
+  // initializer since localStorage isn't available during SSR.
+  const draftKey = `verexa-organizer-draft:${responseId}`;
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw) as {
+        answers?: Record<string, string>;
+        repeaterRows?: Record<string, Record<string, string>[]>;
+      };
+      if (draft.answers) setAnswers((prev) => ({ ...prev, ...draft.answers }));
+      if (draft.repeaterRows) setRepeaterRows((prev) => ({ ...prev, ...draft.repeaterRows }));
+    } catch {
+      // Best-effort -- a missing/corrupt draft just means nothing to restore.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({ answers, repeaterRows }));
+    } catch {
+      // Best-effort -- storage full or unavailable (private browsing) just
+      // means no draft safety net, not something to surface to the client.
+    }
+  }, [answers, repeaterRows, draftKey]);
+  // Discourages navigating away mid-batch -- each item in the loop below is
+  // its own RPC call, so leaving partway through is what produced the
+  // "some answers reverted" report: everything before the interruption was
+  // already saved for good, everything after it was still only in memory.
+  useEffect(() => {
+    if (!submittingFlags) return;
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [submittingFlags]);
+
+  function clearDraft() {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {
+      // Best-effort, same as above.
+    }
+  }
+
+  // Snapshot of every flagged field's value exactly as the page loaded --
+  // never updated after mount. Used only to tell "the client typed a real
+  // answer/correction" apart from "this is just what was already there" for
+  // the checklist and submit-changes validation below; a live answers/
+  // repeaterRows read would give the same value for both cases.
+  const [initialAnswerSnapshot] = useState<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const a of initialAnswers) {
+      const key = `${a.organizer_field_id}:${a.instance_index ?? 0}`;
+      map.set(key, a.value !== null && a.value !== undefined ? answerToString(a.organizer_field_id, a.value) : "");
+    }
+    return map;
+  });
+
+  function currentValueFor(fieldId: string, instanceIndex: number): string {
+    if (repeaterChildIds.has(fieldId)) {
+      const parentId = childToParentId.get(fieldId);
+      return (parentId && repeaterRows[parentId]?.[instanceIndex]?.[fieldId]) ?? "";
+    }
+    return answers[fieldId] ?? "";
+  }
+
+  // "Answered" for a flagged item means the client has actually typed
+  // something different from what was there when the page loaded -- for a
+  // previously-blank field any non-empty value qualifies; for a correction
+  // to an already-answered field, retyping the same value doesn't count as
+  // having reviewed it.
+  function isLocallyAnswered(item: InfoRequestItemRow): boolean {
+    const current = currentValueFor(item.organizer_field_id, item.instance_index);
+    const initial = initialAnswerSnapshot.get(`${item.organizer_field_id}:${item.instance_index}`) ?? "";
+    return current.trim() !== "" && current !== initial;
+  }
+
+  async function submitFlaggedChanges() {
+    const unanswered = actionableInfoItems.filter((item) => !isLocallyAnswered(item));
+    const unansweredDynamic = dynamicRequiredFields.filter((f) => !(answers[f.id] ?? "").trim());
+    if (unanswered.length > 0 || unansweredDynamic.length > 0) {
+      const labels = [
+        ...unanswered.map((i) => fieldLabelById.get(i.organizer_field_id) ?? "a flagged question"),
+        ...unansweredDynamic.map((f) => f.label),
+      ];
+      toast.show(`Please answer: ${labels.join(", ")}`, "error");
+      return;
+    }
+    setSubmittingFlags(true);
+    try {
+      for (const item of actionableInfoItems) {
+        const value = currentValueFor(item.organizer_field_id, item.instance_index);
+        const fieldType = fieldTypeById.get(item.organizer_field_id) ?? "short_text";
+        const jsonValue = toOrganizerJsonValue(fieldType, value);
+        const { error } = item.was_answered_when_flagged
+          ? await supabase.rpc("propose_organizer_answer_correction", { p_item_id: item.id, p_proposed_value: jsonValue })
+          : await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: item.id, p_value: jsonValue });
+        if (error) {
+          toast.show(error.message, "error");
+          return;
+        }
+      }
+      // Required fields a flagged answer revealed but that were never
+      // themselves flagged by staff -- no info-request item exists for
+      // these yet, so they go through their own RPC that creates one.
+      for (const field of dynamicRequiredFields) {
+        const value = answers[field.id] ?? "";
+        const jsonValue = toOrganizerJsonValue(field.field_type, value);
+        const { error } = await supabase.rpc("save_organizer_dynamic_required_answer", {
+          p_response_id: responseId,
+          p_organizer_field_id: field.id,
+          p_value: jsonValue,
+        });
+        if (error) {
+          toast.show(error.message, "error");
+          return;
+        }
+      }
+      // Best-effort and deliberately not awaited into the same try block --
+      // the client's answers are already safely saved above regardless of
+      // whether staff actually gets told about them, so a notification
+      // failure here must never surface as "your submission failed".
+      supabase
+        .rpc("notify_staff_organizer_information_responded", {
+          p_response_id: responseId,
+          p_item_count: actionableInfoItems.length + dynamicRequiredFields.length,
+        })
+        .then(({ error }) => {
+          if (error) console.error("notify_staff_organizer_information_responded failed:", error.message);
+        });
+      clearDraft();
+      setJustSubmittedFlags(true);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not submit -- please try again.", "error");
+    } finally {
+      setSubmittingFlags(false);
+    }
+  }
 
   async function saveAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
@@ -328,6 +483,7 @@ export function OrganizerForm({
       // their organizer actually went through. This blocks on an explicit
       // "OK" instead, then sends them back to the dashboard rather than
       // leaving them looking at the (now read-only) form they just finished.
+      clearDraft();
       setJustSubmitted(true);
     } catch (err) {
       toast.show(err instanceof Error ? err.message : "Could not submit -- please try again.", "error");
@@ -341,12 +497,42 @@ export function OrganizerForm({
     router.refresh();
   }
 
+  // A staff-flagged question stays visible even when its own conditional
+  // logic would otherwise hide it -- that's the entire point of being able
+  // to flag a conditionally-hidden question (see ReviewWorkspace). The
+  // condition it depends on may not evaluate true yet: a correction that
+  // would flip it is only ever a *proposed* value until approved (see
+  // propose_organizer_answer_correction -- it never touches
+  // organizer_response_answers), so gating visibility on the live
+  // conditional-logic result would hide the very question the client
+  // needs to answer to make that correction land.
   const topLevelFields = fields
     .filter((f) => !f.parent_field_id)
-    // A flagged field must stay visible even if its own conditional logic
-    // would otherwise hide it -- the preparer's flag is what the client is
-    // here to respond to, and it can't disappear on them.
-    .filter((f) => shouldShowField(parseConditionalLogic(f.conditional_logic), answers) || infoItemsByKey.has(`${f.id}:0`));
+    .filter((f) => infoItemsByKey.has(`${f.id}:0`) || shouldShowField(parseConditionalLogic(f.conditional_logic), answers));
+  // Required fields that are only visible/required because of how a
+  // flagged field was answered -- staff never flagged these directly (no
+  // organizer_information_request_items row exists for them), but they
+  // still need an answer before the client's corrections can be
+  // considered complete. Gated on infoRequestItems (not actionableInfoItems)
+  // -- the underlying information request stays open, and the RPC below
+  // still has somewhere to attach a new item, for as long as ANY item on
+  // it is non-terminal (pending/client_responded/rejected), even after
+  // every originally-flagged question has been answered. Gating on
+  // actionableInfoItems instead cut this off the moment the last flagged
+  // question was answered, right when answering it could reveal yet
+  // another conditional-required field -- exactly the case this exists
+  // for. "Unanswered when the page loaded" is what marks a field as
+  // belonging here rather than being pre-existing content nothing asked
+  // the client to touch.
+  const dynamicRequiredFields =
+    infoRequestItems.length > 0
+      ? topLevelFields.filter((f) => {
+          if (!f.is_required) return false;
+          if (infoItemsByKey.has(`${f.id}:0`)) return false;
+          return (initialAnswerSnapshot.get(`${f.id}:0`) ?? "") === "";
+        })
+      : [];
+  const dynamicRequiredFieldIds = new Set(dynamicRequiredFields.map((f) => f.id));
   const pages = splitIntoPages(topLevelFields);
   const currentIndex = Math.min(pageIndex, pages.length - 1);
   const currentPage = pages[currentIndex];
@@ -395,6 +581,69 @@ export function OrganizerForm({
           </div>
         </Modal>
       )}
+      {justSubmittedFlags && (
+        <Modal title="Response submitted" onClose={backToDashboard}>
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <CheckCircle2 size={40} className="text-success" aria-hidden="true" />
+            <p className="text-sm text-slate">Your responses have been submitted. Your preparer will review them.</p>
+            <button
+              type="button"
+              onClick={backToDashboard}
+              className="mt-2 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            >
+              OK
+            </button>
+          </div>
+        </Modal>
+      )}
+      {readOnly && (infoRequestItems.length > 0 || dynamicRequiredFields.length > 0) && (
+        <div className="mb-6 rounded-2xl border border-border bg-surface p-4 print:hidden">
+          <p className="text-sm font-semibold text-ink">Flagged questions</p>
+          <p className="mt-0.5 text-xs text-muted">
+            {actionableInfoItems.length === 0 && dynamicRequiredFields.length === 0
+              ? "All caught up -- nothing left for you to answer here."
+              : `${
+                  actionableInfoItems.filter(isLocallyAnswered).length +
+                  dynamicRequiredFields.filter((f) => (answers[f.id] ?? "").trim()).length
+                } of ${actionableInfoItems.length + dynamicRequiredFields.length} answered`}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {infoRequestItems.map((item) => {
+              const label = fieldLabelById.get(item.organizer_field_id) ?? "Question";
+              const done = item.status === "client_responded" || isLocallyAnswered(item);
+              return (
+                <li key={item.id} className="flex items-start gap-2 text-sm">
+                  {done ? (
+                    <CheckCircle2
+                      size={16}
+                      className={`mt-0.5 shrink-0 ${item.status === "client_responded" ? "text-muted" : "text-success"}`}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-danger" aria-hidden="true" />
+                  )}
+                  <span className={done ? "text-muted line-through decoration-border" : "text-slate"}>{label}</span>
+                  {item.status === "client_responded" && <span className="text-xs text-muted">(waiting for review)</span>}
+                </li>
+              );
+            })}
+            {dynamicRequiredFields.map((field) => {
+              const done = Boolean((answers[field.id] ?? "").trim());
+              return (
+                <li key={field.id} className="flex items-start gap-2 text-sm">
+                  {done ? (
+                    <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
+                  ) : (
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-danger" aria-hidden="true" />
+                  )}
+                  <span className={done ? "text-muted line-through decoration-border" : "text-slate"}>{field.label}</span>
+                  {!done && <span className="text-xs text-muted">(now required)</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {readOnly && (
         <OrganizerPrintSummary
           templateName={templateName}
@@ -439,6 +688,7 @@ export function OrganizerForm({
               entityId={entityId}
               responseId={responseId}
               infoRequestItem={infoItemsByKey.get(`${field.id}:0`)}
+              dynamicRequired={dynamicRequiredFieldIds.has(field.id)}
             />
           )
         )}
@@ -490,6 +740,19 @@ export function OrganizerForm({
               {submitting ? "Submitting..." : "Submit organizer"}
             </button>
           )}
+        </div>
+      )}
+
+      {readOnly && (actionableInfoItems.length > 0 || dynamicRequiredFields.length > 0) && (pages.length === 1 || isLastPage) && (
+        <div className="flex items-center gap-2 pt-2 print:hidden">
+          <button
+            type="button"
+            onClick={submitFlaggedChanges}
+            disabled={submittingFlags}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+          >
+            {submittingFlags ? "Submitting..." : "Submit changes"}
+          </button>
         </div>
       )}
     </div>
@@ -764,6 +1027,7 @@ function FieldInput({
   entityId,
   responseId,
   infoRequestItem,
+  dynamicRequired,
 }: {
   field: FieldRow;
   value: string;
@@ -774,46 +1038,29 @@ function FieldInput({
   entityId: string;
   responseId: string;
   infoRequestItem?: InfoRequestItemRow;
+  dynamicRequired?: boolean;
 }) {
-  const supabase = createClient();
-  const toast = useToast();
-  const router = useRouter();
-  const [infoBusy, setInfoBusy] = useState(false);
-  const [infoError, setInfoError] = useState<string | null>(null);
-
   // A flagged field stays editable (and shows the preparer's note) even
   // when the rest of the organizer is otherwise locked -- see the
   // infoItemsByKey comment in OrganizerForm for why. Once the client has
   // submitted a response (status=client_responded) it goes back to
-  // disabled until the preparer approves or rejects it.
+  // disabled until the preparer approves or rejects it. Saving/submitting
+  // happens once, for every flagged field at once, via OrganizerForm's
+  // "Submit changes" button -- not per field here. dynamicRequired is the
+  // same idea for a field that only became required because of how a
+  // flagged field was answered -- staff never flagged it directly.
   const isActionable = infoRequestItem?.status === "pending" || infoRequestItem?.status === "rejected";
-  const disabled = isActionable ? false : disabledProp;
-
-  async function submitInfoResponse() {
-    if (!infoRequestItem) return;
-    setInfoBusy(true);
-    setInfoError(null);
-    const jsonValue = toOrganizerJsonValue(field.field_type, value);
-    const { error } = infoRequestItem.was_answered_when_flagged
-      ? await supabase.rpc("propose_organizer_answer_correction", { p_item_id: infoRequestItem.id, p_proposed_value: jsonValue })
-      : await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: infoRequestItem.id, p_value: jsonValue });
-    setInfoBusy(false);
-    if (error) {
-      setInfoError(error.message);
-      return;
-    }
-    toast.show(infoRequestItem.was_answered_when_flagged ? "Correction sent to your preparer" : "Answer saved", "success");
-    router.refresh();
-  }
+  const disabled = isActionable || dynamicRequired ? false : disabledProp;
+  const needsAnswer = (isActionable || dynamicRequired) && !value.trim();
 
   const infoPanel = infoRequestItem ? (
     <div
       className={`mt-2 rounded-xl border p-3 ${
-        infoRequestItem.status === "client_responded" ? "border-border bg-surfaceMuted" : "border-warning/40 bg-warning/10"
+        infoRequestItem.status === "client_responded" ? "border-border bg-surfaceMuted" : "border-danger/40 bg-danger/5"
       }`}
     >
       <div className="flex items-start gap-2">
-        <MessageCircleWarning size={14} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+        <MessageCircleWarning size={14} className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-ink">Your preparer flagged this question</p>
           {infoRequestItem.note && <p className="mt-0.5 text-xs text-slate">{infoRequestItem.note}</p>}
@@ -823,16 +1070,22 @@ function FieldInput({
           {infoRequestItem.status === "client_responded" ? (
             <p className="mt-1.5 text-xs text-muted">Submitted -- waiting for your preparer to review it.</p>
           ) : (
-            <button
-              type="button"
-              onClick={submitInfoResponse}
-              disabled={infoBusy || !value.trim()}
-              className="mt-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-            >
-              {infoBusy ? "Submitting..." : infoRequestItem.was_answered_when_flagged ? "Submit correction" : "Submit answer"}
-            </button>
+            <p className="mt-1.5 text-xs text-muted">
+              {value.trim() ? "Answered -- included when you submit your changes." : "Answer this, then use \"Submit changes\" below."}
+            </p>
           )}
-          {infoError && <p className="mt-1 text-xs text-danger">{infoError}</p>}
+        </div>
+      </div>
+    </div>
+  ) : dynamicRequired ? (
+    <div className="mt-2 rounded-xl border border-danger/40 bg-danger/5 p-3">
+      <div className="flex items-start gap-2">
+        <MessageCircleWarning size={14} className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-ink">Now required based on your updated answer</p>
+          <p className="mt-1.5 text-xs text-muted">
+            {value.trim() ? "Answered -- included when you submit your changes." : "Answer this, then use \"Submit changes\" below."}
+          </p>
         </div>
       </div>
     </div>
@@ -864,14 +1117,17 @@ function FieldInput({
     <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
       {showHeader && (
         <>
-          <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
+          <label
+            htmlFor={`field-${field.id}`}
+            className={`block text-sm font-semibold ${needsAnswer ? "text-danger" : "text-ink"}`}
+          >
             {field.label} {field.is_required && <span className="text-danger">*</span>}
           </label>
           {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
         </>
       )}
 
-      <div className={showHeader ? "mt-1.5" : ""}>
+      <div className={`${showHeader ? "mt-1.5" : ""} ${needsAnswer ? "rounded-xl ring-2 ring-danger/60" : ""}`}>
         {field.field_type === "name" ? (
           <NameInput value={value} onChange={(v) => onChange(field.id, v)} disabled={disabled} />
         ) : field.field_type === "email" ? (

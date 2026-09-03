@@ -64,6 +64,35 @@ export default async function ReviewQueuePage() {
         .order("submitted_at", { ascending: false })
     : { data: [] as { id: string; submitted_at: string | null; organizer_templates: { name: string } | null; clients: Parameters<typeof clientLabel>[0] }[] };
 
+  // A response drops off the "Organizers submitted" section above the
+  // moment it's first reviewed (status moves past 'submitted'), but a
+  // client can still respond to flagged/reopened questions on it long
+  // after that -- this is the only other place that resurfaces it. Scoped
+  // through organizer_information_requests.workspace_id since
+  // organizer_information_request_items itself doesn't carry one.
+  const { data: respondedItems } = canReviewOrganizers
+    ? await supabase
+        .from("organizer_information_request_items")
+        .select("organizer_information_requests!inner(workspace_id, organizer_response_id)")
+        .eq("status", "client_responded")
+        .eq("organizer_information_requests.workspace_id", workspace.id)
+    : { data: [] as { organizer_information_requests: { workspace_id: string; organizer_response_id: string } }[] };
+
+  const respondedCountByResponseId = new Map<string, number>();
+  for (const row of respondedItems ?? []) {
+    const responseId = (row.organizer_information_requests as unknown as { organizer_response_id: string }).organizer_response_id;
+    respondedCountByResponseId.set(responseId, (respondedCountByResponseId.get(responseId) ?? 0) + 1);
+  }
+  const respondedResponseIds = Array.from(respondedCountByResponseId.keys());
+
+  const { data: respondedOrganizers } =
+    respondedResponseIds.length > 0
+      ? await supabase
+          .from("organizer_responses")
+          .select("id, organizer_templates(name), clients(client_type, first_name, last_name, business_name)")
+          .in("id", respondedResponseIds)
+      : { data: [] as { id: string; organizer_templates: { name: string } | null; clients: Parameters<typeof clientLabel>[0] }[] };
+
   const { data: shares } = await supabase
     .from("engagement_shares")
     .select(
@@ -181,6 +210,36 @@ export default async function ReviewQueuePage() {
                 })}
               </ul>
             )}
+          </section>
+        )}
+
+        {canReviewOrganizers && (respondedOrganizers ?? []).length > 0 && (
+          <section>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Organizer corrections responded to</h2>
+            <ul className="space-y-3">
+              {(respondedOrganizers ?? []).map((o) => {
+                const name = clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0]);
+                const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer";
+                const count = respondedCountByResponseId.get(o.id) ?? 0;
+                return (
+                  <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-sm shadow-soft">
+                    <Avatar name={name} url={null} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-ink">{name}</p>
+                      <p className="text-xs text-muted">
+                        Responded to {count} flagged {count === 1 ? "question" : "questions"} on {templateName}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/organizers/${o.id}/review`}
+                      className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
+                    >
+                      Review
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         )}
 
