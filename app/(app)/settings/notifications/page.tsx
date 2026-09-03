@@ -17,6 +17,7 @@ const PREFERENCE_ROWS = [
   { eventType: "DOCUMENT_REQUEST_COMPLETED", channel: "In-App", label: "A client finishes sending requested documents", description: "Notifies you the moment every document you asked for has come in." },
   { eventType: "ORGANIZER_SUBMITTED", channel: "In-App", label: "A client submits their intake form", description: "Notifies your firm's owners/admins that a client finished their organizer and it's ready to review." },
   { eventType: "ORGANIZER_REVIEWED", channel: "In-App", label: "A client's intake form gets reviewed", description: "Notifies you once a staff member approves or requests changes on a client's submitted organizer." },
+  { eventType: "ORGANIZER_INFORMATION_RESPONDED", channel: "In-App", label: "A client responds to flagged questions", description: "Notifies the assigned reviewer once a client answers or corrects the questions you flagged on their organizer." },
   { eventType: "PAYMENT_RECEIVED", channel: "In-App", label: "A payment comes in", description: "Notifies you any time a payment (any amount, any method) is recorded for one of your clients." },
   { eventType: "INVOICE_PAID", channel: "In-App", label: "An invoice is fully paid off", description: "Notifies you when an invoice's balance hits zero." },
   // Everything below are timed reminders sent by email/text ahead of a

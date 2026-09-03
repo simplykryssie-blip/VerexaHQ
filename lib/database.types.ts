@@ -10831,6 +10831,10 @@ export type Database = {
         Args: { p_message: string; p_request_id: string }
         Returns: undefined
       }
+      notify_staff_organizer_information_responded: {
+        Args: { p_item_count: number; p_response_id: string }
+        Returns: undefined
+      }
       notify_workspace_admins: {
         Args: {
           p_channels: string[]

@@ -45,6 +45,13 @@ const TITLES: Record<string, (p: Payload) => string> = {
     const status = str(p, "review_status", "reviewed");
     return `${client}'s organizer was ${status.toLowerCase()}`;
   },
+  ORGANIZER_INFORMATION_RESPONDED: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    const count = str(p, "item_count");
+    const n = Number(count);
+    const questionWord = n === 1 ? "question" : "questions";
+    return count ? `${client} responded to ${count} flagged ${questionWord}` : `${client} responded to flagged questions on their organizer`;
+  },
   PAYMENT_RECEIVED: (p) => {
     const client = str(p, "client_name", "A client").trim() || "A client";
     const amount = str(p, "amount");
@@ -73,6 +80,7 @@ function entityHref(entityType: string | null, entityId: string | null): string 
   if (entityType === "engagement") return `/engagements/${entityId}`;
   if (entityType === "client") return `/clients/${entityId}`;
   if (entityType === "automation") return `/workflows/${entityId}`;
+  if (entityType === "organizer_response") return `/organizers/${entityId}/review`;
   return null;
 }
 
