@@ -50,6 +50,7 @@ const QUESTION_STATUS_LABEL: Record<ReviewQuestionStatus, string> = {
   unanswered: "Unanswered",
   optional_blank: "Not answered",
   needs_review: "Approved",
+  "Awaiting Review": "Awaiting review",
   Pending: "Pending",
   "In Review": "In review",
   Approved: "Approved",
@@ -62,6 +63,7 @@ const QUESTION_STATUS_TONE: Record<ReviewQuestionStatus, BadgeTone> = {
   unanswered: "danger",
   optional_blank: "neutral",
   needs_review: "success",
+  "Awaiting Review": "danger",
   Pending: "neutral",
   "In Review": "accent",
   Approved: "success",
@@ -141,6 +143,13 @@ export function ReviewWorkspace({
   const [collapsedHidden, setCollapsedHidden] = useState(true);
 
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
+  // review_status has no default -- it stays null until the first time a
+  // reviewer takes any decision on this response (sends an info request,
+  // approves, or rejects). Before that, an unflagged answered question
+  // showing "Approved" would be a false signal (nothing has actually been
+  // reviewed yet); after it, everything not specifically flagged really is
+  // implicitly fine by the "flag only what's wrong" model.
+  const hasReviewStarted = response.reviewStatus !== null;
 
   const totalAttention = sections.reduce((sum, s) => sum + s.attentionCount, 0);
   const totalVisible = sections.reduce((sum, s) => sum + s.totalVisible, 0);
@@ -223,7 +232,7 @@ export function ReviewWorkspace({
       return;
     }
     setAwaitingReviewItems((prev) => prev.filter((i) => i.id !== itemId));
-    toast.show("Correction approved.", "success");
+    toast.show("Approved.", "success");
     router.refresh();
   }
 
@@ -236,7 +245,7 @@ export function ReviewWorkspace({
       return;
     }
     setAwaitingReviewItems((prev) => prev.filter((i) => i.id !== itemId));
-    toast.show("Correction rejected; the client has been notified.", "success");
+    toast.show("Sent back to the client for another look.", "success");
     router.refresh();
   }
 
@@ -340,6 +349,7 @@ export function ReviewWorkspace({
                     key={entry.item.fieldId}
                     item={entry.item}
                     collapsedHidden={collapsedHidden}
+                    hasReviewStarted={hasReviewStarted}
                     busy={
                       busyItemId !== null &&
                       (busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId)
@@ -366,6 +376,7 @@ export function ReviewWorkspace({
                                   item={item}
                                   compact
                                   collapsedHidden={collapsedHidden}
+                                  hasReviewStarted={hasReviewStarted}
                                   busy={
                                     busyItemId !== null &&
                                     (busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId)
@@ -578,6 +589,7 @@ function QuestionCard({
   item,
   compact = false,
   collapsedHidden,
+  hasReviewStarted,
   busy,
   onFlag,
   onUnflag,
@@ -585,6 +597,7 @@ function QuestionCard({
   item: ReviewQuestionItem;
   compact?: boolean;
   collapsedHidden: boolean;
+  hasReviewStarted: boolean;
   busy: boolean;
   onFlag: (note: string) => Promise<boolean>;
   onUnflag: () => void;
@@ -610,13 +623,22 @@ function QuestionCard({
   const canFlag = !isAwaitingClientCorrection;
 
   return (
-    <div className={`rounded-2xl border border-border bg-surface shadow-soft ${compact ? "p-3" : "p-4"} ${isHidden ? "opacity-60" : ""}`}>
+    <div
+      className={`rounded-2xl border shadow-soft ${compact ? "p-3" : "p-4"} ${
+        isHidden ? "border-border bg-surface opacity-60" : isAwaitingClientCorrection ? "border-danger/40 bg-danger/5" : "border-border bg-surface"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-ink">{item.label}</p>
           {item.helpText && <p className="mt-0.5 text-xs text-muted">{item.helpText}</p>}
         </div>
-        <Badge tone={QUESTION_STATUS_TONE[item.status]}>{QUESTION_STATUS_LABEL[item.status]}</Badge>
+        {/* "Approved" only means something once the reviewer has made a first
+            decision on this response -- before that, an answered question
+            with no flag is just untouched, not approved. */}
+        {!(item.status === "needs_review" && !hasReviewStarted) && (
+          <Badge tone={QUESTION_STATUS_TONE[item.status]}>{QUESTION_STATUS_LABEL[item.status]}</Badge>
+        )}
       </div>
 
       {!isHidden && (
@@ -711,16 +733,23 @@ function AwaitingReviewCard({
   const [note, setNote] = useState("");
 
   return (
-    <li className="rounded-lg border border-border p-2.5 text-xs">
-      <p className="font-medium text-ink">{item.fieldLabel}</p>
+    <li className="rounded-lg border border-danger/40 bg-danger/5 p-2.5 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-ink">{item.fieldLabel}</p>
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-danger">
+          {item.wasAnsweredWhenFlagged ? "Correction" : "New answer"}
+        </span>
+      </div>
       {item.note && <p className="mt-0.5 text-muted">Reviewer asked: &quot;{item.note}&quot;</p>}
       <div className="mt-1.5 space-y-1">
+        {item.wasAnsweredWhenFlagged && (
+          <p>
+            <span className="text-muted">Current: </span>
+            {item.currentDisplay || "(blank)"}
+          </p>
+        )}
         <p>
-          <span className="text-muted">Current: </span>
-          {item.currentDisplay || "--"}
-        </p>
-        <p>
-          <span className="text-muted">Proposed: </span>
+          <span className="text-muted">{item.wasAnsweredWhenFlagged ? "Proposed: " : "Answer: "}</span>
           <span className="font-medium text-accent">{item.proposedDisplay || "--"}</span>
         </p>
       </div>
