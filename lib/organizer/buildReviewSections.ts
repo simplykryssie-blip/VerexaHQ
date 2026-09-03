@@ -124,11 +124,15 @@ function questionStatus(
   reviewStatus: OrganizerReviewStatus | null,
   hasOpenInfoItem: boolean
 ): ReviewQuestionStatus {
-  if (!visible) return "not_applicable";
-  // An open information-request item always reads as "Needs info," whether
-  // or not the field has an answer -- this is what lets an unanswered
-  // question (e.g. a missing upload) be flagged and tracked too.
+  // An open information-request item always wins, even over a field that's
+  // conditionally hidden by the client's own answers -- e.g. a client who
+  // only checked "W-2" income but is actually engaged for a Schedule C
+  // return needs a way to be asked about the business section their
+  // answers hid. Checked before visibility so a flagged-while-hidden field
+  // neither disappears again on refresh nor silently blocks the flag in
+  // the first place (see canFlag in ReviewWorkspace.tsx).
   if (hasOpenInfoItem) return "Corrections Requested";
+  if (!visible) return "not_applicable";
   if (!hasAnswer) return isRequired ? "unanswered" : "optional_blank";
   if (reviewStatus) return reviewStatus;
   return "needs_review";
@@ -205,8 +209,13 @@ export function buildReviewSections(
   let current: ReviewSection = { id: "general", label: "General", entries: [], attentionCount: 0, totalVisible: 0, allDecided: true };
   let hasOpenedRealSection = false;
 
-  function tallyStatus(visible: boolean, status: ReviewQuestionStatus) {
-    if (!visible || status === "not_applicable") return;
+  // Driven purely by the computed status, not raw visibility -- a field
+  // conditionally hidden by the client's own answers but flagged anyway
+  // (see questionStatus above) reports a real status, not "not_applicable",
+  // and should count toward the section's attention indicator same as any
+  // other flagged question.
+  function tallyStatus(status: ReviewQuestionStatus) {
+    if (status === "not_applicable") return;
     current.totalVisible += 1;
     if (ATTENTION_STATUSES.has(status)) {
       current.attentionCount += 1;
@@ -240,7 +249,7 @@ export function buildReviewSections(
           const a = answersByFieldAndInstance.get(`${c.id}:${i}`);
           const childVisible = visible && shouldShowField(parseConditionalLogic(c.conditional_logic), instanceAnswers);
           const item = buildQuestionItem(c, a, childVisible, i, pendingByField.get(c.id), openItemByFieldInstance.get(`${c.id}:${i}`));
-          tallyStatus(childVisible, item.status);
+          tallyStatus(item.status);
           return item;
         });
         instances.push({ index: i, items });
@@ -252,7 +261,7 @@ export function buildReviewSections(
     const answer = topAnswersByField.get(field.id);
     const item = buildQuestionItem(field, answer, visible, 0, pendingByField.get(field.id), openItemByFieldInstance.get(`${field.id}:0`));
     current.entries.push({ kind: "question", item });
-    tallyStatus(visible, item.status);
+    tallyStatus(item.status);
   }
   sections.push(current);
 

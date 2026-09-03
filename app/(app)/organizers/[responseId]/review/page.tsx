@@ -88,11 +88,15 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       )
       .eq("organizer_response_id", response.id)
       .order("created_at", { ascending: false }),
+    // Notes taken while reviewing land on the engagement's (or client's, if
+    // there's no engagement) own Notes tab -- same entityType/entityId as
+    // document_requests below -- rather than a third, siloed
+    // "organizer_response" bucket nothing else ever reads.
     supabase
       .from("notes")
       .select("id, subject, body, author_id, created_at")
-      .eq("entity_type", "organizer_response")
-      .eq("entity_id", response.id)
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
       .order("created_at", { ascending: false }),
     supabase
       .from("document_requests")
