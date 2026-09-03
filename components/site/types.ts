@@ -31,7 +31,8 @@ export type SectionType =
   | "cta_button"
   | "spacer"
   | "footer"
-  | "custom_html";
+  | "custom_html"
+  | "booking_widget";
 
 export type SiteSection = {
   id: string;

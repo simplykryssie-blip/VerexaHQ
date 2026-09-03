@@ -112,20 +112,28 @@ export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: numbe
   return slots;
 }
 
-// Removes slots that overlap an existing appointment or fall before `now`,
-// using the specific service's duration to compute each candidate's end time.
+export const DEFAULT_BOOKING_MIN_NOTICE_HOURS = 0;
+export const DEFAULT_BOOKING_BUFFER_MINUTES = 0;
+
+// Removes slots that overlap an existing appointment (padded by
+// `bufferMinutes` on both sides, e.g. so back-to-back bookings always leave
+// a gap) or fall before `now` -- callers wanting a minimum-notice window
+// (e.g. "no same-day bookings") pass `now` as `Date.now() + noticeHours`
+// rather than the literal current instant, so this function itself only
+// ever needs to know "the earliest instant to offer."
 export function filterAvailableSlots(
   candidates: Date[],
   durationMinutes: number,
   existing: { start_at: string; end_at: string }[],
-  now: Date
+  now: Date,
+  bufferMinutes = 0
 ): Date[] {
   return candidates.filter((slot) => {
     const slotEnd = new Date(slot.getTime() + durationMinutes * 60000);
     if (slot < now) return false;
     return !existing.some((a) => {
-      const aStart = new Date(a.start_at);
-      const aEnd = new Date(a.end_at);
+      const aStart = new Date(new Date(a.start_at).getTime() - bufferMinutes * 60000);
+      const aEnd = new Date(new Date(a.end_at).getTime() + bufferMinutes * 60000);
       return slot < aEnd && slotEnd > aStart;
     });
   });

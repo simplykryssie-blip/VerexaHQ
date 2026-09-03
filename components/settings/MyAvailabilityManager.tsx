@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 
@@ -13,12 +13,14 @@ const inputClass = "rounded-lg border border-border px-3 py-2 text-sm focus:bord
 
 export function MyAvailabilityManager({
   workspaceId,
+  workspaceSlug,
   currentUserId,
   staff,
   timeOff,
   canManageOthers,
 }: {
   workspaceId: string;
+  workspaceSlug: string;
   currentUserId: string | null;
   staff: StaffOption[];
   timeOff: TimeOffRow[];
@@ -28,6 +30,15 @@ export function MyAvailabilityManager({
   const supabase = createClient();
   const toast = useToast();
   const staffLabel = new Map(staff.map((s) => [s.id, s.label]));
+  const [linkCopied, setLinkCopied] = useState(false);
+  const myBookingLink =
+    currentUserId && typeof window !== "undefined" ? `${window.location.origin}/book/${workspaceSlug}?staff=${currentUserId}` : "";
+
+  function copyMyBookingLink() {
+    navigator.clipboard.writeText(myBookingLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  }
 
   const [forUserId, setForUserId] = useState(currentUserId ?? "");
   const [startDate, setStartDate] = useState("");
@@ -82,6 +93,26 @@ export function MyAvailabilityManager({
 
   return (
     <div className="space-y-4">
+      {currentUserId && (
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink">My booking link</p>
+          <p className="mt-1 text-[11px] text-muted">
+            Share this with a lead who wants to book time on your calendar specifically -- they&apos;ll pick a service,
+            then a time that works for you (your time off and existing appointments are blocked out automatically).
+          </p>
+          <div className="mt-2 flex items-center gap-1.5">
+            <input readOnly value={myBookingLink} className={`${inputClass} w-full text-muted`} onFocus={(e) => e.target.select()} />
+            <button
+              type="button"
+              onClick={copyMyBookingLink}
+              className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent"
+            >
+              <Copy size={13} /> {linkCopied ? "Copied!" : "Copy"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={addTimeOff} className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {canManageOthers && (

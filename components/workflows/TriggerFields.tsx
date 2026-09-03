@@ -46,6 +46,7 @@ export const TRIGGER_TYPES = [
   { value: "client.service_interest_selected", label: "A client selects a service", category: "contacts_leads", description: "Fires when a client (or lead) selects a service they're interested in.", keywords: "service interest lead" },
   { value: "engagement.created", label: "A new engagement is created for a service", category: "engagements", description: "Fires when a new engagement is created for a specific service.", keywords: "engagement created new" },
   { value: "appointment.status_changed", label: "An appointment's status changes to", category: "appointments", description: "Fires when an appointment's status changes (booked, confirmed, completed, cancelled, no-show).", keywords: "appointment booked cancelled rescheduled no-show completed status" },
+  { value: "appointment.booked", label: "A client books themselves an appointment", category: "appointments", description: "Fires when a client books an appointment through a public or portal booking link -- not when staff create one manually.", keywords: "appointment booking link self-service booked online" },
   { value: "engagement_letter.signed", label: "A client signs their document for a service", category: "tax_workflow", description: "Fires when a client signs their document.", keywords: "signature signed document letter" },
   { value: "document_request.completed", label: "All requested documents are received", category: "documents", description: "Fires once every required document on a request has been received, for any service or a specific one.", keywords: "documents received complete" },
   { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
@@ -258,6 +259,9 @@ export function triggerSummary(
   }
   if (triggerType === "payment_plan.installment_paid") {
     return "When a payment plan installment is paid";
+  }
+  if (triggerType === "appointment.booked") {
+    return "When a client books themselves an appointment";
   }
   return triggerType;
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Copy, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -47,6 +47,8 @@ export type ServiceRow = {
   season_start: string | null;
   season_end: string | null;
   allowed_weekdays: number[] | null;
+  booking_location_type: string;
+  booking_meeting_url: string | null;
   requires_organizer: boolean;
   requires_engagement_letter: boolean;
   requires_documents: boolean;
@@ -93,6 +95,7 @@ function OptionSelect({
 
 export function ServiceForm({
   service,
+  workspaceSlug,
   categories,
   pipelines,
   organizerTemplates,
@@ -104,6 +107,7 @@ export function ServiceForm({
   canManage,
 }: {
   service: ServiceRow;
+  workspaceSlug: string;
   categories: Option[];
   pipelines: Option[];
   organizerTemplates: Option[];
@@ -142,6 +146,9 @@ export function ServiceForm({
   const [seasonStart, setSeasonStart] = useState(service.season_start ?? "");
   const [seasonEnd, setSeasonEnd] = useState(service.season_end ?? "");
   const [allowedWeekdays, setAllowedWeekdays] = useState<number[]>(service.allowed_weekdays ?? []);
+  const [bookingLocationType, setBookingLocationType] = useState(service.booking_location_type);
+  const [bookingMeetingUrl, setBookingMeetingUrl] = useState(service.booking_meeting_url ?? "");
+  const [linkCopied, setLinkCopied] = useState(false);
   const [requirements, setRequirements] = useState(
     Object.fromEntries(REQUIREMENT_FIELDS.map((f) => [f.key, Boolean(service[f.key])])) as Record<string, boolean>
   );
@@ -178,6 +185,14 @@ export function ServiceForm({
   function toggleWeekday(dayIndex: number) {
     setAllowedWeekdays((prev) => (prev.includes(dayIndex) ? prev.filter((d) => d !== dayIndex) : [...prev, dayIndex].sort()));
     setDirty(true);
+  }
+
+  const bookingLink = typeof window !== "undefined" ? `${window.location.origin}/book/${workspaceSlug}?service=${service.id}` : "";
+
+  function copyBookingLink() {
+    navigator.clipboard.writeText(bookingLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   }
 
   async function addCategory(e: React.FormEvent) {
@@ -236,6 +251,8 @@ export function ServiceForm({
         season_start: trimmedSeasonStart || null,
         season_end: trimmedSeasonEnd || null,
         allowed_weekdays: allowedWeekdays.length > 0 ? allowedWeekdays : null,
+        booking_location_type: bookingLocationType,
+        booking_meeting_url: bookingLocationType === "link" ? bookingMeetingUrl.trim() || null : null,
         ...requirements,
       })
       .eq("id", service.id);
@@ -548,6 +565,66 @@ export function ServiceForm({
             <p className="mt-1 text-[11px] text-muted">
               {allowedWeekdays.length === 0 ? "No day restriction -- bookable any day the firm is open." : "Only bookable on the days selected above."}
             </p>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Meeting location</p>
+              <p className="mt-1 text-[11px] text-muted">
+                What happens once a client books this service -- call them back, or hand them a meeting link (Zoom,
+                Google Meet, or anything else).
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => markDirty(setBookingLocationType)("call")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    bookingLocationType === "call" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  We&apos;ll call you
+                </button>
+                <button
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => markDirty(setBookingLocationType)("link")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    bookingLocationType === "link" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  Meeting link
+                </button>
+              </div>
+              {bookingLocationType === "link" && (
+                <label className={`${labelClass} mt-3`}>
+                  Meeting URL
+                  <input
+                    placeholder="https://zoom.us/j/..."
+                    value={bookingMeetingUrl}
+                    onChange={(e) => markDirty(setBookingMeetingUrl)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+              )}
+            </div>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Booking link</p>
+              <p className="mt-1 text-[11px] text-muted">
+                Share this link directly with a lead who already knows they want this service -- it skips straight to
+                picking a time.
+              </p>
+              <div className="mt-2 flex items-center gap-1.5">
+                <input readOnly value={bookingLink} className={`${inputClass} mt-0 text-muted`} onFocus={(e) => e.target.select()} />
+                <button
+                  type="button"
+                  onClick={copyBookingLink}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent"
+                >
+                  <Copy size={13} /> {linkCopied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

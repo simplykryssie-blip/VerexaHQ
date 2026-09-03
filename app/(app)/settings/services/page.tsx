@@ -32,6 +32,12 @@ export default async function ServicesPage() {
   const categoryOptions: ServiceCategoryOption[] = categories ?? [];
 
   return (
-    <ServicesPageClient workspaceId={workspace.id} services={cards} categories={categoryOptions} canManage={Boolean(canManage)} />
+    <ServicesPageClient
+      workspaceId={workspace.id}
+      workspaceSlug={workspace.slug}
+      services={cards}
+      categories={categoryOptions}
+      canManage={Boolean(canManage)}
+    />
   );
 }

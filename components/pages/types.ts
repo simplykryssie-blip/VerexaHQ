@@ -9,7 +9,8 @@ export type SectionType =
   | "cta_button"
   | "spacer"
   | "footer"
-  | "custom_html";
+  | "custom_html"
+  | "booking_widget";
 
 export type BuilderSection = {
   id: string;
@@ -33,6 +34,8 @@ export type BuilderPage = {
 };
 
 export type OrganizerTemplateOption = { id: string; name: string; is_public: boolean; public_token: string };
+export type BookableServiceOption = { id: string; name: string };
+export type StaffOption = { id: string; label: string };
 
 export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   hero: "Hero",
@@ -46,6 +49,7 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   spacer: "Spacer",
   footer: "Footer",
   custom_html: "Custom HTML",
+  booking_widget: "Booking widget",
 };
 
 export const SECTION_TYPES: SectionType[] = [
@@ -56,6 +60,7 @@ export const SECTION_TYPES: SectionType[] = [
   "testimonial",
   "faq",
   "organizer_form",
+  "booking_widget",
   "cta_button",
   "spacer",
   "footer",

@@ -12,6 +12,7 @@ import { CtaButtonSection } from "./sections/CtaButtonSection";
 import { SpacerSection } from "./sections/SpacerSection";
 import { FooterSection } from "./sections/FooterSection";
 import { CustomHtmlSection } from "./sections/CustomHtmlSection";
+import { BookingWidgetSection } from "./sections/BookingWidgetSection";
 
 export function SectionRenderer({
   section,
@@ -55,6 +56,8 @@ export function SectionRenderer({
       return <FooterSection config={section.config as never} firmName={firmName} />;
     case "custom_html":
       return <CustomHtmlSection config={section.config as never} />;
+    case "booking_widget":
+      return <BookingWidgetSection config={section.config as never} workspaceSlug={workspaceSlug} />;
     default:
       return null;
   }

@@ -55,6 +55,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
       <div className="mt-4">
         <ServiceForm
           service={service as ServiceRow}
+          workspaceSlug={workspace.slug}
           categories={asOptions(categories)}
           pipelines={asOptions(pipelines)}
           organizerTemplates={asOptions(organizerTemplates)}

@@ -11,7 +11,7 @@ import { SectionCanvas } from "./SectionCanvas";
 import { SectionPropertiesPanel } from "./SectionPropertiesPanel";
 import { SectionPreview } from "./SectionPreview";
 import { PageSettingsPanel } from "./PageSettingsPanel";
-import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption } from "./types";
+import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption, BookableServiceOption, StaffOption } from "./types";
 
 const DEBOUNCE_MS = 600;
 
@@ -23,6 +23,8 @@ export function PageBuilder({
   initialSections,
   canManage,
   organizerTemplates,
+  bookableServices,
+  staff,
 }: {
   workspaceSlug: string;
   websiteId: string;
@@ -31,6 +33,8 @@ export function PageBuilder({
   initialSections: BuilderSection[];
   canManage: boolean;
   organizerTemplates: OrganizerTemplateOption[];
+  bookableServices: BookableServiceOption[];
+  staff: StaffOption[];
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -180,7 +184,7 @@ export function PageBuilder({
             .slice()
             .sort((a, b) => a.display_order - b.display_order)
             .map((s) => (
-              <SectionPreview key={s.id} section={s} />
+              <SectionPreview key={s.id} section={s} services={bookableServices} staff={staff} />
             ))}
         </div>
       ) : (
@@ -192,6 +196,8 @@ export function PageBuilder({
             onSelect={setSelectedSectionId}
             onMove={moveSection}
             onDelete={deleteSection}
+            services={bookableServices}
+            staff={staff}
           />
           {canManage && (
             <SectionPropertiesPanel
@@ -200,6 +206,8 @@ export function PageBuilder({
               section={selectedSection}
               onUpdate={updateSectionConfig}
               organizerTemplates={organizerTemplates}
+              bookableServices={bookableServices}
+              staff={staff}
               canAdvanceToNextPage={Boolean(page.funnel_id)}
             />
           )}

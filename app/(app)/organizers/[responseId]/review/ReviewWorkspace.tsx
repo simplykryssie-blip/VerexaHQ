@@ -188,6 +188,18 @@ export function ReviewWorkspace({
       if (existing) return prev.map((i) => (i.id === data ? { ...i, note } : i));
       return [...prev, { id: data as string, organizer_field_id: fieldId, instance_index: instanceIndex, note, label }];
     });
+    // The RPC creates the draft organizer_information_requests row on the
+    // first flag but only returns the item id -- without this, draftRequestId
+    // stays null (its initial-render value never re-syncs from router.refresh())
+    // and sendInformationRequest wrongly refuses to send.
+    if (!draftRequestId) {
+      const { data: itemRow } = await supabase
+        .from("organizer_information_request_items")
+        .select("request_id")
+        .eq("id", data as string)
+        .maybeSingle();
+      if (itemRow) setDraftRequestId(itemRow.request_id);
+    }
     toast.show("Flagged for review.", "success");
     router.refresh();
     return true;
@@ -201,7 +213,14 @@ export function ReviewWorkspace({
       toast.show(error.message, "error");
       return;
     }
-    setDraftItems((prev) => prev.filter((i) => i.id !== itemId));
+    setDraftItems((prev) => {
+      const next = prev.filter((i) => i.id !== itemId);
+      // Unflagging the last draft item deletes the draft request row
+      // server-side too -- clear the id so a later flag doesn't try to send
+      // against a request that no longer exists.
+      if (next.length === 0) setDraftRequestId(null);
+      return next;
+    });
     router.refresh();
   }
 

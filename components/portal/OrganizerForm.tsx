@@ -813,7 +813,10 @@ function RepeatingSectionInput({
             </div>
             <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields
-                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .filter(
+                  (child) =>
+                    shouldShowField(parseConditionalLogic(child.conditional_logic), row) || infoItemsByKey.has(`${child.id}:${index}`)
+                )
                 .map((child) => (
                   <FieldInput
                     key={child.id}

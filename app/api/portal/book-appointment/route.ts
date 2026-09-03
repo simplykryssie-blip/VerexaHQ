@@ -11,6 +11,7 @@ import {
   type HolidayRange,
 } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
+import { getBookingSettings } from "@/lib/bookingSettings";
 
 // Mirrors the availability check in available-slots/route.ts and re-runs it
 // server-side rather than trusting the slot the client posted back --
@@ -31,7 +32,9 @@ export async function POST(request: Request) {
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays")
+    .select(
+      "id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url"
+    )
     .eq("id", serviceId)
     .maybeSingle();
   if (!service || service.workspace_id !== identity.workspaceId || !service.is_bookable) {
@@ -64,6 +67,7 @@ export async function POST(request: Request) {
   const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
   const holidays = (holidaysSetting?.value as HolidayRange[] | undefined) ?? [];
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
+  const { minNoticeHours, bufferMinutes } = await getBookingSettings(supabase, identity.workspaceId);
 
   const dayStart = new Date(start);
   dayStart.setHours(0, 0, 0, 0);
@@ -80,8 +84,9 @@ export async function POST(request: Request) {
 
   const externalBusy = await getExternalBusyBlocks(supabase, identity.workspaceId, dayStart.toISOString(), dayEnd.toISOString());
 
+  const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
   const candidates = slotsForDay(dayStart, businessHours, gridMinutes, durationMinutes, holidays);
-  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], new Date());
+  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], earliestStart, bufferMinutes);
   const stillAvailable = available.some((s) => s.getTime() === start.getTime());
   if (!stillAvailable) {
     return NextResponse.json({ error: "That time is no longer available. Pick another slot." }, { status: 409 });
@@ -97,8 +102,8 @@ export async function POST(request: Request) {
       staff_id: null,
       title: `${service.name} (client-booked)`,
       description: null,
-      location: null,
-      meeting_url: null,
+      location: service.booking_location_type === "link" ? service.booking_meeting_url : "We'll call you",
+      meeting_url: service.booking_location_type === "link" ? service.booking_meeting_url : null,
       start_at: start.toISOString(),
       end_at: end.toISOString(),
       status: "scheduled",

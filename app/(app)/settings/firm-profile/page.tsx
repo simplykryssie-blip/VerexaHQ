@@ -4,7 +4,6 @@ import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { SettingsCard } from "@/components/settings/SettingsCard";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours, type HolidayRange } from "@/lib/businessHours";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { FirmProfileForm } from "./FirmProfileForm";
 
@@ -19,33 +18,19 @@ export default async function FirmProfilePage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [
-    { data: profile },
-    { data: contact },
-    { data: branding },
-    { data: settings },
-    { data: myProfile },
-    { data: isAdmin },
-    { data: canManageSettings },
-  ] = await Promise.all([
-      supabase
-        .from("firm_tax_profile")
-        .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
-        .eq("workspace_id", workspace.id)
-        .maybeSingle(),
-      supabase
-        .from("workspaces")
-        .select("phone, website, mailing_address, primary_contact_email")
-        .eq("id", workspace.id)
-        .single(),
-      supabase.from("branding").select("support_email, support_phone").eq("workspace_id", workspace.id).maybeSingle(),
-      supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
-      user
-        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" }),
-    ]);
+  const [{ data: profile }, { data: contact }, { data: branding }, { data: myProfile }, { data: isAdmin }] = await Promise.all([
+    supabase
+      .from("firm_tax_profile")
+      .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
+      .eq("workspace_id", workspace.id)
+      .maybeSingle(),
+    supabase.from("workspaces").select("phone, website, mailing_address, primary_contact_email").eq("id", workspace.id).single(),
+    supabase.from("branding").select("support_email, support_phone").eq("workspace_id", workspace.id).maybeSingle(),
+    user
+      ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
+  ]);
 
   const showEfin = isEroManagementTier(workspace);
   // PTIN belongs to whichever entity the workspace actually represents: for a
@@ -54,10 +39,6 @@ export default async function FirmProfilePage() {
   // personal field on their own profile instead.
   const showFirmPtin = workspace.workspace_type === "independent_ptin";
   const showStaffPtin = !showFirmPtin;
-
-  const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
-  const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (settings?.find((s) => s.key === "holidays")?.value as HolidayRange[] | undefined) ?? [];
 
   return (
     <div className="max-w-2xl">
@@ -85,7 +66,6 @@ export default async function FirmProfilePage() {
             businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
             isOwner={workspace.is_owner}
             isAdmin={Boolean(isAdmin)}
-            canManageSettings={Boolean(canManageSettings)}
             showEin
             showEfin={showEfin}
             showFirmPtin={showFirmPtin}
@@ -93,9 +73,6 @@ export default async function FirmProfilePage() {
             efinLast4={profile?.efin_last4 ?? null}
             firmPtinLast4={profile?.ptin_last4 ?? null}
             supportedFilingStates={profile?.supported_filing_states ?? []}
-            initialHours={businessHours}
-            initialSlotMinutes={slotMinutes}
-            initialHolidays={holidays}
           />
         </div>
       )}
