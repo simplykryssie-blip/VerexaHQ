@@ -12,7 +12,14 @@ export type KpiData = {
   openClientMessages: number;
 };
 
-export type OverdueTask = { id: string; title: string; due_date: string; engagement_id: string | null; client_id: string | null };
+export type OverdueTask = {
+  id: string;
+  title: string;
+  due_date: string;
+  engagement_id: string | null;
+  client_id: string | null;
+  related_organizer_response_id: string | null;
+};
 export type OverdueInvoice = { id: string; invoice_number: string | null; client_id: string; due_date: string; balance: number };
 export type ReviewItem = {
   workflow_stage_id: string;
@@ -122,7 +129,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .not("status", "in", '("Completed","Archived")'),
     supabase
       .from("tasks")
-      .select("id, title, due_date, engagement_id, client_id, status")
+      .select("id, title, due_date, engagement_id, client_id, related_organizer_response_id, status")
       .eq("workspace_id", workspaceId)
       .not("due_date", "is", null)
       .neq("status", "completed"),

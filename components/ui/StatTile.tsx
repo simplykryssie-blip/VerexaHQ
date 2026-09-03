@@ -11,6 +11,7 @@ export function StatTile({
   value,
   trend,
   sparkline,
+  onClick,
 }: {
   icon: React.ElementType;
   tone?: IconChipTone;
@@ -20,9 +21,16 @@ export function StatTile({
   trend?: { direction: "up" | "down"; label: string; sentiment?: "positive" | "negative" };
   /** Only pass this when a genuine day-by-day series exists -- omit rather than invent one. */
   sparkline?: number[];
+  /** Makes the tile a button that opens whatever it's summarizing (e.g. Open tasks -> the task list) instead of a static number. */
+  onClick?: () => void;
 }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:shadow-softHover">
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`w-full rounded-2xl border border-border bg-surface shadow-soft p-4 text-left transition hover:shadow-softHover ${onClick ? "cursor-pointer hover:border-accent" : ""}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <IconChip tone={tone}>
           <Icon size={16} aria-hidden="true" />
@@ -40,6 +48,6 @@ export function StatTile({
             </p>
           );
         })()}
-    </div>
+    </Wrapper>
   );
 }

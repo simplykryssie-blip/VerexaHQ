@@ -8093,6 +8093,7 @@ export type Database = {
           id: string
           overdue_flagged_at: string | null
           priority: string | null
+          related_organizer_response_id: string | null
           status: string
           title: string
           updated_at: string | null
@@ -8113,6 +8114,7 @@ export type Database = {
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
+          related_organizer_response_id?: string | null
           status?: string
           title: string
           updated_at?: string | null
@@ -8133,6 +8135,7 @@ export type Database = {
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
+          related_organizer_response_id?: string | null
           status?: string
           title?: string
           updated_at?: string | null
@@ -8175,6 +8178,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "tasks_related_organizer_response_id_fkey"
+            columns: ["related_organizer_response_id"]
+            isOneToOne: false
+            referencedRelation: "organizer_responses"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tasks_workspace_id_fkey"

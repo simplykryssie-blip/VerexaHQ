@@ -20,7 +20,7 @@ type Insights = {
 };
 
 function computeInsights(props: ClientWorkspaceProps): Insights {
-  const { tasks, invoices, engagements, timeline, messages, workspaceServices, missingDocumentCount } = props;
+  const { tasks, invoices, engagements, timeline, messages, workspaceServices, missingDocumentCount, interestedServiceIds } = props;
   const now = Date.now();
   const DAY = 24 * 60 * 60 * 1000;
 
@@ -66,8 +66,16 @@ function computeInsights(props: ClientWorkspaceProps): Insights {
   healthScore = Math.max(0, healthScore);
   if (healthFactors.length === 0) healthFactors.push("No issues found -- on track");
 
+  // A service the client is already engaged for, or has already expressed
+  // interest in (awaiting its own organizer/engagement automation), isn't a
+  // fresh cross-sell -- suggesting it back is just noise.
   const currentServiceNames = new Set(engagements.map((e) => e.services?.name).filter((n): n is string => Boolean(n)));
-  const crossSell = workspaceServices.map((s) => s.name).filter((name) => !currentServiceNames.has(name)).slice(0, 3);
+  const interestedIds = new Set(interestedServiceIds);
+  const crossSell = workspaceServices
+    .filter((s) => !interestedIds.has(s.id))
+    .map((s) => s.name)
+    .filter((name) => !currentServiceNames.has(name))
+    .slice(0, 3);
 
   return { healthScore, healthFactors, riskSignals, crossSell };
 }

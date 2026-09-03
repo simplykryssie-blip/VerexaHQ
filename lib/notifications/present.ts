@@ -79,7 +79,7 @@ const STATIC_LINKS: Record<string, string> = {
   appointment_reminder: "/calendar",
 };
 
-function entityHref(entityType: string | null, entityId: string | null): string | null {
+export function entityHref(entityType: string | null, entityId: string | null): string | null {
   if (!entityType || !entityId) return null;
   if (entityType === "engagement") return `/engagements/${entityId}`;
   if (entityType === "client") return `/clients/${entityId}`;

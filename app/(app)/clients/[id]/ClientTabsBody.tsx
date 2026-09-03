@@ -3,10 +3,10 @@
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import { Tabs } from "@/components/ui/Tabs";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
-import { OverviewTab, MessagesTab, BillingTab, NotesTab } from "./ClientWorkspaceTabs";
+import { OverviewTab, MessagesTab, BillingTab, NotesTab, TasksTab } from "./ClientWorkspaceTabs";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 
-export const TABS = ["Details", "Documents", "Messages", "Billing", "Notes"] as const;
+export const TABS = ["Details", "Tasks", "Documents", "Messages", "Billing", "Notes"] as const;
 export type ClientTab = (typeof TABS)[number];
 
 function displayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
@@ -105,8 +105,10 @@ export function ClientTabsBody({
             onCreateInvoice={() => onTabChange("Billing")}
             onShowNotes={() => onTabChange("Notes")}
             onCreateNote={() => onTabChange("Notes")}
+            onShowTasks={() => onTabChange("Tasks")}
           />
         )}
+        {tab === "Tasks" && <TasksTab clientId={client.id} tasks={tasks} />}
         {tab === "Documents" && (
           <DocumentWorkspace
             workspaceId={workspace.id}
