@@ -100,10 +100,16 @@ export function OrganizerForm({
   // not_started/in_progress, since that's what the RLS on
   // organizer_response_answers/organizer_responses locks down at that point.
   const infoItemsByKey = new Map(infoRequestItems.map((i) => [`${i.organizer_field_id}:${i.instance_index}`, i]));
+  // Items the client can still act on -- client_responded is already sent
+  // and awaiting the preparer's decision, so it's excluded from both the
+  // "still needs an answer" validation and the batch submit below.
+  const actionableInfoItems = infoRequestItems.filter((i) => i.status === "pending" || i.status === "rejected");
+  const fieldLabelById = new Map(fields.map((f) => [f.id, f.label]));
 
   const repeaterFields = fields.filter((f) => f.field_type === "repeating_section" && !f.parent_field_id);
   const childFieldsByParent = new Map(repeaterFields.map((r) => [r.id, fields.filter((f) => f.parent_field_id === r.id)]));
   const repeaterChildIds = new Set(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => c.id)));
+  const childToParentId = new Map(repeaterFields.flatMap((r) => (childFieldsByParent.get(r.id) ?? []).map((c) => [c.id, r.id])));
 
   const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
   // Delegates address/name/phone to the shared helper; signature and
@@ -169,6 +175,72 @@ export function OrganizerForm({
   const [submitting, setSubmitting] = useState(false);
   const [pageIndex, setPageIndex] = useState(0);
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [submittingFlags, setSubmittingFlags] = useState(false);
+  const [justSubmittedFlags, setJustSubmittedFlags] = useState(false);
+
+  // Snapshot of every flagged field's value exactly as the page loaded --
+  // never updated after mount. Used only to tell "the client typed a real
+  // answer/correction" apart from "this is just what was already there" for
+  // the checklist and submit-changes validation below; a live answers/
+  // repeaterRows read would give the same value for both cases.
+  const [initialAnswerSnapshot] = useState<Map<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const a of initialAnswers) {
+      const key = `${a.organizer_field_id}:${a.instance_index ?? 0}`;
+      map.set(key, a.value !== null && a.value !== undefined ? answerToString(a.organizer_field_id, a.value) : "");
+    }
+    return map;
+  });
+
+  function currentValueFor(fieldId: string, instanceIndex: number): string {
+    if (repeaterChildIds.has(fieldId)) {
+      const parentId = childToParentId.get(fieldId);
+      return (parentId && repeaterRows[parentId]?.[instanceIndex]?.[fieldId]) ?? "";
+    }
+    return answers[fieldId] ?? "";
+  }
+
+  // "Answered" for a flagged item means the client has actually typed
+  // something different from what was there when the page loaded -- for a
+  // previously-blank field any non-empty value qualifies; for a correction
+  // to an already-answered field, retyping the same value doesn't count as
+  // having reviewed it.
+  function isLocallyAnswered(item: InfoRequestItemRow): boolean {
+    const current = currentValueFor(item.organizer_field_id, item.instance_index);
+    const initial = initialAnswerSnapshot.get(`${item.organizer_field_id}:${item.instance_index}`) ?? "";
+    return current.trim() !== "" && current !== initial;
+  }
+
+  async function submitFlaggedChanges() {
+    const unanswered = actionableInfoItems.filter((item) => !isLocallyAnswered(item));
+    if (unanswered.length > 0) {
+      toast.show(
+        `Please answer: ${unanswered.map((i) => fieldLabelById.get(i.organizer_field_id) ?? "a flagged question").join(", ")}`,
+        "error"
+      );
+      return;
+    }
+    setSubmittingFlags(true);
+    try {
+      for (const item of actionableInfoItems) {
+        const value = currentValueFor(item.organizer_field_id, item.instance_index);
+        const fieldType = fieldTypeById.get(item.organizer_field_id) ?? "short_text";
+        const jsonValue = toOrganizerJsonValue(fieldType, value);
+        const { error } = item.was_answered_when_flagged
+          ? await supabase.rpc("propose_organizer_answer_correction", { p_item_id: item.id, p_proposed_value: jsonValue })
+          : await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: item.id, p_value: jsonValue });
+        if (error) {
+          toast.show(error.message, "error");
+          return;
+        }
+      }
+      setJustSubmittedFlags(true);
+    } catch (err) {
+      toast.show(err instanceof Error ? err.message : "Could not submit -- please try again.", "error");
+    } finally {
+      setSubmittingFlags(false);
+    }
+  }
 
   async function saveAnswer(fieldId: string, value: string) {
     setAnswers((prev) => ({ ...prev, [fieldId]: value }));
@@ -392,6 +464,52 @@ export function OrganizerForm({
           </div>
         </Modal>
       )}
+      {justSubmittedFlags && (
+        <Modal title="Response submitted" onClose={backToDashboard}>
+          <div className="flex flex-col items-center gap-3 py-2 text-center">
+            <CheckCircle2 size={40} className="text-success" aria-hidden="true" />
+            <p className="text-sm text-slate">Your responses have been submitted. Your preparer will review them.</p>
+            <button
+              type="button"
+              onClick={backToDashboard}
+              className="mt-2 w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+            >
+              OK
+            </button>
+          </div>
+        </Modal>
+      )}
+      {readOnly && infoRequestItems.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-border bg-surface p-4 print:hidden">
+          <p className="text-sm font-semibold text-ink">Flagged questions</p>
+          <p className="mt-0.5 text-xs text-muted">
+            {actionableInfoItems.length === 0
+              ? "All caught up -- nothing left for you to answer here."
+              : `${actionableInfoItems.filter(isLocallyAnswered).length} of ${actionableInfoItems.length} answered`}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {infoRequestItems.map((item) => {
+              const label = fieldLabelById.get(item.organizer_field_id) ?? "Question";
+              const done = item.status === "client_responded" || isLocallyAnswered(item);
+              return (
+                <li key={item.id} className="flex items-start gap-2 text-sm">
+                  {done ? (
+                    <CheckCircle2
+                      size={16}
+                      className={`mt-0.5 shrink-0 ${item.status === "client_responded" ? "text-muted" : "text-success"}`}
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden="true" />
+                  )}
+                  <span className={done ? "text-muted line-through decoration-border" : "text-slate"}>{label}</span>
+                  {item.status === "client_responded" && <span className="text-xs text-muted">(waiting for review)</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {readOnly && (
         <OrganizerPrintSummary
           templateName={templateName}
@@ -487,6 +605,19 @@ export function OrganizerForm({
               {submitting ? "Submitting..." : "Submit organizer"}
             </button>
           )}
+        </div>
+      )}
+
+      {readOnly && actionableInfoItems.length > 0 && (
+        <div className="flex items-center gap-2 pt-2 print:hidden">
+          <button
+            type="button"
+            onClick={submitFlaggedChanges}
+            disabled={submittingFlags}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+          >
+            {submittingFlags ? "Submitting..." : "Submit changes"}
+          </button>
         </div>
       )}
     </div>
@@ -769,36 +900,15 @@ function FieldInput({
   responseId: string;
   infoRequestItem?: InfoRequestItemRow;
 }) {
-  const supabase = createClient();
-  const toast = useToast();
-  const router = useRouter();
-  const [infoBusy, setInfoBusy] = useState(false);
-  const [infoError, setInfoError] = useState<string | null>(null);
-
   // A flagged field stays editable (and shows the preparer's note) even
   // when the rest of the organizer is otherwise locked -- see the
   // infoItemsByKey comment in OrganizerForm for why. Once the client has
   // submitted a response (status=client_responded) it goes back to
-  // disabled until the preparer approves or rejects it.
+  // disabled until the preparer approves or rejects it. Saving/submitting
+  // happens once, for every flagged field at once, via OrganizerForm's
+  // "Submit changes" button -- not per field here.
   const isActionable = infoRequestItem?.status === "pending" || infoRequestItem?.status === "rejected";
   const disabled = isActionable ? false : disabledProp;
-
-  async function submitInfoResponse() {
-    if (!infoRequestItem) return;
-    setInfoBusy(true);
-    setInfoError(null);
-    const jsonValue = toOrganizerJsonValue(field.field_type, value);
-    const { error } = infoRequestItem.was_answered_when_flagged
-      ? await supabase.rpc("propose_organizer_answer_correction", { p_item_id: infoRequestItem.id, p_proposed_value: jsonValue })
-      : await supabase.rpc("save_organizer_reopened_field_answer", { p_item_id: infoRequestItem.id, p_value: jsonValue });
-    setInfoBusy(false);
-    if (error) {
-      setInfoError(error.message);
-      return;
-    }
-    toast.show(infoRequestItem.was_answered_when_flagged ? "Correction sent to your preparer" : "Answer saved", "success");
-    router.refresh();
-  }
 
   const infoPanel = infoRequestItem ? (
     <div
@@ -817,16 +927,10 @@ function FieldInput({
           {infoRequestItem.status === "client_responded" ? (
             <p className="mt-1.5 text-xs text-muted">Submitted -- waiting for your preparer to review it.</p>
           ) : (
-            <button
-              type="button"
-              onClick={submitInfoResponse}
-              disabled={infoBusy || !value.trim()}
-              className="mt-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-            >
-              {infoBusy ? "Submitting..." : infoRequestItem.was_answered_when_flagged ? "Submit correction" : "Submit answer"}
-            </button>
+            <p className="mt-1.5 text-xs text-muted">
+              {value.trim() ? "Answered -- included when you submit your changes." : "Answer this, then use \"Submit changes\" below."}
+            </p>
           )}
-          {infoError && <p className="mt-1 text-xs text-danger">{infoError}</p>}
         </div>
       </div>
     </div>
