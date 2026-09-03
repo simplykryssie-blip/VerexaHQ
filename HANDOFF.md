@@ -136,6 +136,155 @@ merged app (every route from both branches builds, including `/partners`,
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
 
+## Addendum — 2026-09-03: Manus audit triage/fixes, production data cleanup, F-05 test-project setup (blocked on missing baseline schema)
+
+Branch: `claude/verexa-remove-services-vaqbfx`. The user fed this session a
+series of external AI-generated ("Manus") audit reports run against the
+live production app and the real MKB Financial Group LLC workspace. Every
+finding was checked against actual source code or live Vercel telemetry
+before acting — several audit claims turned out to be wrong or overstated
+(see below) and were not "fixed" on the audit's say-so alone.
+
+**Fixed and pushed:**
+1. **F-04, identity inconsistency**: the Dashboard greeting used
+   `first_name` while the sidebar used `display_name`, so a staff member
+   who only set a display name saw a different name in each place. Per
+   the user's explicit call ("Display name should win"), `app/(app)/
+   dashboard/page.tsx` and `DashboardShell.tsx` now source the greeting
+   from `display_name` (falling back to `first_name`, then workspace
+   name). The separate `profileComplete` onboarding-gate check still
+   uses `first_name` on purpose — different concern, `display_name`
+   defaults to email so it's always truthy and can't gate on it.
+2. **F-06, Tiptap npm advisory**: all 9 `@tiptap/*` packages bumped
+   `^3.29.2` → `^3.31.0` (`npm install --force` needed — transient
+   ERESOLVE from npm validating peer deps mid-transaction, safe here
+   since every package moved to the same target version). Verified via
+   `npm ls @tiptap/core` (fully deduped) and `npm audit`. The other
+   advisories surfaced alongside it (`tar`, `@mapbox/node-pre-gyp`,
+   `canvas`) were deliberately left alone — fixing them needs a breaking
+   `pdfjs-dist` major bump, out of scope for this pass.
+3. **F-07, lint finding**: raw `<img>` for the MFA QR code in
+   `app/(app)/settings/security/MfaSetup.tsx` — added the same
+   `eslint-disable-next-line @next/next/no-img-element` pattern already
+   used in `components/Avatar.tsx` (it's a `data:` SVG URI from
+   Supabase's MFA enroll response, not an optimizable remote asset).
+4. **F-01/F-09, cron queue timeout risk**: three `/api/cron/*` routes
+   (`run-pending-automation-steps`, `send-pending-engagement-letters`,
+   `send-pending-portal-invites`) process a batch of up to 20-50 rows
+   serially inside `maxDuration=60`; a batch of normal-latency jobs could
+   still exceed 60s cumulatively even though two of the three already had
+   a per-job 25s timeout guard. Added a shared pattern to all three: track
+   `startedAt`, check elapsed against `DEADLINE_MS = 45_000` at the top of
+   each loop iteration, `break` early and leave the rest for the next cron
+   tick (safe/idempotent — nothing is marked processed until it actually
+   completes). The audit had also flagged `fire-date-reminder-automations`
+   and `check-stale-automation-queues` as having the same issue — checked
+   both, they don't share this pattern, left untouched.
+5. **`tests/critical-paths.test.ts`**: previously used
+   `describe.skipIf(!canRun)`, so CI reported green with **zero**
+   critical-path coverage actually run whenever Supabase test env vars
+   were absent (always, until today — see below). Changed to fail loudly
+   with a clear message instead of skipping silently. This was
+   deliberately decoupled from actually getting the suite runnable (item
+   below) so CI stops lying regardless of how long the test-project setup
+   takes.
+
+**Investigated, found not to be a real/actionable bug:**
+- **F-02**: a Next.js RSC TypeError on `/clients.rsc` in Vercel's runtime
+  error telemetry. Stack trace is entirely inside Next's own compiled
+  runtime (`next/dist/compiled/...`), not attributable to a specific line
+  of app code, and hasn't recurred since. Logged as "resolved by
+  non-recurrence," not fabricated a speculative fix.
+- **F-08**, misspelled Firm Profile URL: explicitly the user's own
+  website to fix ("I will change my personal website") — no code action.
+- **F-10**, authorization/tenant-isolation testing: needs the user to
+  provision a second restricted-role staff test account before it's
+  actionable. Not started.
+
+**Production data cleanup (MKB Financial Group LLC workspace,
+`9d3e27c8-e7ed-4db0-a0ce-9b2fa0fe23c7`)**, all at the user's explicit
+request, after confirming no payments were attached before deleting
+anything: removed the `$1` test invoice (`INV-2026-000001`), the "Test
+Payment ZZZ" lead, and the "QA Synthetic Release Test" client + its
+engagement `ENG-2026-000001` (an earlier audit run's own leftover
+synthetic data) — including the `engagement_tax_details`/
+`document_requests`/`attachments`/`notes`/`activity_log` rows scoped to
+those entities, and a follow-up `audit_log` sweep for the audit-trail
+entries the deletes themselves generated. Verified zero remaining rows
+for all of it, including a workspace-wide `clients` count.
+
+**F-05 (make the critical-path suite actually runnable) — in progress,
+currently blocked.** The user created a dedicated, empty Supabase test
+project for this (`verexahq-test`, ref `vnyxoubbnuyzywlqmhlh`, org
+`awcioqmvramifkuxfccm` — a different org than production's
+`daxpavvsotvsyqqntddc`, in org `nmkuapcamjwfrnulutkd`). Plan was: apply
+every file in `supabase/migrations/` (385 files) to it, then set
+`NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` for it in
+`.env.local`/CI.
+
+**Real, confirmed blocker found while attempting this — the migrations
+folder cannot build the schema from scratch.** Verified independently
+(not just an agent's claim):
+```
+grep -ohE "CREATE TABLE (IF NOT EXISTS )?public\.[a-z_]+" supabase/migrations/*.sql | sort -u | wc -l
+# → 0 matches for any core table (workspaces, clients, invoices,
+#   engagements, user_profiles, ...); only ~50 newer feature tables
+#   (ai_agent_*, learning_*, library_folders, ...) are ever CREATE TABLE'd
+#   anywhere in the 385 files at all.
+```
+The earliest migration by filename, `20260805230613_invoice_quote_sent_at_
+sync.sql`, already assumes `public.invoices` exists. Git history explains
+why: commit `2b126bc` ("Reconcile supabase/migrations/ against the live
+project's actual applied history", 2026-08-15) documents an "Aug 3
+platform_foundation rebuild" and describes deleting ~20 pre-rebuild
+migration files that referenced the schema it replaced — but **no
+replacement migration that actually creates the rebuilt core schema was
+ever committed**. It looks like that rebuild was applied straight to
+production (dashboard/SQL editor or similar) and never captured as a
+migration file. There's no `schema.sql`/`pg_dump` baseline anywhere in the
+repo either — `lib/database.types.ts` exists but is generated TS types
+only (no constraints/RLS/functions/triggers), not a usable substitute.
+
+**What unblocks this**: someone with real access to production
+(`daxpavvsotvsyqqntddc`) needs to generate a schema-only dump (e.g.
+`supabase db pull` or `pg_dump --schema-only`) and commit it as a baseline
+migration dated before `20260805230613`. Once that exists, the rest of
+the 385 migrations should apply on top of it without issue (no
+`CREATE INDEX CONCURRENTLY`/`REINDEX CONCURRENTLY`/bare
+`ALTER TYPE ... ADD VALUE` in any of them — checked — so batching many
+files into one `apply_migration` transaction is safe). `verexahq-test`
+itself is confirmed still completely empty (0 migrations, 0 tables) —
+nothing was left half-applied.
+
+**Separately, this session's own Supabase MCP access became unreliable
+partway through**: the connector was originally scoped to org
+`nmkuapcamjwfrnulutkd` (production + the unrelated `Full-service-CRM`
+project), then the user reconnected it to pick up `verexahq-test`'s org
+(`awcioqmvramifkuxfccm`) — which meant production dropped out of reach
+entirely (both orgs were never visible at once). A later reconnect
+attempt aimed at getting both orgs simultaneously left the Supabase MCP
+server in a broken state for the rest of this session (`ListConnectors`
+reported it "connected" at the account level, but no `mcp__Supabase__*`
+tools would load via `ToolSearch` for the remainder of the session — likely
+a live MCP binding not picking up a mid-session reauth). **Whoever picks
+this up should start a fresh session so the Supabase connector binds
+clean, then check `mcp__Supabase__list_projects` shows both the
+production org and `verexahq-test`'s org before doing anything else.**
+
+**Still open / next steps for F-05, in order:**
+1. New session: confirm Supabase access covers both orgs.
+2. Generate a schema-only baseline dump of production, commit it as a
+   migration dated before `20260805230613`.
+3. Apply all 385 migrations (+ new baseline) to `vnyxoubbnuyzywlqmhlh` in
+   batches (no need to redo the investigation above — the "no
+   CONCURRENTLY/bare ADD VALUE" check already passed).
+4. Verify schema parity against production (`list_tables` on both,
+   `get_advisors` sanity check on the test project).
+5. Set `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` for the test
+   project in `.env.local` and CI secrets, confirm
+   `tests/critical-paths.test.ts` actually passes against it (it currently
+   correctly fails, since those env vars aren't set anywhere yet).
+
 ## Addendum — 2026-08-31: tax-prep pipeline finishing touches, platform billing dunning, ERO/PTIN Partners directory, Settings consolidation
 
 Branch: `claude/verexa-remove-services-vaqbfx` (forked from `main` at
