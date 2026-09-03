@@ -257,10 +257,14 @@ export function ReviewWorkspace({
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    // Lands on the engagement's Notes tab (or the client's, if this
+    // organizer isn't tied to an engagement) -- same place every other
+    // note about this client/engagement lives, not a separate bucket only
+    // this screen could ever read back.
     const { error } = await supabase.from("notes").insert({
       workspace_id: workspaceId,
-      entity_type: "organizer_response",
-      entity_id: response.id,
+      entity_type: response.engagementId ? "engagement" : "client",
+      entity_id: response.engagementId ?? response.clientId,
       author_id: user?.id,
       body: noteBody.trim(),
     });
@@ -592,7 +596,12 @@ function QuestionCard({
   // can be flagged the same as an answered one.
   const isFlagged = Boolean(item.infoRequestItemId) && item.infoRequestItemStatus === "pending";
   const isAwaitingClientCorrection = Boolean(item.infoRequestItemId) && item.infoRequestItemStatus === "client_responded";
-  const canFlag = !isHidden && !isAwaitingClientCorrection;
+  // Flaggable even while conditionally hidden by the client's own answers --
+  // e.g. a question that only shows up if the client checked "self-employed"
+  // still needs to be flaggable if a reviewer believes it was answered
+  // incorrectly and should apply. The backend has never restricted this;
+  // only this check did.
+  const canFlag = !isAwaitingClientCorrection;
 
   return (
     <div className={`rounded-2xl border border-border bg-surface shadow-soft ${compact ? "p-3" : "p-4"} ${isHidden ? "opacity-60" : ""}`}>
