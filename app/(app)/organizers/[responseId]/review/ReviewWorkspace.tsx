@@ -340,7 +340,10 @@ export function ReviewWorkspace({
                     key={entry.item.fieldId}
                     item={entry.item}
                     collapsedHidden={collapsedHidden}
-                    busy={busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId}
+                    busy={
+                      busyItemId !== null &&
+                      (busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId)
+                    }
                     onFlag={(note) => flagField(entry.item.fieldId, entry.item.instanceIndex, entry.item.label, note)}
                     onUnflag={() => entry.item.infoRequestItemId && unflagItem(entry.item.infoRequestItemId)}
                   />
@@ -363,7 +366,10 @@ export function ReviewWorkspace({
                                   item={item}
                                   compact
                                   collapsedHidden={collapsedHidden}
-                                  busy={busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId}
+                                  busy={
+                                    busyItemId !== null &&
+                                    (busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId)
+                                  }
                                   onFlag={(note) => flagField(item.fieldId, item.instanceIndex, `${entry.group.label} ${instance.index + 1} -- ${item.label}`, note)}
                                   onUnflag={() => item.infoRequestItemId && unflagItem(item.infoRequestItemId)}
                                 />
