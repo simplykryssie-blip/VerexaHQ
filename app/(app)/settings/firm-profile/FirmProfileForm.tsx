@@ -14,7 +14,7 @@ import { SettingsCard } from "@/components/settings/SettingsCard";
 import { formatEin, formatEfin, formatPtin } from "@/lib/taxIds";
 import { formatPhone } from "@/lib/phone";
 import { US_STATES, SPECIAL_CERTIFICATION_STATE_CODES } from "@/lib/usStates";
-import { WEEKDAYS, type BusinessHours, type DayHours, type HolidayRange } from "@/lib/businessHours";
+import { WEEKDAYS, BOOKING_WINDOW_DAYS, type BusinessHours, type DayHours, type HolidayRange } from "@/lib/businessHours";
 
 const DAY_LABELS: Record<string, string> = {
   sunday: "Sunday",
@@ -54,6 +54,9 @@ type Props = {
   initialHours: BusinessHours;
   initialSlotMinutes: number;
   initialHolidays: HolidayRange[];
+  initialWindowDays: number;
+  initialMinNoticeHours: number;
+  initialBufferMinutes: number;
 };
 
 function LabeledInput({
@@ -105,6 +108,9 @@ export function FirmProfileForm({
   initialHours,
   initialSlotMinutes,
   initialHolidays,
+  initialWindowDays,
+  initialMinNoticeHours,
+  initialBufferMinutes,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
@@ -138,6 +144,9 @@ export function FirmProfileForm({
   const [holidays, setHolidays] = useState<HolidayRange[]>(initialHolidays);
   const [newHolidayStart, setNewHolidayStart] = useState("");
   const [newHolidayEnd, setNewHolidayEnd] = useState("");
+  const [windowDays, setWindowDays] = useState(String(initialWindowDays));
+  const [minNoticeHours, setMinNoticeHours] = useState(String(initialMinNoticeHours));
+  const [bufferMinutes, setBufferMinutes] = useState(String(initialBufferMinutes));
 
   function addHoliday() {
     if (!newHolidayStart) return;
@@ -203,7 +212,25 @@ export function FirmProfileForm({
           .upsert({ workspace_id: workspaceId, key: "booking_slot_minutes", value: slotMinutes }, { onConflict: "workspace_id,key" }),
         supabase
           .from("system_settings")
-          .upsert({ workspace_id: workspaceId, key: "holidays", value: holidays }, { onConflict: "workspace_id,key" })
+          .upsert({ workspace_id: workspaceId, key: "holidays", value: holidays }, { onConflict: "workspace_id,key" }),
+        supabase
+          .from("system_settings")
+          .upsert(
+            { workspace_id: workspaceId, key: "booking_window_days", value: Number(windowDays) || BOOKING_WINDOW_DAYS },
+            { onConflict: "workspace_id,key" }
+          ),
+        supabase
+          .from("system_settings")
+          .upsert(
+            { workspace_id: workspaceId, key: "booking_min_notice_hours", value: Number(minNoticeHours) || 0 },
+            { onConflict: "workspace_id,key" }
+          ),
+        supabase
+          .from("system_settings")
+          .upsert(
+            { workspace_id: workspaceId, key: "booking_buffer_minutes", value: Number(bufferMinutes) || 0 },
+            { onConflict: "workspace_id,key" }
+          )
       );
     }
     if (isOwner) {
@@ -516,6 +543,43 @@ export function FirmProfileForm({
             ))}
           </select>
         </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+            Booking window (days ahead)
+            <input
+              type="number"
+              min={1}
+              value={windowDays}
+              onChange={(e) => setWindowDays(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+            Minimum notice (hours)
+            <input
+              type="number"
+              min={0}
+              value={minNoticeHours}
+              onChange={(e) => setMinNoticeHours(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted">
+            Buffer between bookings (minutes)
+            <input
+              type="number"
+              min={0}
+              value={bufferMinutes}
+              onChange={(e) => setBufferMinutes(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </label>
+        </div>
+        <p className="mt-1 text-[11px] text-muted">
+          How far ahead clients can book, how much advance notice you need before a booking, and how much breathing
+          room to leave between appointments.
+        </p>
 
         <div className="mt-4">
           <p className="text-sm font-medium text-ink">Holidays / office closures</p>

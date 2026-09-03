@@ -7206,6 +7206,8 @@ export type Database = {
         Row: {
           allowed_weekdays: number[] | null
           billing_rule_id: string | null
+          booking_location_type: string
+          booking_meeting_url: string | null
           cloned_from_service_id: string | null
           created_at: string
           created_by: string | null
@@ -7242,6 +7244,8 @@ export type Database = {
         Insert: {
           allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
+          booking_location_type?: string
+          booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7278,6 +7282,8 @@ export type Database = {
         Update: {
           allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
+          booking_location_type?: string
+          booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null

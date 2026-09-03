@@ -11,6 +11,7 @@ import {
   type HolidayRange,
 } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
+import { getBookingSettings } from "@/lib/bookingSettings";
 
 // Reads services.is_bookable, system_settings, and every appointment on the
 // requested day -- all things the portal session has no established RLS
@@ -30,6 +31,13 @@ export async function GET(request: Request) {
   if (Number.isNaN(date.getTime())) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
 
   const supabase = createServiceClient();
+
+  const { windowDays, minNoticeHours, bufferMinutes } = await getBookingSettings(supabase, identity.workspaceId);
+  const windowEnd = new Date();
+  windowEnd.setDate(windowEnd.getDate() + windowDays);
+  if (date > windowEnd) {
+    return NextResponse.json({ slots: [], durationMinutes: DEFAULT_SLOT_MINUTES });
+  }
 
   const { data: service } = await supabase
     .from("services")
@@ -84,8 +92,9 @@ export async function GET(request: Request) {
   // effort, never blocks booking if a calendar connection can't be reached.
   const externalBusy = await getExternalBusyBlocks(supabase, identity.workspaceId, dayStart.toISOString(), dayEnd.toISOString());
 
+  const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
   const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes, holidays);
-  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], new Date());
+  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], earliestStart, bufferMinutes);
 
   return NextResponse.json({ slots: available.map((s) => s.toISOString()), durationMinutes });
 }

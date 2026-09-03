@@ -4,7 +4,15 @@ import { Building2, FileText } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { SettingsCard } from "@/components/settings/SettingsCard";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours, type HolidayRange } from "@/lib/businessHours";
+import {
+  DEFAULT_BUSINESS_HOURS,
+  DEFAULT_SLOT_MINUTES,
+  BOOKING_WINDOW_DAYS,
+  DEFAULT_BOOKING_MIN_NOTICE_HOURS,
+  DEFAULT_BOOKING_BUFFER_MINUTES,
+  type BusinessHours,
+  type HolidayRange,
+} from "@/lib/businessHours";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { FirmProfileForm } from "./FirmProfileForm";
 
@@ -58,6 +66,11 @@ export default async function FirmProfilePage() {
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
   const holidays = (settings?.find((s) => s.key === "holidays")?.value as HolidayRange[] | undefined) ?? [];
+  const windowDays = (settings?.find((s) => s.key === "booking_window_days")?.value as number | undefined) ?? BOOKING_WINDOW_DAYS;
+  const minNoticeHours =
+    (settings?.find((s) => s.key === "booking_min_notice_hours")?.value as number | undefined) ?? DEFAULT_BOOKING_MIN_NOTICE_HOURS;
+  const bufferMinutes =
+    (settings?.find((s) => s.key === "booking_buffer_minutes")?.value as number | undefined) ?? DEFAULT_BOOKING_BUFFER_MINUTES;
 
   return (
     <div className="max-w-2xl">
@@ -96,6 +109,9 @@ export default async function FirmProfilePage() {
             initialHours={businessHours}
             initialSlotMinutes={slotMinutes}
             initialHolidays={holidays}
+            initialWindowDays={windowDays}
+            initialMinNoticeHours={minNoticeHours}
+            initialBufferMinutes={bufferMinutes}
           />
         </div>
       )}

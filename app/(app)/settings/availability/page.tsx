@@ -35,6 +35,7 @@ export default async function AvailabilityPage() {
       />
       <MyAvailabilityManager
         workspaceId={workspace.id}
+        workspaceSlug={workspace.slug}
         currentUserId={user?.id ?? null}
         staff={staff.map((s) => ({ id: s.user_id, label: s.display_name ?? "Staff member" }))}
         timeOff={timeOff ?? []}
