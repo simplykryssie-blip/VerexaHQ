@@ -52,6 +52,10 @@ const TITLES: Record<string, (p: Payload) => string> = {
     const questionWord = n === 1 ? "question" : "questions";
     return count ? `${client} responded to ${count} flagged ${questionWord}` : `${client} responded to flagged questions on their organizer`;
   },
+  ORGANIZER_ERO_REVIEW_REQUESTED: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    return `${client}'s organizer was sent to you for ERO review`;
+  },
   PAYMENT_RECEIVED: (p) => {
     const client = str(p, "client_name", "A client").trim() || "A client";
     const amount = str(p, "amount");
