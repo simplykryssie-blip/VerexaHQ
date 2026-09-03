@@ -7206,6 +7206,8 @@ export type Database = {
         Row: {
           allowed_weekdays: number[] | null
           billing_rule_id: string | null
+          booking_location_type: string
+          booking_meeting_url: string | null
           cloned_from_service_id: string | null
           created_at: string
           created_by: string | null
@@ -7242,6 +7244,8 @@ export type Database = {
         Insert: {
           allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
+          booking_location_type?: string
+          booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7278,6 +7282,8 @@ export type Database = {
         Update: {
           allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
+          booking_location_type?: string
+          booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -11161,6 +11167,14 @@ export type Database = {
           error_detail: string
           passed: boolean
         }[]
+      }
+      save_organizer_dynamic_required_answer: {
+        Args: {
+          p_organizer_field_id: string
+          p_response_id: string
+          p_value: Json
+        }
+        Returns: undefined
       }
       save_organizer_reopened_field_answer: {
         Args: { p_item_id: string; p_value: Json }
