@@ -49,6 +49,7 @@ export type ServiceRow = {
   allowed_weekdays: number[] | null;
   booking_location_type: string;
   booking_meeting_url: string | null;
+  zoom_host_user_id: string | null;
   requires_organizer: boolean;
   requires_engagement_letter: boolean;
   requires_documents: boolean;
@@ -104,6 +105,7 @@ export function ServiceForm({
   documentFolderTemplates,
   pricingRules,
   billingRules,
+  staffOptions,
   canManage,
 }: {
   service: ServiceRow;
@@ -116,6 +118,7 @@ export function ServiceForm({
   documentFolderTemplates: Option[];
   pricingRules: Option[];
   billingRules: Option[];
+  staffOptions: Option[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -148,6 +151,7 @@ export function ServiceForm({
   const [allowedWeekdays, setAllowedWeekdays] = useState<number[]>(service.allowed_weekdays ?? []);
   const [bookingLocationType, setBookingLocationType] = useState(service.booking_location_type);
   const [bookingMeetingUrl, setBookingMeetingUrl] = useState(service.booking_meeting_url ?? "");
+  const [zoomHostUserId, setZoomHostUserId] = useState(service.zoom_host_user_id ?? "");
   const [linkCopied, setLinkCopied] = useState(false);
   const [requirements, setRequirements] = useState(
     Object.fromEntries(REQUIREMENT_FIELDS.map((f) => [f.key, Boolean(service[f.key])])) as Record<string, boolean>
@@ -253,6 +257,7 @@ export function ServiceForm({
         allowed_weekdays: allowedWeekdays.length > 0 ? allowedWeekdays : null,
         booking_location_type: bookingLocationType,
         booking_meeting_url: bookingLocationType === "link" ? bookingMeetingUrl.trim() || null : null,
+        zoom_host_user_id: bookingLocationType === "zoom" ? zoomHostUserId || null : null,
         ...requirements,
       })
       .eq("id", service.id);
@@ -569,10 +574,10 @@ export function ServiceForm({
             <div className="mt-4 border-t border-border pt-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-ink">Meeting location</p>
               <p className="mt-1 text-[11px] text-muted">
-                What happens once a client books this service -- call them back, or hand them a meeting link (Zoom,
-                Google Meet, or anything else).
+                What happens once a client books this service -- call them back, hand them a fixed meeting link (Zoom,
+                Google Meet, or anything else), or auto-generate a fresh Zoom meeting for every booking.
               </p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={!canManage}
@@ -591,7 +596,17 @@ export function ServiceForm({
                     bookingLocationType === "link" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
                   }`}
                 >
-                  Meeting link
+                  Fixed meeting link
+                </button>
+                <button
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => markDirty(setBookingLocationType)("zoom")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    bookingLocationType === "zoom" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  Zoom (unique per booking)
                 </button>
               </div>
               {bookingLocationType === "link" && (
@@ -605,6 +620,28 @@ export function ServiceForm({
                     className={inputClass}
                   />
                 </label>
+              )}
+              {bookingLocationType === "zoom" && (
+                <>
+                  <label className={`${labelClass} mt-3`}>
+                    Zoom host
+                    <OptionSelect
+                      value={zoomHostUserId}
+                      onChange={markDirty(setZoomHostUserId)}
+                      options={staffOptions}
+                      noneLabel="Select a staff member..."
+                      disabled={!canManage}
+                    />
+                  </label>
+                  <p className="mt-1 text-[11px] text-muted">
+                    A brand-new Zoom meeting is created for every booking, so no two clients ever share a link -- even
+                    if they book the same time slot with different staff. This host&apos;s connected Zoom account
+                    creates the meeting when the client books through the general or this service&apos;s own link. If
+                    the client instead books a staff member&apos;s personal link, that staff member&apos;s own
+                    connected Zoom account is used automatically. Each staff member connects their Zoom account under
+                    Settings &gt; Integrations.
+                  </p>
+                </>
               )}
             </div>
 

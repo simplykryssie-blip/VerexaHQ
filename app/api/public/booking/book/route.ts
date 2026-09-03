@@ -14,6 +14,7 @@ import {
 } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 import { getBookingSettings } from "@/lib/bookingSettings";
+import { resolveBookedMeeting } from "@/lib/zoom/bookingMeeting";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
 
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
   const { data: service } = await supabase
     .from("services")
     .select(
-      "id, name, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url"
+      "id, name, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id"
     )
     .eq("id", serviceId)
     .maybeSingle();
@@ -166,8 +167,15 @@ export async function POST(request: Request) {
   }
 
   const end = new Date(start.getTime() + durationMinutes * 60000);
-  const location = service.booking_location_type === "link" ? service.booking_meeting_url : "We'll call you";
-  const meetingUrl = service.booking_location_type === "link" ? service.booking_meeting_url : null;
+  const { location, meetingUrl } = await resolveBookedMeeting(supabase, {
+    locationType: service.booking_location_type,
+    staticMeetingUrl: service.booking_meeting_url,
+    staffId,
+    zoomHostUserId: service.zoom_host_user_id,
+    topic: `${service.name} with ${workspace.name}`,
+    startTimeIso: start.toISOString(),
+    durationMinutes,
+  });
 
   const { data: appointment, error } = await supabase
     .from("appointments")

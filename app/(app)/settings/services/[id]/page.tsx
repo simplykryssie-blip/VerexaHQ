@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { ServiceForm, type ServiceRow, type Option } from "@/components/settings/ServiceForm";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     { data: pricingRules },
     { data: billingRules },
     { data: canManage },
+    staff,
   ] = await Promise.all([
     supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
     supabase.from("processes").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
@@ -42,9 +44,11 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     supabase.from("pricing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("billing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    getWorkspaceStaff(supabase, workspace.id),
   ]);
 
   const asOptions = (rows: { id: string; name: string }[] | null): Option[] => rows ?? [];
+  const staffOptions: Option[] = staff.map((s) => ({ id: s.user_id, name: s.display_name ?? "Staff member" }));
 
   return (
     <div className="max-w-2xl">
@@ -64,6 +68,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
           documentFolderTemplates={asOptions(documentFolderTemplates)}
           pricingRules={asOptions(pricingRules)}
           billingRules={asOptions(billingRules)}
+          staffOptions={staffOptions}
           canManage={Boolean(canManage)}
         />
       </div>
