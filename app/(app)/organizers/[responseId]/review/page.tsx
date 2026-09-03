@@ -52,6 +52,13 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
     redirect(response.engagement_id ? `/engagements/${response.engagement_id}` : `/clients/${response.client_id}`);
   }
 
+  const [{ data: canApprove }, { data: canDeny }, { data: canRequestInfo }, { data: canEroReview }] = await Promise.all([
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_approve" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_deny" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_request_info" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_ero" }),
+  ]);
+
   const entityType: "engagement" | "client" = response.engagement_id ? "engagement" : "client";
   const entityId = response.engagement_id ?? response.client_id;
 
@@ -242,6 +249,10 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       entityId={entityId}
       activity={activity}
       staffOptions={staffMembers.map((s) => ({ id: s.user_id, display_name: s.display_name }))}
+      canApprove={Boolean(canApprove)}
+      canDeny={Boolean(canDeny)}
+      canRequestInfo={Boolean(canRequestInfo)}
+      canEroReview={Boolean(canEroReview)}
     />
   );
 }

@@ -6723,6 +6723,7 @@ export type Database = {
           description: string | null
           folder_id: string | null
           id: string
+          is_lead_funnel: boolean
           name: string
           slug: string
           status: string
@@ -6735,6 +6736,7 @@ export type Database = {
           description?: string | null
           folder_id?: string | null
           id?: string
+          is_lead_funnel?: boolean
           name: string
           slug: string
           status?: string
@@ -6747,6 +6749,7 @@ export type Database = {
           description?: string | null
           folder_id?: string | null
           id?: string
+          is_lead_funnel?: boolean
           name?: string
           slug?: string
           status?: string
@@ -11197,6 +11200,10 @@ export type Database = {
           p_show_in_portal?: boolean
           p_tags?: string[]
         }
+        Returns: undefined
+      }
+      send_organizer_to_ero_review: {
+        Args: { p_response_id: string }
         Returns: undefined
       }
       set_client_address_primary: {

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Flag, HelpCircle, X } from "lucide-react";
+import { ArrowUpRight, Check, Flag, HelpCircle, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -104,6 +104,10 @@ export function ReviewWorkspace({
   entityId,
   activity,
   staffOptions,
+  canApprove,
+  canDeny,
+  canRequestInfo,
+  canEroReview,
 }: {
   workspaceId: string;
   response: ResponseInfo;
@@ -123,6 +127,11 @@ export function ReviewWorkspace({
   entityId: string;
   activity: ActivityRow[];
   staffOptions: StaffOption[];
+  /** Which of the four review decisions the logged-in staffer's role can take -- see organizers.review_approve/_deny/_request_info/_ero. */
+  canApprove: boolean;
+  canDeny: boolean;
+  canRequestInfo: boolean;
+  canEroReview: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -166,6 +175,18 @@ export function ReviewWorkspace({
       return;
     }
     toast.show(`Marked ${status}.`, "success");
+    router.refresh();
+  }
+
+  async function sendToEroReview() {
+    setBusyResponse(true);
+    const { error } = await supabase.rpc("send_organizer_to_ero_review", { p_response_id: response.id });
+    setBusyResponse(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Sent to ERO review.", "success");
     router.refresh();
   }
 
@@ -369,6 +390,7 @@ export function ReviewWorkspace({
                     item={entry.item}
                     collapsedHidden={collapsedHidden}
                     hasReviewStarted={hasReviewStarted}
+                    canRequestInfo={canRequestInfo}
                     busy={
                       busyItemId !== null &&
                       (busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId)
@@ -396,6 +418,7 @@ export function ReviewWorkspace({
                                   compact
                                   collapsedHidden={collapsedHidden}
                                   hasReviewStarted={hasReviewStarted}
+                                  canRequestInfo={canRequestInfo}
                                   busy={
                                     busyItemId !== null &&
                                     (busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId)
@@ -450,32 +473,52 @@ export function ReviewWorkspace({
         <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4 space-y-5">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Review decision</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setResponseStatus("Approved")}
-                disabled={busyResponse}
-                className="inline-flex items-center gap-1 rounded-lg border border-emerald px-2.5 py-1.5 text-xs font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
-              >
-                <Check size={12} /> Approve
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowNeedsInfoModal(true)}
-                disabled={busyResponse}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
-              >
-                <HelpCircle size={12} /> Need Info{draftItems.length > 0 ? ` (${draftItems.length})` : ""}
-              </button>
-              <button
-                type="button"
-                onClick={() => setResponseStatus("Rejected")}
-                disabled={busyResponse}
-                className="inline-flex items-center gap-1 rounded-lg border border-rose px-2.5 py-1.5 text-xs font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
-              >
-                <X size={12} /> Deny
-              </button>
-            </div>
+            {!canApprove && !canDeny && !canRequestInfo && !canEroReview ? (
+              <p className="text-xs text-muted">You don&apos;t have permission to make a review decision on this organizer.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {canApprove && (
+                  <button
+                    type="button"
+                    onClick={() => setResponseStatus("Approved")}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald px-2.5 py-1.5 text-xs font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
+                  >
+                    <Check size={12} /> Approve
+                  </button>
+                )}
+                {canRequestInfo && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNeedsInfoModal(true)}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
+                  >
+                    <HelpCircle size={12} /> Need Info{draftItems.length > 0 ? ` (${draftItems.length})` : ""}
+                  </button>
+                )}
+                {canEroReview && (
+                  <button
+                    type="button"
+                    onClick={sendToEroReview}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-accent px-2.5 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-60"
+                  >
+                    <ArrowUpRight size={12} /> ERO Review
+                  </button>
+                )}
+                {canDeny && (
+                  <button
+                    type="button"
+                    onClick={() => setResponseStatus("Rejected")}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose px-2.5 py-1.5 text-xs font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
+                  >
+                    <X size={12} /> Deny
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -494,7 +537,7 @@ export function ReviewWorkspace({
             </select>
           </div>
 
-          {awaitingReviewItems.length > 0 && (
+          {canRequestInfo && awaitingReviewItems.length > 0 && (
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Awaiting your review</p>
               <ul className="space-y-2">
@@ -609,6 +652,7 @@ function QuestionCard({
   compact = false,
   collapsedHidden,
   hasReviewStarted,
+  canRequestInfo,
   busy,
   onFlag,
   onUnflag,
@@ -617,6 +661,7 @@ function QuestionCard({
   compact?: boolean;
   collapsedHidden: boolean;
   hasReviewStarted: boolean;
+  canRequestInfo: boolean;
   busy: boolean;
   onFlag: (note: string) => Promise<boolean>;
   onUnflag: () => void;
@@ -639,7 +684,7 @@ function QuestionCard({
   // still needs to be flaggable if a reviewer believes it was answered
   // incorrectly and should apply. The backend has never restricted this;
   // only this check did.
-  const canFlag = !isAwaitingClientCorrection;
+  const canFlag = canRequestInfo && !isAwaitingClientCorrection;
 
   return (
     <div
