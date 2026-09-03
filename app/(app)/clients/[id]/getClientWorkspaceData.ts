@@ -417,11 +417,18 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
   // not any actual request sent to this client (so a real ad-hoc or
   // organizer-driven request, with no service template involved, never
   // counted here).
+  // is_required=true only -- an organizer-driven checklist item (e.g. a
+  // 1099-INT upload question) is opted into the checklist but is never
+  // hard-required on its own, since whether the client actually has that
+  // document depends on their situation, not the form. Counting every
+  // pending item regardless of is_required flagged clients as missing
+  // documents they were never actually required to provide.
   const { count: missingDocumentCountRaw } = await supabase
     .from("document_request_item_statuses")
     .select("id, document_requests!inner(entity_type, entity_id, status)", { count: "exact", head: true })
     .eq("document_requests.status", "open")
     .eq("status", "pending")
+    .eq("is_required", true)
     .or(
       [`entity_id.eq.${client.id}`, engagementIds.length > 0 ? `entity_id.in.(${engagementIds.join(",")})` : null]
         .filter(Boolean)

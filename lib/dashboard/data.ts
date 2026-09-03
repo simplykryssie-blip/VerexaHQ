@@ -211,7 +211,8 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     .select("id, document_requests!inner(workspace_id, status)", { count: "exact", head: true })
     .eq("document_requests.workspace_id", workspaceId)
     .eq("document_requests.status", "open")
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .eq("is_required", true);
 
   let reviewItems: ReviewItem[] = [];
   const runIds = (workflowRuns ?? []).map((r) => r.id);

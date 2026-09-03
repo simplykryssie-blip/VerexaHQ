@@ -48,7 +48,7 @@ export default async function PortalDashboardPage() {
   const { data: myAttachments } = await supabase.from("attachments").select("id").or(entityFilter);
   const attachmentIds = (myAttachments ?? []).map((a) => a.id);
 
-  const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: activity }, { data: contactRows }] =
+  const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: contactRows }] =
     await Promise.all([
       supabase
         .from("engagements")
@@ -68,12 +68,6 @@ export default async function PortalDashboardPage() {
             .in("attachment_id", attachmentIds)
         : Promise.resolve({ data: [] as { id: string; title: string; due_date: string | null; attachment: { file_name: string } | null }[] }),
       supabase.from("invoices").select("id, invoice_number, total_amount, amount_paid, status, due_date").eq("client_id", identity.clientId),
-      supabase
-        .from("activity_log")
-        .select("id, description, created_at")
-        .or(entityFilter)
-        .order("created_at", { ascending: false })
-        .limit(8),
       supabase.rpc("get_portal_client_contact"),
     ]);
 
@@ -235,22 +229,6 @@ export default async function PortalDashboardPage() {
                       <p className="text-xs text-muted">{e.engagement_number}</p>
                     </div>
                     <span className="text-xs capitalize text-muted">{e.status}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-surface shadow-soft">
-            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Recent activity</h2>
-            {(activity ?? []).length === 0 ? (
-              <EmptyState message="No activity yet." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {(activity ?? []).map((a) => (
-                  <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <span className="text-slate">{a.description}</span>
-                    <span className="text-xs text-muted">{new Date(a.created_at).toLocaleDateString()}</span>
                   </li>
                 ))}
               </ul>
