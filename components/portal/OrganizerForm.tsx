@@ -304,6 +304,18 @@ export function OrganizerForm({
           return;
         }
       }
+      // Best-effort and deliberately not awaited into the same try block --
+      // the client's answers are already safely saved above regardless of
+      // whether staff actually gets told about them, so a notification
+      // failure here must never surface as "your submission failed".
+      supabase
+        .rpc("notify_staff_organizer_information_responded", {
+          p_response_id: responseId,
+          p_item_count: actionableInfoItems.length + dynamicRequiredFields.length,
+        })
+        .then(({ error }) => {
+          if (error) console.error("notify_staff_organizer_information_responded failed:", error.message);
+        });
       clearDraft();
       setJustSubmittedFlags(true);
     } catch (err) {
