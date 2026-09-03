@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, type BusinessHours, type HolidayRange } from "@/lib/businessHours";
+import {
+  DEFAULT_BUSINESS_HOURS,
+  DEFAULT_SLOT_MINUTES,
+  slotsForDay,
+  filterAvailableSlots,
+  isServiceBookableOnDate,
+  type BusinessHours,
+  type HolidayRange,
+} from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
 
 // Mirrors the availability check in available-slots/route.ts and re-runs it
@@ -23,11 +31,14 @@ export async function POST(request: Request) {
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, name, is_bookable, workspace_id, estimated_duration_minutes")
+    .select("id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays")
     .eq("id", serviceId)
     .maybeSingle();
   if (!service || service.workspace_id !== identity.workspaceId || !service.is_bookable) {
     return NextResponse.json({ error: "This service isn't bookable." }, { status: 404 });
+  }
+  if (!isServiceBookableOnDate(start, { seasonStart: service.season_start, seasonEnd: service.season_end, allowedWeekdays: service.allowed_weekdays })) {
+    return NextResponse.json({ error: "This service isn't bookable on that date." }, { status: 409 });
   }
 
   const { data: hoursSetting } = await supabase

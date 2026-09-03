@@ -36,7 +36,7 @@ export default async function CalendarPage() {
     );
   }
 
-  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows] =
+  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows, { data: timeOffRows }] =
     await Promise.all([
       supabase
         .from("engagements")
@@ -64,6 +64,11 @@ export default async function CalendarPage() {
         .is("merged_into_client_id", null),
       supabase.from("engagements").select("id, engagement_number, client_id").eq("workspace_id", workspace.id),
       getWorkspaceStaff(supabase, workspace.id),
+      supabase
+        .from("staff_time_off")
+        .select("user_id, start_date, end_date")
+        .eq("workspace_id", workspace.id)
+        .gte("end_date", new Date().toISOString().slice(0, 10)),
     ]);
 
   const appointments: AppointmentRow[] = (appointmentRows ?? []).map((a: any) => ({
@@ -138,6 +143,7 @@ export default async function CalendarPage() {
           clients={clients}
           engagements={engagementOpts}
           staff={staff}
+          staffTimeOff={timeOffRows ?? []}
           canManage={Boolean(canManage)}
           currentUserId={user?.id ?? null}
         />
