@@ -58,7 +58,9 @@ export function TaskRow({ task }: { task: TaskRowType }) {
               Depends on: {blockedBy.map((d) => d.depends_on_title).join(", ")}
             </span>
           )}
-          {task.description && <p className="mt-0.5">{task.description}</p>}
+          {task.description && (
+            <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: task.description }} />
+          )}
         </div>
       )}
     </li>

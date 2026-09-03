@@ -9,7 +9,8 @@ import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import { Bold, Italic, List, ListOrdered, Heading2, SeparatorHorizontal, Table2, ListChecks, Trash2 } from "lucide-react";
+import Underline from "@tiptap/extension-underline";
+import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Heading2, SeparatorHorizontal, Table2, ListChecks, Trash2 } from "lucide-react";
 import { PageBreak } from "@/lib/tiptap/pageBreak";
 
 function ToolbarButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
@@ -35,6 +36,9 @@ function Toolbar({ editor, extra, rounded, allowPageBreak }: { editor: Editor; e
         </ToolbarButton>
         <ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} label="Italic">
           <Italic size={14} />
+        </ToolbarButton>
+        <ToolbarButton active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} label="Underline">
+          <UnderlineIcon size={14} />
         </ToolbarButton>
         <ToolbarButton active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="Heading">
           <Heading2 size={14} />
@@ -107,8 +111,8 @@ export function RichTextEditor({
 }) {
   const editor = useEditor({
     extensions: allowPageBreak
-      ? [StarterKit, PageBreak, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, TaskList, TaskItem.configure({ nested: true })]
-      : [StarterKit],
+      ? [StarterKit, Underline, PageBreak, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, TaskList, TaskItem.configure({ nested: true })]
+      : [StarterKit, Underline],
     content,
     editable,
     immediatelyRender: false,
