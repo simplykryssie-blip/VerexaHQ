@@ -9,6 +9,7 @@ import {
   EyeOff,
   ArrowUp,
   ArrowDown,
+  GripVertical,
   DollarSign,
   Briefcase,
   Receipt,
@@ -97,6 +98,8 @@ export function DashboardShell({
   const [rows, setRows] = useState(widgets);
   const [customizing, setCustomizing] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const sorted = [...rows].sort((a, b) => a.display_order - b.display_order);
   const visible = sorted.filter((w) => w.is_visible);
@@ -126,23 +129,25 @@ export function DashboardShell({
     router.refresh();
   }
 
-  async function move(row: WidgetRow, direction: -1 | 1) {
-    const idx = sorted.findIndex((r) => r.id === row.id);
-    const swapWith = sorted[idx + direction];
-    if (!swapWith) return;
+  // Drag-to-reorder replaces the old up/down buttons -- dropping a widget
+  // anywhere in the list moves it there directly instead of one step at a
+  // time. Reassigns every row's display_order sequentially (not just the
+  // two that swapped) since a drop can move an item across several
+  // positions in one gesture.
+  async function reorder(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const current = [...sorted];
+    const fromIndex = current.findIndex((r) => r.id === draggedId);
+    const toIndex = current.findIndex((r) => r.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
 
-    setSaving(row.id);
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id === row.id) return { ...r, display_order: swapWith.display_order };
-        if (r.id === swapWith.id) return { ...r, display_order: row.display_order };
-        return r;
-      })
-    );
-    await Promise.all([
-      savePreference(row.id, { display_order: swapWith.display_order }),
-      savePreference(swapWith.id, { display_order: row.display_order }),
-    ]);
+    const [moved] = current.splice(fromIndex, 1);
+    current.splice(toIndex, 0, moved);
+    const reindexed = current.map((r, i) => ({ ...r, display_order: i }));
+
+    setSaving(draggedId);
+    setRows((prev) => prev.map((r) => reindexed.find((x) => x.id === r.id) ?? r));
+    await Promise.all(reindexed.map((r) => savePreference(r.id, { display_order: r.display_order })));
     setSaving(null);
     router.refresh();
   }
@@ -309,40 +314,50 @@ export function DashboardShell({
 
         {customizing && (
           <div className="mb-4 rounded-xl border border-border bg-surfaceMuted p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout -- drag to reorder</h2>
             <ul className="mt-2 divide-y divide-border">
-              {sorted.map((row, i) => (
-                <li key={row.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className={row.is_visible ? "text-slate" : "text-muted line-through"}>{row.title ?? row.widget_type}</span>
+              {sorted.map((row) => (
+                <li
+                  key={row.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", row.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDraggingId(row.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null);
+                    setDragOverId(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverId !== row.id) setDragOverId(row.id);
+                  }}
+                  onDragLeave={() => setDragOverId((id) => (id === row.id ? null : id))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const draggedId = e.dataTransfer.getData("text/plain");
+                    setDragOverId(null);
+                    if (draggedId) reorder(draggedId, row.id);
+                  }}
+                  className={`flex cursor-grab items-center justify-between py-2 text-sm transition active:cursor-grabbing ${
+                    draggingId === row.id ? "opacity-40" : ""
+                  } ${dragOverId === row.id && draggingId !== row.id ? "border-t-2 border-accent" : ""}`}
+                >
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={i === 0 || saving === row.id}
-                      onClick={() => move(row, -1)}
-                      aria-label={`Move ${row.title ?? row.widget_type} up`}
-                      className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowUp size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={i === sorted.length - 1 || saving === row.id}
-                      onClick={() => move(row, 1)}
-                      aria-label={`Move ${row.title ?? row.widget_type} down`}
-                      className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowDown size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving === row.id}
-                      onClick={() => toggleVisible(row)}
-                      aria-label={row.is_visible ? `Hide ${row.title ?? row.widget_type}` : `Show ${row.title ?? row.widget_type}`}
-                      className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                    >
-                      {row.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
+                    <GripVertical size={14} className="shrink-0 text-muted" aria-hidden="true" />
+                    <span className={row.is_visible ? "text-slate" : "text-muted line-through"}>{row.title ?? row.widget_type}</span>
                   </div>
+                  <button
+                    type="button"
+                    disabled={saving === row.id}
+                    onClick={() => toggleVisible(row)}
+                    aria-label={row.is_visible ? `Hide ${row.title ?? row.widget_type}` : `Show ${row.title ?? row.widget_type}`}
+                    className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
+                  >
+                    {row.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </button>
                 </li>
               ))}
             </ul>
