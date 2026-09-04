@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CalendarView, type CalendarItem } from "./CalendarView";
 import { AppointmentsToolbar, type AppointmentFilter } from "@/components/appointments/AppointmentsToolbar";
 import { AppointmentsList } from "@/components/appointments/AppointmentsList";
-import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "@/components/appointments/types";
+import type { AppointmentRow, ClientOption, EngagementOption, StaffOption, ServiceOption } from "@/components/appointments/types";
 
 // The appointments toolbar (filter tabs + New appointment) sits above the
 // month grid so it's reachable without scrolling past it; the filtered
@@ -17,6 +17,7 @@ export function CalendarPageClient({
   clients,
   engagements,
   staff,
+  services,
   staffTimeOff,
   canManage,
   currentUserId,
@@ -27,6 +28,7 @@ export function CalendarPageClient({
   clients: ClientOption[];
   engagements: EngagementOption[];
   staff: StaffOption[];
+  services: ServiceOption[];
   staffTimeOff: { user_id: string; start_date: string; end_date: string }[];
   canManage: boolean;
   currentUserId: string | null;
@@ -40,6 +42,7 @@ export function CalendarPageClient({
         clients={clients}
         engagements={engagements}
         staff={staff}
+        services={services}
         staffTimeOff={staffTimeOff}
         canManage={canManage}
         currentUserId={currentUserId}

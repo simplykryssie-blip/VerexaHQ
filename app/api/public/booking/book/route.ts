@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   const { data: service } = await supabase
     .from("services")
     .select(
-      "id, name, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id"
+      "id, name, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id, allow_overlapping_bookings"
     )
     .eq("id", serviceId)
     .maybeSingle();
@@ -147,9 +147,10 @@ export async function POST(request: Request) {
 
   const externalBusy = await getExternalBusyBlocks(supabase, workspace.id, dayStart.toISOString(), dayEnd.toISOString());
 
+  const busyBlocks = service.allow_overlapping_bookings ? externalBusy : [...(existing ?? []), ...externalBusy];
   const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
   const candidates = slotsForDay(dayStart, businessHours, gridMinutes, durationMinutes, holidays);
-  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], earliestStart, bufferMinutes);
+  const available = filterAvailableSlots(candidates, durationMinutes, busyBlocks, earliestStart, bufferMinutes);
   const stillAvailable = available.some((s) => s.getTime() === start.getTime());
   if (!stillAvailable) {
     return NextResponse.json({ error: "That time is no longer available. Pick another slot." }, { status: 409 });
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
       workspace_id: workspace.id,
       client_id: clientId,
       staff_id: staffId,
+      service_id: service.id,
       title: `${service.name} (booked online)`,
       description: null,
       location,
