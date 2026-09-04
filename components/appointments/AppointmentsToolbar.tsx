@@ -7,7 +7,12 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 import { isDateInAnyRange } from "@/lib/businessHours";
-import type { ClientOption, EngagementOption, StaffOption } from "./types";
+import type { ClientOption, EngagementOption, StaffOption, ServiceOption } from "./types";
+
+function toLocalInputValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 export type AppointmentFilter = "upcoming" | "past" | "all";
 
@@ -20,6 +25,7 @@ export function AppointmentsToolbar({
   clients,
   engagements,
   staff,
+  services,
   staffTimeOff,
   canManage,
   currentUserId,
@@ -30,6 +36,7 @@ export function AppointmentsToolbar({
   clients: ClientOption[];
   engagements: EngagementOption[];
   staff: StaffOption[];
+  services: ServiceOption[];
   staffTimeOff: { user_id: string; start_date: string; end_date: string }[];
   canManage: boolean;
   currentUserId: string | null;
@@ -49,12 +56,43 @@ export function AppointmentsToolbar({
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
   const [engagementId, setEngagementId] = useState("");
   const [staffId, setStaffId] = useState(currentUserId ?? "");
+  const [serviceId, setServiceId] = useState("");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [portalVisible, setPortalVisible] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [creatingZoomMeeting, setCreatingZoomMeeting] = useState(false);
+
+  const selectedService = services.find((s) => s.id === serviceId) ?? null;
+
+  // Selecting a service (or changing the start time while one's selected)
+  // auto-fills the end time from that service's own duration, and a fixed
+  // meeting link if it has one -- the same auto-fill the public/portal
+  // booking flows already do, just triggered manually here since a staff
+  // member picks the time themselves instead of choosing from a slot grid.
+  function applyServiceDefaults(service: ServiceOption, fromStartAt: string) {
+    if (fromStartAt && service.estimated_duration_minutes) {
+      const start = new Date(fromStartAt);
+      if (!Number.isNaN(start.getTime())) {
+        setEndAt(toLocalInputValue(new Date(start.getTime() + service.estimated_duration_minutes * 60000)));
+      }
+    }
+    if (service.booking_location_type === "link" && service.booking_meeting_url) {
+      setMeetingUrl(service.booking_meeting_url);
+    }
+  }
+
+  function handleServiceChange(id: string) {
+    setServiceId(id);
+    const service = services.find((s) => s.id === id);
+    if (service) applyServiceDefaults(service, startAt);
+  }
+
+  function handleStartAtChange(value: string) {
+    setStartAt(value);
+    if (selectedService) applyServiceDefaults(selectedService, value);
+  }
   const clientDropdownRef = useDropdownDismiss<HTMLDivElement>(clientDropdownOpen, () => setClientDropdownOpen(false));
 
   const filteredEngagements = useMemo(() => (clientId ? engagements.filter((e) => e.client_id === clientId) : engagements), [engagements, clientId]);
@@ -83,6 +121,29 @@ export function AppointmentsToolbar({
       return;
     }
     setSaving(true);
+
+    // Mirrors the conflict check the public/portal booking flows already
+    // do -- a service marked "allow overlapping bookings" skips it
+    // entirely; everything else blocks on any other appointment for the
+    // same staff member that overlaps the chosen time.
+    if (staffId && !selectedService?.allow_overlapping_bookings) {
+      const start = new Date(startAt);
+      const end = new Date(endAt);
+      const { data: conflicts } = await supabase
+        .from("appointments")
+        .select("id, title, start_at, end_at")
+        .eq("workspace_id", workspaceId)
+        .eq("staff_id", staffId)
+        .neq("status", "cancelled")
+        .lt("start_at", end.toISOString())
+        .gt("end_at", start.toISOString());
+      if (conflicts && conflicts.length > 0) {
+        setSaving(false);
+        setError(`This overlaps "${conflicts[0].title}" already on the calendar for this time. Pick a different time, or mark this service as allowing overlapping bookings in Settings > Services.`);
+        return;
+      }
+    }
+
     const { error: insertError } = await supabase.from("appointments").insert({
       workspace_id: workspaceId,
       title: title.trim(),
@@ -92,6 +153,7 @@ export function AppointmentsToolbar({
       client_id: clientId || null,
       engagement_id: engagementId || null,
       staff_id: staffId || null,
+      service_id: serviceId || null,
       start_at: new Date(startAt).toISOString(),
       end_at: new Date(endAt).toISOString(),
       portal_visible: portalVisible,
@@ -109,6 +171,7 @@ export function AppointmentsToolbar({
     setMeetingUrl("");
     setClientId("");
     setClientQuery("");
+    setServiceId("");
     setEngagementId("");
     setStaffId(currentUserId ?? "");
     setStartAt("");
@@ -246,6 +309,18 @@ export function AppointmentsToolbar({
                 </option>
               ))}
             </select>
+            <select
+              value={serviceId}
+              onChange={(e) => handleServiceChange(e.target.value)}
+              className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:col-span-2"
+            >
+              <option value="">No service</option>
+              {services.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
             <input
               placeholder="Location (e.g. Office, Phone)"
               value={location}
@@ -275,7 +350,7 @@ export function AppointmentsToolbar({
                 required
                 type="datetime-local"
                 value={startAt}
-                onChange={(e) => setStartAt(e.target.value)}
+                onChange={(e) => handleStartAtChange(e.target.value)}
                 className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </label>
@@ -302,6 +377,9 @@ export function AppointmentsToolbar({
             </label>
           </div>
           {timeOffWarning && <p className="mt-2 text-sm text-warning">{timeOffWarning}</p>}
+          {selectedService?.allow_overlapping_bookings && (
+            <p className="mt-2 text-xs text-muted">This service allows overlapping bookings -- no conflict check will be run.</p>
+          )}
           {error && <p className="mt-2 text-sm text-danger">{error}</p>}
           <button
             type="submit"

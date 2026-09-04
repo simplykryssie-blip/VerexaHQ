@@ -553,6 +553,7 @@ export type Database = {
           location: string | null
           meeting_url: string | null
           portal_visible: boolean
+          service_id: string | null
           staff_id: string | null
           start_at: string
           status: string
@@ -573,6 +574,7 @@ export type Database = {
           location?: string | null
           meeting_url?: string | null
           portal_visible?: boolean
+          service_id?: string | null
           staff_id?: string | null
           start_at: string
           status?: string
@@ -593,6 +595,7 @@ export type Database = {
           location?: string | null
           meeting_url?: string | null
           portal_visible?: boolean
+          service_id?: string | null
           staff_id?: string | null
           start_at?: string
           status?: string
@@ -628,6 +631,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "appointments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "appointments_workspace_id_fkey"
@@ -7207,6 +7217,7 @@ export type Database = {
       }
       services: {
         Row: {
+          allow_overlapping_bookings: boolean
           allowed_weekdays: number[] | null
           billing_rule_id: string | null
           booking_location_type: string
@@ -7246,6 +7257,7 @@ export type Database = {
           zoom_host_user_id: string | null
         }
         Insert: {
+          allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
           booking_location_type?: string
@@ -7285,6 +7297,7 @@ export type Database = {
           zoom_host_user_id?: string | null
         }
         Update: {
+          allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
           billing_rule_id?: string | null
           booking_location_type?: string
@@ -11507,6 +11520,10 @@ export type Database = {
       submit_quiz_attempt: {
         Args: { p_answers: Json; p_module_id: string }
         Returns: Json
+      }
+      sync_client_relationships_for_response: {
+        Args: { p_response_id: string }
+        Returns: undefined
       }
       turn_on_service: {
         Args: {

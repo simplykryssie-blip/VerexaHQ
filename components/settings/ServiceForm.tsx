@@ -50,6 +50,7 @@ export type ServiceRow = {
   booking_location_type: string;
   booking_meeting_url: string | null;
   zoom_host_user_id: string | null;
+  allow_overlapping_bookings: boolean;
   requires_organizer: boolean;
   requires_engagement_letter: boolean;
   requires_documents: boolean;
@@ -152,6 +153,7 @@ export function ServiceForm({
   const [bookingLocationType, setBookingLocationType] = useState(service.booking_location_type);
   const [bookingMeetingUrl, setBookingMeetingUrl] = useState(service.booking_meeting_url ?? "");
   const [zoomHostUserId, setZoomHostUserId] = useState(service.zoom_host_user_id ?? "");
+  const [allowOverlappingBookings, setAllowOverlappingBookings] = useState(service.allow_overlapping_bookings);
   const [linkCopied, setLinkCopied] = useState(false);
   const [requirements, setRequirements] = useState(
     Object.fromEntries(REQUIREMENT_FIELDS.map((f) => [f.key, Boolean(service[f.key])])) as Record<string, boolean>
@@ -258,6 +260,7 @@ export function ServiceForm({
         booking_location_type: bookingLocationType,
         booking_meeting_url: bookingLocationType === "link" ? bookingMeetingUrl.trim() || null : null,
         zoom_host_user_id: bookingLocationType === "zoom" ? zoomHostUserId || null : null,
+        allow_overlapping_bookings: allowOverlappingBookings,
         ...requirements,
       })
       .eq("id", service.id);
@@ -643,6 +646,27 @@ export function ServiceForm({
                   </p>
                 </>
               )}
+            </div>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <label className="flex items-start gap-2 text-sm text-slate">
+                <input
+                  type="checkbox"
+                  checked={allowOverlappingBookings}
+                  onChange={(e) => markDirty(setAllowOverlappingBookings)(e.target.checked)}
+                  disabled={!canManage}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                />
+                <span>
+                  Allow this service to be double-booked
+                  <span className="mt-1 block text-[11px] text-muted">
+                    By default, once a time slot is taken (online or on the internal Calendar), it&apos;s off-limits to
+                    everyone else. Turn this on for a service where overlapping is fine -- e.g. a quick optional
+                    consult call -- so booking it never blocks or gets blocked by anything else already on the
+                    calendar.
+                  </span>
+                </span>
+              </label>
             </div>
 
             <div className="mt-4 border-t border-border pt-4">

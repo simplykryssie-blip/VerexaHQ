@@ -7,7 +7,7 @@ import type { CalendarItem } from "./CalendarView";
 import { CalendarPageClient } from "./CalendarPageClient";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
-import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "@/components/appointments/types";
+import type { AppointmentRow, ClientOption, EngagementOption, StaffOption, ServiceOption } from "@/components/appointments/types";
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +36,7 @@ export default async function CalendarPage() {
     );
   }
 
-  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows, { data: timeOffRows }] =
+  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows, { data: timeOffRows }, { data: serviceRows }] =
     await Promise.all([
       supabase
         .from("engagements")
@@ -69,6 +69,12 @@ export default async function CalendarPage() {
         .select("user_id, start_date, end_date")
         .eq("workspace_id", workspace.id)
         .gte("end_date", new Date().toISOString().slice(0, 10)),
+      supabase
+        .from("services")
+        .select("id, name, estimated_duration_minutes, booking_location_type, booking_meeting_url, allow_overlapping_bookings")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "published")
+        .order("name"),
     ]);
 
   const appointments: AppointmentRow[] = (appointmentRows ?? []).map((a: any) => ({
@@ -102,6 +108,7 @@ export default async function CalendarPage() {
     label: e.engagement_number ?? "Engagement",
   }));
   const staff: StaffOption[] = staffRows.map((s) => ({ id: s.user_id, label: s.display_name ?? "Staff member" }));
+  const services: ServiceOption[] = serviceRows ?? [];
 
   const items: CalendarItem[] = [
     ...(engagements ?? []).map((e) => ({
@@ -143,6 +150,7 @@ export default async function CalendarPage() {
           clients={clients}
           engagements={engagementOpts}
           staff={staff}
+          services={services}
           staffTimeOff={timeOffRows ?? []}
           canManage={Boolean(canManage)}
           currentUserId={user?.id ?? null}

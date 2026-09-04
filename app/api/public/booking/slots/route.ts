@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays")
+    .select("id, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, allow_overlapping_bookings")
     .eq("id", serviceId)
     .maybeSingle();
   if (!service || service.workspace_id !== workspace.id || !service.is_bookable || !service.is_portal_visible) {
@@ -115,9 +115,16 @@ export async function GET(request: Request) {
   // when it isn't scoped to anyone in particular.
   const externalBusy = await getExternalBusyBlocks(supabase, workspace.id, dayStart.toISOString(), dayEnd.toISOString());
 
+  // A service marked "allow overlapping bookings" tolerates sharing a slot
+  // with another Verexa appointment -- skip filtering those out (a
+  // connected personal calendar's busy blocks still apply either way,
+  // since that's a real external conflict, not an internal double-booking
+  // tolerance).
+  const busyBlocks = service.allow_overlapping_bookings ? externalBusy : [...(existing ?? []), ...externalBusy];
+
   const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
   const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes, holidays);
-  const available = filterAvailableSlots(candidates, durationMinutes, [...(existing ?? []), ...externalBusy], earliestStart, bufferMinutes);
+  const available = filterAvailableSlots(candidates, durationMinutes, busyBlocks, earliestStart, bufferMinutes);
 
   return NextResponse.json({ slots: available.map((s) => s.toISOString()), durationMinutes });
 }
