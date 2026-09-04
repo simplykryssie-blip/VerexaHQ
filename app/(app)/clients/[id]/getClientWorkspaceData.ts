@@ -396,12 +396,22 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
       : Promise.resolve({ data: [] as { id: string; thread_id: string; sender_type: string; body: string; is_internal: boolean; created_at: string; sender_id: string | null; workspace_id: string }[] }),
   ]);
 
-  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null }[] = [];
+  let tasks: {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string | null;
+    due_date: string | null;
+    engagement_id: string | null;
+    client_id: string | null;
+    related_organizer_response_id: string | null;
+  }[] = [];
   {
     const engagementFilter = engagementIds.length > 0 ? `engagement_id.in.(${engagementIds.join(",")})` : "";
     const { data: taskRows } = await supabase
       .from("tasks")
-      .select("id, title, status, due_date, engagement_id")
+      .select("id, title, description, status, priority, due_date, engagement_id, client_id, related_organizer_response_id")
       .or([engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(","))
       .neq("status", "completed")
       .order("due_date");
@@ -417,11 +427,18 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
   // not any actual request sent to this client (so a real ad-hoc or
   // organizer-driven request, with no service template involved, never
   // counted here).
+  // is_required=true only -- an organizer-driven checklist item (e.g. a
+  // 1099-INT upload question) is opted into the checklist but is never
+  // hard-required on its own, since whether the client actually has that
+  // document depends on their situation, not the form. Counting every
+  // pending item regardless of is_required flagged clients as missing
+  // documents they were never actually required to provide.
   const { count: missingDocumentCountRaw } = await supabase
     .from("document_request_item_statuses")
     .select("id, document_requests!inner(entity_type, entity_id, status)", { count: "exact", head: true })
     .eq("document_requests.status", "open")
     .eq("status", "pending")
+    .eq("is_required", true)
     .or(
       [`entity_id.eq.${client.id}`, engagementIds.length > 0 ? `entity_id.in.(${engagementIds.join(",")})` : null]
         .filter(Boolean)

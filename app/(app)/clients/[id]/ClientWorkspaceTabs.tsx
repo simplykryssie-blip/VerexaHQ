@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Briefcase, CheckSquare, Receipt } from "lucide-react";
+import { Briefcase, CheckSquare, Receipt, ArrowUpRight } from "lucide-react";
+import { taskHref } from "@/lib/taskLink";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -101,6 +102,7 @@ export function OverviewTab({
   onCreateInvoice,
   onShowNotes,
   onCreateNote,
+  onShowTasks,
 }: {
   client: {
     id: string;
@@ -150,6 +152,7 @@ export function OverviewTab({
   onCreateInvoice: () => void;
   onShowNotes: () => void;
   onCreateNote: () => void;
+  onShowTasks: () => void;
 }) {
   const portalByEmail = new Map(portalUsers.filter((p) => p.invited_email).map((p) => [p.invited_email.toLowerCase(), p]));
   const matchedPortalIds = new Set(
@@ -188,8 +191,8 @@ export function OverviewTab({
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
-        <StatTile icon={CheckSquare} tone="amber" label="Open tasks" value={openTasks.length} />
-        <StatTile icon={Receipt} tone="rose" label="Outstanding balance" value={money(outstandingBalance)} />
+        <StatTile icon={CheckSquare} tone="amber" label="Open tasks" value={openTasks.length} onClick={onShowTasks} />
+        <StatTile icon={Receipt} tone="rose" label="Outstanding balance" value={money(outstandingBalance)} onClick={onCreateInvoice} />
       </div>
 
       {primaryEngagement && primaryProgressPercent !== null && (
@@ -1186,6 +1189,79 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
   );
 }
 
+export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  async function complete(task: TaskRow) {
+    setPendingId(task.id);
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", task.id);
+    setPendingId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Task completed", "success");
+    router.refresh();
+  }
+
+  const sorted = [...tasks].sort((a, b) => {
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    if (a.due_date) return -1;
+    if (b.due_date) return 1;
+    return 0;
+  });
+
+  return (
+    <Section title="Tasks">
+      {sorted.length === 0 ? (
+        <EmptyState message="No open tasks for this client." />
+      ) : (
+        <ul className="divide-y divide-border">
+          {sorted.map((t) => {
+            const href = taskHref(t);
+            const linksElsewhere = href && href !== `/clients/${clientId}`;
+            return (
+              <li key={t.id} className="flex items-start gap-3 py-3">
+                <input
+                  type="checkbox"
+                  disabled={pendingId === t.id}
+                  onChange={() => complete(t)}
+                  className="mt-1 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                  aria-label={`Mark "${t.title}" complete`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-ink">{t.title}</p>
+                    {t.priority && <span className="text-xs capitalize text-muted">({t.priority})</span>}
+                  </div>
+                  {t.description && (
+                    <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: t.description }} />
+                  )}
+                  <div className="mt-1 flex items-center gap-3 text-xs text-muted">
+                    {t.due_date && <span>Due {new Date(t.due_date).toLocaleDateString()}</span>}
+                    {linksElsewhere && (
+                      <Link href={href} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                        {t.related_organizer_response_id ? "Open organizer review" : "Open engagement"}
+                        <ArrowUpRight size={12} aria-hidden="true" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
 // ------------------------------------------------------------------- Types
 
 export type ContactRow = { id: string; first_name: string | null; last_name: string | null; title: string | null; email: string | null; phone: string | null; is_primary: boolean };
@@ -1212,7 +1288,17 @@ export type RelationshipRow = {
 };
 export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
-export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null };
+export type TaskRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string | null;
+  due_date: string | null;
+  engagement_id: string | null;
+  client_id: string | null;
+  related_organizer_response_id: string | null;
+};
 export type QuoteRow = {
   id: string;
   quote_number: string | null;

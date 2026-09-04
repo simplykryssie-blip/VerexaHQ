@@ -143,13 +143,14 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
         <div className="grid grid-cols-2 gap-3 border-b border-border p-5 sm:grid-cols-4">
           <StatTile icon={Briefcase} tone="accent" label="Current engagement" value={currentServiceName} />
           <StatTile icon={FolderOpen} tone="accent" label="Open engagements" value={engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived").length} />
-          <StatTile icon={FileWarning} tone="amber" label="Missing documents" value={missingDocuments} />
-          <StatTile icon={ListChecks} tone="amber" label="Open tasks" value={openTasksCount} />
+          <StatTile icon={FileWarning} tone="amber" label="Missing documents" value={missingDocuments} onClick={() => setTab("Documents")} />
+          <StatTile icon={ListChecks} tone="amber" label="Open tasks" value={openTasksCount} onClick={() => setTab("Tasks")} />
           <StatTile
             icon={Wallet}
             tone="rose"
             label="Outstanding balance"
             value={`$${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            onClick={() => setTab("Billing")}
           />
           <StatTile
             icon={CalendarClock}
@@ -157,7 +158,13 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             label="Next appointment"
             value={nextAppointment ? new Date(nextAppointment.start_at).toLocaleDateString() : "None scheduled"}
           />
-          <StatTile icon={MessageCircle} tone="emerald" label="Last message" value={lastMessage ? relativeTime(lastMessage.created_at) : "No messages"} />
+          <StatTile
+            icon={MessageCircle}
+            tone="emerald"
+            label="Last message"
+            value={lastMessage ? relativeTime(lastMessage.created_at) : "No messages"}
+            onClick={() => setTab("Messages")}
+          />
           <StatTile icon={Contact} tone="accent" label="Client type" value={<span className="capitalize">{client.client_type}</span>} />
         </div>
 

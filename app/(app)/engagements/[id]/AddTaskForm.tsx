@@ -24,6 +24,7 @@ export function AddTaskForm({
       label="Add Task"
       fields={[
         { name: "title", label: "Title", required: true },
+        { name: "description", label: "Description", type: "richtext" },
         {
           name: "priority",
           label: "Priority",
@@ -63,12 +64,14 @@ export function AddTaskForm({
           : []),
       ]}
       onSubmit={async (v) => {
+        const description = v.description && v.description.replace(/<[^>]+>/g, "").trim() ? v.description : null;
         const { data: task, error } = await supabase
           .from("tasks")
           .insert({
             workspace_id: workspaceId,
             engagement_id: engagementId,
             title: v.title,
+            description,
             priority: v.priority || null,
             assigned_staff_id: v.assigned_staff_id || null,
             due_date: v.due_date || null,

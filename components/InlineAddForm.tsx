@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import { useToast } from "@/components/Toast";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
 
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "email" | "tel" | "date" | "select" | "textarea";
+  type?: "text" | "email" | "tel" | "date" | "select" | "textarea" | "richtext";
   required?: boolean;
   options?: { value: string; label: string }[];
   showIf?: (values: Record<string, string>) => boolean;
@@ -69,7 +70,12 @@ export function InlineAddForm({
     <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-surfaceMuted p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {fields.filter((f) => !f.showIf || f.showIf(values)).map((f) =>
-          f.type === "textarea" ? (
+          f.type === "richtext" ? (
+            <div key={f.name} className="col-span-2">
+              <p className="mb-1 text-xs font-medium text-muted">{f.label}</p>
+              <RichTextEditor content={values[f.name] ?? ""} onChange={(html) => setValues((v) => ({ ...v, [f.name]: html }))} />
+            </div>
+          ) : f.type === "textarea" ? (
             <textarea
               key={f.name}
               required={f.required}
