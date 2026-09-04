@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
-import { DataTable } from "@/components/ui/DataTable";
 import { NewClientButton } from "./NewClientButton";
 import { TagFilterControl } from "./TagFilterControl";
-import { CLIENT_COLUMNS, type ClientRow } from "./clientListColumns";
+import { ContactsSearchBar } from "./ContactsSearchBar";
+import { ContactsBulkTable } from "./ContactsBulkTable";
+import type { ClientRow } from "./clientListColumns";
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,21 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
-export default async function ClientsPage({ searchParams }: { searchParams: { page?: string; status?: string; tag?: string } }) {
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: {
+    page?: string;
+    status?: string;
+    tag?: string;
+    q?: string;
+    service?: string;
+    staff?: string;
+    stage?: string;
+    missingDocs?: string;
+    balance?: string;
+  };
+}) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -37,47 +52,75 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
 
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
 
   const tag = searchParams.tag?.trim() || "";
-
-  let clientsQuery = supabase
-    .from("clients")
-    .select("id, client_type, first_name, last_name, business_name, primary_email, primary_phone, lifecycle_status, tags", {
-      count: "exact",
-    })
-    .eq("workspace_id", workspace.id)
-    .is("merged_into_client_id", null)
-    .order("created_at", { ascending: false })
-    .range(from, to);
-  clientsQuery = clientsQuery.in("lifecycle_status", status ? [status] : ALL_LIFECYCLE_STATUSES);
-  if (tag) clientsQuery = clientsQuery.contains("tags", [tag]);
+  const q = searchParams.q?.trim() || "";
+  const serviceFilter = searchParams.service?.trim() || "";
+  const staffFilter = searchParams.staff?.trim() || "";
+  const stageFilter = searchParams.stage?.trim() || "";
+  const missingDocuments = searchParams.missingDocs === "1";
+  const outstandingBalance = searchParams.balance === "1";
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: clients, count }, { data: services }, { data: serviceCategoriesRaw }, { data: canCreate }, { data: workspaceTags }, { data: activeMembers }, { data: membership }] =
-    await Promise.all([
-      clientsQuery,
-      supabase
-        .from("services")
-        .select("id, name, service_category_id, service_categories(slug)")
-        .eq("workspace_id", workspace.id)
-        .eq("status", "published")
-        .order("display_order"),
-      supabase
-        .from("service_categories")
-        .select("id, name")
-        .eq("workspace_id", workspace.id)
-        .order("display_order"),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
-      supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
-      supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
-      user
-        ? supabase.from("workspace_users").select("is_owner").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+  const [
+    { data: searchResults },
+    { data: services },
+    { data: serviceCategoriesRaw },
+    { data: canCreate },
+    { data: workspaceTags },
+    { data: activeMembers },
+    { data: membership },
+    { data: pipelineStageRows },
+  ] = await Promise.all([
+    // Every filter this page offers (free text, service, assigned staff,
+    // pipeline stage, missing documents, outstanding balance) lives on a
+    // different table -- search_clients does the real joins server-side so
+    // pagination stays correct against the filtered set.
+    supabase.rpc("search_clients", {
+      p_workspace_id: workspace.id,
+      p_query: q || undefined,
+      p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
+      p_tag: tag || undefined,
+      p_service_id: serviceFilter || undefined,
+      p_assigned_staff_id: staffFilter || undefined,
+      p_pipeline_stage_name: stageFilter || undefined,
+      p_missing_documents: missingDocuments ? true : undefined,
+      p_outstanding_balance: outstandingBalance ? true : undefined,
+      p_limit: PAGE_SIZE,
+      p_offset: from,
+    }),
+    supabase
+      .from("services")
+      .select("id, name, service_category_id, service_categories(slug)")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "published")
+      .order("display_order"),
+    supabase
+      .from("service_categories")
+      .select("id, name")
+      .eq("workspace_id", workspace.id)
+      .order("display_order"),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
+    supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
+    user
+      ? supabase.from("workspace_users").select("is_owner").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Distinct stage names across active pipelines in this workspace, for
+    // the "Pipeline stage" filter -- stage_name is denormalized onto
+    // pipeline_stages itself so no join to process_stages is needed.
+    supabase
+      .from("pipeline_stages")
+      .select("stage_name, pipeline_runs!inner(workspace_id, status)")
+      .eq("pipeline_runs.workspace_id", workspace.id)
+      .eq("pipeline_runs.status", "Active"),
+  ]);
+
+  const clients = searchResults ?? [];
+  const count = Number(clients[0]?.total_count ?? 0);
 
   const isOwner = Boolean(membership?.is_owner);
   // Only the owner ever sees the "assign to" picker (below), so whenever it
@@ -94,6 +137,14 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     ? await supabase.from("user_profiles").select("id, display_name").in("id", staffUserIds)
     : { data: [] };
   const staffOptions = staffProfiles ?? [];
+
+  const staffFilterOptions = user
+    ? [{ value: user.id, label: accountHolderName }, ...staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Unnamed" }))]
+    : staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Unnamed" }));
+  const serviceFilterOptions = (services ?? []).map((s) => ({ value: s.id, label: s.name }));
+  const pipelineStageOptions = Array.from(new Set((pipelineStageRows ?? []).map((r) => r.stage_name).filter((n): n is string => Boolean(n))))
+    .sort()
+    .map((name) => ({ value: name, label: name }));
 
   // Same category -> service grouping shape the public organizer's own
   // "what do you need help with" contact step uses (get_public_service_options),
@@ -141,9 +192,25 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
   }));
 
-  const extraQuery = [status ? `status=${status}` : "", tag ? `tag=${encodeURIComponent(tag)}` : ""].filter(Boolean).join("&");
-  const statusQuery = tag ? `&tag=${encodeURIComponent(tag)}` : "";
-  const tagQueryBase = `/clients${status ? `?status=${status}` : ""}`;
+  // Every active filter, so switching status/tag or paging never silently
+  // drops the others.
+  const activeParams = (
+    [
+      ["status", status],
+      ["tag", tag],
+      ["q", q],
+      ["service", serviceFilter],
+      ["staff", staffFilter],
+      ["stage", stageFilter],
+      ["missingDocs", missingDocuments ? "1" : ""],
+      ["balance", outstandingBalance ? "1" : ""],
+    ] as [string, string][]
+  ).filter(([, v]) => v);
+  const extraQuery = activeParams.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+  const statusQuery = activeParams.filter(([k]) => k !== "status").length > 0
+    ? `&${activeParams.filter(([k]) => k !== "status").map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`
+    : "";
+  const tagQueryBase = `/clients?${activeParams.filter(([k]) => k !== "tag").map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
 
   return (
     <>
@@ -164,11 +231,23 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
         }
       />
       <div className="flex-1 px-8 py-6">
+        <ContactsSearchBar
+          initialQuery={q}
+          basePath="/clients"
+          services={serviceFilterOptions}
+          staffOptions={staffFilterOptions}
+          pipelineStages={pipelineStageOptions}
+          activeServiceId={serviceFilter}
+          activeStaffId={staffFilter}
+          activeStage={stageFilter}
+          missingDocuments={missingDocuments}
+          outstandingBalance={outstandingBalance}
+        />
         <div className="mb-2 flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => (
             <Link
               key={f.value}
-              href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients${statusQuery}`}
+              href={f.value ? `/clients?status=${f.value}${statusQuery}` : `/clients?${statusQuery.replace(/^&/, "")}`}
               className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                 status === f.value ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
               }`}
@@ -184,16 +263,19 @@ export default async function ClientsPage({ searchParams }: { searchParams: { pa
           </div>
         )}
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
-          <DataTable
-            columns={CLIENT_COLUMNS}
+          <ContactsBulkTable
             rows={clientRows}
+            workspaceId={workspace.id}
+            canManage={Boolean(canCreate)}
             emptyMessage={
-              status
+              q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance
+                ? "No contacts match this search."
+                : status
                 ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".`
                 : "No clients yet. Add your first client to get started."
             }
             emptyAction={
-              !status && canCreate ? (
+              !status && !q && !serviceFilter && !staffFilter && !stageFilter && !missingDocuments && !outstandingBalance && canCreate ? (
                 <NewClientButton
               workspaceId={workspace.id}
               workspaceName={workspace.name}
