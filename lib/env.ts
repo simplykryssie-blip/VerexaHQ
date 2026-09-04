@@ -3,14 +3,14 @@ import { getEnv } from "@vercel/functions";
 export type AppEnvironment = "development" | "staging" | "production";
 
 /**
- * Server-only. In production, VERCEL_ENV/VERCEL_TARGET_ENV weren't reliably
- * present on plain process.env for this project's serverless runtime (a real
- * live request logged everything else correctly but read those as
- * undefined) -- Vercel's own docs point at `getEnv()` from `@vercel/functions`
- * as the supported way to read System Environment Variables now, so that's
- * the primary source here, with process.env as a fallback for any context
- * where the package isn't wired up the same way (e.g. local `next dev`,
- * where neither source has it and this falls through to "development").
+ * Server-only. Reads VERCEL_ENV via `getEnv()` from `@vercel/functions`
+ * (Vercel's supported way to read System Environment Variables), falling
+ * back to process.env for any context where the package isn't wired up the
+ * same way. Requires the project's "Automatically expose System
+ * Environment Variables" setting to be on (Vercel dashboard > Settings >
+ * Environment Variables) -- with it off, VERCEL_ENV is never injected and
+ * this always falls through to "development", even on a real deployment.
+ * Local `next dev` also has neither source and falls through the same way.
  */
 export function getAppEnvironment(): AppEnvironment {
   const env = getEnv();
