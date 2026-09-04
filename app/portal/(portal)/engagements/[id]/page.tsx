@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
+import { getEngagementProgressMap } from "@/lib/portalEngagementProgress";
 import { PageHeader } from "@/components/PageHeader";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 
@@ -18,6 +19,9 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
     .eq("client_id", identity.clientId)
     .maybeSingle();
   if (!engagement) notFound();
+
+  const progressMap = await getEngagementProgressMap([engagement.id]);
+  const progress = progressMap.get(engagement.id);
 
   const [{ data: folders }, { data: documents }, { data: requests }, { data: signatureRequestRows }, { data: activity }] = await Promise.all([
     supabase.from("document_folders").select("id, name, parent_folder_id, display_order").eq("entity_type", "engagement").eq("entity_id", engagement.id).order("display_order"),
@@ -69,7 +73,7 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
         description={
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
             <span>{engagement.engagement_number}</span>
-            <span className="capitalize">{engagement.status}</span>
+            <span className="capitalize">{progress?.stageName ?? engagement.status}</span>
             {taxDetail?.tax_year && <span>Tax year {taxDetail.tax_year}</span>}
             {taxDetail?.return_status && taxDetail.return_status !== "not_filed" && <span className="capitalize">{taxDetail.return_status.replace("_", " ")}</span>}
             {taxDetail?.is_extended && <span>Extended{taxDetail.extension_due_date && ` to ${new Date(taxDetail.extension_due_date).toLocaleDateString()}`}</span>}
