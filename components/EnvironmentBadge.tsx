@@ -21,5 +21,10 @@ const LABEL: Record<ReturnType<typeof getAppEnvironment>, string> = {
  */
 export function EnvironmentBadge() {
   const env = getAppEnvironment();
-  return <Badge tone={TONE[env]}>{LABEL[env]}</Badge>;
+  const raw = process.env.VERCEL_ENV ?? process.env.VERCEL_TARGET_ENV ?? "unset";
+  return (
+    <span title={`VERCEL_ENV/VERCEL_TARGET_ENV: ${raw}`}>
+      <Badge tone={TONE[env]}>{LABEL[env]}</Badge>
+    </span>
+  );
 }
