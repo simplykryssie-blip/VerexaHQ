@@ -29,9 +29,13 @@ import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
 import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
 import { StageBreakdownWidget } from "@/components/widgets/StageBreakdownWidget";
 import { DeadlineRiskWidget } from "@/components/widgets/DeadlineRiskWidget";
+import { UnassignedEngagementsWidget } from "@/components/widgets/UnassignedEngagementsWidget";
+import { OverdueRequestsWidget } from "@/components/widgets/OverdueRequestsWidget";
+import { FailedAutomationRunsWidget } from "@/components/widgets/FailedAutomationRunsWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
 import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
+import { FreshnessBadge } from "@/components/dashboard/FreshnessBadge";
 import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
@@ -55,6 +59,7 @@ function trendFor(current: number, previous: number, suffix: string, sentiment?:
 
 export function DashboardShell({
   workspaceName,
+  generatedAt,
   greetingName,
   isAdmin,
   widgets,
@@ -66,6 +71,9 @@ export function DashboardShell({
   seenOnboardingSteps,
 }: {
   workspaceName: string;
+  /** ISO timestamp taken at the start of this server render -- see
+   *  FreshnessBadge for why the display formatting happens client-side. */
+  generatedAt: string;
   /** For the greeting hero -- the same display_name shown in the sidebar, so
    *  the two never disagree. Null falls back to the workspace name so a
    *  staff member who hasn't set one yet still gets a real greeting. */
@@ -198,7 +206,7 @@ export function DashboardShell({
             tone={data.kpis.outstandingInvoicesCount > 0 ? "warning" : "default"}
             icon={Receipt}
             chip="rose"
-            reportHref="/billing"
+            reportHref="/billing?filter=unpaid"
           />
         );
       case "missing_documents":
@@ -209,7 +217,7 @@ export function DashboardShell({
             tone={data.kpis.missingDocumentsCount > 0 ? "warning" : "default"}
             icon={FileWarning}
             chip="amber"
-            reportHref="/reports/documents"
+            reportHref="/reports/documents?report=missing"
           />
         );
       case "messages":
@@ -232,6 +240,12 @@ export function DashboardShell({
         return <StageBreakdownWidget stages={data.engagementPipeline} />;
       case "deadline_risk":
         return <DeadlineRiskWidget items={data.deadlineRisk} />;
+      case "unassigned_engagements":
+        return <UnassignedEngagementsWidget items={data.unassignedEngagements} />;
+      case "overdue_requests":
+        return <OverdueRequestsWidget items={data.overdueRequests} />;
+      case "failed_automations":
+        return <FailedAutomationRunsWidget items={data.failedAutomationRuns} />;
       default:
         return null;
     }
@@ -257,6 +271,9 @@ export function DashboardShell({
               Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{resolvedGreetingName}</span>.
             </h1>
             <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
+            <div className="mt-3">
+              <FreshnessBadge generatedAt={generatedAt} />
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button
