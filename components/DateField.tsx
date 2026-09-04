@@ -77,6 +77,17 @@ export function DateField({
     setOpen(false);
   }
 
+  // Clear commits and closes immediately, unlike picking a day -- otherwise
+  // it only staged `pending` to null, and closing any other way (Cancel,
+  // clicking outside) silently discarded it and left the original date in
+  // place, making Clear look like it did nothing.
+  async function clear() {
+    setSaving(true);
+    await onApply(null);
+    setSaving(false);
+    setOpen(false);
+  }
+
   return (
     <div className={`relative inline-block ${className}`} ref={containerRef}>
       <button
@@ -143,8 +154,8 @@ export function DateField({
             })}
           </div>
           <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-            <button type="button" onClick={() => setPending(null)} className="text-xs font-medium text-muted hover:text-ink">
-              Clear
+            <button type="button" onClick={clear} disabled={saving} className="text-xs font-medium text-muted hover:text-ink disabled:opacity-60">
+              {saving ? "Clearing..." : "Clear"}
             </button>
             <div className="flex gap-2">
               <button
