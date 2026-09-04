@@ -13,7 +13,7 @@ function clientLabel(c: { client_type: string; first_name: string | null; last_n
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
-export default async function BillingPage() {
+export default async function BillingPage({ searchParams }: { searchParams: { filter?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -112,6 +112,7 @@ export default async function BillingPage() {
           payments={payments}
           services={services ?? []}
           canManage={Boolean(canManage)}
+          initialUnpaidOnly={searchParams.filter === "unpaid"}
         />
       </div>
     </>
