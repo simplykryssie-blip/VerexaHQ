@@ -1,0 +1,55 @@
+name: Critical path tests
+
+# Runs the critical-path smoke test suite (tests/critical-paths.test.ts)
+# against the isolated Supabase staging project on every push to main and
+# on every published release, so client creation, engagement creation,
+# authorization, billing, and workflow-trigger regressions are caught
+# before/at release time rather than discovered live.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   NEXT_PUBLIC_SUPABASE_URL  -- staging project URL
+#   SUPABASE_SERVICE_ROLE_KEY -- staging project service_role key
+# These must point at the isolated staging project, never production.
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch: {}
+
+jobs:
+  critical-path-tests:
+    name: Critical path tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify staging credentials are configured
+        run: |
+          if [ -z "${NEXT_PUBLIC_SUPABASE_URL}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+            echo "::error::NEXT_PUBLIC_SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY repo secrets are not set." \
+                 "The critical-path suite requires both so it actually runs against the isolated" \
+                 "Supabase staging project instead of silently skipping. See .github/workflows/critical-path-tests.yml" \
+                 "for setup instructions."
+            exit 1
+          fi
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Run critical path smoke tests
+        run: npm test
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
