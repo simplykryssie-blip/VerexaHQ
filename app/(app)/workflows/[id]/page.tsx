@@ -20,7 +20,7 @@ import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkflowDetailPage({ params }: { params: { id: string } }) {
+export default async function WorkflowDetailPage({ params, searchParams }: { params: { id: string }; searchParams: { activity?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -264,6 +264,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           pendingApprovals={pendingApprovals}
           conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
           webhookToken={automation.webhook_token}
+          initialActivityOpen={searchParams.activity === "1"}
         />
       </div>
     </>

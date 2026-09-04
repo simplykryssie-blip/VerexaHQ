@@ -55,6 +55,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
+  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
   {
@@ -91,7 +92,7 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Calendar", "Messages"] },
+  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Assignments", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
   { label: "Reference", itemLabels: ["Documents", "Tax Office", "Partners", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
@@ -168,7 +169,6 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Team", href: "/settings/users", icon: Users },
-  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
 ];
 

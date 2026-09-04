@@ -1776,6 +1776,7 @@ export function WorkflowBuilder({
   pendingApprovals = [],
   conditions: initialConditions = [],
   webhookToken,
+  initialActivityOpen = false,
 }: {
   workspaceId: string;
   automationId: string;
@@ -1803,6 +1804,10 @@ export function WorkflowBuilder({
   pendingApprovals?: PendingApprovalRow[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
+  /** Set when a dashboard "Failed Automation Runs" card links here with
+   *  ?activity=1 -- opens straight on the Activity panel instead of the
+   *  builder canvas, so a failed run is one click away, not two. */
+  initialActivityOpen?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -1815,7 +1820,7 @@ export function WorkflowBuilder({
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
-  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(initialActivityOpen);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testClient, setTestClient] = useState<ClientOption | null>(null);
   const [runningTest, setRunningTest] = useState(false);
