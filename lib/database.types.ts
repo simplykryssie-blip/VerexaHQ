@@ -3756,6 +3756,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_id: string | null
           shared_by: string | null
           shared_items: Json
           shared_with_workspace_id: string
@@ -3771,6 +3772,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_id?: string | null
           shared_by?: string | null
           shared_items?: Json
           shared_with_workspace_id: string
@@ -3786,6 +3788,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_id?: string | null
           shared_by?: string | null
           shared_items?: Json
           shared_with_workspace_id?: string
@@ -4215,6 +4218,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -4224,6 +4228,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -4233,6 +4238,7 @@ export type Database = {
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
+          default_reviewer_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
@@ -4242,6 +4248,7 @@ export type Database = {
           relationship_type: string
           responded_at?: string | null
           responded_by?: string | null
+          restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           status?: string
           updated_at?: string
@@ -4251,6 +4258,7 @@ export type Database = {
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
+          default_reviewer_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
@@ -4260,6 +4268,7 @@ export type Database = {
           relationship_type?: string
           responded_at?: string | null
           responded_by?: string | null
+          restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           status?: string
           updated_at?: string
@@ -9832,6 +9841,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -9841,6 +9851,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -10147,6 +10158,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_id: string | null
           shared_by: string | null
           shared_items: Json
           shared_with_workspace_id: string
@@ -10168,6 +10180,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -10177,6 +10190,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -10429,6 +10443,7 @@ export type Database = {
           child_workspace_id: string
           connection_id: string
           created_at: string
+          default_reviewer_id: string
           mailing_address: string
           name: string
           notes: string
@@ -10436,6 +10451,7 @@ export type Database = {
           primary_contact_email: string
           relationship_type: string
           responded_at: string
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           website: string
@@ -11040,6 +11056,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -11049,6 +11066,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -11087,6 +11105,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -11096,6 +11115,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
