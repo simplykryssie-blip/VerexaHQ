@@ -56,7 +56,7 @@ export function Sidebar({
   showMessages?: boolean;
   /** Partners is only relevant to an ERO/SB with connections to manage -- an independent PTIN has no one to show there. */
   showPartners?: boolean;
-  /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (Team -- which also holds Connections -- Assignments, ERO Profile) to the main nav. */
+  /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (ERO Dashboard, Team -- which also holds Connections -- ERO Profile) to the main nav. Assignments lives in the regular Daily section instead, since every workspace tier needs to reassign work, not just ERO/SB. */
   showEroManagement?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
   currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;

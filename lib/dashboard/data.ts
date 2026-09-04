@@ -481,6 +481,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     .select("id, automation_id, completed_at")
     .eq("workspace_id", workspaceId)
     .eq("status", "failed")
+    .is("acknowledged_at", null)
     .order("completed_at", { ascending: false, nullsFirst: false })
     .limit(8);
 

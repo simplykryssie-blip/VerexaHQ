@@ -971,6 +971,8 @@ export type Database = {
       }
       automation_runs: {
         Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
           automation_id: string
           client_id: string | null
           completed_at: string | null
@@ -983,6 +985,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           automation_id: string
           client_id?: string | null
           completed_at?: string | null
@@ -995,6 +999,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           automation_id?: string
           client_id?: string | null
           completed_at?: string | null
@@ -6914,13 +6920,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "quotes_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "quotes_engagement_id_fkey"
             columns: ["engagement_id"]
             isOneToOne: false
@@ -6940,6 +6939,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "quotes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "quotes_service_id_fkey"
@@ -9854,6 +9860,10 @@ export type Database = {
       accept_workspace_invitation_by_token: {
         Args: { p_token: string }
         Returns: string
+      }
+      acknowledge_automation_run: {
+        Args: { p_run_id: string }
+        Returns: undefined
       }
       add_client_address: {
         Args: {
