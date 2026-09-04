@@ -1394,6 +1394,7 @@ export type Database = {
           custom_domain: string | null
           dba: string | null
           display_name: string | null
+          document_footer_text: string | null
           email_from_name: string | null
           email_header_logo_url: string | null
           favicon_url: string | null
@@ -1423,6 +1424,7 @@ export type Database = {
           custom_domain?: string | null
           dba?: string | null
           display_name?: string | null
+          document_footer_text?: string | null
           email_from_name?: string | null
           email_header_logo_url?: string | null
           favicon_url?: string | null
@@ -1452,6 +1454,7 @@ export type Database = {
           custom_domain?: string | null
           dba?: string | null
           display_name?: string | null
+          document_footer_text?: string | null
           email_from_name?: string | null
           email_header_logo_url?: string | null
           favicon_url?: string | null

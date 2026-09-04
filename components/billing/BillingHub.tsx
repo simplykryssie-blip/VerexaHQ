@@ -185,6 +185,7 @@ export function BillingHub({
                     )}
                     <PreviewButton
                       kind="quote"
+                      workspaceId={workspaceId}
                       firmName={workspaceName}
                       clientName={q.client_name}
                       number={q.quote_number}
@@ -234,6 +235,7 @@ export function BillingHub({
                     )}
                     <PreviewButton
                       kind="invoice"
+                      workspaceId={workspaceId}
                       firmName={workspaceName}
                       clientName={i.client_name}
                       number={i.invoice_number}

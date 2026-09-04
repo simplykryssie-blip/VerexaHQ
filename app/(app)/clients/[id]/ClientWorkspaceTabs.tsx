@@ -1018,6 +1018,7 @@ export function BillingTab({
                   )}
                   <PreviewButton
                     kind="quote"
+                    workspaceId={workspaceId}
                     firmName={workspaceName}
                     clientName={clientName}
                     number={q.quote_number}
@@ -1068,6 +1069,7 @@ export function BillingTab({
                       )}
                       <PreviewButton
                         kind="invoice"
+                        workspaceId={workspaceId}
                         firmName={workspaceName}
                         clientName={clientName}
                         number={i.invoice_number}

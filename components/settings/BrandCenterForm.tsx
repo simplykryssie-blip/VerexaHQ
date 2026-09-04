@@ -237,6 +237,7 @@ export function BrandCenterForm({
   secondaryColor,
   sidebarBgColor,
   sidebarTextColor,
+  documentFooterText,
   isOwner,
   isWhitelabeledByEro,
   allowsBrandingOverride,
@@ -259,6 +260,8 @@ export function BrandCenterForm({
   sidebarBgColor: string | null;
   /** Raw stored override -- null means "auto-pick for contrast." */
   sidebarTextColor: string | null;
+  /** Shown at the bottom of every quote and invoice -- policies, terms, etc. */
+  documentFooterText: string | null;
   isOwner: boolean;
   isWhitelabeledByEro: boolean;
   allowsBrandingOverride: boolean;
@@ -281,6 +284,7 @@ export function BrandCenterForm({
   const [sidebarBg, setSidebarBg] = useState(sidebarBgColor ?? "#0F172A");
   const [textMode, setTextMode] = useState<TextMode>(sidebarTextColor === "#FFFFFF" ? "light" : sidebarTextColor === "#0F172A" ? "dark" : "auto");
   const [showAdvanced, setShowAdvanced] = useState(Boolean(sidebarLogoUrl || portalLogoUrl));
+  const [footerText, setFooterText] = useState(documentFooterText ?? "");
   const [saving, setSaving] = useState(false);
 
   const editable = platformAdminOverride || (isOwner && (!isWhitelabeledByEro || allowsBrandingOverride));
@@ -300,6 +304,7 @@ export function BrandCenterForm({
       secondary_color: string;
       sidebar_bg_color: string | null;
       sidebar_text_color: string | null;
+      document_footer_text: string | null;
     } = {
       workspace_id: workspaceId,
       logo_url: logo,
@@ -310,6 +315,7 @@ export function BrandCenterForm({
       secondary_color: secondary,
       sidebar_bg_color: customSidebar ? sidebarBg : null,
       sidebar_text_color: customSidebar && textMode !== "auto" ? resolvedSidebarText : null,
+      document_footer_text: footerText.trim() || null,
     };
     if (!isWhitelabeledByEro) patch.display_name = bizName || null;
     const { error } = await supabase.from("branding").upsert(patch, { onConflict: "workspace_id" });
@@ -486,6 +492,20 @@ export function BrandCenterForm({
             </div>
           </div>
         )}
+      </SettingsCard>
+
+      <SettingsCard title="Quote & invoice footer" description="Shown at the bottom of every quote and invoice your clients see -- policies, terms, refund/cancellation language, and the like.">
+        <label className="block">
+          <span className="sr-only">Footer text</span>
+          <textarea
+            value={footerText}
+            disabled={!editable}
+            onChange={(e) => setFooterText(e.target.value)}
+            rows={3}
+            placeholder="e.g. Prices valid for 30 days. Payment due upon acceptance. See our engagement terms for cancellation policy."
+            className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          />
+        </label>
       </SettingsCard>
 
       {editable && (
