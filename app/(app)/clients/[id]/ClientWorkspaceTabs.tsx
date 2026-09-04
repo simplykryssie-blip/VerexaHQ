@@ -21,6 +21,7 @@ import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/Payme
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
 import { PreviewButton } from "@/components/billing/PreviewButton";
 import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
+import { ReactivateQuoteButton } from "@/components/billing/ReactivateQuoteButton";
 import { AddRelationshipForm, LinkExistingClientForm, RelationshipsList } from "./RelationshipsSection";
 import { ClientAssignmentForm } from "./ClientAssignmentForm";
 import { AddAppointmentForm } from "./AddAppointmentForm";
@@ -1007,6 +1008,7 @@ export function BillingTab({
                     </Badge>
                     {money(q.total_amount)}
                   </span>
+                  {canManageBilling && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                   {canManageBilling && (
                     <button
                       type="button"

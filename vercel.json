@@ -9,6 +9,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/cancel-overdue-quotes",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/check-billing-cycles",
       "schedule": "0 * * * *"
     },

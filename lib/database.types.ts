@@ -6825,6 +6825,7 @@ export type Database = {
       quotes: {
         Row: {
           accepted_at: string | null
+          cancelled_at: string | null
           client_id: string
           created_at: string
           created_by: string | null
@@ -6849,6 +6850,7 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          cancelled_at?: string | null
           client_id: string
           created_at?: string
           created_by?: string | null
@@ -6873,6 +6875,7 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          cancelled_at?: string | null
           client_id?: string
           created_at?: string
           created_by?: string | null
@@ -9944,6 +9947,7 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      cancel_overdue_quotes: { Args: never; Returns: number }
       capture_public_lead_from_contact_step: {
         Args: {
           p_auth_user_id?: string

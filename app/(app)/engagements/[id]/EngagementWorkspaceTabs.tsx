@@ -25,6 +25,7 @@ import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseC
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { ReactivateQuoteButton } from "@/components/billing/ReactivateQuoteButton";
 import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 
@@ -793,6 +794,7 @@ export function BillingTab({
                     </Badge>
                     {money(q.total_amount)}
                   </span>
+                  {canManageBilling && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                   {canManageBilling && (
                     <button
                       type="button"

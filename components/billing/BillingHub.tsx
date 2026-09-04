@@ -11,6 +11,7 @@ import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billing
 import { InvoiceQuoteForm, type EditingInvoiceQuote } from "./InvoiceQuoteForm";
 import { PreviewButton } from "./PreviewButton";
 import { NewBillingDocumentModal } from "./NewBillingDocumentModal";
+import { ReactivateQuoteButton } from "./ReactivateQuoteButton";
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -178,6 +179,7 @@ export function BillingHub({
                       {q.status}
                     </Badge>
                     <span className="text-slate">{money(q.total_amount)}</span>
+                    {canManage && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                     {canManage && (
                       <button type="button" onClick={() => setEditingQuote(q)} className="text-xs font-medium text-accent hover:underline">
                         Edit
