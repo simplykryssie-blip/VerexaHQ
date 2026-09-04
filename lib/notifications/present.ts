@@ -66,6 +66,11 @@ const TITLES: Record<string, (p: Payload) => string> = {
     const invoiceNumber = str(p, "invoice_number");
     return invoiceNumber ? `Invoice ${invoiceNumber} for ${client} is fully paid` : `${client}'s invoice is fully paid`;
   },
+  APPOINTMENT_BOOKED_ONLINE: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    const title = str(p, "appointment_title", "an appointment");
+    return `${client} booked ${title}`;
+  },
   automation: (p) => {
     const message = str(p, "message").trim();
     if (message) return message;

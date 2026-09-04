@@ -21,6 +21,7 @@ const PREFERENCE_ROWS = [
   { eventType: "ORGANIZER_ERO_REVIEW_REQUESTED", channel: "In-App", label: "An organizer is sent to you for ERO review", description: "Notifies you when a reviewer sends a submitted organizer to you for ERO review." },
   { eventType: "PAYMENT_RECEIVED", channel: "In-App", label: "A payment comes in", description: "Notifies you any time a payment (any amount, any method) is recorded for one of your clients." },
   { eventType: "INVOICE_PAID", channel: "In-App", label: "An invoice is fully paid off", description: "Notifies you when an invoice's balance hits zero." },
+  { eventType: "APPOINTMENT_BOOKED_ONLINE", channel: "In-App", label: "A client books an appointment online", description: "Notifies you the moment someone books through your public booking link or the client portal." },
   // Everything below are timed reminders sent by email/text ahead of a
   // deadline, not "something just happened" notices.
   { eventType: "workflow_stage_due", channel: "Email", label: "Workflow stage due soon (Email)", description: "A stage assigned to you is due within 2 days." },
