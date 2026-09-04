@@ -39,8 +39,17 @@ export default function ForgotPasswordPage() {
         return;
       }
 
+      // Recovery links hand the session back as a URL fragment
+      // (#access_token=...), which never reaches a server route handler at
+      // all -- browsers don't send fragments over HTTP. Routing this
+      // through /auth/confirm (server-side) meant the session was silently
+      // lost and the user landed on /login with no error shown. Sending the
+      // link straight to /reset-password (a client component) lets the
+      // browser-side Supabase client auto-detect the session from the URL
+      // on load, which works regardless of whether it arrives as a fragment
+      // or a PKCE code.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/confirm?next=/reset-password`,
+        redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
