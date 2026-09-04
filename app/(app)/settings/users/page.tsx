@@ -100,6 +100,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
     role_name: roleNameById.get(i.role_id) ?? null,
   }));
   const pendingInvitations = invitations.filter((i) => i.status === "pending");
+  const reviewerOptions = members.map((m) => ({ id: m.user_id, display_name: m.display_name }));
   const myConnection = (myConnectionRows ?? [])[0] ?? null;
   const myConnectionParentLabel = myConnection ? PARENT_TIER_LABEL[myConnection.relationship_type] ?? "firm" : null;
   const canInvite = childRelationshipTypes.length > 0;
@@ -255,10 +256,14 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
                       connectionId={c.connection_id}
                       name={c.name}
                       tierLabel={CONNECTED_CHILD_TIER_LABEL[c.relationship_type] ?? "firm"}
+                      relationshipType={c.relationship_type}
                       status={c.status}
                       billingResponsibility={c.billing_responsibility}
                       sharesCommunicationsIdentity={c.shares_communications_identity}
                       allowsBrandingOverride={c.allows_branding_override}
+                      defaultReviewerId={c.default_reviewer_id ?? null}
+                      restrictPtinStaffAssignment={Boolean(c.restrict_ptin_staff_assignment)}
+                      reviewerOptions={reviewerOptions}
                     />
                   ))}
                 </ul>
