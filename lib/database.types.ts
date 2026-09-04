@@ -6832,6 +6832,7 @@ export type Database = {
           discount_amount: number
           engagement_id: string | null
           id: string
+          invoice_id: string | null
           line_items: Json
           notes: string | null
           quote_number: string | null
@@ -6855,6 +6856,7 @@ export type Database = {
           discount_amount?: number
           engagement_id?: string | null
           id?: string
+          invoice_id?: string | null
           line_items?: Json
           notes?: string | null
           quote_number?: string | null
@@ -6878,6 +6880,7 @@ export type Database = {
           discount_amount?: number
           engagement_id?: string | null
           id?: string
+          invoice_id?: string | null
           line_items?: Json
           notes?: string | null
           quote_number?: string | null
@@ -6905,6 +6908,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
           {
