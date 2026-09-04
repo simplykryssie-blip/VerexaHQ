@@ -377,7 +377,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
 
   const engagementIds = (engagements ?? []).map((e) => e.id);
 
-  const [{ data: engagementActivity }, { data: threadMessages }] = await Promise.all([
+  const [{ data: engagementActivity }, { data: threadMessages }, { data: emailLog }] = await Promise.all([
     engagementIds.length > 0
       ? supabase
           .from("activity_log")
@@ -394,6 +394,17 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
           .in("thread_id", messageThreads.map((t) => t.id))
           .order("created_at", { ascending: true })
       : Promise.resolve({ data: [] as { id: string; thread_id: string; sender_type: string; body: string; is_internal: boolean; created_at: string; sender_id: string | null; workspace_id: string }[] }),
+    // Matched by address rather than a direct client_id -- email_log is
+    // transactional (invoices, reminders, portal invites, ...) with no
+    // entity link back to who it was about, only who it went to.
+    client.primary_email
+      ? supabase
+          .from("email_log")
+          .select("id, subject, status, sent_at, created_at")
+          .eq("recipient_email", client.primary_email)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] as { id: string; subject: string; status: string; sent_at: string | null; created_at: string }[] }),
   ]);
 
   let tasks: {
@@ -447,7 +458,34 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     );
   const missingDocumentCount = missingDocumentCountRaw ?? 0;
 
-  const timeline = [...(clientActivity ?? []), ...(engagementActivity ?? [])].sort(
+  // "Important events only" -- deliberately excludes pipeline/workflow
+  // process noise (stage moves, automation runs) that activity_log never
+  // logged in the first place. Adds the categories that already exist as
+  // separate data on this page but weren't in the timeline: notes,
+  // payments, and outbound email (matched by address -- email_log has no
+  // entity link back to a client). Calls and a staff-assignment change
+  // history aren't tracked anywhere in the schema, so they're left out
+  // rather than faked.
+  const noteEvents = (notes ?? []).map((n) => ({
+    id: `note:${n.id}`,
+    description: `Note added${n.subject ? `: ${n.subject}` : ""}`,
+    activity_type: "NOTE_ADDED",
+    created_at: n.created_at,
+  }));
+  const paymentEvents = (payments ?? []).map((p) => ({
+    id: `payment:${p.id}`,
+    description: `Payment ${p.status} -- $${Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    activity_type: "PAYMENT_RECEIVED",
+    created_at: p.payment_date,
+  }));
+  const emailEvents = (emailLog ?? []).map((e) => ({
+    id: `email:${e.id}`,
+    description: `Email ${e.status}${e.subject ? `: ${e.subject}` : ""}`,
+    activity_type: "EMAIL_SENT",
+    created_at: e.sent_at ?? e.created_at,
+  }));
+
+  const timeline = [...(clientActivity ?? []), ...(engagementActivity ?? []), ...noteEvents, ...paymentEvents, ...emailEvents].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 

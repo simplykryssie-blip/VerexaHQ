@@ -28,13 +28,17 @@ function clientLabelFor(c: { first_name: string | null; last_name: string | null
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
-export default async function AssignmentsPage({ searchParams }: { searchParams: { tab?: string; role?: string } }) {
+export default async function AssignmentsPage({ searchParams }: { searchParams: { tab?: string; role?: string; filter?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const tab: Tab = searchParams.tab === "tasks" ? "tasks" : searchParams.tab === "engagements" ? "engagements" : "clients";
   const engagementRole: EngagementRoleKey =
     ENGAGEMENT_ROLES.find((r) => r.key === searchParams.role)?.key ?? "assigned_staff_id";
+  // Only meaningful for the role currently being viewed -- an engagement
+  // "unassigned" as staff can still have a reviewer, so the filter tracks
+  // whichever role column is actually selected, not always assigned_staff_id.
+  const unassignedOnly = tab === "engagements" && searchParams.filter === "unassigned";
 
   const supabase = createClient();
   // Mirrors the real RLS UPDATE policies on each table exactly -- clients_update
@@ -104,8 +108,9 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
       .limit(200);
     table = "engagements";
     field = engagementRole;
-    emptyMessage = "No engagements yet.";
-    rows = (data ?? []).map((e) => {
+    emptyMessage = unassignedOnly ? "Every engagement already has an owner." : "No engagements yet.";
+    const filteredData = unassignedOnly ? (data ?? []).filter((e) => !e[engagementRole]) : (data ?? []);
+    rows = filteredData.map((e) => {
       const c = e.clients as unknown as {
         first_name: string | null;
         last_name: string | null;
@@ -142,11 +147,11 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
         </nav>
 
         {tab === "engagements" && (
-          <div className="mb-4 flex gap-1">
+          <div className="mb-4 flex flex-wrap items-center gap-1">
             {ENGAGEMENT_ROLES.map((r) => (
               <Link
                 key={r.key}
-                href={`/assignments?tab=engagements&role=${r.key}`}
+                href={`/assignments?tab=engagements&role=${r.key}${unassignedOnly ? "&filter=unassigned" : ""}`}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   engagementRole === r.key ? "bg-accent text-white" : "bg-surfaceMuted text-muted hover:text-ink"
                 }`}
@@ -154,6 +159,14 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
                 {r.label}
               </Link>
             ))}
+            {unassignedOnly && (
+              <span className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-accent bg-accentSoft px-3 py-1 text-xs font-medium text-accent">
+                Unassigned only
+                <Link href={`/assignments?tab=engagements&role=${engagementRole}`} className="hover:underline" aria-label="Clear filter">
+                  &times;
+                </Link>
+              </span>
+            )}
           </div>
         )}
 

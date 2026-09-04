@@ -20,7 +20,7 @@ import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 
 export const dynamic = "force-dynamic";
 
-export default async function WorkflowDetailPage({ params }: { params: { id: string } }) {
+export default async function WorkflowDetailPage({ params, searchParams }: { params: { id: string }; searchParams: { activity?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
@@ -67,7 +67,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
         .order("sort_order"),
       supabase
         .from("automation_runs")
-        .select("id, status, started_at, completed_at, current_step_id, engagements(engagement_number), clients(first_name, last_name, business_name)")
+        .select("id, status, started_at, completed_at, current_step_id, is_test, engagements(engagement_number), clients(first_name, last_name, business_name)")
         .eq("automation_id", automation.id)
         .order("started_at", { ascending: false })
         .limit(50),
@@ -203,6 +203,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
     started_at: r.started_at,
     completed_at: r.completed_at,
     current_step_id: r.current_step_id,
+    is_test: Boolean(r.is_test),
     engagement_number: (r.engagements as unknown as { engagement_number: string | null } | null)?.engagement_number ?? null,
     client_name: clientLabelFor(r.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
   }));
@@ -242,6 +243,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           triggerType={automation.trigger_type}
           triggerConfig={automation.trigger_config as Record<string, unknown>}
           isEnabled={automation.is_enabled}
+          status={automation.status}
           steps={stepRows}
           stepEdges={stepEdgeRows}
           runs={runRows}
@@ -262,6 +264,7 @@ export default async function WorkflowDetailPage({ params }: { params: { id: str
           pendingApprovals={pendingApprovals}
           conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
           webhookToken={automation.webhook_token}
+          initialActivityOpen={searchParams.activity === "1"}
         />
       </div>
     </>

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
 
 export type KpiData = {
   revenueThisMonth: number;
@@ -44,6 +45,28 @@ export type DeadlineRiskItem = {
   status: string;
   daysRemaining: number;
 };
+export type UnassignedEngagementItem = {
+  id: string;
+  engagement_number: string | null;
+  client_id: string;
+  client_name: string;
+  status: string;
+  due_date: string | null;
+};
+export type OverdueRequestItem = {
+  id: string;
+  title: string;
+  due_date: string;
+  entityLabel: string;
+  entityHref: string;
+};
+export type FailedAutomationRunItem = {
+  id: string;
+  automation_id: string;
+  automation_name: string;
+  completed_at: string | null;
+  error_message: string | null;
+};
 
 // How close to its due date an engagement has to be (or how far past it)
 // before it counts as at risk -- generous enough to be useful without
@@ -80,6 +103,9 @@ export type DashboardData = {
   topServices: ServiceEngagementCount[];
   engagementPipeline: PipelineStageCount[];
   deadlineRisk: DeadlineRiskItem[];
+  unassignedEngagements: UnassignedEngagementItem[];
+  overdueRequests: OverdueRequestItem[];
+  failedAutomationRuns: FailedAutomationRunItem[];
 };
 
 export async function getDashboardData(workspaceId: string): Promise<DashboardData> {
@@ -381,6 +407,117 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       };
     });
 
+  // Unassigned engagements: open work nobody owns yet -- the same "still
+  // open" status filter as the deadline-risk query above, just without the
+  // due-date requirement, since an engagement with no due date can still
+  // sit unassigned indefinitely.
+  const { data: unassignedRows } = await supabase
+    .from("engagements")
+    .select("id, engagement_number, client_id, status, due_date")
+    .eq("workspace_id", workspaceId)
+    .is("assigned_staff_id", null)
+    .not("status", "in", '("Completed","Archived")')
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .limit(8);
+
+  const unassignedClientIds = Array.from(new Set((unassignedRows ?? []).map((e) => e.client_id).filter((v): v is string => Boolean(v))));
+  const { data: unassignedClientRows } = unassignedClientIds.length
+    ? await supabase.from("clients").select("id, client_type, first_name, last_name, business_name").in("id", unassignedClientIds)
+    : { data: [] as { id: string; client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }[] };
+  const unassignedClientById = new Map((unassignedClientRows ?? []).map((c) => [c.id, c]));
+
+  const unassignedEngagements: UnassignedEngagementItem[] = (unassignedRows ?? [])
+    .filter((e): e is typeof e & { client_id: string } => Boolean(e.client_id))
+    .map((e) => {
+      const client = unassignedClientById.get(e.client_id);
+      const clientName = client
+        ? client.client_type === "business" && client.business_name
+          ? client.business_name
+          : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
+        : "Unknown client";
+      return {
+        id: e.id,
+        engagement_number: e.engagement_number,
+        client_id: e.client_id,
+        client_name: clientName,
+        status: e.status,
+        due_date: e.due_date,
+      };
+    });
+
+  // Overdue client requests: open document requests whose due date has
+  // already passed -- same open-request source as the Missing Documents
+  // KPI, just filtered to the overdue subset and resolved to a real
+  // client/engagement link via the same label map the Documents report uses.
+  const { data: overdueRequestRows } = await supabase
+    .from("document_requests")
+    .select("id, title, due_date, entity_type, entity_id")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "open")
+    .not("due_date", "is", null)
+    .lt("due_date", startOfToday.toISOString())
+    .order("due_date", { ascending: true })
+    .limit(8);
+
+  const overdueRequestLabelMap = await buildEntityLabelMap(supabase, overdueRequestRows ?? []);
+  const overdueRequests: OverdueRequestItem[] = (overdueRequestRows ?? []).map((r) => {
+    const entity = overdueRequestLabelMap.get(`${r.entity_type}:${r.entity_id}`);
+    return {
+      id: r.id,
+      title: r.title,
+      due_date: r.due_date as string,
+      entityLabel: entity?.label ?? "Unknown",
+      entityHref: entity?.href ?? "/documents",
+    };
+  });
+
+  // Failed automation runs: automation_runs.status = 'failed' is the
+  // authoritative run-level outcome every automation action sets on
+  // failure -- the per-step error text lives on automation_execution_logs
+  // (workflow_run_id -> automation_runs.id), so a second query pulls the
+  // most recent one per failed run for a real error preview, not a guess.
+  const { data: failedRunRows } = await supabase
+    .from("automation_runs")
+    .select("id, automation_id, completed_at")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "failed")
+    .is("acknowledged_at", null)
+    .order("completed_at", { ascending: false, nullsFirst: false })
+    .limit(8);
+
+  const failedRunIds = (failedRunRows ?? []).map((r) => r.id);
+  const failedAutomationIds = Array.from(new Set((failedRunRows ?? []).map((r) => r.automation_id).filter((v): v is string => Boolean(v))));
+  const [{ data: failedAutomationNameRows }, { data: failedLogRows }] = await Promise.all([
+    failedAutomationIds.length
+      ? supabase.from("automations").select("id, name").in("id", failedAutomationIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    failedRunIds.length
+      ? supabase
+          .from("automation_execution_logs")
+          .select("workflow_run_id, error_message, executed_at")
+          .in("workflow_run_id", failedRunIds)
+          .eq("status", "failed")
+          .order("executed_at", { ascending: false })
+      : Promise.resolve({ data: [] as { workflow_run_id: string | null; error_message: string | null; executed_at: string }[] }),
+  ]);
+  const automationNameById = new Map((failedAutomationNameRows ?? []).map((a) => [a.id, a.name]));
+  const latestErrorByRun = new Map<string, string | null>();
+  for (const log of failedLogRows ?? []) {
+    if (log.workflow_run_id && !latestErrorByRun.has(log.workflow_run_id)) {
+      latestErrorByRun.set(log.workflow_run_id, log.error_message);
+    }
+  }
+
+  const failedAutomationRuns: FailedAutomationRunItem[] = (failedRunRows ?? [])
+    .filter((r): r is typeof r & { automation_id: string } => Boolean(r.automation_id))
+    .map((r) => ({
+      id: r.id,
+      automation_id: r.automation_id,
+      automation_name: automationNameById.get(r.automation_id) ?? "Automation",
+      completed_at: r.completed_at,
+      error_message: latestErrorByRun.get(r.id) ?? null,
+    }));
+
   return {
     kpis: {
       revenueThisMonth,
@@ -402,5 +539,8 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     topServices,
     engagementPipeline,
     deadlineRisk,
+    unassignedEngagements,
+    overdueRequests,
+    failedAutomationRuns,
   };
 }
