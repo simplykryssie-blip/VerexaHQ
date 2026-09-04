@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Briefcase, CheckSquare, Receipt, ArrowUpRight } from "lucide-react";
+import { Briefcase, CheckSquare, Receipt, ArrowUpRight, FileText, ClipboardCheck, PenLine, RefreshCw, StickyNote, DollarSign, Mail, HelpCircle } from "lucide-react";
 import { taskHref } from "@/lib/taskLink";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
@@ -1143,19 +1143,47 @@ export function BillingTab({
 
 // ----------------------------------------------------------------- Timeline
 
+// Only what a staff member would actually call "an event" -- documents,
+// organizer activity, signatures, notes, payments, email, and status
+// changes. No pipeline-stage or automation-run noise, since activity_log
+// never records those against a client in the first place.
+const TIMELINE_ICON: Record<string, typeof FileText> = {
+  DOCUMENT_UPLOADED: FileText,
+  DOCUMENT_DELETED: FileText,
+  DOCUMENT_REQUEST_CREATED: FileText,
+  ENGAGEMENT_CREATED: Briefcase,
+  ORGANIZER_INFO_REQUESTED: ClipboardCheck,
+  ORGANIZER_REVIEWED: ClipboardCheck,
+  ORGANIZER_SUBMITTED: ClipboardCheck,
+  organizer_submitted: ClipboardCheck,
+  SIGNATURE_SIGNED: PenLine,
+  STATUS_CHANGE: RefreshCw,
+  NOTE_ADDED: StickyNote,
+  PAYMENT_RECEIVED: DollarSign,
+  EMAIL_SENT: Mail,
+};
+
 export function TimelineTab({ timeline }: { timeline: ActivityRow[] }) {
   return (
     <Section title="Timeline">
       {timeline.length === 0 ? (
         <EmptyState message="No activity recorded yet." />
       ) : (
-        <ul className="space-y-3">
-          {timeline.map((a) => (
-            <li key={a.id} className="flex items-center justify-between text-sm">
-              <span className="text-slate">{a.description}</span>
-              <span className="text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>
-            </li>
-          ))}
+        <ul className="space-y-2">
+          {timeline.map((a) => {
+            const Icon = TIMELINE_ICON[a.activity_type] ?? HelpCircle;
+            return (
+              <li key={a.id} className="flex items-start gap-2.5 rounded-xl border border-border bg-surfaceMuted px-3 py-2.5">
+                <span className="mt-0.5 shrink-0 text-muted">
+                  <Icon size={15} aria-hidden="true" />
+                </span>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="truncate text-sm text-slate">{a.description}</span>
+                  <span className="shrink-0 text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </Section>
