@@ -22,6 +22,11 @@ const PREFERENCE_ROWS = [
   { eventType: "PAYMENT_RECEIVED", channel: "In-App", label: "A payment comes in", description: "Notifies you any time a payment (any amount, any method) is recorded for one of your clients." },
   { eventType: "INVOICE_PAID", channel: "In-App", label: "An invoice is fully paid off", description: "Notifies you when an invoice's balance hits zero." },
   { eventType: "APPOINTMENT_BOOKED_ONLINE", channel: "In-App", label: "A client books an appointment online", description: "Notifies you the moment someone books through your public booking link or the client portal." },
+  // Quote accepted/declined also gets a real email, not just the bell --
+  // it's revenue-adjacent enough that most firms want to know even away
+  // from the app, unlike the purely-in-app events above.
+  { eventType: "quote_accepted", channel: "Email", label: "A client accepts a quote (Email)", description: "A client accepted a quote -- it's automatically turned into an invoice." },
+  { eventType: "quote_declined", channel: "Email", label: "A client declines a quote (Email)", description: "A client declined a quote you sent them." },
   // Everything below are timed reminders sent by email/text ahead of a
   // deadline, not "something just happened" notices.
   { eventType: "workflow_stage_due", channel: "Email", label: "Workflow stage due soon (Email)", description: "A stage assigned to you is due within 2 days." },
