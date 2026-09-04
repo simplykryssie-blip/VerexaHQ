@@ -979,6 +979,7 @@ export type Database = {
           current_step_id: string | null
           engagement_id: string | null
           id: string
+          is_test: boolean
           started_at: string
           status: string
           trigger_snapshot: Json
@@ -993,6 +994,7 @@ export type Database = {
           current_step_id?: string | null
           engagement_id?: string | null
           id?: string
+          is_test?: boolean
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1007,6 +1009,7 @@ export type Database = {
           current_step_id?: string | null
           engagement_id?: string | null
           id?: string
+          is_test?: boolean
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -3753,6 +3756,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_id: string | null
           shared_by: string | null
           shared_items: Json
           shared_with_workspace_id: string
@@ -3768,6 +3772,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_id?: string | null
           shared_by?: string | null
           shared_items?: Json
           shared_with_workspace_id: string
@@ -3783,6 +3788,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_id?: string | null
           shared_by?: string | null
           shared_items?: Json
           shared_with_workspace_id?: string
@@ -4212,6 +4218,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -4221,6 +4228,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -4230,6 +4238,7 @@ export type Database = {
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
+          default_reviewer_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
@@ -4239,6 +4248,7 @@ export type Database = {
           relationship_type: string
           responded_at?: string | null
           responded_by?: string | null
+          restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           status?: string
           updated_at?: string
@@ -4248,6 +4258,7 @@ export type Database = {
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
+          default_reviewer_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
@@ -4257,6 +4268,7 @@ export type Database = {
           relationship_type?: string
           responded_at?: string | null
           responded_by?: string | null
+          restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           status?: string
           updated_at?: string
@@ -5220,6 +5232,7 @@ export type Database = {
           error: string | null
           event_type: string | null
           id: string
+          is_test: boolean
           max_attempts: number
           payload: Json
           priority: string | null
@@ -5244,6 +5257,7 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
+          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -5268,6 +5282,7 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
+          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -9826,6 +9841,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -9835,6 +9851,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -10141,6 +10158,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_id: string | null
           shared_by: string | null
           shared_items: Json
           shared_with_workspace_id: string
@@ -10162,6 +10180,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -10171,6 +10190,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -10423,6 +10443,7 @@ export type Database = {
           child_workspace_id: string
           connection_id: string
           created_at: string
+          default_reviewer_id: string
           mailing_address: string
           name: string
           notes: string
@@ -10430,6 +10451,7 @@ export type Database = {
           primary_contact_email: string
           relationship_type: string
           responded_at: string
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           website: string
@@ -11034,6 +11056,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -11043,6 +11066,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -11081,6 +11105,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -11090,6 +11115,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -11224,6 +11250,14 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      run_automation_test: {
+        Args: {
+          p_automation_id: string
+          p_client_id: string
+          p_engagement_id?: string
+        }
+        Returns: string
+      }
       run_critical_path_smoke_tests: {
         Args: never
         Returns: {
@@ -11243,6 +11277,33 @@ export type Database = {
       save_organizer_reopened_field_answer: {
         Args: { p_item_id: string; p_value: Json }
         Returns: undefined
+      }
+      search_clients: {
+        Args: {
+          p_assigned_staff_id?: string
+          p_lifecycle_statuses?: string[]
+          p_limit?: number
+          p_missing_documents?: boolean
+          p_offset?: number
+          p_outstanding_balance?: boolean
+          p_pipeline_stage_name?: string
+          p_query?: string
+          p_service_id?: string
+          p_tag?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          business_name: string
+          client_type: string
+          first_name: string
+          id: string
+          last_name: string
+          lifecycle_status: string
+          primary_email: string
+          primary_phone: string
+          tags: string[]
+          total_count: number
+        }[]
       }
       send_organizer_information_request: {
         Args: {
