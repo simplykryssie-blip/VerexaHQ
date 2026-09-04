@@ -1,16 +1,20 @@
+import { getEnv } from "@vercel/functions";
+
 export type AppEnvironment = "development" | "staging" | "production";
 
 /**
- * Server-only. Vercel sets VERCEL_ENV automatically: "production" for the
- * Production deployment, "preview" for every preview deployment (mapped to
- * "staging" here since preview deployments point at the isolated staging
- * Supabase project -- see .env.local.example). Also checks VERCEL_TARGET_ENV,
- * Vercel's newer parallel signal (introduced for custom environments), in
- * case a given deployment ever populates that but not VERCEL_ENV. Local
- * `next dev`, where neither is set, falls through to "development".
+ * Server-only. In production, VERCEL_ENV/VERCEL_TARGET_ENV weren't reliably
+ * present on plain process.env for this project's serverless runtime (a real
+ * live request logged everything else correctly but read those as
+ * undefined) -- Vercel's own docs point at `getEnv()` from `@vercel/functions`
+ * as the supported way to read System Environment Variables now, so that's
+ * the primary source here, with process.env as a fallback for any context
+ * where the package isn't wired up the same way (e.g. local `next dev`,
+ * where neither source has it and this falls through to "development").
  */
 export function getAppEnvironment(): AppEnvironment {
-  const vercelEnv = process.env.VERCEL_ENV ?? process.env.VERCEL_TARGET_ENV;
+  const env = getEnv();
+  const vercelEnv = env.VERCEL_ENV ?? process.env.VERCEL_ENV ?? process.env.VERCEL_TARGET_ENV;
   if (vercelEnv === "production") return "production";
   if (vercelEnv === "preview") return "staging";
   return "development";

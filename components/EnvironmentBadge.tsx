@@ -1,3 +1,4 @@
+import { getEnv } from "@vercel/functions";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { getAppEnvironment } from "@/lib/env";
 
@@ -21,16 +22,19 @@ const LABEL: Record<ReturnType<typeof getAppEnvironment>, string> = {
  */
 export function EnvironmentBadge() {
   const env = getAppEnvironment();
-  // Temporary broader diagnostic: VERCEL and NODE_ENV are set by the
-  // platform/Next.js in every context, so if these are ALSO unset it means
-  // this render path isn't seeing the Vercel runtime environment at all
-  // (not just missing VERCEL_ENV specifically) -- narrows the real cause.
+  // Temporary broader diagnostic: compares the @vercel/functions getEnv()
+  // source (what Vercel's docs recommend for System Environment Variables)
+  // against raw process.env side by side, since process.env alone was
+  // observed unset for VERCEL_ENV/VERCEL_TARGET_ENV/even VERCEL on a real
+  // Preview deployment.
+  const fnEnv = getEnv();
   const debug = [
-    `VERCEL_ENV=${process.env.VERCEL_ENV ?? "unset"}`,
-    `VERCEL_TARGET_ENV=${process.env.VERCEL_TARGET_ENV ?? "unset"}`,
-    `VERCEL=${process.env.VERCEL ?? "unset"}`,
-    `NODE_ENV=${process.env.NODE_ENV ?? "unset"}`,
-    `VERCEL_URL=${process.env.VERCEL_URL ?? "unset"}`,
+    `getEnv().VERCEL_ENV=${fnEnv.VERCEL_ENV ?? "unset"}`,
+    `process.env.VERCEL_ENV=${process.env.VERCEL_ENV ?? "unset"}`,
+    `process.env.VERCEL_TARGET_ENV=${process.env.VERCEL_TARGET_ENV ?? "unset"}`,
+    `process.env.VERCEL=${process.env.VERCEL ?? "unset"}`,
+    `process.env.NODE_ENV=${process.env.NODE_ENV ?? "unset"}`,
+    `process.env.VERCEL_URL=${process.env.VERCEL_URL ?? "unset"}`,
   ].join(" | ");
   return (
     <span title={debug}>
