@@ -971,36 +971,45 @@ export type Database = {
       }
       automation_runs: {
         Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
           automation_id: string
           client_id: string | null
           completed_at: string | null
           current_step_id: string | null
           engagement_id: string | null
           id: string
+          is_test: boolean
           started_at: string
           status: string
           trigger_snapshot: Json
           workspace_id: string
         }
         Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           automation_id: string
           client_id?: string | null
           completed_at?: string | null
           current_step_id?: string | null
           engagement_id?: string | null
           id?: string
+          is_test?: boolean
           started_at?: string
           status?: string
           trigger_snapshot?: Json
           workspace_id: string
         }
         Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
           automation_id?: string
           client_id?: string | null
           completed_at?: string | null
           current_step_id?: string | null
           engagement_id?: string | null
           id?: string
+          is_test?: boolean
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -3747,6 +3756,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_id: string | null
           shared_by: string | null
           shared_items: Json
           shared_with_workspace_id: string
@@ -3762,6 +3772,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_id?: string | null
           shared_by?: string | null
           shared_items?: Json
           shared_with_workspace_id: string
@@ -3777,6 +3788,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          reviewer_id?: string | null
           shared_by?: string | null
           shared_items?: Json
           shared_with_workspace_id?: string
@@ -4206,6 +4218,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -4215,6 +4228,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -4224,6 +4238,7 @@ export type Database = {
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
+          default_reviewer_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
@@ -4233,6 +4248,7 @@ export type Database = {
           relationship_type: string
           responded_at?: string | null
           responded_by?: string | null
+          restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           status?: string
           updated_at?: string
@@ -4242,6 +4258,7 @@ export type Database = {
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
+          default_reviewer_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
@@ -4251,6 +4268,7 @@ export type Database = {
           relationship_type?: string
           responded_at?: string | null
           responded_by?: string | null
+          restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           status?: string
           updated_at?: string
@@ -5214,6 +5232,7 @@ export type Database = {
           error: string | null
           event_type: string | null
           id: string
+          is_test: boolean
           max_attempts: number
           payload: Json
           priority: string | null
@@ -5238,6 +5257,7 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
+          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -5262,6 +5282,7 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
+          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -6914,13 +6935,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "quotes_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "quotes_engagement_id_fkey"
             columns: ["engagement_id"]
             isOneToOne: false
@@ -6940,6 +6954,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "quotes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "quotes_service_id_fkey"
@@ -9820,6 +9841,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -9829,6 +9851,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -9854,6 +9877,10 @@ export type Database = {
       accept_workspace_invitation_by_token: {
         Args: { p_token: string }
         Returns: string
+      }
+      acknowledge_automation_run: {
+        Args: { p_run_id: string }
+        Returns: undefined
       }
       add_client_address: {
         Args: {
@@ -10131,6 +10158,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          reviewer_id: string | null
           shared_by: string | null
           shared_items: Json
           shared_with_workspace_id: string
@@ -10152,6 +10180,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -10161,6 +10190,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -10413,6 +10443,7 @@ export type Database = {
           child_workspace_id: string
           connection_id: string
           created_at: string
+          default_reviewer_id: string
           mailing_address: string
           name: string
           notes: string
@@ -10420,6 +10451,7 @@ export type Database = {
           primary_contact_email: string
           relationship_type: string
           responded_at: string
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           website: string
@@ -10835,6 +10867,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      mark_client_lost: {
+        Args: { p_client_id: string; p_reason?: string }
+        Returns: undefined
+      }
       mark_document_request_item_received: {
         Args: { p_item_status_id: string }
         Returns: undefined
@@ -11020,6 +11056,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -11029,6 +11066,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -11067,6 +11105,7 @@ export type Database = {
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
+          default_reviewer_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
@@ -11076,6 +11115,7 @@ export type Database = {
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           status: string
           updated_at: string
@@ -11210,6 +11250,14 @@ export type Database = {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: undefined
       }
+      run_automation_test: {
+        Args: {
+          p_automation_id: string
+          p_client_id: string
+          p_engagement_id?: string
+        }
+        Returns: string
+      }
       run_critical_path_smoke_tests: {
         Args: never
         Returns: {
@@ -11229,6 +11277,33 @@ export type Database = {
       save_organizer_reopened_field_answer: {
         Args: { p_item_id: string; p_value: Json }
         Returns: undefined
+      }
+      search_clients: {
+        Args: {
+          p_assigned_staff_id?: string
+          p_lifecycle_statuses?: string[]
+          p_limit?: number
+          p_missing_documents?: boolean
+          p_offset?: number
+          p_outstanding_balance?: boolean
+          p_pipeline_stage_name?: string
+          p_query?: string
+          p_service_id?: string
+          p_tag?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          business_name: string
+          client_type: string
+          first_name: string
+          id: string
+          last_name: string
+          lifecycle_status: string
+          primary_email: string
+          primary_phone: string
+          tags: string[]
+          total_count: number
+        }[]
       }
       send_organizer_information_request: {
         Args: {
