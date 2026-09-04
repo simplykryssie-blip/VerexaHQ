@@ -10845,6 +10845,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      mark_client_lost: {
+        Args: { p_client_id: string; p_reason?: string }
+        Returns: undefined
+      }
       mark_document_request_item_received: {
         Args: { p_item_status_id: string }
         Returns: undefined
