@@ -139,7 +139,7 @@ export default async function DashboardPage() {
         key: "profile",
         label: "Complete your profile",
         description: "Add your name and a photo so colleagues recognize you in messages.",
-        href: "/settings/firm-profile",
+        href: "/settings/profile",
         complete: profileComplete,
       },
       ...(showEroSteps

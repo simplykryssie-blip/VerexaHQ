@@ -25,7 +25,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   profile: {
     whatItDoes: "Your name and photo are how colleagues recognize you across the app -- on internal messages, the staff directory, and anywhere else your activity shows up.",
     howItWorks: "Once set, your photo and name show up automatically next to anything you do -- no separate setup needed per feature.",
-    howToSetUp: "Go to Firm Profile, upload a photo, and fill in your name if it's not already there.",
+    howToSetUp: "Go to Profile, upload a photo, and fill in your name if it's not already there.",
   },
   roles: {
     whatItDoes: "Roles control what each person on your team can see and do -- e.g. a preparer might not need access to billing, while a reviewer needs to approve returns.",
