@@ -309,6 +309,33 @@ export function OverviewTab({
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
+            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
+          </div>
+          {addresses.length === 0 ? (
+            <EmptyState message="No additional addresses." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {addresses.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                  <span>
+                    <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
+                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                    {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!a.is_primary && <SetAddressPrimaryButton addressId={a.id} />}
+                    <EditAddressForm address={a} />
+                    <DeleteAddressButton addressId={a.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Tags</h3>
           <TagsEditor clientId={client.id} workspaceId={workspaceId} tags={client.tags ?? []} suggestions={workspaceTags} />
         </div>
@@ -434,33 +461,6 @@ export function OverviewTab({
           )}
         </div>
         )}
-
-        <div className="mt-4 border-t border-border pt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
-            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
-          </div>
-          {addresses.length === 0 ? (
-            <EmptyState message="No additional addresses." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {addresses.map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                  <span>
-                    <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
-                    {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {!a.is_primary && <SetAddressPrimaryButton addressId={a.id} />}
-                    <EditAddressForm address={a} />
-                    <DeleteAddressButton addressId={a.id} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
 
         {client.client_type === "individual" && (
         <div className="mt-4 border-t border-border pt-4">
