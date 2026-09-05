@@ -65,8 +65,8 @@ import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
-import { TagNameInput } from "@/components/workflows/TagNameInput";
-import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
+import { TagListInput } from "@/components/workflows/TagListInput";
+import { ensureTagsConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
 import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
@@ -438,8 +438,8 @@ export function StepCard({
   async function save(configOverride?: Record<string, unknown>) {
     const configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
-      const tag = (configToSave.tag as string | undefined)?.trim();
-      if (tag && !(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+      const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
+      if (tags.length > 0 && !(await ensureTagsConfirmed(supabase, workspaceId, tags))) return;
     }
 
     setSaving(true);
@@ -1602,13 +1602,15 @@ export function StepCard({
 
         {(actionType === "add_tag" || actionType === "remove_tag") && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Tag
-            <TagNameInput
+            Tags
+            <TagListInput
               disabled={!canManage}
-              value={(config.tag as string) ?? ""}
-              onChange={(v) => setField("tag", v)}
+              value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
+              onChange={(v) => {
+                setConfig((c) => ({ ...c, tags: v }));
+                setSaved(false);
+              }}
               tagOptions={tagOptions}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             />
           </label>
         )}
@@ -1829,12 +1831,10 @@ export function WorkflowBuilder({
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
     if (currentTriggerType === "client.tag_added") {
-      const triggerTag = (config.tag as string | undefined)?.trim();
-      if (triggerTag) tagsToConfirm.add(triggerTag);
+      const triggerTags = (config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : []);
+      triggerTags.forEach((t) => tagsToConfirm.add(t));
     }
-    for (const tag of tagsToConfirm) {
-      if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
-    }
+    if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return;
 
     setSavingTrigger(true);
     const { error } = await supabase
