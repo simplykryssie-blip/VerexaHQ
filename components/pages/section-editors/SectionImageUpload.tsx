@@ -1,36 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { ImagePlus, X, FolderOpen } from "lucide-react";
+import { Check, Copy, ImagePlus, X, FolderOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { mediaLibraryPrefix } from "@/components/websites/MediaLibrary";
 
 type LibraryFile = { name: string; url: string };
 
-// Uploads land in the same per-website "branding" bucket prefix the
-// website's Media tab (MediaLibrary.tsx) manages, so anything uploaded here
-// shows up there and vice versa -- one media library, not two.
+// Uploads land in the same workspace-level "branding" bucket prefix the
+// Media Library tab (MediaLibrary.tsx) manages, so anything uploaded here
+// shows up there (and on every other website/funnel in the workspace) and
+// vice versa -- one shared media library, not one per website.
 export function SectionImageUpload({
   workspaceId,
-  websiteId,
   value,
   onChange,
   label = "Image",
 }: {
   workspaceId: string;
-  websiteId: string;
   value?: string;
   onChange: (url: string | null) => void;
   label?: string;
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const prefix = mediaLibraryPrefix(workspaceId, websiteId);
+  const prefix = mediaLibraryPrefix(workspaceId);
   const [uploading, setUploading] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   const [libraryFiles, setLibraryFiles] = useState<LibraryFile[] | null>(null);
   const [loadingLibrary, setLoadingLibrary] = useState(false);
+  const [copiedName, setCopiedName] = useState<string | null>(null);
 
   async function upload(file: File) {
     setUploading(true);
@@ -60,6 +60,13 @@ export function SectionImageUpload({
         .filter((f) => f.id)
         .map((f) => ({ name: f.name, url: supabase.storage.from("branding").getPublicUrl(`${prefix}/${f.name}`).data.publicUrl }))
     );
+  }
+
+  async function copyLink(f: LibraryFile, e: React.MouseEvent) {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(f.url);
+    setCopiedName(f.name);
+    setTimeout(() => setCopiedName((cur) => (cur === f.name ? null : cur)), 2000);
   }
 
   return (
@@ -100,22 +107,32 @@ export function SectionImageUpload({
           {loadingLibrary ? (
             <p className="p-2 text-xs text-muted">Loading...</p>
           ) : !libraryFiles || libraryFiles.length === 0 ? (
-            <p className="p-2 text-xs text-muted">No media uploaded yet -- upload one above, or add some from the website&apos;s Media tab.</p>
+            <p className="p-2 text-xs text-muted">No media uploaded yet -- upload one above, or add some from the workspace&apos;s Media Library.</p>
           ) : (
             <div className="grid grid-cols-3 gap-1.5">
               {libraryFiles.map((f) => (
-                <button
-                  key={f.name}
-                  type="button"
-                  onClick={() => {
-                    onChange(f.url);
-                    setBrowsing(false);
-                  }}
-                  className="overflow-hidden rounded-lg border border-border hover:border-accent"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.name} className="aspect-video w-full object-cover" />
-                </button>
+                <div key={f.name} className="group relative overflow-hidden rounded-lg border border-border hover:border-accent">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange(f.url);
+                      setBrowsing(false);
+                    }}
+                    className="block w-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt={f.name} className="aspect-video w-full object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => copyLink(f, e)}
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                    title="Copy link"
+                    aria-label="Copy link"
+                  >
+                    {copiedName === f.name ? <Check size={11} /> : <Copy size={11} />}
+                  </button>
+                </div>
               ))}
             </div>
           )}
