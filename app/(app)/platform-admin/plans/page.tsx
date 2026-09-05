@@ -26,7 +26,7 @@ export default async function PlatformAdminPlansPage() {
   const { data: plans } = await supabase
     .from("platform_subscription_plans")
     .select(
-      "id, slug, name, base_price_cents, included_seats, per_seat_price_cents, email_overage_rate_cents, sms_overage_rate_cents, storage_overage_rate_cents, signup_free_emails, signup_free_sms, signup_free_storage_gb, currency, is_active"
+      "id, slug, name, base_price_cents, included_seats, per_seat_price_cents, email_overage_rate_cents_per_1000, sms_overage_rate_cents, storage_overage_rate_cents, signup_free_emails, signup_free_sms, signup_free_storage_gb, currency, is_active"
     )
     .order("base_price_cents", { ascending: true });
 

@@ -15,6 +15,14 @@ const RESOURCE_UNIT_LABEL: Record<"email" | "sms" | "storage", string> = {
   storage: "GB",
 };
 
+// Email is priced per 1,000 (Resend-style); SMS and storage are priced per
+// single unit -- matches UNITS_PER_RATE in the usage-topup-checkout route.
+const UNITS_PER_RATE: Record<"email" | "sms" | "storage", number> = {
+  email: 1000,
+  sms: 1,
+  storage: 1,
+};
+
 function UsageBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
   const tone = pct >= 100 ? "bg-danger" : pct >= 80 ? "bg-amber" : "bg-accent";
@@ -39,7 +47,7 @@ function TopUp({
   const [amount, setAmount] = useState(String(MINIMUM_TOPUP_DOLLARS));
   const parsed = Number(amount);
   const isValid = Number.isFinite(parsed) && parsed >= MINIMUM_TOPUP_DOLLARS;
-  const estimatedUnits = isValid && rateCents > 0 ? (parsed * 100) / rateCents : 0;
+  const estimatedUnits = isValid && rateCents > 0 ? ((parsed * 100) / rateCents) * UNITS_PER_RATE[resourceType] : 0;
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -85,7 +93,7 @@ function TopUp({
 
 export function PlanUsageManager({
   isOwner,
-  emailRateCents,
+  emailRateCentsPer1000,
   smsRateCents,
   storageRateCents,
   email,
@@ -93,7 +101,7 @@ export function PlanUsageManager({
   storage,
 }: {
   isOwner: boolean;
-  emailRateCents: number;
+  emailRateCentsPer1000: number;
   smsRateCents: number;
   storageRateCents: number;
   email: BucketMetric;
@@ -144,7 +152,7 @@ export function PlanUsageManager({
         {emailFreeLeft === 0 && email.prepaidBalance === 0 && (
           <p className="mt-1.5 text-xs text-danger">Free amount used up -- sending is paused until you buy a top-up.</p>
         )}
-        {isOwner && <TopUp resourceType="email" rateCents={emailRateCents} disabled={purchasing !== null} onBuy={buy} />}
+        {isOwner && <TopUp resourceType="email" rateCents={emailRateCentsPer1000} disabled={purchasing !== null} onBuy={buy} />}
       </div>
 
       <div>

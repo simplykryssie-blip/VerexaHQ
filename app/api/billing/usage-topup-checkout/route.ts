@@ -12,10 +12,18 @@ import { getAppUrl } from "@/lib/appUrl";
 // and only when they actually need more (no recurring/automatic charge).
 const MINIMUM_TOPUP_CENTS = 2500;
 
-const RATE_COLUMN: Record<"email" | "sms" | "storage", "email_overage_rate_cents" | "sms_overage_rate_cents" | "storage_overage_rate_cents"> = {
-  email: "email_overage_rate_cents",
+const RATE_COLUMN: Record<"email" | "sms" | "storage", "email_overage_rate_cents_per_1000" | "sms_overage_rate_cents" | "storage_overage_rate_cents"> = {
+  email: "email_overage_rate_cents_per_1000",
   sms: "sms_overage_rate_cents",
   storage: "storage_overage_rate_cents",
+};
+
+// Email is priced per 1,000 (Resend-style); SMS and storage are priced per
+// single unit -- see the email_overage_rate_cents_per_1000 column comment.
+const UNITS_PER_RATE: Record<"email" | "sms" | "storage", number> = {
+  email: 1000,
+  sms: 1,
+  storage: 1,
 };
 
 const RESOURCE_LABEL: Record<"email" | "sms" | "storage", string> = {
@@ -63,11 +71,11 @@ export async function POST(request: Request) {
 
   const { data: subscription } = await supabase
     .from("workspace_subscriptions")
-    .select("stripe_status, platform_subscription_plans(email_overage_rate_cents, sms_overage_rate_cents, storage_overage_rate_cents)")
+    .select("stripe_status, platform_subscription_plans(email_overage_rate_cents_per_1000, sms_overage_rate_cents, storage_overage_rate_cents)")
     .eq("workspace_id", workspace.id)
     .maybeSingle();
   const plan = subscription?.platform_subscription_plans as {
-    email_overage_rate_cents: number;
+    email_overage_rate_cents_per_1000: number;
     sms_overage_rate_cents: number;
     storage_overage_rate_cents: number;
   } | null;
@@ -79,7 +87,7 @@ export async function POST(request: Request) {
   if (!rateCents || rateCents <= 0) {
     return NextResponse.json({ error: "This plan doesn't have an overage rate configured for that resource." }, { status: 400 });
   }
-  const units = amountCents / rateCents;
+  const units = (amountCents / rateCents) * UNITS_PER_RATE[resourceType];
   const appUrl = getAppUrl(request);
 
   const result = await createCheckoutSession({

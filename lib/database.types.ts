@@ -6498,7 +6498,7 @@ export type Database = {
           base_price_cents: number
           created_at: string
           currency: string
-          email_overage_rate_cents: number
+          email_overage_rate_cents_per_1000: number
           id: string
           included_seats: number
           is_active: boolean
@@ -6518,7 +6518,7 @@ export type Database = {
           base_price_cents: number
           created_at?: string
           currency?: string
-          email_overage_rate_cents?: number
+          email_overage_rate_cents_per_1000?: number
           id?: string
           included_seats?: number
           is_active?: boolean
@@ -6538,7 +6538,7 @@ export type Database = {
           base_price_cents?: number
           created_at?: string
           currency?: string
-          email_overage_rate_cents?: number
+          email_overage_rate_cents_per_1000?: number
           id?: string
           included_seats?: number
           is_active?: boolean

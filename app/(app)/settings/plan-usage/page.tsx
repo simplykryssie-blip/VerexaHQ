@@ -19,7 +19,7 @@ export default async function PlanUsagePage() {
     supabase
       .from("workspace_subscriptions")
       .select(
-        "stripe_status, card_brand, card_last4, card_exp_month, card_exp_year, platform_subscription_plans(name, email_overage_rate_cents, sms_overage_rate_cents, storage_overage_rate_cents)"
+        "stripe_status, card_brand, card_last4, card_exp_month, card_exp_year, platform_subscription_plans(name, email_overage_rate_cents_per_1000, sms_overage_rate_cents, storage_overage_rate_cents)"
       )
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
@@ -34,7 +34,7 @@ export default async function PlanUsagePage() {
 
   const plan = subscription?.platform_subscription_plans as {
     name: string;
-    email_overage_rate_cents: number;
+    email_overage_rate_cents_per_1000: number;
     sms_overage_rate_cents: number;
     storage_overage_rate_cents: number;
   } | null;
@@ -71,7 +71,7 @@ export default async function PlanUsagePage() {
           <SettingsCard title={plan.name} description="Contact Verexa to change plans.">
             <PlanUsageManager
               isOwner={workspace.is_owner}
-              emailRateCents={plan.email_overage_rate_cents}
+              emailRateCentsPer1000={plan.email_overage_rate_cents_per_1000}
               smsRateCents={plan.sms_overage_rate_cents}
               storageRateCents={plan.storage_overage_rate_cents}
               email={{
