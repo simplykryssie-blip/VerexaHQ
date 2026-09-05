@@ -4,6 +4,7 @@ import { sendEmailViaResend } from "@/lib/email/resend";
 import { sendSmsViaTwilio } from "@/lib/sms/twilio";
 import { renderTemplate } from "@/lib/templates/render";
 import { recordProviderCheck } from "@/lib/providerHealth";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,7 +22,7 @@ function isAuthorized(request: Request) {
 // external provider, so they're marked sent immediately) and promotes any
 // due scheduled messages out of draft_saves. Meant to be hit by a Vercel
 // Cron job every few minutes; see vercel.json.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -297,3 +298,4 @@ function referencesToken(template: string, token: string) {
   return new RegExp(`\\{\\{\\s*${token}\\s*\\}\\}`).test(template);
 }
 
+export const GET = withJobLogging("dispatch-notifications", handleGET);

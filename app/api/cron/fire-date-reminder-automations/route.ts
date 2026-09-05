@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -16,7 +17,7 @@ function isAuthorized(request: Request) {
 // comparison and starts a run for every match; its own dedupe table
 // (automation_date_reminders_sent) keeps a match from firing twice on the
 // same calendar day even across multiple cron ticks.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -30,3 +31,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ fired: data ?? 0 });
 }
+
+export const GET = withJobLogging("fire-date-reminder-automations", handleGET);

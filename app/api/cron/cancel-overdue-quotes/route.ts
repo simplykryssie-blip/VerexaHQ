@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ function isAuthorized(request: Request) {
 // Quotes still 'sent' 24 hours past their valid_until date auto-cancel.
 // Idempotent via cancel_overdue_quotes() only touching status='sent' rows --
 // once cancelled a quote won't match the sweep again.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -25,3 +26,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ cancelled: data });
 }
+
+export const GET = withJobLogging("cancel-overdue-quotes", handleGET);

@@ -2654,6 +2654,36 @@ export type Database = {
           },
         ]
       }
+      cron_job_runs: {
+        Row: {
+          completed_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          job_key: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          job_key: string
+          started_at: string
+          status: string
+        }
+        Update: {
+          completed_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          job_key?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       dashboard_widgets: {
         Row: {
           config: Json
@@ -10620,6 +10650,21 @@ export type Database = {
           workspace_type: string
         }[]
       }
+      get_platform_failed_automation_runs: {
+        Args: { p_limit?: number }
+        Returns: {
+          action_type: string
+          automation_id: string
+          automation_name: string
+          error_message: string
+          failed_at: string
+          failed_step_id: string
+          run_id: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
+      get_platform_it_staff_emails: { Args: never; Returns: string[] }
       get_platform_staff_directory: {
         Args: never
         Returns: {
@@ -11216,6 +11261,10 @@ export type Database = {
       }
       resubmit_engagement_share: {
         Args: { p_engagement_share_id: string }
+        Returns: undefined
+      }
+      retry_failed_automation_run: {
+        Args: { p_run_id: string }
         Returns: undefined
       }
       reveal_client_ein: { Args: { p_client_id: string }; Returns: string }
