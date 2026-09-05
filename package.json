@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.73.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.110.6",
     "@tiptap/extension-table": "^3.31.0",
