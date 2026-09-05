@@ -8,6 +8,9 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+
+const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "success", archived: "neutral" };
 
 export type FunnelCard = { id: string; name: string; status: string; page_count: number };
 
@@ -133,7 +136,9 @@ export function FunnelLibrary({
                   {canManage ? (
                     <TemplateStatusCycle table="site_funnels" id={f.id} status={f.status} />
                   ) : (
-                    <span className="rounded-full bg-surfaceMuted px-2.5 py-1 text-xs font-medium capitalize text-muted">{f.status}</span>
+                    <Badge tone={STATUS_TONE[f.status] ?? "neutral"} className="capitalize">
+                      {f.status}
+                    </Badge>
                   )}
                 </div>
                 <Link

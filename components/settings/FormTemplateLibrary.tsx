@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { LayoutTemplate } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
 import { DocumentRequestLibrary, type DocumentRequestTemplateCard } from "@/components/settings/document-request-editor/DocumentRequestLibrary";
@@ -157,19 +157,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       />
 
       <div className="mt-4">
-        <nav className="flex gap-1 border-b border-border">
-          {tabs.map((t) => (
-            <Link
-              key={t.key}
-              href={`/templates?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                activeTab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
+        <Tabs tabs={tabs.map((t) => ({ id: t.key, label: t.label, href: `/templates?tab=${t.key}` }))} active={activeTab} />
       </div>
 
       <div className="mt-4">
