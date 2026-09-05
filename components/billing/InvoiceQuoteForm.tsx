@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { DateField } from "@/components/DateField";
 import { InvoicePreview, type PreviewLineItem } from "./InvoicePreview";
 
 export type EditingInvoiceQuote = {
@@ -277,12 +278,9 @@ export function InvoiceQuoteForm({
           </label>
           <label className="text-xs text-muted">
             {kind === "invoice" ? "Due date" : "Valid until"}
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <div className="mt-1">
+              <DateField value={dueDate || null} onApply={(next) => setDueDate(next ?? "")} className="w-full" />
+            </div>
           </label>
         </div>
 
