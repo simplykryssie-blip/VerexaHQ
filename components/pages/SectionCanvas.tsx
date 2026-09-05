@@ -13,6 +13,7 @@ export function SectionCanvas({
   accentColor,
   services,
   staff,
+  customCss,
 }: {
   sections: BuilderSection[];
   selectedSectionId: string | null;
@@ -22,6 +23,7 @@ export function SectionCanvas({
   accentColor?: string;
   services?: BookableServiceOption[];
   staff?: StaffOption[];
+  customCss?: string | null;
 }) {
   if (sections.length === 0) {
     return (
@@ -33,6 +35,7 @@ export function SectionCanvas({
 
   return (
     <div className="flex-1 overflow-y-auto bg-white p-4">
+      {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
       <div className="mx-auto max-w-3xl space-y-3">
         {sections.map((section, i) => (
           <div
@@ -83,7 +86,7 @@ export function SectionCanvas({
               </div>
             </div>
             <div className="pointer-events-none">
-              <SectionPreview section={section} accentColor={accentColor} services={services} staff={staff} />
+              <SectionPreview section={section} accentColor={accentColor} services={services} staff={staff} customCss={customCss} />
             </div>
           </div>
         ))}

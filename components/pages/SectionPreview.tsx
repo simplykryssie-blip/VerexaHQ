@@ -22,11 +22,13 @@ export function SectionPreview({
   accentColor,
   services = [],
   staff = [],
+  customCss,
 }: {
   section: BuilderSection;
   accentColor?: string;
   services?: BookableServiceOption[];
   staff?: StaffOption[];
+  customCss?: string | null;
 }) {
   switch (section.section_type) {
     case "hero":
@@ -82,7 +84,7 @@ export function SectionPreview({
       return (
         <section className="mx-auto max-w-5xl px-6 py-8">
           {cfg.html ? (
-            <SandboxedHtmlPreview html={cfg.html} />
+            <SandboxedHtmlPreview html={cfg.html} customCss={customCss} />
           ) : (
             <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">
               Custom HTML block -- paste some HTML to see it here.
