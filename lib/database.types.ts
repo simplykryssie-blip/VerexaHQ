@@ -8374,6 +8374,7 @@ export type Database = {
       user_profiles: {
         Row: {
           avatar_url: string | null
+          caf_number: string | null
           created_at: string
           default_workspace_id: string | null
           display_name: string | null
@@ -8397,6 +8398,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          caf_number?: string | null
           created_at?: string
           default_workspace_id?: string | null
           display_name?: string | null
@@ -8420,6 +8422,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          caf_number?: string | null
           created_at?: string
           default_workspace_id?: string | null
           display_name?: string | null

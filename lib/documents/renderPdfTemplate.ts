@@ -1,6 +1,13 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { renderTemplate } from "@/lib/templates/render";
 
-export type AcroformFieldMapping = { kind: "acroform"; pdfFieldName: string; mergeField: string };
+// `template` is free text that may contain zero or more {{merge_field}}
+// tokens (same convention as email/SMS templates) -- not just one bare
+// token. This is what lets a field like "Taxpayer name and address" combine
+// {{client_name}} and {{client_address}} on one line, or a field that needs
+// something no merge field covers (an internal file number, boilerplate
+// text) just be typed in directly with no tokens at all.
+export type AcroformFieldMapping = { kind: "acroform"; pdfFieldName: string; template: string };
 export type OverlayFieldMapping = { kind: "overlay"; mergeField: string; page: number; xPct: number; yPct: number; fontSize: number };
 export type PdfFieldMapping = AcroformFieldMapping | OverlayFieldMapping;
 
@@ -32,7 +39,7 @@ export async function renderPdfTemplate({
     const form = pdfDoc.getForm();
     for (const mapping of fieldMappings) {
       if (mapping.kind !== "acroform") continue;
-      const value = values[mapping.mergeField];
+      const value = renderTemplate(mapping.template, values);
       if (!value) continue;
       try {
         form.getTextField(mapping.pdfFieldName).setText(value);

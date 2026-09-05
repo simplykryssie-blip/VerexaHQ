@@ -25,7 +25,11 @@ export default async function ProfilePage() {
   const showBusinessInfo = !isEroManagementTier(workspace);
 
   const [{ data: myProfile }, { data: isAdmin }, firmTaxResult, contactResult, brandingResult] = await Promise.all([
-    supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("user_profiles")
+      .select("first_name, last_name, display_name, avatar_url, phone, ptin_last4, caf_number")
+      .eq("id", user.id)
+      .maybeSingle(),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
     showBusinessInfo
       ? supabase.from("firm_tax_profile").select("ein_last4, ptin_last4").eq("workspace_id", workspace.id).maybeSingle()
@@ -55,6 +59,7 @@ export default async function ProfilePage() {
           displayName={myProfile?.display_name ?? null}
           avatarUrl={myProfile?.avatar_url ?? null}
           personalPhone={myProfile?.phone ?? null}
+          cafNumber={myProfile?.caf_number ?? null}
           ptinSource={showBusinessInfo ? "firm" : "personal"}
           ptinLast4={showBusinessInfo ? firmTax?.ptin_last4 ?? null : myProfile?.ptin_last4 ?? null}
           showBusinessInfo={showBusinessInfo}

@@ -95,6 +95,18 @@ export const MERGE_FIELD_GROUPS: { group: string; fields: MergeFieldDef[] }[] = 
     ],
   },
   {
+    group: "Preparer",
+    fields: [
+      {
+        token: "preparer_caf_number",
+        label: "Preparer's CAF number",
+        kind: "auto",
+        source: "user_profiles.caf_number (the staff member sending this document)",
+        sample: "1234-56789R",
+      },
+    ],
+  },
+  {
     group: "Filled in when sent (not auto-populated)",
     fields: [
       { token: "payment_terms", label: "Payment terms", kind: "manual", sample: "due upon receipt" },

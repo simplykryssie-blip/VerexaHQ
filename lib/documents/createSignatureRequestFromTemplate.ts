@@ -38,6 +38,13 @@ export async function createSignatureRequestFromTemplate({
   title: string;
   dueDate?: string | null;
 }): Promise<{ requestId: string } | { error: string }> {
+  const {
+    data: { user: sendingUser },
+  } = await supabase.auth.getUser();
+  const { data: senderProfile } = sendingUser
+    ? await supabase.from("user_profiles").select("caf_number").eq("id", sendingUser.id).maybeSingle()
+    : { data: null };
+
   const mergeValues = {
     client_name: clientName ?? "",
     client_email: clientEmail ?? "",
@@ -45,6 +52,7 @@ export async function createSignatureRequestFromTemplate({
     firm_address: "",
     firm_phone: "",
     current_date: new Date().toLocaleDateString(),
+    preparer_caf_number: senderProfile?.caf_number ?? "",
   };
   // A rendered PDF (not the raw HTML) so the signing page can actually
   // preview it -- it only knows how to render PDFs and images -- and so it
@@ -68,9 +76,6 @@ export async function createSignatureRequestFromTemplate({
     pdfBytes = await renderLetterPdf(template.name, mergedHtml, signerLabel, undefined, bannerImageBytes ?? undefined);
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
   const fileName = `${template.name}.pdf`;
   const path = `${workspaceId}/${entityId}/${Date.now()}-${fileName}`;
   const blob = new Blob([pdfBytes as unknown as BlobPart], { type: "application/pdf" });
@@ -87,7 +92,7 @@ export async function createSignatureRequestFromTemplate({
       storage_path: path,
       mime_type: "application/pdf",
       file_size_bytes: blob.size,
-      uploaded_by: user?.id,
+      uploaded_by: sendingUser?.id,
       visibility: "internal",
       category: "Signed Document",
     })
