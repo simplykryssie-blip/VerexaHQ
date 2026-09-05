@@ -22,6 +22,7 @@ type Props = {
   displayName: string | null;
   avatarUrl: string | null;
   personalPhone: string | null;
+  cafNumber: string | null;
   // "personal": an ERO/service-bureau staff member's own PTIN, stored on
   // user_profiles. "firm": a solo PTIN-tier workspace's PTIN, stored on
   // firm_tax_profile -- the workspace IS the preparer, so there's no
@@ -63,6 +64,7 @@ export function ProfileForm({
   displayName,
   avatarUrl,
   personalPhone,
+  cafNumber,
   ptinSource,
   ptinLast4,
   showBusinessInfo,
@@ -85,6 +87,7 @@ export function ProfileForm({
   const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [pPhone, setPPhone] = useState(personalPhone ?? "");
+  const [caf, setCaf] = useState(cafNumber ?? "");
   const [ptin, setPtin] = useState("");
   const [clearPtin, setClearPtin] = useState(false);
 
@@ -123,7 +126,14 @@ export function ProfileForm({
 
     const { error: profileError } = await supabase
       .from("user_profiles")
-      .update({ first_name: first || null, last_name: last || null, display_name: display || null, phone: pPhone || null, avatar_url: avatar })
+      .update({
+        first_name: first || null,
+        last_name: last || null,
+        display_name: display || null,
+        phone: pPhone || null,
+        avatar_url: avatar,
+        caf_number: caf.trim() || null,
+      })
       .eq("id", userId);
     if (profileError) {
       setSaving(false);
@@ -249,6 +259,14 @@ export function ProfileForm({
             clear={clearPtin}
             onClearChange={setClearPtin}
             helpText="Encrypted -- only you can reveal it."
+          />
+        </div>
+        <div className="mt-3">
+          <LabeledInput
+            label="CAF number"
+            value={caf}
+            onChange={(e) => setCaf(e.target.value)}
+            helpText="Your IRS Centralized Authorization File number, for designee/POA forms (e.g. Form 8821) -- available as a merge field when mapping an uploaded PDF."
           />
         </div>
       </SettingsCard>
