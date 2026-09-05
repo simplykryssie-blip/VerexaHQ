@@ -1,23 +1,88 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ALL_MERGE_FIELDS } from "@/lib/mergeFields";
-import type { AcroformFieldMapping } from "@/lib/documents/renderPdfTemplate";
+import type { AcroformFieldMapping, DetectedPdfField } from "@/lib/documents/renderPdfTemplate";
 
-// Lists the PDF's own fillable fields (detected via pdf-lib when the file
-// was uploaded) and lets staff map each one to a merge field -- no visual
-// placement needed since the PDF already knows where each field sits on the
-// page.
+let pdfjsInitPromise: Promise<typeof import("pdfjs-dist")> | null = null;
+function loadPdfjs() {
+  if (!pdfjsInitPromise) {
+    pdfjsInitPromise = import("pdfjs-dist").then((pdfjsLib) => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+      return pdfjsLib;
+    });
+  }
+  return pdfjsInitPromise;
+}
+
+type PositionedField = DetectedPdfField & { page: number; rect: NonNullable<DetectedPdfField["rect"]> };
+
+// Shows the actual uploaded PDF (any PDF -- not tied to any one form) with a
+// dropdown overlaid directly on top of each fillable field's real on-page
+// position, so staff can see what they're mapping instead of matching a raw
+// XFA/AcroForm field name (e.g. "topmostSubform[0].Page1[0].f1_1[0]") against
+// a bare list with no visual context. Any field whose position pdf-lib
+// couldn't resolve still shows up in a plain fallback list below, so nothing
+// becomes unmappable.
 export function AcroFormFieldMapper({
+  pdfBytes,
   detectedFields,
   mappings,
   onChange,
   disabled,
 }: {
-  detectedFields: { name: string; type: string }[];
+  pdfBytes: Uint8Array;
+  detectedFields: DetectedPdfField[];
   mappings: AcroformFieldMapping[];
   onChange: (mappings: AcroformFieldMapping[]) => void;
   disabled?: boolean;
 }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [pdfDoc, setPdfDoc] = useState<import("pdfjs-dist").PDFDocumentProxy | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [rendered, setRendered] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadPdfjs()
+      .then((pdfjsLib) => pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise)
+      .then((doc) => {
+        if (!cancelled) setPdfDoc(doc);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Could not load this PDF for preview.");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // pdfBytes is a stable snapshot passed down once per upload -- re-running
+    // this on every render would reload the same document repeatedly.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!pdfDoc || !canvasRef.current) return;
+    let cancelled = false;
+    setRendered(false);
+    pdfDoc.getPage(pageIndex + 1).then(async (page) => {
+      if (cancelled) return;
+      const viewport = page.getViewport({ scale: 1.3 });
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      if (!cancelled) setRendered(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfDoc, pageIndex]);
+
   const mergeFieldByPdfField = new Map(mappings.map((m) => [m.pdfFieldName, m.mergeField]));
 
   function setMapping(pdfFieldName: string, mergeField: string) {
@@ -30,36 +95,105 @@ export function AcroFormFieldMapper({
     return <p className="text-xs text-muted">This PDF has no fillable form fields.</p>;
   }
 
+  const positioned = detectedFields.filter((f): f is PositionedField => f.page !== null && f.rect !== null);
+  const unpositioned = detectedFields.filter((f) => f.page === null || f.rect === null);
+  const fieldsOnPage = positioned.filter((f) => f.page === pageIndex);
+  const mappedCount = detectedFields.filter((f) => mergeFieldByPdfField.get(f.name)).length;
+
+  function renderSelect(field: DetectedPdfField, extraClassName: string, style?: React.CSSProperties) {
+    const mapped = Boolean(mergeFieldByPdfField.get(field.name));
+    return (
+      <select
+        key={field.name}
+        disabled={disabled}
+        value={mergeFieldByPdfField.get(field.name) ?? ""}
+        onChange={(e) => setMapping(field.name, e.target.value)}
+        title={field.name}
+        style={style}
+        className={`rounded-md border px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
+          mapped ? "border-accent bg-accentSoft font-medium text-accent" : "border-dashed border-slate/50 bg-white/90 text-muted"
+        } ${extraClassName}`}
+      >
+        <option value="">Leave blank</option>
+        {ALL_MERGE_FIELDS.map((mf) => (
+          <option key={mf.token} value={mf.token}>
+            {mf.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
       <p className="text-xs font-medium uppercase tracking-wide text-muted">Map PDF fields to merge fields</p>
       <p className="mt-1 text-xs text-muted">
-        {detectedFields.length} fillable field{detectedFields.length === 1 ? "" : "s"} found in this PDF. Choose what fills each one when
-        it&apos;s sent -- leave any field unmapped to leave it blank.
+        {detectedFields.length} fillable field{detectedFields.length === 1 ? "" : "s"} found -- {mappedCount} mapped. Each dropdown sits
+        right on top of the spot it fills on the page -- pick what goes there, or leave it blank.
       </p>
-      <div className="mt-3 space-y-2">
-        {detectedFields.map((f) => (
-          <div key={f.name} className="flex items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-ink">{f.name}</p>
-              <p className="text-[11px] text-muted">{f.type.replace(/^PDF/, "")}</p>
+
+      {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+      {!error && !pdfDoc && <p className="mt-3 text-xs text-muted">Loading preview...</p>}
+
+      {!error && pdfDoc && (
+        <>
+          {pdfDoc.numPages > 1 && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted">
+              <button
+                type="button"
+                disabled={pageIndex === 0}
+                onClick={() => setPageIndex((p) => p - 1)}
+                className="rounded-lg border border-border p-1 hover:bg-surfaceMuted disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              Page {pageIndex + 1} of {pdfDoc.numPages}
+              <button
+                type="button"
+                disabled={pageIndex === pdfDoc.numPages - 1}
+                onClick={() => setPageIndex((p) => p + 1)}
+                className="rounded-lg border border-border p-1 hover:bg-surfaceMuted disabled:opacity-40"
+              >
+                <ChevronRight size={14} />
+              </button>
             </div>
-            <select
-              disabled={disabled}
-              value={mergeFieldByPdfField.get(f.name) ?? ""}
-              onChange={(e) => setMapping(f.name, e.target.value)}
-              className="w-56 shrink-0 rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-            >
-              <option value="">Leave blank</option>
-              {ALL_MERGE_FIELDS.map((mf) => (
-                <option key={mf.token} value={mf.token}>
-                  {mf.label}
-                </option>
-              ))}
-            </select>
+          )}
+
+          <div className="relative mt-3 inline-block rounded-lg border border-border">
+            <canvas ref={canvasRef} className="block max-w-full" />
+            {rendered &&
+              fieldsOnPage.map((field) =>
+                renderSelect(field, "absolute", {
+                  left: `${field.rect.xPct * 100}%`,
+                  top: `${field.rect.yPct * 100}%`,
+                  width: `${Math.max(field.rect.widthPct * 100, 10)}%`,
+                  height: `${Math.max(field.rect.heightPct * 100, 3)}%`,
+                })
+              )}
           </div>
-        ))}
-      </div>
+          {!rendered && <p className="mt-2 text-xs text-muted">Rendering page...</p>}
+          {rendered && fieldsOnPage.length === 0 && (
+            <p className="mt-2 text-xs text-muted">No fields resolved to this page.</p>
+          )}
+        </>
+      )}
+
+      {unpositioned.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Other fields (position not found on the page)</p>
+          <div className="mt-2 space-y-2">
+            {unpositioned.map((field) => (
+              <div key={field.name} className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-ink">{field.name}</p>
+                  <p className="text-[11px] text-muted">{field.type.replace(/^PDF/, "")}</p>
+                </div>
+                {renderSelect(field, "w-56 shrink-0 py-1.5")}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
