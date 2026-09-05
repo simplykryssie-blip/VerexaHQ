@@ -4,15 +4,18 @@ import Link from "next/link";
 import type { SitePageData } from "./types";
 import { SectionRenderer } from "./SectionRenderer";
 import { TrackingScripts } from "./TrackingScripts";
+import { MkbHomePage } from "./mkb/MkbHomePage";
 
 export function PublicSitePage({
   workspaceSlug,
   websiteSlug,
+  pageSlug,
   data,
   showLoginLink,
 }: {
   workspaceSlug: string;
   websiteSlug: string;
+  pageSlug?: string;
   data: SitePageData;
   // Only ever passed by app/page.tsx for Verexa's own marketing homepage --
   // this component is shared by every tenant firm's published website too,
@@ -23,6 +26,19 @@ export function PublicSitePage({
   const accentColor = branding?.secondary_color || branding?.primary_color || undefined;
   const ordered = [...sections].sort((a, b) => a.display_order - b.display_order);
   const loginLinkColor = website.header_background ? "#ffffff" : "inherit";
+
+  if (workspaceSlug === "mkb-financial-group-llc" && websiteSlug === "mkb-financial-group" && pageSlug === "home") {
+    return (
+      <div className="min-h-screen overflow-x-hidden bg-black">
+        <TrackingScripts headCode={website.head_tracking_code} bodyCode={website.body_tracking_code} />
+        {page.schema_markup && (
+          // eslint-disable-next-line react/no-danger
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: page.schema_markup }} />
+        )}
+        <MkbHomePage />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: page.background_color || "#ffffff" }}>

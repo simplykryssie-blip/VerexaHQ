@@ -29,6 +29,14 @@ function currentDomain() {
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const data = await loadPage(currentDomain(), params.pageSlug);
   if (!data) return { title: "Page not found" };
+  if (data.workspace_slug === "mkb-financial-group-llc" && data.website_slug === "mkb-financial-group" && params.pageSlug === "home") {
+    return {
+      title: "MKB Financial Group | Business Structure, Bookkeeping & Tax Support",
+      description:
+        "MKB Financial Group helps entrepreneurs and small business owners with business structure, bookkeeping, payroll, tax preparation, tax planning, and compliance support.",
+      icons: { icon: "https://assets.cdn.filesafe.space/DS8aGyVjpPT17utB06sE/media/68b4edce091480ccef401763.png" },
+    };
+  }
   return {
     title: data.page.title,
     description: data.page.meta_description ?? undefined,
@@ -48,5 +56,5 @@ export default async function CustomDomainSitePage({ params }: { params: Params 
     );
   }
 
-  return <PublicSitePage workspaceSlug={data.workspace_slug} websiteSlug={data.website_slug} data={data} />;
+  return <PublicSitePage workspaceSlug={data.workspace_slug} websiteSlug={data.website_slug} pageSlug={params.pageSlug} data={data} />;
 }

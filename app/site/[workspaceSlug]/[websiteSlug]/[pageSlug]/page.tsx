@@ -32,6 +32,14 @@ const loadPage = cache(async (workspaceSlug: string, websiteSlug: string, pageSl
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const data = await loadPage(params.workspaceSlug, params.websiteSlug, params.pageSlug);
   if (!data) return { title: "Page not found" };
+  if (params.workspaceSlug === "mkb-financial-group-llc" && params.websiteSlug === "mkb-financial-group" && params.pageSlug === "home") {
+    return {
+      title: "MKB Financial Group | Business Structure, Bookkeeping & Tax Support",
+      description:
+        "MKB Financial Group helps entrepreneurs and small business owners with business structure, bookkeeping, payroll, tax preparation, tax planning, and compliance support.",
+      icons: { icon: "https://assets.cdn.filesafe.space/DS8aGyVjpPT17utB06sE/media/68b4edce091480ccef401763.png" },
+    };
+  }
   return {
     title: data.page.title,
     description: data.page.meta_description ?? undefined,
@@ -55,6 +63,7 @@ export default async function PublicSiteRoutePage({ params }: { params: Params }
     <PublicSitePage
       workspaceSlug={params.workspaceSlug}
       websiteSlug={params.websiteSlug}
+      pageSlug={params.pageSlug}
       data={data}
       showLoginLink={params.workspaceSlug === VEREXA_OWN_WORKSPACE_SLUG}
     />
