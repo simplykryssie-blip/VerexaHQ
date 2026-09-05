@@ -66,8 +66,8 @@ export function MyConnectionStatus({
             {allowsBrandingOverride ? (
               <>
                 You can set your own logo/color in{" "}
-                <a href="/settings/firm-profile" className="font-medium text-accent hover:underline">
-                  Firm Profile
+                <a href="/settings/brand-center" className="font-medium text-accent hover:underline">
+                  Branding
                 </a>
               </>
             ) : (

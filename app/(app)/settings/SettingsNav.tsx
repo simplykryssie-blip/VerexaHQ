@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SETTINGS_NAV_SECTIONS } from "@/lib/nav";
 
-export function SettingsNav() {
+export function SettingsNav({ hideFirmProfile }: { hideFirmProfile: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -12,7 +12,9 @@ export function SettingsNav() {
       {SETTINGS_NAV_SECTIONS.map((section) => (
         <div key={section.label} className="flex gap-1 lg:block lg:space-y-1">
           <p className="hidden px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted lg:block">{section.label}</p>
-          {section.items.map((item) => {
+          {section.items
+            .filter((item) => !(hideFirmProfile && item.label === "Firm Profile"))
+            .map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (

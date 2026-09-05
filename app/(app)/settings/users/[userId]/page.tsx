@@ -144,7 +144,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
                 <dd className="text-slate">{profile?.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
               </div>
             </dl>
-            <p className="mt-3 text-xs text-muted">Set by this person from their own Firm Profile settings.</p>
+            <p className="mt-3 text-xs text-muted">Set by this person from their own Profile settings.</p>
           </div>
         )}
 
