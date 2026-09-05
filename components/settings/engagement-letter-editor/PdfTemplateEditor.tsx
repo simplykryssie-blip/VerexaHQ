@@ -5,7 +5,7 @@ import { UploadCloud, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { detectPdfFormFields } from "@/lib/documents/renderPdfTemplate";
-import type { PdfFieldMapping, AcroformFieldMapping, OverlayFieldMapping } from "@/lib/documents/renderPdfTemplate";
+import type { PdfFieldMapping, AcroformFieldMapping, OverlayFieldMapping, DetectedPdfField } from "@/lib/documents/renderPdfTemplate";
 import { AcroFormFieldMapper } from "./AcroFormFieldMapper";
 import { OverlayFieldPlacer } from "./OverlayFieldPlacer";
 
@@ -37,7 +37,7 @@ export function PdfTemplateEditor({
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
-  const [detectedFields, setDetectedFields] = useState<{ name: string; type: string }[]>([]);
+  const [detectedFields, setDetectedFields] = useState<DetectedPdfField[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
 
   useEffect(() => {
@@ -130,6 +130,7 @@ export function PdfTemplateEditor({
 
       {pdfBytes && fieldMode === "acroform" && (
         <AcroFormFieldMapper
+          pdfBytes={pdfBytes}
           detectedFields={detectedFields}
           mappings={fieldMappings.filter((m): m is AcroformFieldMapping => m.kind === "acroform")}
           onChange={onFieldMappingsChange}
