@@ -2,7 +2,7 @@
 
 import { Zap } from "lucide-react";
 import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
-import { TagNameInput } from "@/components/workflows/TagNameInput";
+import { TagListInput } from "@/components/workflows/TagListInput";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 
 export type TemplateOption = { id: string; name: string };
@@ -369,11 +369,11 @@ export function TriggerFields({
 
       {triggerType === "client.tag_added" && (
         <label className="flex flex-col gap-1 text-xs text-muted">
-          Tag
-          <TagNameInput
+          Tags (fires when any of these is added)
+          <TagListInput
             disabled={disabled}
-            value={(config.tag as string) ?? ""}
-            onChange={(v) => onConfigChange({ tag: v })}
+            value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
+            onChange={(v) => onConfigChange({ tags: v })}
             tagOptions={tagOptions}
           />
         </label>
