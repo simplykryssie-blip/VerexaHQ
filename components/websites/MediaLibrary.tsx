@@ -91,7 +91,7 @@ export function MediaLibrary({ workspaceId, websiteId, canManage }: { workspaceI
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {files.map((f) => (
-              <div key={f.name} className="group relative overflow-hidden rounded-xl border border-border bg-surface">
+              <div key={f.name} className="group relative overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={f.url} alt={f.name} className="aspect-video w-full object-cover" />
                 <p className="truncate border-t border-border px-2 py-1 text-[11px] text-muted">{f.name.replace(/^\d+-/, "")}</p>

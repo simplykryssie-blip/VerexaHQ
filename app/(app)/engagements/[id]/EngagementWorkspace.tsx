@@ -12,6 +12,7 @@ import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
 import { Badge } from "@/components/ui/Badge";
+import { Tabs } from "@/components/ui/Tabs";
 import { ENGAGEMENT_STATUS_TONE } from "@/lib/engagementStatus";
 import {
   OverviewTab,
@@ -183,23 +184,13 @@ export function EngagementWorkspace({
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
-          <nav className="flex gap-1 overflow-x-auto border-b border-border bg-surface px-8">
-            {visibleTabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ${
-                  tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                {t}
-                {t === "Review" && reviewCount > 0 && (
-                  <span className="ml-1.5 rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] text-accent">{reviewCount}</span>
-                )}
-              </button>
-            ))}
-          </nav>
+          <div className="bg-surface px-8">
+            <Tabs
+              tabs={visibleTabs.map((t) => ({ id: t, label: t, badge: t === "Review" ? reviewCount : undefined }))}
+              active={tab}
+              onChange={(id) => setTab(id as Tab)}
+            />
+          </div>
 
           <div className="px-8 py-6">
             {tab === "Details" && (

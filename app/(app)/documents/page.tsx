@@ -9,6 +9,7 @@ import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
 import { StatTile } from "@/components/ui/StatTile";
 import type { IconChipTone } from "@/components/ui/IconChip";
+import { Badge } from "@/components/ui/Badge";
 
 export const dynamic = "force-dynamic";
 
@@ -139,9 +140,9 @@ export default async function DocumentCenterHubPage() {
                         </Link>
                         <p className="text-xs text-muted">{r.title}</p>
                       </div>
-                      <span className={`text-xs ${overdue ? "text-danger" : "text-muted"}`}>
+                      <Badge tone={overdue ? "danger" : missing > 0 ? "warning" : "neutral"}>
                         {missing} missing{r.due_date && ` -- due ${new Date(r.due_date).toLocaleDateString()}`}
-                      </span>
+                      </Badge>
                     </li>
                   );
                 })}
