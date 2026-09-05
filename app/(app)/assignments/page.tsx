@@ -5,6 +5,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
+import { Tabs } from "@/components/ui/Tabs";
 import { BulkAssignList, type AssignableRow } from "@/components/assignments/BulkAssignList";
 
 export const dynamic = "force-dynamic";
@@ -132,19 +133,9 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
     <>
       <PageHeader title="Assignments" description="Reassign clients, tasks, and engagements across your team in bulk." />
       <div className="flex-1 px-8 py-6">
-        <nav className="mb-4 flex gap-1 border-b border-border">
-          {TABS.map((t) => (
-            <Link
-              key={t.key}
-              href={`/assignments?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                tab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="mb-4">
+          <Tabs tabs={TABS.map((t) => ({ id: t.key, label: t.label, href: `/assignments?tab=${t.key}` }))} active={tab} />
+        </div>
 
         {tab === "engagements" && (
           <div className="mb-4 flex flex-wrap items-center gap-1">

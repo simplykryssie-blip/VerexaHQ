@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { GraduationCap } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { IconChip } from "@/components/ui/IconChip";
 
 export type CourseCard = {
   id: string;
@@ -30,9 +31,9 @@ export function CourseCatalog({ courses }: { courses: CourseCard[] }) {
             className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:border-accent"
           >
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
+              <IconChip tone="accent">
                 <GraduationCap size={16} />
-              </span>
+              </IconChip>
               <p className="text-sm font-semibold text-ink">{c.title}</p>
             </div>
             {c.description && <p className="mt-2 line-clamp-2 text-xs text-muted">{c.description}</p>}

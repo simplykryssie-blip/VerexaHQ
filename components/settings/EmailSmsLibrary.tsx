@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Mail } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { EmailSmsTemplateGallery } from "@/components/settings/EmailSmsTemplateGallery";
+import { Tabs } from "@/components/ui/Tabs";
 
 export type EmailSmsTabKey = "email" | "sms";
 
@@ -51,19 +51,7 @@ export async function EmailSmsLibrary({ workspaceId, activeTabParam }: { workspa
       />
 
       <div className="mt-4">
-        <nav className="flex gap-1 border-b border-border">
-          {tabs.map((t) => (
-            <Link
-              key={t.key}
-              href={`/automations?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                activeTab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
+        <Tabs tabs={tabs.map((t) => ({ id: t.key, label: t.label, href: `/automations?tab=${t.key}` }))} active={activeTab} />
       </div>
 
       <div className="mt-4">
