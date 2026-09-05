@@ -44,7 +44,7 @@ export default async function IntegrationsPage({
 
   const zoomSection = user && (
     <>
-      <h2 className="mt-8 text-base font-semibold text-ink">Zoom</h2>
+      <h2 className="mt-8 font-display text-base font-semibold text-ink">Zoom</h2>
       <p className="mt-1 text-sm text-muted">
         Personal to you -- each staff member connects their own Zoom account to create meetings for their own appointments.
       </p>
@@ -60,7 +60,7 @@ export default async function IntegrationsPage({
 
   const calendarSection = user && (
     <>
-      <h2 className="mt-8 text-base font-semibold text-ink">Calendar</h2>
+      <h2 className="mt-8 font-display text-base font-semibold text-ink">Calendar</h2>
       <p className="mt-1 text-sm text-muted">
         Personal to you -- connect your own Google or Outlook calendar so your Verexa appointments show up on it, and so clients can&apos;t book
         you during something that&apos;s only on your personal calendar.
@@ -111,7 +111,7 @@ export default async function IntegrationsPage({
         description="Accounts your firm or you personally connect to Verexa. SMS sending is configured platform-wide and isn't shown here."
       />
 
-      <h2 className="mt-2 text-base font-semibold text-ink">Stripe Connect</h2>
+      <h2 className="mt-2 font-display text-base font-semibold text-ink">Stripe Connect</h2>
       <p className="mt-1 text-sm text-muted">
         Connect your firm&apos;s own Stripe account to accept client payments. Funds go straight to your account -- Verexa charges no
         platform fee on transactions.
@@ -124,7 +124,7 @@ export default async function IntegrationsPage({
         />
       </div>
 
-      <h2 className="mt-8 text-base font-semibold text-ink">Email</h2>
+      <h2 className="mt-8 font-display text-base font-semibold text-ink">Email</h2>
       <p className="mt-1 text-sm text-muted">
         Verify your own domain so emails to clients come from your firm instead of verexahq.com.
       </p>
@@ -143,13 +143,13 @@ export default async function IntegrationsPage({
         />
       </div>
 
-      <h2 className="mt-8 text-base font-semibold text-ink">JotForm</h2>
+      <h2 className="mt-8 font-display text-base font-semibold text-ink">JotForm</h2>
       <p className="mt-1 text-sm text-muted">Import your firm&apos;s existing JotForm forms as organizer templates.</p>
       <div className="mt-6">
         <JotFormConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isJotformConnected)} />
       </div>
 
-      <h2 className="mt-8 text-base font-semibold text-ink">GoHighLevel</h2>
+      <h2 className="mt-8 font-display text-base font-semibold text-ink">GoHighLevel</h2>
       <p className="mt-1 text-sm text-muted">Import your firm&apos;s GHL contacts as leads. Pipelines and workflows aren&apos;t auto-imported.</p>
       <div className="mt-6">
         <GhlConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isGhlConnected)} />

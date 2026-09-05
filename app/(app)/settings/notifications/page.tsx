@@ -90,7 +90,7 @@ export default async function NotificationsPage() {
       </div>
 
       <div>
-        <h2 className="text-base font-semibold text-ink">Recent notifications</h2>
+        <h2 className="font-display text-base font-semibold text-ink">Recent notifications</h2>
         <p className="mt-1 text-sm text-muted">
           Notifications queued for you. In-app entries here are the delivery surface for the &quot;In-App&quot; channel; email/SMS
           reminders send separately once the provider credentials above are configured. The bell in the top corner shows these live.
