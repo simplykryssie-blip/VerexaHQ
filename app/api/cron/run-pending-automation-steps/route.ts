@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
   const { data: pending } = await supabase
     .from("automation_pending_steps")
-    .select("id, run_id, automation_step_id, automation_steps(action_type)")
+    .select("id, run_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
     .eq("status", "pending_delay")
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
@@ -60,6 +60,15 @@ export async function GET(request: Request) {
       deferred = (pending?.length ?? 0) - processed - stillWaiting;
       console.log(`run-pending-automation-steps: stopping early with ${deferred} row(s) left for the next tick`);
       break;
+    }
+    // The run may have been cancelled (e.g. a pending-approval step on it
+    // was rejected) while this step was still waiting out its delay --
+    // without this check the step would fire anyway once its time came,
+    // even though the run it belongs to is no longer running.
+    const runStatus = (row.automation_runs as unknown as { status?: string } | null)?.status;
+    if (runStatus !== "running") {
+      await supabase.from("automation_pending_steps").delete().eq("id", row.id);
+      continue;
     }
     const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
     if (shouldAdvance === false) {
