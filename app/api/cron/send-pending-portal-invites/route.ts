@@ -4,6 +4,7 @@ import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderPortalInviteEmail } from "@/lib/email/portalInvite";
 import { reportSystemFailure, isAccountLevelResendError } from "@/lib/systemFailures";
 import { getAppUrl } from "@/lib/appUrl";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,7 +29,7 @@ function isAuthorized(request: Request) {
 // reuses the exact same template lookup + renderer + sender the manual
 // "Invite to portal" button already uses (app/api/portal-invitations/send-email),
 // just from a service-role context instead of a signed-in staff member's request.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -269,3 +270,5 @@ async function sendOne(supabase: ReturnType<typeof createServiceClient>, job: Pe
     return "failed";
   }
 }
+
+export const GET = withJobLogging("send-pending-portal-invites", handleGET);

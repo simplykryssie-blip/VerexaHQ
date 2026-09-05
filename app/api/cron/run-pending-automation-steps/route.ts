@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -35,7 +36,7 @@ function isAuthorized(request: Request) {
 // does, so advancing it calls start_next_automation_step(run_id) (which
 // re-evaluates its branches from the run's current position) instead of
 // execute_automation_step.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -87,3 +88,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ processed, stillWaiting, deferred });
 }
+
+export const GET = withJobLogging("run-pending-automation-steps", handleGET);
