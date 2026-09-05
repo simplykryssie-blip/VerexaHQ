@@ -241,6 +241,7 @@ export function EngagementWorkspace({
               <MessagesTab
                 workspaceId={workspace.id}
                 engagementId={engagement.id}
+                clientId={client?.id ?? null}
                 primaryEmail={client?.primary_email ?? null}
                 primaryPhone={client?.primary_phone ?? null}
                 permissions={permissions}

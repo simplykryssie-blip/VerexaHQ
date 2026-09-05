@@ -5,6 +5,7 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PlanUsageManager } from "@/components/settings/PlanUsageManager";
+import { PhoneNumbersManager, type PhoneNumberRow } from "@/components/settings/PhoneNumbersManager";
 import { BillingCardManager } from "@/components/settings/BillingCardManager";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export default async function PlanUsagePage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: subscription }, { data: meters }, { data: storageFiles }] = await Promise.all([
+  const [{ data: subscription }, { data: meters }, { data: storageFiles }, { data: phoneNumbers }] = await Promise.all([
     supabase
       .from("workspace_subscriptions")
       .select(
@@ -24,6 +25,11 @@ export default async function PlanUsagePage() {
       .maybeSingle(),
     supabase.from("workspace_usage_meters").select("resource_type, free_units_granted, free_units_consumed, prepaid_balance").eq("workspace_id", workspace.id),
     supabase.from("attachments").select("file_size_bytes").eq("workspace_id", workspace.id).eq("is_archived", false),
+    supabase
+      .from("workspace_phone_numbers")
+      .select("id, phone_number, is_free, status, assigned_client:clients(id, first_name, last_name, business_name, client_type)")
+      .eq("workspace_id", workspace.id)
+      .order("created_at", { ascending: true }),
   ]);
 
   const plan = subscription?.platform_subscription_plans as {
@@ -83,6 +89,21 @@ export default async function PlanUsagePage() {
                 prepaidBalance: meterByType.get("storage")?.prepaid_balance ?? 0,
                 usedGb: storageBytesUsed / 1073741824,
               }}
+            />
+          </SettingsCard>
+          </div>
+          <div className="mt-6">
+          <SettingsCard title="Phone numbers" description="Your first number is free. Every one after that is $4.99/month, billed from your SMS balance.">
+            <PhoneNumbersManager
+              workspaceId={workspace.id}
+              isOwner={workspace.is_owner}
+              numbers={(phoneNumbers ?? []).map((n) => ({
+                id: n.id,
+                phone_number: n.phone_number,
+                is_free: n.is_free,
+                status: n.status,
+                assigned_client: n.assigned_client as PhoneNumberRow["assigned_client"],
+              }))}
             />
           </SettingsCard>
           </div>

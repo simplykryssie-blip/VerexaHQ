@@ -8858,6 +8858,57 @@ export type Database = {
           },
         ]
       }
+      workspace_phone_numbers: {
+        Row: {
+          assigned_client_id: string | null
+          created_at: string
+          id: string
+          is_free: boolean
+          last_billed_at: string | null
+          phone_number: string
+          status: string
+          twilio_sid: string | null
+          workspace_id: string
+        }
+        Insert: {
+          assigned_client_id?: string | null
+          created_at?: string
+          id?: string
+          is_free?: boolean
+          last_billed_at?: string | null
+          phone_number: string
+          status?: string
+          twilio_sid?: string | null
+          workspace_id: string
+        }
+        Update: {
+          assigned_client_id?: string | null
+          created_at?: string
+          id?: string
+          is_free?: boolean
+          last_billed_at?: string | null
+          phone_number?: string
+          status?: string
+          twilio_sid?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_phone_numbers_assigned_client_id_fkey"
+            columns: ["assigned_client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_phone_numbers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_retention_policies: {
         Row: {
           archived_clients_retention_days: number | null
@@ -9999,6 +10050,14 @@ export type Database = {
         Args: { p_signer_id: string }
         Returns: undefined
       }
+      bill_and_pause_phone_numbers: {
+        Args: { p_workspace_id?: string }
+        Returns: {
+          phone_number: string
+          result: string
+          workspace_id: string
+        }[]
+      }
       can_access_admin_ai: { Args: never; Returns: boolean }
       can_use_network_messaging: {
         Args: { p_workspace_id: string }
@@ -11027,6 +11086,30 @@ export type Database = {
       propose_organizer_answer_correction: {
         Args: { p_item_id: string; p_proposed_value: Json }
         Returns: undefined
+      }
+      provision_phone_number_record: {
+        Args: {
+          p_phone_number: string
+          p_twilio_sid: string
+          p_workspace_id: string
+        }
+        Returns: {
+          assigned_client_id: string | null
+          created_at: string
+          id: string
+          is_free: boolean
+          last_billed_at: string | null
+          phone_number: string
+          status: string
+          twilio_sid: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_phone_numbers"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       record_agent_evidence: {
         Args: {
