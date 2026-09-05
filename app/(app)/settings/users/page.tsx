@@ -200,7 +200,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
 
         {workspace.is_owner && !canInviteStaff(workspace) && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
+            <h3 className="font-display text-sm font-semibold text-ink">Invite staff</h3>
             <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
               <EmptyState
                 icon={Lock}
@@ -212,7 +212,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
 
         {workspace.is_owner && canInviteStaff(workspace) && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-ink">Invite staff</h3>
+            <h3 className="font-display text-sm font-semibold text-ink">Invite staff</h3>
             <p className="mt-1 text-sm text-muted">Send an email invitation to add someone to this workspace.</p>
             <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
               <InviteStaffForm roles={roles} />
@@ -222,7 +222,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
 
         {workspace.is_owner && pendingInvitations.length > 0 && (
           <div className="mt-8">
-            <h3 className="text-sm font-semibold text-ink">Pending invitations</h3>
+            <h3 className="font-display text-sm font-semibold text-ink">Pending invitations</h3>
             <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
               <DataTable columns={invitationColumns} rows={pendingInvitations} emptyMessage="No pending invitations." />
             </div>
@@ -239,7 +239,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
 
         {canManageConnections && canInvite && (
           <div className="mt-6">
-            <h3 className="text-sm font-semibold text-ink">Connected firms</h3>
+            <h3 className="font-display text-sm font-semibold text-ink">Connected firms</h3>
             <p className="mt-1 text-sm text-muted">
               Firms connected to you can share a client&apos;s file with you once it&apos;s ready for filing, for your review and
               approval before it can go to e-file.
@@ -280,7 +280,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
         )}
 
         <div className="mt-8">
-          <h3 className="text-sm font-semibold text-ink">Your {myConnectionParentLabel ?? "ERO/Service Bureau"} connection</h3>
+          <h3 className="font-display text-sm font-semibold text-ink">Your {myConnectionParentLabel ?? "ERO/Service Bureau"} connection</h3>
           <p className="mt-1 text-sm text-muted">
             {myConnection
               ? `You're connected to a ${myConnectionParentLabel}. Sharing a client with them is available from that client's engagement page once it's ready for filing.`

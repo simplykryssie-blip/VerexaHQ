@@ -114,7 +114,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
 
       <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
-          <h2 className="text-sm font-semibold text-ink">Basic information</h2>
+          <h2 className="font-display text-sm font-semibold text-ink">Basic information</h2>
           <dl className="mt-3 space-y-2.5 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-muted">Email</dt>
@@ -137,7 +137,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
 
         {showPtin && (
           <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
-            <h2 className="text-sm font-semibold text-ink">Professional information</h2>
+            <h2 className="font-display text-sm font-semibold text-ink">Professional information</h2>
             <dl className="mt-3 space-y-2.5 text-sm">
               <div className="flex justify-between gap-4">
                 <dt className="text-muted">PTIN</dt>
@@ -149,7 +149,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
         )}
 
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
-          <h2 className="text-sm font-semibold text-ink">Workload</h2>
+          <h2 className="font-display text-sm font-semibold text-ink">Workload</h2>
           <dl className="mt-3 space-y-2.5 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-muted">Assigned clients</dt>
@@ -167,7 +167,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
-          <h2 className="text-sm font-semibold text-ink">Permissions</h2>
+          <h2 className="font-display text-sm font-semibold text-ink">Permissions</h2>
           <p className="mt-2 text-sm text-muted">Controlled by this person&apos;s role ({roleName ?? "no role"}).</p>
           <Link href="/settings/roles" className="mt-2 inline-block text-sm font-medium text-accent hover:underline">
             View or edit role permissions &rarr;
@@ -176,7 +176,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
       </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-soft">
-        <h2 className="text-sm font-semibold text-ink">Assigned clients</h2>
+        <h2 className="font-display text-sm font-semibold text-ink">Assigned clients</h2>
         {assignedClients.length === 0 ? (
           <EmptyState message="No clients assigned to this person yet." />
         ) : (
@@ -200,7 +200,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
 
       <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
-          <h2 className="text-sm font-semibold text-ink">Open tasks</h2>
+          <h2 className="font-display text-sm font-semibold text-ink">Open tasks</h2>
           {openTasks.length === 0 ? (
             <EmptyState message="No open tasks." />
           ) : (
@@ -219,7 +219,7 @@ export default async function PreparerProfilePage({ params }: { params: { userId
         </div>
 
         <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
-          <h2 className="text-sm font-semibold text-ink">Recent activity</h2>
+          <h2 className="font-display text-sm font-semibold text-ink">Recent activity</h2>
           {(activity ?? []).length === 0 ? (
             <EmptyState message="No recent activity." />
           ) : (
