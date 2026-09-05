@@ -30,7 +30,7 @@ type StripeInvoice = {
 type PlanSnapshot = {
   base_price_cents: number;
   per_seat_price_cents: number;
-  email_overage_rate_cents: number;
+  email_overage_rate_cents_per_1000: number;
   storage_overage_rate_cents: number;
   sms_overage_rate_cents: number;
   currency: string;
@@ -44,7 +44,7 @@ function toIso(unixSeconds: number | null): string | null {
 function snapshotFromPlan(plan: {
   base_price_cents: number;
   per_seat_price_cents: number;
-  email_overage_rate_cents: number;
+  email_overage_rate_cents_per_1000: number;
   storage_overage_rate_cents: number;
   sms_overage_rate_cents: number;
   currency: string;
@@ -52,7 +52,7 @@ function snapshotFromPlan(plan: {
   return {
     base_price_cents: plan.base_price_cents,
     per_seat_price_cents: plan.per_seat_price_cents,
-    email_overage_rate_cents: plan.email_overage_rate_cents,
+    email_overage_rate_cents_per_1000: plan.email_overage_rate_cents_per_1000,
     storage_overage_rate_cents: plan.storage_overage_rate_cents,
     sms_overage_rate_cents: plan.sms_overage_rate_cents,
     currency: plan.currency,

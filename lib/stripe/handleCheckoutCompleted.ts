@@ -28,6 +28,12 @@ export async function handleUsageTopupCheckoutCompleted(
 
   await supabase.rpc("credit_prepaid_balance", { p_workspace_id: workspaceId, p_resource_type: resourceType, p_units: units });
 
+  // An SMS top-up may have just covered a paused phone number's monthly
+  // fee -- reactivate immediately rather than waiting for tomorrow's cron.
+  if (resourceType === "sms") {
+    await supabase.rpc("bill_and_pause_phone_numbers", { p_workspace_id: workspaceId });
+  }
+
   return { skipped: undefined };
 }
 

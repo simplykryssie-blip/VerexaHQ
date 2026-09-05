@@ -184,7 +184,7 @@ export function PageBuilder({
             .slice()
             .sort((a, b) => a.display_order - b.display_order)
             .map((s) => (
-              <SectionPreview key={s.id} section={s} services={bookableServices} staff={staff} />
+              <SectionPreview key={s.id} section={s} services={bookableServices} staff={staff} customCss={customCss} />
             ))}
         </div>
       ) : (
@@ -198,6 +198,7 @@ export function PageBuilder({
             onDelete={deleteSection}
             services={bookableServices}
             staff={staff}
+            customCss={customCss}
           />
           {canManage && (
             <SectionPropertiesPanel

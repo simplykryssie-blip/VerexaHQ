@@ -7,29 +7,29 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getAppUrl } from "@/lib/appUrl";
 
-// Fixed pack sizes only -- a client can't submit an arbitrary unit count
-// and have it priced trustingly. Price comes from the workspace's own plan
-// overage rate, so it's always the same per-unit rate already shown on
-// Platform Admin > Plans (cost-covered with margin over Resend/Twilio/Supabase).
-const PACKS: Record<"email" | "sms" | "storage", { units: number; label: string }[]> = {
-  email: [
-    { units: 1000, label: "1,000 emails" },
-    { units: 5000, label: "5,000 emails" },
-  ],
-  sms: [
-    { units: 250, label: "250 text messages" },
-    { units: 1000, label: "1,000 text messages" },
-  ],
-  storage: [
-    { units: 10, label: "10 GB storage" },
-    { units: 50, label: "50 GB storage" },
-  ],
-};
+// Workspaces top up by dollar amount, not a fixed pack size -- they buy
+// whatever a given amount converts to at their plan's per-unit overage rate,
+// and only when they actually need more (no recurring/automatic charge).
+const MINIMUM_TOPUP_CENTS = 2500;
 
-const RATE_COLUMN: Record<"email" | "sms" | "storage", "email_overage_rate_cents" | "sms_overage_rate_cents" | "storage_overage_rate_cents"> = {
-  email: "email_overage_rate_cents",
+const RATE_COLUMN: Record<"email" | "sms" | "storage", "email_overage_rate_cents_per_1000" | "sms_overage_rate_cents" | "storage_overage_rate_cents"> = {
+  email: "email_overage_rate_cents_per_1000",
   sms: "sms_overage_rate_cents",
   storage: "storage_overage_rate_cents",
+};
+
+// Email is priced per 1,000 (Resend-style); SMS and storage are priced per
+// single unit -- see the email_overage_rate_cents_per_1000 column comment.
+const UNITS_PER_RATE: Record<"email" | "sms" | "storage", number> = {
+  email: 1000,
+  sms: 1,
+  storage: 1,
+};
+
+const RESOURCE_LABEL: Record<"email" | "sms" | "storage", string> = {
+  email: "emails",
+  sms: "text messages",
+  storage: "GB storage",
 };
 
 export async function POST(request: Request) {
@@ -54,15 +54,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only the workspace owner can purchase usage top-ups." }, { status: 403 });
   }
 
-  const body = (await request.json()) as { resourceType?: string; units?: number };
+  const body = (await request.json()) as { resourceType?: string; amountCents?: number };
   const resourceType = body.resourceType;
   if (resourceType !== "email" && resourceType !== "sms" && resourceType !== "storage") {
     return NextResponse.json({ error: "resourceType must be email, sms, or storage" }, { status: 400 });
   }
 
-  const pack = PACKS[resourceType].find((p) => p.units === body.units);
-  if (!pack) {
-    return NextResponse.json({ error: "units must match an available pack size" }, { status: 400 });
+  const amountCents = body.amountCents;
+  if (amountCents === undefined || !Number.isInteger(amountCents) || amountCents < MINIMUM_TOPUP_CENTS) {
+    return NextResponse.json({ error: `Top-ups start at $${(MINIMUM_TOPUP_CENTS / 100).toFixed(2)}.` }, { status: 400 });
   }
 
   if (!isStripeConfigured()) {
@@ -71,11 +71,11 @@ export async function POST(request: Request) {
 
   const { data: subscription } = await supabase
     .from("workspace_subscriptions")
-    .select("stripe_status, platform_subscription_plans(email_overage_rate_cents, sms_overage_rate_cents, storage_overage_rate_cents)")
+    .select("stripe_status, platform_subscription_plans(email_overage_rate_cents_per_1000, sms_overage_rate_cents, storage_overage_rate_cents)")
     .eq("workspace_id", workspace.id)
     .maybeSingle();
   const plan = subscription?.platform_subscription_plans as {
-    email_overage_rate_cents: number;
+    email_overage_rate_cents_per_1000: number;
     sms_overage_rate_cents: number;
     storage_overage_rate_cents: number;
   } | null;
@@ -84,15 +84,18 @@ export async function POST(request: Request) {
   }
 
   const rateCents = plan[RATE_COLUMN[resourceType]];
-  const amountCents = pack.units * rateCents;
+  if (!rateCents || rateCents <= 0) {
+    return NextResponse.json({ error: "This plan doesn't have an overage rate configured for that resource." }, { status: 400 });
+  }
+  const units = (amountCents / rateCents) * UNITS_PER_RATE[resourceType];
   const appUrl = getAppUrl(request);
 
   const result = await createCheckoutSession({
     amount: amountCents / 100,
-    description: `Verexa usage top-up -- ${pack.label}`,
+    description: `Verexa usage top-up -- ~${units.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${RESOURCE_LABEL[resourceType]}`,
     successUrl: `${appUrl}/settings/plan-usage?topup=1`,
     cancelUrl: `${appUrl}/settings/plan-usage?topup=0`,
-    metadata: { type: "usage_topup", workspace_id: workspace.id, resource_type: resourceType, units: String(pack.units) },
+    metadata: { type: "usage_topup", workspace_id: workspace.id, resource_type: resourceType, units: units.toFixed(6) },
   });
 
   if (!result.ok) {

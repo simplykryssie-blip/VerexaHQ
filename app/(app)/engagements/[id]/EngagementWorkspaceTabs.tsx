@@ -303,6 +303,7 @@ export function TasksTab({
 export function MessagesTab({
   workspaceId,
   engagementId,
+  clientId,
   primaryEmail,
   primaryPhone,
   permissions,
@@ -311,6 +312,7 @@ export function MessagesTab({
 }: {
   workspaceId: string;
   engagementId: string;
+  clientId: string | null;
   primaryEmail: string | null;
   primaryPhone: string | null;
   permissions: Pick<ActionPermissions, "messagesSend" | "messagesInternalNote">;
@@ -427,7 +429,7 @@ export function MessagesTab({
         const res = await fetch("/api/sms/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: primaryPhone, body }),
+          body: JSON.stringify({ to: primaryPhone, body, clientId }),
         });
         const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
         if (!data.sent) toast.show(`Message saved, but the SMS wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
