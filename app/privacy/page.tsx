@@ -119,6 +119,7 @@ export default function PrivacyPolicyPage() {
           <li><strong className="text-ink">Twilio</strong> -- SMS delivery for text notifications and reminders a Firm configures.</li>
           <li><strong className="text-ink">Resend</strong> -- transactional email delivery (account, engagement, and document notifications).</li>
           <li><strong className="text-ink">Zoom</strong> -- only if a Firm staff member connects their own Zoom account, used to generate meeting links for appointments they schedule.</li>
+          <li><strong className="text-ink">Sentry</strong> -- error monitoring. When the platform encounters a technical error, diagnostic details (such as the error message, the page or request involved, and browser/device information) are sent to Sentry so we can detect and fix issues. Sentry is not used to log normal activity, only errors.</li>
         </ul>
         <p>
           We may add or change service providers from time to time as the platform evolves; any new provider is held to
