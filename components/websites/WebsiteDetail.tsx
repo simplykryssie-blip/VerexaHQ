@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageLibrary, type SitePageCard } from "./PageLibrary";
 import { WebsiteSettings } from "./WebsiteSettings";
 import { MediaLibrary } from "./MediaLibrary";
+import { Tabs } from "@/components/ui/Tabs";
 
 type Website = {
   id: string;
@@ -35,20 +36,11 @@ export function WebsiteDetail({
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-border">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`border-b-2 px-3 py-2 text-sm font-medium capitalize ${
-              tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={TABS.map((t) => ({ id: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))}
+        active={tab}
+        onChange={(id) => setTab(id as (typeof TABS)[number])}
+      />
 
       <div className="mt-4">
         {tab === "pages" && (

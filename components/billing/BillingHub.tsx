@@ -5,7 +5,8 @@ import Link from "next/link";
 import { FileText, Receipt, DollarSign, AlertTriangle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
-import { IconChip, type IconChipTone } from "@/components/ui/IconChip";
+import type { IconChipTone } from "@/components/ui/IconChip";
+import { StatTile } from "@/components/ui/StatTile";
 import { Modal } from "@/components/Modal";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 import { InvoiceQuoteForm, type EditingInvoiceQuote } from "./InvoiceQuoteForm";
@@ -122,13 +123,7 @@ export function BillingHub({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
-            <IconChip tone={s.chip} className="mb-3">
-              <s.icon size={17} aria-hidden="true" />
-            </IconChip>
-            <p className="text-xs uppercase tracking-wide text-muted">{s.label}</p>
-            <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{s.value}</p>
-          </div>
+          <StatTile key={s.label} icon={s.icon} tone={s.chip} label={s.label} value={s.value} />
         ))}
       </div>
 

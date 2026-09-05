@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { REPORT_CATEGORIES } from "@/lib/reportCategories";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { IconChip } from "@/components/ui/IconChip";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +45,9 @@ export default async function ReportsPage() {
                 href={`/reports/${c.slug}`}
                 className="flex items-start gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 transition hover:border-accent hover:shadow-softHover"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
+                <IconChip tone={c.tone}>
                   <c.icon size={18} strokeWidth={2} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <div>
                   <h2 className="text-sm font-semibold text-ink">{c.title}</h2>
                   <p className="mt-1 text-sm text-muted">{c.description}</p>
