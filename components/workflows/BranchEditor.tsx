@@ -12,7 +12,7 @@ import {
 } from "@/components/workflows/ConditionsEditor";
 import type { StaffOption, WorkflowStepEdgeRow } from "@/components/workflows/WorkflowBuilder";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
-import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
+import { ensureTagsConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 
 type DraftBranch = {
   id: string | null;
@@ -114,9 +114,7 @@ export function BranchEditor({
 
   async function save() {
     const tagsToConfirm = collectClientTagValues(branches.flatMap((b) => b.conditions).flatMap((g) => g.conditions));
-    for (const tag of tagsToConfirm) {
-      if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
-    }
+    if (!(await ensureTagsConfirmed(supabase, workspaceId, tagsToConfirm))) return;
 
     setSaving(true);
     for (const id of removedIds) {
