@@ -18,10 +18,14 @@ const QUEUE_STATUS_TONE: Record<string, BadgeTone> = {
   failed: "danger",
 };
 import { SystemCredentialsManager } from "./SystemCredentialsManager";
+import { AutomationFailuresManager } from "./AutomationFailuresManager";
+import { CronJobHealthManager, type CronJobHealthRow } from "./CronJobHealthManager";
+import { EXPECTED_INTERVAL_MINUTES, isStale } from "@/lib/cron/expectedIntervals";
 
 export const dynamic = "force-dynamic";
 
 const FAILURE_PAGE_SIZE = 100;
+const CRON_RUN_LOOKBACK = 1000;
 
 function statusCounts(rows: { status: string }[]) {
   const counts = new Map<string, number>();
@@ -58,6 +62,8 @@ export default async function PlatformAdminSystemsPage() {
     { data: engagementLetterJobs },
     { data: webhookJobs },
     { data: credentials },
+    { data: failedAutomationRuns },
+    { data: cronRuns },
   ] = await Promise.all([
     supabase
       .from("system_failure_log")
@@ -71,7 +77,31 @@ export default async function PlatformAdminSystemsPage() {
     supabase.from("pending_engagement_letter_sends").select("status"),
     supabase.from("automation_webhook_deliveries").select("status"),
     supabase.from("platform_system_credentials").select("id, system_name, username, notes, updated_at").order("system_name"),
+    supabase.rpc("get_platform_failed_automation_runs", { p_limit: 50 }),
+    supabase
+      .from("cron_job_runs")
+      .select("job_key, status, completed_at, error_message")
+      .order("completed_at", { ascending: false })
+      .limit(CRON_RUN_LOOKBACK),
   ]);
+
+  const latestRunByJobKey = new Map<string, { status: "success" | "failure"; completed_at: string; error_message: string | null }>();
+  for (const run of cronRuns ?? []) {
+    if (!latestRunByJobKey.has(run.job_key)) latestRunByJobKey.set(run.job_key, run as { status: "success" | "failure"; completed_at: string; error_message: string | null });
+  }
+  const cronJobHealth: CronJobHealthRow[] = Object.entries(EXPECTED_INTERVAL_MINUTES).map(([jobKey, intervalMinutes]) => {
+    const latest = latestRunByJobKey.get(jobKey);
+    const lastSuccessAt = latest?.status === "success" ? latest.completed_at : null;
+    return {
+      jobKey,
+      intervalMinutes,
+      lastStatus: latest?.status ?? null,
+      lastRunAt: latest?.completed_at ?? null,
+      lastErrorMessage: latest?.status === "failure" ? latest.error_message : null,
+      isStale: isStale(lastSuccessAt, intervalMinutes),
+    };
+  });
+  cronJobHealth.sort((a, b) => Number(b.isStale) - Number(a.isStale));
 
   const workspaceIds = Array.from(new Set((failures ?? []).map((f) => f.workspace_id).filter((id): id is string => Boolean(id))));
   const failureWorkspaceNameById = new Map((workspaces ?? []).filter((w) => workspaceIds.includes(w.id)).map((w) => [w.id, w.name]));
@@ -122,6 +152,21 @@ export default async function PlatformAdminSystemsPage() {
             demand.
           </p>
           <SystemCredentialsManager credentials={credentials ?? []} />
+        </div>
+
+        <div>
+          <h3 className="mb-1 font-display text-sm font-semibold text-ink">Automation failures</h3>
+          <p className="mb-3 text-xs text-muted">Workflow runs that hit an error mid-execution, across every workspace. Retry once the underlying issue is fixed.</p>
+          <AutomationFailuresManager runs={failedAutomationRuns ?? []} />
+        </div>
+
+        <div>
+          <h3 className="mb-1 font-display text-sm font-semibold text-ink">Cron job health</h3>
+          <p className="mb-3 text-xs text-muted">
+            Every scheduled job&apos;s last successful run. &quot;Stale&quot; means it hasn&apos;t succeeded within roughly twice its expected interval --
+            check Vercel&apos;s function logs for why, or run it manually here.
+          </p>
+          <CronJobHealthManager jobs={cronJobHealth} />
         </div>
 
         <div>

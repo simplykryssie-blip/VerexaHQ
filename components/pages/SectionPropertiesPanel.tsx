@@ -14,7 +14,6 @@ import { CustomHtmlEditor } from "./section-editors/CustomHtmlEditor";
 
 export function SectionPropertiesPanel({
   workspaceId,
-  websiteId,
   section,
   onUpdate,
   organizerTemplates,
@@ -23,7 +22,6 @@ export function SectionPropertiesPanel({
   canAdvanceToNextPage,
 }: {
   workspaceId: string;
-  websiteId: string;
   section: BuilderSection | null;
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
   organizerTemplates: OrganizerTemplateOption[];
@@ -47,14 +45,14 @@ export function SectionPropertiesPanel({
     <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">{SECTION_TYPE_LABELS[section.section_type]}</p>
       <div className="mt-3">
-        {section.section_type === "hero" && <HeroEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "hero" && <HeroEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
         {section.section_type === "rich_text" && <RichTextEditorSection config={section.config as never} onChange={onChange} />}
-        {section.section_type === "image" && <ImageEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "image" && <ImageEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
         {section.section_type === "text_image" && (
-          <TextImageEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
+          <TextImageEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />
         )}
         {section.section_type === "testimonial" && (
-          <TestimonialEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
+          <TestimonialEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />
         )}
         {section.section_type === "faq" && <FaqEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "organizer_form" && (

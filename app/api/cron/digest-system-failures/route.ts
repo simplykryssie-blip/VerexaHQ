@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendEmailViaResend } from "@/lib/email/resend";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const BATCH_SIZE = 200;
 const DIGEST_RECIPIENT = "failedsystem@verexahq.com";
+
+// The digest used to go to one static inbox only -- now it also reaches
+// whoever actually holds platform admin/IT access (Nicholas included),
+// so a system failure is a proactive alert to a real person, not just an
+// inbox nobody's watching.
+async function getDigestRecipients(supabase: ReturnType<typeof createServiceClient>) {
+  const { data: staffEmails } = await supabase.rpc("get_platform_it_staff_emails");
+  return Array.from(new Set([DIGEST_RECIPIENT, ...(staffEmails ?? [])]));
+}
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -21,7 +31,7 @@ function escapeHtml(value: string) {
 // Drains system_failure_log (see lib/systemFailures.ts) into one digest
 // email every run instead of one email per failure -- a bad Resend key or
 // a systemic bug shouldn't be able to flood this inbox.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -71,18 +81,17 @@ export async function GET(request: Request) {
       <tbody>${rows}</tbody>
     </table>`;
 
-  const result = await sendEmailViaResend({
-    to: DIGEST_RECIPIENT,
-    subject: `Verexa: ${failures.length} system failure${failures.length === 1 ? "" : "s"}`,
-    html,
-    sender: "noreply",
-  });
+  const recipients = await getDigestRecipients(supabase);
+  const subject = `Verexa: ${failures.length} system failure${failures.length === 1 ? "" : "s"}`;
+  const results = await Promise.all(recipients.map((to) => sendEmailViaResend({ to, subject, html, sender: "noreply" })));
+  const sentCount = results.filter((r) => r.sent).length;
 
-  if (!result.sent) {
+  if (sentCount === 0) {
     // Leave every row unmarked -- they'll roll into the next digest
     // attempt instead of being silently dropped.
-    console.error("digest-system-failures: could not send the digest email", result.error ?? result.reason);
-    return NextResponse.json({ digested: 0, sendError: result.error ?? result.reason }, { status: 200 });
+    const firstError = results.find((r) => !r.sent);
+    console.error("digest-system-failures: could not send the digest email to anyone", firstError?.error ?? firstError?.reason);
+    return NextResponse.json({ digested: 0, sendError: firstError?.error ?? firstError?.reason }, { status: 200 });
   }
 
   const { error: markErr } = await supabase
@@ -93,3 +102,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ digested: failures.length });
 }
+
+export const GET = withJobLogging("digest-system-failures", handleGET);

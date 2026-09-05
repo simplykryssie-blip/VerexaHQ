@@ -4,29 +4,12 @@ import { FileText, AlertTriangle, PenLine, Receipt, Phone, Mail, MessageCircle }
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { getEffectiveBranding } from "@/lib/branding";
+import { getEngagementProgressMap } from "@/lib/portalEngagementProgress";
 import { EmptyState } from "@/components/EmptyState";
 import { StatTile } from "@/components/ui/StatTile";
 import type { IconChipTone } from "@/components/ui/IconChip";
-import { ENGAGEMENT_PIPELINE_STATUSES } from "@/lib/dashboard/data";
 
 export const dynamic = "force-dynamic";
-
-// Plain-language status copy for the progress card, keyed off the real
-// engagements.status value -- not a fabricated stat, just a translation of
-// the same status the pipeline strip already tracks.
-const STATUS_GUIDANCE: Record<string, string> = {
-  New: "We're just getting started -- we'll reach out if we need anything from you.",
-  "Waiting On Client": "We're waiting on you for the next step.",
-  "Waiting On Staff": "It's with our team right now -- no action needed from you.",
-  "In Progress": "Our team is actively working on it.",
-  "Waiting On Review": "It's in review with our team.",
-  "Corrections Requested": "We're making a correction before moving forward.",
-  Approved: "Approved and moving to the next step.",
-  "Waiting On Signature": "It's ready -- check Documents for a signature request.",
-  "Waiting On Payment": "Just waiting on payment to move forward.",
-  "Ready To Release": "Almost there -- final steps are underway.",
-  Completed: "All done.",
-};
 
 export default async function PortalDashboardPage() {
   const identity = await getPortalIdentity();
@@ -83,6 +66,7 @@ export default async function PortalDashboardPage() {
     (inv) => inv.due_date && new Date(inv.due_date) < today && inv.total_amount - inv.amount_paid > 0
   ).length;
   const activeEngagements = (engagements ?? []).filter((e) => e.status !== "Completed" && e.status !== "Archived");
+  const progressMap = await getEngagementProgressMap((engagements ?? []).map((e) => e.id));
 
   // The active engagement closest to needing attention -- the one with the
   // nearest due date, or the most recently opened one if none have a due
@@ -95,11 +79,9 @@ export default async function PortalDashboardPage() {
       return 0;
     })[0] ?? null;
   const primaryServiceName = (primaryEngagement?.services as unknown as { name?: string } | null)?.name ?? "engagement";
-  const primaryStatusIndex = primaryEngagement
-    ? ENGAGEMENT_PIPELINE_STATUSES.indexOf(primaryEngagement.status as (typeof ENGAGEMENT_PIPELINE_STATUSES)[number])
-    : -1;
-  const primaryProgressPercent =
-    primaryStatusIndex >= 0 ? Math.round((primaryStatusIndex / (ENGAGEMENT_PIPELINE_STATUSES.length - 1)) * 100) : null;
+  const primaryProgress = primaryEngagement ? progressMap.get(primaryEngagement.id) : undefined;
+  const primaryStageLabel = primaryProgress?.stageName ?? primaryEngagement?.status ?? "";
+  const primaryProgressPercent = primaryProgress?.percent ?? null;
   const primaryMissingItems = primaryEngagement
     ? (openRequests ?? [])
         .filter((r) => r.entity_type === "engagement" && r.entity_id === primaryEngagement.id)
@@ -109,12 +91,12 @@ export default async function PortalDashboardPage() {
     primaryMissingItems > 0
       ? `${primaryMissingItems} document${primaryMissingItems === 1 ? "" : "s"} still needed before this can move forward.`
       : primaryEngagement
-        ? (STATUS_GUIDANCE[primaryEngagement.status] ?? "")
+        ? "We'll reach out if we need anything from you."
         : "";
 
   const attentionCount = missingDocuments + (pendingSignatures ?? []).length + overdueInvoiceCount;
   const heroSub = primaryEngagement
-    ? `Your ${primaryServiceName} is ${primaryEngagement.status.toLowerCase()}.${
+    ? `Your ${primaryServiceName} is ${primaryStageLabel.toLowerCase()}.${
         attentionCount > 0
           ? ` ${attentionCount} thing${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention.`
           : " You're all caught up."
@@ -174,7 +156,7 @@ export default async function PortalDashboardPage() {
             </div>
             <div>
               <h3 className="font-display text-base font-semibold text-ink">
-                {primaryServiceName} &mdash; {primaryEngagement.status}
+                {primaryServiceName} &mdash; {primaryStageLabel}
               </h3>
               {progressNote && <p className="mt-1 text-sm text-slate">{progressNote}</p>}
             </div>
@@ -228,7 +210,7 @@ export default async function PortalDashboardPage() {
                       <p className="font-medium text-slate">{(e.services as unknown as { name?: string } | null)?.name ?? "Engagement"}</p>
                       <p className="text-xs text-muted">{e.engagement_number}</p>
                     </div>
-                    <span className="text-xs capitalize text-muted">{e.status}</span>
+                    <span className="text-xs capitalize text-muted">{progressMap.get(e.id)?.stageName ?? e.status}</span>
                   </li>
                 ))}
               </ul>

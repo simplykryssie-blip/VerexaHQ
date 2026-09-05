@@ -12,6 +12,7 @@ import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billing
 import { InvoiceQuoteForm, type EditingInvoiceQuote } from "./InvoiceQuoteForm";
 import { PreviewButton } from "./PreviewButton";
 import { NewBillingDocumentModal } from "./NewBillingDocumentModal";
+import { ReactivateQuoteButton } from "./ReactivateQuoteButton";
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -80,6 +81,7 @@ export function BillingHub({
   payments,
   services,
   canManage,
+  initialUnpaidOnly = false,
 }: {
   workspaceId: string;
   workspaceName: string;
@@ -88,8 +90,14 @@ export function BillingHub({
   payments: BillingPaymentRow[];
   services: { id: string; name: string }[];
   canManage: boolean;
+  /** Set when the dashboard's "Outstanding Invoices" KPI links here with
+   *  ?filter=unpaid -- opens straight on the Invoices tab pre-filtered to
+   *  the same outstanding-balance set that KPI counted, instead of landing
+   *  on the unfiltered hub and making staff re-find what they clicked for. */
+  initialUnpaidOnly?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("Invoices");
+  const [unpaidOnly, setUnpaidOnly] = useState(initialUnpaidOnly);
   const [creating, setCreating] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<BillingQuoteRow | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<BillingInvoiceRow | null>(null);
@@ -173,6 +181,7 @@ export function BillingHub({
                       {q.status}
                     </Badge>
                     <span className="text-slate">{money(q.total_amount)}</span>
+                    {canManage && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                     {canManage && (
                       <button type="button" onClick={() => setEditingQuote(q)} className="text-xs font-medium text-accent hover:underline">
                         Edit
@@ -180,6 +189,7 @@ export function BillingHub({
                     )}
                     <PreviewButton
                       kind="quote"
+                      workspaceId={workspaceId}
                       firmName={workspaceName}
                       clientName={q.client_name}
                       number={q.quote_number}
@@ -203,11 +213,23 @@ export function BillingHub({
 
       {tab === "Invoices" && (
         <div className="rounded-2xl border border-border bg-surface shadow-soft">
-          {invoices.length === 0 ? (
-            <EmptyState message="No invoices yet." />
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => setUnpaidOnly((v) => !v)}
+              aria-pressed={unpaidOnly}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                unpaidOnly ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:border-accent hover:text-accent"
+              }`}
+            >
+              Unpaid only {unpaidOnly && `(${outstandingInvoices.length})`}
+            </button>
+          </div>
+          {(unpaidOnly ? outstandingInvoices : invoices).length === 0 ? (
+            <EmptyState message={unpaidOnly ? "No outstanding invoices -- everything's paid up." : "No invoices yet."} />
           ) : (
             <ul className="divide-y divide-border">
-              {invoices.map((i) => (
+              {(unpaidOnly ? outstandingInvoices : invoices).map((i) => (
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                   <div className="min-w-0">
                     <Link href={`/clients/${i.client_id}`} className="font-medium text-accent hover:underline">
@@ -229,6 +251,7 @@ export function BillingHub({
                     )}
                     <PreviewButton
                       kind="invoice"
+                      workspaceId={workspaceId}
                       firmName={workspaceName}
                       clientName={i.client_name}
                       number={i.invoice_number}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportSystemFailure } from "@/lib/systemFailures";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -102,7 +103,7 @@ async function alreadyAlertedRecently(supabase: ReturnType<typeof createServiceC
   return (data?.length ?? 0) > 0;
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -129,3 +130,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked: QUEUE_CHECKS.length, stale, alerted });
 }
+
+export const GET = withJobLogging("check-stale-automation-queues", handleGET);

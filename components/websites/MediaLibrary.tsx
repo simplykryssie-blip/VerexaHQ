@@ -1,25 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ImagePlus, Trash2 } from "lucide-react";
+import { Check, Copy, ImagePlus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 
-export function mediaLibraryPrefix(workspaceId: string, websiteId: string) {
-  return `${workspaceId}/websites/${websiteId}/media`;
+// Workspace-scoped (not per-website) -- anything uploaded here is reusable
+// across every website and funnel in the workspace, matching the precedent
+// set by BannerImageUpload/BrandCenterForm's workspace-level storage paths.
+export function mediaLibraryPrefix(workspaceId: string) {
+  return `${workspaceId}/media`;
 }
 
 type MediaFile = { name: string; url: string };
 
-export function MediaLibrary({ workspaceId, websiteId, canManage }: { workspaceId: string; websiteId: string; canManage: boolean }) {
+export function MediaLibrary({ workspaceId, canManage }: { workspaceId: string; canManage: boolean }) {
   const supabase = createClient();
   const toast = useToast();
-  const prefix = mediaLibraryPrefix(workspaceId, websiteId);
+  const prefix = mediaLibraryPrefix(workspaceId);
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deletingName, setDeletingName] = useState<string | null>(null);
+  const [copiedName, setCopiedName] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,9 +68,15 @@ export function MediaLibrary({ workspaceId, websiteId, canManage }: { workspaceI
     setFiles((prev) => prev.filter((f) => f.name !== name));
   }
 
+  async function copyLink(f: MediaFile) {
+    await navigator.clipboard.writeText(f.url);
+    setCopiedName(f.name);
+    setTimeout(() => setCopiedName((cur) => (cur === f.name ? null : cur)), 2000);
+  }
+
   return (
     <div>
-      <p className="text-sm text-muted">Banners, logos, and other images your website&apos;s sections can use -- upload once, reuse anywhere on this site.</p>
+      <p className="text-sm text-muted">Banners, logos, and other images -- upload once, reuse on any website or funnel in this workspace. Copy a file&apos;s link to drop it straight into custom HTML.</p>
 
       {canManage && (
         <label className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent">
@@ -94,7 +104,18 @@ export function MediaLibrary({ workspaceId, websiteId, canManage }: { workspaceI
               <div key={f.name} className="group relative overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={f.url} alt={f.name} className="aspect-video w-full object-cover" />
-                <p className="truncate border-t border-border px-2 py-1 text-[11px] text-muted">{f.name.replace(/^\d+-/, "")}</p>
+                <div className="flex items-center justify-between gap-1 border-t border-border px-2 py-1">
+                  <p className="truncate text-[11px] text-muted">{f.name.replace(/^\d+-/, "")}</p>
+                  <button
+                    type="button"
+                    onClick={() => copyLink(f)}
+                    className="shrink-0 text-muted hover:text-accent"
+                    title="Copy link"
+                    aria-label="Copy link"
+                  >
+                    {copiedName === f.name ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                  </button>
+                </div>
                 {canManage && (
                   <button
                     type="button"

@@ -53,7 +53,7 @@ export function WebsiteDetail({
             canManage={canManage}
           />
         )}
-        {tab === "media" && <MediaLibrary workspaceId={website.workspace_id} websiteId={website.id} canManage={canManage} />}
+        {tab === "media" && <MediaLibrary workspaceId={website.workspace_id} canManage={canManage} />}
         {tab === "settings" && <WebsiteSettings website={website} canManage={canManage} />}
       </div>
     </div>

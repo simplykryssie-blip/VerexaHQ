@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken } from "@/lib/calendarSync/tokens";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ function isAuthorized(request: Request) {
 // between appointments for the connection to silently die. Exercising the
 // refresh flow here on a schedule keeps it alive indefinitely. Mirrors
 // refresh-zoom-tokens.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -41,3 +42,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked: stale?.length ?? 0, refreshed, failed });
 }
+
+export const GET = withJobLogging("refresh-calendar-tokens", handleGET);

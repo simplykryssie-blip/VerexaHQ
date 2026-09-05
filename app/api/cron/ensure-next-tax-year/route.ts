@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ function isAuthorized(request: Request) {
 
 // Runs once a year (Dec 31, see vercel.json) so next year's tax_years row
 // exists before anyone needs to pick it in the Tax Details dropdown.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -24,3 +25,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ year: data });
 }
+
+export const GET = withJobLogging("ensure-next-tax-year", handleGET);

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ function isAuthorized(request: Request) {
 // access on -- no separate access check needed here, just keeping that
 // column current. Idempotent: only touches status = 'invited' rows, so an
 // invite that was accepted (or already revoked) is never touched again.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -29,3 +30,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ revoked: data });
 }
+
+export const GET = withJobLogging("revoke-expired-portal-access", handleGET);

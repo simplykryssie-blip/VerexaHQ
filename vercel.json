@@ -9,6 +9,10 @@
       "schedule": "0 */6 * * *"
     },
     {
+      "path": "/api/cron/cancel-overdue-quotes",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/check-billing-cycles",
       "schedule": "0 * * * *"
     },
@@ -74,6 +78,10 @@
     },
     {
       "path": "/api/cron/verify-pending-email-domains",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/check-stale-cron-jobs",
       "schedule": "*/15 * * * *"
     }
   ]

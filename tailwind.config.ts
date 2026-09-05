@@ -1,7 +1,13 @@
 import type { Config } from "tailwindcss";
+import containerQueries from "@tailwindcss/container-queries";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  // lib/** is included because a few shared helpers (e.g.
+  // lib/organizer/layoutWidth.ts) assemble Tailwind class strings that are
+  // never typed literally inside app/ or components/ -- without this, the
+  // JIT scanner never sees those classes and silently never generates the
+  // CSS for them.
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -87,7 +93,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [containerQueries],
 };
 
 export default config;

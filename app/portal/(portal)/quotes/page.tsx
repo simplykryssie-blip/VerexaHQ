@@ -38,6 +38,7 @@ export default async function PortalQuotesPage() {
               <div key={q.id} className="max-w-2xl">
                 <InvoicePreview
                   kind="quote"
+                  workspaceId={identity.workspaceId}
                   firmName={firmName}
                   clientName={identity.clientLabel}
                   number={q.quote_number}

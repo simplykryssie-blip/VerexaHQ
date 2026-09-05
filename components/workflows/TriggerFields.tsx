@@ -28,6 +28,7 @@ export const ORGANIZER_REVIEW_STATUS_OPTIONS = [
 export const TRIGGER_CATEGORIES: { key: string; label: string }[] = [
   { key: "contacts_leads", label: "Contacts & Leads" },
   { key: "engagements", label: "Engagements" },
+  { key: "ero_ptin", label: "ERO / PTIN Sharing" },
   { key: "forms_intake", label: "Forms & Intake" },
   { key: "appointments", label: "Appointments" },
   { key: "documents", label: "Documents" },
@@ -82,6 +83,7 @@ export const TRIGGER_TYPES = [
   { value: "invoice.paid", label: "An invoice is paid in full", category: "billing", description: "Fires when an invoice is paid in full.", keywords: "invoice paid payment" },
   { value: "invoice.overdue", label: "An invoice becomes overdue", category: "billing", description: "Fires when an invoice's due date passes unpaid (checked every 6 hours).", keywords: "invoice overdue late payment" },
   { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
+  { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -262,6 +264,9 @@ export function triggerSummary(
   }
   if (triggerType === "appointment.booked") {
     return "When a client books themselves an appointment";
+  }
+  if (triggerType === "engagement_share.created") {
+    return "When a connected PTIN shares an engagement for review";
   }
   return triggerType;
 }

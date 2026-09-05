@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { previewUpcomingInvoiceAmount, chargeOffSession, createCustomerBalanceCredit } from "@/lib/stripe/client";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ function daysBetween(fromDateStr: string, toDateStr: string): number {
  *    Stripe's own Smart Retries exhausting into an "unpaid" subscription
  *    status, since that can take longer than a single billing cycle.
  */
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -214,3 +215,5 @@ async function notifyPaymentFailed(supabase: ReturnType<typeof createServiceClie
     dedupe_key: `billing-payment-failed:${workspaceId}:${periodEnd}`,
   });
 }
+
+export const GET = withJobLogging("check-billing-cycles", handleGET);

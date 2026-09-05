@@ -553,7 +553,7 @@ export function PublicOrganizerForm({
               {currentPage.title ? ` -- ${currentPage.title}` : ""}
             </p>
           )}
-          <div className="grid grid-cols-12 gap-x-5 gap-y-6">
+          <div className="@container grid grid-cols-12 gap-x-5 gap-y-6">
             {currentPage.fields.map((field) =>
               field.field_type === "repeating_section" ? (
                 <PublicRepeatingSection
@@ -640,7 +640,7 @@ function PublicRepeatingSection({
                 Remove
               </button>
             </div>
-            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
+            <div className="@container mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields
                 .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
                 .map((child) => (

@@ -6,6 +6,7 @@ export const BILLING_DOCUMENT_STATUS_TONE: Record<string, BadgeTone> = {
   sent: "warning",
   paid: "success",
   void: "neutral",
+  cancelled: "danger",
 };
 
 export const PAYMENT_STATUS_TONE: Record<string, BadgeTone> = {
