@@ -246,7 +246,6 @@ export function NewEngagementForm({
   hasAnyClients,
   defaultClient,
   services,
-  billingRules,
   pipelines,
   autoAssignToSelf,
 }: {
@@ -257,11 +256,9 @@ export function NewEngagementForm({
     id: string;
     name: string;
     organizer_template_id: string | null;
-    billing_rule_id: string | null;
     organizer_templates: { name: string } | null;
     service_categories: { slug: string } | null;
   }[];
-  billingRules: { id: string; name: string }[];
   pipelines: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
@@ -274,8 +271,6 @@ export function NewEngagementForm({
   const [serviceId, setServiceId] = useState("");
   const [serviceTouched, setServiceTouched] = useState(false);
   const [processId, setProcessId] = useState("");
-  const [billingRuleId, setBillingRuleId] = useState("");
-  const [billingRuleTouched, setBillingRuleTouched] = useState(false);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -326,10 +321,6 @@ export function NewEngagementForm({
   function selectService(id: string) {
     setServiceTouched(true);
     setServiceId(id);
-    if (!billingRuleTouched) {
-      const service = services.find((s) => s.id === id);
-      setBillingRuleId(service?.billing_rule_id ?? "");
-    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -371,7 +362,6 @@ export function NewEngagementForm({
       p_process_id: processId,
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
-      p_billing_rule_id: billingRuleId || undefined,
       p_case_type: caseTypeFromCategorySlug(selectedServiceForCaseType?.service_categories?.slug),
     });
 
@@ -581,26 +571,6 @@ export function NewEngagementForm({
           ))}
         </select>
         <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate">Payment method</label>
-        <select
-          value={billingRuleId}
-          onChange={(e) => {
-            setBillingRuleTouched(true);
-            setBillingRuleId(e.target.value);
-          }}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="">None set</option>
-          {billingRules.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-muted">Defaults from the service, but this client may pay differently -- change it here if so.</p>
       </div>
 
       <div>

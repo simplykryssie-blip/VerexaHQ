@@ -23,8 +23,6 @@ export function TemplateStatusCycle({
     | "sms_templates"
     | "engagement_letter_templates"
     | "services"
-    | "pricing_rules"
-    | "billing_rules"
     | "organizer_templates"
     | "document_request_templates"
     | "processes"
