@@ -8,11 +8,14 @@ import { Badge } from "@/components/ui/Badge";
 import type { IconChipTone } from "@/components/ui/IconChip";
 import { StatTile } from "@/components/ui/StatTile";
 import { Modal } from "@/components/Modal";
-import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE, BANK_PRODUCT_STATUS_TONE } from "@/lib/billingStatus";
 import { InvoiceQuoteForm, type EditingInvoiceQuote } from "./InvoiceQuoteForm";
 import { PreviewButton } from "./PreviewButton";
 import { NewBillingDocumentModal } from "./NewBillingDocumentModal";
 import { ReactivateQuoteButton } from "./ReactivateQuoteButton";
+import { BankProductImportModal } from "./BankProductImportModal";
+import { BankProductStatusSelect } from "./BankProductStatusSelect";
+import { Upload } from "lucide-react";
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -62,6 +65,19 @@ export type BillingPaymentRow = {
   client_name: string;
 };
 
+export type BillingBankProductRow = {
+  id: string;
+  bank_partner: string;
+  product_type: string;
+  rebate_amount: number | null;
+  status: string;
+  created_at: string;
+  engagement_id: string;
+  engagement_number: string | null;
+  client_id: string;
+  client_name: string;
+};
+
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   stripe: "Card",
   check: "Check",
@@ -70,7 +86,7 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-const TABS = ["Quotes", "Invoices", "Payments"] as const;
+const TABS = ["Quotes", "Invoices", "Payments", "Bank Products"] as const;
 type Tab = (typeof TABS)[number];
 
 export function BillingHub({
@@ -79,6 +95,7 @@ export function BillingHub({
   quotes,
   invoices,
   payments,
+  bankProducts,
   services,
   canManage,
   initialUnpaidOnly = false,
@@ -88,6 +105,7 @@ export function BillingHub({
   quotes: BillingQuoteRow[];
   invoices: BillingInvoiceRow[];
   payments: BillingPaymentRow[];
+  bankProducts: BillingBankProductRow[];
   services: { id: string; name: string }[];
   canManage: boolean;
   /** Set when the dashboard's "Outstanding Invoices" KPI links here with
@@ -99,6 +117,7 @@ export function BillingHub({
   const [tab, setTab] = useState<Tab>("Invoices");
   const [unpaidOnly, setUnpaidOnly] = useState(initialUnpaidOnly);
   const [creating, setCreating] = useState<"invoice" | "quote" | null>(null);
+  const [importingBankProducts, setImportingBankProducts] = useState(false);
   const [editingQuote, setEditingQuote] = useState<BillingQuoteRow | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<BillingInvoiceRow | null>(null);
 
@@ -140,7 +159,18 @@ export function BillingHub({
             </button>
           ))}
         </div>
-        {canManage && (
+        {canManage && tab === "Bank Products" && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setImportingBankProducts(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+            >
+              <Upload size={14} /> Import CSV
+            </button>
+          </div>
+        )}
+        {canManage && tab !== "Bank Products" && (
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -302,6 +332,41 @@ export function BillingHub({
           )}
         </div>
       )}
+
+      {tab === "Bank Products" && (
+        <div className="rounded-2xl border border-border bg-surface shadow-soft">
+          {bankProducts.length === 0 ? (
+            <EmptyState message="No refund transfers or advances recorded yet -- record one from an engagement's Billing tab, or import a CSV." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {bankProducts.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
+                  <div className="min-w-0">
+                    <Link href={`/engagements/${b.engagement_id}`} className="font-medium text-accent hover:underline">
+                      {b.client_name}
+                    </Link>
+                    <p className="text-xs text-muted">
+                      {b.engagement_number ?? "Engagement"} -- {b.bank_partner} ({b.product_type.replace("_", " ")})
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate">{money(b.rebate_amount ?? 0)} rebate</span>
+                    {canManage ? (
+                      <BankProductStatusSelect id={b.id} status={b.status} />
+                    ) : (
+                      <Badge tone={BANK_PRODUCT_STATUS_TONE[b.status] ?? "neutral"} className="capitalize">
+                        {b.status}
+                      </Badge>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {importingBankProducts && <BankProductImportModal workspaceId={workspaceId} onClose={() => setImportingBankProducts(false)} />}
 
       {creating && (
         <NewBillingDocumentModal

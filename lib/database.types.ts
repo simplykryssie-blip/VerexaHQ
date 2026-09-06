@@ -11123,6 +11123,10 @@ export type Database = {
         Returns: boolean
       }
       hash_firm_secret: { Args: { p_plaintext: string }; Returns: string }
+      import_bank_product_transactions: {
+        Args: { p_rows: Json; p_workspace_id: string }
+        Returns: Json
+      }
       invite_portal_user: {
         Args: {
           p_client_id: string
