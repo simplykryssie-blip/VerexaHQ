@@ -476,9 +476,14 @@ export function OverviewTab({
       <Section
         title="Engagements"
         action={
-          <Link href={`/engagements/new?clientId=${client.id}`} className="text-xs font-medium text-accent hover:underline">
-            + New Engagement
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href={`/clients/${client.id}/irs-authorizations/new`} className="text-xs font-medium text-accent hover:underline">
+              + New IRS Authorization
+            </Link>
+            <Link href={`/engagements/new?clientId=${client.id}`} className="text-xs font-medium text-accent hover:underline">
+              + New Engagement
+            </Link>
+          </div>
         }
       >
         {engagements.length === 0 ? (

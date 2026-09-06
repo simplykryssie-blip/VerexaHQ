@@ -4573,6 +4573,187 @@ export type Database = {
           },
         ]
       }
+      irs_authorization_identity_checks: {
+        Row: {
+          decision: string | null
+          id: string
+          id_photo_path: string
+          irs_authorization_id: string
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          selfie_path: string
+          submitted_at: string
+        }
+        Insert: {
+          decision?: string | null
+          id?: string
+          id_photo_path: string
+          irs_authorization_id: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path: string
+          submitted_at?: string
+        }
+        Update: {
+          decision?: string | null
+          id?: string
+          id_photo_path?: string
+          irs_authorization_id?: string
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          selfie_path?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irs_authorization_identity_checks_irs_authorization_id_fkey"
+            columns: ["irs_authorization_id"]
+            isOneToOne: false
+            referencedRelation: "irs_authorizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorization_identity_checks_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      irs_authorizations: {
+        Row: {
+          access_token: string
+          attachment_id: string | null
+          authorized_at: string | null
+          client_id: string
+          created_at: string
+          created_by: string | null
+          designee_caf_number: string | null
+          designee_name: string
+          designee_user_id: string | null
+          engagement_id: string | null
+          id: string
+          signature_request_id: string | null
+          staff_note: string | null
+          status: Database["public"]["Enums"]["irs_authorization_status"]
+          submitted_at: string | null
+          tax_matters: Json
+          taxpayer_type: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          access_token?: string
+          attachment_id?: string | null
+          authorized_at?: string | null
+          client_id: string
+          created_at?: string
+          created_by?: string | null
+          designee_caf_number?: string | null
+          designee_name: string
+          designee_user_id?: string | null
+          engagement_id?: string | null
+          id?: string
+          signature_request_id?: string | null
+          staff_note?: string | null
+          status?: Database["public"]["Enums"]["irs_authorization_status"]
+          submitted_at?: string | null
+          tax_matters?: Json
+          taxpayer_type: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          access_token?: string
+          attachment_id?: string | null
+          authorized_at?: string | null
+          client_id?: string
+          created_at?: string
+          created_by?: string | null
+          designee_caf_number?: string | null
+          designee_name?: string
+          designee_user_id?: string | null
+          engagement_id?: string | null
+          id?: string
+          signature_request_id?: string | null
+          staff_note?: string | null
+          status?: Database["public"]["Enums"]["irs_authorization_status"]
+          submitted_at?: string | null
+          tax_matters?: Json
+          taxpayer_type?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "irs_authorizations_attachment_id_fkey"
+            columns: ["attachment_id"]
+            isOneToOne: false
+            referencedRelation: "attachments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_designee_user_id_fkey"
+            columns: ["designee_user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_signature_request_id_fkey"
+            columns: ["signature_request_id"]
+            isOneToOne: false
+            referencedRelation: "signature_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "irs_authorizations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       irs_notices: {
         Row: {
           created_at: string
@@ -5414,6 +5595,7 @@ export type Database = {
           help_text: string | null
           id: string
           include_in_document_checklist: boolean
+          irs_8821_role: string | null
           is_required: boolean
           label: string
           layout_width: string
@@ -5436,6 +5618,7 @@ export type Database = {
           help_text?: string | null
           id?: string
           include_in_document_checklist?: boolean
+          irs_8821_role?: string | null
           is_required?: boolean
           label: string
           layout_width?: string
@@ -5458,6 +5641,7 @@ export type Database = {
           help_text?: string | null
           id?: string
           include_in_document_checklist?: boolean
+          irs_8821_role?: string | null
           is_required?: boolean
           label?: string
           layout_width?: string
@@ -10294,6 +10478,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_irs_authorization: {
+        Args: {
+          p_client_id: string
+          p_designee_user_id: string
+          p_engagement_id: string
+          p_tax_matters: Json
+          p_taxpayer_type: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       create_notification: {
         Args: {
           p_channels?: string[]
@@ -11500,6 +11695,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_irs_authorization_status: {
+        Args: {
+          p_authorization_id: string
+          p_note?: string
+          p_status: Database["public"]["Enums"]["irs_authorization_status"]
+        }
+        Returns: undefined
+      }
       set_my_ptin: {
         Args: { p_clear?: boolean; p_ptin: string }
         Returns: undefined
@@ -11839,6 +12042,19 @@ export type Database = {
         | "Ready To Release"
         | "Completed"
         | "Archived"
+      irs_authorization_status:
+        | "draft"
+        | "awaiting_identity_verification"
+        | "identity_verification_rejected"
+        | "identity_verified"
+        | "awaiting_signature"
+        | "signed"
+        | "submitted"
+        | "irs_processing"
+        | "authorized"
+        | "transcript_eligible"
+        | "denied"
+        | "revoked"
       review_status:
         | "Pending"
         | "In Review"
@@ -11998,6 +12214,20 @@ export const Constants = {
         "Ready To Release",
         "Completed",
         "Archived",
+      ],
+      irs_authorization_status: [
+        "draft",
+        "awaiting_identity_verification",
+        "identity_verification_rejected",
+        "identity_verified",
+        "awaiting_signature",
+        "signed",
+        "submitted",
+        "irs_processing",
+        "authorized",
+        "transcript_eligible",
+        "denied",
+        "revoked",
       ],
       review_status: [
         "Pending",

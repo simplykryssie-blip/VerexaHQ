@@ -6,6 +6,7 @@ import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
 import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/organizer/relationshipRoles";
+import { IRS_8821_ROLES_BY_TYPE, IRS_8821_ROLE_LABELS } from "@/lib/organizer/irs8821Roles";
 import { isWidthEligible } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import type { BuilderField } from "./types";
@@ -48,6 +49,7 @@ export function FieldPropertiesPanel({
         | "conditional_logic"
         | "client_profile_field"
         | "relationship_role"
+        | "irs_8821_role"
         | "layout_width"
         | "include_in_document_checklist"
         | "document_checklist_name"
@@ -138,6 +140,7 @@ function PropertiesForm({
         | "conditional_logic"
         | "client_profile_field"
         | "relationship_role"
+        | "irs_8821_role"
         | "layout_width"
         | "include_in_document_checklist"
         | "document_checklist_name"
@@ -367,6 +370,29 @@ function PropertiesForm({
             by what the question is actually asking -- only pick one if this question truly captures that piece of information
             about a spouse or dependent. For dependents, put the tagged fields (name, date of birth, relationship) inside a
             repeating section so each repeat becomes a separate person; spouse fields should stay outside any repeating section.
+          </span>
+        </label>
+      )}
+
+      {IRS_8821_ROLES_BY_TYPE[field.field_type] && (
+        <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+          Feeds an IRS 8821 authorization
+          <select
+            value={field.irs_8821_role ?? ""}
+            disabled={readOnly}
+            onChange={(e) => onUpdate(field.id, { irs_8821_role: e.target.value || null })}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          >
+            <option value="">None</option>
+            {IRS_8821_ROLES_BY_TYPE[field.field_type]!.map((role) => (
+              <option key={role} value={role}>
+                {IRS_8821_ROLE_LABELS[role]}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] normal-case text-muted">
+            When staff create an IRS Form 8821 authorization for a client who already submitted this organizer, this
+            answer pre-fills the matching field instead of being re-typed.
           </span>
         </label>
       )}
