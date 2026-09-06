@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ALL_MERGE_FIELDS } from "@/lib/mergeFields";
+import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 import type { AcroformFieldMapping, DetectedPdfField } from "@/lib/documents/renderPdfTemplate";
 
 let pdfjsInitPromise: Promise<typeof import("pdfjs-dist")> | null = null;
@@ -19,12 +20,16 @@ function loadPdfjs() {
 type PositionedField = DetectedPdfField & { page: number; rect: NonNullable<DetectedPdfField["rect"]> };
 
 // Shows the actual uploaded PDF (any PDF -- not tied to any one form) with a
-// dropdown overlaid directly on top of each fillable field's real on-page
+// text box overlaid directly on top of each fillable field's real on-page
 // position, so staff can see what they're mapping instead of matching a raw
-// XFA/AcroForm field name (e.g. "topmostSubform[0].Page1[0].f1_1[0]") against
-// a bare list with no visual context. Any field whose position pdf-lib
-// couldn't resolve still shows up in a plain fallback list below, so nothing
-// becomes unmappable.
+// XFA/AcroForm field name against a bare list with no visual context. Each
+// box holds a *template* -- free text that can mix staff-typed content with
+// one or more {{merge_field}} tokens (via the "Insert merge field" picker,
+// which drops a token at the last-focused box's cursor) -- so one field can
+// combine several details ("name and address" boxes), or hold something no
+// merge field covers (a file number, boilerplate text, a preset value) with
+// no token at all. Any field whose position pdf-lib couldn't resolve still
+// shows up in a plain fallback list below, so nothing becomes unmappable.
 export function AcroFormFieldMapper({
   pdfBytes,
   detectedFields,
@@ -39,10 +44,12 @@ export function AcroFormFieldMapper({
   disabled?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const inputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const [pdfDoc, setPdfDoc] = useState<import("pdfjs-dist").PDFDocumentProxy | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [rendered, setRendered] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,12 +90,19 @@ export function AcroFormFieldMapper({
     };
   }, [pdfDoc, pageIndex]);
 
-  const mergeFieldByPdfField = new Map(mappings.map((m) => [m.pdfFieldName, m.mergeField]));
+  const templateByPdfField = new Map(mappings.map((m) => [m.pdfFieldName, m.template]));
 
-  function setMapping(pdfFieldName: string, mergeField: string) {
+  function setMapping(pdfFieldName: string, template: string) {
     const next = mappings.filter((m) => m.pdfFieldName !== pdfFieldName);
-    if (mergeField) next.push({ kind: "acroform", pdfFieldName, mergeField });
+    if (template.trim()) next.push({ kind: "acroform", pdfFieldName, template });
     onChange(next);
+  }
+
+  function insertToken(token: string) {
+    if (!focusedField) return;
+    const el = inputRefs.current.get(focusedField) ?? null;
+    const current = templateByPdfField.get(focusedField) ?? "";
+    insertAtFieldCursor(el, current, token, (next) => setMapping(focusedField, next));
   }
 
   if (detectedFields.length === 0) {
@@ -98,39 +112,46 @@ export function AcroFormFieldMapper({
   const positioned = detectedFields.filter((f): f is PositionedField => f.page !== null && f.rect !== null);
   const unpositioned = detectedFields.filter((f) => f.page === null || f.rect === null);
   const fieldsOnPage = positioned.filter((f) => f.page === pageIndex);
-  const mappedCount = detectedFields.filter((f) => mergeFieldByPdfField.get(f.name)).length;
+  const mappedCount = detectedFields.filter((f) => (templateByPdfField.get(f.name) ?? "").trim()).length;
 
-  function renderSelect(field: DetectedPdfField, extraClassName: string, style?: React.CSSProperties) {
-    const mapped = Boolean(mergeFieldByPdfField.get(field.name));
+  function renderInput(field: DetectedPdfField, extraClassName: string, style?: CSSProperties) {
+    const value = templateByPdfField.get(field.name) ?? "";
+    const mapped = Boolean(value.trim());
     return (
-      <select
+      <input
         key={field.name}
+        ref={(el) => {
+          if (el) inputRefs.current.set(field.name, el);
+          else inputRefs.current.delete(field.name);
+        }}
+        type="text"
         disabled={disabled}
-        value={mergeFieldByPdfField.get(field.name) ?? ""}
+        value={value}
         onChange={(e) => setMapping(field.name, e.target.value)}
+        onFocus={() => setFocusedField(field.name)}
         title={field.name}
+        placeholder="Type text or insert a merge field..."
         style={style}
         className={`rounded-md border px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-60 ${
           mapped ? "border-accent bg-accentSoft font-medium text-accent" : "border-dashed border-slate/50 bg-white/90 text-muted"
         } ${extraClassName}`}
-      >
-        <option value="">Leave blank</option>
-        {ALL_MERGE_FIELDS.map((mf) => (
-          <option key={mf.token} value={mf.token}>
-            {mf.label}
-          </option>
-        ))}
-      </select>
+      />
     );
   }
 
   return (
     <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">Map PDF fields to merge fields</p>
-      <p className="mt-1 text-xs text-muted">
-        {detectedFields.length} fillable field{detectedFields.length === 1 ? "" : "s"} found -- {mappedCount} mapped. Each dropdown sits
-        right on top of the spot it fills on the page -- pick what goes there, or leave it blank.
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Map PDF fields to merge fields</p>
+          <p className="mt-1 text-xs text-muted">
+            {detectedFields.length} fillable field{detectedFields.length === 1 ? "" : "s"} found -- {mappedCount} mapped. Click into a box, then
+            type your own text, insert a merge field, or mix both -- e.g. combine a name and address on one line, or add boilerplate a merge
+            field doesn&apos;t cover.
+          </p>
+        </div>
+        {!disabled && <MergeFieldPicker label="Insert merge field" onInsert={insertToken} disabled={!focusedField} />}
+      </div>
 
       {error && <p className="mt-3 text-sm text-danger">{error}</p>}
       {!error && !pdfDoc && <p className="mt-3 text-xs text-muted">Loading preview...</p>}
@@ -163,7 +184,7 @@ export function AcroFormFieldMapper({
             <canvas ref={canvasRef} className="block max-w-full" />
             {rendered &&
               fieldsOnPage.map((field) =>
-                renderSelect(field, "absolute", {
+                renderInput(field, "absolute", {
                   left: `${field.rect.xPct * 100}%`,
                   top: `${field.rect.yPct * 100}%`,
                   width: `${Math.max(field.rect.widthPct * 100, 10)}%`,
@@ -188,7 +209,7 @@ export function AcroFormFieldMapper({
                   <p className="truncate text-sm text-ink">{field.name}</p>
                   <p className="text-[11px] text-muted">{field.type.replace(/^PDF/, "")}</p>
                 </div>
-                {renderSelect(field, "w-56 shrink-0 py-1.5")}
+                {renderInput(field, "w-56 shrink-0 py-1.5")}
               </div>
             ))}
           </div>

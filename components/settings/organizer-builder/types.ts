@@ -14,6 +14,7 @@ export type BuilderField = {
   conditional_logic: unknown;
   client_profile_field: string | null;
   relationship_role: string | null;
+  irs_8821_role: string | null;
   layout_width: LayoutWidth;
   include_in_document_checklist: boolean;
   document_checklist_name: string | null;
