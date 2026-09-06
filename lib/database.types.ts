@@ -1317,83 +1317,6 @@ export type Database = {
           },
         ]
       }
-      billing_rules: {
-        Row: {
-          automatic_reminders: Json
-          collections_after_days: number | null
-          collections_enabled: boolean
-          created_at: string
-          created_by: string | null
-          deposit_percent: number | null
-          deposit_required: boolean
-          id: string
-          installment_count: number | null
-          installments_allowed: boolean
-          invoice_timing: string
-          late_fee_amount: number | null
-          late_fee_enabled: boolean
-          late_fee_percent: number | null
-          name: string
-          payment_before_release: boolean
-          slug: string
-          status: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          automatic_reminders?: Json
-          collections_after_days?: number | null
-          collections_enabled?: boolean
-          created_at?: string
-          created_by?: string | null
-          deposit_percent?: number | null
-          deposit_required?: boolean
-          id?: string
-          installment_count?: number | null
-          installments_allowed?: boolean
-          invoice_timing?: string
-          late_fee_amount?: number | null
-          late_fee_enabled?: boolean
-          late_fee_percent?: number | null
-          name: string
-          payment_before_release?: boolean
-          slug: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          automatic_reminders?: Json
-          collections_after_days?: number | null
-          collections_enabled?: boolean
-          created_at?: string
-          created_by?: string | null
-          deposit_percent?: number | null
-          deposit_required?: boolean
-          id?: string
-          installment_count?: number | null
-          installments_allowed?: boolean
-          invoice_timing?: string
-          late_fee_amount?: number | null
-          late_fee_enabled?: boolean
-          late_fee_percent?: number | null
-          name?: string
-          payment_before_release?: boolean
-          slug?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_rules_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       branding: {
         Row: {
           accent_color: string
@@ -4041,7 +3964,6 @@ export type Database = {
         Row: {
           archived_date: string | null
           assigned_staff_id: string | null
-          billing_rule_id: string | null
           case_type: string
           client_id: string
           completed_date: string | null
@@ -4069,7 +3991,6 @@ export type Database = {
         Insert: {
           archived_date?: string | null
           assigned_staff_id?: string | null
-          billing_rule_id?: string | null
           case_type?: string
           client_id: string
           completed_date?: string | null
@@ -4097,7 +4018,6 @@ export type Database = {
         Update: {
           archived_date?: string | null
           assigned_staff_id?: string | null
-          billing_rule_id?: string | null
           case_type?: string
           client_id?: string
           completed_date?: string | null
@@ -4128,13 +4048,6 @@ export type Database = {
             columns: ["assigned_staff_id"]
             isOneToOne: false
             referencedRelation: "user_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagements_billing_rule_id_fkey"
-            columns: ["billing_rule_id"]
-            isOneToOne: false
-            referencedRelation: "billing_rules"
             referencedColumns: ["id"]
           },
           {
@@ -6773,74 +6686,6 @@ export type Database = {
         }
         Relationships: []
       }
-      pricing_rules: {
-        Row: {
-          allow_override: boolean
-          base_amount: number | null
-          complexity_tiers: Json
-          created_at: string
-          created_by: string | null
-          discount_rules: Json
-          form_based_rates: Json
-          hourly_rate: number | null
-          id: string
-          maximum_amount: number | null
-          minimum_amount: number | null
-          name: string
-          pricing_method: string
-          slug: string
-          status: string
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          allow_override?: boolean
-          base_amount?: number | null
-          complexity_tiers?: Json
-          created_at?: string
-          created_by?: string | null
-          discount_rules?: Json
-          form_based_rates?: Json
-          hourly_rate?: number | null
-          id?: string
-          maximum_amount?: number | null
-          minimum_amount?: number | null
-          name: string
-          pricing_method: string
-          slug: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          allow_override?: boolean
-          base_amount?: number | null
-          complexity_tiers?: Json
-          created_at?: string
-          created_by?: string | null
-          discount_rules?: Json
-          form_based_rates?: Json
-          hourly_rate?: number | null
-          id?: string
-          maximum_amount?: number | null
-          minimum_amount?: number | null
-          name?: string
-          pricing_method?: string
-          slug?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "pricing_rules_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       process_stages: {
         Row: {
           completion_rule: string
@@ -7470,7 +7315,6 @@ export type Database = {
         Row: {
           allow_overlapping_bookings: boolean
           allowed_weekdays: number[] | null
-          billing_rule_id: string | null
           booking_location_type: string
           booking_meeting_url: string | null
           cloned_from_service_id: string | null
@@ -7488,15 +7332,7 @@ export type Database = {
           is_portal_visible: boolean
           name: string
           organizer_template_id: string | null
-          pricing_rule_id: string | null
           process_id: string | null
-          requires_documents: boolean
-          requires_engagement_letter: boolean
-          requires_invoice: boolean
-          requires_organizer: boolean
-          requires_payment_before_release: boolean
-          requires_review: boolean
-          requires_signature: boolean
           season_end: string | null
           season_start: string | null
           service_category_id: string | null
@@ -7510,7 +7346,6 @@ export type Database = {
         Insert: {
           allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
-          billing_rule_id?: string | null
           booking_location_type?: string
           booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
@@ -7528,15 +7363,7 @@ export type Database = {
           is_portal_visible?: boolean
           name: string
           organizer_template_id?: string | null
-          pricing_rule_id?: string | null
           process_id?: string | null
-          requires_documents?: boolean
-          requires_engagement_letter?: boolean
-          requires_invoice?: boolean
-          requires_organizer?: boolean
-          requires_payment_before_release?: boolean
-          requires_review?: boolean
-          requires_signature?: boolean
           season_end?: string | null
           season_start?: string | null
           service_category_id?: string | null
@@ -7550,7 +7377,6 @@ export type Database = {
         Update: {
           allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
-          billing_rule_id?: string | null
           booking_location_type?: string
           booking_meeting_url?: string | null
           cloned_from_service_id?: string | null
@@ -7568,15 +7394,7 @@ export type Database = {
           is_portal_visible?: boolean
           name?: string
           organizer_template_id?: string | null
-          pricing_rule_id?: string | null
           process_id?: string | null
-          requires_documents?: boolean
-          requires_engagement_letter?: boolean
-          requires_invoice?: boolean
-          requires_organizer?: boolean
-          requires_payment_before_release?: boolean
-          requires_review?: boolean
-          requires_signature?: boolean
           season_end?: string | null
           season_start?: string | null
           service_category_id?: string | null
@@ -7588,13 +7406,6 @@ export type Database = {
           zoom_host_user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "services_billing_rule_id_fkey"
-            columns: ["billing_rule_id"]
-            isOneToOne: false
-            referencedRelation: "billing_rules"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "services_cloned_from_service_id_fkey"
             columns: ["cloned_from_service_id"]
@@ -7628,13 +7439,6 @@ export type Database = {
             columns: ["organizer_template_id"]
             isOneToOne: false
             referencedRelation: "organizer_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "services_pricing_rule_id_fkey"
-            columns: ["pricing_rule_id"]
-            isOneToOne: false
-            referencedRelation: "pricing_rules"
             referencedColumns: ["id"]
           },
           {
@@ -10413,7 +10217,6 @@ export type Database = {
       create_engagement: {
         Args: {
           p_assigned_staff_id?: string
-          p_billing_rule_id?: string
           p_case_type?: string
           p_client_id: string
           p_due_date?: string
@@ -10639,10 +10442,6 @@ export type Database = {
       encrypt_firm_secret: { Args: { p_plaintext: string }; Returns: string }
       encrypt_zoom_secret: { Args: { p_plaintext: string }; Returns: string }
       engagement_has_signed_letter: {
-        Args: { p_engagement_id: string }
-        Returns: boolean
-      }
-      engagement_meets_payment_requirement: {
         Args: { p_engagement_id: string }
         Returns: boolean
       }

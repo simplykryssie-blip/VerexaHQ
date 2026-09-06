@@ -37,8 +37,6 @@ export type ServiceRow = {
   engagement_letter_template_id: string | null;
   document_request_template_id: string | null;
   document_folder_template_id: string | null;
-  pricing_rule_id: string | null;
-  billing_rule_id: string | null;
   default_price: number | null;
   estimated_duration_minutes: number | null;
   display_order: number;
@@ -51,24 +49,7 @@ export type ServiceRow = {
   booking_meeting_url: string | null;
   zoom_host_user_id: string | null;
   allow_overlapping_bookings: boolean;
-  requires_organizer: boolean;
-  requires_engagement_letter: boolean;
-  requires_documents: boolean;
-  requires_signature: boolean;
-  requires_review: boolean;
-  requires_invoice: boolean;
-  requires_payment_before_release: boolean;
 };
-
-const REQUIREMENT_FIELDS: { key: keyof ServiceRow; label: string }[] = [
-  { key: "requires_organizer", label: "Requires an organizer" },
-  { key: "requires_engagement_letter", label: "Requires a signed document" },
-  { key: "requires_documents", label: "Requires documents" },
-  { key: "requires_signature", label: "Requires signature" },
-  { key: "requires_review", label: "Requires review" },
-  { key: "requires_invoice", label: "Requires an invoice" },
-  { key: "requires_payment_before_release", label: "Requires payment before release" },
-];
 
 function OptionSelect({
   value,
@@ -104,8 +85,6 @@ export function ServiceForm({
   engagementLetterTemplates,
   documentRequestTemplates,
   documentFolderTemplates,
-  pricingRules,
-  billingRules,
   staffOptions,
   canManage,
 }: {
@@ -117,8 +96,6 @@ export function ServiceForm({
   engagementLetterTemplates: Option[];
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
-  pricingRules: Option[];
-  billingRules: Option[];
   staffOptions: Option[];
   canManage: boolean;
 }) {
@@ -138,8 +115,6 @@ export function ServiceForm({
   const [engagementLetterTemplateId, setEngagementLetterTemplateId] = useState(service.engagement_letter_template_id ?? "");
   const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
-  const [pricingRuleId, setPricingRuleId] = useState(service.pricing_rule_id ?? "");
-  const [billingRuleId, setBillingRuleId] = useState(service.billing_rule_id ?? "");
   const [defaultPrice, setDefaultPrice] = useState(service.default_price != null ? String(service.default_price) : "");
   const [estimatedDuration, setEstimatedDuration] = useState(
     service.estimated_duration_minutes != null ? String(service.estimated_duration_minutes) : ""
@@ -155,29 +130,18 @@ export function ServiceForm({
   const [zoomHostUserId, setZoomHostUserId] = useState(service.zoom_host_user_id ?? "");
   const [allowOverlappingBookings, setAllowOverlappingBookings] = useState(service.allow_overlapping_bookings);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [requirements, setRequirements] = useState(
-    Object.fromEntries(REQUIREMENT_FIELDS.map((f) => [f.key, Boolean(service[f.key])])) as Record<string, boolean>
-  );
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Everything below defaults collapsed -- pricing/billing, document
-  // templates, and the requirements checklist aren't part of the core
-  // Service -> Pipeline -> Organizer flow a normal tax professional sets up
-  // day to day, but stay reachable for firms that use them. Auto-opens if
-  // any of them already has something set, so existing configuration isn't
-  // hidden from whoever's looking at it.
+  // Everything below defaults collapsed -- pricing and document templates
+  // aren't part of the core Service -> Pipeline -> Organizer flow a normal
+  // tax professional sets up day to day, but stay reachable for firms that
+  // use them. Auto-opens if any of them already has something set, so
+  // existing configuration isn't hidden from whoever's looking at it.
   const hasAdvancedConfig = Boolean(
-    documentRequestTemplateId ||
-      documentFolderTemplateId ||
-      engagementLetterTemplateId ||
-      pricingRuleId ||
-      billingRuleId ||
-      defaultPrice ||
-      estimatedDuration ||
-      Object.values(requirements).some(Boolean)
+    documentRequestTemplateId || documentFolderTemplateId || engagementLetterTemplateId || defaultPrice || estimatedDuration
   );
   const [showAdvanced, setShowAdvanced] = useState(hasAdvancedConfig);
 
@@ -247,8 +211,6 @@ export function ServiceForm({
         engagement_letter_template_id: engagementLetterTemplateId || null,
         document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
-        pricing_rule_id: pricingRuleId || null,
-        billing_rule_id: billingRuleId || null,
         default_price: defaultPrice.trim() ? Number(defaultPrice) : null,
         estimated_duration_minutes: estimatedDuration.trim() ? Number(estimatedDuration) : null,
         display_order: Number(displayOrder) || 0,
@@ -261,7 +223,6 @@ export function ServiceForm({
         booking_meeting_url: bookingLocationType === "link" ? bookingMeetingUrl.trim() || null : null,
         zoom_host_user_id: bookingLocationType === "zoom" ? zoomHostUserId || null : null,
         allow_overlapping_bookings: allowOverlappingBookings,
-        ...requirements,
       })
       .eq("id", service.id);
     setSaving(false);
@@ -386,7 +347,7 @@ export function ServiceForm({
           className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-slate"
         >
           <ChevronDown size={12} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-          Advanced -- document templates, pricing &amp; billing, requirements
+          Advanced -- document templates, pricing
         </button>
 
         {showAdvanced && (
@@ -426,7 +387,7 @@ export function ServiceForm({
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pricing &amp; billing</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pricing</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
                 <label className={labelClass}>
                   Default price
@@ -449,48 +410,6 @@ export function ServiceForm({
                     className={inputClass}
                   />
                 </label>
-              </div>
-              <label className={`${labelClass} mt-3`}>
-                Pricing rule
-                <OptionSelect
-                  value={pricingRuleId}
-                  onChange={markDirty(setPricingRuleId)}
-                  options={pricingRules}
-                  noneLabel="No pricing rule"
-                  disabled={!canManage}
-                />
-              </label>
-              <label className={`${labelClass} mt-3`}>
-                Billing rule
-                <OptionSelect
-                  value={billingRuleId}
-                  onChange={markDirty(setBillingRuleId)}
-                  options={billingRules}
-                  noneLabel="No billing rule"
-                  disabled={!canManage}
-                />
-              </label>
-            </div>
-
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Requirements</p>
-              <p className="mt-1 text-[11px] text-muted">
-                Informational only for now -- nothing yet blocks an engagement on these. Longer-term home for this is a
-                pipeline stage&apos;s own requirements, not a flat list here.
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {REQUIREMENT_FIELDS.map((f) => (
-                  <label key={f.key} className="flex items-center gap-2 text-sm text-slate">
-                    <input
-                      type="checkbox"
-                      checked={requirements[f.key]}
-                      onChange={(e) => markDirty(setRequirements)({ ...requirements, [f.key]: e.target.checked })}
-                      disabled={!canManage}
-                      className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                    />
-                    {f.label}
-                  </label>
-                ))}
               </div>
             </div>
           </div>

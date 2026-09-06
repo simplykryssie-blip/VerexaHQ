@@ -30,8 +30,6 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: documentFolderTemplates },
-    { data: pricingRules },
-    { data: billingRules },
     { data: canManage },
     staff,
   ] = await Promise.all([
@@ -41,8 +39,6 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     supabase.from("engagement_letter_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_request_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_folder_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
-    supabase.from("pricing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
-    supabase.from("billing_rules").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     getWorkspaceStaff(supabase, workspace.id),
   ]);
@@ -66,8 +62,6 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
           engagementLetterTemplates={asOptions(engagementLetterTemplates)}
           documentRequestTemplates={asOptions(documentRequestTemplates)}
           documentFolderTemplates={asOptions(documentFolderTemplates)}
-          pricingRules={asOptions(pricingRules)}
-          billingRules={asOptions(billingRules)}
           staffOptions={staffOptions}
           canManage={Boolean(canManage)}
         />
