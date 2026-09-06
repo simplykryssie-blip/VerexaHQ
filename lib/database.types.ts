@@ -10979,6 +10979,19 @@ export type Database = {
         Args: { p_token: string }
         Returns: Json
       }
+      get_public_platform_plans: {
+        Args: never
+        Returns: {
+          base_price_cents: number
+          included_seats: number
+          name: string
+          per_seat_price_cents: number
+          signup_free_emails: number
+          signup_free_sms: number
+          signup_free_storage_gb: number
+          slug: string
+        }[]
+      }
       get_public_service_options: { Args: { p_token: string }; Returns: Json }
       get_public_site_page: {
         Args: {

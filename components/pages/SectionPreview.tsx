@@ -8,6 +8,7 @@ import { CtaButtonSection } from "@/components/site/sections/CtaButtonSection";
 import { SpacerSection } from "@/components/site/sections/SpacerSection";
 import { FooterSection } from "@/components/site/sections/FooterSection";
 import { SandboxedHtmlPreview } from "./SandboxedHtmlPreview";
+import { PricingTableSection } from "@/components/site/sections/PricingTableSection";
 import type { BuilderSection, BookableServiceOption, StaffOption } from "./types";
 
 // Reuses the real public-facing section components for everything except
@@ -79,6 +80,10 @@ export function SectionPreview({
         </section>
       );
     }
+    case "pricing_table":
+      // Read-only, no side effects (unlike organizer_form/booking_widget), so
+      // it's safe to render for real here rather than a static stand-in.
+      return <PricingTableSection config={section.config as never} />;
     case "custom_html": {
       const cfg = section.config as { html?: string };
       return (
