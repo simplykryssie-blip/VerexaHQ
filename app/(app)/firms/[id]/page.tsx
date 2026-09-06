@@ -1,0 +1,104 @@
+import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentWorkspace } from "@/lib/workspace";
+import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
+import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
+import { FirmDetailClient } from "@/components/firms/FirmDetailClient";
+
+export const dynamic = "force-dynamic";
+
+const CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE: Record<string, string[]> = {
+  ero_office: ["ero_ptin"],
+  service_bureau: ["service_bureau_ero", "service_bureau_ptin"],
+  multi_office_firm: ["ero_ptin"],
+};
+
+const CONNECTED_CHILD_TIER_LABEL: Record<string, string> = {
+  ero_ptin: "PTIN",
+  service_bureau_ero: "ERO",
+  service_bureau_ptin: "PTIN",
+};
+
+export default async function FirmDetailPage({ params }: { params: { id: string } }) {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return null;
+  if (!isEroManagementTier(workspace)) redirect("/dashboard");
+
+  const supabase = createClient();
+  const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
+
+  const [{ data: connectedFirms }, { members }, { data: packages }] = await Promise.all([
+    childRelationshipTypes.length
+      ? supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
+      : Promise.resolve({ data: [] as never[] }),
+    getWorkspaceMemberWorkload(supabase, workspace.id),
+    supabase.from("firm_packages").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+  ]);
+
+  const firm = (connectedFirms ?? []).find((f) => f.connection_id === params.id);
+  if (!firm) notFound();
+
+  const reviewerOptions = members.map((m) => ({ id: m.user_id, display_name: m.display_name }));
+
+  const [{ data: production }, { data: payouts }] = await Promise.all([
+    firm.status === "active"
+      ? supabase.rpc("get_firm_production", { p_connection_id: firm.connection_id })
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("firm_payouts")
+      .select("id, period_start, period_end, gross_prep_fees, gross_bank_product_rebates, ero_share_amount, amount_owed_to_ptin, status, paid_at")
+      .eq("connection_id", firm.connection_id)
+      .order("period_start", { ascending: false }),
+  ]);
+
+  return (
+    <div className="max-w-4xl">
+      <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
+        <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
+      </Link>
+      <h1 className="font-display text-lg font-semibold text-ink">
+        {firm.name} <span className="text-sm font-normal text-muted">({CONNECTED_CHILD_TIER_LABEL[firm.relationship_type] ?? "Firm"})</span>
+      </h1>
+
+      <FirmDetailClient
+        connectionId={firm.connection_id}
+        parentWorkspaceId={workspace.id}
+        firmInfo={{
+          phone: firm.phone,
+          primaryContactEmail: firm.primary_contact_email,
+          website: firm.website,
+          mailingAddress: firm.mailing_address,
+        }}
+        packageId={firm.package_id}
+        packages={packages ?? []}
+        production={production as Record<string, unknown> | null}
+        payouts={payouts ?? []}
+        isActive={firm.status === "active"}
+      />
+
+      {firm.status === "active" && (
+        <div className="mt-8 border-t border-border pt-6">
+          <h2 className="font-display text-sm font-semibold text-ink">Connection settings</h2>
+          <ul className="mt-3 divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
+            <ConnectedPtinRow
+              connectionId={firm.connection_id}
+              name={firm.name}
+              tierLabel={CONNECTED_CHILD_TIER_LABEL[firm.relationship_type] ?? "firm"}
+              relationshipType={firm.relationship_type}
+              status={firm.status}
+              billingResponsibility={firm.billing_responsibility}
+              sharesCommunicationsIdentity={firm.shares_communications_identity}
+              allowsBrandingOverride={firm.allows_branding_override}
+              defaultReviewerId={firm.default_reviewer_id ?? null}
+              restrictPtinStaffAssignment={Boolean(firm.restrict_ptin_staff_assignment)}
+              reviewerOptions={reviewerOptions}
+            />
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}

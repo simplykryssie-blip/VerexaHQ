@@ -1317,6 +1317,89 @@ export type Database = {
           },
         ]
       }
+      bank_product_transactions: {
+        Row: {
+          addon_fee: number | null
+          bank_fee: number | null
+          bank_partner: string
+          created_at: string
+          created_by: string | null
+          disbursed_at: string | null
+          disbursement_method: string | null
+          engagement_id: string
+          id: string
+          prep_fee_collected: number | null
+          product_type: string
+          rebate_amount: number | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          addon_fee?: number | null
+          bank_fee?: number | null
+          bank_partner: string
+          created_at?: string
+          created_by?: string | null
+          disbursed_at?: string | null
+          disbursement_method?: string | null
+          engagement_id: string
+          id?: string
+          prep_fee_collected?: number | null
+          product_type: string
+          rebate_amount?: number | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          addon_fee?: number | null
+          bank_fee?: number | null
+          bank_partner?: string
+          created_at?: string
+          created_by?: string | null
+          disbursed_at?: string | null
+          disbursement_method?: string | null
+          engagement_id?: string
+          id?: string
+          prep_fee_collected?: number | null
+          product_type?: string
+          rebate_amount?: number | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_product_transactions_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_product_transactions_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_engagement_progress"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "bank_product_transactions_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "v_reviewer_queue"
+            referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "bank_product_transactions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branding: {
         Row: {
           accent_color: string
@@ -4167,6 +4250,7 @@ export type Database = {
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          package_id: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -4187,6 +4271,7 @@ export type Database = {
           invite_token?: string | null
           invited_by?: string | null
           notes?: string | null
+          package_id?: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at?: string | null
@@ -4207,6 +4292,7 @@ export type Database = {
           invite_token?: string | null
           invited_by?: string | null
           notes?: string | null
+          package_id?: string | null
           parent_workspace_id?: string
           relationship_type?: string
           responded_at?: string | null
@@ -4225,7 +4311,146 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "firm_connections_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "firm_packages"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "firm_connections_parent_workspace_id_fkey"
+            columns: ["parent_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_packages: {
+        Row: {
+          billing_cadence: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          flat_price: number | null
+          id: string
+          name: string
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          billing_cadence?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          flat_price?: number | null
+          id?: string
+          name: string
+          revenue_share_percent?: number | null
+          revenue_share_scope?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          billing_cadence?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          flat_price?: number | null
+          id?: string
+          name?: string
+          revenue_share_percent?: number | null
+          revenue_share_scope?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_packages_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_payouts: {
+        Row: {
+          amount_owed_to_ptin: number
+          child_workspace_id: string
+          connection_id: string
+          created_at: string
+          ero_share_amount: number
+          gross_bank_product_rebates: number
+          gross_prep_fees: number
+          id: string
+          paid_at: string | null
+          paid_by: string | null
+          parent_workspace_id: string
+          payment_note: string | null
+          period_end: string
+          period_start: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount_owed_to_ptin?: number
+          child_workspace_id: string
+          connection_id: string
+          created_at?: string
+          ero_share_amount?: number
+          gross_bank_product_rebates?: number
+          gross_prep_fees?: number
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          parent_workspace_id: string
+          payment_note?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount_owed_to_ptin?: number
+          child_workspace_id?: string
+          connection_id?: string
+          created_at?: string
+          ero_share_amount?: number
+          gross_bank_product_rebates?: number
+          gross_prep_fees?: number
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          parent_workspace_id?: string
+          payment_note?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_payouts_child_workspace_id_fkey"
+            columns: ["child_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_payouts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_payouts_parent_workspace_id_fkey"
             columns: ["parent_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -9919,6 +10144,7 @@ export type Database = {
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          package_id: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -10265,6 +10491,7 @@ export type Database = {
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          package_id: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -10502,6 +10729,14 @@ export type Database = {
         Args: { p_attachment_id: string; p_item_status_id: string }
         Returns: undefined
       }
+      generate_firm_payout: {
+        Args: {
+          p_connection_id: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: string
+      }
       get_config_object_versions: {
         Args: { p_id: string; p_table: string }
         Returns: {
@@ -10533,6 +10768,7 @@ export type Database = {
           mailing_address: string
           name: string
           notes: string
+          package_id: string
           phone: string
           primary_contact_email: string
           relationship_type: string
@@ -10616,6 +10852,14 @@ export type Database = {
           relationship_type: string
           status: string
         }[]
+      }
+      get_firm_production: {
+        Args: {
+          p_connection_id: string
+          p_period_end?: string
+          p_period_start?: string
+        }
+        Returns: Json
       }
       get_invitation_preview: {
         Args: { p_token: string }
@@ -10993,6 +11237,10 @@ export type Database = {
         Args: { p_document_request_id: string }
         Returns: undefined
       }
+      mark_firm_payout_paid: {
+        Args: { p_payment_note?: string; p_payout_id: string }
+        Returns: undefined
+      }
       mark_lesson_complete: {
         Args: { p_module_id: string }
         Returns: undefined
@@ -11200,6 +11448,7 @@ export type Database = {
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          package_id: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null
@@ -11249,6 +11498,7 @@ export type Database = {
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          package_id: string | null
           parent_workspace_id: string
           relationship_type: string
           responded_at: string | null

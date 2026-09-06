@@ -170,6 +170,7 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
+  { label: "Firms", href: "/firms", icon: Building2 },
   { label: "Team", href: "/settings/users", icon: Users },
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
 ];
@@ -188,6 +189,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
+  { label: "Packages", href: "/settings/packages", icon: Handshake },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
@@ -203,7 +205,7 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Profile", "Security", "Availability", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags"] },
+  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions", "Tags"] },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
