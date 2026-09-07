@@ -10756,6 +10756,13 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_cron_job_last_success: {
+        Args: never
+        Returns: {
+          job_key: string
+          last_success_at: string
+        }[]
+      }
       get_ero_connected_partners: {
         Args: { p_relationship_types?: string[]; p_workspace_id: string }
         Returns: {

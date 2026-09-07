@@ -9,6 +9,12 @@ export const maxDuration = 30;
 const STALE_AFTER_MINUTES = 30;
 const REALERT_AFTER_HOURS = 3;
 const MAX_ROWS_PER_QUEUE = 200;
+// A "wait until condition" step deliberately sits in pending_delay -- re-checked
+// every run-pending-automation-steps tick -- for up to its own wait_timeout_days,
+// only advancing early if the condition is met sooner. That's normal, not stuck,
+// so it gets its own (much longer) threshold instead of the flat 30 minutes below.
+// The grace period covers the timeout-check's own cron cadence plus RPC latency.
+const CONDITION_WAIT_GRACE_MINUTES = 60;
 
 function isAuthorized(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -60,15 +66,55 @@ const QUEUE_CHECKS: QueueCheck[] = [
     statusValue: "pending",
     ageColumn: "next_attempt_at",
   },
-  {
-    source: "stale-queue:automation_pending_steps",
-    label: "delayed automation step",
-    table: "automation_pending_steps",
-    statusColumn: "status",
-    statusValue: "pending_delay",
-    ageColumn: "scheduled_for",
-  },
 ];
+
+const AUTOMATION_PENDING_STEPS_SOURCE = "stale-queue:automation_pending_steps";
+
+type WaitActionConfig = { wait_mode?: string; wait_timeout_days?: number } | null | undefined;
+
+// automation_pending_steps needs its own check, separate from the generic
+// QUEUE_CHECKS loop above: a "wait until condition" step deliberately sits
+// here -- re-checked every run-pending-automation-steps tick -- for up to
+// its own wait_timeout_days, only advancing early once the condition is
+// met. A client who simply hasn't submitted their organizer yet isn't a
+// stuck drain cron, so this uses each row's own timeout instead of the flat
+// STALE_AFTER_MINUTES the other queues use.
+async function findStaleAutomationSteps(supabase: ReturnType<typeof createServiceClient>) {
+  const cutoffIso = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000).toISOString();
+
+  const { data: rows, error } = await supabase
+    .from("automation_pending_steps")
+    .select("id, workspace_id, scheduled_for, automation_steps(action_config)")
+    .eq("status", "pending_delay")
+    .lt("scheduled_for", cutoffIso)
+    .order("scheduled_for", { ascending: true })
+    .limit(MAX_ROWS_PER_QUEUE);
+
+  if (error) {
+    console.error("check-stale-automation-queues: could not query automation_pending_steps", error);
+    return null;
+  }
+  if (!rows || rows.length === 0) return null;
+
+  const now = Date.now();
+  const trulyStale = rows.filter((row) => {
+    if (!row.scheduled_for) return false;
+    const config = (row.automation_steps as unknown as { action_config?: WaitActionConfig } | null)?.action_config;
+    const ageMinutes = (now - new Date(row.scheduled_for).getTime()) / 60000;
+    if (config?.wait_mode === "until_condition") {
+      const timeoutMinutes = (config.wait_timeout_days ?? 1) * 24 * 60 + CONDITION_WAIT_GRACE_MINUTES;
+      return ageMinutes > timeoutMinutes;
+    }
+    return ageMinutes > STALE_AFTER_MINUTES;
+  });
+
+  if (trulyStale.length === 0) return null;
+
+  const oldest = trulyStale[0] as unknown as { id: string; workspace_id: string | null; scheduled_for: string };
+  const ageMinutes = Math.round((now - new Date(oldest.scheduled_for).getTime()) / 60000);
+
+  return { count: trulyStale.length, ageMinutes, workspaceId: oldest.workspace_id, oldestId: oldest.id };
+}
 
 async function findStale(supabase: ReturnType<typeof createServiceClient>, check: QueueCheck) {
   const cutoffIso = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000).toISOString();
@@ -128,7 +174,20 @@ async function handleGET(request: Request) {
     alerted.push(check.source);
   }
 
-  return NextResponse.json({ checked: QUEUE_CHECKS.length, stale, alerted });
+  const stepsFinding = await findStaleAutomationSteps(supabase);
+  if (stepsFinding) {
+    stale.push(AUTOMATION_PENDING_STEPS_SOURCE);
+    if (!(await alreadyAlertedRecently(supabase, AUTOMATION_PENDING_STEPS_SOURCE))) {
+      await reportSystemFailure(
+        AUTOMATION_PENDING_STEPS_SOURCE,
+        `${stepsFinding.count} delayed automation step${stepsFinding.count === 1 ? " has" : "s have"} been stuck pending well past its expected time (oldest is ${stepsFinding.ageMinutes} min old) -- the drain cron for this queue may be failing silently, or a "wait until condition" step's timeout isn't advancing it.`,
+        { workspaceId: stepsFinding.workspaceId ?? undefined, context: { table: "automation_pending_steps", oldestId: stepsFinding.oldestId, count: stepsFinding.count, ageMinutes: stepsFinding.ageMinutes } }
+      );
+      alerted.push(AUTOMATION_PENDING_STEPS_SOURCE);
+    }
+  }
+
+  return NextResponse.json({ checked: QUEUE_CHECKS.length + 1, stale, alerted });
 }
 
 export const GET = withJobLogging("check-stale-automation-queues", handleGET);
