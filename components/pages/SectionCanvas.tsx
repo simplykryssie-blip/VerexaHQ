@@ -14,6 +14,7 @@ export function SectionCanvas({
   services,
   staff,
   customCss,
+  backgroundColor,
 }: {
   sections: BuilderSection[];
   selectedSectionId: string | null;
@@ -24,6 +25,7 @@ export function SectionCanvas({
   services?: BookableServiceOption[];
   staff?: StaffOption[];
   customCss?: string | null;
+  backgroundColor?: string | null;
 }) {
   if (sections.length === 0) {
     return (
@@ -34,7 +36,7 @@ export function SectionCanvas({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white">
+    <div className="flex-1 overflow-y-auto" style={{ background: backgroundColor || "#ffffff" }}>
       {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
       {/* No max-width cap and no gap between sections here -- this must match
        * PublicSitePage.tsx exactly (each section controls its own width and

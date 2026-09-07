@@ -6,6 +6,8 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { getMyEroConnection } from "@/lib/firmConnection";
+import { PackageCheckoutCard, type PackagePurchaseRow } from "@/components/settings/PackageCheckoutCard";
+import type { OptionGroupRow } from "@/components/settings/PackageOptionGroupsEditor";
 import { FirmProfileForm } from "./FirmProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,40 @@ export default async function FirmProfilePage() {
   if (!eroTier) {
     const connection = await getMyEroConnection(supabase, workspace.id);
     if (!connection) redirect("/settings/profile");
+
+    let pkg: { id: string; name: string; description: string | null; flat_price: number | null; billing_cadence: string | null } | null = null;
+    let optionGroups: OptionGroupRow[] = [];
+    let purchase: PackagePurchaseRow | null = null;
+
+    if (connection.package_id) {
+      const [{ data: pkgRow }, { data: groupRows }, { data: purchaseRow }] = await Promise.all([
+        supabase.from("firm_packages").select("id, name, description, flat_price, billing_cadence").eq("id", connection.package_id).maybeSingle(),
+        supabase
+          .from("firm_package_option_groups")
+          .select("id, name, min_select, max_select, display_order, firm_package_options(id, label, display_order)")
+          .eq("package_id", connection.package_id)
+          .order("display_order"),
+        supabase
+          .from("firm_package_purchases")
+          .select("status, billing_cadence, amount, selected_option_ids, current_period_end")
+          .eq("connection_id", connection.connection_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      pkg = pkgRow;
+      optionGroups = (groupRows ?? []).map((g) => ({
+        id: g.id,
+        name: g.name,
+        min_select: g.min_select,
+        max_select: g.max_select,
+        display_order: g.display_order,
+        options: ((g.firm_package_options ?? []) as { id: string; label: string; display_order: number }[]).sort(
+          (a, b) => a.display_order - b.display_order,
+        ),
+      }));
+      purchase = purchaseRow;
+    }
 
     return (
       <div className="max-w-2xl">
@@ -51,6 +87,11 @@ export default async function FirmProfilePage() {
             </dl>
           </SettingsCard>
         </div>
+        {pkg && (
+          <div className="mt-6">
+            <PackageCheckoutCard connectionId={connection.connection_id} pkg={pkg} groups={optionGroups} purchase={purchase} />
+          </div>
+        )}
       </div>
     );
   }

@@ -25,8 +25,10 @@ export function PublicSitePage({
   const ordered = [...sections].sort((a, b) => a.display_order - b.display_order);
   const loginLinkColor = website.header_background ? "#ffffff" : "inherit";
 
+  // `background` (not `backgroundColor`) so a page can set a CSS gradient,
+  // not just a flat color -- a plain hex value still works fine here too.
   return (
-    <div className="min-h-screen" style={{ backgroundColor: page.background_color || "#ffffff" }}>
+    <div className="min-h-screen" style={{ background: page.background_color || "#ffffff" }}>
       <TrackingScripts headCode={website.head_tracking_code} bodyCode={website.body_tracking_code} />
       {page.custom_js && <TrackingScripts headCode={null} bodyCode={page.custom_js} />}
       {page.custom_css && <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />}

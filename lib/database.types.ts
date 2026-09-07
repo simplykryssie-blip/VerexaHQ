@@ -4326,6 +4326,168 @@ export type Database = {
           },
         ]
       }
+      firm_package_option_groups: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          max_select: number | null
+          min_select: number
+          name: string
+          package_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          max_select?: number | null
+          min_select?: number
+          name: string
+          package_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          max_select?: number | null
+          min_select?: number
+          name?: string
+          package_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_package_option_groups_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "firm_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_package_options: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          label: string
+          option_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          label: string
+          option_group_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          label?: string
+          option_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_package_options_option_group_id_fkey"
+            columns: ["option_group_id"]
+            isOneToOne: false
+            referencedRelation: "firm_package_option_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_package_purchases: {
+        Row: {
+          amount: number | null
+          billing_cadence: string | null
+          canceled_at: string | null
+          connection_id: string
+          created_at: string
+          current_period_end: string | null
+          id: string
+          package_id: string
+          parent_workspace_id: string
+          purchased_at: string | null
+          selected_option_ids: string[] | null
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount?: number | null
+          billing_cadence?: string | null
+          canceled_at?: string | null
+          connection_id: string
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          package_id: string
+          parent_workspace_id: string
+          purchased_at?: string | null
+          selected_option_ids?: string[] | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number | null
+          billing_cadence?: string | null
+          canceled_at?: string | null
+          connection_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          package_id?: string
+          parent_workspace_id?: string
+          purchased_at?: string | null
+          selected_option_ids?: string[] | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_package_purchases_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "firm_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_parent_workspace_id_fkey"
+            columns: ["parent_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firm_packages: {
         Row: {
           billing_cadence: string | null
@@ -11025,6 +11187,7 @@ export type Database = {
           connection_id: string
           ero_workspace_id: string
           name: string
+          package_id: string
           phone: string
           primary_contact_email: string
           relationship_type: string

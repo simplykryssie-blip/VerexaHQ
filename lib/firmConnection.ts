@@ -11,6 +11,7 @@ export type MyEroConnection = {
   billing_responsibility: string;
   shares_communications_identity: boolean;
   allows_branding_override: boolean;
+  package_id: string | null;
 };
 
 /**
