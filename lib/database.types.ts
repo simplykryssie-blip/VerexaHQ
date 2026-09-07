@@ -11348,6 +11348,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      get_site_page_preview: { Args: { p_page_id: string }; Returns: Json }
       get_workspace_billing_admin: {
         Args: { p_workspace_id: string }
         Returns: {

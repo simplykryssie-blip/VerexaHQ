@@ -11,6 +11,7 @@ export function PublicSitePage({
   websiteSlug,
   data,
   showLoginLink,
+  previewMode,
 }: {
   workspaceSlug: string;
   websiteSlug: string;
@@ -19,6 +20,15 @@ export function PublicSitePage({
   // this component is shared by every tenant firm's published website too,
   // and a link to Verexa's own staff login has no place on their sites.
   showLoginLink?: boolean;
+  // Only ever passed by app/site-preview/[pageId]/page.tsx -- renders a
+  // staff member's own unpublished draft through this exact same component
+  // instead of a separate mockup, so "what will this look like once
+  // published" is never a guess. Suppresses popups (an exit-intent or timed
+  // popup firing while someone's just checking a draft would be confusing,
+  // and its own form has the same real-submission risk as organizer_form)
+  // and swaps a couple of section types for safe stand-ins -- see
+  // SectionRenderer.tsx.
+  previewMode?: boolean;
 }) {
   const { page, website, branding, funnel, sections } = data;
   const accentColor = branding?.secondary_color || branding?.primary_color || undefined;
@@ -65,17 +75,21 @@ export function PublicSitePage({
             funnel={funnel}
             accentColor={accentColor}
             firmName={branding?.display_name ?? null}
+            previewMode={previewMode}
+            customCss={page.custom_css}
           />
         ))}
       </main>
-      <PopupHost
-        websiteId={website.id}
-        pageId={page.id}
-        workspaceSlug={workspaceSlug}
-        websiteSlug={websiteSlug}
-        accentColor={accentColor}
-        firmName={branding?.display_name ?? null}
-      />
+      {!previewMode && (
+        <PopupHost
+          websiteId={website.id}
+          pageId={page.id}
+          workspaceSlug={workspaceSlug}
+          websiteSlug={websiteSlug}
+          accentColor={accentColor}
+          firmName={branding?.display_name ?? null}
+        />
+      )}
     </div>
   );
 }

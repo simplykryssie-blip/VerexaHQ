@@ -7,8 +7,9 @@ import { FaqSection } from "@/components/site/sections/FaqSection";
 import { CtaButtonSection } from "@/components/site/sections/CtaButtonSection";
 import { SpacerSection } from "@/components/site/sections/SpacerSection";
 import { FooterSection } from "@/components/site/sections/FooterSection";
-import { SandboxedHtmlPreview } from "./SandboxedHtmlPreview";
+import { SandboxedHtmlPreview } from "@/components/site/sections/SandboxedHtmlPreview";
 import { PricingTableSection } from "@/components/site/sections/PricingTableSection";
+import { PreviewOnlyNotice } from "@/components/site/sections/PreviewOnlyNotice";
 import type { BuilderSection, BookableServiceOption, StaffOption } from "./types";
 
 // Reuses the real public-facing section components for everything except
@@ -53,14 +54,10 @@ export function SectionPreview({
     case "organizer_form": {
       const cfg = section.config as { template_name?: string };
       return (
-        <section className="mx-auto max-w-lg px-6 py-12">
-          <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
-            <h2 className="text-xl font-semibold text-ink">{cfg.template_name || "Form"}</h2>
-            <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">
-              {cfg.template_name ? `"${cfg.template_name}" form -- preview only, not submittable here.` : "No form selected yet -- pick one in the panel on the right."}
-            </p>
-          </div>
-        </section>
+        <PreviewOnlyNotice
+          title={cfg.template_name || "Form"}
+          note={cfg.template_name ? `"${cfg.template_name}" form -- preview only, not submittable here.` : "No form selected yet -- pick one in the panel on the right."}
+        />
       );
     }
     case "booking_widget": {
@@ -69,15 +66,10 @@ export function SectionPreview({
       const staffMember = staff.find((s) => s.id === cfg.staff_id);
       const scope = [service?.name, staffMember?.label].filter(Boolean).join(" -- ");
       return (
-        <section className="mx-auto max-w-lg px-6 py-12">
-          <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
-            <h2 className="text-xl font-semibold text-ink">Booking widget</h2>
-            <p className="mt-4 rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">
-              {scope ? `Scoped to: ${scope}` : "Open booking -- visitors pick any service"} -- preview only, not
-              bookable here.
-            </p>
-          </div>
-        </section>
+        <PreviewOnlyNotice
+          title="Booking widget"
+          note={`${scope ? `Scoped to: ${scope}` : "Open booking -- visitors pick any service"} -- preview only, not bookable here.`}
+        />
       );
     }
     case "pricing_table":
