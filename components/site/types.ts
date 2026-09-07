@@ -32,7 +32,8 @@ export type SectionType =
   | "spacer"
   | "footer"
   | "custom_html"
-  | "booking_widget";
+  | "booking_widget"
+  | "pricing_table";
 
 export type SiteSection = {
   id: string;

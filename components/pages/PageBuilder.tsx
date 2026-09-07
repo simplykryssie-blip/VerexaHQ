@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, Settings } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { slugify } from "@/lib/slugify";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { SectionPalette } from "./SectionPalette";
 import { SectionCanvas } from "./SectionCanvas";
@@ -50,13 +51,20 @@ export function PageBuilder({
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId) ?? null;
 
-  async function commitTitleSlug() {
+  // Accepts an explicit slug override so the "Match name" button can commit
+  // its freshly-computed value immediately -- state set just beforehand
+  // (setSlug) isn't visible yet inside this same event handler.
+  async function commitTitleSlug(slugOverride?: string) {
     const trimmedTitle = title.trim() || page.title;
-    const trimmedSlug = slug.trim() || page.slug;
+    // Always sanitized before it can reach the database -- a slug with
+    // spaces or mixed case (e.g. typed straight into the field) silently
+    // breaks the live URL ("this page isn't available") instead of erroring,
+    // so this is the one place that can never be skipped.
+    const cleanSlug = slugify((slugOverride ?? slug).trim() || trimmedTitle);
     setTitle(trimmedTitle);
-    setSlug(trimmedSlug);
-    if (trimmedTitle === page.title && trimmedSlug === page.slug) return;
-    const { error } = await supabase.from("site_pages").update({ title: trimmedTitle, slug: trimmedSlug }).eq("id", page.id);
+    setSlug(cleanSlug);
+    if (trimmedTitle === page.title && cleanSlug === page.slug) return;
+    const { error } = await supabase.from("site_pages").update({ title: trimmedTitle, slug: cleanSlug }).eq("id", page.id);
     if (error) toast.show(error.message, "error");
   }
 
@@ -127,7 +135,7 @@ export function PageBuilder({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              onBlur={commitTitleSlug}
+              onBlur={() => commitTitleSlug()}
               className="w-56 truncate rounded-lg border border-transparent px-2 py-1 text-center text-sm font-semibold text-ink hover:border-border focus:border-accent focus:outline-none"
             />
           ) : (
@@ -169,10 +177,22 @@ export function PageBuilder({
             <input
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              onBlur={commitTitleSlug}
+              onBlur={() => commitTitleSlug()}
               className="w-40 rounded border border-border px-1.5 py-0.5 text-ink focus:border-accent focus:outline-none"
             />
           </label>
+          <button
+            type="button"
+            onClick={() => {
+              const next = slugify(title);
+              setSlug(next);
+              commitTitleSlug(next);
+            }}
+            title="Set the URL slug to match the page name"
+            className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted hover:border-accent hover:text-accent"
+          >
+            <RefreshCw size={11} /> Match name
+          </button>
           <span className="truncate text-muted">{liveUrl}</span>
         </div>
       )}

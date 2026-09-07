@@ -13,6 +13,7 @@ import { SpacerSection } from "./sections/SpacerSection";
 import { FooterSection } from "./sections/FooterSection";
 import { CustomHtmlSection } from "./sections/CustomHtmlSection";
 import { BookingWidgetSection } from "./sections/BookingWidgetSection";
+import { PricingTableSection } from "./sections/PricingTableSection";
 
 export function SectionRenderer({
   section,
@@ -58,6 +59,8 @@ export function SectionRenderer({
       return <CustomHtmlSection config={section.config as never} />;
     case "booking_widget":
       return <BookingWidgetSection config={section.config as never} workspaceSlug={workspaceSlug} />;
+    case "pricing_table":
+      return <PricingTableSection config={section.config as never} />;
     default:
       return null;
   }

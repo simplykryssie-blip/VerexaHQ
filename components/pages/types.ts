@@ -10,7 +10,8 @@ export type SectionType =
   | "spacer"
   | "footer"
   | "custom_html"
-  | "booking_widget";
+  | "booking_widget"
+  | "pricing_table";
 
 export type BuilderSection = {
   id: string;
@@ -50,6 +51,11 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   footer: "Footer",
   custom_html: "Custom HTML",
   booking_widget: "Booking widget",
+  // Reads Verexa's own platform_subscription_plans (get_public_platform_plans)
+  // -- deliberately left out of SECTION_TYPES below so tenant staff can't add
+  // it to their own site and get Verexa's platform pricing instead of their
+  // own. Only exists where a migration placed it directly (Verexa's own site).
+  pricing_table: "Pricing table (Verexa platform plans)",
 };
 
 export const SECTION_TYPES: SectionType[] = [
