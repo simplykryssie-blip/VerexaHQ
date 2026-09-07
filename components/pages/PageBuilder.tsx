@@ -203,7 +203,7 @@ export function PageBuilder({
       )}
 
       {view === "preview" ? (
-        <div className="flex-1 overflow-y-auto" style={{ backgroundColor: backgroundColor || "#ffffff" }}>
+        <div className="flex-1 overflow-y-auto" style={{ background: backgroundColor || "#ffffff" }}>
           {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
           {sections
             .slice()
@@ -224,6 +224,7 @@ export function PageBuilder({
             services={bookableServices}
             staff={staff}
             customCss={customCss}
+            backgroundColor={backgroundColor}
           />
           {canManage && (
             <SectionPropertiesPanel

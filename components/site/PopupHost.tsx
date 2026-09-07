@@ -74,6 +74,7 @@ export function PopupHost({
   accentColor?: string;
   firmName: string | null;
 }) {
+  const [allPopups, setAllPopups] = useState<ActivePopup[]>([]);
   const [queue, setQueue] = useState<ActivePopup[]>([]);
   const [visiblePopup, setVisiblePopup] = useState<ActivePopup | null>(null);
   const armedIds = useRef<Set<string>>(new Set());
@@ -83,13 +84,29 @@ export function PopupHost({
     const supabase = createClient();
     supabase.rpc("get_active_site_popups", { p_website_id: websiteId, p_page_id: pageId }).then(({ data }) => {
       if (cancelled || !data) return;
-      const popups = (data as unknown as ActivePopup[]).filter((p) => !alreadyShown(p));
-      setQueue(popups);
+      const popups = data as unknown as ActivePopup[];
+      setAllPopups(popups);
+      setQueue(popups.filter((p) => !alreadyShown(p)));
     });
     return () => {
       cancelled = true;
     };
   }, [websiteId, pageId]);
+
+  // Any link with href="#popup" opens the page's popup immediately, ignoring
+  // frequency suppression -- a visitor who deliberately clicked a "Start your
+  // trial" button should always see the form, whether or not they already
+  // saw it fire automatically this session.
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = (e.target as HTMLElement | null)?.closest('a[href$="#popup"]');
+      if (!target || allPopups.length === 0) return;
+      e.preventDefault();
+      setVisiblePopup(allPopups[0]);
+    }
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, [allPopups]);
 
   useEffect(() => {
     if (visiblePopup) return;
