@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Workflow, Plus } from "lucide-react";
+import { Trash2, Bell, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -14,17 +14,24 @@ import { IconChip } from "@/components/ui/IconChip";
 
 const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "success", archived: "neutral" };
 
-export type FunnelCard = { id: string; name: string; status: string; page_count: number };
+const TRIGGER_LABEL: Record<string, string> = {
+  on_load: "On page load",
+  after_delay: "After a delay",
+  exit_intent: "Exit intent",
+  scroll_percent: "On scroll",
+};
 
-export function FunnelLibrary({
+export type PopupCard = { id: string; name: string; status: string; trigger_type: string };
+
+export function PopupLibrary({
   workspaceId,
   websiteId,
-  funnels,
+  popups,
   canManage,
 }: {
   workspaceId: string;
   websiteId: string;
-  funnels: FunnelCard[];
+  popups: PopupCard[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -36,32 +43,32 @@ export function FunnelLibrary({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  async function createFunnel(e: React.FormEvent) {
+  async function createPopup(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      setError("A funnel name is required.");
+      setError("A popup name is required.");
       return;
     }
     setSaving(true);
     setError(null);
     const { data, error } = await supabase
-      .from("site_funnels")
+      .from("site_popups")
       .insert({ workspace_id: workspaceId, website_id: websiteId, name: trimmed })
       .select("id")
       .single();
     setSaving(false);
     if (error || !data) {
-      setError(error?.message ?? "Could not create funnel.");
+      setError(error?.message ?? "Could not create popup.");
       return;
     }
-    router.push(`/websites/${websiteId}/funnels/${data.id}`);
+    router.push(`/websites/${websiteId}/popups/${data.id}`);
   }
 
-  async function deleteFunnel(id: string) {
-    if (!confirm("Delete this funnel? Its pages will become standalone pages, not deleted.")) return;
+  async function deletePopup(id: string) {
+    if (!confirm("Delete this popup? This can't be undone.")) return;
     setDeletingId(id);
-    const { error } = await supabase.from("site_funnels").delete().eq("id", id);
+    const { error } = await supabase.from("site_popups").delete().eq("id", id);
     setDeletingId(null);
     if (error) {
       toast.show(error.message, "error");
@@ -75,20 +82,20 @@ export function FunnelLibrary({
       {canManage && (
         <div className="flex justify-end">
           <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus size={14} aria-hidden="true" /> New funnel
+            <Plus size={14} aria-hidden="true" /> New popup
           </Button>
         </div>
       )}
 
       {creating && (
-        <form onSubmit={createFunnel} className="mt-4 flex items-end gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft">
+        <form onSubmit={createPopup} className="mt-4 flex items-end gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft">
           <label className="flex-1 text-xs font-medium uppercase tracking-wide text-muted">
-            Funnel name
+            Popup name
             <input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Free Consultation Funnel"
+              placeholder="e.g. Free Consultation Offer"
               className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
@@ -111,52 +118,50 @@ export function FunnelLibrary({
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
       <div className="mt-4">
-        {funnels.length === 0 ? (
+        {popups.length === 0 ? (
           <EmptyState
-            icon={Workflow}
-            message="No funnels yet -- chain pages together into a linear sequence."
-            action={canManage ? <Button onClick={() => setCreating(true)}><Plus size={14} aria-hidden="true" /> New funnel</Button> : undefined}
+            icon={Bell}
+            message="No popups yet -- add one for lead capture, an announcement, or a limited-time offer."
+            action={canManage ? <Button onClick={() => setCreating(true)}><Plus size={14} aria-hidden="true" /> New popup</Button> : undefined}
           />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {funnels.map((f) => (
+            {popups.map((p) => (
               <div
-                key={f.id}
+                key={p.id}
                 className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <IconChip tone="amber">
-                      <Workflow size={16} aria-hidden="true" />
+                    <IconChip tone="violet">
+                      <Bell size={16} aria-hidden="true" />
                     </IconChip>
-                    <h3 className="text-sm font-semibold text-ink">{f.name}</h3>
+                    <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
                   </div>
                   {canManage && (
                     <button
                       type="button"
-                      onClick={() => deleteFunnel(f.id)}
-                      disabled={deletingId === f.id}
+                      onClick={() => deletePopup(p.id)}
+                      disabled={deletingId === p.id}
                       className="shrink-0 rounded p-1 text-muted hover:text-danger disabled:opacity-60"
-                      aria-label="Delete funnel"
+                      aria-label="Delete popup"
                     >
                       <Trash2 size={14} />
                     </button>
                   )}
                 </div>
-                <p className="mt-2 text-xs text-muted">
-                  {f.page_count} page{f.page_count === 1 ? "" : "s"}
-                </p>
+                <p className="mt-2 text-xs text-muted">{TRIGGER_LABEL[p.trigger_type] ?? p.trigger_type}</p>
                 <div className="mt-3">
                   {canManage ? (
-                    <TemplateStatusCycle table="site_funnels" id={f.id} status={f.status} />
+                    <TemplateStatusCycle table="site_popups" id={p.id} status={p.status} />
                   ) : (
-                    <Badge tone={STATUS_TONE[f.status] ?? "neutral"} className="capitalize">
-                      {f.status}
+                    <Badge tone={STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
+                      {p.status}
                     </Badge>
                   )}
                 </div>
-                <Link href={`/websites/${websiteId}/funnels/${f.id}`} className={buttonClasses("secondary", "sm", "mt-4")}>
-                  {canManage ? "Manage" : "View"}
+                <Link href={`/websites/${websiteId}/popups/${p.id}`} className={buttonClasses("secondary", "sm", "mt-4")}>
+                  {canManage ? "Edit" : "View"}
                 </Link>
               </div>
             ))}

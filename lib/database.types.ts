@@ -8010,6 +8010,113 @@ export type Database = {
           },
         ]
       }
+      site_popup_sections: {
+        Row: {
+          config: Json
+          created_at: string
+          display_order: number
+          id: string
+          popup_id: string
+          section_type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          display_order: number
+          id?: string
+          popup_id: string
+          section_type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          display_order?: number
+          id?: string
+          popup_id?: string
+          section_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_popup_sections_popup_id_fkey"
+            columns: ["popup_id"]
+            isOneToOne: false
+            referencedRelation: "site_popups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_popups: {
+        Row: {
+          background_color: string | null
+          created_at: string
+          created_by: string | null
+          custom_css: string | null
+          display_frequency: string
+          frequency_days: number | null
+          id: string
+          name: string
+          status: string
+          target_page_ids: string[] | null
+          trigger_type: string
+          trigger_value: number | null
+          updated_at: string
+          website_id: string
+          workspace_id: string
+        }
+        Insert: {
+          background_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_css?: string | null
+          display_frequency?: string
+          frequency_days?: number | null
+          id?: string
+          name: string
+          status?: string
+          target_page_ids?: string[] | null
+          trigger_type?: string
+          trigger_value?: number | null
+          updated_at?: string
+          website_id: string
+          workspace_id: string
+        }
+        Update: {
+          background_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_css?: string | null
+          display_frequency?: string
+          frequency_days?: number | null
+          id?: string
+          name?: string
+          status?: string
+          target_page_ids?: string[] | null
+          trigger_type?: string
+          trigger_value?: number | null
+          updated_at?: string
+          website_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_popups_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "site_websites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_popups_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_websites: {
         Row: {
           body_tracking_code: string | null
@@ -10737,6 +10844,10 @@ export type Database = {
         }
         Returns: string
       }
+      get_active_site_popups: {
+        Args: { p_page_id: string; p_website_id: string }
+        Returns: Json
+      }
       get_config_object_versions: {
         Args: { p_id: string; p_table: string }
         Returns: {
@@ -11130,6 +11241,10 @@ export type Database = {
         Returns: boolean
       }
       hash_firm_secret: { Args: { p_plaintext: string }; Returns: string }
+      import_bank_product_transactions: {
+        Args: { p_rows: Json; p_workspace_id: string }
+        Returns: Json
+      }
       invite_portal_user: {
         Args: {
           p_client_id: string
@@ -11562,6 +11677,10 @@ export type Database = {
       }
       reorder_site_page_sections: {
         Args: { p_page_id: string; p_section_ids: string[] }
+        Returns: undefined
+      }
+      reorder_site_popup_sections: {
+        Args: { p_popup_id: string; p_section_ids: string[] }
         Returns: undefined
       }
       request_portal_service: {

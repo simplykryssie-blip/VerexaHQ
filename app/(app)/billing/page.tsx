@@ -3,7 +3,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Lock } from "lucide-react";
-import { BillingHub, type BillingQuoteRow, type BillingInvoiceRow, type BillingPaymentRow } from "@/components/billing/BillingHub";
+import { BillingHub, type BillingQuoteRow, type BillingInvoiceRow, type BillingPaymentRow, type BillingBankProductRow } from "@/components/billing/BillingHub";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { fi
     );
   }
 
-  const [{ data: canManage }, { data: quotesRaw }, { data: invoicesRaw }, { data: paymentsRaw }, { data: services }] = await Promise.all([
+  const [{ data: canManage }, { data: quotesRaw }, { data: invoicesRaw }, { data: paymentsRaw }, { data: bankProductsRaw }, { data: services }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "billing.manage" }),
     supabase
       .from("quotes")
@@ -52,6 +52,14 @@ export default async function BillingPage({ searchParams }: { searchParams: { fi
       .select("id, status, amount, payment_date, payment_method, client_id, clients(first_name, last_name, business_name, client_type)")
       .eq("workspace_id", workspace.id)
       .order("payment_date", { ascending: false })
+      .limit(200),
+    supabase
+      .from("bank_product_transactions")
+      .select(
+        "id, bank_partner, product_type, rebate_amount, status, created_at, engagement_id, engagements(engagement_number, client_id, clients(first_name, last_name, business_name, client_type))"
+      )
+      .eq("workspace_id", workspace.id)
+      .order("created_at", { ascending: false })
       .limit(200),
     supabase.from("services").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`).eq("status", "published").order("display_order"),
   ]);
@@ -100,6 +108,22 @@ export default async function BillingPage({ searchParams }: { searchParams: { fi
     client_name: clientLabel(p.clients as never),
   }));
 
+  const bankProducts: BillingBankProductRow[] = (bankProductsRaw ?? []).map((b) => {
+    const engagement = b.engagements as unknown as { engagement_number: string | null; client_id: string; clients: never } | null;
+    return {
+      id: b.id,
+      bank_partner: b.bank_partner,
+      product_type: b.product_type,
+      rebate_amount: b.rebate_amount,
+      status: b.status,
+      created_at: b.created_at,
+      engagement_id: b.engagement_id,
+      engagement_number: engagement?.engagement_number ?? null,
+      client_id: engagement?.client_id ?? "",
+      client_name: engagement ? clientLabel(engagement.clients) : "--",
+    };
+  });
+
   return (
     <>
       <PageHeader title="Billing" description="Quotes, invoices, and payments across every client -- for trends and history, see Reports > Financial." />
@@ -110,6 +134,7 @@ export default async function BillingPage({ searchParams }: { searchParams: { fi
           quotes={quotes}
           invoices={invoices}
           payments={payments}
+          bankProducts={bankProducts}
           services={services ?? []}
           canManage={Boolean(canManage)}
           initialUnpaidOnly={searchParams.filter === "unpaid"}

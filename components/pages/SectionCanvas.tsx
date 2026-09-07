@@ -34,63 +34,69 @@ export function SectionCanvas({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-white p-4">
+    <div className="flex-1 overflow-y-auto bg-white">
       {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
-      <div className="mx-auto max-w-3xl space-y-3">
-        {sections.map((section, i) => (
+      {/* No max-width cap and no gap between sections here -- this must match
+       * PublicSitePage.tsx exactly (each section controls its own width and
+       * full-bleed background) so what staff see while editing is what
+       * visitors actually get, not a narrower editor-only mockup. Selection
+       * and the move/delete toolbar are pure overlays (ring + absolutely
+       * positioned button group) so they never affect layout or width. */}
+      {sections.map((section, i) => (
+        <div
+          key={section.id}
+          onClick={() => onSelect(section.id)}
+          className={`group relative cursor-pointer transition ${
+            selectedSectionId === section.id ? "ring-2 ring-inset ring-accent" : "ring-1 ring-inset ring-transparent hover:ring-border"
+          }`}
+        >
           <div
-            key={section.id}
-            onClick={() => onSelect(section.id)}
-            className={`relative cursor-pointer rounded-xl border-2 transition ${
-              selectedSectionId === section.id ? "border-accent" : "border-transparent hover:border-border"
+            className={`absolute right-2 top-2 z-10 items-center gap-1 rounded-lg border border-border bg-surface px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted shadow-soft ${
+              selectedSectionId === section.id ? "flex" : "hidden group-hover:flex"
             }`}
           >
-            <div className="flex items-center justify-between border-b border-border bg-surfaceMuted px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
-              <span>{SECTION_TYPE_LABELS[section.section_type]}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMove(section.id, "up");
-                  }}
-                  disabled={i === 0}
-                  className="rounded p-0.5 hover:text-ink disabled:opacity-30"
-                  aria-label="Move section up"
-                >
-                  <ChevronUp size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMove(section.id, "down");
-                  }}
-                  disabled={i === sections.length - 1}
-                  className="rounded p-0.5 hover:text-ink disabled:opacity-30"
-                  aria-label="Move section down"
-                >
-                  <ChevronDown size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(section.id);
-                  }}
-                  className="rounded p-0.5 hover:text-danger"
-                  aria-label="Delete section"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </div>
-            <div className="pointer-events-none">
-              <SectionPreview section={section} accentColor={accentColor} services={services} staff={staff} customCss={customCss} />
-            </div>
+            <span className="mr-1 normal-case tracking-normal text-slate">{SECTION_TYPE_LABELS[section.section_type]}</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(section.id, "up");
+              }}
+              disabled={i === 0}
+              className="rounded p-0.5 hover:text-ink disabled:opacity-30"
+              aria-label="Move section up"
+            >
+              <ChevronUp size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(section.id, "down");
+              }}
+              disabled={i === sections.length - 1}
+              className="rounded p-0.5 hover:text-ink disabled:opacity-30"
+              aria-label="Move section down"
+            >
+              <ChevronDown size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(section.id);
+              }}
+              className="rounded p-0.5 hover:text-danger"
+              aria-label="Delete section"
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
-        ))}
-      </div>
+          <div className="pointer-events-none">
+            <SectionPreview section={section} accentColor={accentColor} services={services} staff={staff} customCss={customCss} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

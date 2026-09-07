@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Copy, ImagePlus, Trash2 } from "lucide-react";
+import { Check, Copy, Image as ImageIcon, ImagePlus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -97,11 +97,11 @@ export function MediaLibrary({ workspaceId, canManage }: { workspaceId: string; 
         {loading ? (
           <p className="text-sm text-muted">Loading...</p>
         ) : files.length === 0 ? (
-          <EmptyState message="No media uploaded yet." />
+          <EmptyState icon={ImageIcon} message="No media uploaded yet." />
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {files.map((f) => (
-              <div key={f.name} className="group relative overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+              <div key={f.name} className="group relative overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={f.url} alt={f.name} className="aspect-video w-full object-cover" />
                 <div className="flex items-center justify-between gap-1 border-t border-border px-2 py-1">

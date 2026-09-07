@@ -14,3 +14,10 @@ export const PAYMENT_STATUS_TONE: Record<string, BadgeTone> = {
   failed: "danger",
   refunded: "neutral",
 };
+
+export const BANK_PRODUCT_STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "warning",
+  funded: "success",
+  disbursed: "success",
+  rejected: "danger",
+};
