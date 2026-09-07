@@ -37,16 +37,15 @@ async function handleGET(request: Request) {
   const stale: string[] = [];
   const alerted: string[] = [];
 
-  const { data: recentRuns } = await supabase
-    .from("cron_job_runs")
-    .select("job_key, status, completed_at")
-    .eq("status", "success")
-    .order("completed_at", { ascending: false })
-    .limit(2000);
+  // Per-job_key max(completed_at), computed in the database -- a client-side
+  // "take the top N most recent successes across every job" approach starves
+  // once-a-day jobs of visibility once every-1-to-5-minute jobs alone produce
+  // thousands of success rows a day (see migration 20260914050000).
+  const { data: lastSuccesses } = await supabase.rpc("get_cron_job_last_success");
 
   const lastSuccessByJob = new Map<string, string>();
-  for (const run of recentRuns ?? []) {
-    if (!lastSuccessByJob.has(run.job_key)) lastSuccessByJob.set(run.job_key, run.completed_at);
+  for (const row of lastSuccesses ?? []) {
+    if (row.last_success_at) lastSuccessByJob.set(row.job_key, row.last_success_at);
   }
 
   for (const [jobKey, intervalMinutes] of Object.entries(EXPECTED_INTERVAL_MINUTES)) {
