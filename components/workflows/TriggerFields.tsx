@@ -84,6 +84,8 @@ export const TRIGGER_TYPES = [
   { value: "invoice.overdue", label: "An invoice becomes overdue", category: "billing", description: "Fires when an invoice's due date passes unpaid (checked every 6 hours).", keywords: "invoice overdue late payment" },
   { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
   { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
+  { value: "firm_package.purchased", label: "A connected firm purchases a package", category: "ero_ptin", description: "Fires in your workspace when a connected firm checks out and pays for the package you assigned them (e.g. a tax software or bank product package) -- use it to automate onboarding onto whatever they chose.", keywords: "package purchase checkout software bank connected firm ero ptin" },
+  { value: "firm_package.canceled", label: "A connected firm's package is canceled", category: "ero_ptin", description: "Fires in your workspace when a connected firm's package purchase is canceled (a recurring subscription ending, most commonly) -- use it to automate revoking access.", keywords: "package canceled subscription ended connected firm ero ptin" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -267,6 +269,12 @@ export function triggerSummary(
   }
   if (triggerType === "engagement_share.created") {
     return "When a connected PTIN shares an engagement for review";
+  }
+  if (triggerType === "firm_package.purchased") {
+    return "When a connected firm purchases a package";
+  }
+  if (triggerType === "firm_package.canceled") {
+    return "When a connected firm's package is canceled";
   }
   return triggerType;
 }
