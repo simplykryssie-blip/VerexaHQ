@@ -2,82 +2,60 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, RefreshCw, Settings } from "lucide-react";
+import { ArrowLeft, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { slugify } from "@/lib/slugify";
-import { getLiveUrl } from "@/lib/websites/liveUrl";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
-import { SectionPalette } from "./SectionPalette";
-import { SectionCanvas } from "./SectionCanvas";
-import { SectionPropertiesPanel } from "./SectionPropertiesPanel";
-import { SectionPreview } from "./SectionPreview";
-import { PageSettingsPanel } from "./PageSettingsPanel";
-import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption, BookableServiceOption, StaffOption } from "./types";
+import { SectionPalette } from "@/components/pages/SectionPalette";
+import { SectionCanvas } from "@/components/pages/SectionCanvas";
+import { SectionPropertiesPanel } from "@/components/pages/SectionPropertiesPanel";
+import { SectionPreview } from "@/components/pages/SectionPreview";
+import { POPUP_SECTION_TYPES, type BuilderSection, type SectionType, type OrganizerTemplateOption } from "@/components/pages/types";
+import { PopupSettingsPanel, type PopupSettings, type PopupSettingsPatch } from "./PopupSettingsPanel";
 
 const DEBOUNCE_MS = 600;
 
-export function PageBuilder({
-  workspaceSlug,
+export function PopupBuilder({
   websiteId,
-  websiteSlug,
-  customDomain,
-  domainVerified,
-  page,
+  popup,
   initialSections,
+  pageOptions,
   canManage,
   organizerTemplates,
-  bookableServices,
-  staff,
 }: {
-  workspaceSlug: string;
   websiteId: string;
-  websiteSlug: string;
-  customDomain: string | null;
-  domainVerified: boolean;
-  page: BuilderPage;
+  popup: PopupSettings & { id: string; workspace_id: string; name: string; status: string };
   initialSections: BuilderSection[];
+  pageOptions: { id: string; title: string }[];
   canManage: boolean;
   organizerTemplates: OrganizerTemplateOption[];
-  bookableServices: BookableServiceOption[];
-  staff: StaffOption[];
 }) {
   const supabase = createClient();
   const toast = useToast();
-  const [title, setTitle] = useState(page.title);
-  const [slug, setSlug] = useState(page.slug);
+  const [name, setName] = useState(popup.name);
   const [sections, setSections] = useState<BuilderSection[]>([...initialSections].sort((a, b) => a.display_order - b.display_order));
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [view, setView] = useState<"build" | "preview">("build");
-  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
-  const [backgroundColor, setBackgroundColor] = useState(page.background_color);
-  const [customCss, setCustomCss] = useState(page.custom_css);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState(popup.background_color);
+  const [customCss, setCustomCss] = useState(popup.custom_css);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId) ?? null;
 
-  // Accepts an explicit slug override so the "Match name" button can commit
-  // its freshly-computed value immediately -- state set just beforehand
-  // (setSlug) isn't visible yet inside this same event handler.
-  async function commitTitleSlug(slugOverride?: string) {
-    const trimmedTitle = title.trim() || page.title;
-    // Always sanitized before it can reach the database -- a slug with
-    // spaces or mixed case (e.g. typed straight into the field) silently
-    // breaks the live URL ("this page isn't available") instead of erroring,
-    // so this is the one place that can never be skipped.
-    const cleanSlug = slugify((slugOverride ?? slug).trim() || trimmedTitle);
-    setTitle(trimmedTitle);
-    setSlug(cleanSlug);
-    if (trimmedTitle === page.title && cleanSlug === page.slug) return;
-    const { error } = await supabase.from("site_pages").update({ title: trimmedTitle, slug: cleanSlug }).eq("id", page.id);
+  async function commitName() {
+    const trimmed = name.trim() || popup.name;
+    setName(trimmed);
+    if (trimmed === popup.name) return;
+    const { error } = await supabase.from("site_popups").update({ name: trimmed }).eq("id", popup.id);
     if (error) toast.show(error.message, "error");
   }
 
   async function addSection(type: SectionType) {
     const nextOrder = sections.length;
     const { data, error } = await supabase
-      .from("site_page_sections")
-      .insert({ page_id: page.id, section_type: type, display_order: nextOrder, config: {} })
+      .from("site_popup_sections")
+      .insert({ popup_id: popup.id, section_type: type, display_order: nextOrder, config: {} })
       .select("id, section_type, display_order, config")
       .single();
     if (error || !data) {
@@ -97,7 +75,7 @@ export function PageBuilder({
     [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
     setSections(reordered.map((s, i) => ({ ...s, display_order: i })));
 
-    const { error } = await supabase.rpc("reorder_site_page_sections", { p_page_id: page.id, p_section_ids: reordered.map((s) => s.id) });
+    const { error } = await supabase.rpc("reorder_site_popup_sections", { p_popup_id: popup.id, p_section_ids: reordered.map((s) => s.id) });
     if (error) toast.show(error.message, "error");
   }
 
@@ -106,12 +84,10 @@ export function PageBuilder({
     const remaining = sections.filter((s) => s.id !== id);
     setSections(remaining);
     if (selectedSectionId === id) setSelectedSectionId(null);
-    const { error } = await supabase.from("site_page_sections").delete().eq("id", id);
+    const { error } = await supabase.from("site_popup_sections").delete().eq("id", id);
     if (error) toast.show(error.message, "error");
-    // Compact display_order so a later reorder call's "exactly every section
-    // once" validation doesn't choke on a gap left by the deleted row.
     if (remaining.length > 0) {
-      await supabase.rpc("reorder_site_page_sections", { p_page_id: page.id, p_section_ids: remaining.map((s) => s.id) });
+      await supabase.rpc("reorder_site_popup_sections", { p_popup_id: popup.id, p_section_ids: remaining.map((s) => s.id) });
     }
   }
 
@@ -122,12 +98,10 @@ export function PageBuilder({
     debounceTimers.current[id] = setTimeout(async () => {
       const current = sections.find((s) => s.id === id);
       const merged = { ...(current?.config ?? {}), ...patch };
-      const { error } = await supabase.from("site_page_sections").update({ config: merged as never }).eq("id", id);
+      const { error } = await supabase.from("site_popup_sections").update({ config: merged as never }).eq("id", id);
       if (error) toast.show(error.message, "error");
     }, DEBOUNCE_MS);
   }
-
-  const liveUrl = getLiveUrl({ pageSlug: slug, workspaceSlug, websiteSlug, customDomain, domainVerified });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -138,28 +112,23 @@ export function PageBuilder({
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-4">
           {canManage ? (
             <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={() => commitTitleSlug()}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={commitName}
               className="w-56 truncate rounded-lg border border-transparent px-2 py-1 text-center text-sm font-semibold text-ink hover:border-border focus:border-accent focus:outline-none"
             />
           ) : (
-            <p className="truncate text-sm font-semibold text-ink">{title}</p>
+            <p className="truncate text-sm font-semibold text-ink">{name}</p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {page.status === "published" && (
-            <a href={liveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
-              <ExternalLink size={12} /> View live
-            </a>
-          )}
-          {canManage && <TemplateStatusCycle table="site_pages" id={page.id} status={page.status} />}
+          {canManage && <TemplateStatusCycle table="site_popups" id={popup.id} status={popup.status} />}
           {canManage && (
             <button
               type="button"
-              onClick={() => setPageSettingsOpen(true)}
-              title="Page settings"
-              aria-label="Page settings"
+              onClick={() => setSettingsOpen(true)}
+              title="Popup settings"
+              aria-label="Popup settings"
               className="rounded-lg border border-border p-1.5 text-muted hover:border-accent hover:text-accent"
             >
               <Settings size={14} />
@@ -175,33 +144,6 @@ export function PageBuilder({
         </div>
       </header>
 
-      {canManage && view === "build" && (
-        <div className="flex items-center gap-3 border-b border-border bg-surfaceMuted px-4 py-2 text-xs">
-          <label className="flex items-center gap-1.5 text-muted">
-            URL slug
-            <input
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              onBlur={() => commitTitleSlug()}
-              className="w-40 rounded border border-border px-1.5 py-0.5 text-ink focus:border-accent focus:outline-none"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => {
-              const next = slugify(title);
-              setSlug(next);
-              commitTitleSlug(next);
-            }}
-            title="Set the URL slug to match the page name"
-            className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted hover:border-accent hover:text-accent"
-          >
-            <RefreshCw size={11} /> Match name
-          </button>
-          <span className="truncate text-muted">{liveUrl}</span>
-        </div>
-      )}
-
       {view === "preview" ? (
         <div className="flex-1 overflow-y-auto" style={{ backgroundColor: backgroundColor || "#ffffff" }}>
           {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
@@ -209,41 +151,40 @@ export function PageBuilder({
             .slice()
             .sort((a, b) => a.display_order - b.display_order)
             .map((s) => (
-              <SectionPreview key={s.id} section={s} services={bookableServices} staff={staff} customCss={customCss} />
+              <SectionPreview key={s.id} section={s} customCss={customCss} />
             ))}
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
-          {canManage && <SectionPalette onAdd={addSection} />}
+          {canManage && <SectionPalette onAdd={addSection} types={POPUP_SECTION_TYPES} />}
           <SectionCanvas
             sections={sections}
             selectedSectionId={selectedSectionId}
             onSelect={setSelectedSectionId}
             onMove={moveSection}
             onDelete={deleteSection}
-            services={bookableServices}
-            staff={staff}
             customCss={customCss}
           />
           {canManage && (
             <SectionPropertiesPanel
-              workspaceId={page.workspace_id}
+              workspaceId={popup.workspace_id}
               section={selectedSection}
               onUpdate={updateSectionConfig}
               organizerTemplates={organizerTemplates}
-              bookableServices={bookableServices}
-              staff={staff}
-              canAdvanceToNextPage={Boolean(page.funnel_id)}
+              bookableServices={[]}
+              staff={[]}
+              canAdvanceToNextPage={false}
             />
           )}
         </div>
       )}
 
-      {pageSettingsOpen && (
-        <PageSettingsPanel
-          page={{ ...page, title, slug }}
-          onClose={() => setPageSettingsOpen(false)}
-          onSaved={(patch) => {
+      {settingsOpen && (
+        <PopupSettingsPanel
+          popup={popup}
+          pageOptions={pageOptions}
+          onClose={() => setSettingsOpen(false)}
+          onSaved={(patch: PopupSettingsPatch) => {
             setBackgroundColor(patch.background_color);
             setCustomCss(patch.custom_css);
           }}

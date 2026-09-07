@@ -25,6 +25,7 @@ export function TemplateStatusCycle({
     | "services"
     | "firm_packages"
     | "organizer_templates"
+    | "site_popups"
     | "document_request_templates"
     | "processes"
     | "site_pages"

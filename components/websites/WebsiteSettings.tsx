@@ -6,6 +6,7 @@ import { Trash2, X, Globe, CheckCircle2, Copy, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { SectionImageUpload } from "@/components/pages/section-editors/SectionImageUpload";
+import { Button } from "@/components/ui/Button";
 
 const inputClass = "mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -248,14 +249,9 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
                 placeholder="yourfirm.com"
                 className={`${inputClass} mt-0`}
               />
-              <button
-                type="button"
-                onClick={saveDomain}
-                disabled={savingDomain || !domainInput.trim()}
-                className="shrink-0 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-white disabled:opacity-60"
-              >
+              <Button size="sm" onClick={saveDomain} disabled={savingDomain || !domainInput.trim()} className="shrink-0">
                 {savingDomain ? "Connecting..." : "Connect domain"}
-              </button>
+              </Button>
             </div>
           )
         ) : (
@@ -275,22 +271,13 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
               </div>
               {canManage && (
                 <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={verifyDomain}
-                    disabled={verifying}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:border-accent hover:text-accent disabled:opacity-60"
-                  >
+                  <Button variant="secondary" size="sm" onClick={verifyDomain} disabled={verifying}>
                     <RefreshCw size={12} className={verifying ? "animate-spin" : ""} />
                     {verifying ? "Checking..." : "Verify DNS"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={removeDomain}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted hover:border-danger hover:text-danger"
-                  >
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={removeDomain}>
                     <X size={12} /> Disconnect
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -408,21 +395,12 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
 
       {canManage && (
         <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={deleteWebsite}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-medium text-danger hover:border-danger"
-          >
+          <Button variant="destructive" size="sm" onClick={deleteWebsite}>
             <Trash2 size={13} /> Delete website
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving || !dirty}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
+          </Button>
+          <Button onClick={save} disabled={saving || !dirty}>
             {saving ? "Saving..." : "Save"}
-          </button>
+          </Button>
         </div>
       )}
     </div>

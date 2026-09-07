@@ -72,3 +72,8 @@ export const SECTION_TYPES: SectionType[] = [
   "footer",
   "custom_html",
 ];
+
+// A popup's small footprint doesn't fit page-only layouts (hero, testimonial,
+// faq, text_image, footer, booking_widget, pricing_table) -- mirrors the
+// site_popup_sections CHECK constraint exactly.
+export const POPUP_SECTION_TYPES: SectionType[] = ["rich_text", "image", "organizer_form", "cta_button", "spacer", "custom_html"];

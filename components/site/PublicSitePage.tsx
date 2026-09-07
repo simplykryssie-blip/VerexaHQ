@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { SitePageData } from "./types";
 import { SectionRenderer } from "./SectionRenderer";
 import { TrackingScripts } from "./TrackingScripts";
+import { PopupHost } from "./PopupHost";
 
 export function PublicSitePage({
   workspaceSlug,
@@ -65,6 +66,14 @@ export function PublicSitePage({
           />
         ))}
       </main>
+      <PopupHost
+        websiteId={website.id}
+        pageId={page.id}
+        workspaceSlug={workspaceSlug}
+        websiteSlug={websiteSlug}
+        accentColor={accentColor}
+        firmName={branding?.display_name ?? null}
+      />
     </div>
   );
 }
