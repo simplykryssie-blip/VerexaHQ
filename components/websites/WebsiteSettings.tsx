@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ImagePlus, X, Globe, CheckCircle2, Copy, RefreshCw } from "lucide-react";
+import { Trash2, X, Globe, CheckCircle2, Copy, RefreshCw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { SectionImageUpload } from "@/components/pages/section-editors/SectionImageUpload";
 
 const inputClass = "mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -53,7 +54,6 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
   const [faviconUrl, setFaviconUrl] = useState(website.favicon_url ?? "");
   const [headCode, setHeadCode] = useState(website.head_tracking_code ?? "");
   const [bodyCode, setBodyCode] = useState(website.body_tracking_code ?? "");
-  const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -147,20 +147,6 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
     toast.show("Copied", "success");
   }
 
-  async function uploadFavicon(file: File) {
-    setUploadingFavicon(true);
-    const path = `${website.workspace_id}/favicon-${Date.now()}-${file.name}`;
-    const { error } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
-    setUploadingFavicon(false);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    const { data } = supabase.storage.from("branding").getPublicUrl(path);
-    setFaviconUrl(data.publicUrl);
-    setDirty(true);
-  }
-
   async function save() {
     setSaving(true);
     const { error } = await supabase
@@ -222,38 +208,26 @@ export function WebsiteSettings({ website, canManage }: { website: Website; canM
         </label>
 
         <div className="mt-3">
-          <p className={labelClass}>Favicon</p>
-          {faviconUrl ? (
-            <div className="mt-1.5 flex items-center gap-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={faviconUrl} alt="" className="h-6 w-6 rounded border border-border object-contain" />
-              {canManage && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFaviconUrl("");
-                    setDirty(true);
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted hover:border-danger hover:text-danger"
-                >
-                  <X size={12} /> Remove
-                </button>
-              )}
-            </div>
+          {canManage ? (
+            <SectionImageUpload
+              workspaceId={website.workspace_id}
+              value={faviconUrl || undefined}
+              onChange={(url) => {
+                setFaviconUrl(url ?? "");
+                setDirty(true);
+              }}
+              label="Favicon"
+            />
           ) : (
-            canManage && (
-              <label className="mt-1.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent">
-                <ImagePlus size={14} />
-                {uploadingFavicon ? "Uploading..." : "Upload a favicon"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={uploadingFavicon}
-                  className="hidden"
-                  onChange={(e) => e.target.files?.[0] && uploadFavicon(e.target.files[0])}
-                />
-              </label>
-            )
+            <>
+              <p className={labelClass}>Favicon</p>
+              {faviconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={faviconUrl} alt="" className="mt-1.5 h-6 w-6 rounded border border-border object-contain" />
+              ) : (
+                <p className="mt-1.5 text-xs text-muted">No favicon set.</p>
+              )}
+            </>
           )}
         </div>
       </div>
