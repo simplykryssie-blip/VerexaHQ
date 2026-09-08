@@ -8671,6 +8671,39 @@ export type Database = {
           },
         ]
       }
+      support_articles: {
+        Row: {
+          body: string
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string | null
+          section: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          section: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          section?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       system_failure_log: {
         Row: {
           context: Json | null
