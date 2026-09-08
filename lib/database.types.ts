@@ -5160,8 +5160,54 @@ export type Database = {
           },
         ]
       }
+      learning_course_assignments: {
+        Row: {
+          assigned_by: string | null
+          course_id: string
+          created_at: string
+          due_date: string | null
+          id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          course_id: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          course_id?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_course_assignments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "learning_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learning_course_assignments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_courses: {
         Row: {
+          category: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -5173,6 +5219,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -5184,6 +5231,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -10636,6 +10684,10 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      assign_learning_course: {
+        Args: { p_course_id: string; p_due_date?: string; p_user_id: string }
+        Returns: undefined
+      }
       attest_signature_presence: {
         Args: { p_signer_id: string }
         Returns: undefined
@@ -11256,6 +11308,20 @@ export type Database = {
           role_name: string
           status: string
           workspace_name: string
+        }[]
+      }
+      get_learning_assignment_rollup: {
+        Args: { p_owner_workspace_id: string }
+        Returns: {
+          assigned_at: string
+          assignment_id: string
+          completed_modules: number
+          course_id: string
+          course_title: string
+          due_date: string
+          total_modules: number
+          user_email: string
+          user_id: string
         }[]
       }
       get_learning_completion_rollup: {
@@ -12418,6 +12484,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      unassign_learning_course: {
+        Args: { p_course_id: string; p_user_id: string }
+        Returns: undefined
       }
       unflag_organizer_information_request_item: {
         Args: { p_item_id: string }
