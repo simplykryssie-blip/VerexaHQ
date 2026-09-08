@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Copy, Package } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Button } from "@/components/ui/Button";
+import { Tabs } from "@/components/ui/Tabs";
+import { SERVICE_DELIVERY_TABS } from "@/lib/settingsSubNav";
 import { ServiceLibrary, type ServiceCard, type ServiceCategoryOption } from "@/components/settings/ServiceLibrary";
 
 export function ServicesPageClient({
@@ -43,6 +45,9 @@ export function ServicesPageClient({
           )
         }
       />
+      <div className="mt-4">
+        <Tabs tabs={SERVICE_DELIVERY_TABS} active="services" />
+      </div>
 
       <div className="mt-4 rounded-2xl border border-border bg-surface p-4 shadow-soft">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink">General booking link</p>

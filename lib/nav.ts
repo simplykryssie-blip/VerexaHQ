@@ -206,10 +206,10 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Personal", itemLabels: ["Profile", "Security", "Availability", "Notifications"] },
+  { label: "Personal", itemLabels: ["Profile"] },
   {
     label: "Firm",
-    itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Locations", "Packages", "Users & Staff", "Roles & Permissions", "Tags"],
+    itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions"],
   },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
@@ -218,3 +218,13 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = SETTINGS_SECTION_MEMB
   label: section.label,
   items: section.itemLabels.map((label) => SETTINGS_NAV_ITEMS.find((item) => item.label === label)).filter((item): item is SettingsNavItem => Boolean(item)),
 }));
+
+// Security/Availability/Notifications and Locations/Tags used to be their
+// own top-level nav entries; they're now tabs reachable from Profile and
+// Services respectively (see lib/settingsSubNav.ts), so the sidebar link
+// for the parent should still read as "active" while on one of those
+// sub-pages instead of going dark.
+export const SETTINGS_GROUPED_HREFS: Record<string, string[]> = {
+  "/settings/profile": ["/settings/profile", "/settings/security", "/settings/availability", "/settings/notifications"],
+  "/settings/services": ["/settings/services", "/settings/locations", "/settings/tags"],
+};

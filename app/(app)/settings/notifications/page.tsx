@@ -3,6 +3,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { Bell } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { PROFILE_ACCOUNT_TABS } from "@/lib/settingsSubNav";
 import { NotificationPreferenceToggle } from "@/components/settings/NotificationPreferenceToggle";
 import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
 
@@ -66,6 +68,9 @@ export default async function NotificationsPage() {
     <div className="max-w-2xl space-y-8">
       <div>
         <SettingsSectionHeader icon={Bell} title="Notification preferences" description="Choose what automatically notifies you -- bell alerts and email/text reminders. Everything is on by default; turn off anything you don't want." />
+        <div className="mt-4">
+          <Tabs tabs={PROFILE_ACCOUNT_TABS} active="notifications" />
+        </div>
         {workspace ? (
           <div className="mt-4 divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {PREFERENCE_ROWS.map((row) => (

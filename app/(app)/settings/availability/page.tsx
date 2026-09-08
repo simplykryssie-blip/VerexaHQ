@@ -2,6 +2,8 @@ import { CalendarOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { PROFILE_ACCOUNT_TABS } from "@/lib/settingsSubNav";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { MyAvailabilityManager } from "@/components/settings/MyAvailabilityManager";
 import { BookingAvailabilityForm } from "@/components/settings/BookingAvailabilityForm";
@@ -73,6 +75,7 @@ export default async function AvailabilityPage() {
         title="Availability"
         description="Block off vacation and personal days so no one books you during that time. Everyone on the team can see who's out; you can only remove your own days unless you manage staff."
       />
+      <Tabs tabs={PROFILE_ACCOUNT_TABS} active="availability" />
       <MyAvailabilityManager
         workspaceId={workspace.id}
         workspaceSlug={workspace.slug}

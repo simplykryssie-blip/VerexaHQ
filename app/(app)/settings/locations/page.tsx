@@ -2,6 +2,8 @@ import { MapPin } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { SERVICE_DELIVERY_TABS } from "@/lib/settingsSubNav";
 import { LocationsManager, type LocationRow } from "@/components/settings/LocationsManager";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +29,9 @@ export default async function LocationsPage() {
         title="Locations"
         description="Multiple offices with their own hours and timezone -- assign a service to one under its own settings to use that office's schedule instead of the workspace default."
       />
+      <div className="mt-4">
+        <Tabs tabs={SERVICE_DELIVERY_TABS} active="locations" />
+      </div>
       <div className="mt-6">
         <LocationsManager workspaceId={workspace.id} locations={(locations ?? []) as LocationRow[]} canManage={Boolean(canManage)} />
       </div>
