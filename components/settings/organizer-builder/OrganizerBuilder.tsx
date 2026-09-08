@@ -246,7 +246,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-ink">
               {name} {readOnly && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
               {!readOnly && (
-                <button type="button" onClick={() => setRenamingName(true)} className="text-muted hover:text-ink" aria-label="Rename organizer">
+                <button type="button" onClick={() => setRenamingName(true)} className="text-muted hover:text-ink" aria-label="Rename form">
                   <Pencil size={12} />
                 </button>
               )}

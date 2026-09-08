@@ -34,7 +34,7 @@ export function ServicesPageClient({
       <SettingsSectionHeader
         icon={Package}
         title="Services"
-        description="What your firm offers. Each service routes to a pipeline and an organizer -- pricing, document templates, and other details are optional and tucked under Advanced."
+        description="What your firm offers. Each service routes to a pipeline and a form -- pricing, document templates, and other details are optional and tucked under Advanced."
         actions={
           canManage && (
             <Button size="sm" onClick={() => setCreating(true)}>
