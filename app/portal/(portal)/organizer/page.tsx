@@ -39,11 +39,11 @@ export default async function PortalOrganizerPage() {
 
   return (
     <>
-      <PageHeader title="Tax Organizer" description="Answer a few questions to help us prepare your return." />
+      <PageHeader title="Tax Form" description="Answer a few questions to help us prepare your return." />
       <div className="flex-1 space-y-6 px-8 py-6">
         {availableTemplates.length > 0 && (
           <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-            <h2 className="text-sm font-semibold text-ink">Start a new organizer</h2>
+            <h2 className="text-sm font-semibold text-ink">Start a new form</h2>
             <div className="mt-2">
               <StartOrganizerForm workspaceId={identity.workspaceId} clientId={identity.clientId} templates={availableTemplates} />
             </div>
@@ -51,7 +51,7 @@ export default async function PortalOrganizerPage() {
         )}
 
         {(responses ?? []).length === 0 ? (
-          <EmptyState message="No organizers yet." />
+          <EmptyState message="No forms yet." />
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(responses ?? []).map((r) => (

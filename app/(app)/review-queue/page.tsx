@@ -64,7 +64,7 @@ export default async function ReviewQueuePage() {
         .order("submitted_at", { ascending: false })
     : { data: [] as { id: string; submitted_at: string | null; organizer_templates: { name: string } | null; clients: Parameters<typeof clientLabel>[0] }[] };
 
-  // A response drops off the "Organizers submitted" section above the
+  // A response drops off the "Forms submitted" section above the
   // moment it's first reviewed (status moves past 'submitted'), but a
   // client can still respond to flagged/reopened questions on it long
   // after that -- this is the only other place that resurfaces it. Scoped
