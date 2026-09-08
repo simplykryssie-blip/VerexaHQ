@@ -5,6 +5,8 @@
 // service (services.estimated_duration_minutes), falling back to the grid
 // length for services with no duration set.
 
+import { zonedTimeToUtc, weekdayOfIsoDate } from "@/lib/timezone";
+
 export type DayHours = { start: string; end: string } | null;
 
 export type BusinessHours = {
@@ -87,16 +89,21 @@ export function isServiceBookableOnDate(date: Date, rules: ServiceAvailabilityRu
   return isDateInSeason(toIsoDate(date), rules.seasonStart, rules.seasonEnd) && isWeekdayAllowedForService(date, rules.allowedWeekdays);
 }
 
-// `date` is a plain local calendar day (midnight); returns candidate slot
-// start times as Date objects for that day, spaced by `gridMinutes` and
-// each guaranteed to fit a `durationMinutes`-long appointment before
-// closing -- before existing appointments/lead time are subtracted out.
-// `holidays` are the same system_settings shape the business-hours due-date
-// engine reads -- a date falling in any range closes the day entirely
-// regardless of its normal weekly hours.
-export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: number, durationMinutes: number, holidays: HolidayRange[] = []): Date[] {
-  if (isHoliday(toIsoDate(date), holidays)) return [];
-  const dayKey = WEEKDAYS[date.getDay()];
+// `isoDate` is a plain 'YYYY-MM-DD' calendar day; returns candidate slot
+// start times as real UTC instants for that day in `timeZone`, spaced by
+// `gridMinutes` and each guaranteed to fit a `durationMinutes`-long
+// appointment before closing -- before existing appointments/lead time are
+// subtracted out. `holidays` are the same system_settings shape the
+// business-hours due-date engine reads -- a date falling in any range
+// closes the day entirely regardless of its normal weekly hours.
+//
+// Takes a plain date string and an explicit IANA zone rather than a Date
+// object -- this runs server-side (Vercel functions default to UTC), so
+// building "9:00" as a server-local Date silently meant "9:00 UTC" instead
+// of the firm's actual local hours. See lib/timezone.ts.
+export function slotsForDay(isoDate: string, timeZone: string, hours: BusinessHours, gridMinutes: number, durationMinutes: number, holidays: HolidayRange[] = []): Date[] {
+  if (isHoliday(isoDate, holidays)) return [];
+  const dayKey = WEEKDAYS[weekdayOfIsoDate(isoDate)];
   const day = hours[dayKey];
   if (!day) return [];
 
@@ -104,10 +111,9 @@ export function slotsForDay(date: Date, hours: BusinessHours, gridMinutes: numbe
   const endMin = timeToMinutes(day.end);
   const slots: Date[] = [];
   for (let m = startMin; m + durationMinutes <= endMin; m += gridMinutes) {
-    const slot = new Date(date);
-    slot.setHours(0, 0, 0, 0);
-    slot.setMinutes(m);
-    slots.push(slot);
+    const hh = String(Math.floor(m / 60)).padStart(2, "0");
+    const mm = String(m % 60).padStart(2, "0");
+    slots.push(zonedTimeToUtc(isoDate, `${hh}:${mm}`, timeZone));
   }
   return slots;
 }

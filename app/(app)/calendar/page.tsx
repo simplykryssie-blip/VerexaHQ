@@ -1,7 +1,8 @@
-import { Lock } from "lucide-react";
+import { Lock, CalendarDays, Clock3, Briefcase, ListTodo } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import type { CalendarItem } from "./CalendarView";
 import { CalendarPageClient } from "./CalendarPageClient";
@@ -28,7 +29,16 @@ export default async function CalendarPage() {
   if (!canView) {
     return (
       <>
-        <PageHeader title="Calendar" description="Engagement and task due dates, and appointments, across your workspace." />
+        <PageHero
+          icon={CalendarDays}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>calendar</HeroHighlight>.
+            </>
+          }
+          subtitle="Engagement and task due dates, and appointments, across your workspace."
+        />
         <div className="flex-1 px-8 py-6">
           <EmptyState icon={Lock} message="You don't have permission to view the calendar." />
         </div>
@@ -136,13 +146,30 @@ export default async function CalendarPage() {
       })),
   ];
 
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const upcomingAppointments = appointments.filter((a) => a.status !== "cancelled" && new Date(a.start_at) >= now).length;
+  const todaysAppointments = appointments.filter((a) => a.status !== "cancelled" && a.start_at.slice(0, 10) === todayStr).length;
+
   return (
     <>
-      <PageHeader
-        title="Calendar"
-        description="Engagement and task due dates, and appointments, in one place."
+      <PageHero
+        icon={CalendarDays}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>calendar</HeroHighlight>.
+          </>
+        }
+        subtitle="Engagement and task due dates, and appointments, in one place."
       />
-      <div className="flex-1 px-8 py-6">
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={Clock3} tone="accent" label="Upcoming appointments" value={upcomingAppointments} />
+          <StatTile icon={CalendarDays} tone="emerald" label="Today" value={todaysAppointments} />
+          <StatTile icon={Briefcase} tone="violet" label="Engagements due" value={(engagements ?? []).length} />
+          <StatTile icon={ListTodo} tone="amber" label="Tasks due" value={(tasks ?? []).length} />
+        </div>
         <CalendarPageClient
           workspaceId={workspace.id}
           items={items}

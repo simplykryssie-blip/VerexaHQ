@@ -161,7 +161,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.service_id", label: "Requested service", group: "Lead & client", valueKind: "service", ops: SELECT_OPS },
   { key: "client.source", label: "Lead source", group: "Lead & client", valueKind: "select", options: CLIENT_SOURCE_OPTIONS, ops: SELECT_OPS },
   { key: "client.portal_status", label: "Portal status", group: "Lead & client", valueKind: "labeled_select", labeledOptions: PORTAL_STATUS_OPTIONS, ops: SELECT_OPS },
-  { key: "client.organizer_status", label: "Organizer status", group: "Lead & client", valueKind: "organizer_status", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
+  { key: "client.organizer_status", label: "Form status", group: "Lead & client", valueKind: "organizer_status", labeledOptions: ORGANIZER_STATUS_OPTIONS, ops: SELECT_OPS },
   { key: "lead.process_stage_id", label: "Lead pipeline stage", group: "Lead & client", valueKind: "pipeline_stage", ops: ID_OPS },
 
   { key: "engagement.status", label: "Engagement status", group: "Engagement", valueKind: "select", options: ENGAGEMENT_STATUS_OPTIONS, ops: LIST_OPS },
@@ -317,9 +317,9 @@ function ConditionRow({
                 className={inputClass}
               >
                 <option value="" disabled>
-                  Choose an organizer
+                  Choose a form
                 </option>
-                <option value="current_run">Whichever organizer this run sent</option>
+                <option value="current_run">Whichever form this run sent</option>
                 {organizerTemplates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}

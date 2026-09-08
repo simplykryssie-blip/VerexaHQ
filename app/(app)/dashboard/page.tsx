@@ -187,7 +187,7 @@ export default async function DashboardPage() {
         : []),
       {
         key: "organizer",
-        label: "Add or create organizers",
+        label: "Add or create forms",
         description: "Build the questions clients answer before you start their work.",
         href: "/templates",
         complete: (organizerCount ?? 0) > 0,
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
       {
         key: "automations",
         label: "Create your automations",
-        description: "Decide what happens automatically -- welcome emails, sending an organizer, moving a client into a pipeline.",
+        description: "Decide what happens automatically -- welcome emails, sending a form, moving a client into a pipeline.",
         href: "/workflows",
         complete: (automationCount ?? 0) > 0,
       },

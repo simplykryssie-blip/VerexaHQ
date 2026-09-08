@@ -147,9 +147,9 @@ export function ReviewQueueClientChangeItem({
           <p className="text-xs text-muted">
             {organizerResponseId ? (
               <>
-                Submitted with an organizer --{" "}
+                Submitted with a form --{" "}
                 <Link href={`/organizers/${organizerResponseId}/review`} className="text-accent hover:underline">
-                  view organizer
+                  view form
                 </Link>
               </>
             ) : (

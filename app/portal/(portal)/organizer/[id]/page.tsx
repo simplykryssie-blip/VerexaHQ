@@ -65,7 +65,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         .filter((a) => a.value !== null)
     : [];
 
-  const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Organizer";
+  const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Form";
 
   return (
     <>
@@ -74,8 +74,8 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         description={
           readOnly
             ? (infoRequestItems ?? []).length > 0
-              ? "This organizer has been submitted -- respond to the flagged questions below."
-              : "This organizer has been submitted and can no longer be edited."
+              ? "This form has been submitted -- respond to the flagged questions below."
+              : "This form has been submitted and can no longer be edited."
             : "Fill in what you can -- you can save progress and come back."
         }
       />

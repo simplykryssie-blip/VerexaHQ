@@ -469,7 +469,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
         id: o.id,
         status: o.status,
         submitted_at: o.submitted_at,
-        template_name: o.organizer_templates?.name ?? "Organizer",
+        template_name: o.organizer_templates?.name ?? "Form",
         filed_as_attachment: o.filed_as_attachment,
         topLevel: o.topLevel,
         repeaters: o.repeaters,

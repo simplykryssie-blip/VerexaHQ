@@ -4,7 +4,8 @@ import { Building2, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 
@@ -42,11 +43,29 @@ export default async function FirmsPage() {
     : { data: [] as never[] };
 
   const firms = connectedFirms ?? [];
+  const activeCount = firms.filter((f) => f.status === "active").length;
+  const eroCount = firms.filter((f) => CONNECTED_CHILD_TIER_LABEL[f.relationship_type] === "ERO").length;
+  const ptinCount = firms.filter((f) => CONNECTED_CHILD_TIER_LABEL[f.relationship_type] === "PTIN").length;
 
   return (
     <>
-      <PageHeader title="Firms" description="Firms connected to you -- their info, production, package, and payout ledger." />
-      <div className="flex-1 px-8 py-6">
+      <PageHero
+        icon={Building2}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>connected firms</HeroHighlight>.
+          </>
+        }
+        subtitle="Firms connected to you -- their info, production, package, and payout ledger."
+      />
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={Building2} tone="accent" label="Connected firms" value={firms.length} />
+          <StatTile icon={Building2} tone="emerald" label="Active" value={activeCount} />
+          <StatTile icon={Building2} tone="violet" label="EROs" value={eroCount} />
+          <StatTile icon={Building2} tone="amber" label="PTINs" value={ptinCount} />
+        </div>
         {firms.length === 0 ? (
           <EmptyState message="No firms connected yet. Invite one from Settings > Users & Staff." />
         ) : (

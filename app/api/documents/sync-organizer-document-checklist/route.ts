@@ -42,10 +42,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!response) {
-    return NextResponse.json({ error: "Organizer response not found" }, { status: 404 });
+    return NextResponse.json({ error: "Form response not found" }, { status: 404 });
   }
   if (response.status !== "submitted" && response.status !== "reviewed") {
-    return NextResponse.json({ error: "This organizer has not been submitted yet" }, { status: 400 });
+    return NextResponse.json({ error: "This form has not been submitted yet" }, { status: 400 });
   }
 
   const { data: trackedFields } = await supabase
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     .eq("include_in_document_checklist", true);
 
   if (!trackedFields || trackedFields.length === 0) {
-    return NextResponse.json({ ok: true, skipped: "No document-checklist questions on this organizer" });
+    return NextResponse.json({ ok: true, skipped: "No document-checklist questions on this form" });
   }
 
   const { data: answers } = await supabase
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         entity_type: entityType,
         entity_id: entityId,
         organizer_response_id: responseId,
-        title: "Documents from submitted organizer",
+        title: "Documents from submitted form",
       })
       .select("id")
       .single();

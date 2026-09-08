@@ -95,12 +95,12 @@ export function OrganizerLibrary({
       }
       if (error?.code !== "23505") {
         setSaving(false);
-        setError(error?.message ?? "Could not create organizer.");
+        setError(error?.message ?? "Could not create form.");
         return;
       }
     }
     setSaving(false);
-    setError("Could not create organizer -- try a slightly different name.");
+    setError("Could not create form -- try a slightly different name.");
   }
 
   async function deleteTemplate(card: GalleryCard) {
@@ -112,13 +112,13 @@ export function OrganizerLibrary({
       // this organizer, rather than silently orphaning their real answers.
       toast.show(
         error.code === "23503"
-          ? "Can't delete -- a client has already submitted answers for this organizer. Archive it instead."
+          ? "Can't delete -- a client has already submitted answers for this form. Archive it instead."
           : error.message,
         "error"
       );
       return;
     }
-    toast.show("Organizer deleted", "success");
+    toast.show("Form deleted", "success");
     router.refresh();
   }
 
@@ -143,9 +143,9 @@ export function OrganizerLibrary({
         cards={cards}
         icon={ClipboardList}
         statusTable="organizer_templates"
-        searchPlaceholder="Search organizer templates..."
-        emptyMessage="No organizer templates match."
-        createTileLabel="Create new organizer"
+        searchPlaceholder="Search form templates..."
+        emptyMessage="No form templates match."
+        createTileLabel="Create new form"
         onCreateClick={() => setCreating(true)}
         onDeleteClick={deleteTemplate}
         onShareClick={downlineWorkspaces.length > 0 ? (card) => setSharingCard(card) : undefined}
@@ -166,7 +166,7 @@ export function OrganizerLibrary({
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
           <form onSubmit={createTemplate} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-semibold text-ink">New organizer</h2>
+              <h2 className="font-display text-sm font-semibold text-ink">New form</h2>
               <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
                 ×
               </button>

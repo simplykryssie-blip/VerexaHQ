@@ -97,11 +97,14 @@ function toAnswerValue(fieldType: string, value: string): Json {
 // file uploads aren't possible pre-authentication -- different enough of a
 // lifecycle that sharing the component would mean threading a lot of
 // "is this the public flow?" branches through it instead.
+export type OrganizerPrefill = { clientId: string; firstName: string; lastName: string; email: string; phone: string };
+
 export function PublicOrganizerForm({
   token,
   data,
   onSubmitConfig,
   onNextPage,
+  prefill,
 }: {
   token: string;
   data: TemplateData;
@@ -110,6 +113,11 @@ export function PublicOrganizerForm({
   // original built-in "Thank you" screen unchanged.
   onSubmitConfig?: OrganizerSubmitConfig;
   onNextPage?: () => void;
+  // Only passed when this organizer is attached to a service and shown
+  // right after a booking completes -- the lead/client already exists and
+  // already gave their name/email/phone during booking, so skip straight
+  // to the question form instead of asking for the same contact info twice.
+  prefill?: OrganizerPrefill;
 }) {
   const supabase = createClient();
   const { template, workspace_name, requires_portal_signup, password_min_length, branding, fields } = data;
@@ -121,11 +129,11 @@ export function PublicOrganizerForm({
   const topLevelFields = fields.filter((f) => !f.parent_field_id);
   const fieldTypeById = new Map(fields.map((f) => [f.id, f.field_type]));
 
-  const [step, setStep] = useState<"contact" | "form" | "done">("contact");
+  const [step, setStep] = useState<"contact" | "form" | "done">(prefill ? "form" : "contact");
   const [pageIndex, setPageIndex] = useState(0);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [name, setName] = useState(prefill ? stringifyNameValue({ first: prefill.firstName, middle: "", last: prefill.lastName, suffix: "" }) : "");
+  const [email, setEmail] = useState(prefill?.email ?? "");
+  const [phone, setPhone] = useState(prefill?.phone ?? "");
   const [address, setAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -140,9 +148,32 @@ export function PublicOrganizerForm({
   // Set as soon as the Contact step completes -- the lead (and, if this
   // template requires one, the portal account) already exist by the time
   // the client reaches the organizer questions, independent of whether
-  // they ever finish/submit it. See continueFromContact().
-  const [clientId, setClientId] = useState<string | null>(null);
+  // they ever finish/submit it. See continueFromContact(). Pre-populated
+  // when this organizer is attached to a service booking -- see `prefill`.
+  const [clientId, setClientId] = useState<string | null>(prefill?.clientId ?? null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+
+  // Mirrors the same "carry forward what was just typed" step at the end of
+  // continueFromContact() below -- prefilled bookings skip that function
+  // entirely, so client_profile_field-mapped questions still need seeding
+  // once, on mount, instead.
+  useEffect(() => {
+    if (!prefill) return;
+    setAnswers((prev) => {
+      const next = { ...prev };
+      for (const field of topLevelFields) {
+        if (next[field.id]) continue;
+        if (field.client_profile_field === "full_name")
+          next[field.id] = stringifyNameValue({ first: prefill.firstName, middle: "", last: prefill.lastName, suffix: "" });
+        else if (field.client_profile_field === "first_name") next[field.id] = prefill.firstName;
+        else if (field.client_profile_field === "last_name") next[field.id] = prefill.lastName;
+        else if (field.client_profile_field === "primary_email") next[field.id] = prefill.email;
+        else if (field.client_profile_field === "primary_phone") next[field.id] = prefill.phone;
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     supabase.rpc("get_public_service_options", { p_token: token }).then(({ data }) => {

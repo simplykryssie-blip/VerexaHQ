@@ -148,6 +148,15 @@ export function PageBuilder({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={`/site-preview/${page.id}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Opens this draft in a new tab, rendered exactly like the published site will look"
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            <ExternalLink size={12} /> Full preview
+          </a>
           {page.status === "published" && (
             <a href={liveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
               <ExternalLink size={12} /> View live

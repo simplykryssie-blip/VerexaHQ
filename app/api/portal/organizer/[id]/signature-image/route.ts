@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     .maybeSingle();
 
   if (!response) {
-    return NextResponse.json({ error: "Organizer not found" }, { status: 404 });
+    return NextResponse.json({ error: "Form not found" }, { status: 404 });
   }
 
   const result = await uploadSignatureImage(supabase, response.workspace_id, response.id, dataUrl);

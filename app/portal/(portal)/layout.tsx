@@ -99,8 +99,8 @@ export default async function PortalLayout({ children }: { children: React.React
               >
                 <ClipboardList size={15} className="shrink-0 text-warning" aria-hidden="true" />
                 {pending.length === 1
-                  ? `You have an organizer to complete: ${firstPendingName ?? "Organizer"} -- start it now`
-                  : `You have ${pending.length} organizers to complete -- start them now`}
+                  ? `You have a form to complete: ${firstPendingName ?? "Form"} -- start it now`
+                  : `You have ${pending.length} forms to complete -- start them now`}
               </Link>
             )}
             {infoRequestsAwaitingResponse.length > 0 && (
@@ -110,8 +110,8 @@ export default async function PortalLayout({ children }: { children: React.React
               >
                 <MessageCircleWarning size={15} className="shrink-0 text-warning" aria-hidden="true" />
                 {infoRequestsAwaitingResponse.length === 1
-                  ? "Your preparer needs more information on your organizer -- view details"
-                  : `Your preparer needs more information on ${infoRequestsAwaitingResponse.length} organizers -- view details`}
+                  ? "Your preparer needs more information on your form -- view details"
+                  : `Your preparer needs more information on ${infoRequestsAwaitingResponse.length} forms -- view details`}
               </Link>
             )}
             {children}

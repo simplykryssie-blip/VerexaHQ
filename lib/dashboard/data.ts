@@ -326,7 +326,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       : "Unknown client";
     reviewItems.push({
       workflow_stage_id: `organizer:${o.id}`,
-      stage_name: "Organizer Submitted",
+      stage_name: "Form Submitted",
       engagement_number: null,
       client_id: o.client_id,
       client_name: clientName,

@@ -142,7 +142,7 @@ export const ACTION_CATEGORIES: { key: string; label: string }[] = [
   { key: "contacts_leads", label: "Contacts & Leads" },
   { key: "tasks", label: "Tasks" },
   { key: "appointments", label: "Appointments" },
-  { key: "documents_organizers", label: "Documents & Organizers" },
+  { key: "documents_organizers", label: "Documents & Forms" },
   { key: "pipeline_engagements", label: "Pipeline & Engagements" },
   { key: "billing", label: "Billing" },
   { key: "tax_workflow", label: "Tax Workflow" },
@@ -155,8 +155,8 @@ export const ACTION_TYPES = [
   { value: "send_sms", label: "Send a text", category: "communication", description: "Send a templated text message to the client.", keywords: "message sms text" },
   { value: "create_task", label: "Create a task", category: "tasks", description: "Create a task assigned to a staff member.", keywords: "todo assign" },
   { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
-  { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
-  { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (organizer-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
+  { value: "send_organizer_template", label: "Push a form to the client's portal", category: "documents_organizers", description: "Send an intake form to the client's portal.", keywords: "intake form organizer" },
+  { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (form-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
   { value: "send_engagement_letter", label: "Send the document for signature", category: "tax_workflow", description: "Queue the document for e-signature.", keywords: "signature sign document letter" },
   { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
   { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
@@ -1008,7 +1008,7 @@ export function StepCard({
 
         {actionType === "send_organizer_template" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Organizer
+            Form
             <div className="flex gap-1.5">
               <select
                 disabled={!canManage}
@@ -1027,7 +1027,7 @@ export function StepCard({
                 <button
                   type="button"
                   onClick={() => setCreatingTemplateKind("organizer")}
-                  title="Create a new organizer"
+                  title="Create a new form"
                   className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
                 >
                   <Plus size={14} />
@@ -1035,13 +1035,13 @@ export function StepCard({
               )}
             </div>
             <span className="text-[11px] text-muted">
-              Auto-detect sends whichever organizer is linked to the service that triggered this run (set per
+              Auto-detect sends whichever form is linked to the service that triggered this run (set per
               service under Services) -- pick a specific template instead only if this step should always send the
-              same organizer regardless of service.
+              same form regardless of service.
             </span>
             {organizerOptions.length === 0 && (
               <span className="text-[11px] text-warning">
-                No published organizers yet -- an organizer stays hidden here until you publish it from{" "}
+                No published forms yet -- a form stays hidden here until you publish it from{" "}
                 <a href="/templates" target="_blank" rel="noreferrer" className="underline">
                   Form Templates
                 </a>
@@ -1078,8 +1078,8 @@ export function StepCard({
 
         {actionType === "create_engagement" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            Creates an engagement from the service already resolved on the organizer submission that triggered this run. Only works when
-            this step follows an &quot;An organizer is submitted&quot; trigger. This does not put the engagement in a pipeline -- add a
+            Creates an engagement from the service already resolved on the form submission that triggered this run. Only works when
+            this step follows the &quot;A form is submitted&quot; trigger. This does not put the engagement in a pipeline -- add a
             &quot;Move to a pipeline stage&quot; step after this one to do that.
           </p>
         )}

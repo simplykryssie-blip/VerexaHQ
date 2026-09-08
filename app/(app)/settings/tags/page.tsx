@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { Tags as TagsIcon } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { SERVICE_DELIVERY_TABS } from "@/lib/settingsSubNav";
 import { TagsManager } from "@/components/settings/TagsManager";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,9 @@ export default async function TagsPage() {
         title="Tags"
         description="Every tag in use across your leads and clients, including ones your automations reference but haven't fired yet. Renaming or deleting a tag here updates every automation and record that uses it -- nothing is left pointing at a name that no longer exists."
       />
+      <div className="mt-4">
+        <Tabs tabs={SERVICE_DELIVERY_TABS} active="tags" />
+      </div>
       <div className="mt-6">
         <TagsManager workspaceId={workspace.id} initialTags={tags ?? []} canManage={Boolean(canManage)} />
       </div>

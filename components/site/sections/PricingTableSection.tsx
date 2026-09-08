@@ -115,7 +115,7 @@ export function PricingTableSection({ config }: { config?: PricingTableConfig })
         </div>
 
         <p className="vx-center" style={{ marginTop: 20, fontSize: 13, color: "#94a3b8", maxWidth: 640, marginLeft: "auto", marginRight: "auto" }}>
-          Every plan includes the same platform: client CRM, pipelines &amp; workflows, documents &amp; organizers, e-signatures, client portal,
+          Every plan includes the same platform: client CRM, pipelines &amp; workflows, documents &amp; forms, e-signatures, client portal,
           communications, and reporting.* Team and Firm add the extra seats a multi-person office needs.
         </p>
         <p className="vx-center" style={{ marginTop: 8, fontSize: 12, color: "#94a3b8" }}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PublicBookingFlow, type BookableService } from "@/components/booking/PublicBookingFlow";
+import { PublicBookingFlow, type BookableService, type BookingBranding } from "@/components/booking/PublicBookingFlow";
 
 type BookingWidgetConfig = {
   service_id?: string;
@@ -13,6 +13,7 @@ type Context = {
   services: BookableService[];
   staff: { id: string; name: string } | null;
   windowDays: number;
+  branding: BookingBranding;
 };
 
 export function BookingWidgetSection({ config, workspaceSlug }: { config: BookingWidgetConfig; workspaceSlug: string }) {
@@ -48,6 +49,7 @@ export function BookingWidgetSection({ config, workspaceSlug }: { config: Bookin
       staffId={context.staff?.id ?? null}
       staffName={context.staff?.name ?? null}
       windowDays={context.windowDays}
+      branding={context.branding}
     />
   );
 }

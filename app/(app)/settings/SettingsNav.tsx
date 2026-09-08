@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SETTINGS_NAV_SECTIONS } from "@/lib/nav";
+import { SETTINGS_NAV_SECTIONS, SETTINGS_GROUPED_HREFS } from "@/lib/nav";
 
 export function SettingsNav({ hideFirmProfile }: { hideFirmProfile: boolean }) {
   const pathname = usePathname();
@@ -15,7 +15,7 @@ export function SettingsNav({ hideFirmProfile }: { hideFirmProfile: boolean }) {
           {section.items
             .filter((item) => !(hideFirmProfile && item.label === "Firm Profile"))
             .map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || Boolean(pathname && SETTINGS_GROUPED_HREFS[item.href]?.includes(pathname));
             const Icon = item.icon;
             return (
               <Link

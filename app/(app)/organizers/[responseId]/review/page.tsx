@@ -200,7 +200,7 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
         id: response.id,
         status: response.status,
         submittedAt: response.submitted_at,
-        templateName: (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Organizer",
+        templateName: (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Form",
         reviewStatus: response.review_status,
         assignedReviewerId: response.assigned_reviewer_id,
         clientId: response.client_id,
