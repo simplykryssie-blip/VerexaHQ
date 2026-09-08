@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LayoutTemplate, FileText, ListChecks, ClipboardList, Share2 } from "lucide-react";
 import { Tabs } from "@/components/ui/Tabs";
 import { StatTile } from "@/components/ui/StatTile";
-import { IconChip } from "@/components/ui/IconChip";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
 import { DocumentRequestLibrary, type DocumentRequestTemplateCard } from "@/components/settings/document-request-editor/DocumentRequestLibrary";
@@ -178,23 +178,16 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
 
   return (
     <>
-      <div className="relative overflow-hidden border-b border-border px-8 py-9">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandGradientTo opacity-20 blur-3xl"
-        />
-        <div className="relative flex items-center gap-4">
-          <IconChip tone="violet">
-            <LayoutTemplate size={18} aria-hidden="true" />
-          </IconChip>
-          <div>
-            <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">
-              Your <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">template library</span>.
-            </h1>
-            <p className="mt-1.5 max-w-[60ch] text-sm text-slate">{heroSub}</p>
-          </div>
-        </div>
-      </div>
+      <PageHero
+        icon={LayoutTemplate}
+        tone="violet"
+        heading={
+          <>
+            Your <HeroHighlight>template library</HeroHighlight>.
+          </>
+        }
+        subtitle={heroSub}
+      />
 
       <div className="flex-1 space-y-6 px-8 py-6">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

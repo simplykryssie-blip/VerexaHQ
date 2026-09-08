@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { FileCheck2 } from "lucide-react";
+import { FileCheck2, ClipboardCheck, ListChecks, FileText, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
 import { ReviewQueueItem } from "./ReviewQueueItem";
@@ -142,10 +143,32 @@ export default async function ReviewQueuePage() {
     (pendingClientChanges ?? []).filter((r) => r.organizer_response_id).map((r) => [r.batch_id, r.organizer_response_id as string])
   );
 
+  const totalPending =
+    clientChangeBatches.size + (submittedOrganizers ?? []).length + (completedDocumentRequests ?? []).length + openShares.length;
+
   return (
     <>
-      <PageHeader title="Review Queue" description="Filings your connected PTINs have shared with you for approval, plus client-submitted info changes awaiting your OK." />
+      <PageHero
+        icon={ClipboardCheck}
+        tone="rose"
+        heading={
+          <>
+            Your <HeroHighlight>review queue</HeroHighlight>.
+          </>
+        }
+        subtitle={
+          totalPending > 0
+            ? `${totalPending} item${totalPending === 1 ? "" : "s"} waiting on your review.`
+            : "Filings your connected PTINs have shared with you for approval, plus client-submitted info changes awaiting your OK."
+        }
+      />
       <div className="flex-1 space-y-8 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={FileText} tone="accent" label="Client info changes" value={clientChangeBatches.size} />
+          <StatTile icon={ListChecks} tone="emerald" label="Forms submitted" value={(submittedOrganizers ?? []).length} />
+          <StatTile icon={FileCheck2} tone="amber" label="Documents submitted" value={(completedDocumentRequests ?? []).length} />
+          <StatTile icon={Share2} tone="violet" label="Shares awaiting review" value={openShares.length} />
+        </div>
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink">Client info changes</h2>
           {clientChangeBatches.size === 0 ? (
