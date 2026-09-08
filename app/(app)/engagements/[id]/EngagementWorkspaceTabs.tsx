@@ -154,9 +154,9 @@ export function OverviewTab({
         </div>
       </div>
 
-      <Section title="Organizers">
+      <Section title="Forms">
         {organizerResponses.length === 0 ? (
-          <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
+          <EmptyState message="No form sent yet -- use Send Form above to assign one." />
         ) : (
           <div className="space-y-3">
             {organizerResponses.map((o) => (

@@ -5,6 +5,7 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { MyAvailabilityManager } from "@/components/settings/MyAvailabilityManager";
 import { BookingAvailabilityForm } from "@/components/settings/BookingAvailabilityForm";
+import { StaffScheduleManager, type StaffScheduleRow } from "@/components/settings/StaffScheduleManager";
 import {
   DEFAULT_BUSINESS_HOURS,
   DEFAULT_SLOT_MINUTES,
@@ -26,17 +27,35 @@ export default async function AvailabilityPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: canManageOthers }, { data: canManageSettings }, staff, { data: timeOff }, { data: settings }] = await Promise.all([
-    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "users.manage" }),
-    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" }),
-    getWorkspaceStaff(supabase, workspace.id),
-    supabase
-      .from("staff_time_off")
-      .select("id, user_id, start_date, end_date, reason")
-      .eq("workspace_id", workspace.id)
-      .order("start_date", { ascending: true }),
-    supabase.from("system_settings").select("key, value").eq("workspace_id", workspace.id).order("key"),
+  const [{ data: canManageOthers }, { data: canManageSettings }, staff, { data: timeOff }, { data: settings }, { data: workspaceRow }] =
+    await Promise.all([
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "users.manage" }),
+      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" }),
+      getWorkspaceStaff(supabase, workspace.id),
+      supabase
+        .from("staff_time_off")
+        .select("id, user_id, start_date, end_date, reason")
+        .eq("workspace_id", workspace.id)
+        .order("start_date", { ascending: true }),
+      supabase.from("system_settings").select("key, value").eq("workspace_id", workspace.id).order("key"),
+      supabase.from("workspaces").select("timezone").eq("id", workspace.id).single(),
+    ]);
+
+  const staffIds = staff.map((s) => s.user_id);
+  const [{ data: profiles }, { data: staffHoursRows }] = await Promise.all([
+    staffIds.length ? supabase.from("user_profiles").select("id, timezone").in("id", staffIds) : Promise.resolve({ data: [] }),
+    staffIds.length
+      ? supabase.from("staff_business_hours").select("user_id, hours").eq("workspace_id", workspace.id).in("user_id", staffIds)
+      : Promise.resolve({ data: [] }),
   ]);
+  const timezoneByUser = new Map((profiles ?? []).map((p) => [p.id, p.timezone]));
+  const hoursByUser = new Map((staffHoursRows ?? []).map((r) => [r.user_id, r.hours as BusinessHours]));
+  const staffSchedules: StaffScheduleRow[] = staff.map((s) => ({
+    id: s.user_id,
+    label: s.display_name ?? "Staff member",
+    timezone: timezoneByUser.get(s.user_id) ?? null,
+    hours: hoursByUser.get(s.user_id) ?? null,
+  }));
 
   const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
   const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
@@ -62,9 +81,16 @@ export default async function AvailabilityPage() {
         timeOff={timeOff ?? []}
         canManageOthers={Boolean(canManageOthers)}
       />
+      <StaffScheduleManager
+        workspaceId={workspace.id}
+        currentUserId={user?.id ?? null}
+        staff={staffSchedules}
+        canManageOthers={Boolean(canManageOthers)}
+      />
       {canManageSettings && (
         <BookingAvailabilityForm
           workspaceId={workspace.id}
+          initialTimezone={workspaceRow?.timezone ?? "America/New_York"}
           initialHours={businessHours}
           initialSlotMinutes={slotMinutes}
           initialHolidays={holidays}

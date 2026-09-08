@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
-import {
-  DEFAULT_BUSINESS_HOURS,
-  DEFAULT_SLOT_MINUTES,
-  slotsForDay,
-  filterAvailableSlots,
-  isServiceBookableOnDate,
-  isDateInAnyRange,
-  toIsoDate,
-  type BusinessHours,
-  type HolidayRange,
-} from "@/lib/businessHours";
+import { DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, isServiceBookableOnDate, isDateInAnyRange } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
-import { getBookingSettings } from "@/lib/bookingSettings";
+import { resolveEffectiveAvailability } from "@/lib/bookingAvailability";
+import { zonedTimeToUtc, isoDateInZone } from "@/lib/timezone";
 import { resolveBookedMeeting } from "@/lib/zoom/bookingMeeting";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
@@ -68,7 +59,7 @@ export async function POST(request: Request) {
   const { data: service } = await supabase
     .from("services")
     .select(
-      "id, name, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id, allow_overlapping_bookings"
+      "id, name, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id, allow_overlapping_bookings, booking_min_notice_hours_override, booking_buffer_minutes_override, booking_window_days_override, booking_location_id, organizer_template_id"
     )
     .eq("id", serviceId)
     .maybeSingle();
@@ -88,52 +79,37 @@ export async function POST(request: Request) {
       .eq("status", "active")
       .maybeSingle();
     if (!membership) return NextResponse.json({ error: "That team member isn't available for booking." }, { status: 404 });
+  }
 
+  const { hours, timeZone, gridMinutes, holidays, minNoticeHours, bufferMinutes, windowDays } = await resolveEffectiveAvailability(
+    supabase,
+    workspace.id,
+    staffId,
+    service
+  );
+
+  if (staffId) {
     const { data: timeOff } = await supabase
       .from("staff_time_off")
       .select("start_date, end_date")
       .eq("workspace_id", workspace.id)
       .eq("user_id", staffId);
-    if (isDateInAnyRange(toIsoDate(start), (timeOff ?? []).map((t) => ({ start: t.start_date, end: t.end_date })))) {
+    if (isDateInAnyRange(isoDateInZone(start, timeZone), (timeOff ?? []).map((t) => ({ start: t.start_date, end: t.end_date })))) {
       return NextResponse.json({ error: "That time is no longer available. Pick another slot." }, { status: 409 });
     }
   }
 
-  const { windowDays, minNoticeHours, bufferMinutes } = await getBookingSettings(supabase, workspace.id);
   const windowEnd = new Date();
   windowEnd.setDate(windowEnd.getDate() + windowDays);
   if (start > windowEnd) {
     return NextResponse.json({ error: "That time is too far out to book." }, { status: 409 });
   }
 
-  const { data: hoursSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", workspace.id)
-    .eq("key", "business_hours")
-    .maybeSingle();
-  const { data: slotSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", workspace.id)
-    .eq("key", "booking_slot_minutes")
-    .maybeSingle();
-  const { data: holidaysSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", workspace.id)
-    .eq("key", "holidays")
-    .maybeSingle();
-
-  const businessHours = (hoursSetting?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
-  const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (holidaysSetting?.value as HolidayRange[] | undefined) ?? [];
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
-
-  const dayStart = new Date(start);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const isoDate = isoDateInZone(start, timeZone);
+  const dayStart = zonedTimeToUtc(isoDate, "00:00", timeZone);
+  const dayEnd = zonedTimeToUtc(isoDate, "00:00", timeZone);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
   let existingQuery = supabase
     .from("appointments")
@@ -149,7 +125,7 @@ export async function POST(request: Request) {
 
   const busyBlocks = service.allow_overlapping_bookings ? externalBusy : [...(existing ?? []), ...externalBusy];
   const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
-  const candidates = slotsForDay(dayStart, businessHours, gridMinutes, durationMinutes, holidays);
+  const candidates = slotsForDay(isoDate, timeZone, hours, gridMinutes, durationMinutes, holidays);
   const available = filterAvailableSlots(candidates, durationMinutes, busyBlocks, earliestStart, bufferMinutes);
   const stillAvailable = available.some((s) => s.getTime() === start.getTime());
   if (!stillAvailable) {
@@ -201,7 +177,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error?.message ?? "Could not book the appointment." }, { status: 500 });
   }
 
-  const when = start.toLocaleString("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const when = start.toLocaleString("en-US", {
+    timeZone,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
   await sendEmailViaResend({
     to: email,
     sender: "team",
@@ -215,5 +199,19 @@ export async function POST(request: Request) {
     }),
   });
 
-  return NextResponse.json({ appointment });
+  // The service links to a template by its internal id, but the public
+  // organizer form is keyed by its separate share token -- resolve it here
+  // so the booking flow can show the question form without a second
+  // unauthenticated lookup exposing the raw template id.
+  let organizerToken: string | null = null;
+  if (service.organizer_template_id) {
+    const { data: template } = await supabase
+      .from("organizer_templates")
+      .select("public_token")
+      .eq("id", service.organizer_template_id)
+      .maybeSingle();
+    organizerToken = template?.public_token ?? null;
+  }
+
+  return NextResponse.json({ appointment, clientId, organizerToken });
 }

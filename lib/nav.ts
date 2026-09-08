@@ -34,6 +34,7 @@ import {
   Sparkles,
   CalendarOff,
   UserCircle,
+  MapPin,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -189,6 +190,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
+  { label: "Locations", href: "/settings/locations", icon: MapPin },
   { label: "Packages", href: "/settings/packages", icon: Handshake },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
@@ -205,7 +207,10 @@ export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Profile", "Security", "Availability", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions", "Tags"] },
+  {
+    label: "Firm",
+    itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Locations", "Packages", "Users & Staff", "Roles & Permissions", "Tags"],
+  },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 

@@ -33,9 +33,9 @@ export async function sendOrganizerToEngagement({
       body: JSON.stringify({
         to: primaryEmail,
         sender: "notifications",
-        subject: `New organizer to complete: ${template.name}`,
+        subject: `New form to complete: ${template.name}`,
         html: renderEmail({
-          heading: "An organizer is ready for you",
+          heading: "A form is ready for you",
           bodyHtml: `<p>Please log in to your client portal and complete the <strong>${template.name}</strong> when you have a chance.</p>`,
           ctaLabel: "Go to portal",
           ctaUrl: `${appUrl}/portal/organizer`,

@@ -15,10 +15,10 @@ const PREFERENCE_ROWS = [
   // These fire automatically the moment the thing happens -- no Workflow to
   // build, nothing to configure. Bell icon only (In-App).
   { eventType: "DOCUMENT_REQUEST_COMPLETED", channel: "In-App", label: "A client finishes sending requested documents", description: "Notifies you the moment every document you asked for has come in." },
-  { eventType: "ORGANIZER_SUBMITTED", channel: "In-App", label: "A client submits their intake form", description: "Notifies your firm's owners/admins that a client finished their organizer and it's ready to review." },
-  { eventType: "ORGANIZER_REVIEWED", channel: "In-App", label: "A client's intake form gets reviewed", description: "Notifies you once a staff member approves or requests changes on a client's submitted organizer." },
-  { eventType: "ORGANIZER_INFORMATION_RESPONDED", channel: "In-App", label: "A client responds to flagged questions", description: "Notifies the assigned reviewer once a client answers or corrects the questions you flagged on their organizer." },
-  { eventType: "ORGANIZER_ERO_REVIEW_REQUESTED", channel: "In-App", label: "An organizer is sent to you for ERO review", description: "Notifies you when a reviewer sends a submitted organizer to you for ERO review." },
+  { eventType: "ORGANIZER_SUBMITTED", channel: "In-App", label: "A client submits their intake form", description: "Notifies your firm's owners/admins that a client finished their form and it's ready to review." },
+  { eventType: "ORGANIZER_REVIEWED", channel: "In-App", label: "A client's intake form gets reviewed", description: "Notifies you once a staff member approves or requests changes on a client's submitted form." },
+  { eventType: "ORGANIZER_INFORMATION_RESPONDED", channel: "In-App", label: "A client responds to flagged questions", description: "Notifies the assigned reviewer once a client answers or corrects the questions you flagged on their form." },
+  { eventType: "ORGANIZER_ERO_REVIEW_REQUESTED", channel: "In-App", label: "A form is sent to you for ERO review", description: "Notifies you when a reviewer sends a submitted form to you for ERO review." },
   { eventType: "PAYMENT_RECEIVED", channel: "In-App", label: "A payment comes in", description: "Notifies you any time a payment (any amount, any method) is recorded for one of your clients." },
   { eventType: "INVOICE_PAID", channel: "In-App", label: "An invoice is fully paid off", description: "Notifies you when an invoice's balance hits zero." },
   { eventType: "APPOINTMENT_BOOKED_ONLINE", channel: "In-App", label: "A client books an appointment online", description: "Notifies you the moment someone books through your public booking link or the client portal." },

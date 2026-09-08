@@ -1400,6 +1400,53 @@ export type Database = {
           },
         ]
       }
+      booking_locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          display_order: number
+          hours: Json
+          id: string
+          is_default: boolean
+          name: string
+          timezone: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          display_order?: number
+          hours: Json
+          id?: string
+          is_default?: boolean
+          name: string
+          timezone?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          display_order?: number
+          hours?: Json
+          id?: string
+          is_default?: boolean
+          name?: string
+          timezone?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branding: {
         Row: {
           accent_color: string
@@ -7702,8 +7749,12 @@ export type Database = {
         Row: {
           allow_overlapping_bookings: boolean
           allowed_weekdays: number[] | null
+          booking_buffer_minutes_override: number | null
+          booking_location_id: string | null
           booking_location_type: string
           booking_meeting_url: string | null
+          booking_min_notice_hours_override: number | null
+          booking_window_days_override: number | null
           cloned_from_service_id: string | null
           created_at: string
           created_by: string | null
@@ -7733,8 +7784,12 @@ export type Database = {
         Insert: {
           allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
+          booking_buffer_minutes_override?: number | null
+          booking_location_id?: string | null
           booking_location_type?: string
           booking_meeting_url?: string | null
+          booking_min_notice_hours_override?: number | null
+          booking_window_days_override?: number | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7764,8 +7819,12 @@ export type Database = {
         Update: {
           allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
+          booking_buffer_minutes_override?: number | null
+          booking_location_id?: string | null
           booking_location_type?: string
           booking_meeting_url?: string | null
+          booking_min_notice_hours_override?: number | null
+          booking_window_days_override?: number | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7793,6 +7852,13 @@ export type Database = {
           zoom_host_user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "services_booking_location_id_fkey"
+            columns: ["booking_location_id"]
+            isOneToOne: false
+            referencedRelation: "booking_locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "services_cloned_from_service_id_fkey"
             columns: ["cloned_from_service_id"]
@@ -8481,6 +8547,41 @@ export type Database = {
           },
         ]
       }
+      staff_business_hours: {
+        Row: {
+          created_at: string
+          hours: Json
+          id: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          hours: Json
+          id?: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          hours?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_business_hours_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_time_off: {
         Row: {
           created_at: string
@@ -8876,6 +8977,7 @@ export type Database = {
           ptin_hash: string | null
           ptin_last4: string | null
           seen_onboarding_steps: string[]
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -8900,6 +9002,7 @@ export type Database = {
           ptin_hash?: string | null
           ptin_last4?: string | null
           seen_onboarding_steps?: string[]
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -8924,6 +9027,7 @@ export type Database = {
           ptin_hash?: string | null
           ptin_last4?: string | null
           seen_onboarding_steps?: string[]
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [

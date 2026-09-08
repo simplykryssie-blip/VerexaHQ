@@ -228,14 +228,14 @@ export function ClientPortalPreview({
           )}
         </Section>
 
-        <Section title="Tax organizer">
+        <Section title="Tax form">
           {organizerResponses.length === 0 ? (
-            <EmptyState message="No organizers started yet." />
+            <EmptyState message="No forms started yet." />
           ) : (
             <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
               {organizerResponses.map((r) => (
                 <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                  <span className="font-medium text-slate">{r.organizer_templates?.name ?? "Organizer"}</span>
+                  <span className="font-medium text-slate">{r.organizer_templates?.name ?? "Form"}</span>
                   <span className="text-xs capitalize text-muted">{ORGANIZER_STATUS_LABEL[r.status] ?? r.status}</span>
                 </li>
               ))}

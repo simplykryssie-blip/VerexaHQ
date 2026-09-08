@@ -1,19 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit, clientIp } from "@/lib/rateLimit";
-import {
-  DEFAULT_BUSINESS_HOURS,
-  DEFAULT_SLOT_MINUTES,
-  slotsForDay,
-  filterAvailableSlots,
-  isServiceBookableOnDate,
-  isDateInAnyRange,
-  toIsoDate,
-  type BusinessHours,
-  type HolidayRange,
-} from "@/lib/businessHours";
+import { DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, isServiceBookableOnDate, isDateInAnyRange } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
-import { getBookingSettings } from "@/lib/bookingSettings";
+import { resolveEffectiveAvailability } from "@/lib/bookingAvailability";
+import { zonedTimeToUtc } from "@/lib/timezone";
 
 // Public, unauthenticated equivalent of /api/portal/available-slots --
 // resolves the workspace from its public slug instead of a portal session.
@@ -34,8 +25,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "workspaceSlug, serviceId and date are required." }, { status: 400 });
   }
 
-  const date = new Date(`${dateParam}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
+  // Weekday/season checks only ever care about the calendar date itself,
+  // never a real instant -- parsed as UTC so the server's own timezone can
+  // never shift which calendar day this resolves to.
+  const dateAsUtc = new Date(`${dateParam}T00:00:00Z`);
+  if (Number.isNaN(dateAsUtc.getTime())) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
 
   const supabase = createServiceClient();
 
@@ -44,20 +38,27 @@ export async function GET(request: Request) {
 
   const { data: service } = await supabase
     .from("services")
-    .select("id, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, allow_overlapping_bookings")
+    .select(
+      "id, is_bookable, is_portal_visible, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, allow_overlapping_bookings, booking_min_notice_hours_override, booking_buffer_minutes_override, booking_window_days_override, booking_location_id"
+    )
     .eq("id", serviceId)
     .maybeSingle();
   if (!service || service.workspace_id !== workspace.id || !service.is_bookable || !service.is_portal_visible) {
     return NextResponse.json({ error: "This service isn't bookable." }, { status: 404 });
   }
-  if (!isServiceBookableOnDate(date, { seasonStart: service.season_start, seasonEnd: service.season_end, allowedWeekdays: service.allowed_weekdays })) {
+  if (!isServiceBookableOnDate(dateAsUtc, { seasonStart: service.season_start, seasonEnd: service.season_end, allowedWeekdays: service.allowed_weekdays })) {
     return NextResponse.json({ slots: [], durationMinutes: service.estimated_duration_minutes ?? DEFAULT_SLOT_MINUTES });
   }
 
-  const { windowDays, minNoticeHours, bufferMinutes } = await getBookingSettings(supabase, workspace.id);
+  const { hours, timeZone, gridMinutes, holidays, minNoticeHours, bufferMinutes, windowDays } = await resolveEffectiveAvailability(
+    supabase,
+    workspace.id,
+    staffId,
+    service
+  );
   const windowEnd = new Date();
   windowEnd.setDate(windowEnd.getDate() + windowDays);
-  if (date > windowEnd) {
+  if (dateAsUtc > windowEnd) {
     return NextResponse.json({ slots: [], durationMinutes: service.estimated_duration_minutes ?? DEFAULT_SLOT_MINUTES });
   }
 
@@ -67,38 +68,19 @@ export async function GET(request: Request) {
       .select("start_date, end_date")
       .eq("workspace_id", workspace.id)
       .eq("user_id", staffId);
-    if (isDateInAnyRange(toIsoDate(date), (timeOff ?? []).map((t) => ({ start: t.start_date, end: t.end_date })))) {
+    if (isDateInAnyRange(dateParam, (timeOff ?? []).map((t) => ({ start: t.start_date, end: t.end_date })))) {
       return NextResponse.json({ slots: [], durationMinutes: service.estimated_duration_minutes ?? DEFAULT_SLOT_MINUTES });
     }
   }
 
-  const { data: hoursSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", workspace.id)
-    .eq("key", "business_hours")
-    .maybeSingle();
-  const { data: slotSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", workspace.id)
-    .eq("key", "booking_slot_minutes")
-    .maybeSingle();
-  const { data: holidaysSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", workspace.id)
-    .eq("key", "holidays")
-    .maybeSingle();
-
-  const businessHours = (hoursSetting?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
-  const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (holidaysSetting?.value as HolidayRange[] | undefined) ?? [];
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
 
-  const dayStart = new Date(date);
-  const dayEnd = new Date(date);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  // Real day boundaries in the effective timezone, not the server's own
+  // clock -- otherwise "today's appointments" could include or miss ones
+  // near midnight depending on where the server happens to run.
+  const dayStart = zonedTimeToUtc(dateParam, "00:00", timeZone);
+  const dayEnd = zonedTimeToUtc(dateParam, "00:00", timeZone);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
   let existingQuery = supabase
     .from("appointments")
@@ -123,7 +105,7 @@ export async function GET(request: Request) {
   const busyBlocks = service.allow_overlapping_bookings ? externalBusy : [...(existing ?? []), ...externalBusy];
 
   const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
-  const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes, holidays);
+  const candidates = slotsForDay(dateParam, timeZone, hours, gridMinutes, durationMinutes, holidays);
   const available = filterAvailableSlots(candidates, durationMinutes, busyBlocks, earliestStart, bufferMinutes);
 
   return NextResponse.json({ slots: available.map((s) => s.toISOString()), durationMinutes });

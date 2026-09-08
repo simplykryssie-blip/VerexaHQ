@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  DEFAULT_BUSINESS_HOURS,
-  DEFAULT_SLOT_MINUTES,
-  slotsForDay,
-  filterAvailableSlots,
-  isServiceBookableOnDate,
-  type BusinessHours,
-  type HolidayRange,
-} from "@/lib/businessHours";
+import { DEFAULT_SLOT_MINUTES, slotsForDay, filterAvailableSlots, isServiceBookableOnDate } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
-import { getBookingSettings } from "@/lib/bookingSettings";
+import { resolveEffectiveAvailability } from "@/lib/bookingAvailability";
+import { zonedTimeToUtc } from "@/lib/timezone";
 
 // Reads services.is_bookable, system_settings, and every appointment on the
 // requested day -- all things the portal session has no established RLS
@@ -27,57 +20,42 @@ export async function GET(request: Request) {
   const dateParam = searchParams.get("date");
   if (!serviceId || !dateParam) return NextResponse.json({ error: "serviceId and date are required." }, { status: 400 });
 
-  const date = new Date(`${dateParam}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
+  const dateAsUtc = new Date(`${dateParam}T00:00:00Z`);
+  if (Number.isNaN(dateAsUtc.getTime())) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
 
   const supabase = createServiceClient();
 
-  const { windowDays, minNoticeHours, bufferMinutes } = await getBookingSettings(supabase, identity.workspaceId);
-  const windowEnd = new Date();
-  windowEnd.setDate(windowEnd.getDate() + windowDays);
-  if (date > windowEnd) {
-    return NextResponse.json({ slots: [], durationMinutes: DEFAULT_SLOT_MINUTES });
-  }
-
   const { data: service } = await supabase
     .from("services")
-    .select("id, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, allow_overlapping_bookings")
+    .select(
+      "id, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, allow_overlapping_bookings, booking_min_notice_hours_override, booking_buffer_minutes_override, booking_window_days_override, booking_location_id"
+    )
     .eq("id", serviceId)
     .maybeSingle();
   if (!service || service.workspace_id !== identity.workspaceId || !service.is_bookable) {
     return NextResponse.json({ error: "This service isn't bookable." }, { status: 404 });
   }
-  if (!isServiceBookableOnDate(date, { seasonStart: service.season_start, seasonEnd: service.season_end, allowedWeekdays: service.allowed_weekdays })) {
+  if (!isServiceBookableOnDate(dateAsUtc, { seasonStart: service.season_start, seasonEnd: service.season_end, allowedWeekdays: service.allowed_weekdays })) {
     return NextResponse.json({ slots: [], durationMinutes: service.estimated_duration_minutes ?? DEFAULT_SLOT_MINUTES });
   }
 
-  const { data: hoursSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", identity.workspaceId)
-    .eq("key", "business_hours")
-    .maybeSingle();
-  const { data: slotSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", identity.workspaceId)
-    .eq("key", "booking_slot_minutes")
-    .maybeSingle();
-  const { data: holidaysSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", identity.workspaceId)
-    .eq("key", "holidays")
-    .maybeSingle();
+  const { hours, timeZone, gridMinutes, holidays, minNoticeHours, bufferMinutes, windowDays } = await resolveEffectiveAvailability(
+    supabase,
+    identity.workspaceId,
+    null,
+    service
+  );
+  const windowEnd = new Date();
+  windowEnd.setDate(windowEnd.getDate() + windowDays);
+  if (dateAsUtc > windowEnd) {
+    return NextResponse.json({ slots: [], durationMinutes: service.estimated_duration_minutes ?? DEFAULT_SLOT_MINUTES });
+  }
 
-  const businessHours = (hoursSetting?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
-  const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (holidaysSetting?.value as HolidayRange[] | undefined) ?? [];
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
 
-  const dayStart = new Date(date);
-  const dayEnd = new Date(date);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const dayStart = zonedTimeToUtc(dateParam, "00:00", timeZone);
+  const dayEnd = zonedTimeToUtc(dateParam, "00:00", timeZone);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
   const { data: existing } = await supabase
     .from("appointments")
@@ -100,7 +78,7 @@ export async function GET(request: Request) {
   const busyBlocks = service.allow_overlapping_bookings ? externalBusy : [...(existing ?? []), ...externalBusy];
 
   const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
-  const candidates = slotsForDay(date, businessHours, gridMinutes, durationMinutes, holidays);
+  const candidates = slotsForDay(dateParam, timeZone, hours, gridMinutes, durationMinutes, holidays);
   const available = filterAvailableSlots(candidates, durationMinutes, busyBlocks, earliestStart, bufferMinutes);
 
   return NextResponse.json({ slots: available.map((s) => s.toISOString()), durationMinutes });

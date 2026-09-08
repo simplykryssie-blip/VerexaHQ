@@ -126,11 +126,11 @@ export async function POST(request: Request) {
       break;
     }
     if (error?.code !== "23505") {
-      return NextResponse.json({ ok: false, error: error?.message ?? "Could not create the organizer template." }, { status: 500 });
+      return NextResponse.json({ ok: false, error: error?.message ?? "Could not create the form template." }, { status: 500 });
     }
   }
   if (!template) {
-    return NextResponse.json({ ok: false, error: "Could not create the organizer template -- try again." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not create the form template -- try again." }, { status: 500 });
   }
 
   const approximated: string[] = [];

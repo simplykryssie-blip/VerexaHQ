@@ -474,7 +474,7 @@ export function ReviewWorkspace({
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Review decision</p>
             {!canApprove && !canDeny && !canRequestInfo && !canEroReview ? (
-              <p className="text-xs text-muted">You don&apos;t have permission to make a review decision on this organizer.</p>
+              <p className="text-xs text-muted">You don&apos;t have permission to make a review decision on this form.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {canApprove && (

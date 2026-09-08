@@ -9,7 +9,7 @@ type Entry = { title: string; body: string };
 const HOW_IT_WORKS: Entry[] = [
   {
     title: "Contacts & Clients",
-    body: "A client is the person or business you do work for -- everything else (engagements, documents, invoices, messages) lives underneath them. A client that hasn't started real work yet is tagged \"Lead\"; submitting an intake form (organizer) or being accepted by staff flips them to an active client automatically. Adding a Relationship (spouse, business partner, etc.) or Contact under a client is optional and lives in the Contacts tab on their profile.",
+    body: "A client is the person or business you do work for -- everything else (engagements, documents, invoices, messages) lives underneath them. A client that hasn't started real work yet is tagged \"Lead\"; submitting an intake form or being accepted by staff flips them to an active client automatically. Adding a Relationship (spouse, business partner, etc.) or Contact under a client is optional and lives in the Contacts tab on their profile.",
   },
   {
     title: "Engagements",
@@ -17,11 +17,11 @@ const HOW_IT_WORKS: Entry[] = [
   },
   {
     title: "Services",
-    body: "A service is what you sell (\"Individual Tax Return,\" \"Bookkeeping\"). Opening one has three tabs: Details (name, price, category), Stages (the ordered steps its engagements move through, each optionally with an organizer, document request, or signable document template attached), and Board (a live view of which of your clients are currently sitting in which stage -- nothing to configure there, it just reflects what's already happening). Attaching a template to a stage never sends anything automatically -- it just pre-selects the right template when staff use the manual \"Send Organizer\" / \"Request Documents\" / \"Send for Signature\" buttons on an engagement at that stage. To actually automate sending, use Workflows instead -- that's a separate, optional engine, not part of a service.",
+    body: "A service is what you sell (\"Individual Tax Return,\" \"Bookkeeping\"). Opening one has three tabs: Details (name, price, category), Stages (the ordered steps its engagements move through, each optionally with a form, document request, or signable document template attached), and Board (a live view of which of your clients are currently sitting in which stage -- nothing to configure there, it just reflects what's already happening). Attaching a template to a stage never sends anything automatically -- it just pre-selects the right template when staff use the manual \"Send Form\" / \"Request Documents\" / \"Send for Signature\" buttons on an engagement at that stage. To actually automate sending, use Workflows instead -- that's a separate, optional engine, not part of a service.",
   },
   {
     title: "Workflows (automations)",
-    body: "Workflows let you make things happen automatically instead of a staff member remembering to do them -- e.g. when a client creates a portal account, send a welcome email and load their intake form; when an organizer is submitted, create the engagement and start its pipeline. Every workflow has a trigger (what starts it) and one or more steps (what happens). Nothing runs until a workflow exists and is Active (not Paused) -- each workflow's page shows its recent runs and an execution log so you can confirm it actually fired.",
+    body: "Workflows let you make things happen automatically instead of a staff member remembering to do them -- e.g. when a client creates a portal account, send a welcome email and load their intake form; when a form is submitted, create the engagement and start its pipeline. Every workflow has a trigger (what starts it) and one or more steps (what happens). Nothing runs until a workflow exists and is Active (not Paused) -- each workflow's page shows its recent runs and an execution log so you can confirm it actually fired.",
   },
   {
     title: "Documents",
@@ -33,7 +33,7 @@ const HOW_IT_WORKS: Entry[] = [
   },
   {
     title: "Client Portal",
-    body: "This is what your clients see when they log in: their own documents, messages, invoices, organizers, and e-signature requests -- scoped strictly to their own file. The portal's logo and colors follow your firm's branding (Firm Profile > Branding); if your firm is connected to an ERO, your portal shows the ERO's brand instead of your own.",
+    body: "This is what your clients see when they log in: their own documents, messages, invoices, forms, and e-signature requests -- scoped strictly to their own file. The portal's logo and colors follow your firm's branding (Firm Profile > Branding); if your firm is connected to an ERO, your portal shows the ERO's brand instead of your own.",
   },
   {
     title: "Portal invite 30-day expiration",
@@ -67,8 +67,8 @@ const TROUBLESHOOTING: Entry[] = [
     body: "Open the engagement's Workflow tab -- stages only advance when someone explicitly marks the current stage complete. Nothing moves a stage forward silently, so if a client submitted something and the stage still shows as open, that's expected until staff mark it done.",
   },
   {
-    title: "A document request or organizer isn't showing as received",
-    body: "Check the Requests tab under Documents -- items are marked fulfilled individually as the client uploads them, not all at once. For an organizer, check the client's engagement for a \"needs service review\" flag, which appears when an organizer submission couldn't be automatically matched to a service.",
+    title: "A document request or form isn't showing as received",
+    body: "Check the Requests tab under Documents -- items are marked fulfilled individually as the client uploads them, not all at once. For a form, check the client's engagement for a \"needs service review\" flag, which appears when a form submission couldn't be automatically matched to a service.",
   },
   {
     title: "My 2FA code isn't working",

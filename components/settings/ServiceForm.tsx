@@ -49,6 +49,10 @@ export type ServiceRow = {
   booking_meeting_url: string | null;
   zoom_host_user_id: string | null;
   allow_overlapping_bookings: boolean;
+  booking_location_id: string | null;
+  booking_min_notice_hours_override: number | null;
+  booking_buffer_minutes_override: number | null;
+  booking_window_days_override: number | null;
 };
 
 function OptionSelect({
@@ -86,6 +90,7 @@ export function ServiceForm({
   documentRequestTemplates,
   documentFolderTemplates,
   staffOptions,
+  locationOptions,
   canManage,
 }: {
   service: ServiceRow;
@@ -97,6 +102,7 @@ export function ServiceForm({
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
   staffOptions: Option[];
+  locationOptions: Option[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -129,6 +135,16 @@ export function ServiceForm({
   const [bookingMeetingUrl, setBookingMeetingUrl] = useState(service.booking_meeting_url ?? "");
   const [zoomHostUserId, setZoomHostUserId] = useState(service.zoom_host_user_id ?? "");
   const [allowOverlappingBookings, setAllowOverlappingBookings] = useState(service.allow_overlapping_bookings);
+  const [bookingLocationId, setBookingLocationId] = useState(service.booking_location_id ?? "");
+  const [minNoticeOverride, setMinNoticeOverride] = useState(
+    service.booking_min_notice_hours_override != null ? String(service.booking_min_notice_hours_override) : ""
+  );
+  const [bufferOverride, setBufferOverride] = useState(
+    service.booking_buffer_minutes_override != null ? String(service.booking_buffer_minutes_override) : ""
+  );
+  const [windowOverride, setWindowOverride] = useState(
+    service.booking_window_days_override != null ? String(service.booking_window_days_override) : ""
+  );
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -223,6 +239,10 @@ export function ServiceForm({
         booking_meeting_url: bookingLocationType === "link" ? bookingMeetingUrl.trim() || null : null,
         zoom_host_user_id: bookingLocationType === "zoom" ? zoomHostUserId || null : null,
         allow_overlapping_bookings: allowOverlappingBookings,
+        booking_location_id: bookingLocationId || null,
+        booking_min_notice_hours_override: minNoticeOverride.trim() ? Number(minNoticeOverride) : null,
+        booking_buffer_minutes_override: bufferOverride.trim() ? Number(bufferOverride) : null,
+        booking_window_days_override: windowOverride.trim() ? Number(windowOverride) : null,
       })
       .eq("id", service.id);
     setSaving(false);
@@ -565,6 +585,63 @@ export function ServiceForm({
                   </p>
                 </>
               )}
+            </div>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Office &amp; booking rules</p>
+              <label className={`${labelClass} mt-3`}>
+                Office / location
+                <OptionSelect
+                  value={bookingLocationId}
+                  onChange={markDirty(setBookingLocationId)}
+                  options={locationOptions}
+                  noneLabel="Use the workspace default hours"
+                  disabled={!canManage}
+                />
+              </label>
+              <p className="mt-1 text-[11px] text-muted">
+                Assign this service to one of your offices to use that office&apos;s hours and timezone instead of the
+                workspace default. Manage offices under Settings &gt; Locations.
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <label className={labelClass}>
+                  Min notice (hrs)
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Default"
+                    value={minNoticeOverride}
+                    onChange={(e) => markDirty(setMinNoticeOverride)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+                <label className={labelClass}>
+                  Buffer (min)
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Default"
+                    value={bufferOverride}
+                    onChange={(e) => markDirty(setBufferOverride)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+                <label className={labelClass}>
+                  Booking window (days)
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Default"
+                    value={windowOverride}
+                    onChange={(e) => markDirty(setWindowOverride)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] text-muted">Leave any of these blank to use the workspace-wide default set under Settings &gt; Availability.</p>
             </div>
 
             <div className="mt-4 border-t border-border pt-4">

@@ -552,7 +552,7 @@ export function OverviewTab({
       </Section>
 
       {organizerResponses.length > 0 && (
-        <Section title="Organizers">
+        <Section title="Forms">
           <div className="space-y-3">
             {organizerResponses.map((o) => (
               <OrganizerResponseCard key={o.id} response={o} workspaceServices={workspaceServices} />
@@ -1284,7 +1284,7 @@ export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow
                     {t.due_date && <span>Due {new Date(t.due_date).toLocaleDateString()}</span>}
                     {linksElsewhere && (
                       <Link href={href} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                        {t.related_organizer_response_id ? "Open organizer review" : "Open engagement"}
+                        {t.related_organizer_response_id ? "Open form review" : "Open engagement"}
                         <ArrowUpRight size={12} aria-hidden="true" />
                       </Link>
                     )}

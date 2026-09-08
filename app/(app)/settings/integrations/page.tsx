@@ -144,7 +144,7 @@ export default async function IntegrationsPage({
       </div>
 
       <h2 className="mt-8 font-display text-base font-semibold text-ink">JotForm</h2>
-      <p className="mt-1 text-sm text-muted">Import your firm&apos;s existing JotForm forms as organizer templates.</p>
+      <p className="mt-1 text-sm text-muted">Import your firm&apos;s existing JotForm forms as form templates.</p>
       <div className="mt-6">
         <JotFormConnectionCard workspaceId={workspace!.id} isConnected={Boolean(isJotformConnected)} />
       </div>

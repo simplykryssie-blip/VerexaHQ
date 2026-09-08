@@ -175,14 +175,14 @@ export default async function ReviewQueuePage() {
 
         {canReviewOrganizers && (
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-ink">Organizers submitted</h2>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Forms submitted</h2>
             {(submittedOrganizers ?? []).length === 0 ? (
-              <EmptyState message="No submitted organizers waiting on your review." />
+              <EmptyState message="No submitted forms waiting on your review." />
             ) : (
               <ul className="space-y-3">
                 {(submittedOrganizers ?? []).map((o) => {
                   const name = clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0]);
-                  const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer";
+                  const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Form";
                   const hasLinkedChanges = organizerResponseIdsWithChanges.has(o.id);
                   return (
                     <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-sm shadow-soft">
@@ -215,11 +215,11 @@ export default async function ReviewQueuePage() {
 
         {canReviewOrganizers && (respondedOrganizers ?? []).length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-ink">Organizer corrections responded to</h2>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Form corrections responded to</h2>
             <ul className="space-y-3">
               {(respondedOrganizers ?? []).map((o) => {
                 const name = clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0]);
-                const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer";
+                const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Form";
                 const count = respondedCountByResponseId.get(o.id) ?? 0;
                 return (
                   <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-sm shadow-soft">
