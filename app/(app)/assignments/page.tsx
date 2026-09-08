@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, UsersRound, ListChecks, UserX, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Tabs } from "@/components/ui/Tabs";
 import { BulkAssignList, type AssignableRow } from "@/components/assignments/BulkAssignList";
@@ -129,10 +130,26 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
     });
   }
 
+  const unassignedCount = rows.filter((r) => !r.currentAssigneeName).length;
+
   return (
     <>
-      <PageHeader title="Assignments" description="Reassign clients, tasks, and engagements across your team in bulk." />
-      <div className="flex-1 px-8 py-6">
+      <PageHero
+        icon={UsersRound}
+        tone="amber"
+        heading={
+          <>
+            Your <HeroHighlight>assignments</HeroHighlight>.
+          </>
+        }
+        subtitle="Reassign clients, tasks, and engagements across your team in bulk."
+      />
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <StatTile icon={ListChecks} tone="accent" label={`${TABS.find((t) => t.key === tab)?.label ?? "Items"} shown`} value={rows.length} />
+          <StatTile icon={UserX} tone="rose" label="Unassigned" value={unassignedCount} />
+          <StatTile icon={Users} tone="emerald" label="Staff available" value={staffOptions.length} />
+        </div>
         <div className="mb-4">
           <Tabs tabs={TABS.map((t) => ({ id: t.key, label: t.label, href: `/assignments?tab=${t.key}` }))} active={tab} />
         </div>
