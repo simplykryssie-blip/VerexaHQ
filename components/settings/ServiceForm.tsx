@@ -329,22 +329,22 @@ export function ServiceForm({
       </div>
 
       <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline, organizer &amp; engagement letter</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline, form &amp; engagement letter</p>
         <p className="mt-1 text-[11px] text-muted">
           When a client selects this service, this is what routes them: the pipeline their engagement moves through, the
-          organizer they fill out, and the engagement letter they sign.
+          form they fill out, and the engagement letter they sign.
         </p>
         <label className={`${labelClass} mt-3`}>
           Pipeline
           <OptionSelect value={processId} onChange={markDirty(setProcessId)} options={pipelines} noneLabel="No pipeline" disabled={!canManage} />
         </label>
         <label className={`${labelClass} mt-3`}>
-          Organizer
+          Form
           <OptionSelect
             value={organizerTemplateId}
             onChange={markDirty(setOrganizerTemplateId)}
             options={organizerTemplates}
-            noneLabel="No organizer"
+            noneLabel="No form"
             disabled={!canManage}
           />
         </label>
