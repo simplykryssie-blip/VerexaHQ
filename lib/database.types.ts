@@ -12573,6 +12573,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_platform_account_holder: {
+        Args: {
+          p_company_name: string
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       upsert_workspace_subscription: {
         Args: {
           p_plan_id: string
