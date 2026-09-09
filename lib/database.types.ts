@@ -157,6 +157,11 @@ export type Database = {
           affected_module: string | null
           agent_id: string
           ai_analysis: Json | null
+          autofix_note: string | null
+          autofix_requested_at: string | null
+          autofix_requested_by: string | null
+          autofix_status: string
+          autofix_updated_at: string | null
           category: string
           created_at: string
           decision_notes: string | null
@@ -185,6 +190,11 @@ export type Database = {
           affected_module?: string | null
           agent_id: string
           ai_analysis?: Json | null
+          autofix_note?: string | null
+          autofix_requested_at?: string | null
+          autofix_requested_by?: string | null
+          autofix_status?: string
+          autofix_updated_at?: string | null
           category: string
           created_at?: string
           decision_notes?: string | null
@@ -213,6 +223,11 @@ export type Database = {
           affected_module?: string | null
           agent_id?: string
           ai_analysis?: Json | null
+          autofix_note?: string | null
+          autofix_requested_at?: string | null
+          autofix_requested_by?: string | null
+          autofix_status?: string
+          autofix_updated_at?: string | null
           category?: string
           created_at?: string
           decision_notes?: string | null
@@ -12050,6 +12065,10 @@ export type Database = {
         Args: { p_popup_id: string; p_section_ids: string[] }
         Returns: undefined
       }
+      request_finding_autofix: {
+        Args: { p_finding_id: string }
+        Returns: undefined
+      }
       request_portal_service: {
         Args: { p_service_id: string }
         Returns: undefined
@@ -12233,6 +12252,10 @@ export type Database = {
           p_flag_key: string
           p_workspace_id: string
         }
+        Returns: undefined
+      }
+      set_finding_autofix_result: {
+        Args: { p_autofix_status: string; p_finding_id: string; p_note?: string }
         Returns: undefined
       }
       set_firm_tax_profile: {
