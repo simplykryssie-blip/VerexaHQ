@@ -313,44 +313,33 @@ export function WorkflowList({
                     <>
                       <FolderMoveSelect folders={folders} value={w.folder_id} onChange={(folderId) => moveWorkflow(w.id, folderId)} />
                       {w.status === "draft" ? (
-                        <button
-                          type="button"
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={() => publish(w.id)}
-                          className="rounded-lg border border-accent px-2 py-1 text-xs font-medium text-accent hover:bg-accentSoft"
+                          className="!border-accent !text-accent hover:!bg-accentSoft"
                         >
                           Publish
-                        </button>
+                        </Button>
                       ) : w.status === "archived" ? (
-                        <button
-                          type="button"
-                          onClick={() => reactivate(w.id)}
-                          className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
-                        >
+                        <Button size="sm" variant="secondary" onClick={() => reactivate(w.id)}>
                           Restore as draft
-                        </button>
+                        </Button>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => toggleEnabled(w.id, w.is_enabled)}
-                            className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
-                          >
+                          <Button size="sm" variant="secondary" onClick={() => toggleEnabled(w.id, w.is_enabled)}>
                             {w.is_enabled ? "Pause" : "Activate"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => retire(w.id)}
-                            className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted hover:bg-surfaceMuted"
-                          >
+                          </Button>
+                          <Button size="sm" variant="tertiary" onClick={() => retire(w.id)}>
                             Retire
-                          </button>
+                          </Button>
                         </>
                       )}
                       <button
                         type="button"
                         onClick={() => duplicate(w.id, w.name)}
                         disabled={duplicatingId === w.id}
-                        className="text-muted hover:text-ink disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
                         aria-label="Duplicate workflow"
                       >
                         <Copy size={14} />
@@ -359,7 +348,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => remove(w.id)}
                         disabled={deletingId === w.id}
-                        className="text-muted hover:text-danger disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
                         aria-label="Delete workflow"
                       >
                         <Trash2 size={14} />
