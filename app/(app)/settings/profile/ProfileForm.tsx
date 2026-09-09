@@ -249,7 +249,7 @@ export function ProfileForm({
           />
         </div>
 
-        <div className="mt-3 overflow-hidden rounded-xl border border-border">
+        <div className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border">
           <MaskedSecretField
             label="PTIN"
             last4={ptinLast4}
@@ -260,14 +260,20 @@ export function ProfileForm({
             onClearChange={setClearPtin}
             helpText="Encrypted -- only you can reveal it."
           />
-        </div>
-        <div className="mt-3">
-          <LabeledInput
-            label="CAF number"
-            value={caf}
-            onChange={(e) => setCaf(e.target.value)}
-            helpText="Your IRS Centralized Authorization File number, for designee/POA forms (e.g. Form 8821) -- available as a merge field when mapping an uploaded PDF."
-          />
+          <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
+            <div className="sm:w-36 sm:flex-shrink-0">
+              <span className="text-sm font-semibold text-ink">CAF number</span>
+              <span className="mt-0.5 block text-xs leading-snug text-muted">
+                For designee/POA forms (e.g. Form 8821) -- available as a merge field when mapping an uploaded PDF.
+              </span>
+            </div>
+            <input
+              value={caf}
+              onChange={(e) => setCaf(e.target.value)}
+              placeholder="Not set"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-1.5 font-mono text-xs text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
         </div>
       </SettingsCard>
 
