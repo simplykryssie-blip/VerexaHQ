@@ -331,7 +331,15 @@ export function PublicOrganizerForm({
   function finish() {
     const action = onSubmitConfig?.action ?? "inline_thank_you";
     if (action === "custom_url" && onSubmitConfig?.custom_url) {
-      window.location.href = onSubmitConfig.custom_url;
+      // Carry the contact info just given over as query params, so a
+      // destination like the real trial-signup page can prefill instead of
+      // asking for the same name/email twice in one continuous flow.
+      const url = new URL(onSubmitConfig.custom_url, window.location.origin);
+      const nameParts = parseNameValue(name);
+      if (nameParts.first.trim()) url.searchParams.set("first_name", nameParts.first.trim());
+      if (nameParts.last.trim()) url.searchParams.set("last_name", nameParts.last.trim());
+      if (email.trim()) url.searchParams.set("email", email.trim());
+      window.location.href = url.toString();
       return;
     }
     if (action === "next_page" && onNextPage) {
