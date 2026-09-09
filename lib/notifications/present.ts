@@ -5,6 +5,7 @@ export type NotificationRow = {
   payload: unknown;
   entity_type: string | null;
   entity_id: string | null;
+  workspace_id: string | null;
   created_at: string;
   read_at: string | null;
 };

@@ -38,7 +38,7 @@ export default async function PortalNotificationsPage() {
   const [{ data: notifications }, { data: preferences }] = await Promise.all([
     supabase
       .from("notification_queue")
-      .select("id, event_type, template_key, payload, entity_type, entity_id, channel, status, created_at, read_at")
+      .select("id, event_type, template_key, payload, entity_type, entity_id, workspace_id, channel, status, created_at, read_at")
       .eq("recipient_user_id", user?.id ?? "")
       .order("created_at", { ascending: false })
       .limit(100),

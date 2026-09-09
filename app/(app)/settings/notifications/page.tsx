@@ -53,7 +53,7 @@ export default async function NotificationsPage() {
   const [{ data: notifications }, { data: preferences }] = await Promise.all([
     supabase
       .from("notification_queue")
-      .select("id, event_type, template_key, payload, entity_type, entity_id, status, created_at, channels, read_at")
+      .select("id, event_type, template_key, payload, entity_type, entity_id, workspace_id, status, created_at, channels, read_at")
       .eq("recipient_user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20),
