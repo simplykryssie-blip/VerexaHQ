@@ -11017,6 +11017,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_trial_workspace: {
+        Args: { p_first_name?: string; p_last_name?: string; p_name: string }
+        Returns: string
+      }
       create_workflow_pipeline: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
@@ -12226,7 +12230,11 @@ export type Database = {
         Returns: undefined
       }
       set_agent_finding_status: {
-        Args: { p_decision_notes?: string; p_finding_id: string; p_status: string }
+        Args: {
+          p_decision_notes?: string
+          p_finding_id: string
+          p_status: string
+        }
         Returns: undefined
       }
       set_client_address_primary: {
@@ -12259,7 +12267,11 @@ export type Database = {
         Returns: undefined
       }
       set_finding_autofix_result: {
-        Args: { p_autofix_status: string; p_finding_id: string; p_note?: string }
+        Args: {
+          p_autofix_status: string
+          p_finding_id: string
+          p_note?: string
+        }
         Returns: undefined
       }
       set_firm_tax_profile: {
