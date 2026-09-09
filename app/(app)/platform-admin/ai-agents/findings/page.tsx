@@ -3,26 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Lock, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
-import { Badge } from "@/components/ui/Badge";
-import type { BadgeTone } from "@/components/ui/Badge";
+import { FindingsTable } from "./FindingsTable";
 
 export const dynamic = "force-dynamic";
-
-const SEVERITY_TONE: Record<string, BadgeTone> = {
-  critical: "danger",
-  high: "danger",
-  medium: "warning",
-  low: "neutral",
-};
-
-const STATUS_TONE: Record<string, BadgeTone> = {
-  open: "danger",
-  reopened: "danger",
-  investigating: "warning",
-  retest_required: "warning",
-  fixed: "success",
-  resolved: "success",
-};
 
 const AGENT_OPTIONS = [
   { value: "", label: "All agents" },
@@ -82,9 +65,10 @@ export default async function AiAgentFindingsPage({
 
   let query = supabase
     .from("ai_agent_findings")
-    .select("id, title, severity, status, category, affected_module, created_at, last_detected_at, ai_agents!inner(name, agent_key), workspaces(name)", {
-      count: "exact",
-    })
+    .select(
+      "id, title, severity, status, category, affected_module, created_at, last_detected_at, decision_notes, ai_agents!inner(name, agent_key), workspaces(name)",
+      { count: "exact" }
+    )
     .order("last_detected_at", { ascending: false })
     .range(from, to);
 
@@ -143,44 +127,13 @@ export default async function AiAgentFindingsPage({
             <EmptyState icon={Sparkles} message="No findings match these filters." />
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
-                  <th className="px-5 py-3 font-medium">Finding</th>
-                  <th className="px-5 py-3 font-medium">Agent</th>
-                  <th className="px-5 py-3 font-medium">Workspace</th>
-                  <th className="px-5 py-3 font-medium">Module</th>
-                  <th className="px-5 py-3 font-medium">Severity</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">First seen</th>
-                  <th className="px-5 py-3 font-medium">Last seen</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {findings.map((f) => (
-                  <tr key={f.id} className="transition-colors hover:bg-surfaceMuted">
-                    <td className="px-5 py-3 text-slate">{f.title}</td>
-                    <td className="px-5 py-3 text-slate">{(f.ai_agents as unknown as { name: string } | null)?.name ?? "--"}</td>
-                    <td className="px-5 py-3 text-slate">{(f.workspaces as unknown as { name: string } | null)?.name ?? "--"}</td>
-                    <td className="px-5 py-3 text-slate">{f.affected_module ?? "--"}</td>
-                    <td className="px-5 py-3">
-                      <Badge tone={SEVERITY_TONE[f.severity] ?? "neutral"} className="capitalize">
-                        {f.severity}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-3">
-                      <Badge tone={STATUS_TONE[f.status] ?? "neutral"} className="capitalize">
-                        {f.status.replace(/_/g, " ")}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-3 text-slate">{new Date(f.created_at).toLocaleDateString()}</td>
-                    <td className="px-5 py-3 text-slate">{new Date(f.last_detected_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <FindingsTable
+            findings={findings.map((f) => ({
+              ...f,
+              ai_agents: f.ai_agents as unknown as { name: string } | null,
+              workspaces: f.workspaces as unknown as { name: string } | null,
+            }))}
+          />
         )}
 
         {totalPages > 1 && (
