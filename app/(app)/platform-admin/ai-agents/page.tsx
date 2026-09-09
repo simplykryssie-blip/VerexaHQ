@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Lock, Sparkles, FlaskConical, ShieldCheck, Workflow, Gauge, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
@@ -141,7 +142,12 @@ export default async function AdminAiAgentsPage() {
         </div>
 
         <div>
-          <h2 className="mb-3 font-display text-sm font-semibold text-ink">Recent findings</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-sm font-semibold text-ink">Recent findings</h2>
+            <Link href="/platform-admin/ai-agents/findings" className="text-sm font-medium text-accent hover:underline">
+              See all findings &rarr;
+            </Link>
+          </div>
           {!recentFindings || recentFindings.length === 0 ? (
             <div className="rounded-2xl border border-border bg-surface shadow-soft">
               <EmptyState icon={Sparkles} message="No findings yet -- none of the agents have run." />
