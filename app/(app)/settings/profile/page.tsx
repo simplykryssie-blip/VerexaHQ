@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { UserCircle } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { PROFILE_ACCOUNT_TABS } from "@/lib/settingsSubNav";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { ProfileForm } from "./ProfileForm";
 
@@ -49,6 +51,9 @@ export default async function ProfilePage() {
   return (
     <div className="max-w-2xl">
       <SettingsSectionHeader icon={UserCircle} title="Profile" description="Your own info and preferences -- personal to you, not shared with the rest of your workspace." />
+      <div className="mt-4">
+        <Tabs tabs={PROFILE_ACCOUNT_TABS} active="profile" />
+      </div>
 
       <div className="mt-6">
         <ProfileForm

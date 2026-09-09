@@ -3,6 +3,8 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { ShieldCheck } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { PROFILE_ACCOUNT_TABS } from "@/lib/settingsSubNav";
 import { SecurityForm } from "./SecurityForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { MfaSetup } from "./MfaSetup";
@@ -32,6 +34,9 @@ export default async function SecurityPage() {
   return (
     <div className="max-w-2xl">
       <SettingsSectionHeader icon={ShieldCheck} title="Security" description="Your account password and this workspace's security policy." />
+      <div className="mt-4">
+        <Tabs tabs={PROFILE_ACCOUNT_TABS} active="security" />
+      </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft p-5">
         <h3 className="font-display text-sm font-semibold text-ink">Change your password</h3>

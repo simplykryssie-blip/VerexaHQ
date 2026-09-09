@@ -391,7 +391,7 @@ function PropertiesForm({
             ))}
           </select>
           <span className="mt-1 block text-[11px] normal-case text-muted">
-            When staff create an IRS Form 8821 authorization for a client who already submitted this organizer, this
+            When staff create an IRS Form 8821 authorization for a client who already submitted this form, this
             answer pre-fills the matching field instead of being re-typed.
           </span>
         </label>

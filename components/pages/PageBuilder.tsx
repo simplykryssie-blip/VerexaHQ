@@ -6,6 +6,7 @@ import { ArrowLeft, ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { slugify } from "@/lib/slugify";
+import { getLiveUrl } from "@/lib/websites/liveUrl";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { SectionPalette } from "./SectionPalette";
 import { SectionCanvas } from "./SectionCanvas";
@@ -20,6 +21,8 @@ export function PageBuilder({
   workspaceSlug,
   websiteId,
   websiteSlug,
+  customDomain,
+  domainVerified,
   page,
   initialSections,
   canManage,
@@ -30,6 +33,8 @@ export function PageBuilder({
   workspaceSlug: string;
   websiteId: string;
   websiteSlug: string;
+  customDomain: string | null;
+  domainVerified: boolean;
   page: BuilderPage;
   initialSections: BuilderSection[];
   canManage: boolean;
@@ -122,7 +127,7 @@ export function PageBuilder({
     }, DEBOUNCE_MS);
   }
 
-  const liveUrl = `/site/${workspaceSlug}/${websiteSlug}/${slug}`;
+  const liveUrl = getLiveUrl({ pageSlug: slug, workspaceSlug, websiteSlug, customDomain, domainVerified });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -143,6 +148,15 @@ export function PageBuilder({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={`/site-preview/${page.id}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Opens this draft in a new tab, rendered exactly like the published site will look"
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            <ExternalLink size={12} /> Full preview
+          </a>
           {page.status === "published" && (
             <a href={liveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
               <ExternalLink size={12} /> View live
@@ -198,7 +212,7 @@ export function PageBuilder({
       )}
 
       {view === "preview" ? (
-        <div className="flex-1 overflow-y-auto" style={{ backgroundColor: backgroundColor || "#ffffff" }}>
+        <div className="flex-1 overflow-y-auto" style={{ background: backgroundColor || "#ffffff" }}>
           {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
           {sections
             .slice()
@@ -219,6 +233,7 @@ export function PageBuilder({
             services={bookableServices}
             staff={staff}
             customCss={customCss}
+            backgroundColor={backgroundColor}
           />
           {canManage && (
             <SectionPropertiesPanel

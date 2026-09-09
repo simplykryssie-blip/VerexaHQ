@@ -20,7 +20,7 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
         )
         .eq("id", params.pageId)
         .maybeSingle(),
-      supabase.from("site_websites").select("id, slug").eq("id", params.id).maybeSingle(),
+      supabase.from("site_websites").select("id, slug, custom_domain, domain_verified").eq("id", params.id).maybeSingle(),
       supabase.from("site_page_sections").select("id, section_type, display_order, config").eq("page_id", params.pageId).order("display_order"),
       supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "site_pages.manage" }),
       supabase.from("organizer_templates").select("id, name, is_public, public_token").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
@@ -35,6 +35,8 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
       workspaceSlug={workspace.slug}
       websiteId={website.id}
       websiteSlug={website.slug}
+      customDomain={website.custom_domain}
+      domainVerified={Boolean(website.domain_verified)}
       page={page}
       initialSections={(sections ?? []) as never}
       canManage={Boolean(canManage)}

@@ -92,8 +92,8 @@ export function OrganizerResponseCard({
     e.stopPropagation();
     const confirmed = window.confirm(
       hasAnswers
-        ? "This organizer has already been submitted with answers. Removing it will permanently delete those answers. Are you sure?"
-        : "Remove this organizer? The client will no longer see it in their portal."
+        ? "This form has already been submitted with answers. Removing it will permanently delete those answers. Are you sure?"
+        : "Remove this form? The client will no longer see it in their portal."
     );
     if (!confirmed) return;
     setRemoving(true);
@@ -103,7 +103,7 @@ export function OrganizerResponseCard({
       toast.show(error.message, "error");
       return;
     }
-    toast.show("Organizer removed.", "success");
+    toast.show("Form removed.", "success");
     router.refresh();
   }
 
@@ -118,13 +118,13 @@ export function OrganizerResponseCard({
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!data.ok) {
-        toast.show(data.error ?? "Could not file this organizer.", "error");
+        toast.show(data.error ?? "Could not file this form.", "error");
         return;
       }
       toast.show("Filed to Documents.", "success");
       window.location.reload();
     } catch {
-      toast.show("Could not file this organizer.", "error");
+      toast.show("Could not file this form.", "error");
     } finally {
       setFiling(false);
     }
@@ -149,7 +149,7 @@ export function OrganizerResponseCard({
               onClick={fileNow}
               disabled={filing}
               className="inline-flex items-center gap-1 rounded-full border border-accent px-2 py-0.5 text-[11px] font-medium text-accent hover:bg-accentSoft disabled:opacity-60"
-              title="File this organizer's answers into Documents"
+              title="File this form's answers into Documents"
             >
               <FileCheck size={11} /> {filing ? "Filing..." : "File to Documents"}
             </button>
@@ -162,7 +162,7 @@ export function OrganizerResponseCard({
             type="button"
             onClick={removeResponse}
             disabled={removing}
-            title="Remove this assigned organizer"
+            title="Remove this assigned form"
             className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted hover:border-danger hover:text-danger disabled:opacity-60"
           >
             <Trash2 size={11} /> {removing ? "Removing..." : "Remove"}
@@ -275,7 +275,7 @@ export function OrganizerResponseCard({
           ))}
 
           {(response.topLevel ?? []).length === 0 && (response.repeaters ?? []).length === 0 && (
-            <p className="text-xs text-muted">No answers were recorded on this organizer.</p>
+            <p className="text-xs text-muted">No answers were recorded on this form.</p>
           )}
         </div>
       )}

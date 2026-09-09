@@ -41,7 +41,7 @@ export const TRIGGER_CATEGORIES: { key: string; label: string }[] = [
 
 export const TRIGGER_TYPES = [
   { value: "engagement.status_changed", label: "Engagement status changes to", category: "engagements", description: "Fires when an engagement's status is set to a specific value.", keywords: "status change engagement" },
-  { value: "organizer.submitted", label: "An organizer is submitted", category: "forms_intake", description: "Fires when a client submits an intake organizer.", keywords: "intake form organizer submit" },
+  { value: "organizer.submitted", label: "A form is submitted", category: "forms_intake", description: "Fires when a client submits an intake form.", keywords: "intake form organizer submit" },
   { value: "client.tag_added", label: "A tag is added to a client", category: "contacts_leads", description: "Fires when a specific tag is added to a client.", keywords: "tag label contact" },
   { value: "client.portal_created", label: "A client creates a portal account", category: "contacts_leads", description: "Fires when a client accepts their portal invite and creates an account.", keywords: "portal account signup" },
   { value: "client.service_interest_selected", label: "A client selects a service", category: "contacts_leads", description: "Fires when a client (or lead) selects a service they're interested in.", keywords: "service interest lead" },
@@ -50,8 +50,8 @@ export const TRIGGER_TYPES = [
   { value: "appointment.booked", label: "A client books themselves an appointment", category: "appointments", description: "Fires when a client books an appointment through a public or portal booking link -- not when staff create one manually.", keywords: "appointment booking link self-service booked online" },
   { value: "engagement_letter.signed", label: "A client signs their document for a service", category: "tax_workflow", description: "Fires when a client signs their document.", keywords: "signature signed document letter" },
   { value: "document_request.completed", label: "All requested documents are received", category: "documents", description: "Fires once every required document on a request has been received, for any service or a specific one.", keywords: "documents received complete" },
-  { value: "organizer_information_request.resolved", label: "An organizer information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
-  { value: "organizer_response.review_decided", label: "A reviewed organizer is approved, denied, or needs info", category: "forms_intake", description: "Fires when a staff reviewer sets an organizer's review decision to a specific status.", keywords: "organizer review approved denied rejected needs info decision" },
+  { value: "organizer_information_request.resolved", label: "A form information request is resolved", category: "forms_intake", description: "Fires once every flagged question on an information request has been answered, corrected, or rejected.", keywords: "information request needs info resolved organizer" },
+  { value: "organizer_response.review_decided", label: "A reviewed form is approved, denied, or needs info", category: "forms_intake", description: "Fires when a staff reviewer sets a form's review decision to a specific status.", keywords: "organizer review approved denied rejected needs info decision" },
   { value: "engagement.stage_entered", label: "An engagement enters a pipeline stage", category: "engagements", description: "Fires when an engagement enters a specific stage of its pipeline.", keywords: "pipeline stage engagement" },
   { value: "lead.created", label: "A new lead is created", category: "contacts_leads", description: "Fires when a new lead is created (staff entry, public form, portal, referral, etc).", keywords: "contact created lead new" },
   { value: "lead.updated", label: "A lead's info is updated", category: "contacts_leads", description: "Fires when a lead's information is changed.", keywords: "contact changed lead updated" },
@@ -84,6 +84,8 @@ export const TRIGGER_TYPES = [
   { value: "invoice.overdue", label: "An invoice becomes overdue", category: "billing", description: "Fires when an invoice's due date passes unpaid (checked every 6 hours).", keywords: "invoice overdue late payment" },
   { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
   { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
+  { value: "firm_package.purchased", label: "A connected firm purchases a package", category: "ero_ptin", description: "Fires in your workspace when a connected firm checks out and pays for the package you assigned them (e.g. a tax software or bank product package) -- use it to automate onboarding onto whatever they chose.", keywords: "package purchase checkout software bank connected firm ero ptin" },
+  { value: "firm_package.canceled", label: "A connected firm's package is canceled", category: "ero_ptin", description: "Fires in your workspace when a connected firm's package purchase is canceled (a recurring subscription ending, most commonly) -- use it to automate revoking access.", keywords: "package canceled subscription ended connected firm ero ptin" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -115,7 +117,7 @@ export function triggerSummary(
   if (triggerType === "organizer.submitted") {
     const templateId = config.organizer_template_id as string | undefined;
     const template = organizerTemplates.find((t) => t.id === templateId);
-    return `When "${template?.name ?? "an organizer"}" is submitted`;
+    return `When "${template?.name ?? "a form"}" is submitted`;
   }
   if (triggerType === "client.tag_added") {
     return `When the tag "${config.tag ?? "?"}" is added to a client`;
@@ -149,9 +151,9 @@ export function triggerSummary(
   }
   if (triggerType === "organizer_information_request.resolved") {
     const templateId = config.organizer_template_id as string | undefined;
-    if (!templateId) return "When an information request is resolved on any organizer";
+    if (!templateId) return "When an information request is resolved on any form";
     const template = organizerTemplates.find((t) => t.id === templateId);
-    return `When an information request is resolved on "${template?.name ?? "an organizer"}"`;
+    return `When an information request is resolved on "${template?.name ?? "a form"}"`;
   }
   if (triggerType === "engagement.stage_entered") {
     const processId = config.process_id as string | undefined;
@@ -165,7 +167,7 @@ export function triggerSummary(
     const label = ORGANIZER_REVIEW_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status ?? "?";
     const templateId = config.organizer_template_id as string | undefined;
     const template = templateId ? organizerTemplates.find((t) => t.id === templateId) : undefined;
-    return `When "${template?.name ?? "an organizer"}" is reviewed and marked "${label}"`;
+    return `When "${template?.name ?? "a form"}" is reviewed and marked "${label}"`;
   }
   if (triggerType === "lead.created") {
     return "When a new lead is created";
@@ -268,6 +270,12 @@ export function triggerSummary(
   if (triggerType === "engagement_share.created") {
     return "When a connected PTIN shares an engagement for review";
   }
+  if (triggerType === "firm_package.purchased") {
+    return "When a connected firm purchases a package";
+  }
+  if (triggerType === "firm_package.canceled") {
+    return "When a connected firm's package is canceled";
+  }
   return triggerType;
 }
 
@@ -348,7 +356,7 @@ export function TriggerFields({
 
       {triggerType === "organizer.submitted" && (
         <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Organizer
+          Form
           <select
             disabled={disabled}
             value={(config.organizer_template_id as string) ?? ""}
@@ -356,7 +364,7 @@ export function TriggerFields({
             className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           >
             <option value="" disabled>
-              Choose an organizer template
+              Choose a form template
             </option>
             {organizerTemplates.map((t) => (
               <option key={t.id} value={t.id}>
@@ -442,14 +450,14 @@ export function TriggerFields({
 
       {triggerType === "organizer_information_request.resolved" && (
         <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-          Organizer (optional)
+          Form (optional)
           <select
             disabled={disabled}
             value={(config.organizer_template_id as string) ?? ""}
             onChange={(e) => onConfigChange({ organizer_template_id: e.target.value || undefined })}
             className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           >
-            <option value="">Any organizer template</option>
+            <option value="">Any form template</option>
             {organizerTemplates.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -477,14 +485,14 @@ export function TriggerFields({
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted">
-            Organizer (optional)
+            Form (optional)
             <select
               disabled={disabled}
               value={(config.organizer_template_id as string) ?? ""}
               onChange={(e) => onConfigChange({ ...config, organizer_template_id: e.target.value || undefined })}
               className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             >
-              <option value="">Any organizer template</option>
+              <option value="">Any form template</option>
               {organizerTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name}
@@ -631,8 +639,8 @@ export function TriggerFields({
             ))}
           </select>
           <span className="text-[11px] text-muted">
-            Leave as &quot;Any service&quot; to match every service at once -- pair with the &quot;Push an organizer&quot;
-            action left on &quot;Auto-detect&quot; to route each one to its own linked organizer without needing a
+            Leave as &quot;Any service&quot; to match every service at once -- pair with the &quot;Push a form&quot;
+            action left on &quot;Auto-detect&quot; to route each one to its own linked form without needing a
             separate workflow per service.
           </span>
         </label>

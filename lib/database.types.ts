@@ -1400,6 +1400,53 @@ export type Database = {
           },
         ]
       }
+      booking_locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          display_order: number
+          hours: Json
+          id: string
+          is_default: boolean
+          name: string
+          timezone: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          display_order?: number
+          hours: Json
+          id?: string
+          is_default?: boolean
+          name: string
+          timezone?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          display_order?: number
+          hours?: Json
+          id?: string
+          is_default?: boolean
+          name?: string
+          timezone?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_locations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branding: {
         Row: {
           accent_color: string
@@ -4326,6 +4373,168 @@ export type Database = {
           },
         ]
       }
+      firm_package_option_groups: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          max_select: number | null
+          min_select: number
+          name: string
+          package_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          max_select?: number | null
+          min_select?: number
+          name: string
+          package_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          max_select?: number | null
+          min_select?: number
+          name?: string
+          package_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_package_option_groups_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "firm_packages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_package_options: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          label: string
+          option_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          label: string
+          option_group_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          label?: string
+          option_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_package_options_option_group_id_fkey"
+            columns: ["option_group_id"]
+            isOneToOne: false
+            referencedRelation: "firm_package_option_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_package_purchases: {
+        Row: {
+          amount: number | null
+          billing_cadence: string | null
+          canceled_at: string | null
+          connection_id: string
+          created_at: string
+          current_period_end: string | null
+          id: string
+          package_id: string
+          parent_workspace_id: string
+          purchased_at: string | null
+          selected_option_ids: string[] | null
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount?: number | null
+          billing_cadence?: string | null
+          canceled_at?: string | null
+          connection_id: string
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          package_id: string
+          parent_workspace_id: string
+          purchased_at?: string | null
+          selected_option_ids?: string[] | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount?: number | null
+          billing_cadence?: string | null
+          canceled_at?: string | null
+          connection_id?: string
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          package_id?: string
+          parent_workspace_id?: string
+          purchased_at?: string | null
+          selected_option_ids?: string[] | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_package_purchases_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "firm_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_parent_workspace_id_fkey"
+            columns: ["parent_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firm_packages: {
         Row: {
           billing_cadence: string | null
@@ -4951,8 +5160,54 @@ export type Database = {
           },
         ]
       }
+      learning_course_assignments: {
+        Row: {
+          assigned_by: string | null
+          course_id: string
+          created_at: string
+          due_date: string | null
+          id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          course_id: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          course_id?: string
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_course_assignments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "learning_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learning_course_assignments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_courses: {
         Row: {
+          category: string | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -4964,6 +5219,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -4975,6 +5231,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -7540,8 +7797,12 @@ export type Database = {
         Row: {
           allow_overlapping_bookings: boolean
           allowed_weekdays: number[] | null
+          booking_buffer_minutes_override: number | null
+          booking_location_id: string | null
           booking_location_type: string
           booking_meeting_url: string | null
+          booking_min_notice_hours_override: number | null
+          booking_window_days_override: number | null
           cloned_from_service_id: string | null
           created_at: string
           created_by: string | null
@@ -7571,8 +7832,12 @@ export type Database = {
         Insert: {
           allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
+          booking_buffer_minutes_override?: number | null
+          booking_location_id?: string | null
           booking_location_type?: string
           booking_meeting_url?: string | null
+          booking_min_notice_hours_override?: number | null
+          booking_window_days_override?: number | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7602,8 +7867,12 @@ export type Database = {
         Update: {
           allow_overlapping_bookings?: boolean
           allowed_weekdays?: number[] | null
+          booking_buffer_minutes_override?: number | null
+          booking_location_id?: string | null
           booking_location_type?: string
           booking_meeting_url?: string | null
+          booking_min_notice_hours_override?: number | null
+          booking_window_days_override?: number | null
           cloned_from_service_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7631,6 +7900,13 @@ export type Database = {
           zoom_host_user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "services_booking_location_id_fkey"
+            columns: ["booking_location_id"]
+            isOneToOne: false
+            referencedRelation: "booking_locations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "services_cloned_from_service_id_fkey"
             columns: ["cloned_from_service_id"]
@@ -8010,6 +8286,113 @@ export type Database = {
           },
         ]
       }
+      site_popup_sections: {
+        Row: {
+          config: Json
+          created_at: string
+          display_order: number
+          id: string
+          popup_id: string
+          section_type: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          display_order: number
+          id?: string
+          popup_id: string
+          section_type: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          display_order?: number
+          id?: string
+          popup_id?: string
+          section_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_popup_sections_popup_id_fkey"
+            columns: ["popup_id"]
+            isOneToOne: false
+            referencedRelation: "site_popups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_popups: {
+        Row: {
+          background_color: string | null
+          created_at: string
+          created_by: string | null
+          custom_css: string | null
+          display_frequency: string
+          frequency_days: number | null
+          id: string
+          name: string
+          status: string
+          target_page_ids: string[] | null
+          trigger_type: string
+          trigger_value: number | null
+          updated_at: string
+          website_id: string
+          workspace_id: string
+        }
+        Insert: {
+          background_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_css?: string | null
+          display_frequency?: string
+          frequency_days?: number | null
+          id?: string
+          name: string
+          status?: string
+          target_page_ids?: string[] | null
+          trigger_type?: string
+          trigger_value?: number | null
+          updated_at?: string
+          website_id: string
+          workspace_id: string
+        }
+        Update: {
+          background_color?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_css?: string | null
+          display_frequency?: string
+          frequency_days?: number | null
+          id?: string
+          name?: string
+          status?: string
+          target_page_ids?: string[] | null
+          trigger_type?: string
+          trigger_value?: number | null
+          updated_at?: string
+          website_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_popups_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "site_websites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_popups_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_websites: {
         Row: {
           body_tracking_code: string | null
@@ -8212,6 +8595,41 @@ export type Database = {
           },
         ]
       }
+      staff_business_hours: {
+        Row: {
+          created_at: string
+          hours: Json
+          id: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          hours: Json
+          id?: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          hours?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_business_hours_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_time_off: {
         Row: {
           created_at: string
@@ -8252,6 +8670,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      support_articles: {
+        Row: {
+          body: string
+          created_at: string
+          display_order: number
+          id: string
+          image_url: string | null
+          section: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          section: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          section?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       system_failure_log: {
         Row: {
@@ -8607,6 +9058,7 @@ export type Database = {
           ptin_hash: string | null
           ptin_last4: string | null
           seen_onboarding_steps: string[]
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -8631,6 +9083,7 @@ export type Database = {
           ptin_hash?: string | null
           ptin_last4?: string | null
           seen_onboarding_steps?: string[]
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -8655,6 +9108,7 @@ export type Database = {
           ptin_hash?: string | null
           ptin_last4?: string | null
           seen_onboarding_steps?: string[]
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -10263,6 +10717,10 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      assign_learning_course: {
+        Args: { p_course_id: string; p_due_date?: string; p_user_id: string }
+        Returns: undefined
+      }
       attest_signature_presence: {
         Args: { p_signer_id: string }
         Returns: undefined
@@ -10737,6 +11195,10 @@ export type Database = {
         }
         Returns: string
       }
+      get_active_site_popups: {
+        Args: { p_page_id: string; p_website_id: string }
+        Returns: Json
+      }
       get_config_object_versions: {
         Args: { p_id: string; p_table: string }
         Returns: {
@@ -10881,6 +11343,20 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      get_learning_assignment_rollup: {
+        Args: { p_owner_workspace_id: string }
+        Returns: {
+          assigned_at: string
+          assignment_id: string
+          completed_modules: number
+          course_id: string
+          course_title: string
+          due_date: string
+          total_modules: number
+          user_email: string
+          user_id: string
+        }[]
+      }
       get_learning_completion_rollup: {
         Args: { p_owner_workspace_id: string }
         Returns: {
@@ -10914,6 +11390,7 @@ export type Database = {
           connection_id: string
           ero_workspace_id: string
           name: string
+          package_id: string
           phone: string
           primary_contact_email: string
           relationship_type: string
@@ -11074,6 +11551,7 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      get_site_page_preview: { Args: { p_page_id: string }; Returns: Json }
       get_workspace_billing_admin: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -11130,6 +11608,10 @@ export type Database = {
         Returns: boolean
       }
       hash_firm_secret: { Args: { p_plaintext: string }; Returns: string }
+      import_bank_product_transactions: {
+        Args: { p_rows: Json; p_workspace_id: string }
+        Returns: Json
+      }
       invite_portal_user: {
         Args: {
           p_client_id: string
@@ -11562,6 +12044,10 @@ export type Database = {
       }
       reorder_site_page_sections: {
         Args: { p_page_id: string; p_section_ids: string[] }
+        Returns: undefined
+      }
+      reorder_site_popup_sections: {
+        Args: { p_popup_id: string; p_section_ids: string[] }
         Returns: undefined
       }
       request_portal_service: {
@@ -12035,6 +12521,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      unassign_learning_course: {
+        Args: { p_course_id: string; p_user_id: string }
+        Returns: undefined
       }
       unflag_organizer_information_request_item: {
         Args: { p_item_id: string }

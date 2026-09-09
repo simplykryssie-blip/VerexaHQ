@@ -74,6 +74,60 @@ export async function createCheckoutSession({
   return { ok: true, data };
 }
 
+/**
+ * Same shape as createCheckoutSession but mode "subscription" with an
+ * ad-hoc recurring price (no pre-made Stripe Price object needed, since a
+ * package's price is set per-tenant, not from a fixed catalog). A
+ * subscription has no PaymentIntent at session-creation time, so its
+ * metadata goes on subscription_data instead of payment_intent_data.
+ */
+export async function createSubscriptionCheckoutSession({
+  amount,
+  currency = "usd",
+  description,
+  interval,
+  successUrl,
+  cancelUrl,
+  metadata,
+  connectedAccountId,
+}: {
+  amount: number;
+  currency?: string;
+  description: string;
+  interval: "month" | "year";
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+  connectedAccountId?: string;
+}): Promise<StripeResult<{ id: string; url: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    mode: "subscription",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][product_data][name]": description,
+    "line_items[0][price_data][unit_amount]": Math.round(amount * 100),
+    "line_items[0][price_data][recurring][interval]": interval,
+    "line_items[0][quantity]": 1,
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+    body.set(`subscription_data[metadata][${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(connectedAccountId), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string; url: string };
+  return { ok: true, data };
+}
+
 export async function createRefund({
   paymentIntentId,
   amount,

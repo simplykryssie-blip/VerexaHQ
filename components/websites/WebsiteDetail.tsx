@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PageLibrary, type SitePageCard } from "./PageLibrary";
+import { PopupLibrary, type PopupCard } from "./PopupLibrary";
 import { WebsiteSettings } from "./WebsiteSettings";
 import { MediaLibrary } from "./MediaLibrary";
 import { Tabs } from "@/components/ui/Tabs";
@@ -19,17 +20,19 @@ type Website = {
   domain_verified_at: string | null;
 };
 
-const TABS = ["pages", "media", "settings"] as const;
+const TABS = ["pages", "popups", "media", "settings"] as const;
 
 export function WebsiteDetail({
   workspaceSlug,
   website,
   pages,
+  popups,
   canManage,
 }: {
   workspaceSlug: string;
   website: Website;
   pages: SitePageCard[];
+  popups: PopupCard[];
   canManage: boolean;
 }) {
   const [tab, setTab] = useState<(typeof TABS)[number]>("pages");
@@ -49,10 +52,13 @@ export function WebsiteDetail({
             workspaceSlug={workspaceSlug}
             websiteId={website.id}
             websiteSlug={website.slug}
+            customDomain={website.custom_domain}
+            domainVerified={website.domain_verified}
             pages={pages}
             canManage={canManage}
           />
         )}
+        {tab === "popups" && <PopupLibrary workspaceId={website.workspace_id} websiteId={website.id} popups={popups} canManage={canManage} />}
         {tab === "media" && <MediaLibrary workspaceId={website.workspace_id} canManage={canManage} />}
         {tab === "settings" && <WebsiteSettings website={website} canManage={canManage} />}
       </div>

@@ -48,6 +48,12 @@ export default async function PublicBookingPage({
 
   const { windowDays } = await getBookingSettings(supabase, workspace.id);
 
+  const { data: branding } = await supabase
+    .from("branding")
+    .select("portal_logo_url, sidebar_logo_url, primary_color, secondary_color")
+    .eq("workspace_id", workspace.id)
+    .maybeSingle();
+
   return (
     <PublicBookingFlow
       workspaceSlug={params.workspaceSlug}
@@ -57,6 +63,15 @@ export default async function PublicBookingPage({
       staffId={staffName ? (searchParams.staff ?? null) : null}
       staffName={staffName}
       windowDays={windowDays}
+      branding={
+        branding
+          ? {
+              logo_url: branding.portal_logo_url ?? branding.sidebar_logo_url,
+              primary_color: branding.primary_color,
+              secondary_color: branding.secondary_color,
+            }
+          : null
+      }
     />
   );
 }

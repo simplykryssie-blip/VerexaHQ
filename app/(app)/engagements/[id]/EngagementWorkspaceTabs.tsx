@@ -25,6 +25,8 @@ import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseC
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { BankProductTransactionForm } from "@/components/billing/BankProductTransactionForm";
+import { BankProductStatusSelect } from "@/components/billing/BankProductStatusSelect";
 import { ReactivateQuoteButton } from "@/components/billing/ReactivateQuoteButton";
 import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -152,9 +154,9 @@ export function OverviewTab({
         </div>
       </div>
 
-      <Section title="Organizers">
+      <Section title="Forms">
         {organizerResponses.length === 0 ? (
-          <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
+          <EmptyState message="No form sent yet -- use Send Form above to assign one." />
         ) : (
           <div className="space-y-3">
             {organizerResponses.map((o) => (
@@ -682,6 +684,7 @@ export function BillingTab({
   quotes,
   invoices,
   payments,
+  bankProductTransactions,
 }: {
   clientId: string;
   clientName: string;
@@ -692,6 +695,7 @@ export function BillingTab({
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   payments: PaymentRow[];
+  bankProductTransactions: BankProductTransactionRow[];
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -919,6 +923,37 @@ export function BillingTab({
           </ul>
         )}
       </Section>
+
+      <Section title="Bank Products">
+        {bankProductTransactions.length === 0 ? (
+          <EmptyState message="No refund transfers or advances recorded for this return yet." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {bankProductTransactions.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <span className="text-slate">
+                  {b.bank_partner} <span className="text-muted">({b.product_type.replace("_", " ")})</span>
+                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-muted">Rebate {money(b.rebate_amount)}</span>
+                  {canManageBilling ? (
+                    <BankProductStatusSelect id={b.id} status={b.status} />
+                  ) : (
+                    <Badge tone="neutral" className="capitalize">
+                      {b.status}
+                    </Badge>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {canManageBilling && (
+          <div className="mt-2">
+            <BankProductTransactionForm workspaceId={workspaceId} engagementId={engagementId} />
+          </div>
+        )}
+      </Section>
     </div>
   );
 }
@@ -1115,6 +1150,18 @@ export type InvoiceRow = {
   notes: string | null;
 };
 export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; payment_method: string | null; stripe_payment_intent_id: string | null };
+export type BankProductTransactionRow = {
+  id: string;
+  bank_partner: string;
+  product_type: string;
+  prep_fee_collected: number | null;
+  bank_fee: number | null;
+  addon_fee: number | null;
+  rebate_amount: number | null;
+  disbursement_method: string | null;
+  status: string;
+  created_at: string;
+};
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   stripe: "Card",

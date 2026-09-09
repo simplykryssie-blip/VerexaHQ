@@ -47,11 +47,11 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
             : "inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
         }
       >
-        <BookOpen size={variant === "row" ? 16 : 14} /> Send Organizer
+        <BookOpen size={variant === "row" ? 16 : 14} /> Send Form
       </button>
 
       {open && (
-        <Modal title="Send organizer" onClose={() => setOpen(false)}>
+        <Modal title="Send form" onClose={() => setOpen(false)}>
           {pendingTemplates.length > 0 && (
             <p className="mb-3 text-sm text-muted">
               Already sent and still pending, so not shown below: {pendingTemplates.map((t) => t.name).join(", ")}.
@@ -59,11 +59,11 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
           )}
           {organizerTemplates.length === 0 ? (
             <p className="text-sm text-muted">
-              No organizer templates are published yet -- add one in Settings first.
+              No form templates are published yet -- add one in Settings first.
             </p>
           ) : availableTemplates.length === 0 ? (
             <p className="text-sm text-muted">
-              Every published organizer is already sent and awaiting the client -- nothing new to send right now.
+              Every published form is already sent and awaiting the client -- nothing new to send right now.
             </p>
           ) : (
             <InlineAddForm
@@ -72,7 +72,7 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
               fields={[
                 {
                   name: "organizer_template_id",
-                  label: "Organizer",
+                  label: "Form",
                   type: "select",
                   required: true,
                   options: availableTemplates.map((t) => ({ value: t.id, label: t.name })),
@@ -80,7 +80,7 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
               ]}
               onSubmit={async (v) => {
                 if (pendingSet.has(v.organizer_template_id)) {
-                  return "This organizer is already sent and still pending for this client.";
+                  return "This form is already sent and still pending for this client.";
                 }
                 const template = organizerTemplates.find((t) => t.id === v.organizer_template_id);
                 const { error } = await supabase.from("organizer_responses").insert({
@@ -98,10 +98,10 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
                     body: JSON.stringify({
                       to: primaryEmail,
                       sender: "notifications",
-                      subject: `New organizer to complete: ${template?.name ?? ""}`,
+                      subject: `New form to complete: ${template?.name ?? ""}`,
                       html: renderEmail({
-                        heading: "An organizer is ready for you",
-                        bodyHtml: `<p>Please log in to your client portal and complete the <strong>${template?.name ?? "organizer"}</strong> when you have a chance.</p>`,
+                        heading: "A form is ready for you",
+                        bodyHtml: `<p>Please log in to your client portal and complete the <strong>${template?.name ?? "form"}</strong> when you have a chance.</p>`,
                         ctaLabel: "Go to portal",
                         ctaUrl: `${appUrl}/portal/organizer`,
                       }),
@@ -110,7 +110,7 @@ export function QuickActions({ clientId, workspaceId, organizerTemplates, pendin
                   const emailResult = await emailRes.json().catch(() => null);
                   router.refresh();
                   if (!emailRes.ok || !emailResult?.sent) {
-                    return "Organizer created, but the notification email couldn't be sent. The client won't know it's waiting for them until you tell them directly.";
+                    return "Form created, but the notification email couldn't be sent. The client won't know it's waiting for them until you tell them directly.";
                   }
                 }
 

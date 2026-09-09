@@ -30,6 +30,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: documentFolderTemplates },
+    { data: locations },
     { data: canManage },
     staff,
   ] = await Promise.all([
@@ -39,6 +40,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     supabase.from("engagement_letter_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_request_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_folder_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("booking_locations").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
     getWorkspaceStaff(supabase, workspace.id),
   ]);
@@ -63,6 +65,7 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
           documentRequestTemplates={asOptions(documentRequestTemplates)}
           documentFolderTemplates={asOptions(documentFolderTemplates)}
           staffOptions={staffOptions}
+          locationOptions={asOptions(locations)}
           canManage={Boolean(canManage)}
         />
       </div>

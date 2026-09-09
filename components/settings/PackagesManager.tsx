@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Settings2, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -66,16 +67,24 @@ function PackageCard({ pkg, canManage, onDeleted }: { pkg: PackageRow; canManage
         )}
         {pkg.flat_price == null && pkg.revenue_share_percent == null && <span className="text-muted">No price or revenue share set yet.</span>}
       </div>
-      {canManage && (
-        <button
-          type="button"
-          onClick={remove}
-          disabled={deleting}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-danger hover:underline disabled:opacity-60"
+      <div className="mt-3 flex items-center gap-4">
+        <Link
+          href={`/settings/packages/${pkg.id}`}
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
         >
-          <Trash2 size={13} /> Delete
-        </button>
-      )}
+          <Settings2 size={13} /> Manage options
+        </Link>
+        {canManage && (
+          <button
+            type="button"
+            onClick={remove}
+            disabled={deleting}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-danger hover:underline disabled:opacity-60"
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        )}
+      </div>
     </div>
   );
 }

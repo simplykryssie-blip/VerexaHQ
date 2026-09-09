@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { getPortalIdentity } from "@/lib/portal";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  DEFAULT_BUSINESS_HOURS,
-  DEFAULT_SLOT_MINUTES,
-  slotsForDay,
-  filterAvailableSlots,
-  isServiceBookableOnDate,
-  type BusinessHours,
-  type HolidayRange,
-} from "@/lib/businessHours";
+import { slotsForDay, filterAvailableSlots, isServiceBookableOnDate } from "@/lib/businessHours";
 import { getExternalBusyBlocks } from "@/lib/calendarSync/freebusy";
-import { getBookingSettings } from "@/lib/bookingSettings";
+import { resolveEffectiveAvailability } from "@/lib/bookingAvailability";
+import { zonedTimeToUtc, isoDateInZone } from "@/lib/timezone";
 import { resolveBookedMeeting } from "@/lib/zoom/bookingMeeting";
 
 // Mirrors the availability check in available-slots/route.ts and re-runs it
@@ -34,7 +27,7 @@ export async function POST(request: Request) {
   const { data: service } = await supabase
     .from("services")
     .select(
-      "id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id, allow_overlapping_bookings"
+      "id, name, is_bookable, workspace_id, estimated_duration_minutes, season_start, season_end, allowed_weekdays, booking_location_type, booking_meeting_url, zoom_host_user_id, allow_overlapping_bookings, booking_min_notice_hours_override, booking_buffer_minutes_override, booking_window_days_override, booking_location_id"
     )
     .eq("id", serviceId)
     .maybeSingle();
@@ -45,35 +38,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This service isn't bookable on that date." }, { status: 409 });
   }
 
-  const { data: hoursSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", identity.workspaceId)
-    .eq("key", "business_hours")
-    .maybeSingle();
-  const { data: slotSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", identity.workspaceId)
-    .eq("key", "booking_slot_minutes")
-    .maybeSingle();
-  const { data: holidaysSetting } = await supabase
-    .from("system_settings")
-    .select("value")
-    .eq("workspace_id", identity.workspaceId)
-    .eq("key", "holidays")
-    .maybeSingle();
-
-  const businessHours = (hoursSetting?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
-  const gridMinutes = (slotSetting?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (holidaysSetting?.value as HolidayRange[] | undefined) ?? [];
+  const { hours, timeZone, gridMinutes, holidays, minNoticeHours, bufferMinutes } = await resolveEffectiveAvailability(
+    supabase,
+    identity.workspaceId,
+    null,
+    service
+  );
   const durationMinutes = service.estimated_duration_minutes ?? gridMinutes;
-  const { minNoticeHours, bufferMinutes } = await getBookingSettings(supabase, identity.workspaceId);
 
-  const dayStart = new Date(start);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const isoDate = isoDateInZone(start, timeZone);
+  const dayStart = zonedTimeToUtc(isoDate, "00:00", timeZone);
+  const dayEnd = zonedTimeToUtc(isoDate, "00:00", timeZone);
+  dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
 
   const { data: existing } = await supabase
     .from("appointments")
@@ -87,7 +63,7 @@ export async function POST(request: Request) {
 
   const busyBlocks = service.allow_overlapping_bookings ? externalBusy : [...(existing ?? []), ...externalBusy];
   const earliestStart = new Date(Date.now() + minNoticeHours * 3600000);
-  const candidates = slotsForDay(dayStart, businessHours, gridMinutes, durationMinutes, holidays);
+  const candidates = slotsForDay(isoDate, timeZone, hours, gridMinutes, durationMinutes, holidays);
   const available = filterAvailableSlots(candidates, durationMinutes, busyBlocks, earliestStart, bufferMinutes);
   const stillAvailable = available.some((s) => s.getTime() === start.getTime());
   if (!stillAvailable) {

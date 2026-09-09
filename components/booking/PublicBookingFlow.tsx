@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { PublicOrganizerForm, type OrganizerPrefill } from "@/components/organizer/PublicOrganizerForm";
 
 export type BookableService = {
   id: string;
@@ -11,7 +13,13 @@ export type BookableService = {
   booking_location_type: string;
 };
 
-type Step = "service" | "date" | "slot" | "contact" | "success";
+export type BookingBranding = {
+  logo_url: string | null;
+  primary_color: string | null;
+  secondary_color: string | null;
+} | null;
+
+type Step = "service" | "date" | "slot" | "contact" | "form" | "success";
 
 function nextDays(count: number): Date[] {
   const days: Date[] = [];
@@ -40,6 +48,7 @@ export function PublicBookingFlow({
   staffId,
   staffName,
   windowDays,
+  branding = null,
   embedded = false,
 }: {
   workspaceSlug: string;
@@ -49,12 +58,16 @@ export function PublicBookingFlow({
   staffId: string | null;
   staffName: string | null;
   windowDays: number;
+  branding?: BookingBranding;
   /** Renders as a plain card sized to its container, without the full-page
    * centered layout -- for embedding inside a Websites/Funnels page section,
    * which already provides its own page chrome and background. */
   embedded?: boolean;
 }) {
+  const supabase = createClient();
   const preselected = preselectedServiceId ? services.find((s) => s.id === preselectedServiceId) ?? null : null;
+  const accentColor = branding?.secondary_color || branding?.primary_color || undefined;
+  const accentButtonStyle = accentColor ? { backgroundColor: accentColor } : undefined;
 
   const [step, setStep] = useState<Step>(preselected ? "date" : "service");
   const [serviceId, setServiceId] = useState<string | null>(preselected?.id ?? null);
@@ -70,6 +83,9 @@ export function PublicBookingFlow({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<{ title: string; start_at: string } | null>(null);
+  const [organizerTemplateData, setOrganizerTemplateData] = useState<unknown>(undefined);
+  const [organizerPrefill, setOrganizerPrefill] = useState<OrganizerPrefill | null>(null);
+  const [organizerToken, setOrganizerToken] = useState<string | null>(null);
 
   const selectedService = services.find((s) => s.id === serviceId) ?? null;
 
@@ -115,6 +131,20 @@ export function PublicBookingFlow({
       return;
     }
     setConfirmed(data.appointment);
+
+    // The selected service has a form attached -- collect it right after
+    // booking (the standard "pick a time, then fill out the form" order)
+    // instead of jumping straight to the confirmation screen.
+    if (data.organizerToken && data.clientId) {
+      const { data: templateData } = await supabase.rpc("get_public_organizer_template", { p_token: data.organizerToken });
+      if (templateData) {
+        setOrganizerToken(data.organizerToken);
+        setOrganizerTemplateData(templateData);
+        setOrganizerPrefill({ clientId: data.clientId, firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), phone: phone.trim() });
+        setStep("form");
+        return;
+      }
+    }
     setStep("success");
   }
 
@@ -127,8 +157,26 @@ export function PublicBookingFlow({
     );
   }
 
+  if (step === "form" && organizerTemplateData && organizerPrefill) {
+    return (
+      <Centered wide embedded={embedded}>
+        <PublicOrganizerForm
+          token={organizerToken as string}
+          data={organizerTemplateData as never}
+          prefill={organizerPrefill}
+          onSubmitConfig={{ action: "next_page" }}
+          onNextPage={() => setStep("success")}
+        />
+      </Centered>
+    );
+  }
+
   return (
     <Centered wide embedded={embedded}>
+      {branding?.logo_url && (
+        // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
+        <img src={branding.logo_url} alt={workspaceName} className="mb-3 h-10 w-auto object-contain" />
+      )}
       <h1 className="text-lg font-semibold text-ink">
         Book with {workspaceName}
         {staffName ? ` -- ${staffName}` : ""}
@@ -238,7 +286,8 @@ export function PublicBookingFlow({
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
+            style={accentButtonStyle}
+            className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-60 ${accentColor ? "" : "bg-accent hover:bg-accent/90"}`}
           >
             {submitting ? "Booking..." : "Confirm booking"}
           </button>

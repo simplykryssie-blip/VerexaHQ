@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { ShieldCheck, CheckCircle2, Clock3, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { IRS_AUTHORIZATION_STATUS_LABELS, IRS_AUTHORIZATION_STATUS_TONE, type IrsAuthorizationStatus } from "@/lib/irsAuthorizationStatus";
@@ -25,7 +27,16 @@ export default async function IrsAuthorizationsPage() {
   if (!canView) {
     return (
       <>
-        <PageHeader title="IRS Authorizations" />
+        <PageHero
+          icon={ShieldCheck}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>IRS authorizations</HeroHighlight>.
+            </>
+          }
+          subtitle="Form 8821 tax information authorizations, from identity verification through IRS status tracking."
+        />
         <div className="flex-1 px-8 py-6">
           <EmptyState message="You don't have permission to view IRS authorizations." />
         </div>
@@ -40,14 +51,29 @@ export default async function IrsAuthorizationsPage() {
     .order("created_at", { ascending: false });
 
   const rows = authorizations ?? [];
+  const authorizedCount = rows.filter((r) => r.status === "authorized" || r.status === "transcript_eligible").length;
+  const needsActionCount = rows.filter((r) => r.status === "identity_verification_rejected" || r.status === "denied" || r.status === "revoked").length;
+  const inProgressCount = rows.length - authorizedCount - needsActionCount - rows.filter((r) => r.status === "draft").length;
 
   return (
     <>
-      <PageHeader
-        title="IRS Authorizations"
-        description="Form 8821 tax information authorizations, from identity verification through IRS status tracking."
+      <PageHero
+        icon={ShieldCheck}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>IRS authorizations</HeroHighlight>.
+          </>
+        }
+        subtitle="Form 8821 tax information authorizations, from identity verification through IRS status tracking."
       />
-      <div className="flex-1 px-8 py-6">
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={ShieldCheck} tone="accent" label="Total authorizations" value={rows.length} />
+          <StatTile icon={CheckCircle2} tone="emerald" label="Authorized" value={authorizedCount} />
+          <StatTile icon={Clock3} tone="violet" label="In progress" value={inProgressCount} />
+          <StatTile icon={AlertTriangle} tone="rose" label="Needs action" value={needsActionCount} />
+        </div>
         {rows.length === 0 ? (
           <EmptyState message="No IRS authorizations yet. Start one from a client's workspace page." />
         ) : (

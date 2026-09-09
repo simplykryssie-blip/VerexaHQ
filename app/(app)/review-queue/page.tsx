@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { FileCheck2 } from "lucide-react";
+import { FileCheck2, ClipboardCheck, ListChecks, FileText, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
 import { ReviewQueueItem } from "./ReviewQueueItem";
@@ -64,7 +65,7 @@ export default async function ReviewQueuePage() {
         .order("submitted_at", { ascending: false })
     : { data: [] as { id: string; submitted_at: string | null; organizer_templates: { name: string } | null; clients: Parameters<typeof clientLabel>[0] }[] };
 
-  // A response drops off the "Organizers submitted" section above the
+  // A response drops off the "Forms submitted" section above the
   // moment it's first reviewed (status moves past 'submitted'), but a
   // client can still respond to flagged/reopened questions on it long
   // after that -- this is the only other place that resurfaces it. Scoped
@@ -142,10 +143,32 @@ export default async function ReviewQueuePage() {
     (pendingClientChanges ?? []).filter((r) => r.organizer_response_id).map((r) => [r.batch_id, r.organizer_response_id as string])
   );
 
+  const totalPending =
+    clientChangeBatches.size + (submittedOrganizers ?? []).length + (completedDocumentRequests ?? []).length + openShares.length;
+
   return (
     <>
-      <PageHeader title="Review Queue" description="Filings your connected PTINs have shared with you for approval, plus client-submitted info changes awaiting your OK." />
+      <PageHero
+        icon={ClipboardCheck}
+        tone="rose"
+        heading={
+          <>
+            Your <HeroHighlight>review queue</HeroHighlight>.
+          </>
+        }
+        subtitle={
+          totalPending > 0
+            ? `${totalPending} item${totalPending === 1 ? "" : "s"} waiting on your review.`
+            : "Filings your connected PTINs have shared with you for approval, plus client-submitted info changes awaiting your OK."
+        }
+      />
       <div className="flex-1 space-y-8 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={FileText} tone="accent" label="Client info changes" value={clientChangeBatches.size} />
+          <StatTile icon={ListChecks} tone="emerald" label="Forms submitted" value={(submittedOrganizers ?? []).length} />
+          <StatTile icon={FileCheck2} tone="amber" label="Documents submitted" value={(completedDocumentRequests ?? []).length} />
+          <StatTile icon={Share2} tone="violet" label="Shares awaiting review" value={openShares.length} />
+        </div>
         <section>
           <h2 className="mb-2 text-sm font-semibold text-ink">Client info changes</h2>
           {clientChangeBatches.size === 0 ? (
@@ -175,14 +198,14 @@ export default async function ReviewQueuePage() {
 
         {canReviewOrganizers && (
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-ink">Organizers submitted</h2>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Forms submitted</h2>
             {(submittedOrganizers ?? []).length === 0 ? (
-              <EmptyState message="No submitted organizers waiting on your review." />
+              <EmptyState message="No submitted forms waiting on your review." />
             ) : (
               <ul className="space-y-3">
                 {(submittedOrganizers ?? []).map((o) => {
                   const name = clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0]);
-                  const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer";
+                  const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Form";
                   const hasLinkedChanges = organizerResponseIdsWithChanges.has(o.id);
                   return (
                     <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-sm shadow-soft">
@@ -215,11 +238,11 @@ export default async function ReviewQueuePage() {
 
         {canReviewOrganizers && (respondedOrganizers ?? []).length > 0 && (
           <section>
-            <h2 className="mb-2 text-sm font-semibold text-ink">Organizer corrections responded to</h2>
+            <h2 className="mb-2 text-sm font-semibold text-ink">Form corrections responded to</h2>
             <ul className="space-y-3">
               {(respondedOrganizers ?? []).map((o) => {
                 const name = clientLabel(o.clients as unknown as Parameters<typeof clientLabel>[0]);
-                const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Organizer";
+                const templateName = (o.organizer_templates as unknown as { name: string } | null)?.name ?? "Form";
                 const count = respondedCountByResponseId.get(o.id) ?? 0;
                 return (
                   <li key={o.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-sm shadow-soft">

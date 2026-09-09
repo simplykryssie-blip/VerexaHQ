@@ -18,7 +18,7 @@ export const PORTAL_NAV_ITEMS: PortalNavItem[] = [
   { label: "Documents", href: "/portal/documents", icon: FolderOpen },
   { label: "Messages", href: "/portal/messages", icon: MessageSquare },
   { label: "Billing", href: "/portal/billing", icon: Receipt },
-  { label: "Organizer", href: "/portal/organizer", icon: ClipboardList },
+  { label: "Form", href: "/portal/organizer", icon: ClipboardList },
   { label: "Appointments", href: "/portal/appointments", icon: CalendarClock },
   { label: "Notifications", href: "/portal/notifications", icon: Bell },
   { label: "Activity", href: "/portal/activity", icon: History },

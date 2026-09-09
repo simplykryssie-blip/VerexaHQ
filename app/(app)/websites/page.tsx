@@ -1,6 +1,8 @@
+import { Globe, CheckCircle2, PenLine, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { WebsiteLibrary, type WebsiteCard } from "@/components/websites/WebsiteLibrary";
 
 export const dynamic = "force-dynamic";
@@ -30,13 +32,29 @@ export default async function WebsitesPage() {
     page_count: (w.site_pages as unknown as { id: string }[]).length,
   }));
 
+  const publishedCount = cards.filter((c) => c.status === "published").length;
+  const draftCount = cards.filter((c) => c.status === "draft").length;
+  const totalPages = cards.reduce((sum, c) => sum + c.page_count, 0);
+
   return (
     <>
-      <PageHeader
-        title="Websites"
-        description="Public marketing sites, funnels, and lead-capture forms, hosted at your workspace's own address."
+      <PageHero
+        icon={Globe}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>websites & funnels</HeroHighlight>.
+          </>
+        }
+        subtitle="Public marketing sites, funnels, and lead-capture forms, hosted at your workspace's own address."
       />
-      <div className="flex-1 px-8 py-6">
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={Globe} tone="accent" label="Websites" value={cards.length} />
+          <StatTile icon={CheckCircle2} tone="emerald" label="Published" value={publishedCount} />
+          <StatTile icon={PenLine} tone="amber" label="Draft" value={draftCount} />
+          <StatTile icon={FileText} tone="violet" label="Total pages" value={totalPages} />
+        </div>
         <WebsiteLibrary workspaceId={workspace.id} workspaceSlug={workspace.slug} websites={cards} folders={folders ?? []} canManage={Boolean(canManage)} />
       </div>
     </>

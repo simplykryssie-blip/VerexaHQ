@@ -3,8 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Workflow } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { IconChip } from "@/components/ui/IconChip";
 
 export type FunnelWithWebsite = { id: string; name: string; status: string; website_id: string; website_name: string; page_count: number };
 
@@ -32,30 +35,30 @@ export function AllFunnelsLibrary({ funnels, websites }: { funnels: FunnelWithWe
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            onClick={() => router.push(`/websites/${targetWebsiteId}/funnels`)}
-            disabled={!targetWebsiteId}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
+          <Button onClick={() => router.push(`/websites/${targetWebsiteId}/funnels`)} disabled={!targetWebsiteId}>
             Go
-          </button>
+          </Button>
         </div>
       )}
 
       <div className="mt-4">
         {funnels.length === 0 ? (
-          <EmptyState message="No funnels yet -- open a website and add one from its Funnels tab." />
+          <EmptyState icon={Workflow} message="No funnels yet -- open a website and add one from its Funnels tab." />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {funnels.map((f) => (
               <Link
                 key={f.id}
                 href={`/websites/${f.website_id}/funnels/${f.id}`}
-                className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft hover:border-accent"
+                className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover hover:border-accent"
               >
-                <h3 className="text-sm font-semibold text-ink">{f.name}</h3>
-                <p className="mt-1 text-xs text-muted">{f.website_name}</p>
+                <div className="flex items-center gap-2.5">
+                  <IconChip tone="amber">
+                    <Workflow size={16} aria-hidden="true" />
+                  </IconChip>
+                  <h3 className="text-sm font-semibold text-ink">{f.name}</h3>
+                </div>
+                <p className="mt-2 text-xs text-muted">{f.website_name}</p>
                 <p className="mt-1 text-xs text-muted">
                   {f.page_count} page{f.page_count === 1 ? "" : "s"}
                 </p>

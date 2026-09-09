@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
           include names, dates of birth, Social Security numbers or other tax identification numbers, mailing and email
           addresses, phone numbers, filing status, dependents, income and expense documentation, bank account information
           for refund/payment purposes, uploaded tax documents and other files, and the content of intake questionnaires
-          (&ldquo;organizers&rdquo;), engagement letters, e-signatures, and messages exchanged through the platform.
+          (&ldquo;forms&rdquo;), engagement letters, e-signatures, and messages exchanged through the platform.
         </p>
         <p>
           <strong className="text-ink">Billing information:</strong> when a Firm or its client pays through Verexa,
@@ -84,7 +84,7 @@ export default function PrivacyPolicyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>Let Firm staff manage client engagements, documents, billing, and communications</li>
           <li>Let a Firm&rsquo;s clients securely submit information and documents and view their own file through the client portal</li>
-          <li>Generate and route documents the Firm configures, such as intake organizers, engagement letters, e-signature requests, and document requests</li>
+          <li>Generate and route documents the Firm configures, such as intake forms, engagement letters, e-signature requests, and document requests</li>
           <li>Send account, appointment, and engagement-related notifications by email, SMS, or in-app notification</li>
           <li>Process payments a Firm or its client initiates</li>
           <li>Secure the platform, investigate misuse, enforce our Terms of Service, and comply with legal obligations</li>

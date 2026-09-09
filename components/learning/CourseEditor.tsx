@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 
-type Course = { id: string; title: string; description: string | null; status: string };
+type Course = { id: string; title: string; description: string | null; category: string | null; status: string };
 type ModuleRow = { id: string; title: string; module_type: string; display_order: number };
 
 export function CourseEditor({ course, modules }: { course: Course; modules: ModuleRow[] }) {
@@ -17,6 +17,7 @@ export function CourseEditor({ course, modules }: { course: Course; modules: Mod
   const toast = useToast();
   const [title, setTitle] = useState(course.title);
   const [description, setDescription] = useState(course.description ?? "");
+  const [category, setCategory] = useState(course.category ?? "");
   const [status, setStatus] = useState(course.status);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -28,7 +29,7 @@ export function CourseEditor({ course, modules }: { course: Course; modules: Mod
     setSaving(true);
     const { error } = await supabase
       .from("learning_courses")
-      .update({ title, description: description || null, status })
+      .update({ title, description: description || null, category: category.trim() || null, status })
       .eq("id", course.id);
     setSaving(false);
     if (error) {
@@ -108,6 +109,18 @@ export function CourseEditor({ course, modules }: { course: Course; modules: Mod
             }}
             rows={2}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </label>
+        <label className="mt-3 block text-xs font-medium uppercase tracking-wide text-muted">
+          Category
+          <input
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setDirty(true);
+            }}
+            placeholder="e.g. Compliance, Software, Onboarding"
+            className="mt-1 w-full max-w-xs rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </label>
         <div className="mt-3 flex items-center justify-between">

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { WEEKDAYS, BOOKING_WINDOW_DAYS, type BusinessHours, type DayHours, type HolidayRange } from "@/lib/businessHours";
+import { TIMEZONE_OPTIONS } from "@/lib/timezoneOptions";
 
 const DAY_LABELS: Record<string, string> = {
   sunday: "Sunday",
@@ -20,6 +21,7 @@ const SLOT_OPTIONS = [15, 30, 45, 60];
 
 export function BookingAvailabilityForm({
   workspaceId,
+  initialTimezone,
   initialHours,
   initialSlotMinutes,
   initialHolidays,
@@ -28,6 +30,7 @@ export function BookingAvailabilityForm({
   initialBufferMinutes,
 }: {
   workspaceId: string;
+  initialTimezone: string;
   initialHours: BusinessHours;
   initialSlotMinutes: number;
   initialHolidays: HolidayRange[];
@@ -39,6 +42,7 @@ export function BookingAvailabilityForm({
   const supabase = createClient();
   const toast = useToast();
 
+  const [timezone, setTimezone] = useState(initialTimezone);
   const [hours, setHours] = useState<BusinessHours>(initialHours);
   const [slotMinutes, setSlotMinutes] = useState(initialSlotMinutes);
   const [holidays, setHolidays] = useState<HolidayRange[]>(initialHolidays);
@@ -74,6 +78,7 @@ export function BookingAvailabilityForm({
   async function save() {
     setSaving(true);
     const results = await Promise.all([
+      supabase.from("workspaces").update({ timezone }).eq("id", workspaceId),
       supabase.from("system_settings").upsert({ workspace_id: workspaceId, key: "business_hours", value: hours }, { onConflict: "workspace_id,key" }),
       supabase
         .from("system_settings")
@@ -113,6 +118,22 @@ export function BookingAvailabilityForm({
       title="Booking availability"
       description="When clients can self-book a bookable service from their portal. Slot length sets the scheduling grid; each service's own duration determines how much time a booking actually reserves."
     >
+      <label className="mb-4 flex flex-col gap-1 text-xs font-medium text-muted">
+        Timezone
+        <select
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="w-full max-w-xs rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          {TIMEZONE_OPTIONS.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
+            </option>
+          ))}
+        </select>
+        <span className="font-normal text-[11px] text-muted">What &quot;9:00&quot; below actually means -- everyone booking sees times converted from this.</span>
+      </label>
+
       <div className="space-y-2">
         {WEEKDAYS.map((day) => {
           const open = hours[day];

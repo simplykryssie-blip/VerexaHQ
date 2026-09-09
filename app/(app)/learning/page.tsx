@@ -1,6 +1,7 @@
+import { GraduationCap } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { CourseCatalog } from "@/components/learning/CourseCatalog";
 
 export const dynamic = "force-dynamic";
@@ -10,17 +11,24 @@ export default async function LearningHubPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const [{ data: canManage }, { data: courses }, { data: modules }, { data: completions }] = await Promise.all([
+  const [{ data: canManage }, { data: courses }, { data: modules }, { data: completions }, { data: assignments }] = await Promise.all([
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "learning_hub.manage" }),
     supabase
       .from("learning_courses")
-      .select("id, owner_workspace_id, title, description, status, display_order, workspaces:owner_workspace_id(name)")
+      .select("id, owner_workspace_id, title, description, category, status, display_order, workspaces:owner_workspace_id(name)")
       .eq("status", "published")
       .order("display_order"),
     supabase.from("learning_modules").select("id, course_id"),
     supabase.from("learning_module_completions").select("module_id, passed"),
+    user
+      ? supabase.from("learning_course_assignments").select("course_id, due_date").eq("user_id", user.id)
+      : Promise.resolve({ data: [] as { course_id: string; due_date: string | null }[] }),
   ]);
+  const dueDateByCourse = new Map((assignments ?? []).map((a) => [a.course_id, a.due_date]));
 
   const moduleCountByCourse = new Map<string, number>();
   for (const m of modules ?? []) {
@@ -39,17 +47,26 @@ export default async function LearningHubPage() {
     id: c.id,
     title: c.title,
     description: c.description,
+    category: c.category,
     ownerName: (c.workspaces as unknown as { name: string } | null)?.name ?? null,
     isOwnFirm: c.owner_workspace_id === workspace.id,
     moduleCount: moduleCountByCourse.get(c.id) ?? 0,
     completedCount: completedCountByCourse.get(c.id) ?? 0,
+    dueDate: dueDateByCourse.get(c.id) ?? null,
+    isAssigned: dueDateByCourse.has(c.id),
   }));
 
   return (
     <>
-      <PageHeader
-        title="Learning Hub"
-        description="Training courses from your firm and any connected offices."
+      <PageHero
+        icon={GraduationCap}
+        tone="violet"
+        heading={
+          <>
+            Your <HeroHighlight>learning hub</HeroHighlight>.
+          </>
+        }
+        subtitle="Training courses from your firm and any connected offices."
         actions={
           canManage ? (
             <a

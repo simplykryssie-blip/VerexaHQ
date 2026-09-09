@@ -138,7 +138,7 @@ export function ServiceLibrary({
 
       <div className="mt-4">
         {filtered.length === 0 ? (
-          <EmptyState message={services.length === 0 ? "No services yet -- create one to attach a pipeline, organizer, and requirements." : "No services match."} />
+          <EmptyState message={services.length === 0 ? "No services yet -- create one to attach a pipeline, form, and requirements." : "No services match."} />
         ) : (
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="divide-y divide-border">
@@ -218,7 +218,7 @@ export function ServiceLibrary({
                   ))}
                 </select>
               </label>
-              <p className="text-xs text-muted">You&apos;ll set the pipeline, organizer, and other requirements after creating it.</p>
+              <p className="text-xs text-muted">You&apos;ll set the pipeline, form, and other requirements after creating it.</p>
               {error && <p className="text-sm text-danger">{error}</p>}
             </div>
             <div className="mt-4 flex justify-end gap-2">
