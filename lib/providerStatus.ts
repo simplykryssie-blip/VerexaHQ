@@ -41,3 +41,17 @@ export function isZoomConfigured() {
 export function isVercelDomainAutomationConfigured() {
   return !!process.env.VERCEL_API_TOKEN;
 }
+
+/**
+ * Reading Sentry's Issues API (Platform Admin > Systems) needs the org/project
+ * slugs plus a token with Issue & Event read scope. SENTRY_ORG/SENTRY_PROJECT
+ * already exist for the build-time source-map upload -- reused here since
+ * they identify the same Sentry project either way. The token is separate:
+ * SENTRY_API_TOKEN if set (recommended -- a narrowly-scoped read token),
+ * falling back to SENTRY_AUTH_TOKEN (the release-upload token, which also
+ * works if its scopes happen to include issue reads) so a single token still
+ * works for anyone who doesn't want to manage two.
+ */
+export function isSentryApiConfigured() {
+  return !!process.env.SENTRY_ORG && !!process.env.SENTRY_PROJECT && !!(process.env.SENTRY_API_TOKEN || process.env.SENTRY_AUTH_TOKEN);
+}
