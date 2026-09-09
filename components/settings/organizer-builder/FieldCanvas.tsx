@@ -197,7 +197,7 @@ export function FieldCanvas({
           </p>
         )}
 
-        <div className="grid grid-cols-12 gap-3">
+        <div className="@container grid grid-cols-12 gap-3">
           {topLevelFields.map((field, index) => (
             <Fragment key={field.id}>
               <FieldBlock
@@ -217,7 +217,7 @@ export function FieldCanvas({
               />
 
               {field.field_type === "repeating_section" && (
-                <div className="col-span-12 ml-6 grid grid-cols-12 gap-2 border-l-2 border-border pl-4">
+                <div className="@container col-span-12 ml-6 grid grid-cols-12 gap-2 border-l-2 border-border pl-4">
                   {(childrenByParent.get(field.id) ?? []).map((child, childIndex, children) => (
                     <FieldBlock
                       key={child.id}

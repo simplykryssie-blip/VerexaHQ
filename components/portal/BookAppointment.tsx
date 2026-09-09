@@ -9,6 +9,8 @@ import { BOOKING_WINDOW_DAYS } from "@/lib/businessHours";
 
 export type BookableService = { id: string; name: string; description: string | null; estimated_duration_minutes: number | null };
 
+const DEFAULT_WINDOW_DAYS = BOOKING_WINDOW_DAYS;
+
 function nextDays(count: number): Date[] {
   const days: Date[] = [];
   const today = new Date();
@@ -21,7 +23,7 @@ function nextDays(count: number): Date[] {
   return days;
 }
 
-export function BookAppointment({ services }: { services: BookableService[] }) {
+export function BookAppointment({ services, windowDays = DEFAULT_WINDOW_DAYS }: { services: BookableService[]; windowDays?: number }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -129,7 +131,7 @@ export function BookAppointment({ services }: { services: BookableService[] }) {
             <div>
               <p className="mb-2 text-xs text-muted">{selectedService?.name}</p>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {nextDays(BOOKING_WINDOW_DAYS).map((d) => (
+                {nextDays(windowDays).map((d) => (
                   <button
                     key={d.toISOString()}
                     type="button"

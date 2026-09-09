@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Users, Network, MailWarning } from "lucide-react";
 import { NetworkMessagingHub, type NetworkThread, type NetworkMessage } from "@/components/messaging/NetworkMessagingHub";
 import { InternalMessagingHub, type InternalThread, type InternalMessage, type Teammate } from "@/components/messaging/InternalMessagingHub";
 import { MessagesTabs } from "@/components/messaging/MessagesTabs";
@@ -42,7 +43,16 @@ export default async function MessagesHubPage() {
     const isEroOrSb = workspace.workspace_type === "ero_office" || workspace.workspace_type === "service_bureau";
     return (
       <>
-        <PageHeader title="Messages" description="Internal conversations with your team and your connected network." />
+        <PageHero
+          icon={MessageSquare}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>messages</HeroHighlight>.
+            </>
+          }
+          subtitle="Internal conversations with your team and your connected network."
+        />
         <div className="flex-1 px-8 py-6">
           <EmptyState
             icon={MessageSquare}
@@ -168,11 +178,31 @@ export default async function MessagesHubPage() {
 
   const teamUnread = internalMessages.filter((m) => m.senderId !== currentUserId && !m.readAt).length;
   const networkUnread = networkMessages.filter((m) => m.senderWorkspaceId !== workspace.id && !m.readAt).length;
+  const totalUnread = teamUnread + networkUnread;
 
   return (
     <>
-      <PageHeader title="Messages" description="Internal conversations with your team and your connected network." />
-      <div className="flex-1 px-8 py-6">
+      <PageHero
+        icon={MessageSquare}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>messages</HeroHighlight>.
+          </>
+        }
+        subtitle={
+          totalUnread > 0
+            ? `${totalUnread} unread message${totalUnread === 1 ? "" : "s"}.`
+            : "Internal conversations with your team and your connected network."
+        }
+      />
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className={`grid grid-cols-2 gap-4 ${hasTeam && hasNetwork ? "sm:grid-cols-4" : "sm:grid-cols-2"}`}>
+          {hasTeam && <StatTile icon={Users} tone="accent" label="Team threads" value={internalThreads.length} />}
+          {hasNetwork && <StatTile icon={Network} tone="violet" label="Network threads" value={networkThreads.length} />}
+          <StatTile icon={MailWarning} tone="rose" label="Unread" value={totalUnread} />
+          <StatTile icon={MessageSquare} tone="emerald" label="Total threads" value={internalThreads.length + networkThreads.length} />
+        </div>
         {hasTeam && hasNetwork ? (
           <MessagesTabs team={teamHub} network={networkHub} teamUnread={teamUnread} networkUnread={networkUnread} />
         ) : (

@@ -4,12 +4,14 @@ import Link from "next/link";
 import type { SitePageData } from "./types";
 import { SectionRenderer } from "./SectionRenderer";
 import { TrackingScripts } from "./TrackingScripts";
+import { PopupHost } from "./PopupHost";
 
 export function PublicSitePage({
   workspaceSlug,
   websiteSlug,
   data,
   showLoginLink,
+  previewMode,
 }: {
   workspaceSlug: string;
   websiteSlug: string;
@@ -18,14 +20,25 @@ export function PublicSitePage({
   // this component is shared by every tenant firm's published website too,
   // and a link to Verexa's own staff login has no place on their sites.
   showLoginLink?: boolean;
+  // Only ever passed by app/site-preview/[pageId]/page.tsx -- renders a
+  // staff member's own unpublished draft through this exact same component
+  // instead of a separate mockup, so "what will this look like once
+  // published" is never a guess. Suppresses popups (an exit-intent or timed
+  // popup firing while someone's just checking a draft would be confusing,
+  // and its own form has the same real-submission risk as organizer_form)
+  // and swaps a couple of section types for safe stand-ins -- see
+  // SectionRenderer.tsx.
+  previewMode?: boolean;
 }) {
   const { page, website, branding, funnel, sections } = data;
   const accentColor = branding?.secondary_color || branding?.primary_color || undefined;
   const ordered = [...sections].sort((a, b) => a.display_order - b.display_order);
   const loginLinkColor = website.header_background ? "#ffffff" : "inherit";
 
+  // `background` (not `backgroundColor`) so a page can set a CSS gradient,
+  // not just a flat color -- a plain hex value still works fine here too.
   return (
-    <div className="min-h-screen" style={{ backgroundColor: page.background_color || "#ffffff" }}>
+    <div className="min-h-screen" style={{ background: page.background_color || "#ffffff" }}>
       <TrackingScripts headCode={website.head_tracking_code} bodyCode={website.body_tracking_code} />
       {page.custom_js && <TrackingScripts headCode={null} bodyCode={page.custom_js} />}
       {page.custom_css && <style dangerouslySetInnerHTML={{ __html: page.custom_css }} />}
@@ -62,9 +75,21 @@ export function PublicSitePage({
             funnel={funnel}
             accentColor={accentColor}
             firmName={branding?.display_name ?? null}
+            previewMode={previewMode}
+            customCss={page.custom_css}
           />
         ))}
       </main>
+      {!previewMode && (
+        <PopupHost
+          websiteId={website.id}
+          pageId={page.id}
+          workspaceSlug={workspaceSlug}
+          websiteSlug={websiteSlug}
+          accentColor={accentColor}
+          firmName={branding?.display_name ?? null}
+        />
+      )}
     </div>
   );
 }

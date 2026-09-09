@@ -18,11 +18,11 @@ export function StartOrganizerForm({
 
   return (
     <InlineAddForm
-      label="Start Organizer"
+      label="Start Form"
       fields={[
         {
           name: "organizer_template_id",
-          label: "Organizer",
+          label: "Form",
           type: "select",
           required: true,
           options: templates.map((t) => ({ value: t.id, label: t.name })),

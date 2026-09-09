@@ -41,11 +41,11 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition hover:bg-accent/90"
       >
-        <BookOpen size={14} /> Send Organizer
+        <BookOpen size={14} /> Send Form
       </button>
 
       {open && (
-        <Modal title="Send organizer" onClose={() => setOpen(false)}>
+        <Modal title="Send form" onClose={() => setOpen(false)}>
           {pendingTemplates.length > 0 && (
             <p className="mb-3 text-sm text-muted">
               Already sent and still pending, so not shown below: {pendingTemplates.map((t) => t.name).join(", ")}.
@@ -53,11 +53,11 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
           )}
           {organizerTemplates.length === 0 ? (
             <p className="text-sm text-muted">
-              No organizer templates are published yet -- add one in Settings first.
+              No form templates are published yet -- add one in Settings first.
             </p>
           ) : availableTemplates.length === 0 ? (
             <p className="text-sm text-muted">
-              Every published organizer is already sent and awaiting the client -- nothing new to send right now.
+              Every published form is already sent and awaiting the client -- nothing new to send right now.
             </p>
           ) : (
             <InlineAddForm
@@ -66,7 +66,7 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
               fields={[
                 {
                   name: "organizer_template_id",
-                  label: "Organizer",
+                  label: "Form",
                   type: "select",
                   required: true,
                   options: availableTemplates.map((t) => ({ value: t.id, label: t.name })),
@@ -74,10 +74,10 @@ export function QuickActions({ engagementId, clientId, workspaceId, organizerTem
               ]}
               onSubmit={async (v) => {
                 if (pendingSet.has(v.organizer_template_id)) {
-                  return "This organizer is already sent and still pending for this client.";
+                  return "This form is already sent and still pending for this client.";
                 }
                 const template = organizerTemplates.find((t) => t.id === v.organizer_template_id);
-                if (!template) return "Select an organizer.";
+                if (!template) return "Select a form.";
                 const errorMessage = await sendOrganizerToEngagement({
                   supabase,
                   workspaceId,

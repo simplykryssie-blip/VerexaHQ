@@ -565,11 +565,11 @@ export function OrganizerForm({
   return (
     <div className="space-y-4">
       {justSubmitted && (
-        <Modal title="Organizer submitted" onClose={backToDashboard}>
+        <Modal title="Form submitted" onClose={backToDashboard}>
           <div className="flex flex-col items-center gap-3 py-2 text-center">
             <CheckCircle2 size={40} className="text-success" aria-hidden="true" />
             <p className="text-sm text-slate">
-              Your organizer has been submitted. Your firm has been notified and will review your answers.
+              Your form has been submitted. Your firm has been notified and will review your answers.
             </p>
             <button
               type="button"
@@ -660,7 +660,7 @@ export function OrganizerForm({
             {currentPage.title ? ` -- ${currentPage.title}` : ""}
           </p>
         )}
-        <div className="grid grid-cols-12 gap-x-5 gap-y-6">
+        <div className="@container grid grid-cols-12 gap-x-5 gap-y-6">
         {currentPage.fields.map((field) =>
           field.field_type === "repeating_section" ? (
             <RepeatingSectionInput
@@ -737,7 +737,7 @@ export function OrganizerForm({
               disabled={saving || submitting}
               className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
-              {submitting ? "Submitting..." : "Submit organizer"}
+              {submitting ? "Submitting..." : "Submit form"}
             </button>
           )}
         </div>
@@ -811,9 +811,12 @@ function RepeatingSectionInput({
                 </button>
               )}
             </div>
-            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
+            <div className="@container mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields
-                .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
+                .filter(
+                  (child) =>
+                    shouldShowField(parseConditionalLogic(child.conditional_logic), row) || infoItemsByKey.has(`${child.id}:${index}`)
+                )
                 .map((child) => (
                   <FieldInput
                     key={child.id}

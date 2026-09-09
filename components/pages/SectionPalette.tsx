@@ -1,11 +1,11 @@
 import { SECTION_TYPES, SECTION_TYPE_LABELS, type SectionType } from "./types";
 
-export function SectionPalette({ onAdd }: { onAdd: (type: SectionType) => void }) {
+export function SectionPalette({ onAdd, types = SECTION_TYPES }: { onAdd: (type: SectionType) => void; types?: SectionType[] }) {
   return (
     <aside className="w-48 shrink-0 overflow-y-auto border-r border-border bg-surfaceMuted p-3">
       <p className="px-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Add a section</p>
       <div className="mt-2 space-y-1">
-        {SECTION_TYPES.map((type) => (
+        {types.map((type) => (
           <button
             key={type}
             type="button"

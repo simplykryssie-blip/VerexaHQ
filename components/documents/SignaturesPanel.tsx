@@ -10,6 +10,7 @@ import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignat
 import { uploadSignatureImageClient } from "@/lib/documents/uploadSignatureImage";
 import { renderEmail } from "@/lib/email/template";
 import { SignaturePad } from "@/components/SignaturePad";
+import { DateField } from "@/components/DateField";
 import { Badge } from "@/components/ui/Badge";
 import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
@@ -337,12 +338,7 @@ export function SignaturesPanel({
                 ))}
               </select>
             )}
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <DateField value={dueDate || null} onApply={(next) => setDueDate(next ?? "")} placeholder="Due date (optional)" className="w-full" />
             <div>
               <label className="block text-xs font-medium text-muted">
                 Who signs this -- one per line, as &quot;Name, email@example.com&quot;

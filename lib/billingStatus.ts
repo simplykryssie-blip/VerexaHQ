@@ -6,10 +6,18 @@ export const BILLING_DOCUMENT_STATUS_TONE: Record<string, BadgeTone> = {
   sent: "warning",
   paid: "success",
   void: "neutral",
+  cancelled: "danger",
 };
 
 export const PAYMENT_STATUS_TONE: Record<string, BadgeTone> = {
   succeeded: "success",
   failed: "danger",
   refunded: "neutral",
+};
+
+export const BANK_PRODUCT_STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "warning",
+  funded: "success",
+  disbursed: "success",
+  rejected: "danger",
 };

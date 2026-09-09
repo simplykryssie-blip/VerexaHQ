@@ -19,13 +19,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, sent: false, error: "Too many requests. Try again shortly." }, { status: 429 });
   }
 
-  const { to, body } = (await request.json()) as { to?: string; body?: string };
+  const { to, body, clientId } = (await request.json()) as { to?: string; body?: string; clientId?: string };
   if (!to || !body) {
     return NextResponse.json({ ok: false, sent: false, error: "to and body are required" }, { status: 400 });
   }
 
   const workspace = await getCurrentWorkspace();
-  const result = await sendSmsViaTwilio({ to, body, ...(workspace ? { workspaceId: workspace.id } : {}) });
+  const result = await sendSmsViaTwilio({ to, body, ...(workspace ? { workspaceId: workspace.id } : {}), ...(clientId ? { clientId } : {}) });
   if (result.reason === undefined) {
     await recordProviderCheck("sms", result.sent, result.error);
   }

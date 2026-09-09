@@ -9,7 +9,9 @@ export type SectionType =
   | "cta_button"
   | "spacer"
   | "footer"
-  | "custom_html";
+  | "custom_html"
+  | "booking_widget"
+  | "pricing_table";
 
 export type BuilderSection = {
   id: string;
@@ -33,6 +35,8 @@ export type BuilderPage = {
 };
 
 export type OrganizerTemplateOption = { id: string; name: string; is_public: boolean; public_token: string };
+export type BookableServiceOption = { id: string; name: string };
+export type StaffOption = { id: string; label: string };
 
 export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   hero: "Hero",
@@ -46,6 +50,12 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   spacer: "Spacer",
   footer: "Footer",
   custom_html: "Custom HTML",
+  booking_widget: "Booking widget",
+  // Reads Verexa's own platform_subscription_plans (get_public_platform_plans)
+  // -- deliberately left out of SECTION_TYPES below so tenant staff can't add
+  // it to their own site and get Verexa's platform pricing instead of their
+  // own. Only exists where a migration placed it directly (Verexa's own site).
+  pricing_table: "Pricing table (Verexa platform plans)",
 };
 
 export const SECTION_TYPES: SectionType[] = [
@@ -56,8 +66,14 @@ export const SECTION_TYPES: SectionType[] = [
   "testimonial",
   "faq",
   "organizer_form",
+  "booking_widget",
   "cta_button",
   "spacer",
   "footer",
   "custom_html",
 ];
+
+// A popup's small footprint doesn't fit page-only layouts (hero, testimonial,
+// faq, text_image, footer, booking_widget, pricing_table) -- mirrors the
+// site_popup_sections CHECK constraint exactly.
+export const POPUP_SECTION_TYPES: SectionType[] = ["rich_text", "image", "organizer_form", "cta_button", "spacer", "custom_html"];

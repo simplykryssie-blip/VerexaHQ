@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { DateField } from "@/components/DateField";
 import { InvoicePreview, type PreviewLineItem } from "./InvoicePreview";
 
 export type EditingInvoiceQuote = {
@@ -225,8 +226,8 @@ export function InvoiceQuoteForm({
                   type="number"
                   min={0}
                   step="1"
-                  value={li.quantity}
-                  onChange={(e) => updateItem(i, { quantity: Number(e.target.value) || 0 })}
+                  value={li.quantity === 0 ? "" : li.quantity}
+                  onChange={(e) => updateItem(i, { quantity: e.target.value === "" ? 0 : Number(e.target.value) })}
                   className="w-16 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <input
@@ -234,8 +235,8 @@ export function InvoiceQuoteForm({
                   type="number"
                   min={0}
                   step="0.01"
-                  value={li.unit_price}
-                  onChange={(e) => updateItem(i, { unit_price: Number(e.target.value) || 0 })}
+                  value={li.unit_price === 0 ? "" : li.unit_price}
+                  onChange={(e) => updateItem(i, { unit_price: e.target.value === "" ? 0 : Number(e.target.value) })}
                   className="w-24 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <button
@@ -259,8 +260,8 @@ export function InvoiceQuoteForm({
               type="number"
               min={0}
               step="0.01"
-              value={discountAmount}
-              onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)}
+              value={discountAmount === 0 ? "" : discountAmount}
+              onChange={(e) => setDiscountAmount(e.target.value === "" ? 0 : Number(e.target.value))}
               className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
@@ -270,19 +271,16 @@ export function InvoiceQuoteForm({
               type="number"
               min={0}
               step="0.01"
-              value={taxRate}
-              onChange={(e) => setTaxRate(Number(e.target.value) || 0)}
+              value={taxRate === 0 ? "" : taxRate}
+              onChange={(e) => setTaxRate(e.target.value === "" ? 0 : Number(e.target.value))}
               className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
           <label className="text-xs text-muted">
             {kind === "invoice" ? "Due date" : "Valid until"}
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <div className="mt-1">
+              <DateField value={dueDate || null} onApply={(next) => setDueDate(next ?? "")} className="w-full" />
+            </div>
           </label>
         </div>
 
@@ -323,6 +321,7 @@ export function InvoiceQuoteForm({
       <div>
         <InvoicePreview
           kind={kind}
+          workspaceId={workspaceId}
           firmName={firmName}
           clientName={clientName}
           number={null}

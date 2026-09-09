@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken } from "@/lib/calendarSync/tokens";
 import * as google from "@/lib/calendarSync/google";
 import * as microsoft from "@/lib/calendarSync/microsoft";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -42,7 +43,7 @@ type Connection = {
 // to every Google/Outlook calendar the assigned staff member has connected.
 // Same queue+cron dispatch pattern as dispatch-notifications. Meant to be
 // hit by a Vercel Cron job every few minutes; see vercel.json.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -182,3 +183,5 @@ async function syncOneConnection(
   });
   return { ok: true };
 }
+
+export const GET = withJobLogging("sync-calendar-events", handleGET);

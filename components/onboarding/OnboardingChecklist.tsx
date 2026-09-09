@@ -25,7 +25,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   profile: {
     whatItDoes: "Your name and photo are how colleagues recognize you across the app -- on internal messages, the staff directory, and anywhere else your activity shows up.",
     howItWorks: "Once set, your photo and name show up automatically next to anything you do -- no separate setup needed per feature.",
-    howToSetUp: "Go to Firm Profile, upload a photo, and fill in your name if it's not already there.",
+    howToSetUp: "Go to Profile, upload a photo, and fill in your name if it's not already there.",
   },
   roles: {
     whatItDoes: "Roles control what each person on your team can see and do -- e.g. a preparer might not need access to billing, while a reviewer needs to approve returns.",
@@ -48,13 +48,13 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
     howToSetUp: "Go to Settings > Security, turn on two-factor authentication for your own account, and review the workspace's password, session, and lockout policy.",
   },
   organizer: {
-    whatItDoes: "An intake form (organizer) is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
+    whatItDoes: "An intake form is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
     howItWorks: "Once a client submits it, their answers show up on their engagement automatically, and you can route different forms to different services if one form covers more than one type of work.",
-    howToSetUp: "Go to Templates, create a new organizer, add the questions you need, then attach it to a service's stage so it's pre-selected when staff send it from an engagement at that stage.",
+    howToSetUp: "Go to Templates, create a new form, add the questions you need, then attach it to a service's stage so it's pre-selected when staff send it from an engagement at that stage.",
   },
   pipeline: {
     whatItDoes: "A pipeline is the stages a piece of work moves through -- e.g. \"Info gathered\" -> \"In prep\" -> \"Review\" -> \"Delivered.\" Every engagement you open moves through one.",
-    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or signable document to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
+    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching a form, document checklist, or signable document to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
     howToSetUp: "Go to Pipelines, create one, and add its stages. Nothing about opening an engagement requires a service first.",
   },
   invite: {
@@ -64,7 +64,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   },
   automations: {
     whatItDoes: "Automations let you decide what should happen automatically instead of a staff member remembering to do it -- e.g. when a client creates a portal account, send them a welcome email and load their intake form. Every office runs differently, so the trigger and the actions are both yours to pick.",
-    howItWorks: "You choose a trigger (a client signs up, an organizer is submitted, an engagement is created, an appointment's status changes) and then one or more actions to run when it fires (send an email or text, create a task, push an intake form, start the engagement's pipeline). Nothing sends unless you build it -- there's no automation running until you create one.",
+    howItWorks: "You choose a trigger (a client signs up, a form is submitted, an engagement is created, an appointment's status changes) and then one or more actions to run when it fires (send an email or text, create a task, push an intake form, start the engagement's pipeline). Nothing sends unless you build it -- there's no automation running until you create one.",
     howToSetUp: "Go to Workflows, click New workflow, pick a trigger, then add the steps you want to happen. You can pause or edit it any time, and each run shows up in that workflow's history so you can see it actually fired.",
   },
 };

@@ -23,6 +23,9 @@ export type WidgetType =
   | "engagement_pipeline"
   | "stage_breakdown"
   | "deadline_risk"
+  | "unassigned_engagements"
+  | "overdue_requests"
+  | "failed_automations"
   // Reserved in the DB constraint for future modules -- no live data
   // source yet, so nothing renders them today.
   | "returns_due"
@@ -47,6 +50,9 @@ export const IMPLEMENTED_WIDGET_TYPES: WidgetType[] = [
   "engagement_pipeline",
   "stage_breakdown",
   "deadline_risk",
+  "unassigned_engagements",
+  "overdue_requests",
+  "failed_automations",
 ];
 
 /** Widgets that are inherently a wide strip rather than a card -- span the full dashboard grid row instead of one cell. */

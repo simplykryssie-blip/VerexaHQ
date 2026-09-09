@@ -7,6 +7,9 @@ import { ChevronUp, ChevronDown, X, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+
+const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "success", archived: "neutral" };
 
 type MemberPage = { id: string; title: string; slug: string; status: string; funnel_position: number | null };
 type AvailablePage = { id: string; title: string; slug: string };
@@ -132,7 +135,9 @@ export function FunnelManager({
         {canManage ? (
           <TemplateStatusCycle table="site_funnels" id={funnel.id} status={funnel.status} />
         ) : (
-          <span className="rounded-full bg-surfaceMuted px-2.5 py-1 text-xs font-medium capitalize text-muted">{funnel.status}</span>
+          <Badge tone={STATUS_TONE[funnel.status] ?? "neutral"} className="capitalize">
+            {funnel.status}
+          </Badge>
         )}
       </div>
 
@@ -145,7 +150,9 @@ export function FunnelManager({
               <p className="truncate text-sm font-medium text-ink">{p.title}</p>
               <p className="truncate text-xs text-muted">/{p.slug}</p>
             </div>
-            <span className="shrink-0 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium capitalize text-muted">{p.status}</span>
+            <Badge tone={STATUS_TONE[p.status] ?? "neutral"} className="shrink-0 capitalize">
+              {p.status}
+            </Badge>
             {canManage && (
               <div className="flex shrink-0 items-center gap-1">
                 <button type="button" onClick={() => move(p.id, "up")} disabled={i === 0} className="rounded p-1 text-muted hover:text-ink disabled:opacity-30" aria-label="Move up">

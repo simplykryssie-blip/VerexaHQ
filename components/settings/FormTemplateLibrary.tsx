@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { LayoutTemplate } from "lucide-react";
-import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { LayoutTemplate, FileText, ListChecks, ClipboardList, Share2 } from "lucide-react";
+import { Tabs } from "@/components/ui/Tabs";
+import { StatTile } from "@/components/ui/StatTile";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
 import { DocumentRequestLibrary, type DocumentRequestTemplateCard } from "@/components/settings/document-request-editor/DocumentRequestLibrary";
@@ -92,6 +93,25 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     };
   });
 
+  // The stat row always shows all three counts regardless of which tab is
+  // active -- the active tab's count comes free from the cards array already
+  // fetched above; the other two get a cheap head-only count query instead
+  // of pulling their full rows.
+  const [{ count: engagementLetterCountRaw }, { count: organizerCountRaw }, { count: documentRequestCountRaw }] = await Promise.all([
+    !isOrganizers && !isDocumentRequests
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("engagement_letter_templates").select("id", { count: "exact", head: true }).or(orFilter),
+    isOrganizers
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("organizer_templates").select("id", { count: "exact", head: true }).or(orFilter),
+    isDocumentRequests
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("document_request_templates").select("id", { count: "exact", head: true }).or(orFilter),
+  ]);
+  const engagementLetterCount = !isOrganizers && !isDocumentRequests ? engagementLetterCards.length : engagementLetterCountRaw ?? 0;
+  const organizerCount = isOrganizers ? organizerCards.length : organizerCountRaw ?? 0;
+  const documentRequestCount = isDocumentRequests ? documentRequestCards.length : documentRequestCountRaw ?? 0;
+
   const { data: folders } = await supabase
     .from("library_folders")
     .select("id, parent_folder_id, name")
@@ -142,57 +162,67 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     sharedByFirmName: (r.workspaces as unknown as { name?: string } | null)?.name ?? "A connected firm",
   }));
 
-  const tabs: { key: FormTemplateTabKey; label: string }[] = [
-    { key: "engagement-letter", label: "Documents" },
-    { key: "organizers", label: "Organizers" },
+  const pendingLetterShareCount = pendingShares.filter((s) => s.objectType === "engagement_letter_templates").length;
+  const pendingOrganizerShareCount = pendingShares.filter((s) => s.objectType === "organizer_templates").length;
+
+  const tabs: { key: FormTemplateTabKey; label: string; badge?: number }[] = [
+    { key: "engagement-letter", label: "Documents", badge: pendingLetterShareCount },
+    { key: "organizers", label: "Forms", badge: pendingOrganizerShareCount },
     { key: "document-requests", label: "Document Requests" },
   ];
 
+  const heroSub =
+    pendingShares.length > 0
+      ? `${pendingShares.length} shared template${pendingShares.length === 1 ? "" : "s"} waiting for your review.`
+      : `${engagementLetterCount + organizerCount + documentRequestCount} templates across documents, forms, and requests.`;
+
   return (
-    <div className="max-w-6xl">
-      <SettingsSectionHeader
+    <>
+      <PageHero
         icon={LayoutTemplate}
-        title="Form Templates"
-        description="Document and organizer templates. See Email & SMS in the Templates menu for message templates."
+        tone="violet"
+        heading={
+          <>
+            Your <HeroHighlight>template library</HeroHighlight>.
+          </>
+        }
+        subtitle={heroSub}
       />
 
-      <div className="mt-4">
-        <nav className="flex gap-1 border-b border-border">
-          {tabs.map((t) => (
-            <Link
-              key={t.key}
-              href={`/templates?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                activeTab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={FileText} tone="accent" label="Document templates" value={engagementLetterCount} />
+          <StatTile icon={ListChecks} tone="emerald" label="Form templates" value={organizerCount} />
+          <StatTile icon={ClipboardList} tone="amber" label="Document request templates" value={documentRequestCount} />
+          <StatTile icon={Share2} tone="rose" label="Pending shares" value={pendingShares.length} />
+        </div>
 
-      <div className="mt-4">
-        <PendingTemplateShares shares={pendingShares} />
-        {isOrganizers ? (
-          <OrganizerLibrary
-            workspaceId={workspaceId}
-            templates={organizerCards}
-            folders={folders ?? []}
-            isJotformConnected={Boolean(jotformConnected)}
-            downlineWorkspaces={downlineWorkspaces}
-          />
-        ) : isDocumentRequests ? (
-          <DocumentRequestLibrary workspaceId={workspaceId} templates={documentRequestCards} folders={folders ?? []} />
-        ) : (
-          <EngagementLetterLibrary
-            workspaceId={workspaceId}
-            templates={engagementLetterCards}
-            folders={folders ?? []}
-            downlineWorkspaces={downlineWorkspaces}
-          />
-        )}
+        <div>
+          <Tabs tabs={tabs.map((t) => ({ id: t.key, label: t.label, badge: t.badge, href: `/templates?tab=${t.key}` }))} active={activeTab} />
+        </div>
+
+        <div>
+          <PendingTemplateShares shares={pendingShares} />
+          {isOrganizers ? (
+            <OrganizerLibrary
+              workspaceId={workspaceId}
+              templates={organizerCards}
+              folders={folders ?? []}
+              isJotformConnected={Boolean(jotformConnected)}
+              downlineWorkspaces={downlineWorkspaces}
+            />
+          ) : isDocumentRequests ? (
+            <DocumentRequestLibrary workspaceId={workspaceId} templates={documentRequestCards} folders={folders ?? []} />
+          ) : (
+            <EngagementLetterLibrary
+              workspaceId={workspaceId}
+              templates={engagementLetterCards}
+              folders={folders ?? []}
+              downlineWorkspaces={downlineWorkspaces}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

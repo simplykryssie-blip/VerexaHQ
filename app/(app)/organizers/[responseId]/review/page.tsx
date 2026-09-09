@@ -52,6 +52,13 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
     redirect(response.engagement_id ? `/engagements/${response.engagement_id}` : `/clients/${response.client_id}`);
   }
 
+  const [{ data: canApprove }, { data: canDeny }, { data: canRequestInfo }, { data: canEroReview }] = await Promise.all([
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_approve" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_deny" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_request_info" }),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "organizers.review_ero" }),
+  ]);
+
   const entityType: "engagement" | "client" = response.engagement_id ? "engagement" : "client";
   const entityId = response.engagement_id ?? response.client_id;
 
@@ -88,11 +95,15 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       )
       .eq("organizer_response_id", response.id)
       .order("created_at", { ascending: false }),
+    // Notes taken while reviewing land on the engagement's (or client's, if
+    // there's no engagement) own Notes tab -- same entityType/entityId as
+    // document_requests below -- rather than a third, siloed
+    // "organizer_response" bucket nothing else ever reads.
     supabase
       .from("notes")
       .select("id, subject, body, author_id, created_at")
-      .eq("entity_type", "organizer_response")
-      .eq("entity_id", response.id)
+      .eq("entity_type", entityType)
+      .eq("entity_id", entityId)
       .order("created_at", { ascending: false }),
     supabase
       .from("document_requests")
@@ -189,7 +200,7 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
         id: response.id,
         status: response.status,
         submittedAt: response.submitted_at,
-        templateName: (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Organizer",
+        templateName: (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Form",
         reviewStatus: response.review_status,
         assignedReviewerId: response.assigned_reviewer_id,
         clientId: response.client_id,
@@ -238,6 +249,10 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       entityId={entityId}
       activity={activity}
       staffOptions={staffMembers.map((s) => ({ id: s.user_id, display_name: s.display_name }))}
+      canApprove={Boolean(canApprove)}
+      canDeny={Boolean(canDeny)}
+      canRequestInfo={Boolean(canRequestInfo)}
+      canEroReview={Boolean(canEroReview)}
     />
   );
 }

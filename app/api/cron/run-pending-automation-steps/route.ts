@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -28,7 +29,14 @@ function isAuthorized(request: Request) {
 // necessarily ready to advance. should_advance_wait_until_step re-evaluates
 // the condition (or the wait's timeout) each time; when it says no, the
 // pending row is left exactly as-is so the next cron tick checks it again.
-export async function GET(request: Request) {
+//
+// A condition-type step opted into retry_until_matched (see
+// start_next_automation_step) also parks here while none of its branches
+// match yet -- but a condition step doesn't "execute" the way an action
+// does, so advancing it calls start_next_automation_step(run_id) (which
+// re-evaluates its branches from the run's current position) instead of
+// execute_automation_step.
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -38,7 +46,7 @@ export async function GET(request: Request) {
 
   const { data: pending } = await supabase
     .from("automation_pending_steps")
-    .select("id, run_id, automation_step_id")
+    .select("id, run_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
     .eq("status", "pending_delay")
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
@@ -54,15 +62,31 @@ export async function GET(request: Request) {
       console.log(`run-pending-automation-steps: stopping early with ${deferred} row(s) left for the next tick`);
       break;
     }
+    // The run may have been cancelled (e.g. a pending-approval step on it
+    // was rejected) while this step was still waiting out its delay --
+    // without this check the step would fire anyway once its time came,
+    // even though the run it belongs to is no longer running.
+    const runStatus = (row.automation_runs as unknown as { status?: string } | null)?.status;
+    if (runStatus !== "running") {
+      await supabase.from("automation_pending_steps").delete().eq("id", row.id);
+      continue;
+    }
     const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
     if (shouldAdvance === false) {
       stillWaiting++;
       continue;
     }
-    await supabase.rpc("execute_automation_step", { p_run_id: row.run_id, p_step_id: row.automation_step_id });
+    const actionType = (row.automation_steps as unknown as { action_type?: string } | null)?.action_type;
+    if (actionType === "condition") {
+      await supabase.rpc("start_next_automation_step", { p_run_id: row.run_id });
+    } else {
+      await supabase.rpc("execute_automation_step", { p_run_id: row.run_id, p_step_id: row.automation_step_id });
+    }
     await supabase.from("automation_pending_steps").delete().eq("id", row.id);
     processed++;
   }
 
   return NextResponse.json({ processed, stillWaiting, deferred });
 }
+
+export const GET = withJobLogging("run-pending-automation-steps", handleGET);

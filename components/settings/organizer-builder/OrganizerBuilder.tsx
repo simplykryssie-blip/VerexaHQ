@@ -214,10 +214,10 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
         <Link href="/templates?tab=organizers" className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
-          <ArrowLeft size={14} /> Organizer templates
+          <ArrowLeft size={14} /> Form templates
         </Link>
         <div className="text-center">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Organizer builder</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">Form builder</p>
           {renamingName ? (
             <div className="flex items-center justify-center gap-1.5">
               <input
@@ -246,7 +246,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             <p className="flex items-center justify-center gap-1.5 text-sm font-semibold text-ink">
               {name} {readOnly && <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">System</span>}
               {!readOnly && (
-                <button type="button" onClick={() => setRenamingName(true)} className="text-muted hover:text-ink" aria-label="Rename organizer">
+                <button type="button" onClick={() => setRenamingName(true)} className="text-muted hover:text-ink" aria-label="Rename form">
                   <Pencil size={12} />
                 </button>
               )}

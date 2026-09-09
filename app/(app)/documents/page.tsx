@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { FileText, Clock, AlertTriangle, PenLine, HardDrive } from "lucide-react";
+import { FileText, Clock, AlertTriangle, PenLine, HardDrive, FolderOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap } from "@/lib/documentEntityLabels";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { AllDocumentsPanel } from "@/components/documents/AllDocumentsPanel";
 import { StatTile } from "@/components/ui/StatTile";
 import type { IconChipTone } from "@/components/ui/IconChip";
+import { Badge } from "@/components/ui/Badge";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,16 @@ export default async function DocumentCenterHubPage() {
   if (!canView) {
     return (
       <>
-        <PageHeader title="Document Center" />
+        <PageHero
+          icon={FolderOpen}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>document center</HeroHighlight>.
+            </>
+          }
+          subtitle="Pending requests, signatures, and storage across every client and engagement."
+        />
         <div className="flex-1 px-8 py-6">
           <EmptyState message="You don't have permission to view the Document Center." />
         </div>
@@ -102,9 +112,15 @@ export default async function DocumentCenterHubPage() {
 
   return (
     <>
-      <PageHeader
-        title="Document Center"
-        description="Pending requests, signatures, and storage across every client and engagement -- for analysis, see Reports > Documents."
+      <PageHero
+        icon={FolderOpen}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>document center</HeroHighlight>.
+          </>
+        }
+        subtitle="Pending requests, signatures, and storage across every client and engagement -- for analysis, see Reports > Documents."
         actions={
           <Link href="/reports/documents" className="text-sm font-medium text-accent hover:underline">
             View Reports &rarr;
@@ -139,9 +155,9 @@ export default async function DocumentCenterHubPage() {
                         </Link>
                         <p className="text-xs text-muted">{r.title}</p>
                       </div>
-                      <span className={`text-xs ${overdue ? "text-danger" : "text-muted"}`}>
+                      <Badge tone={overdue ? "danger" : missing > 0 ? "warning" : "neutral"}>
                         {missing} missing{r.due_date && ` -- due ${new Date(r.due_date).toLocaleDateString()}`}
-                      </span>
+                      </Badge>
                     </li>
                   );
                 })}

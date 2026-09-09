@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Lock } from "lucide-react";
+import { Lock, UsersRound, ListChecks, UserX, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
+import { Tabs } from "@/components/ui/Tabs";
 import { BulkAssignList, type AssignableRow } from "@/components/assignments/BulkAssignList";
 
 export const dynamic = "force-dynamic";
@@ -28,13 +30,17 @@ function clientLabelFor(c: { first_name: string | null; last_name: string | null
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
-export default async function AssignmentsPage({ searchParams }: { searchParams: { tab?: string; role?: string } }) {
+export default async function AssignmentsPage({ searchParams }: { searchParams: { tab?: string; role?: string; filter?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const tab: Tab = searchParams.tab === "tasks" ? "tasks" : searchParams.tab === "engagements" ? "engagements" : "clients";
   const engagementRole: EngagementRoleKey =
     ENGAGEMENT_ROLES.find((r) => r.key === searchParams.role)?.key ?? "assigned_staff_id";
+  // Only meaningful for the role currently being viewed -- an engagement
+  // "unassigned" as staff can still have a reviewer, so the filter tracks
+  // whichever role column is actually selected, not always assigned_staff_id.
+  const unassignedOnly = tab === "engagements" && searchParams.filter === "unassigned";
 
   const supabase = createClient();
   // Mirrors the real RLS UPDATE policies on each table exactly -- clients_update
@@ -104,8 +110,9 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
       .limit(200);
     table = "engagements";
     field = engagementRole;
-    emptyMessage = "No engagements yet.";
-    rows = (data ?? []).map((e) => {
+    emptyMessage = unassignedOnly ? "Every engagement already has an owner." : "No engagements yet.";
+    const filteredData = unassignedOnly ? (data ?? []).filter((e) => !e[engagementRole]) : (data ?? []);
+    rows = filteredData.map((e) => {
       const c = e.clients as unknown as {
         first_name: string | null;
         last_name: string | null;
@@ -123,30 +130,36 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
     });
   }
 
+  const unassignedCount = rows.filter((r) => !r.currentAssigneeName).length;
+
   return (
     <>
-      <PageHeader title="Assignments" description="Reassign clients, tasks, and engagements across your team in bulk." />
-      <div className="flex-1 px-8 py-6">
-        <nav className="mb-4 flex gap-1 border-b border-border">
-          {TABS.map((t) => (
-            <Link
-              key={t.key}
-              href={`/assignments?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                tab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
+      <PageHero
+        icon={UsersRound}
+        tone="amber"
+        heading={
+          <>
+            Your <HeroHighlight>assignments</HeroHighlight>.
+          </>
+        }
+        subtitle="Reassign clients, tasks, and engagements across your team in bulk."
+      />
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <StatTile icon={ListChecks} tone="accent" label={`${TABS.find((t) => t.key === tab)?.label ?? "Items"} shown`} value={rows.length} />
+          <StatTile icon={UserX} tone="rose" label="Unassigned" value={unassignedCount} />
+          <StatTile icon={Users} tone="emerald" label="Staff available" value={staffOptions.length} />
+        </div>
+        <div className="mb-4">
+          <Tabs tabs={TABS.map((t) => ({ id: t.key, label: t.label, href: `/assignments?tab=${t.key}` }))} active={tab} />
+        </div>
 
         {tab === "engagements" && (
-          <div className="mb-4 flex gap-1">
+          <div className="mb-4 flex flex-wrap items-center gap-1">
             {ENGAGEMENT_ROLES.map((r) => (
               <Link
                 key={r.key}
-                href={`/assignments?tab=engagements&role=${r.key}`}
+                href={`/assignments?tab=engagements&role=${r.key}${unassignedOnly ? "&filter=unassigned" : ""}`}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   engagementRole === r.key ? "bg-accent text-white" : "bg-surfaceMuted text-muted hover:text-ink"
                 }`}
@@ -154,6 +167,14 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
                 {r.label}
               </Link>
             ))}
+            {unassignedOnly && (
+              <span className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-accent bg-accentSoft px-3 py-1 text-xs font-medium text-accent">
+                Unassigned only
+                <Link href={`/assignments?tab=engagements&role=${engagementRole}`} className="hover:underline" aria-label="Clear filter">
+                  &times;
+                </Link>
+              </span>
+            )}
           </div>
         )}
 

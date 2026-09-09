@@ -16,6 +16,7 @@ import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 export function TagNameInput({
   value,
   onChange,
+  onCommit,
   tagOptions,
   disabled,
   placeholder = "e.g. vip",
@@ -23,6 +24,14 @@ export function TagNameInput({
 }: {
   value: string;
   onChange: (value: string) => void;
+  /** Fires when the user explicitly commits a value -- Enter, or clicking an
+   * existing tag / the "+ Add" button in the dropdown -- as opposed to
+   * onChange, which fires on every keystroke. Optional: callers that just
+   * want a single free-typed value (the trigger/action "Tag" field) can
+   * ignore it and keep reading onChange at save time, same as before this
+   * prop existed. TagListInput is the one caller that needs it, to know
+   * when to turn the current draft into a chip. */
+  onCommit?: (value: string) => void;
   tagOptions: string[];
   disabled?: boolean;
   placeholder?: string;
@@ -48,6 +57,13 @@ export function TagNameInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && onCommit) {
+              e.preventDefault();
+              onCommit(value.trim());
+              setOpen(false);
+            }
+          }}
           placeholder={placeholder}
           autoComplete="off"
           className={`${inputClass} w-full pr-7`}
@@ -72,6 +88,7 @@ export function TagNameInput({
               type="button"
               onClick={() => {
                 onChange(t);
+                onCommit?.(t);
                 setOpen(false);
               }}
               className={`block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm ${
@@ -84,7 +101,10 @@ export function TagNameInput({
           {q && !hasExactMatch && (
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                onCommit?.(value.trim());
+                setOpen(false);
+              }}
               className="block w-full truncate rounded-md px-2.5 py-1.5 text-left text-sm font-medium text-accent hover:bg-accentSoft"
             >
               + Add &quot;{value.trim()}&quot;

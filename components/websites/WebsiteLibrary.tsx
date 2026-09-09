@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Trash2, Globe, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -12,6 +12,8 @@ import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import type { LibraryFolderRow } from "@/components/library/types";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { IconChip } from "@/components/ui/IconChip";
 
 const WEBSITE_STATUS_TONE: Record<string, BadgeTone> = {
   draft: "neutral",
@@ -126,9 +128,9 @@ export function WebsiteLibrary({
       <div className="min-w-0 flex-1">
         {canManage && (
           <div className="flex justify-end">
-            <button type="button" onClick={() => setCreating(true)} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
-              + New website
-            </button>
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus size={14} aria-hidden="true" /> New website
+            </Button>
           </div>
         )}
 
@@ -144,33 +146,48 @@ export function WebsiteLibrary({
                 className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </label>
-            <button type="submit" disabled={saving} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
+            <Button type="submit" disabled={saving}>
               {saving ? "Creating..." : "Create"}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => {
                 setCreating(false);
                 setName("");
                 setError(null);
               }}
-              className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-slate hover:border-accent hover:text-ink"
             >
               Cancel
-            </button>
+            </Button>
           </form>
         )}
         {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
         <div className="mt-4">
           {visibleWebsites.length === 0 ? (
-            <EmptyState message={websites.length === 0 ? "No websites yet -- create one to start building your public site." : "No websites in this folder."} />
+            <EmptyState
+              icon={Globe}
+              message={websites.length === 0 ? "No websites yet -- create one to start building your public site." : "No websites in this folder."}
+              action={
+                canManage && websites.length === 0 ? (
+                  <Button onClick={() => setCreating(true)}>
+                    <Plus size={14} aria-hidden="true" /> New website
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {visibleWebsites.map((w) => (
                 <div key={w.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-ink">{w.name}</h3>
+                    <div className="flex items-center gap-2.5">
+                      <IconChip>
+                        <Globe size={16} aria-hidden="true" />
+                      </IconChip>
+                      <h3 className="text-sm font-semibold text-ink">{w.name}</h3>
+                    </div>
                     {canManage && (
                       <button
                         type="button"
@@ -183,7 +200,7 @@ export function WebsiteLibrary({
                       </button>
                     )}
                   </div>
-                  <p className="mt-1 truncate text-xs text-muted">/site/{workspaceSlug}/{w.slug}</p>
+                  <p className="mt-2 truncate text-xs text-muted">/site/{workspaceSlug}/{w.slug}</p>
                   <p className="mt-1 text-xs text-muted">
                     {w.page_count} page{w.page_count === 1 ? "" : "s"}
                   </p>
@@ -201,10 +218,7 @@ export function WebsiteLibrary({
                       <FolderMoveSelect folders={folders} value={w.folder_id} onChange={(folderId) => moveWebsite(w.id, folderId)} />
                     </div>
                   )}
-                  <Link
-                    href={`/websites/${w.id}`}
-                    className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-ink"
-                  >
+                  <Link href={`/websites/${w.id}`} className={buttonClasses("secondary", "sm", "mt-4")}>
                     {canManage ? "Manage" : "View"}
                   </Link>
                 </div>

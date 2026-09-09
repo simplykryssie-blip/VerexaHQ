@@ -6,6 +6,7 @@ import { Plus, Search, Share2, Trash2, type LucideIcon } from "lucide-react";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { IconChip } from "@/components/ui/IconChip";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import type { LibraryFolderRow } from "@/components/library/types";
@@ -146,12 +147,12 @@ export function TemplateGallery({
           {filtered.length === 0 ? (
             <EmptyState icon={Search} message={cards.length > 0 ? emptyMessage : "No templates yet -- create one to get started."} />
           ) : (
-            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
               {filtered.map((c) => (
                 <div key={c.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surfaceMuted">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
-                    <Icon size={14} aria-hidden="true" />
-                  </span>
+                  <IconChip tone="accent">
+                    <Icon size={16} aria-hidden="true" />
+                  </IconChip>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

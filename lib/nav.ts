@@ -32,6 +32,9 @@ import {
   Receipt,
   Handshake,
   Sparkles,
+  CalendarOff,
+  UserCircle,
+  MapPin,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -54,6 +57,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
+  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
   {
@@ -67,6 +71,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
+  { label: "IRS Authorizations", href: "/irs-authorizations", icon: ShieldCheck },
   { label: "Partners", href: "/partners", icon: Handshake },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
@@ -90,9 +95,9 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Calendar", "Messages"] },
+  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Assignments", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Documents", "Tax Office", "Partners", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "IRS Authorizations", "Partners", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 
@@ -166,8 +171,8 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
+  { label: "Firms", href: "/firms", icon: Building2 },
   { label: "Team", href: "/settings/users", icon: Users },
-  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
 ];
 
@@ -180,14 +185,18 @@ export type SettingsNavItem = {
 };
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
+  { label: "Profile", href: "/settings/profile", icon: UserCircle },
   { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
   { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
+  { label: "Locations", href: "/settings/locations", icon: MapPin },
+  { label: "Packages", href: "/settings/packages", icon: Handshake },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
+  { label: "Availability", href: "/settings/availability", icon: CalendarOff },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
@@ -197,8 +206,11 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Users & Staff", "Roles & Permissions", "Tags"] },
+  { label: "Personal", itemLabels: ["Profile"] },
+  {
+    label: "Firm",
+    itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions"],
+  },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
@@ -206,3 +218,13 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = SETTINGS_SECTION_MEMB
   label: section.label,
   items: section.itemLabels.map((label) => SETTINGS_NAV_ITEMS.find((item) => item.label === label)).filter((item): item is SettingsNavItem => Boolean(item)),
 }));
+
+// Security/Availability/Notifications and Locations/Tags used to be their
+// own top-level nav entries; they're now tabs reachable from Profile and
+// Services respectively (see lib/settingsSubNav.ts), so the sidebar link
+// for the parent should still read as "active" while on one of those
+// sub-pages instead of going dark.
+export const SETTINGS_GROUPED_HREFS: Record<string, string[]> = {
+  "/settings/profile": ["/settings/profile", "/settings/security", "/settings/availability", "/settings/notifications"],
+  "/settings/services": ["/settings/services", "/settings/locations", "/settings/tags"],
+};

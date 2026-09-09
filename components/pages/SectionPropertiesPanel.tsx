@@ -1,4 +1,4 @@
-import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption } from "./types";
+import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption, type BookableServiceOption, type StaffOption } from "./types";
 import { HeroEditor } from "./section-editors/HeroEditor";
 import { RichTextEditorSection } from "./section-editors/RichTextEditorSection";
 import { ImageEditor } from "./section-editors/ImageEditor";
@@ -6,6 +6,7 @@ import { TextImageEditor } from "./section-editors/TextImageEditor";
 import { TestimonialEditor } from "./section-editors/TestimonialEditor";
 import { FaqEditor } from "./section-editors/FaqEditor";
 import { OrganizerFormEditor } from "./section-editors/OrganizerFormEditor";
+import { BookingWidgetEditor } from "./section-editors/BookingWidgetEditor";
 import { CtaButtonEditor } from "./section-editors/CtaButtonEditor";
 import { SpacerEditor } from "./section-editors/SpacerEditor";
 import { FooterEditor } from "./section-editors/FooterEditor";
@@ -13,17 +14,19 @@ import { CustomHtmlEditor } from "./section-editors/CustomHtmlEditor";
 
 export function SectionPropertiesPanel({
   workspaceId,
-  websiteId,
   section,
   onUpdate,
   organizerTemplates,
+  bookableServices,
+  staff,
   canAdvanceToNextPage,
 }: {
   workspaceId: string;
-  websiteId: string;
   section: BuilderSection | null;
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
   organizerTemplates: OrganizerTemplateOption[];
+  bookableServices: BookableServiceOption[];
+  staff: StaffOption[];
   canAdvanceToNextPage: boolean;
 }) {
   if (!section) {
@@ -42,18 +45,21 @@ export function SectionPropertiesPanel({
     <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-accent">{SECTION_TYPE_LABELS[section.section_type]}</p>
       <div className="mt-3">
-        {section.section_type === "hero" && <HeroEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "hero" && <HeroEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
         {section.section_type === "rich_text" && <RichTextEditorSection config={section.config as never} onChange={onChange} />}
-        {section.section_type === "image" && <ImageEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />}
+        {section.section_type === "image" && <ImageEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />}
         {section.section_type === "text_image" && (
-          <TextImageEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
+          <TextImageEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />
         )}
         {section.section_type === "testimonial" && (
-          <TestimonialEditor workspaceId={workspaceId} websiteId={websiteId} config={section.config as never} onChange={onChange} />
+          <TestimonialEditor workspaceId={workspaceId} config={section.config as never} onChange={onChange} />
         )}
         {section.section_type === "faq" && <FaqEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "organizer_form" && (
           <OrganizerFormEditor config={section.config as never} onChange={onChange} organizerTemplates={organizerTemplates} canAdvanceToNextPage={canAdvanceToNextPage} />
+        )}
+        {section.section_type === "booking_widget" && (
+          <BookingWidgetEditor config={section.config as never} onChange={onChange} services={bookableServices} staff={staff} />
         )}
         {section.section_type === "cta_button" && <CtaButtonEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "spacer" && <SpacerEditor config={section.config as never} onChange={onChange} />}

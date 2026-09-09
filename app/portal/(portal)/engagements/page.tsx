@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
+import { getEngagementProgressMap } from "@/lib/portalEngagementProgress";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -18,6 +19,8 @@ export default async function PortalEngagementsPage() {
     .eq("client_id", identity.clientId)
     .order("open_date", { ascending: false });
 
+  const progressMap = await getEngagementProgressMap((engagements ?? []).map((e) => e.id));
+
   return (
     <>
       <PageHeader title="My Engagements" description="Every service we're working on for you." />
@@ -28,6 +31,7 @@ export default async function PortalEngagementsPage() {
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {(engagements ?? []).map((e) => {
               const taxDetail = (e.engagement_tax_details as unknown as { tax_year: number | null; return_type: string | null; return_status: string } | null);
+              const progress = progressMap.get(e.id);
               return (
                 <li key={e.id}>
                   <Link href={`/portal/engagements/${e.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-surfaceMuted">
@@ -40,7 +44,7 @@ export default async function PortalEngagementsPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="text-xs capitalize text-muted">{e.status}</span>
+                      <span className="text-xs capitalize text-muted">{progress?.stageName ?? e.status}</span>
                       {e.due_date && <p className="text-xs text-muted">Due {new Date(e.due_date).toLocaleDateString()}</p>}
                     </div>
                   </Link>

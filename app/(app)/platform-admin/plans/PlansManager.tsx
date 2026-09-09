@@ -15,7 +15,7 @@ type Plan = {
   base_price_cents: number;
   included_seats: number;
   per_seat_price_cents: number;
-  email_overage_rate_cents: number;
+  email_overage_rate_cents_per_1000: number;
   sms_overage_rate_cents: number;
   storage_overage_rate_cents: number;
   signup_free_emails: number;
@@ -87,7 +87,7 @@ function PlanForm({ initial, planId, onDone }: { initial: FormState; planId?: st
       base_price_cents: dollarsToCents(form.basePrice),
       included_seats: parseInt(form.includedSeats, 10) || 0,
       per_seat_price_cents: dollarsToCents(form.perSeatPrice),
-      email_overage_rate_cents: dollarsToCents(form.emailRate),
+      email_overage_rate_cents_per_1000: dollarsToCents(form.emailRate),
       sms_overage_rate_cents: dollarsToCents(form.smsRate),
       storage_overage_rate_cents: dollarsToCents(form.storageRate),
       signup_free_emails: parseInt(form.freeEmails, 10) || 0,
@@ -151,10 +151,10 @@ function PlanForm({ initial, planId, onDone }: { initial: FormState; planId?: st
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate">Per email over included ($)</label>
+          <label className="block text-xs font-medium text-slate">Per 1,000 emails over included ($)</label>
           <input
             type="number"
-            step="0.001"
+            step="0.01"
             value={form.emailRate}
             onChange={(e) => setForm((f) => ({ ...f, emailRate: e.target.value }))}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -252,7 +252,7 @@ export function PlansManager({ plans }: { plans: Plan[] }) {
       basePrice: centsToDollars(p.base_price_cents),
       includedSeats: String(p.included_seats),
       perSeatPrice: centsToDollars(p.per_seat_price_cents),
-      emailRate: centsToDollars(p.email_overage_rate_cents),
+      emailRate: centsToDollars(p.email_overage_rate_cents_per_1000),
       smsRate: centsToDollars(p.sms_overage_rate_cents),
       storageRate: centsToDollars(p.storage_overage_rate_cents),
       freeEmails: String(p.signup_free_emails),

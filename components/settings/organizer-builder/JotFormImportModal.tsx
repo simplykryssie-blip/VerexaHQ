@@ -160,7 +160,7 @@ export function JotFormImportModal({
                 onClick={() => router.push(`/templates/organizers/${result.templateId}`)}
                 className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/90"
               >
-                Open organizer
+                Open form
               </button>
             </div>
           </div>

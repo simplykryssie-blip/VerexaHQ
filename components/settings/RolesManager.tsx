@@ -244,7 +244,7 @@ export function RolesManager({
                 ) : (
                   <>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-ink">{selected.name}</h3>
+                      <h3 className="font-display text-sm font-semibold text-ink">{selected.name}</h3>
                       <span className="shrink-0 rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">
                         {selected.is_system_role ? "System" : "Custom"}
                       </span>

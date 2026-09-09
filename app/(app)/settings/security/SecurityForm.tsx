@@ -11,7 +11,10 @@ export function SecurityForm({ workspaceId, policy }: { workspaceId: string; pol
   const router = useRouter();
   const supabase = createClient();
   const [mfaRequired, setMfaRequired] = useState(policy.mfa_required);
-  const [sessionTimeout, setSessionTimeout] = useState(policy.session_timeout_minutes);
+  // Stored in the database as minutes (IdleLogout and every other consumer
+  // reads it that way), but shown here in hours -- a security admin thinks
+  // in "log me out after N hours", not minutes.
+  const [sessionTimeoutHours, setSessionTimeoutHours] = useState(policy.session_timeout_minutes / 60);
   const [passwordMinLength, setPasswordMinLength] = useState(policy.password_min_length);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -27,7 +30,7 @@ export function SecurityForm({ workspaceId, policy }: { workspaceId: string; pol
       .from("workspace_security_policies")
       .update({
         mfa_required: mfaRequired,
-        session_timeout_minutes: sessionTimeout,
+        session_timeout_minutes: Math.round(sessionTimeoutHours * 60),
         password_min_length: passwordMinLength,
       })
       .eq("workspace_id", workspaceId);
@@ -54,12 +57,14 @@ export function SecurityForm({ workspaceId, policy }: { workspaceId: string; pol
       </label>
 
       <div>
-        <label className="block text-sm font-medium text-slate">Session timeout (minutes)</label>
+        <label className="block text-sm font-medium text-slate">Session timeout (hours)</label>
+        <p className="mt-0.5 text-xs text-muted">Automatically logs everyone in this workspace out after this many hours of inactivity.</p>
         <input
           type="number"
-          min={5}
-          value={sessionTimeout}
-          onChange={(e) => setSessionTimeout(Number(e.target.value))}
+          min={0.25}
+          step={0.25}
+          value={sessionTimeoutHours}
+          onChange={(e) => setSessionTimeoutHours(Number(e.target.value))}
           className="mt-1 w-32 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>

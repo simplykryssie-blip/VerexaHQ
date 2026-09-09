@@ -4,6 +4,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Avatar } from "@/components/Avatar";
+import { EnvironmentBadge } from "@/components/EnvironmentBadge";
 
 /**
  * The persistent chrome the sidebar alone couldn't provide: where you are (breadcrumbs),
@@ -24,6 +25,7 @@ export function AppHeader({
       <div className="min-w-0 flex-1">
         <Breadcrumbs />
       </div>
+      <EnvironmentBadge />
       <GlobalSearch workspaceId={workspaceId} />
       {userId && <NotificationBell workspaceId={workspaceId} userId={userId} />}
       <Link href="/support" aria-label="Help & support" className="text-muted transition hover:text-ink">

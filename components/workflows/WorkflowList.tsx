@@ -154,6 +154,51 @@ export function WorkflowList({
     router.refresh();
   }
 
+  // First publish out of Draft -- same validation gate as activating a
+  // paused workflow, since this is the first moment it becomes eligible to
+  // fire at all (new workflows are created status='draft' is_enabled=false
+  // precisely so they can't fire mid-edit).
+  async function publish(id: string) {
+    const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: id });
+    if (validationError) {
+      toast.show(validationError.message, "error");
+      return;
+    }
+    if (issues && issues.length > 0) {
+      const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+      window.alert(`Can't publish this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+      return;
+    }
+    const { error } = await supabase.from("automations").update({ status: "published", is_enabled: true }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Workflow published and active", "success");
+    router.refresh();
+  }
+
+  async function retire(id: string) {
+    if (!window.confirm("Retire this workflow? It stops firing and moves out of the active list. You can bring it back as a draft later.")) return;
+    const { error } = await supabase.from("automations").update({ status: "archived", is_enabled: false }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Workflow retired", "success");
+    router.refresh();
+  }
+
+  async function reactivate(id: string) {
+    const { error } = await supabase.from("automations").update({ status: "draft", is_enabled: false }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Workflow restored as a draft -- publish it when it's ready", "success");
+    router.refresh();
+  }
+
   async function remove(id: string) {
     if (!window.confirm("Delete this workflow? Its run history will be removed too. This can't be undone.")) return;
     setDeleteError(null);
@@ -255,24 +300,46 @@ export function WorkflowList({
                   </div>
                 </Link>
                 <div className="flex shrink-0 items-center gap-3">
-                  <Badge tone={w.is_enabled ? (w.step_count === 0 ? "warning" : "success") : "neutral"}>
-                    {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
-                  </Badge>
+                  {w.status === "draft" ? (
+                    <Badge tone="warning">Draft</Badge>
+                  ) : w.status === "archived" ? (
+                    <Badge tone="neutral">Retired</Badge>
+                  ) : (
+                    <Badge tone={w.is_enabled ? (w.step_count === 0 ? "warning" : "success") : "neutral"}>
+                      {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
+                    </Badge>
+                  )}
                   {canManage && (
                     <>
                       <FolderMoveSelect folders={folders} value={w.folder_id} onChange={(folderId) => moveWorkflow(w.id, folderId)} />
-                      <button
-                        type="button"
-                        onClick={() => toggleEnabled(w.id, w.is_enabled)}
-                        className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
-                      >
-                        {w.is_enabled ? "Pause" : "Activate"}
-                      </button>
+                      {w.status === "draft" ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => publish(w.id)}
+                          className="!border-accent !text-accent hover:!bg-accentSoft"
+                        >
+                          Publish
+                        </Button>
+                      ) : w.status === "archived" ? (
+                        <Button size="sm" variant="secondary" onClick={() => reactivate(w.id)}>
+                          Restore as draft
+                        </Button>
+                      ) : (
+                        <>
+                          <Button size="sm" variant="secondary" onClick={() => toggleEnabled(w.id, w.is_enabled)}>
+                            {w.is_enabled ? "Pause" : "Activate"}
+                          </Button>
+                          <Button size="sm" variant="tertiary" onClick={() => retire(w.id)}>
+                            Retire
+                          </Button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => duplicate(w.id, w.name)}
                         disabled={duplicatingId === w.id}
-                        className="text-muted hover:text-ink disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
                         aria-label="Duplicate workflow"
                       >
                         <Copy size={14} />
@@ -281,7 +348,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => remove(w.id)}
                         disabled={deletingId === w.id}
-                        className="text-muted hover:text-danger disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
                         aria-label="Delete workflow"
                       >
                         <Trash2 size={14} />

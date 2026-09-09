@@ -11,6 +11,7 @@ import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { IconChip } from "@/components/ui/IconChip";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
 import type { LibraryFolderRow } from "@/components/library/types";
@@ -174,15 +175,15 @@ export function EmailSmsTemplateGallery({
           {filtered.length === 0 ? (
             <EmptyState icon={Search} message={templates.length > 0 ? `No ${kindLabel} templates match.` : `No ${kindLabel} templates yet -- create one to get started.`} />
           ) : (
-            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
               {filtered.map((t) => {
                 const isSystem = !t.workspace_id;
                 const tokenCount = mergeFieldCount(`${t.subject ?? ""} ${kind === "email" ? t.body_html ?? "" : t.body ?? ""}`);
                 return (
                   <div key={t.id} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surfaceMuted">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
-                      <Icon size={14} aria-hidden="true" />
-                    </span>
+                    <IconChip tone="accent">
+                      <Icon size={16} aria-hidden="true" />
+                    </IconChip>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">

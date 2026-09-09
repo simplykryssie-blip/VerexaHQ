@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,7 +20,7 @@ function isAuthorized(request: Request) {
 // notification_queue, but actually performs the fetch() since only Next.js
 // has a real HTTP client. Failed deliveries retry with backoff up to
 // MAX_ATTEMPTS before being marked permanently failed.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -65,3 +66,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ sent, failed });
 }
+
+export const GET = withJobLogging("send-pending-automation-webhooks", handleGET);

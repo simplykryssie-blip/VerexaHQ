@@ -36,3 +36,33 @@ export async function ensureTagConfirmed(supabase: SupabaseClient, workspaceId: 
 export function collectClientTagValues(conditions: { field: string; value: string }[]): string[] {
   return [...new Set(conditions.filter((c) => c.field === "client.tags" && c.value.trim()).map((c) => c.value.trim()))];
 }
+
+/**
+ * Same job as ensureTagConfirmed, but for a whole batch of tag names at
+ * once (a multi-tag trigger/action, or several condition values gathered
+ * together) -- one combined confirmation naming every tag that doesn't
+ * exist yet, instead of a separate dialog per tag. Tags that already exist
+ * are silently skipped, same as the single-tag version.
+ */
+export async function ensureTagsConfirmed(supabase: SupabaseClient, workspaceId: string, rawNames: string[]): Promise<boolean> {
+  const names = [...new Set(rawNames.map((n) => n.trim()).filter(Boolean))];
+  if (names.length === 0) return true;
+
+  const { data: existing } = await supabase.from("workspace_tags").select("name").eq("workspace_id", workspaceId).in("name", names);
+  const existingNames = new Set((existing ?? []).map((r) => r.name as string));
+  const missing = names.filter((n) => !existingNames.has(n));
+  if (missing.length === 0) return true;
+
+  const list = missing.map((n) => `"${n}"`).join(", ");
+  const prompt = missing.length === 1 ? `${list} isn't a tag yet -- create it?` : `${list} aren't tags yet -- create them?`;
+  if (!window.confirm(prompt)) return false;
+
+  for (const name of missing) {
+    const { error } = await supabase.rpc("create_workspace_tag", { p_workspace_id: workspaceId, p_name: name });
+    if (error) {
+      window.alert(error.message);
+      return false;
+    }
+  }
+  return true;
+}

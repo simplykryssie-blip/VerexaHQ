@@ -58,8 +58,8 @@ export function JotFormConnectionCard({ workspaceId, isConnected }: { workspaceI
           <p className="text-sm font-medium text-ink">JotForm</p>
           <p className="text-xs text-muted">
             {isConnected
-              ? "Connected -- import JotForm forms as organizer templates from the Organizer Builder."
-              : "Connect your firm's JotForm account to import existing forms as organizer templates."}
+              ? "Connected -- import JotForm forms as form templates from the Form Builder."
+              : "Connect your firm's JotForm account to import existing forms as form templates."}
           </p>
         </div>
         <Badge tone={isConnected ? "success" : "neutral"}>{isConnected ? "Connected" : "Not connected"}</Badge>

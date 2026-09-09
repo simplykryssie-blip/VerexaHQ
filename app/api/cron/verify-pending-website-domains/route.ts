@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { checkWebsiteDomain } from "@/lib/websites/domainCheck";
 import { addProjectDomain } from "@/lib/vercel/domains";
 import { isVercelDomainAutomationConfigured } from "@/lib/providerStatus";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ function isAuthorized(request: Request) {
 // touches rows still domain_verified = false, so a verified domain is left
 // alone -- if a workspace's DNS later breaks, that's surfaced by them
 // re-checking manually, not silently flipped back by this sweep.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -58,3 +59,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked, verified });
 }
+
+export const GET = withJobLogging("verify-pending-website-domains", handleGET);

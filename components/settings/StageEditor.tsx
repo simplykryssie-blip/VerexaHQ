@@ -415,7 +415,7 @@ export function StageEditor({
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addFirstStage()}
-                placeholder="First stage name (e.g. Intake & Organizer)"
+                placeholder="First stage name (e.g. Intake & Form)"
                 className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <button

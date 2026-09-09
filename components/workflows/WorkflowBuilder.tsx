@@ -43,11 +43,13 @@ import {
   History,
   ShieldCheck,
   ShieldX,
+  FlaskConical,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
 import { Badge } from "@/components/ui/Badge";
+import { ClientPickerField, type ClientOption } from "@/components/billing/ClientPickerField";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
 import {
   ConditionsEditor,
@@ -63,8 +65,8 @@ import { CreateQuickTemplate } from "@/components/workflows/CreateQuickTemplate"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas";
 import { RunDetailPanel } from "@/components/workflows/RunDetailPanel";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
-import { TagNameInput } from "@/components/workflows/TagNameInput";
-import { ensureTagConfirmed, collectClientTagValues } from "@/lib/ensureTag";
+import { TagListInput } from "@/components/workflows/TagListInput";
+import { ensureTagsConfirmed, collectClientTagValues } from "@/lib/ensureTag";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
 import { AUTOMATION_MERGE_FIELD_GROUPS } from "@/lib/automationMergeFields";
 import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
@@ -117,6 +119,7 @@ export type WorkflowRunRow = {
   current_step_id: string | null;
   engagement_number: string | null;
   client_name: string | null;
+  is_test?: boolean;
 };
 
 type WorkflowLogRow = {
@@ -139,7 +142,7 @@ export const ACTION_CATEGORIES: { key: string; label: string }[] = [
   { key: "contacts_leads", label: "Contacts & Leads" },
   { key: "tasks", label: "Tasks" },
   { key: "appointments", label: "Appointments" },
-  { key: "documents_organizers", label: "Documents & Organizers" },
+  { key: "documents_organizers", label: "Documents & Forms" },
   { key: "pipeline_engagements", label: "Pipeline & Engagements" },
   { key: "billing", label: "Billing" },
   { key: "tax_workflow", label: "Tax Workflow" },
@@ -152,8 +155,8 @@ export const ACTION_TYPES = [
   { value: "send_sms", label: "Send a text", category: "communication", description: "Send a templated text message to the client.", keywords: "message sms text" },
   { value: "create_task", label: "Create a task", category: "tasks", description: "Create a task assigned to a staff member.", keywords: "todo assign" },
   { value: "create_appointment", label: "Schedule an appointment (request)", category: "appointments", description: "Book an appointment on the calendar.", keywords: "meeting schedule calendar" },
-  { value: "send_organizer_template", label: "Push an organizer to the client's portal", category: "documents_organizers", description: "Send an intake organizer to the client's portal.", keywords: "intake form organizer" },
-  { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (organizer-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
+  { value: "send_organizer_template", label: "Push a form to the client's portal", category: "documents_organizers", description: "Send an intake form to the client's portal.", keywords: "intake form organizer" },
+  { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (form-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
   { value: "send_engagement_letter", label: "Send the document for signature", category: "tax_workflow", description: "Queue the document for e-signature.", keywords: "signature sign document letter" },
   { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
   { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
@@ -435,8 +438,8 @@ export function StepCard({
   async function save(configOverride?: Record<string, unknown>) {
     const configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
-      const tag = (configToSave.tag as string | undefined)?.trim();
-      if (tag && !(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+      const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
+      if (tags.length > 0 && !(await ensureTagsConfirmed(supabase, workspaceId, tags))) return;
     }
 
     setSaving(true);
@@ -1005,7 +1008,7 @@ export function StepCard({
 
         {actionType === "send_organizer_template" && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Organizer
+            Form
             <div className="flex gap-1.5">
               <select
                 disabled={!canManage}
@@ -1024,7 +1027,7 @@ export function StepCard({
                 <button
                   type="button"
                   onClick={() => setCreatingTemplateKind("organizer")}
-                  title="Create a new organizer"
+                  title="Create a new form"
                   className="shrink-0 rounded-lg border border-border px-2.5 py-1.5 text-muted hover:bg-surfaceMuted"
                 >
                   <Plus size={14} />
@@ -1032,13 +1035,13 @@ export function StepCard({
               )}
             </div>
             <span className="text-[11px] text-muted">
-              Auto-detect sends whichever organizer is linked to the service that triggered this run (set per
+              Auto-detect sends whichever form is linked to the service that triggered this run (set per
               service under Services) -- pick a specific template instead only if this step should always send the
-              same organizer regardless of service.
+              same form regardless of service.
             </span>
             {organizerOptions.length === 0 && (
               <span className="text-[11px] text-warning">
-                No published organizers yet -- an organizer stays hidden here until you publish it from{" "}
+                No published forms yet -- a form stays hidden here until you publish it from{" "}
                 <a href="/templates" target="_blank" rel="noreferrer" className="underline">
                   Form Templates
                 </a>
@@ -1075,8 +1078,8 @@ export function StepCard({
 
         {actionType === "create_engagement" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
-            Creates an engagement from the service already resolved on the organizer submission that triggered this run. Only works when
-            this step follows an &quot;An organizer is submitted&quot; trigger. This does not put the engagement in a pipeline -- add a
+            Creates an engagement from the service already resolved on the form submission that triggered this run. Only works when
+            this step follows the &quot;A form is submitted&quot; trigger. This does not put the engagement in a pipeline -- add a
             &quot;Move to a pipeline stage&quot; step after this one to do that.
           </p>
         )}
@@ -1599,13 +1602,15 @@ export function StepCard({
 
         {(actionType === "add_tag" || actionType === "remove_tag") && (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
-            Tag
-            <TagNameInput
+            Tags
+            <TagListInput
               disabled={!canManage}
-              value={(config.tag as string) ?? ""}
-              onChange={(v) => setField("tag", v)}
+              value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
+              onChange={(v) => {
+                setConfig((c) => ({ ...c, tags: v }));
+                setSaved(false);
+              }}
               tagOptions={tagOptions}
-              className="rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             />
           </label>
         )}
@@ -1752,6 +1757,7 @@ export function WorkflowBuilder({
   triggerType,
   triggerConfig,
   isEnabled,
+  status,
   steps,
   stepEdges,
   runs,
@@ -1772,12 +1778,14 @@ export function WorkflowBuilder({
   pendingApprovals = [],
   conditions: initialConditions = [],
   webhookToken,
+  initialActivityOpen = false,
 }: {
   workspaceId: string;
   automationId: string;
   triggerType: string;
   triggerConfig: Record<string, unknown>;
   isEnabled: boolean;
+  status: string;
   steps: WorkflowStepRow[];
   stepEdges: WorkflowStepEdgeRow[];
   runs: WorkflowRunRow[];
@@ -1798,6 +1806,10 @@ export function WorkflowBuilder({
   pendingApprovals?: PendingApprovalRow[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
+  /** Set when a dashboard "Failed Automation Runs" card links here with
+   *  ?activity=1 -- opens straight on the Activity panel instead of the
+   *  builder canvas, so a failed run is one click away, not two. */
+  initialActivityOpen?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -1805,21 +1817,24 @@ export function WorkflowBuilder({
   const [currentTriggerType, setCurrentTriggerType] = useState(triggerType);
   const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
+  const [workflowStatus, setWorkflowStatus] = useState(status);
   const [conditions, setConditions] = useState<ConditionGroup[]>(() => normalizeToConditionGroups(initialConditions));
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
   const [openRunId, setOpenRunId] = useState<string | null>(null);
-  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(initialActivityOpen);
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [testClient, setTestClient] = useState<ClientOption | null>(null);
+  const [runningTest, setRunningTest] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
 
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
     if (currentTriggerType === "client.tag_added") {
-      const triggerTag = (config.tag as string | undefined)?.trim();
-      if (triggerTag) tagsToConfirm.add(triggerTag);
+      const triggerTags = (config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : []);
+      triggerTags.forEach((t) => tagsToConfirm.add(t));
     }
-    for (const tag of tagsToConfirm) {
-      if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
-    }
+    if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return;
 
     setSavingTrigger(true);
     const { error } = await supabase
@@ -1863,6 +1878,80 @@ export function WorkflowBuilder({
     router.refresh();
   }
 
+  async function publishWorkflow() {
+    const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: automationId });
+    if (validationError) {
+      toast.show(validationError.message, "error");
+      return;
+    }
+    if (issues && issues.length > 0) {
+      const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+      window.alert(`Can't publish this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+      return;
+    }
+    const { error } = await supabase.from("automations").update({ status: "published", is_enabled: true }).eq("id", automationId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setWorkflowStatus("published");
+    setEnabled(true);
+    toast.show("Workflow published and active", "success");
+    router.refresh();
+  }
+
+  async function retireWorkflow() {
+    if (!window.confirm("Retire this workflow? It stops firing until you restore it as a draft.")) return;
+    const { error } = await supabase.from("automations").update({ status: "archived", is_enabled: false }).eq("id", automationId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setWorkflowStatus("archived");
+    setEnabled(false);
+    toast.show("Workflow retired", "success");
+    router.refresh();
+  }
+
+  async function reactivateAsDraft() {
+    const { error } = await supabase.from("automations").update({ status: "draft", is_enabled: false }).eq("id", automationId);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setWorkflowStatus("draft");
+    setEnabled(false);
+    toast.show("Workflow restored as a draft -- publish it when it's ready", "success");
+    router.refresh();
+  }
+
+  // Fires a real automation_runs row against whatever client was picked --
+  // execute_automation_step (see run_automation_test/is_test in the
+  // migrations) skips every client-visible action (email, SMS, portal
+  // message, engagement letter, portal invite, webhook, sending a quote)
+  // and logs what it would have done instead, but everything else (tasks,
+  // notes, tags, assignment, pipeline moves) executes for real against that
+  // client -- that's what makes this a trustworthy test instead of a guess.
+  async function runTest() {
+    if (!testClient) return;
+    setRunningTest(true);
+    setTestError(null);
+    const { data: runId, error } = await supabase.rpc("run_automation_test", {
+      p_automation_id: automationId,
+      p_client_id: testClient.id,
+    });
+    setRunningTest(false);
+    if (error) {
+      setTestError(error.message);
+      return;
+    }
+    setTestModalOpen(false);
+    setTestClient(null);
+    toast.show("Test run started", "success");
+    router.refresh();
+    if (runId) setOpenRunId(runId);
+  }
+
   async function approvePendingStep(pendingStepId: string) {
     const { error } = await supabase.rpc("approve_automation_step", { p_pending_step_id: pendingStepId });
     if (error) {
@@ -1888,19 +1977,39 @@ export function WorkflowBuilder({
     <div className="space-y-6">
       <div>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-ink">Steps</h3>
-          <button
-            type="button"
-            onClick={() => setActivityOpen(true)}
-            className="relative inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
-          >
-            <History size={14} /> Activity{runs.length > 0 ? ` (${runs.length})` : ""}
-            {pendingApprovals.length > 0 && (
-              <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
-                {pendingApprovals.length}
-              </span>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-ink">Steps</h3>
+            {workflowStatus === "draft" ? (
+              <Badge tone="warning">Draft</Badge>
+            ) : workflowStatus === "archived" ? (
+              <Badge tone="neutral">Retired</Badge>
+            ) : (
+              <Badge tone={enabled ? "success" : "neutral"}>{enabled ? "Live" : "Paused"}</Badge>
             )}
-          </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setTestModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+              >
+                <FlaskConical size={14} /> Run test
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setActivityOpen(true)}
+              className="relative inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+            >
+              <History size={14} /> Activity{runs.length > 0 ? ` (${runs.length})` : ""}
+              {pendingApprovals.length > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
+                  {pendingApprovals.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
         {steps.length === 0 && !canManage ? (
           <EmptyState message="No steps yet -- add one to decide what happens when this workflow fires." />
@@ -1938,13 +2047,36 @@ export function WorkflowBuilder({
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-semibold text-ink">Trigger</h2>
               <div className="flex items-center gap-2">
-                {canManage && (
+                {canManage && workflowStatus === "draft" && (
                   <button
                     type="button"
-                    onClick={toggleEnabled}
-                    className={`rounded-lg border px-3 py-1 text-xs font-medium ${enabled ? "border-success text-success" : "border-border text-muted"}`}
+                    onClick={publishWorkflow}
+                    className="rounded-lg border border-accent px-3 py-1 text-xs font-medium text-accent hover:bg-accentSoft"
                   >
-                    {enabled ? "Active -- click to pause" : "Paused -- click to activate"}
+                    Publish
+                  </button>
+                )}
+                {canManage && workflowStatus === "published" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={toggleEnabled}
+                      className={`rounded-lg border px-3 py-1 text-xs font-medium ${enabled ? "border-success text-success" : "border-border text-muted"}`}
+                    >
+                      {enabled ? "Active -- click to pause" : "Paused -- click to activate"}
+                    </button>
+                    <button type="button" onClick={retireWorkflow} className="rounded-lg border border-border px-3 py-1 text-xs font-medium text-muted hover:bg-surfaceMuted">
+                      Retire
+                    </button>
+                  </>
+                )}
+                {canManage && workflowStatus === "archived" && (
+                  <button
+                    type="button"
+                    onClick={reactivateAsDraft}
+                    className="rounded-lg border border-border px-3 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
+                  >
+                    Restore as draft
                   </button>
                 )}
                 <button type="button" onClick={() => setTriggerModalOpen(false)} aria-label="Close" className="text-muted hover:text-ink">
@@ -2067,7 +2199,14 @@ export function WorkflowBuilder({
                           onClick={() => setOpenRunId(r.id)}
                           className="cursor-pointer transition-colors hover:bg-surfaceMuted"
                         >
-                          <td className="px-4 py-2 font-medium text-ink">{r.client_name ?? r.engagement_number ?? "--"}</td>
+                          <td className="px-4 py-2 font-medium text-ink">
+                            {r.client_name ?? r.engagement_number ?? "--"}
+                            {r.is_test && (
+                              <Badge tone="accent" className="ml-2 inline-flex items-center gap-1">
+                                <FlaskConical size={11} /> Test
+                              </Badge>
+                            )}
+                          </td>
                           <td className="px-4 py-2">
                             <Badge
                               tone={
@@ -2113,6 +2252,58 @@ export function WorkflowBuilder({
                 </CollapsibleSection>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {testModalOpen && (
+        <div role="dialog" aria-modal="true" aria-label="Run test" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 px-4 py-8">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-lg">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-1.5 text-base font-semibold text-ink">
+                <FlaskConical size={16} className="text-accent" /> Run test
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setTestModalOpen(false);
+                  setTestClient(null);
+                  setTestError(null);
+                }}
+                aria-label="Close"
+                className="text-muted hover:text-ink"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mb-3 text-xs text-muted">
+              Pick a real client to run this workflow against. Every step actually executes -- tasks, notes, tags, assignment, and pipeline moves happen
+              for real -- but nothing goes out to the client: email, SMS, portal messages, engagement letters, portal invites, webhooks, and sent quotes
+              are simulated and logged instead of sent.
+            </p>
+            <ClientPickerField workspaceId={workspaceId} selected={testClient} onSelect={setTestClient} />
+            {testError && <p className="mt-2 text-sm text-danger">{testError}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setTestModalOpen(false);
+                  setTestClient(null);
+                  setTestError(null);
+                }}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-slate hover:bg-surfaceMuted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={runTest}
+                disabled={!testClient || runningTest}
+                className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              >
+                {runningTest ? "Running..." : "Run test"}
+              </button>
+            </div>
           </div>
         </div>
       )}

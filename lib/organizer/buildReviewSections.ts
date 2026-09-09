@@ -45,7 +45,7 @@ export type OpenInfoRequestItemRow = {
 };
 
 /** A per-question status distinct from OrganizerReviewStatus -- the extra values cover states that have no per-answer decision recorded yet. */
-export type ReviewQuestionStatus = "not_applicable" | "unanswered" | "optional_blank" | "needs_review" | OrganizerReviewStatus;
+export type ReviewQuestionStatus = "not_applicable" | "unanswered" | "optional_blank" | "needs_review" | "Awaiting Review" | OrganizerReviewStatus;
 
 export type ReviewQuestionItem = {
   fieldId: string;
@@ -122,13 +122,21 @@ function questionStatus(
   isRequired: boolean,
   hasAnswer: boolean,
   reviewStatus: OrganizerReviewStatus | null,
-  hasOpenInfoItem: boolean
+  openItemStatus: "pending" | "client_responded" | null
 ): ReviewQuestionStatus {
+  // An open information-request item always wins, even over a field that's
+  // conditionally hidden by the client's own answers -- e.g. a client who
+  // only checked "W-2" income but is actually engaged for a Schedule C
+  // return needs a way to be asked about the business section their
+  // answers hid. Checked before visibility so a flagged-while-hidden field
+  // neither disappears again on refresh nor silently blocks the flag in
+  // the first place (see canFlag in ReviewWorkspace.tsx). A client response
+  // is its own status ("Awaiting Review") distinct from still-waiting-on-
+  // the-client ("Corrections Requested") so the two read differently in
+  // the reviewer's UI.
+  if (openItemStatus === "client_responded") return "Awaiting Review";
+  if (openItemStatus === "pending") return "Corrections Requested";
   if (!visible) return "not_applicable";
-  // An open information-request item always reads as "Needs info," whether
-  // or not the field has an answer -- this is what lets an unanswered
-  // question (e.g. a missing upload) be flagged and tracked too.
-  if (hasOpenInfoItem) return "Corrections Requested";
   if (!hasAnswer) return isRequired ? "unanswered" : "optional_blank";
   if (reviewStatus) return reviewStatus;
   return "needs_review";
@@ -154,7 +162,7 @@ function buildQuestionItem(
     answerId: answer?.id ?? null,
     display: maskable ? maskLast4(answer?.value) : formatOrganizerValue(field.field_type, answer?.value),
     maskable,
-    status: questionStatus(visible, field.is_required, hasAnswer, answer?.review_status ?? null, Boolean(openItem)),
+    status: questionStatus(visible, field.is_required, hasAnswer, answer?.review_status ?? null, openItem?.status ?? null),
     reviewNote: openItem?.note ?? answer?.review_note ?? null,
     pendingChange: pendingChange ?? null,
     infoRequestItemId: openItem?.id ?? null,
@@ -162,7 +170,7 @@ function buildQuestionItem(
   };
 }
 
-const ATTENTION_STATUSES = new Set<ReviewQuestionStatus>(["unanswered", "Corrections Requested", "Rejected"]);
+const ATTENTION_STATUSES = new Set<ReviewQuestionStatus>(["unanswered", "Corrections Requested", "Awaiting Review", "Rejected"]);
 
 /**
  * Groups a template's fields into left-nav sections (split on field_type ===
@@ -205,8 +213,13 @@ export function buildReviewSections(
   let current: ReviewSection = { id: "general", label: "General", entries: [], attentionCount: 0, totalVisible: 0, allDecided: true };
   let hasOpenedRealSection = false;
 
-  function tallyStatus(visible: boolean, status: ReviewQuestionStatus) {
-    if (!visible || status === "not_applicable") return;
+  // Driven purely by the computed status, not raw visibility -- a field
+  // conditionally hidden by the client's own answers but flagged anyway
+  // (see questionStatus above) reports a real status, not "not_applicable",
+  // and should count toward the section's attention indicator same as any
+  // other flagged question.
+  function tallyStatus(status: ReviewQuestionStatus) {
+    if (status === "not_applicable") return;
     current.totalVisible += 1;
     if (ATTENTION_STATUSES.has(status)) {
       current.attentionCount += 1;
@@ -240,7 +253,7 @@ export function buildReviewSections(
           const a = answersByFieldAndInstance.get(`${c.id}:${i}`);
           const childVisible = visible && shouldShowField(parseConditionalLogic(c.conditional_logic), instanceAnswers);
           const item = buildQuestionItem(c, a, childVisible, i, pendingByField.get(c.id), openItemByFieldInstance.get(`${c.id}:${i}`));
-          tallyStatus(childVisible, item.status);
+          tallyStatus(item.status);
           return item;
         });
         instances.push({ index: i, items });
@@ -252,7 +265,7 @@ export function buildReviewSections(
     const answer = topAnswersByField.get(field.id);
     const item = buildQuestionItem(field, answer, visible, 0, pendingByField.get(field.id), openItemByFieldInstance.get(`${field.id}:0`));
     current.entries.push({ kind: "question", item });
-    tallyStatus(visible, item.status);
+    tallyStatus(item.status);
   }
   sections.push(current);
 
@@ -266,9 +279,11 @@ export type AwaitingReviewItem = {
   proposedDisplay: string;
   note: string | null;
   createdAt: string;
+  /** Whether this was a correction to an already-answered question (true) vs a client's answer to a question that was blank when flagged (false). */
+  wasAnsweredWhenFlagged: boolean;
 };
 
-/** Client-proposed corrections to already-answered questions, awaiting a staff approve/reject decision. */
+/** Client-submitted corrections and new answers to flagged questions, awaiting a staff approve/reject decision. */
 export function buildAwaitingReviewItems(
   fields: ReviewFieldRow[],
   answers: ReviewAnswerRow[],
@@ -288,7 +303,7 @@ export function buildAwaitingReviewItems(
   for (const a of answers) answersByFieldAndInstance.set(`${a.organizer_field_id}:${a.instance_index}`, a);
 
   return items
-    .filter((i) => i.status === "client_responded" && i.was_answered_when_flagged)
+    .filter((i) => i.status === "client_responded")
     .map((i) => {
       const field = fieldsById.get(i.organizer_field_id);
       const fieldType = field?.field_type ?? "short_text";
@@ -302,6 +317,7 @@ export function buildAwaitingReviewItems(
         proposedDisplay: maskable ? maskLast4(i.proposed_value) : formatOrganizerValue(fieldType, i.proposed_value),
         note: i.note,
         createdAt: i.created_at,
+        wasAnsweredWhenFlagged: i.was_answered_when_flagged,
       };
     });
 }

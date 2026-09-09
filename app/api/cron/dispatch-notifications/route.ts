@@ -4,6 +4,7 @@ import { sendEmailViaResend } from "@/lib/email/resend";
 import { sendSmsViaTwilio } from "@/lib/sms/twilio";
 import { renderTemplate } from "@/lib/templates/render";
 import { recordProviderCheck } from "@/lib/providerHealth";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,7 +22,7 @@ function isAuthorized(request: Request) {
 // external provider, so they're marked sent immediately) and promotes any
 // due scheduled messages out of draft_saves. Meant to be hit by a Vercel
 // Cron job every few minutes; see vercel.json.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -86,6 +87,7 @@ type NotificationJob = {
   workspace_id: string | null;
   recipient_email: string | null;
   recipient_phone: string | null;
+  recipient_user_id: string | null;
   channel: string;
   template_key: string;
   payload: unknown;
@@ -206,6 +208,53 @@ function pickTemplate<T extends { workspace_id: string | null }>(candidates: T[]
   return candidates.find((c) => c.workspace_id === workspaceId) ?? candidates.find((c) => c.workspace_id === null) ?? null;
 }
 
+// Mirrors execute_automation_step's send_portal_message action (find the
+// client's one open thread, or start one) so an automated email/SMS shows
+// up in the same place a manually-sent message does -- the Messages tab
+// reads message_threads/messages, not notification_queue/email_log/sms_log,
+// so without this an automated send was otherwise invisible there. Only
+// called for a job actually addressed to the client (no recipient_user_id
+// -- that's set only for send_notification's internal staff-alert branch,
+// which has nothing to do with the client-facing conversation).
+async function recordClientMessage(
+  supabase: ReturnType<typeof createServiceClient>,
+  workspaceId: string,
+  clientId: string,
+  channel: "email" | "sms",
+  body: string
+): Promise<string | null> {
+  const { data: existingThread } = await supabase
+    .from("message_threads")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("entity_type", "client")
+    .eq("entity_id", clientId)
+    .eq("status", "open")
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  let threadId = existingThread?.id ?? null;
+  if (!threadId) {
+    const { data: newThread } = await supabase
+      .from("message_threads")
+      .insert({ workspace_id: workspaceId, entity_type: "client", entity_id: clientId, subject: "Automated messages", channel })
+      .select("id")
+      .single();
+    threadId = newThread?.id ?? null;
+  }
+  if (!threadId) return null;
+
+  const { data: message } = await supabase
+    .from("messages")
+    .insert({ workspace_id: workspaceId, thread_id: threadId, sender_type: "staff", is_internal: false, body })
+    .select("id")
+    .single();
+
+  await supabase.from("message_threads").update({ last_message_at: new Date().toISOString() }).eq("id", threadId);
+  return message?.id ?? null;
+}
+
 async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job: NotificationJob, context: DispatchContext): Promise<"sent" | "retry" | "dead"> {
   const basePayload = (job.payload ?? {}) as Record<string, unknown>;
   const workspaceId = job.workspace_id;
@@ -230,9 +279,15 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId });
       if (result.reason === undefined) await recordProviderCheck("email", result.sent, result.error);
 
+      let messageId: string | null = null;
+      if (result.sent && !job.recipient_user_id && clientId) {
+        messageId = await recordClientMessage(supabase, workspaceId, clientId, "email", html);
+      }
+
       await supabase.from("email_log").insert({
         workspace_id: workspaceId,
         notification_queue_id: job.id,
+        message_id: messageId,
         template_key: job.template_key,
         recipient_email: job.recipient_email,
         subject,
@@ -255,9 +310,15 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       const result = await sendSmsViaTwilio({ to: job.recipient_phone, body, workspaceId });
       if (result.reason === undefined) await recordProviderCheck("sms", result.sent, result.error);
 
+      let messageId: string | null = null;
+      if (result.sent && !job.recipient_user_id && clientId) {
+        messageId = await recordClientMessage(supabase, workspaceId, clientId, "sms", body);
+      }
+
       await supabase.from("sms_log").insert({
         workspace_id: workspaceId,
         notification_queue_id: job.id,
+        message_id: messageId,
         template_key: job.template_key,
         recipient_phone: job.recipient_phone,
         body,
@@ -297,3 +358,4 @@ function referencesToken(template: string, token: string) {
   return new RegExp(`\\{\\{\\s*${token}\\s*\\}\\}`).test(template);
 }
 
+export const GET = withJobLogging("dispatch-notifications", handleGET);

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Flag, HelpCircle, X } from "lucide-react";
+import { ArrowUpRight, Check, Flag, HelpCircle, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -50,6 +50,7 @@ const QUESTION_STATUS_LABEL: Record<ReviewQuestionStatus, string> = {
   unanswered: "Unanswered",
   optional_blank: "Not answered",
   needs_review: "Approved",
+  "Awaiting Review": "Awaiting review",
   Pending: "Pending",
   "In Review": "In review",
   Approved: "Approved",
@@ -62,6 +63,7 @@ const QUESTION_STATUS_TONE: Record<ReviewQuestionStatus, BadgeTone> = {
   unanswered: "danger",
   optional_blank: "neutral",
   needs_review: "success",
+  "Awaiting Review": "danger",
   Pending: "neutral",
   "In Review": "accent",
   Approved: "success",
@@ -102,6 +104,10 @@ export function ReviewWorkspace({
   entityId,
   activity,
   staffOptions,
+  canApprove,
+  canDeny,
+  canRequestInfo,
+  canEroReview,
 }: {
   workspaceId: string;
   response: ResponseInfo;
@@ -121,6 +127,11 @@ export function ReviewWorkspace({
   entityId: string;
   activity: ActivityRow[];
   staffOptions: StaffOption[];
+  /** Which of the four review decisions the logged-in staffer's role can take -- see organizers.review_approve/_deny/_request_info/_ero. */
+  canApprove: boolean;
+  canDeny: boolean;
+  canRequestInfo: boolean;
+  canEroReview: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -141,6 +152,13 @@ export function ReviewWorkspace({
   const [collapsedHidden, setCollapsedHidden] = useState(true);
 
   const activeSection = sections.find((s) => s.id === activeSectionId) ?? sections[0];
+  // review_status has no default -- it stays null until the first time a
+  // reviewer takes any decision on this response (sends an info request,
+  // approves, or rejects). Before that, an unflagged answered question
+  // showing "Approved" would be a false signal (nothing has actually been
+  // reviewed yet); after it, everything not specifically flagged really is
+  // implicitly fine by the "flag only what's wrong" model.
+  const hasReviewStarted = response.reviewStatus !== null;
 
   const totalAttention = sections.reduce((sum, s) => sum + s.attentionCount, 0);
   const totalVisible = sections.reduce((sum, s) => sum + s.totalVisible, 0);
@@ -157,6 +175,18 @@ export function ReviewWorkspace({
       return;
     }
     toast.show(`Marked ${status}.`, "success");
+    router.refresh();
+  }
+
+  async function sendToEroReview() {
+    setBusyResponse(true);
+    const { error } = await supabase.rpc("send_organizer_to_ero_review", { p_response_id: response.id });
+    setBusyResponse(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Sent to ERO review.", "success");
     router.refresh();
   }
 
@@ -179,6 +209,18 @@ export function ReviewWorkspace({
       if (existing) return prev.map((i) => (i.id === data ? { ...i, note } : i));
       return [...prev, { id: data as string, organizer_field_id: fieldId, instance_index: instanceIndex, note, label }];
     });
+    // The RPC creates the draft organizer_information_requests row on the
+    // first flag but only returns the item id -- without this, draftRequestId
+    // stays null (its initial-render value never re-syncs from router.refresh())
+    // and sendInformationRequest wrongly refuses to send.
+    if (!draftRequestId) {
+      const { data: itemRow } = await supabase
+        .from("organizer_information_request_items")
+        .select("request_id")
+        .eq("id", data as string)
+        .maybeSingle();
+      if (itemRow) setDraftRequestId(itemRow.request_id);
+    }
     toast.show("Flagged for review.", "success");
     router.refresh();
     return true;
@@ -192,7 +234,14 @@ export function ReviewWorkspace({
       toast.show(error.message, "error");
       return;
     }
-    setDraftItems((prev) => prev.filter((i) => i.id !== itemId));
+    setDraftItems((prev) => {
+      const next = prev.filter((i) => i.id !== itemId);
+      // Unflagging the last draft item deletes the draft request row
+      // server-side too -- clear the id so a later flag doesn't try to send
+      // against a request that no longer exists.
+      if (next.length === 0) setDraftRequestId(null);
+      return next;
+    });
     router.refresh();
   }
 
@@ -223,7 +272,7 @@ export function ReviewWorkspace({
       return;
     }
     setAwaitingReviewItems((prev) => prev.filter((i) => i.id !== itemId));
-    toast.show("Correction approved.", "success");
+    toast.show("Approved.", "success");
     router.refresh();
   }
 
@@ -236,7 +285,7 @@ export function ReviewWorkspace({
       return;
     }
     setAwaitingReviewItems((prev) => prev.filter((i) => i.id !== itemId));
-    toast.show("Correction rejected; the client has been notified.", "success");
+    toast.show("Sent back to the client for another look.", "success");
     router.refresh();
   }
 
@@ -257,10 +306,14 @@ export function ReviewWorkspace({
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    // Lands on the engagement's Notes tab (or the client's, if this
+    // organizer isn't tied to an engagement) -- same place every other
+    // note about this client/engagement lives, not a separate bucket only
+    // this screen could ever read back.
     const { error } = await supabase.from("notes").insert({
       workspace_id: workspaceId,
-      entity_type: "organizer_response",
-      entity_id: response.id,
+      entity_type: response.engagementId ? "engagement" : "client",
+      entity_id: response.engagementId ?? response.clientId,
       author_id: user?.id,
       body: noteBody.trim(),
     });
@@ -336,7 +389,12 @@ export function ReviewWorkspace({
                     key={entry.item.fieldId}
                     item={entry.item}
                     collapsedHidden={collapsedHidden}
-                    busy={busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId}
+                    hasReviewStarted={hasReviewStarted}
+                    canRequestInfo={canRequestInfo}
+                    busy={
+                      busyItemId !== null &&
+                      (busyItemId === `${entry.item.fieldId}:${entry.item.instanceIndex}` || busyItemId === entry.item.infoRequestItemId)
+                    }
                     onFlag={(note) => flagField(entry.item.fieldId, entry.item.instanceIndex, entry.item.label, note)}
                     onUnflag={() => entry.item.infoRequestItemId && unflagItem(entry.item.infoRequestItemId)}
                   />
@@ -359,7 +417,12 @@ export function ReviewWorkspace({
                                   item={item}
                                   compact
                                   collapsedHidden={collapsedHidden}
-                                  busy={busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId}
+                                  hasReviewStarted={hasReviewStarted}
+                                  canRequestInfo={canRequestInfo}
+                                  busy={
+                                    busyItemId !== null &&
+                                    (busyItemId === `${item.fieldId}:${item.instanceIndex}` || busyItemId === item.infoRequestItemId)
+                                  }
                                   onFlag={(note) => flagField(item.fieldId, item.instanceIndex, `${entry.group.label} ${instance.index + 1} -- ${item.label}`, note)}
                                   onUnflag={() => item.infoRequestItemId && unflagItem(item.infoRequestItemId)}
                                 />
@@ -410,32 +473,52 @@ export function ReviewWorkspace({
         <aside className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4 space-y-5">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Review decision</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setResponseStatus("Approved")}
-                disabled={busyResponse}
-                className="inline-flex items-center gap-1 rounded-lg border border-emerald px-2.5 py-1.5 text-xs font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
-              >
-                <Check size={12} /> Approve
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowNeedsInfoModal(true)}
-                disabled={busyResponse}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
-              >
-                <HelpCircle size={12} /> Need Info{draftItems.length > 0 ? ` (${draftItems.length})` : ""}
-              </button>
-              <button
-                type="button"
-                onClick={() => setResponseStatus("Rejected")}
-                disabled={busyResponse}
-                className="inline-flex items-center gap-1 rounded-lg border border-rose px-2.5 py-1.5 text-xs font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
-              >
-                <X size={12} /> Deny
-              </button>
-            </div>
+            {!canApprove && !canDeny && !canRequestInfo && !canEroReview ? (
+              <p className="text-xs text-muted">You don&apos;t have permission to make a review decision on this form.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {canApprove && (
+                  <button
+                    type="button"
+                    onClick={() => setResponseStatus("Approved")}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-emerald px-2.5 py-1.5 text-xs font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
+                  >
+                    <Check size={12} /> Approve
+                  </button>
+                )}
+                {canRequestInfo && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNeedsInfoModal(true)}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-amber px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
+                  >
+                    <HelpCircle size={12} /> Need Info{draftItems.length > 0 ? ` (${draftItems.length})` : ""}
+                  </button>
+                )}
+                {canEroReview && (
+                  <button
+                    type="button"
+                    onClick={sendToEroReview}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-accent px-2.5 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-60"
+                  >
+                    <ArrowUpRight size={12} /> ERO Review
+                  </button>
+                )}
+                {canDeny && (
+                  <button
+                    type="button"
+                    onClick={() => setResponseStatus("Rejected")}
+                    disabled={busyResponse}
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose px-2.5 py-1.5 text-xs font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
+                  >
+                    <X size={12} /> Deny
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -454,7 +537,7 @@ export function ReviewWorkspace({
             </select>
           </div>
 
-          {awaitingReviewItems.length > 0 && (
+          {canRequestInfo && awaitingReviewItems.length > 0 && (
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Awaiting your review</p>
               <ul className="space-y-2">
@@ -568,6 +651,8 @@ function QuestionCard({
   item,
   compact = false,
   collapsedHidden,
+  hasReviewStarted,
+  canRequestInfo,
   busy,
   onFlag,
   onUnflag,
@@ -575,6 +660,8 @@ function QuestionCard({
   item: ReviewQuestionItem;
   compact?: boolean;
   collapsedHidden: boolean;
+  hasReviewStarted: boolean;
+  canRequestInfo: boolean;
   busy: boolean;
   onFlag: (note: string) => Promise<boolean>;
   onUnflag: () => void;
@@ -592,16 +679,30 @@ function QuestionCard({
   // can be flagged the same as an answered one.
   const isFlagged = Boolean(item.infoRequestItemId) && item.infoRequestItemStatus === "pending";
   const isAwaitingClientCorrection = Boolean(item.infoRequestItemId) && item.infoRequestItemStatus === "client_responded";
-  const canFlag = !isHidden && !isAwaitingClientCorrection;
+  // Flaggable even while conditionally hidden by the client's own answers --
+  // e.g. a question that only shows up if the client checked "self-employed"
+  // still needs to be flaggable if a reviewer believes it was answered
+  // incorrectly and should apply. The backend has never restricted this;
+  // only this check did.
+  const canFlag = canRequestInfo && !isAwaitingClientCorrection;
 
   return (
-    <div className={`rounded-2xl border border-border bg-surface shadow-soft ${compact ? "p-3" : "p-4"} ${isHidden ? "opacity-60" : ""}`}>
+    <div
+      className={`rounded-2xl border shadow-soft ${compact ? "p-3" : "p-4"} ${
+        isHidden ? "border-border bg-surface opacity-60" : isAwaitingClientCorrection ? "border-danger/40 bg-danger/5" : "border-border bg-surface"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium text-ink">{item.label}</p>
           {item.helpText && <p className="mt-0.5 text-xs text-muted">{item.helpText}</p>}
         </div>
-        <Badge tone={QUESTION_STATUS_TONE[item.status]}>{QUESTION_STATUS_LABEL[item.status]}</Badge>
+        {/* "Approved" only means something once the reviewer has made a first
+            decision on this response -- before that, an answered question
+            with no flag is just untouched, not approved. */}
+        {!(item.status === "needs_review" && !hasReviewStarted) && (
+          <Badge tone={QUESTION_STATUS_TONE[item.status]}>{QUESTION_STATUS_LABEL[item.status]}</Badge>
+        )}
       </div>
 
       {!isHidden && (
@@ -696,16 +797,23 @@ function AwaitingReviewCard({
   const [note, setNote] = useState("");
 
   return (
-    <li className="rounded-lg border border-border p-2.5 text-xs">
-      <p className="font-medium text-ink">{item.fieldLabel}</p>
+    <li className="rounded-lg border border-danger/40 bg-danger/5 p-2.5 text-xs">
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-ink">{item.fieldLabel}</p>
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-danger">
+          {item.wasAnsweredWhenFlagged ? "Correction" : "New answer"}
+        </span>
+      </div>
       {item.note && <p className="mt-0.5 text-muted">Reviewer asked: &quot;{item.note}&quot;</p>}
       <div className="mt-1.5 space-y-1">
+        {item.wasAnsweredWhenFlagged && (
+          <p>
+            <span className="text-muted">Current: </span>
+            {item.currentDisplay || "(blank)"}
+          </p>
+        )}
         <p>
-          <span className="text-muted">Current: </span>
-          {item.currentDisplay || "--"}
-        </p>
-        <p>
-          <span className="text-muted">Proposed: </span>
+          <span className="text-muted">{item.wasAnsweredWhenFlagged ? "Proposed: " : "Answer: "}</span>
           <span className="font-medium text-accent">{item.proposedDisplay || "--"}</span>
         </p>
       </div>

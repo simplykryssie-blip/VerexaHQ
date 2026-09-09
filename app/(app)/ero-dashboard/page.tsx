@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Users, Briefcase, Clock, Receipt, ArrowRight } from "lucide-react";
+import { Users, Briefcase, Clock, Receipt, ArrowRight, Building2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getDashboardData } from "@/lib/dashboard/data";
 import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { timeAgo } from "@/lib/timeAgo";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { KpiWidget } from "@/components/widgets/KpiWidget";
 import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
@@ -69,7 +69,16 @@ export default async function EroDashboardPage() {
 
   return (
     <>
-      <PageHeader title="ERO Dashboard" description={`Team-wide workload and pipeline for ${workspace.name}.`} />
+      <PageHero
+        icon={Building2}
+        tone="violet"
+        heading={
+          <>
+            Your <HeroHighlight>ERO dashboard</HeroHighlight>.
+          </>
+        }
+        subtitle={`Team-wide workload and pipeline for ${workspace.name}.`}
+      />
 
       <div className="flex-1 px-8 py-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

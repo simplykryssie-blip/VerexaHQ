@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getValidAccessToken } from "@/lib/zoom/tokens";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ function isAuthorized(request: Request) {
 // otherwise go quiet long enough for their connection to silently die.
 // Exercising the refresh flow here keeps it alive indefinitely without
 // requiring an actual meeting-creation call.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -39,3 +40,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked: stale?.length ?? 0, refreshed, failed });
 }
+
+export const GET = withJobLogging("refresh-zoom-tokens", handleGET);

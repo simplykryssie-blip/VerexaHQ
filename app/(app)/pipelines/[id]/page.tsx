@@ -89,7 +89,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
   }
 
   return (
-    <div>
+    <div className="pb-24">
       <Link href="/pipelines" className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={13} /> Back to Pipelines
       </Link>

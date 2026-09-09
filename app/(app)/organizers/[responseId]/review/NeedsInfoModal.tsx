@@ -37,7 +37,7 @@ export function NeedsInfoModal({
   onRemove: (itemId: string) => void;
   onSend: (message: string, dueDate: string | null, tags: string[], sendEmail: boolean, sendSms: boolean, showInPortal: boolean) => Promise<string | void>;
 }) {
-  const [intro, setIntro] = useState("We need a bit more information before we can finish reviewing your organizer:");
+  const [intro, setIntro] = useState("We need a bit more information before we can finish reviewing your form:");
   const [dueDate, setDueDate] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [sendEmail, setSendEmail] = useState(Boolean(clientEmail));

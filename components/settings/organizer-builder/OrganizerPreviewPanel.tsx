@@ -65,7 +65,7 @@ export function OrganizerPreviewPanel({
           </p>
         )}
 
-        <div className="mt-5 grid grid-cols-12 gap-x-5 gap-y-6">
+        <div className="@container mt-5 grid grid-cols-12 gap-x-5 gap-y-6">
           {currentPage.fields.length === 0 && <p className="col-span-12 text-sm text-muted">No fields to show yet.</p>}
           {currentPage.fields.map((field) =>
             field.field_type === "repeating_section" ? (
@@ -139,7 +139,7 @@ function PreviewRepeatingSection({
                 Remove
               </button>
             </div>
-            <div className="mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
+            <div className="@container mt-3 grid grid-cols-12 gap-x-4 gap-y-4">
               {childFields
                 .filter((child) => shouldShowField(parseConditionalLogic(child.conditional_logic), row))
                 .map((child) => (

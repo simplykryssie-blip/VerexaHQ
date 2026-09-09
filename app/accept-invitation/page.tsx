@@ -17,6 +17,7 @@ type Preview = {
   role_name: string;
   account_exists: boolean;
   password_min_length: number;
+  grant_platform_it: boolean;
 };
 
 export default function AcceptInvitationPage() {
@@ -222,7 +223,8 @@ export default function AcceptInvitationPage() {
       <Centered center>
         <h1 className="text-xl font-semibold text-ink">Join {preview.workspace_name}</h1>
         <p className="mt-3 text-sm text-muted">
-          You&apos;ve been invited as {preview.role_name}. Accept to join this workspace.
+          You&apos;ve been invited as {preview.role_name}
+          {preview.grant_platform_it ? ", with IT tools access" : ""}. Accept to join this workspace.
         </p>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
         <button
@@ -241,7 +243,8 @@ export default function AcceptInvitationPage() {
     <Centered>
       <h1 className="text-xl font-semibold text-ink">Join {preview.workspace_name}</h1>
       <p className="mt-1 text-sm text-muted">
-        You&apos;ve been invited as {preview.role_name}. Create an account or sign in with{" "}
+        You&apos;ve been invited as {preview.role_name}
+        {preview.grant_platform_it ? ", with IT tools access" : ""}. Create an account or sign in with{" "}
         <span className="font-medium text-slate">{preview.email}</span> to accept.
       </p>
 

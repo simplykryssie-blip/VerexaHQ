@@ -5,12 +5,17 @@ import Link from "next/link";
 import { FileText, Receipt, DollarSign, AlertTriangle, Plus } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
-import { IconChip, type IconChipTone } from "@/components/ui/IconChip";
+import type { IconChipTone } from "@/components/ui/IconChip";
+import { StatTile } from "@/components/ui/StatTile";
 import { Modal } from "@/components/Modal";
-import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE, BANK_PRODUCT_STATUS_TONE } from "@/lib/billingStatus";
 import { InvoiceQuoteForm, type EditingInvoiceQuote } from "./InvoiceQuoteForm";
 import { PreviewButton } from "./PreviewButton";
 import { NewBillingDocumentModal } from "./NewBillingDocumentModal";
+import { ReactivateQuoteButton } from "./ReactivateQuoteButton";
+import { BankProductImportModal } from "./BankProductImportModal";
+import { BankProductStatusSelect } from "./BankProductStatusSelect";
+import { Upload } from "lucide-react";
 
 function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -60,6 +65,19 @@ export type BillingPaymentRow = {
   client_name: string;
 };
 
+export type BillingBankProductRow = {
+  id: string;
+  bank_partner: string;
+  product_type: string;
+  rebate_amount: number | null;
+  status: string;
+  created_at: string;
+  engagement_id: string;
+  engagement_number: string | null;
+  client_id: string;
+  client_name: string;
+};
+
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   stripe: "Card",
   check: "Check",
@@ -68,7 +86,7 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-const TABS = ["Quotes", "Invoices", "Payments"] as const;
+const TABS = ["Quotes", "Invoices", "Payments", "Bank Products"] as const;
 type Tab = (typeof TABS)[number];
 
 export function BillingHub({
@@ -77,19 +95,29 @@ export function BillingHub({
   quotes,
   invoices,
   payments,
+  bankProducts,
   services,
   canManage,
+  initialUnpaidOnly = false,
 }: {
   workspaceId: string;
   workspaceName: string;
   quotes: BillingQuoteRow[];
   invoices: BillingInvoiceRow[];
   payments: BillingPaymentRow[];
+  bankProducts: BillingBankProductRow[];
   services: { id: string; name: string }[];
   canManage: boolean;
+  /** Set when the dashboard's "Outstanding Invoices" KPI links here with
+   *  ?filter=unpaid -- opens straight on the Invoices tab pre-filtered to
+   *  the same outstanding-balance set that KPI counted, instead of landing
+   *  on the unfiltered hub and making staff re-find what they clicked for. */
+  initialUnpaidOnly?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("Invoices");
+  const [unpaidOnly, setUnpaidOnly] = useState(initialUnpaidOnly);
   const [creating, setCreating] = useState<"invoice" | "quote" | null>(null);
+  const [importingBankProducts, setImportingBankProducts] = useState(false);
   const [editingQuote, setEditingQuote] = useState<BillingQuoteRow | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<BillingInvoiceRow | null>(null);
 
@@ -114,13 +142,7 @@ export function BillingHub({
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((s) => (
-          <div key={s.label} className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
-            <IconChip tone={s.chip} className="mb-3">
-              <s.icon size={17} aria-hidden="true" />
-            </IconChip>
-            <p className="text-xs uppercase tracking-wide text-muted">{s.label}</p>
-            <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{s.value}</p>
-          </div>
+          <StatTile key={s.label} icon={s.icon} tone={s.chip} label={s.label} value={s.value} />
         ))}
       </div>
 
@@ -137,7 +159,18 @@ export function BillingHub({
             </button>
           ))}
         </div>
-        {canManage && (
+        {canManage && tab === "Bank Products" && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setImportingBankProducts(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+            >
+              <Upload size={14} /> Import CSV
+            </button>
+          </div>
+        )}
+        {canManage && tab !== "Bank Products" && (
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -178,6 +211,7 @@ export function BillingHub({
                       {q.status}
                     </Badge>
                     <span className="text-slate">{money(q.total_amount)}</span>
+                    {canManage && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                     {canManage && (
                       <button type="button" onClick={() => setEditingQuote(q)} className="text-xs font-medium text-accent hover:underline">
                         Edit
@@ -185,6 +219,7 @@ export function BillingHub({
                     )}
                     <PreviewButton
                       kind="quote"
+                      workspaceId={workspaceId}
                       firmName={workspaceName}
                       clientName={q.client_name}
                       number={q.quote_number}
@@ -208,11 +243,23 @@ export function BillingHub({
 
       {tab === "Invoices" && (
         <div className="rounded-2xl border border-border bg-surface shadow-soft">
-          {invoices.length === 0 ? (
-            <EmptyState message="No invoices yet." />
+          <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => setUnpaidOnly((v) => !v)}
+              aria-pressed={unpaidOnly}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                unpaidOnly ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:border-accent hover:text-accent"
+              }`}
+            >
+              Unpaid only {unpaidOnly && `(${outstandingInvoices.length})`}
+            </button>
+          </div>
+          {(unpaidOnly ? outstandingInvoices : invoices).length === 0 ? (
+            <EmptyState message={unpaidOnly ? "No outstanding invoices -- everything's paid up." : "No invoices yet."} />
           ) : (
             <ul className="divide-y divide-border">
-              {invoices.map((i) => (
+              {(unpaidOnly ? outstandingInvoices : invoices).map((i) => (
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                   <div className="min-w-0">
                     <Link href={`/clients/${i.client_id}`} className="font-medium text-accent hover:underline">
@@ -234,6 +281,7 @@ export function BillingHub({
                     )}
                     <PreviewButton
                       kind="invoice"
+                      workspaceId={workspaceId}
                       firmName={workspaceName}
                       clientName={i.client_name}
                       number={i.invoice_number}
@@ -284,6 +332,41 @@ export function BillingHub({
           )}
         </div>
       )}
+
+      {tab === "Bank Products" && (
+        <div className="rounded-2xl border border-border bg-surface shadow-soft">
+          {bankProducts.length === 0 ? (
+            <EmptyState message="No refund transfers or advances recorded yet -- record one from an engagement's Billing tab, or import a CSV." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {bankProducts.map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
+                  <div className="min-w-0">
+                    <Link href={`/engagements/${b.engagement_id}`} className="font-medium text-accent hover:underline">
+                      {b.client_name}
+                    </Link>
+                    <p className="text-xs text-muted">
+                      {b.engagement_number ?? "Engagement"} -- {b.bank_partner} ({b.product_type.replace("_", " ")})
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate">{money(b.rebate_amount ?? 0)} rebate</span>
+                    {canManage ? (
+                      <BankProductStatusSelect id={b.id} status={b.status} />
+                    ) : (
+                      <Badge tone={BANK_PRODUCT_STATUS_TONE[b.status] ?? "neutral"} className="capitalize">
+                        {b.status}
+                      </Badge>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      {importingBankProducts && <BankProductImportModal workspaceId={workspaceId} onClose={() => setImportingBankProducts(false)} />}
 
       {creating && (
         <NewBillingDocumentModal

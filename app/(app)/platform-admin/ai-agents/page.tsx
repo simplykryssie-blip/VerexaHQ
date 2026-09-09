@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Lock, Sparkles, FlaskConical, ShieldCheck, Workflow, Gauge } from "lucide-react";
+import { Lock, Sparkles, FlaskConical, ShieldCheck, Workflow, Gauge, ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
@@ -101,9 +102,17 @@ export default async function AdminAiAgentsPage() {
           <p className="font-medium text-ink">How a run gets started</p>
           <p className="mt-1">
             These agents run as Claude Code sessions, not a button that quietly calls an AI API on its own -- ask Claude Code directly (&quot;run the
-            QA agent against the ERO demo workspace&quot;) for an on-demand check, or ask for a scheduled Routine to run one automatically on a
+            QA agent against the ERO demo workspace&quot;) for an on-demand check, or set up a scheduled Routine to run one automatically on a
             cadence. Either way, every run and finding shows up below in real time as it happens.
           </p>
+          <a
+            href="https://claude.ai/code"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-slate transition hover:border-accent hover:text-accent"
+          >
+            <ExternalLink size={14} aria-hidden="true" /> Manage Routines in Claude Code
+          </a>
         </div>
 
         <div>
@@ -133,7 +142,12 @@ export default async function AdminAiAgentsPage() {
         </div>
 
         <div>
-          <h2 className="mb-3 font-display text-sm font-semibold text-ink">Recent findings</h2>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-sm font-semibold text-ink">Recent findings</h2>
+            <Link href="/platform-admin/ai-agents/findings" className="text-sm font-medium text-accent hover:underline">
+              See all findings &rarr;
+            </Link>
+          </div>
           {!recentFindings || recentFindings.length === 0 ? (
             <div className="rounded-2xl border border-border bg-surface shadow-soft">
               <EmptyState icon={Sparkles} message="No findings yet -- none of the agents have run." />

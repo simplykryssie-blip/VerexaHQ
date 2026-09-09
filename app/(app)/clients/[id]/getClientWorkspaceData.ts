@@ -377,7 +377,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
 
   const engagementIds = (engagements ?? []).map((e) => e.id);
 
-  const [{ data: engagementActivity }, { data: threadMessages }] = await Promise.all([
+  const [{ data: engagementActivity }, { data: threadMessages }, { data: emailLog }] = await Promise.all([
     engagementIds.length > 0
       ? supabase
           .from("activity_log")
@@ -394,14 +394,35 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
           .in("thread_id", messageThreads.map((t) => t.id))
           .order("created_at", { ascending: true })
       : Promise.resolve({ data: [] as { id: string; thread_id: string; sender_type: string; body: string; is_internal: boolean; created_at: string; sender_id: string | null; workspace_id: string }[] }),
+    // Matched by address rather than a direct client_id -- email_log is
+    // transactional (invoices, reminders, portal invites, ...) with no
+    // entity link back to who it was about, only who it went to.
+    client.primary_email
+      ? supabase
+          .from("email_log")
+          .select("id, subject, status, sent_at, created_at")
+          .eq("recipient_email", client.primary_email)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] as { id: string; subject: string; status: string; sent_at: string | null; created_at: string }[] }),
   ]);
 
-  let tasks: { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null }[] = [];
+  let tasks: {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    priority: string | null;
+    due_date: string | null;
+    engagement_id: string | null;
+    client_id: string | null;
+    related_organizer_response_id: string | null;
+  }[] = [];
   {
     const engagementFilter = engagementIds.length > 0 ? `engagement_id.in.(${engagementIds.join(",")})` : "";
     const { data: taskRows } = await supabase
       .from("tasks")
-      .select("id, title, status, due_date, engagement_id")
+      .select("id, title, description, status, priority, due_date, engagement_id, client_id, related_organizer_response_id")
       .or([engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(","))
       .neq("status", "completed")
       .order("due_date");
@@ -417,11 +438,18 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
   // not any actual request sent to this client (so a real ad-hoc or
   // organizer-driven request, with no service template involved, never
   // counted here).
+  // is_required=true only -- an organizer-driven checklist item (e.g. a
+  // 1099-INT upload question) is opted into the checklist but is never
+  // hard-required on its own, since whether the client actually has that
+  // document depends on their situation, not the form. Counting every
+  // pending item regardless of is_required flagged clients as missing
+  // documents they were never actually required to provide.
   const { count: missingDocumentCountRaw } = await supabase
     .from("document_request_item_statuses")
     .select("id, document_requests!inner(entity_type, entity_id, status)", { count: "exact", head: true })
     .eq("document_requests.status", "open")
     .eq("status", "pending")
+    .eq("is_required", true)
     .or(
       [`entity_id.eq.${client.id}`, engagementIds.length > 0 ? `entity_id.in.(${engagementIds.join(",")})` : null]
         .filter(Boolean)
@@ -430,7 +458,34 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     );
   const missingDocumentCount = missingDocumentCountRaw ?? 0;
 
-  const timeline = [...(clientActivity ?? []), ...(engagementActivity ?? [])].sort(
+  // "Important events only" -- deliberately excludes pipeline/workflow
+  // process noise (stage moves, automation runs) that activity_log never
+  // logged in the first place. Adds the categories that already exist as
+  // separate data on this page but weren't in the timeline: notes,
+  // payments, and outbound email (matched by address -- email_log has no
+  // entity link back to a client). Calls and a staff-assignment change
+  // history aren't tracked anywhere in the schema, so they're left out
+  // rather than faked.
+  const noteEvents = (notes ?? []).map((n) => ({
+    id: `note:${n.id}`,
+    description: `Note added${n.subject ? `: ${n.subject}` : ""}`,
+    activity_type: "NOTE_ADDED",
+    created_at: n.created_at,
+  }));
+  const paymentEvents = (payments ?? []).map((p) => ({
+    id: `payment:${p.id}`,
+    description: `Payment ${p.status} -- $${Number(p.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    activity_type: "PAYMENT_RECEIVED",
+    created_at: p.payment_date,
+  }));
+  const emailEvents = (emailLog ?? []).map((e) => ({
+    id: `email:${e.id}`,
+    description: `Email ${e.status}${e.subject ? `: ${e.subject}` : ""}`,
+    activity_type: "EMAIL_SENT",
+    created_at: e.sent_at ?? e.created_at,
+  }));
+
+  const timeline = [...(clientActivity ?? []), ...(engagementActivity ?? []), ...noteEvents, ...paymentEvents, ...emailEvents].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 
@@ -502,7 +557,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
       id: o.id,
       status: o.status,
       submitted_at: o.submitted_at,
-      template_name: o.organizer_templates?.name ?? "Organizer",
+      template_name: o.organizer_templates?.name ?? "Form",
       filed_as_attachment: o.filed_as_attachment,
       topLevel: o.topLevel,
       repeaters: o.repeaters,

@@ -6,9 +6,19 @@
 // rather than this helper.
 const STRUCTURAL_FIELD_TYPES = new Set(["section", "page_break", "rich_text", "repeating_section"]);
 
+// Half-width pairing reacts to the grid's own rendered width (a container
+// query) rather than the browser viewport (sm:) -- the same "half" field
+// needs to visually pair up inside a builder canvas or preview panel far
+// narrower than the full viewport, on a properties-panel-crowded desktop
+// window, a rotated/split-screen device, whatever. Every grid this renders
+// into must carry the `@container` class for this to take effect (see
+// FieldCanvas, OrganizerPreviewPanel, PublicOrganizerForm, portal
+// OrganizerForm). 420px comfortably fits two form fields side by side
+// without being so wide that a half field never pairs up in a merely
+// medium-width container.
 const WIDTH_COL_SPAN: Record<string, string> = {
   full: "col-span-12",
-  half: "col-span-12 sm:col-span-6",
+  half: "col-span-12 @[420px]:col-span-6",
 };
 
 export function fieldColSpanClass(fieldType: string, layoutWidth: string | null | undefined): string {

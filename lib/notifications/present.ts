@@ -32,7 +32,7 @@ const TITLES: Record<string, (p: Payload) => string> = {
   ENGAGEMENT_SHARE_CORRECTIONS_REQUESTED: () => "Corrections were requested on your engagement share",
   ORGANIZER_SUBMITTED: (p) => {
     const client = str(p, "client_name").trim();
-    const organizer = str(p, "organizer_template_name", "an organizer");
+    const organizer = str(p, "organizer_template_name", "a form");
     return client ? `${client} submitted ${organizer}` : `${organizer} was submitted`;
   },
   DOCUMENT_REQUEST_COMPLETED: (p) => {
@@ -43,14 +43,18 @@ const TITLES: Record<string, (p: Payload) => string> = {
   ORGANIZER_REVIEWED: (p) => {
     const client = str(p, "client_name", "A client").trim() || "A client";
     const status = str(p, "review_status", "reviewed");
-    return `${client}'s organizer was ${status.toLowerCase()}`;
+    return `${client}'s form was ${status.toLowerCase()}`;
   },
   ORGANIZER_INFORMATION_RESPONDED: (p) => {
     const client = str(p, "client_name", "A client").trim() || "A client";
     const count = str(p, "item_count");
     const n = Number(count);
     const questionWord = n === 1 ? "question" : "questions";
-    return count ? `${client} responded to ${count} flagged ${questionWord}` : `${client} responded to flagged questions on their organizer`;
+    return count ? `${client} responded to ${count} flagged ${questionWord}` : `${client} responded to flagged questions on their form`;
+  },
+  ORGANIZER_ERO_REVIEW_REQUESTED: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    return `${client}'s form was sent to you for ERO review`;
   },
   PAYMENT_RECEIVED: (p) => {
     const client = str(p, "client_name", "A client").trim() || "A client";
@@ -61,6 +65,11 @@ const TITLES: Record<string, (p: Payload) => string> = {
     const client = str(p, "client_name", "A client").trim() || "A client";
     const invoiceNumber = str(p, "invoice_number");
     return invoiceNumber ? `Invoice ${invoiceNumber} for ${client} is fully paid` : `${client}'s invoice is fully paid`;
+  },
+  APPOINTMENT_BOOKED_ONLINE: (p) => {
+    const client = str(p, "client_name", "A client").trim() || "A client";
+    const title = str(p, "appointment_title", "an appointment");
+    return `${client} booked ${title}`;
   },
   automation: (p) => {
     const message = str(p, "message").trim();
@@ -75,7 +84,7 @@ const STATIC_LINKS: Record<string, string> = {
   appointment_reminder: "/calendar",
 };
 
-function entityHref(entityType: string | null, entityId: string | null): string | null {
+export function entityHref(entityType: string | null, entityId: string | null): string | null {
   if (!entityType || !entityId) return null;
   if (entityType === "engagement") return `/engagements/${entityId}`;
   if (entityType === "client") return `/clients/${entityId}`;

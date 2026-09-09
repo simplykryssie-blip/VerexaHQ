@@ -246,7 +246,6 @@ export function NewEngagementForm({
   hasAnyClients,
   defaultClient,
   services,
-  billingRules,
   pipelines,
   autoAssignToSelf,
 }: {
@@ -257,11 +256,9 @@ export function NewEngagementForm({
     id: string;
     name: string;
     organizer_template_id: string | null;
-    billing_rule_id: string | null;
     organizer_templates: { name: string } | null;
     service_categories: { slug: string } | null;
   }[];
-  billingRules: { id: string; name: string }[];
   pipelines: { id: string; name: string }[];
   /** Independent PTIN workspaces are one person -- there's no one else to
    *  assign, so skip the manual assignment step and just assign the
@@ -274,8 +271,6 @@ export function NewEngagementForm({
   const [serviceId, setServiceId] = useState("");
   const [serviceTouched, setServiceTouched] = useState(false);
   const [processId, setProcessId] = useState("");
-  const [billingRuleId, setBillingRuleId] = useState("");
-  const [billingRuleTouched, setBillingRuleTouched] = useState(false);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -326,10 +321,6 @@ export function NewEngagementForm({
   function selectService(id: string) {
     setServiceTouched(true);
     setServiceId(id);
-    if (!billingRuleTouched) {
-      const service = services.find((s) => s.id === id);
-      setBillingRuleId(service?.billing_rule_id ?? "");
-    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -371,7 +362,6 @@ export function NewEngagementForm({
       p_process_id: processId,
       p_assigned_staff_id: assignedStaffId ?? undefined,
       p_priority: priority,
-      p_billing_rule_id: billingRuleId || undefined,
       p_case_type: caseTypeFromCategorySlug(selectedServiceForCaseType?.service_categories?.slug),
     });
 
@@ -407,7 +397,7 @@ export function NewEngagementForm({
       setOrganizerPrompt({
         engagementId,
         organizerTemplateId: selectedService.organizer_template_id,
-        organizerName: selectedService.organizer_templates?.name ?? "organizer",
+        organizerName: selectedService.organizer_templates?.name ?? "form",
       });
       return;
     }
@@ -472,7 +462,7 @@ export function NewEngagementForm({
         const emailResult = await emailRes.json().catch(() => null);
         if (!emailRes.ok || !emailResult?.sent) {
           setSendingOrganizer(false);
-          setOrganizerError(`Organizer and invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`);
+          setOrganizerError(`Form and invite created, but the email couldn't be sent. Share this link with them directly: ${acceptUrl}`);
           return;
         }
       }
@@ -484,9 +474,9 @@ export function NewEngagementForm({
         body: JSON.stringify({
           to: primaryEmail,
           sender: "notifications",
-          subject: `New organizer to complete: ${organizerPrompt.organizerName}`,
+          subject: `New form to complete: ${organizerPrompt.organizerName}`,
           html: renderEmail({
-            heading: "An organizer is ready for you",
+            heading: "A form is ready for you",
             bodyHtml: `<p>Please log in to your client portal and complete the <strong>${organizerPrompt.organizerName}</strong> when you have a chance.</p>`,
             ctaLabel: "Go to portal",
             ctaUrl: `${appUrl}/portal/organizer`,
@@ -496,7 +486,7 @@ export function NewEngagementForm({
       const emailResult = await emailRes.json().catch(() => null);
       if (!emailRes.ok || !emailResult?.sent) {
         setSendingOrganizer(false);
-        setOrganizerError("Organizer created, but the notification email couldn't be sent. The client won't know it's waiting for them until you tell them directly.");
+        setOrganizerError("Form created, but the notification email couldn't be sent. The client won't know it's waiting for them until you tell them directly.");
         return;
       }
     }
@@ -556,10 +546,10 @@ export function NewEngagementForm({
         </select>
         {pendingResponse && pendingResponse.resolved_service_id === serviceId ? (
           <p className="mt-1 text-xs text-success">
-            Suggested from the organizer they already completed -- their answers will be attached to this engagement instead of asking again.
+            Suggested from the form they already completed -- their answers will be attached to this engagement instead of asking again.
           </p>
         ) : (
-          <p className="mt-1 text-xs text-muted">Determines the default organizer and billing for this engagement.</p>
+          <p className="mt-1 text-xs text-muted">Determines the default form and billing for this engagement.</p>
         )}
       </div>
 
@@ -581,26 +571,6 @@ export function NewEngagementForm({
           ))}
         </select>
         <p className="mt-1 text-xs text-muted">Determines this engagement&apos;s workflow and starting stage.</p>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate">Payment method</label>
-        <select
-          value={billingRuleId}
-          onChange={(e) => {
-            setBillingRuleTouched(true);
-            setBillingRuleId(e.target.value);
-          }}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        >
-          <option value="">None set</option>
-          {billingRules.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-muted">Defaults from the service, but this client may pay differently -- change it here if so.</p>
       </div>
 
       <div>
@@ -644,7 +614,7 @@ export function NewEngagementForm({
     {organizerPrompt && (
       <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
         <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-softHover">
-          <h3 className="font-display text-sm font-semibold text-ink">Send organizer now?</h3>
+          <h3 className="font-display text-sm font-semibold text-ink">Send form now?</h3>
           <p className="mt-2 text-sm text-slate">
             Send <strong>{organizerPrompt.organizerName}</strong> to <strong>{selectedClient ? clientLabel(selectedClient) : "the client"}</strong> now?
             {selectedClient && !selectedClient.primary_email && " This client has no email on file, so it will be ready in their portal but no notification will be sent."}

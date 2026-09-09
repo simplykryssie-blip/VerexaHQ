@@ -1,7 +1,13 @@
 import type { Config } from "tailwindcss";
+import containerQueries from "@tailwindcss/container-queries";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  // lib/** is included because a few shared helpers (e.g.
+  // lib/organizer/layoutWidth.ts) assemble Tailwind class strings that are
+  // never typed literally inside app/ or components/ -- without this, the
+  // JIT scanner never sees those classes and silently never generates the
+  // CSS for them.
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -14,12 +20,11 @@ const config: Config = {
         accent: "rgb(var(--brand-accent-rgb, 11 127 224) / <alpha-value>)",
         accentSoft: "rgb(var(--brand-accent-soft-rgb, 232 243 254) / <alpha-value>)",
         surface: "#FFFFFF",
-        // A hair of warmth (a sage bias) instead of a flat gray -- reads as
-        // chosen rather than inherited, and still neutral enough to sit
-        // under any workspace's own accent color. Ties to the green half of
-        // the actual Verexa mark (see brandLime below) the same way the
-        // previous blue-biased value tied to its blue half.
-        surfaceMuted: "#F4F6EF",
+        // Cool, slightly-blue neutral (matches the `border`/`ink` slate
+        // family below) rather than a warm/sage tint -- a warm-biased canvas
+        // reads as dated next to crisp white cards, especially under warm
+        // indoor lighting or a screen's own color cast.
+        surfaceMuted: "#F8FAFC",
         border: "#E3E7F0",
         muted: "#64748B",
         // The lime-green from the second half of the real Verexa "V" mark
@@ -87,7 +92,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [containerQueries],
 };
 
 export default config;

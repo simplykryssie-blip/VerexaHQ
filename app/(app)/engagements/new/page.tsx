@@ -31,7 +31,7 @@ export default async function NewEngagementPage({
     );
   }
 
-  const [{ data: defaultClient }, { data: services }, { count: clientCount }, { data: billingRules }, { data: pipelines }] = await Promise.all([
+  const [{ data: defaultClient }, { data: services }, { count: clientCount }, { data: pipelines }] = await Promise.all([
     searchParams.clientId
       ? supabase
           .from("clients")
@@ -41,17 +41,11 @@ export default async function NewEngagementPage({
       : Promise.resolve({ data: null }),
     supabase
       .from("services")
-      .select("id, name, organizer_template_id, billing_rule_id, organizer_templates(name), service_categories(slug)")
+      .select("id, name, organizer_template_id, organizer_templates(name), service_categories(slug)")
       .eq("workspace_id", workspace.id)
       .eq("status", "published")
       .order("display_order"),
     supabase.from("clients").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).is("merged_into_client_id", null),
-    supabase
-      .from("billing_rules")
-      .select("id, name")
-      .eq("workspace_id", workspace.id)
-      .eq("status", "published")
-      .order("name"),
     supabase
       .from("processes")
       .select("id, name")
@@ -70,7 +64,6 @@ export default async function NewEngagementPage({
             hasAnyClients={(clientCount ?? 0) > 0}
             defaultClient={defaultClient ?? null}
             services={services ?? []}
-            billingRules={billingRules ?? []}
             pipelines={pipelines ?? []}
             autoAssignToSelf={isIndependentTier(workspace)}
           />

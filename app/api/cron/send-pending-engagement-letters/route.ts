@@ -4,6 +4,7 @@ import { renderTemplate } from "@/lib/templates/render";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
 import { renderPdfTemplate, type PdfFieldMapping } from "@/lib/documents/renderPdfTemplate";
 import { reportSystemFailure } from "@/lib/systemFailures";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -30,7 +31,7 @@ function isAuthorized(request: Request) {
 // "Form template" flow in SignaturesPanel.tsx creates via
 // createSignatureRequestFromTemplate.ts, just from a service-role context
 // instead of a signed-in staff member.
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -290,3 +291,5 @@ async function sendOne(
     return "failed";
   }
 }
+
+export const GET = withJobLogging("send-pending-engagement-letters", handleGET);
