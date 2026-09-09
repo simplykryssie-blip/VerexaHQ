@@ -12225,6 +12225,10 @@ export type Database = {
         Args: { p_response_id: string }
         Returns: undefined
       }
+      set_agent_finding_status: {
+        Args: { p_decision_notes?: string; p_finding_id: string; p_status: string }
+        Returns: undefined
+      }
       set_client_address_primary: {
         Args: { p_address_id: string }
         Returns: undefined
