@@ -66,7 +66,7 @@ export default async function AiAgentFindingsPage({
   let query = supabase
     .from("ai_agent_findings")
     .select(
-      "id, title, severity, status, category, affected_module, created_at, last_detected_at, decision_notes, ai_agents!inner(name, agent_key), workspaces(name)",
+      "id, title, severity, status, category, affected_module, created_at, last_detected_at, decision_notes, autofix_status, autofix_note, ai_agents!inner(name, agent_key), workspaces(name)",
       { count: "exact" }
     )
     .order("last_detected_at", { ascending: false })

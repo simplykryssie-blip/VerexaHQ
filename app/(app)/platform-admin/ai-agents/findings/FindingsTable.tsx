@@ -25,6 +25,22 @@ export const STATUS_TONE: Record<string, BadgeTone> = {
 
 const STATUS_OPTIONS = ["open", "investigating", "retest_required", "reopened", "fixed", "resolved"] as const;
 
+const AUTOFIX_TONE: Record<string, BadgeTone> = {
+  requested: "warning",
+  in_progress: "accent",
+  fixed: "success",
+  needs_review: "warning",
+  failed: "danger",
+};
+
+const AUTOFIX_LABEL: Record<string, string> = {
+  requested: "Fix requested",
+  in_progress: "Fixing...",
+  fixed: "Auto-fixed",
+  needs_review: "Needs review",
+  failed: "Fix failed",
+};
+
 export type FindingRow = {
   id: string;
   title: string;
@@ -34,6 +50,8 @@ export type FindingRow = {
   created_at: string;
   last_detected_at: string;
   decision_notes: string | null;
+  autofix_status: string;
+  autofix_note: string | null;
   ai_agents: { name: string } | null;
   workspaces: { name: string } | null;
 };
@@ -45,6 +63,20 @@ export function FindingsTable({ findings }: { findings: FindingRow[] }) {
   const [rows, setRows] = useState(findings);
   const [updating, setUpdating] = useState<string | null>(null);
   const [bulkResolving, setBulkResolving] = useState(false);
+  const [requestingAutofix, setRequestingAutofix] = useState<string | null>(null);
+
+  async function requestAutofix(id: string) {
+    setRequestingAutofix(id);
+    const { error } = await supabase.rpc("request_finding_autofix", { p_finding_id: id });
+    setRequestingAutofix(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, autofix_status: "requested", autofix_note: null } : r)));
+    toast.show("Auto-fix requested -- an agent will pick this up shortly", "success");
+    router.refresh();
+  }
 
   async function updateStatus(id: string, status: string) {
     setUpdating(id);
@@ -106,6 +138,7 @@ export function FindingsTable({ findings }: { findings: FindingRow[] }) {
               <th className="px-5 py-3 font-medium">Module</th>
               <th className="px-5 py-3 font-medium">Severity</th>
               <th className="px-5 py-3 font-medium">Status</th>
+              <th className="px-5 py-3 font-medium">Auto-fix</th>
               <th className="px-5 py-3 font-medium">First seen</th>
               <th className="px-5 py-3 font-medium">Last seen</th>
             </tr>
@@ -138,6 +171,23 @@ export function FindingsTable({ findings }: { findings: FindingRow[] }) {
                       </option>
                     ))}
                   </select>
+                </td>
+                <td className="px-5 py-3">
+                  {f.autofix_status === "none" || f.autofix_status === "failed" ? (
+                    <button
+                      type="button"
+                      onClick={() => requestAutofix(f.id)}
+                      disabled={requestingAutofix === f.id}
+                      className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-60"
+                    >
+                      {requestingAutofix === f.id ? "Requesting..." : f.autofix_status === "failed" ? "Retry auto-fix" : "Request auto-fix"}
+                    </button>
+                  ) : (
+                    <div>
+                      <Badge tone={AUTOFIX_TONE[f.autofix_status] ?? "neutral"}>{AUTOFIX_LABEL[f.autofix_status] ?? f.autofix_status}</Badge>
+                      {f.autofix_note && <p className="mt-0.5 max-w-xs text-xs text-muted">{f.autofix_note}</p>}
+                    </div>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-slate">{new Date(f.created_at).toLocaleDateString()}</td>
                 <td className="px-5 py-3 text-slate">{new Date(f.last_detected_at).toLocaleString()}</td>
