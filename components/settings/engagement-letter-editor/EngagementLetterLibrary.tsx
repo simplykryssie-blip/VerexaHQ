@@ -28,12 +28,14 @@ export function EngagementLetterLibrary({
   folders,
   isJotformConnected,
   downlineWorkspaces,
+  starredIds,
 }: {
   workspaceId: string;
   templates: EngagementLetterCard[];
   folders: LibraryFolderRow[];
   isJotformConnected: boolean;
   downlineWorkspaces: DownlineWorkspace[];
+  starredIds: Set<string>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -59,6 +61,7 @@ export function EngagementLetterLibrary({
       ...(t.requires_signature ? ["Requires signature"] : []),
       `${t.merge_field_count} merge field${t.merge_field_count === 1 ? "" : "s"}`,
     ],
+    starred: starredIds.has(t.id),
   }));
 
   async function moveTemplate(card: GalleryCard, folderId: string | null) {
@@ -140,6 +143,7 @@ export function EngagementLetterLibrary({
       <TemplateGallery
         workspaceId={workspaceId}
         itemType="form_template"
+        entityType="engagement_letter_template"
         folders={folders}
         cards={cards}
         icon={FileSignature}

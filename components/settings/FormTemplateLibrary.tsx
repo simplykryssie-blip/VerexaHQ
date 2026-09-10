@@ -23,6 +23,20 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: starredRows } = user
+    ? await supabase
+        .from("starred_items")
+        .select("entity_type, entity_id")
+        .eq("user_id", user.id)
+        .in("entity_type", ["organizer_template", "engagement_letter_template", "document_request_template"])
+    : { data: [] as { entity_type: string; entity_id: string }[] };
+  const starredOrganizerIds = new Set((starredRows ?? []).filter((r) => r.entity_type === "organizer_template").map((r) => r.entity_id));
+  const starredLetterIds = new Set((starredRows ?? []).filter((r) => r.entity_type === "engagement_letter_template").map((r) => r.entity_id));
+  const starredDocumentRequestIds = new Set((starredRows ?? []).filter((r) => r.entity_type === "document_request_template").map((r) => r.entity_id));
+
   const { data: engagementLetterTemplates } = !isOrganizers && !isDocumentRequests
     ? await supabase
         .from("engagement_letter_templates")
@@ -212,9 +226,10 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
               folders={folders ?? []}
               isJotformConnected={Boolean(jotformConnected)}
               downlineWorkspaces={downlineWorkspaces}
+              starredIds={starredOrganizerIds}
             />
           ) : isDocumentRequests ? (
-            <DocumentRequestLibrary workspaceId={workspaceId} templates={documentRequestCards} folders={folders ?? []} />
+            <DocumentRequestLibrary workspaceId={workspaceId} templates={documentRequestCards} folders={folders ?? []} starredIds={starredDocumentRequestIds} />
           ) : (
             <EngagementLetterLibrary
               workspaceId={workspaceId}
@@ -222,6 +237,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
               folders={folders ?? []}
               isJotformConnected={Boolean(jotformConnected)}
               downlineWorkspaces={downlineWorkspaces}
+              starredIds={starredLetterIds}
             />
           )}
         </div>

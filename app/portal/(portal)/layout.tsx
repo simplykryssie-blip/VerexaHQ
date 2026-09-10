@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { PortalSidebar } from "@/components/portal/PortalSidebar";
+import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getEffectiveBranding } from "@/lib/branding";
@@ -50,6 +51,7 @@ export default async function PortalLayout({ children }: { children: React.React
             />
           </div>
           <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0 print:overflow-visible print:pt-0">
+            <ScrollToTopOnNavigate containerId="portal-main-content" />
             {children}
           </main>
         </div>

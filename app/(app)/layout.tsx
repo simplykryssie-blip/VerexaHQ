@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
@@ -204,6 +205,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
+            <ScrollToTopOnNavigate containerId="main-content" />
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
             <BillingCardPrompt

@@ -12,7 +12,11 @@ export default async function WorkflowsPage() {
 
   const supabase = createClient();
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: folders }, { data: tagRows }] =
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: folders }, { data: tagRows }, { data: starredRows }] =
     await Promise.all([
       supabase
         .from("automations")
@@ -30,7 +34,11 @@ export default async function WorkflowsPage() {
         .order("name"),
       supabase.from("library_folders").select("id, parent_folder_id, name").eq("workspace_id", workspace.id).eq("item_type", "workflow").order("name"),
       supabase.from("workspace_tags").select("name").eq("workspace_id", workspace.id).order("name"),
+      user
+        ? supabase.from("starred_items").select("entity_id").eq("user_id", user.id).eq("entity_type", "automation")
+        : Promise.resolve({ data: [] as { entity_id: string }[] }),
     ]);
+  const starredIds = new Set((starredRows ?? []).map((r) => r.entity_id));
 
   const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
     id: a.id,
@@ -43,6 +51,7 @@ export default async function WorkflowsPage() {
     folder_id: a.folder_id,
     step_count: (a.automation_steps as unknown as { id: string }[]).length,
     run_count: (a.automation_runs as unknown as { id: string }[]).length,
+    starred: starredIds.has(a.id),
   }));
 
   const pipelines: PipelineOption[] = (processes ?? []).map((p) => ({

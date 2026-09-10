@@ -186,7 +186,7 @@ export function RequestsPanel({
   }
 
   async function setItemDueDate(itemId: string, dueDate: string) {
-    const { error } = await supabase.rpc("set_document_request_item_due_date", { p_item_status_id: itemId, p_due_date: dueDate || null });
+    const { error } = await supabase.rpc("set_document_request_item_due_date", { p_item_status_id: itemId, p_due_date: (dueDate || null) as never });
     if (error) {
       toast.show(error.message, "error");
       return;

@@ -10,3 +10,14 @@ export type LibraryFolderRow = {
   parent_folder_id: string | null;
   name: string;
 };
+
+// Mirrors the starred_items.entity_type CHECK constraint -- one row per
+// distinct starrable list, independent of LibraryItemType since Form
+// Templates covers three separate underlying tables.
+export type StarEntityType =
+  | "organizer_template"
+  | "engagement_letter_template"
+  | "document_request_template"
+  | "automation"
+  | "pipeline"
+  | "website";
