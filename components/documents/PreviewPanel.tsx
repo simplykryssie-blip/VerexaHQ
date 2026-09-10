@@ -83,7 +83,11 @@ export function PreviewPanel({ document: doc, onClose }: { document: DocumentRow
           {error && <p className="text-sm text-danger">{error}</p>}
           {!error && !url && <p className="text-sm text-muted">Loading preview...</p>}
           {url && (doc.mime_type === "application/pdf" || doc.mime_type === "text/html") && (
-            <iframe src={url} title={doc.file_name} className="h-full min-h-[60vh] w-full rounded-lg border border-border bg-white" />
+            <iframe
+              src={doc.mime_type === "application/pdf" ? `${url}#toolbar=1&navpanes=0&view=FitH` : url}
+              title={doc.file_name}
+              className="h-full min-h-[60vh] w-full rounded-lg border border-border bg-white"
+            />
           )}
           {url && doc.mime_type?.startsWith("image/") && (
             // eslint-disable-next-line @next/next/no-img-element
