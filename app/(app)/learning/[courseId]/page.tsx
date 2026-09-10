@@ -11,21 +11,27 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
   if (!workspace) return null;
 
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { data: course } = await supabase
     .from("learning_courses")
-    .select("id, title, description")
+    .select("id, title, description, created_at")
     .eq("id", params.courseId)
     .maybeSingle();
   if (!course) notFound();
 
-  const [{ data: modules }, { data: completions }] = await Promise.all([
+  const [{ data: modules }, { data: completions }, { data: assignment }] = await Promise.all([
     supabase
       .from("learning_modules")
-      .select("id, title, module_type, display_order")
+      .select("id, title, module_type, display_order, release_date, release_offset_days")
       .eq("course_id", params.courseId)
       .order("display_order"),
     supabase.from("learning_module_completions").select("module_id, passed, score_percent"),
+    user
+      ? supabase.from("learning_course_assignments").select("created_at").eq("course_id", params.courseId).eq("user_id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const completionByModule = new Map((completions ?? []).map((c) => [c.module_id, c]));
@@ -36,13 +42,19 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
     moduleType: m.module_type as "lesson" | "quiz",
     passed: completionByModule.get(m.id)?.passed ?? null,
     scorePercent: completionByModule.get(m.id)?.score_percent ?? null,
+    releaseDate: m.release_date,
+    releaseOffsetDays: m.release_offset_days,
   }));
 
   return (
     <>
       <PageHeader backHref="/learning" backLabel="Learning Hub" title={course.title} description={course.description ?? undefined} />
       <div className="flex-1 px-8 py-6">
-        <ModuleList courseId={course.id} modules={moduleRows} />
+        <ModuleList
+          courseId={course.id}
+          modules={moduleRows}
+          scheduleAnchor={{ assignedAt: assignment?.created_at ?? null, courseCreatedAt: course.created_at }}
+        />
       </div>
     </>
   );

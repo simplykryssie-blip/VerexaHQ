@@ -5324,6 +5324,8 @@ export type Database = {
           id: string
           module_type: string
           passing_score_percent: number
+          release_date: string | null
+          release_offset_days: number | null
           title: string
           updated_at: string
           video_storage_path: string | null
@@ -5337,6 +5339,8 @@ export type Database = {
           id?: string
           module_type: string
           passing_score_percent?: number
+          release_date?: string | null
+          release_offset_days?: number | null
           title: string
           updated_at?: string
           video_storage_path?: string | null
@@ -5350,6 +5354,8 @@ export type Database = {
           id?: string
           module_type?: string
           passing_score_percent?: number
+          release_date?: string | null
+          release_offset_days?: number | null
           title?: string
           updated_at?: string
           video_storage_path?: string | null
@@ -11673,6 +11679,10 @@ export type Database = {
       is_account_locked: { Args: { p_user_id: string }; Returns: boolean }
       is_ai_sandbox_workspace: {
         Args: { p_workspace_id: string }
+        Returns: boolean
+      }
+      is_module_unlocked: {
+        Args: { p_module_id: string; p_user_id: string }
         Returns: boolean
       }
       is_notification_enabled: {

@@ -22,7 +22,11 @@ export default async function ManageCoursePage({ params }: { params: { courseId:
   if (!course) notFound();
 
   const [{ data: modules }, staffMembers, { data: assignmentRows }] = await Promise.all([
-    supabase.from("learning_modules").select("id, title, module_type, display_order").eq("course_id", params.courseId).order("display_order"),
+    supabase
+      .from("learning_modules")
+      .select("id, title, module_type, display_order, release_date, release_offset_days")
+      .eq("course_id", params.courseId)
+      .order("display_order"),
     getWorkspaceStaff(supabase, workspace.id),
     supabase.from("learning_course_assignments").select("user_id, due_date").eq("course_id", params.courseId),
   ]);
