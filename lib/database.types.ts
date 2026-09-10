@@ -5918,7 +5918,6 @@ export type Database = {
           error: string | null
           event_type: string | null
           id: string
-          is_test: boolean
           max_attempts: number
           payload: Json
           priority: string | null
@@ -5943,7 +5942,6 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
-          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -5968,7 +5966,6 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
-          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -8055,6 +8052,7 @@ export type Database = {
           created_at: string
           decline_reason: string | null
           declined_at: string | null
+          expires_at: string | null
           id: string
           resolved_document_html: string | null
           sign_order: number
@@ -8075,6 +8073,7 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
+          expires_at?: string | null
           id?: string
           resolved_document_html?: string | null
           sign_order?: number
@@ -8095,6 +8094,7 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
+          expires_at?: string | null
           id?: string
           resolved_document_html?: string | null
           sign_order?: number
@@ -10859,6 +10859,10 @@ export type Database = {
         Returns: boolean
       }
       cancel_overdue_quotes: { Args: never; Returns: number }
+      cancel_signature_request: {
+        Args: { p_signature_request_id: string }
+        Returns: undefined
+      }
       capture_public_lead_from_contact_step: {
         Args: {
           p_auth_user_id?: string
@@ -11666,6 +11670,7 @@ export type Database = {
           attachment_mime_type: string
           decline_reason: string
           declined_at: string
+          expires_at: string
           request_status: string
           request_title: string
           signed_at: string
@@ -12471,6 +12476,10 @@ export type Database = {
           p_username: string
         }
         Returns: string
+      }
+      set_signature_request_expiry: {
+        Args: { p_expires_at: string | null; p_signature_request_id: string }
+        Returns: undefined
       }
       set_workspace_ghl_connection: {
         Args: {
