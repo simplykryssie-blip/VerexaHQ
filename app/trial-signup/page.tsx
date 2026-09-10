@@ -213,6 +213,18 @@ export default function TrialSignupPage() {
           Account created. Confirm your email -- a link has been sent to <strong>{email}</strong> -- and your 14-day trial workspace will
           be ready as soon as you click it.
         </p>
+        <button
+          type="button"
+          onClick={() => {
+            setCheckEmail(false);
+            setError(null);
+            setMode("sign-in");
+          }}
+          className={styles.link}
+          style={{ marginTop: 16, display: "block", textAlign: "center", width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+        >
+          Already confirmed? Sign in
+        </button>
       </AuthShell>
     );
   }
