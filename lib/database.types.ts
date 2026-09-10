@@ -3002,6 +3002,7 @@ export type Database = {
           category: string | null
           document_request_id: string
           document_request_item_id: string | null
+          due_date: string | null
           fulfilled_by_attachment_id: string | null
           id: string
           is_required: boolean
@@ -3014,6 +3015,7 @@ export type Database = {
           category?: string | null
           document_request_id: string
           document_request_item_id?: string | null
+          due_date?: string | null
           fulfilled_by_attachment_id?: string | null
           id?: string
           is_required?: boolean
@@ -3026,6 +3028,7 @@ export type Database = {
           category?: string | null
           document_request_id?: string
           document_request_item_id?: string | null
+          due_date?: string | null
           fulfilled_by_attachment_id?: string | null
           id?: string
           is_required?: boolean
@@ -3640,6 +3643,7 @@ export type Database = {
           body_html: string
           created_at: string
           created_by: string | null
+          custom_css: string | null
           folder_id: string | null
           id: string
           is_public: boolean
@@ -3662,6 +3666,7 @@ export type Database = {
           body_html?: string
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           folder_id?: string | null
           id?: string
           is_public?: boolean
@@ -3684,6 +3689,7 @@ export type Database = {
           body_html?: string
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           folder_id?: string | null
           id?: string
           is_public?: boolean
@@ -4303,6 +4309,7 @@ export type Database = {
       firm_connections: {
         Row: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -4324,6 +4331,7 @@ export type Database = {
         }
         Insert: {
           allows_branding_override?: boolean
+          allows_learning_hub_downline_share?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4345,6 +4353,7 @@ export type Database = {
         }
         Update: {
           allows_branding_override?: boolean
+          allows_learning_hub_downline_share?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4684,6 +4693,8 @@ export type Database = {
       }
       firm_tax_profile: {
         Row: {
+          caf_encrypted: string | null
+          caf_last4: string | null
           efin_encrypted: string | null
           efin_hash: string | null
           efin_last4: string | null
@@ -4700,6 +4711,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          caf_encrypted?: string | null
+          caf_last4?: string | null
           efin_encrypted?: string | null
           efin_hash?: string | null
           efin_last4?: string | null
@@ -4716,6 +4729,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          caf_encrypted?: string | null
+          caf_last4?: string | null
           efin_encrypted?: string | null
           efin_hash?: string | null
           efin_last4?: string | null
@@ -5267,6 +5282,53 @@ export type Database = {
           },
         ]
       }
+      learning_live_sessions: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          host_user_id: string
+          id: string
+          is_webinar: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes: number
+          host_user_id: string
+          id?: string
+          is_webinar?: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          host_user_id?: string
+          id?: string
+          is_webinar?: boolean
+          join_url?: string
+          module_id?: string
+          scheduled_start?: string
+          start_url?: string
+          zoom_meeting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_live_sessions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: true
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_module_completions: {
         Row: {
           completed_at: string
@@ -5321,6 +5383,8 @@ export type Database = {
           id: string
           module_type: string
           passing_score_percent: number
+          release_date: string | null
+          release_offset_days: number | null
           title: string
           updated_at: string
           video_storage_path: string | null
@@ -5334,6 +5398,8 @@ export type Database = {
           id?: string
           module_type: string
           passing_score_percent?: number
+          release_date?: string | null
+          release_offset_days?: number | null
           title: string
           updated_at?: string
           video_storage_path?: string | null
@@ -5347,6 +5413,8 @@ export type Database = {
           id?: string
           module_type?: string
           passing_score_percent?: number
+          release_date?: string | null
+          release_offset_days?: number | null
           title?: string
           updated_at?: string
           video_storage_path?: string | null
@@ -5853,7 +5921,6 @@ export type Database = {
           error: string | null
           event_type: string | null
           id: string
-          is_test: boolean
           max_attempts: number
           payload: Json
           priority: string | null
@@ -5878,7 +5945,6 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
-          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -5903,7 +5969,6 @@ export type Database = {
           error?: string | null
           event_type?: string | null
           id?: string
-          is_test?: boolean
           max_attempts?: number
           payload?: Json
           priority?: string | null
@@ -6004,8 +6069,10 @@ export type Database = {
           field_type: string
           help_text: string | null
           id: string
+          image_url: string | null
           include_in_document_checklist: boolean
           irs_8821_role: string | null
+          is_internal_only: boolean
           is_required: boolean
           label: string
           layout_width: string
@@ -6027,8 +6094,10 @@ export type Database = {
           field_type: string
           help_text?: string | null
           id?: string
+          image_url?: string | null
           include_in_document_checklist?: boolean
           irs_8821_role?: string | null
+          is_internal_only?: boolean
           is_required?: boolean
           label: string
           layout_width?: string
@@ -6050,8 +6119,10 @@ export type Database = {
           field_type?: string
           help_text?: string | null
           id?: string
+          image_url?: string | null
           include_in_document_checklist?: boolean
           irs_8821_role?: string | null
+          is_internal_only?: boolean
           is_required?: boolean
           label?: string
           layout_width?: string
@@ -6456,6 +6527,7 @@ export type Database = {
           banner_image_url: string | null
           created_at: string
           created_by: string | null
+          custom_css: string | null
           description: string | null
           folder_id: string | null
           id: string
@@ -6472,6 +6544,7 @@ export type Database = {
           banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           description?: string | null
           folder_id?: string | null
           id?: string
@@ -6488,6 +6561,7 @@ export type Database = {
           banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           description?: string | null
           folder_id?: string | null
           id?: string
@@ -7988,6 +8062,7 @@ export type Database = {
           created_at: string
           decline_reason: string | null
           declined_at: string | null
+          expires_at: string | null
           id: string
           resolved_document_html: string | null
           sign_order: number
@@ -8008,6 +8083,7 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
+          expires_at?: string | null
           id?: string
           resolved_document_html?: string | null
           sign_order?: number
@@ -8028,6 +8104,7 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           declined_at?: string | null
+          expires_at?: string | null
           id?: string
           resolved_document_html?: string | null
           sign_order?: number
@@ -8679,6 +8756,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "staff_time_off_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      starred_items: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "starred_items_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -9691,6 +9803,41 @@ export type Database = {
           },
         ]
       }
+      workspace_software_links: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_software_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_subscription_invoices: {
         Row: {
           amount_due: number
@@ -9987,6 +10134,7 @@ export type Database = {
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
+          owner_name: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string
@@ -10019,6 +10167,7 @@ export type Database = {
           mailing_address?: string | null
           name: string
           onboarding_dismissed_at?: string | null
+          owner_name?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug: string
@@ -10051,6 +10200,7 @@ export type Database = {
           mailing_address?: string | null
           name?: string
           onboarding_dismissed_at?: string | null
+          owner_name?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug?: string
@@ -10604,6 +10754,7 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -10754,6 +10905,10 @@ export type Database = {
         Returns: boolean
       }
       cancel_overdue_quotes: { Args: never; Returns: number }
+      cancel_signature_request: {
+        Args: { p_signature_request_id: string }
+        Returns: undefined
+      }
       capture_public_lead_from_contact_step: {
         Args: {
           p_auth_user_id?: string
@@ -10955,6 +11110,7 @@ export type Database = {
         Args: { p_relationship_type?: string; p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -11015,6 +11171,10 @@ export type Database = {
           p_send_sms?: boolean
           p_show_in_portal?: boolean
         }
+        Returns: string
+      }
+      create_trial_workspace: {
+        Args: { p_first_name?: string; p_last_name?: string; p_name: string }
         Returns: string
       }
       create_workflow_pipeline: {
@@ -11244,6 +11404,7 @@ export type Database = {
         Args: { p_relationship_types?: string[]; p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string
           connection_id: string
@@ -11556,6 +11717,7 @@ export type Database = {
           attachment_mime_type: string
           decline_reason: string
           declined_at: string
+          expires_at: string
           request_status: string
           request_title: string
           signed_at: string
@@ -11666,6 +11828,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      is_module_unlocked: {
+        Args: { p_module_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_notification_enabled: {
         Args: {
           p_channel: string
@@ -11705,6 +11871,12 @@ export type Database = {
       is_workspace_member: {
         Args: { p_workspace_id: string }
         Returns: boolean
+      }
+      learning_hub_reachable_workspaces: {
+        Args: { p_owner_workspace_id: string }
+        Returns: {
+          workspace_id: string
+        }[]
       }
       link_public_portal_account: {
         Args: {
@@ -11943,6 +12115,7 @@ export type Database = {
         Args: { p_token: string; p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -11993,6 +12166,7 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -12133,6 +12307,7 @@ export type Database = {
         Returns: string
       }
       reveal_client_ssn: { Args: { p_client_id: string }; Returns: string }
+      reveal_firm_caf: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_efin: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ein: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ptin: { Args: { p_workspace_id: string }; Returns: string }
@@ -12226,7 +12401,11 @@ export type Database = {
         Returns: undefined
       }
       set_agent_finding_status: {
-        Args: { p_decision_notes?: string; p_finding_id: string; p_status: string }
+        Args: {
+          p_decision_notes?: string
+          p_finding_id: string
+          p_status: string
+        }
         Returns: undefined
       }
       set_client_address_primary: {
@@ -12249,6 +12428,10 @@ export type Database = {
         Args: { p_id: string; p_status: string; p_table: string }
         Returns: undefined
       }
+      set_document_request_item_due_date: {
+        Args: { p_due_date: string; p_item_status_id: string }
+        Returns: undefined
+      }
       set_feature_flag: {
         Args: {
           p_config?: Json
@@ -12259,11 +12442,17 @@ export type Database = {
         Returns: undefined
       }
       set_finding_autofix_result: {
-        Args: { p_autofix_status: string; p_finding_id: string; p_note?: string }
+        Args: {
+          p_autofix_status: string
+          p_finding_id: string
+          p_note?: string
+        }
         Returns: undefined
       }
       set_firm_tax_profile: {
         Args: {
+          p_caf?: string
+          p_clear_caf?: boolean
           p_clear_efin?: boolean
           p_clear_ein?: boolean
           p_clear_ptin?: boolean
@@ -12339,6 +12528,10 @@ export type Database = {
         }
         Returns: string
       }
+      set_signature_request_expiry: {
+        Args: { p_expires_at: string; p_signature_request_id: string }
+        Returns: undefined
+      }
       set_workspace_ghl_connection: {
         Args: {
           p_api_key: string
@@ -12372,6 +12565,7 @@ export type Database = {
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
+          owner_name: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string
@@ -12483,6 +12677,10 @@ export type Database = {
         }
         Returns: string
       }
+      start_trial_workspace: {
+        Args: { p_name: string; p_plan_slug?: string }
+        Returns: string
+      }
       submit_organizer_response: {
         Args: { p_response_id: string }
         Returns: undefined
@@ -12558,6 +12756,17 @@ export type Database = {
           p_decision_notes?: string
           p_finding_id: string
           p_status: string
+        }
+        Returns: undefined
+      }
+      update_platform_account_holder: {
+        Args: {
+          p_company_name: string
+          p_first_name: string
+          p_last_name: string
+          p_phone: string
+          p_user_id: string
+          p_workspace_id: string
         }
         Returns: undefined
       }

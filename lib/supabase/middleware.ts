@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 
 const ALWAYS_PUBLIC_PATHS = ["/auth/callback", "/auth/confirm", "/forgot-password", "/reset-password", "/sign/", "/o/", "/e/", "/site/", "/book/", "/privacy", "/terms", "/contact", "/docs/"];
-const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/join", "/mfa-challenge"];
+const STAFF_PUBLIC_PATHS = ["/login", "/accept-invitation", "/join", "/mfa-challenge", "/trial-signup"];
 const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
 const PORTAL_BASIC_INFO_EXEMPT_PATHS = ["/portal/login", "/portal/accept-invitation", "/portal/basic-info"];
 const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
