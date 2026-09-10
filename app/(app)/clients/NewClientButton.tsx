@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
+import { digitsOnly, formatSsn, formatEin } from "@/lib/taxIds";
 import { useToast } from "@/components/Toast";
 import { US_STATES } from "@/lib/usStates";
 
@@ -49,20 +50,6 @@ const CONTACT_TITLE_OPTIONS = [
   { value: "officer", label: "Officer" },
   { value: "other", label: "Other" },
 ];
-
-function digitsOnly(value: string) {
-  return value.replace(/\D/g, "").slice(0, 9);
-}
-
-function formatSsnOrItin(value: string) {
-  const d = digitsOnly(value);
-  return [d.slice(0, 3), d.slice(3, 5), d.slice(5, 9)].filter(Boolean).join("-");
-}
-
-function formatEin(value: string) {
-  const d = digitsOnly(value);
-  return [d.slice(0, 2), d.slice(2, 9)].filter(Boolean).join("-");
-}
 
 type StaffOption = { id: string; display_name: string | null };
 
@@ -541,7 +528,7 @@ export function NewClientButton({
                     maxLength={11}
                     placeholder="SSN (optional, XXX-XX-XXXX)"
                     value={ssn}
-                    onChange={(e) => setSsn(formatSsnOrItin(e.target.value))}
+                    onChange={(e) => setSsn(formatSsn(e.target.value))}
                     className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <input
@@ -549,7 +536,7 @@ export function NewClientButton({
                     maxLength={11}
                     placeholder="ITIN (optional, XXX-XX-XXXX)"
                     value={itin}
-                    onChange={(e) => setItin(formatSsnOrItin(e.target.value))}
+                    onChange={(e) => setItin(formatSsn(e.target.value))}
                     className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>

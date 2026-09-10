@@ -9,6 +9,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { formatSsn, formatEin, isValidTaxId } from "@/lib/taxIds";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 import { PasswordInput } from "@/components/PasswordInput";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
@@ -207,10 +208,21 @@ export function PublicOrganizerForm({
     );
   }
 
+  function invalidTaxIdOnCurrentPage(): FieldRow | undefined {
+    return currentPage.fields.find(
+      (f) => (f.field_type === "ssn" || f.field_type === "ein") && !isValidTaxId(answers[f.id] ?? "")
+    );
+  }
+
   function goNext() {
     const unmet = unmetRequiredOnCurrentPage();
     if (unmet.length > 0) {
       setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    const invalidTaxId = invalidTaxIdOnCurrentPage();
+    if (invalidTaxId) {
+      setError(`${invalidTaxId.label} must be exactly 9 digits.`);
       return;
     }
     setError(null);
@@ -221,6 +233,11 @@ export function PublicOrganizerForm({
     const unmet = unmetRequiredOnCurrentPage();
     if (unmet.length > 0) {
       setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    const invalidTaxId = invalidTaxIdOnCurrentPage();
+    if (invalidTaxId) {
+      setError(`${invalidTaxId.label} must be exactly 9 digits.`);
       return;
     }
     submit();
@@ -944,8 +961,9 @@ function PublicFieldInput({
             id={`field-${field.id}`}
             type="text"
             inputMode="numeric"
+            maxLength={field.field_type === "ssn" ? 11 : 10}
             value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
+            onChange={(e) => onChange(field.id, field.field_type === "ssn" ? formatSsn(e.target.value) : formatEin(e.target.value))}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
             className={inputClass}
           />
