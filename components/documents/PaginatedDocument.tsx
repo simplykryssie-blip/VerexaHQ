@@ -11,13 +11,24 @@ import { splitPagesByBreak } from "@/lib/documents/pageBreakSplit";
  * a divider line where a page break was inserted. `footer` renders only
  * once the reader reaches the last page -- the signature capture UI, so a
  * client can't sign without having paged through the whole letter. */
-export function PaginatedDocument({ html, footer, bannerImageUrl }: { html: string; footer?: React.ReactNode; bannerImageUrl?: string | null }) {
+export function PaginatedDocument({
+  html,
+  footer,
+  bannerImageUrl,
+  customCss,
+}: {
+  html: string;
+  footer?: React.ReactNode;
+  bannerImageUrl?: string | null;
+  customCss?: string | null;
+}) {
   const pages = splitPagesByBreak(html);
   const [index, setIndex] = useState(0);
   const isLast = index === pages.length - 1;
 
   return (
     <div>
+      {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
       <div className="mx-auto w-full max-w-[816px] overflow-hidden rounded-sm bg-white shadow-lg ring-1 ring-border/60">
         {bannerImageUrl && index === 0 && (
           // eslint-disable-next-line @next/next/no-img-element

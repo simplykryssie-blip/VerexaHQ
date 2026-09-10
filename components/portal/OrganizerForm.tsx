@@ -36,6 +36,7 @@ type FieldRow = {
   conditional_logic?: unknown;
   client_profile_field?: string | null;
   layout_width?: string | null;
+  image_url?: string | null;
 };
 
 type AnswerRow = { organizer_field_id: string; value: unknown; instance_index?: number };
@@ -1114,9 +1115,15 @@ function FieldInput({
 
   if (field.field_type === "section") {
     return (
-      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
-        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
-        {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+      <div className="col-span-12 flex items-start gap-3 border-l-[3px] border-accent py-1 pl-3.5">
+        {field.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={field.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+        )}
+        <div>
+          <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
+          {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+        </div>
       </div>
     );
   }

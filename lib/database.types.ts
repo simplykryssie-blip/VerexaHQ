@@ -3643,6 +3643,7 @@ export type Database = {
           body_html: string
           created_at: string
           created_by: string | null
+          custom_css: string | null
           folder_id: string | null
           id: string
           is_public: boolean
@@ -3665,6 +3666,7 @@ export type Database = {
           body_html?: string
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           folder_id?: string | null
           id?: string
           is_public?: boolean
@@ -3687,6 +3689,7 @@ export type Database = {
           body_html?: string
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           folder_id?: string | null
           id?: string
           is_public?: boolean
@@ -6066,6 +6069,7 @@ export type Database = {
           field_type: string
           help_text: string | null
           id: string
+          image_url: string | null
           include_in_document_checklist: boolean
           irs_8821_role: string | null
           is_internal_only: boolean
@@ -6090,6 +6094,7 @@ export type Database = {
           field_type: string
           help_text?: string | null
           id?: string
+          image_url?: string | null
           include_in_document_checklist?: boolean
           irs_8821_role?: string | null
           is_internal_only?: boolean
@@ -6114,6 +6119,7 @@ export type Database = {
           field_type?: string
           help_text?: string | null
           id?: string
+          image_url?: string | null
           include_in_document_checklist?: boolean
           irs_8821_role?: string | null
           is_internal_only?: boolean
@@ -6521,6 +6527,7 @@ export type Database = {
           banner_image_url: string | null
           created_at: string
           created_by: string | null
+          custom_css: string | null
           description: string | null
           folder_id: string | null
           id: string
@@ -6537,6 +6544,7 @@ export type Database = {
           banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           description?: string | null
           folder_id?: string | null
           id?: string
@@ -6553,6 +6561,7 @@ export type Database = {
           banner_image_url?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           description?: string | null
           folder_id?: string | null
           id?: string

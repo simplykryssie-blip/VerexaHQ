@@ -35,6 +35,8 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [draggingInCanvas, setDraggingInCanvas] = useState(false);
   const [view, setView] = useState<"build" | "preview">("build");
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+  const [customCss, setCustomCss] = useState(template.custom_css ?? "");
+  const [savedCustomCss, setSavedCustomCss] = useState(template.custom_css ?? "");
   const [name, setName] = useState(template.name);
   const [renamingName, setRenamingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
@@ -44,6 +46,17 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     setBannerImageUrl(url);
     const { error } = await supabase.from("organizer_templates").update({ banner_image_url: url }).eq("id", template.id);
     if (error) toast.show(error.message, "error");
+  }
+
+  async function saveCustomCss() {
+    const trimmed = customCss.trim();
+    if (trimmed === savedCustomCss) return;
+    const { error } = await supabase.from("organizer_templates").update({ custom_css: trimmed || null }).eq("id", template.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setSavedCustomCss(trimmed);
   }
 
   async function saveName() {
@@ -292,12 +305,26 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
       )}
 
       {!readOnly && (
-        <div className="border-b border-border bg-surface px-4 py-3">
+        <div className="space-y-3 border-b border-border bg-surface px-4 py-3">
           <BannerImageUpload
             workspaceId={template.workspace_id ?? ""}
             value={bannerImageUrl}
             onChange={updateBanner}
           />
+          <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+            Custom CSS (optional)
+            <textarea
+              value={customCss}
+              onChange={(e) => setCustomCss(e.target.value)}
+              onBlur={saveCustomCss}
+              rows={3}
+              placeholder=".field-label { color: #0f172a; }"
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 font-mono text-xs normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+            <span className="mt-1 block text-[11px] normal-case text-muted">
+              Applied wherever this form is shown to a client -- the public link, the client portal, and any embedded copy.
+            </span>
+          </label>
         </div>
       )}
 
@@ -308,6 +335,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
           topLevelFields={previewTopLevelFields}
           childrenByParent={previewChildrenByParent}
           bannerImageUrl={bannerImageUrl}
+          customCss={customCss}
         />
       ) : (
         <div className="relative flex flex-1 overflow-hidden">
@@ -345,6 +373,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
               onDelete={deleteField}
               onClose={() => setSelectedFieldId(null)}
               readOnly={readOnly}
+              workspaceId={template.workspace_id ?? ""}
             />
           </div>
         </div>

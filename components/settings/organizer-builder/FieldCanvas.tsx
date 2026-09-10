@@ -115,12 +115,17 @@ function FieldBlock({
       <div className="flex items-center justify-between gap-2 text-sm">
         <div className="flex min-w-0 items-center gap-2">
           {!readOnly && <MoveButtons canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />}
-          <IconChip tone={FIELD_TYPE_TONE[field.field_type]}>
-            {(() => {
-              const Icon = FIELD_TYPE_ICONS[field.field_type];
-              return <Icon size={16} aria-hidden="true" />;
-            })()}
-          </IconChip>
+          {field.field_type === "section" && field.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={field.image_url} alt="" className="h-8 w-8 shrink-0 rounded object-cover" />
+          ) : (
+            <IconChip tone={FIELD_TYPE_TONE[field.field_type]}>
+              {(() => {
+                const Icon = FIELD_TYPE_ICONS[field.field_type];
+                return <Icon size={16} aria-hidden="true" />;
+              })()}
+            </IconChip>
+          )}
           <span className="min-w-0 truncate font-medium text-ink">
             {field.label ? (
               field.label

@@ -17,10 +17,12 @@ export function EngagementLetterPreview({
   bodyHtml,
   requiresSignature,
   bannerImageUrl,
+  customCss,
 }: {
   bodyHtml: string;
   requiresSignature: boolean;
   bannerImageUrl?: string | null;
+  customCss?: string | null;
 }) {
   const toast = useToast();
   const interpolated = interpolateSample(bodyHtml);
@@ -38,6 +40,7 @@ export function EngagementLetterPreview({
         <PaginatedDocument
           html={interpolated}
           bannerImageUrl={bannerImageUrl}
+          customCss={customCss}
           footer={
             requiresSignature ? (
               <div className="mt-4 rounded-2xl border border-border bg-surface shadow-soft p-4">
