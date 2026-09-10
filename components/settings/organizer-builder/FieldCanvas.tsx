@@ -3,7 +3,9 @@
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronUp, Columns2 } from "lucide-react";
 import { FIELD_TYPE_LABELS, type OrganizerFieldType } from "@/lib/organizer/fieldTypes";
+import { FIELD_TYPE_ICONS, FIELD_TYPE_TONE } from "@/lib/organizer/fieldTypeIcons";
 import { fieldColSpanClass, isWidthEligible } from "@/lib/organizer/layoutWidth";
+import { IconChip } from "@/components/ui/IconChip";
 import type { BuilderField } from "./types";
 
 type Lane = string | null; // parent_field_id this drag/drop is scoped to; null = top level
@@ -101,13 +103,19 @@ function FieldBlock({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onClick={onSelect}
-      className={`${fieldColSpanClass(field.field_type, field.layout_width)} cursor-pointer rounded-lg border p-3 transition ${
-        selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent border-dashed" : "border-border bg-surface hover:border-accent/50"
+      className={`${fieldColSpanClass(field.field_type, field.layout_width)} cursor-pointer rounded-lg border p-3 shadow-soft transition ${
+        selected ? "border-accent bg-accentSoft" : isDragging ? "border-accent border-dashed" : "border-border bg-surface hover:border-accent/50 hover:shadow-softHover"
       }`}
     >
       <div className="flex items-center justify-between gap-2 text-sm">
-        <div className="flex min-w-0 items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-2">
           {!readOnly && <MoveButtons canMoveUp={canMoveUp} canMoveDown={canMoveDown} onMoveUp={onMoveUp} onMoveDown={onMoveDown} />}
+          <IconChip tone={FIELD_TYPE_TONE[field.field_type]}>
+            {(() => {
+              const Icon = FIELD_TYPE_ICONS[field.field_type];
+              return <Icon size={16} aria-hidden="true" />;
+            })()}
+          </IconChip>
           <span className="min-w-0 truncate font-medium text-ink">
             {field.label ? (
               field.label
