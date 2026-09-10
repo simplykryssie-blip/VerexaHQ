@@ -20,6 +20,7 @@ export type BuilderField = {
   document_checklist_name: string | null;
   document_checklist_category: string | null;
   is_internal_only: boolean;
+  image_url: string | null;
 };
 
 /** JotForm-style row-sharing: whether this field shrinks to share its row with a neighbor. */
@@ -36,4 +37,5 @@ export type BuilderTemplate = {
   is_public: boolean;
   requires_portal_signup: boolean;
   banner_image_url: string | null;
+  custom_css: string | null;
 };

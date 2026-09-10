@@ -10,6 +10,7 @@ import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/orga
 import { IRS_8821_ROLES_BY_TYPE, IRS_8821_ROLE_LABELS } from "@/lib/organizer/irs8821Roles";
 import { isWidthEligible } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
+import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -35,6 +36,7 @@ export function FieldPropertiesPanel({
   onDelete,
   onClose,
   readOnly,
+  workspaceId,
 }: {
   field: BuilderField | null;
   otherTopLevelFields: BuilderField[];
@@ -57,12 +59,14 @@ export function FieldPropertiesPanel({
         | "document_checklist_name"
         | "document_checklist_category"
         | "is_internal_only"
+        | "image_url"
       >
     >
   ) => void;
   onClose: () => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
+  workspaceId: string;
 }) {
   if (!field) {
     return (
@@ -86,6 +90,7 @@ export function FieldPropertiesPanel({
       onDelete={onDelete}
       onClose={onClose}
       readOnly={readOnly}
+      workspaceId={workspaceId}
     />
   );
 }
@@ -146,6 +151,7 @@ function PropertiesForm({
   onDelete,
   onClose,
   readOnly,
+  workspaceId,
 }: {
   field: BuilderField;
   otherTopLevelFields: BuilderField[];
@@ -168,12 +174,14 @@ function PropertiesForm({
         | "document_checklist_name"
         | "document_checklist_category"
         | "is_internal_only"
+        | "image_url"
       >
     >
   ) => void;
   onDelete: (fieldId: string) => void;
   onClose: () => void;
   readOnly: boolean;
+  workspaceId: string;
 }) {
   const [label, setLabel] = useState(field.label);
   const [helpText, setHelpText] = useState(field.help_text ?? "");
@@ -301,6 +309,21 @@ function PropertiesForm({
           />
         </button>
       </div>
+
+      {field.field_type === "section" && (
+        <div className="mt-4 border-t border-border pt-4">
+          <BannerImageUpload
+            workspaceId={workspaceId}
+            value={field.image_url}
+            onChange={(url) => onUpdate(field.id, { image_url: url })}
+            disabled={readOnly}
+            label="Heading image (optional)"
+            helpText="Shown alongside this heading wherever it appears in the document."
+            uploadPathPrefix="heading"
+            imageClassName="h-16 w-16 rounded-lg border border-border object-cover"
+          />
+        </div>
+      )}
 
       {field.field_type === "file_upload" && (
         <div className="mt-4 border-t border-border pt-4">

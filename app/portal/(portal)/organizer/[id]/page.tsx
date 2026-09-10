@@ -15,7 +15,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
   const supabase = createClient();
   const { data: response } = await supabase
     .from("organizer_responses")
-    .select("id, status, organizer_template_id, workspace_id, client_id, engagement_id, organizer_templates(name)")
+    .select("id, status, organizer_template_id, workspace_id, client_id, engagement_id, organizer_templates(name, custom_css)")
     .eq("id", params.id)
     .eq("client_id", identity.clientId)
     .maybeSingle();
@@ -27,7 +27,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
     supabase
       .from("organizer_fields")
       .select(
-        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width, is_internal_only"
+        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width, is_internal_only, image_url"
       )
       .eq("organizer_template_id", response.organizer_template_id)
       .eq("is_internal_only", false)
@@ -66,10 +66,12 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         .filter((a) => a.value !== null)
     : [];
 
-  const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Form";
+  const template = response.organizer_templates as unknown as { name?: string; custom_css?: string | null } | null;
+  const templateName = template?.name ?? "Form";
 
   return (
     <>
+      {template?.custom_css && <style dangerouslySetInnerHTML={{ __html: template.custom_css }} />}
       <PageHeader
         title={templateName}
         description={

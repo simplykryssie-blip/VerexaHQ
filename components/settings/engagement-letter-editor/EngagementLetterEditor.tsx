@@ -29,6 +29,7 @@ export type EngagementLetterTemplateRow = {
   is_public: boolean;
   requires_portal_signup: boolean;
   banner_image_url: string | null;
+  custom_css: string | null;
   source_type: string;
   pdf_storage_path: string | null;
   pdf_field_mode: string | null;
@@ -44,6 +45,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
   const [bodyHtml, setBodyHtml] = useState(template.body_html);
   const [requiresSignature, setRequiresSignature] = useState(template.requires_signature);
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+  const [customCss, setCustomCss] = useState(template.custom_css ?? "");
   const [sourceType, setSourceType] = useState<"richtext" | "pdf">(template.source_type === "pdf" ? "pdf" : "richtext");
   const [pdfStoragePath, setPdfStoragePath] = useState(template.pdf_storage_path);
   const [pdfFieldMode, setPdfFieldMode] = useState<"acroform" | "overlay" | null>(
@@ -69,6 +71,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
         requires_signature: requiresSignature,
         merge_fields: usedTokens,
         banner_image_url: bannerImageUrl,
+        custom_css: customCss.trim() || null,
         source_type: sourceType,
         pdf_storage_path: pdfStoragePath,
         pdf_field_mode: pdfFieldMode,
@@ -139,7 +142,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
 
       <div className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
         {view === "preview" && sourceType === "richtext" ? (
-          <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} />
+          <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} customCss={customCss} />
         ) : (
           <div className="mx-auto max-w-[720px] space-y-4">
             <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
@@ -220,6 +223,26 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
                     }}
                   />
                 </div>
+              )}
+
+              {sourceType === "richtext" && (
+                <label className="mt-4 block border-t border-border pt-3 text-xs font-medium uppercase tracking-wide text-muted">
+                  Custom CSS (optional)
+                  <textarea
+                    value={customCss}
+                    disabled={readOnly}
+                    onChange={(e) => {
+                      setCustomCss(e.target.value);
+                      setDirty(true);
+                    }}
+                    rows={5}
+                    placeholder=".document-body h1 { color: #0f172a; }"
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 font-mono text-xs normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+                  />
+                  <span className="mt-1 block text-[11px] normal-case text-muted">
+                    Applied wherever this letter is shown to a client -- the preview above, the signing page, and the portal.
+                  </span>
+                </label>
               )}
             </div>
 

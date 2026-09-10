@@ -30,12 +30,14 @@ export function OrganizerPreviewPanel({
   topLevelFields,
   childrenByParent,
   bannerImageUrl,
+  customCss,
 }: {
   templateName: string;
   templateDescription: string | null;
   topLevelFields: BuilderField[];
   childrenByParent: Map<string, BuilderField[]>;
   bannerImageUrl?: string | null;
+  customCss?: string | null;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
@@ -49,6 +51,7 @@ export function OrganizerPreviewPanel({
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
+      {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
       <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
         {bannerImageUrl && currentIndex === 0 && (
           // eslint-disable-next-line @next/next/no-img-element
