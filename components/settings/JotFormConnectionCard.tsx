@@ -82,6 +82,8 @@ export function JotFormConnectionCard({ workspaceId, isConnected }: { workspaceI
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="JotForm API key"
               wrapperClassName="w-56"
+              autoComplete="off"
+              name="jotform-api-key"
               className="w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <button

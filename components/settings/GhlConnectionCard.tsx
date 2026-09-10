@@ -101,12 +101,16 @@ export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: s
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Private Integration Token"
               wrapperClassName="w-64"
+              autoComplete="off"
+              name="ghl-private-integration-token"
               className="w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <input
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
               placeholder="Location ID"
+              autoComplete="off"
+              name="ghl-location-id"
               className="w-40 rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <button
