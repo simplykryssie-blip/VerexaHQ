@@ -69,7 +69,7 @@ export async function sendEmailViaResend({
     }
   }
 
-  const displayName = fromName || process.env.EMAIL_FROM_NAME || "VerexaHQ";
+  const displayName = fromName || process.env.EMAIL_FROM_NAME || "Verexa HQ CRM";
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, X, ChevronDown, ChevronLeft, ChevronRight, Layers, Check, Home, LogOut } from "lucide-react";
+import { Menu, X, ChevronDown, ChevronLeft, ChevronRight, Layers, Check, Home, LogOut, Blocks } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS, ERO_MANAGEMENT_NAV_ITEMS, ERO_MANAGEMENT_NAV_SECTION } from "@/lib/nav";
 import { hexToRgba, readableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
@@ -34,6 +34,8 @@ export function Sidebar({
   switchableWorkspaces,
   showMessages,
   showPartners,
+  showLearningHub,
+  softwareLinks,
   showEroManagement,
   currentUser,
   reviewQueueHasItems,
@@ -56,6 +58,10 @@ export function Sidebar({
   showMessages?: boolean;
   /** Partners is only relevant to an ERO/SB with connections to manage -- an independent PTIN has no one to show there. */
   showPartners?: boolean;
+  /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
+  showLearningHub?: boolean;
+  /** Workspace-defined software shortcuts (Settings > ERO Profile / Profile) -- rendered as their own "Software" dropdown group when non-empty, each child opening externally. */
+  softwareLinks?: { id: string; name: string; url: string }[];
   /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (ERO Dashboard, Team -- which also holds Connections -- ERO Profile) to the main nav. Assignments lives in the regular Daily section instead, since every workspace tier needs to reassign work, not just ERO/SB. */
   showEroManagement?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
@@ -287,6 +293,7 @@ export function Sidebar({
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
                   .filter((item) => item.label !== "Partners" || showPartners)
+                  .filter((item) => item.label !== "Learning Hub" || showLearningHub)
                   .map((item) => {
                   const Icon = item.icon;
 
@@ -356,6 +363,43 @@ export function Sidebar({
             </div>
           ))}
         </nav>
+
+        {softwareLinks && softwareLinks.length > 0 && (
+          <div className="px-3 pb-1">
+            <button
+              type="button"
+              onClick={() => toggleExpanded("Software")}
+              aria-expanded={expanded.has("Software")}
+              title="Software"
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
+            >
+              <Blocks size={18} strokeWidth={2} className="shrink-0" />
+              {railExpanded && (
+                <>
+                  <span className="flex-1 text-left">Software</span>
+                  <ChevronDown size={14} className={`shrink-0 transition-transform ${expanded.has("Software") ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+            {expanded.has("Software") && railExpanded && (
+              <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
+                {softwareLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${styles.navItem} block truncate rounded-lg px-3 py-2 text-sm font-medium`}
+                  >
+                    {link.name}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {homeWorkspaceEntry && !homeWorkspaceEntry.isActive && (
           <div className="px-3 pb-1">

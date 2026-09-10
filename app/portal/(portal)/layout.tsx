@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ClipboardList, Handshake, MessageCircleWarning } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
@@ -14,39 +12,14 @@ export default async function PortalLayout({ children }: { children: React.React
   if (!identity) redirect("/portal/login");
 
   const supabase = createClient();
-  const [{ count }, branding, { data: pendingOrganizers }, { data: pendingQuotes }, { data: myOrganizerResponses }] = await Promise.all([
+  const [{ count }, branding] = await Promise.all([
     supabase
       .from("notification_queue")
       .select("id", { count: "exact", head: true })
       .in("channel", ["In-App", "Portal"])
       .neq("status", "cancelled"),
     getEffectiveBranding(identity.workspaceId),
-    supabase
-      .from("organizer_responses")
-      .select("id, organizer_templates(name)")
-      .eq("client_id", identity.clientId)
-      .in("status", ["not_started", "in_progress"])
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("quotes")
-      .select("id, title")
-      .eq("client_id", identity.clientId)
-      .eq("status", "sent")
-      .order("created_at", { ascending: true }),
-    supabase.from("organizer_responses").select("id").eq("client_id", identity.clientId),
   ]);
-
-  const myOrganizerResponseIds = (myOrganizerResponses ?? []).map((r) => r.id);
-  const { data: organizerInfoRequests } =
-    myOrganizerResponseIds.length > 0
-      ? await supabase
-          .from("organizer_information_requests")
-          .select("id, organizer_response_id")
-          .in("organizer_response_id", myOrganizerResponseIds)
-          .in("status", ["active", "viewed"])
-          .order("created_at", { ascending: true })
-      : { data: [] as { id: string; organizer_response_id: string }[] };
-  const infoRequestsAwaitingResponse = organizerInfoRequests ?? [];
 
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
@@ -55,10 +28,6 @@ export default async function PortalLayout({ children }: { children: React.React
     if (accentRgb) (brandVars as Record<string, string>)["--brand-accent-rgb"] = accentRgb;
     if (accentSoftRgb) (brandVars as Record<string, string>)["--brand-accent-soft-rgb"] = accentSoftRgb;
   }
-
-  const pending = pendingOrganizers ?? [];
-  const firstPendingName = (pending[0]?.organizer_templates as unknown as { name?: string } | null)?.name;
-  const quotesAwaitingResponse = pendingQuotes ?? [];
 
   return (
     <div style={brandVars}>
@@ -81,39 +50,6 @@ export default async function PortalLayout({ children }: { children: React.React
             />
           </div>
           <main id="portal-main-content" className="flex flex-1 flex-col overflow-y-auto pt-14 lg:pt-0 print:overflow-visible print:pt-0">
-            {quotesAwaitingResponse.length > 0 && (
-              <Link
-                href="/portal/quotes"
-                className="sticky top-0 z-20 flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm font-medium text-ink hover:bg-warning/20 print:hidden"
-              >
-                <Handshake size={15} className="shrink-0 text-warning" aria-hidden="true" />
-                {quotesAwaitingResponse.length === 1
-                  ? `You have a quote to review: ${quotesAwaitingResponse[0].title} -- accept or decline it`
-                  : `You have ${quotesAwaitingResponse.length} quotes to review -- accept or decline them`}
-              </Link>
-            )}
-            {pending.length > 0 && (
-              <Link
-                href={pending.length === 1 ? `/portal/organizer/${pending[0].id}` : "/portal/organizer"}
-                className="sticky top-0 z-20 flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm font-medium text-ink hover:bg-warning/20 print:hidden"
-              >
-                <ClipboardList size={15} className="shrink-0 text-warning" aria-hidden="true" />
-                {pending.length === 1
-                  ? `You have a form to complete: ${firstPendingName ?? "Form"} -- start it now`
-                  : `You have ${pending.length} forms to complete -- start them now`}
-              </Link>
-            )}
-            {infoRequestsAwaitingResponse.length > 0 && (
-              <Link
-                href={infoRequestsAwaitingResponse.length === 1 ? `/portal/organizer/${infoRequestsAwaitingResponse[0].organizer_response_id}` : "/portal/organizer"}
-                className="sticky top-0 z-20 flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-sm font-medium text-ink hover:bg-warning/20 print:hidden"
-              >
-                <MessageCircleWarning size={15} className="shrink-0 text-warning" aria-hidden="true" />
-                {infoRequestsAwaitingResponse.length === 1
-                  ? "Your preparer needs more information on your form -- view details"
-                  : `Your preparer needs more information on ${infoRequestsAwaitingResponse.length} forms -- view details`}
-              </Link>
-            )}
             {children}
           </main>
         </div>

@@ -22,7 +22,7 @@ export function AuthShell({
         <div className={styles.glowB} aria-hidden="true" />
         <div className={styles.mark}>
           <Image src="/brand/vmark.png" alt="" width={35} height={28} className={styles.markGlyph} priority />
-          <Image src="/brand/wordmark.png" alt="VerexaHQ" width={155} height={26} className={styles.wordmarkGlyph} priority />
+          <Image src="/brand/wordmark.png" alt="Verexa HQ CRM" width={155} height={26} className={styles.wordmarkGlyph} priority />
         </div>
 
         <div className={styles.railBody}>

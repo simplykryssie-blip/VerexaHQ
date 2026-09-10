@@ -5,8 +5,8 @@ import "./globals.css";
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: "VerexaHQ",
-  description: "VerexaHQ business operating platform -- Tax Office module",
+  title: "Verexa HQ CRM",
+  description: "Verexa HQ CRM business operating platform -- Tax Office module",
 };
 
 const plusJakartaSans = Plus_Jakarta_Sans({

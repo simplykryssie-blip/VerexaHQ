@@ -8,11 +8,13 @@ import { useToast } from "@/components/Toast";
 import { AddressInput } from "@/components/AddressInput";
 import { MaskedSecretField } from "@/components/settings/MaskedSecretField";
 import { SettingsCard } from "@/components/settings/SettingsCard";
-import { formatEin, formatEfin } from "@/lib/taxIds";
+import { formatEin, formatEfin, formatPtin } from "@/lib/taxIds";
 import { formatPhone } from "@/lib/phone";
 
 type Props = {
   workspaceId: string;
+  firmName: string;
+  ownerName: string | null;
   website: string | null;
   mailingAddress: string | null;
   businessPhone: string | null;
@@ -21,6 +23,8 @@ type Props = {
   isAdmin: boolean;
   einLast4: string | null;
   efinLast4: string | null;
+  ptinLast4: string | null;
+  cafLast4: string | null;
 };
 
 function LabeledInput({
@@ -42,6 +46,8 @@ function LabeledInput({
 
 export function FirmProfileForm({
   workspaceId,
+  firmName,
+  ownerName,
   website,
   mailingAddress,
   businessPhone,
@@ -50,11 +56,15 @@ export function FirmProfileForm({
   isAdmin,
   einLast4,
   efinLast4,
+  ptinLast4,
+  cafLast4,
 }: Props) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
 
+  const [bizName, setBizName] = useState(firmName);
+  const [bizOwnerName, setBizOwnerName] = useState(ownerName ?? "");
   const [bizWebsite, setBizWebsite] = useState(website ?? "");
   const [bizAddress, setBizAddress] = useState(mailingAddress ?? "");
   const [bizPhone, setBizPhone] = useState(businessPhone ?? "");
@@ -62,8 +72,12 @@ export function FirmProfileForm({
 
   const [ein, setEin] = useState("");
   const [efin, setEfin] = useState("");
+  const [ptin, setPtin] = useState("");
+  const [caf, setCaf] = useState("");
   const [clearEin, setClearEin] = useState(false);
   const [clearEfin, setClearEfin] = useState(false);
+  const [clearPtin, setClearPtin] = useState(false);
+  const [clearCaf, setClearCaf] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +90,14 @@ export function FirmProfileForm({
     if (isOwner) {
       const { error: workspaceError } = await supabase
         .from("workspaces")
-        .update({ phone: bizPhone || null, primary_contact_email: bizEmail || null, website: bizWebsite || null, mailing_address: bizAddress || null })
+        .update({
+          name: bizName.trim() || firmName,
+          owner_name: bizOwnerName.trim() || null,
+          phone: bizPhone || null,
+          primary_contact_email: bizEmail || null,
+          website: bizWebsite || null,
+          mailing_address: bizAddress || null,
+        })
         .eq("id", workspaceId);
       if (workspaceError) {
         setSaving(false);
@@ -97,13 +118,17 @@ export function FirmProfileForm({
       }
     }
 
-    if (isAdmin && (ein.trim() || clearEin || efin.trim() || clearEfin)) {
+    if (isAdmin && (ein.trim() || clearEin || efin.trim() || clearEfin || ptin.trim() || clearPtin || caf.trim() || clearCaf)) {
       const { error: taxError } = await supabase.rpc("set_firm_tax_profile", {
         p_workspace_id: workspaceId,
         p_ein: ein.trim() ? ein.trim() : undefined,
         p_efin: efin.trim() ? efin.trim() : undefined,
+        p_ptin: ptin.trim() ? ptin.trim() : undefined,
+        p_caf: caf.trim() ? caf.trim() : undefined,
         p_clear_ein: clearEin,
         p_clear_efin: clearEfin,
+        p_clear_ptin: clearPtin,
+        p_clear_caf: clearCaf,
       });
       if (taxError) {
         setSaving(false);
@@ -112,8 +137,12 @@ export function FirmProfileForm({
       }
       setEin("");
       setEfin("");
+      setPtin("");
+      setCaf("");
       setClearEin(false);
       setClearEfin(false);
+      setClearPtin(false);
+      setClearCaf(false);
     }
 
     setSaving(false);
@@ -129,6 +158,10 @@ export function FirmProfileForm({
           description="One phone number and email here, used everywhere clients see your firm -- the client portal, your public intake forms, and invite emails."
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <LabeledInput label="Firm name" value={bizName} onChange={(e) => setBizName(e.target.value)} />
+            <LabeledInput label="Owner name" value={bizOwnerName} onChange={(e) => setBizOwnerName(e.target.value)} />
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <LabeledInput label="Business phone" type="tel" value={bizPhone} onChange={(e) => setBizPhone(formatPhone(e.target.value))} />
             <LabeledInput
               label="Business email"
@@ -149,7 +182,7 @@ export function FirmProfileForm({
           </div>
 
           <p className="mt-4 text-sm text-slate">
-            Manage your logo, colors, and business name in{" "}
+            Manage your logo, colors, and brand colors in{" "}
             <Link href="/settings/brand-center" className="font-medium text-accent hover:underline">
               Branding
             </Link>
@@ -161,7 +194,7 @@ export function FirmProfileForm({
       {isAdmin && (
         <SettingsCard
           title="Tax identifiers"
-          description="EIN and EFIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged."
+          description="EFIN, PTIN, CAF, and EIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged."
         >
           <div className="overflow-hidden rounded-xl border border-border">
             <div className="divide-y divide-border">
@@ -183,8 +216,27 @@ export function FirmProfileForm({
                 clear={clearEfin}
                 onClearChange={setClearEfin}
               />
+              <MaskedSecretField
+                label="PTIN"
+                last4={ptinLast4}
+                onReveal={() => supabase.rpc("reveal_firm_ptin", { p_workspace_id: workspaceId })}
+                newValue={ptin}
+                onNewValueChange={(v) => setPtin(formatPtin(v))}
+                clear={clearPtin}
+                onClearChange={setClearPtin}
+              />
+              <MaskedSecretField
+                label="CAF"
+                last4={cafLast4}
+                onReveal={() => supabase.rpc("reveal_firm_caf", { p_workspace_id: workspaceId })}
+                newValue={caf}
+                onNewValueChange={setCaf}
+                clear={clearCaf}
+                onClearChange={setClearCaf}
+              />
             </div>
           </div>
+          <p className="mt-3 text-xs text-muted">EFIN, PTIN, CAF, and EIN are never shared with connected accounts.</p>
         </SettingsCard>
       )}
 

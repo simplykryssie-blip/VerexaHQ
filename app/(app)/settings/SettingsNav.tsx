@@ -13,7 +13,7 @@ export function SettingsNav({ hideFirmProfile }: { hideFirmProfile: boolean }) {
         <div key={section.label} className="flex gap-1 lg:block lg:space-y-1">
           <p className="hidden px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted lg:block">{section.label}</p>
           {section.items
-            .filter((item) => !(hideFirmProfile && item.label === "Firm Profile"))
+            .filter((item) => !(hideFirmProfile && item.label === "ERO Profile"))
             .map((item) => {
             const active = pathname === item.href || Boolean(pathname && SETTINGS_GROUPED_HREFS[item.href]?.includes(pathname));
             const Icon = item.icon;

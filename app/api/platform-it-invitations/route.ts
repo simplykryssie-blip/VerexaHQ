@@ -33,11 +33,11 @@ export async function POST(request: Request) {
   const emailResult = await sendEmailViaResend({
     to: email.trim(),
     sender: "team",
-    subject: "You've been invited to VerexaHQ",
+    subject: "You've been invited to Verexa HQ CRM",
     html: renderEmail({
       heading: "Join Verexa HQ CRM",
       bodyHtml:
-        "<p>You've been invited to create a VerexaHQ account with IT tools access -- system health, job queues, and the workspace roster for troubleshooting.</p><p>Click below to accept the invitation and set up your account.</p>",
+        "<p>You've been invited to create a Verexa HQ CRM account with IT tools access -- system health, job queues, and the workspace roster for troubleshooting.</p><p>Click below to accept the invitation and set up your account.</p>",
       ctaLabel: "Accept invitation",
       ctaUrl: acceptUrl,
     }),

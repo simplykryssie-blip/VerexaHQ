@@ -18,6 +18,7 @@ export function ConnectedPtinRow({
   allowsBrandingOverride,
   defaultReviewerId,
   restrictPtinStaffAssignment,
+  allowsLearningHubDownlineShare,
   reviewerOptions,
 }: {
   connectionId: string;
@@ -30,6 +31,7 @@ export function ConnectedPtinRow({
   allowsBrandingOverride: boolean;
   defaultReviewerId: string | null;
   restrictPtinStaffAssignment: boolean;
+  allowsLearningHubDownlineShare: boolean;
   reviewerOptions: ReviewerOption[];
 }) {
   const router = useRouter();
@@ -84,6 +86,20 @@ export function ConnectedPtinRow({
     const { error } = await supabase
       .from("firm_connections")
       .update({ restrict_ptin_staff_assignment: !restrictPtinStaffAssignment })
+      .eq("id", connectionId);
+    setBusy(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  async function toggleLearningHubDownlineShare() {
+    setBusy("learningHubDownline");
+    const { error } = await supabase
+      .from("firm_connections")
+      .update({ allows_learning_hub_downline_share: !allowsLearningHubDownlineShare })
       .eq("id", connectionId);
     setBusy(null);
     if (error) {
@@ -204,6 +220,23 @@ export function ConnectedPtinRow({
             }`}
           >
             {restrictPtinStaffAssignment ? "Only we can reassign staff during review" : "They can still reassign staff during review"}
+          </button>
+        </div>
+      )}
+
+      {status === "active" && relationshipType === "service_bureau_ero" && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surfaceMuted px-3 py-2">
+          <button
+            type="button"
+            onClick={toggleLearningHubDownlineShare}
+            disabled={busy !== null}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
+              allowsLearningHubDownlineShare ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
+            }`}
+          >
+            {allowsLearningHubDownlineShare
+              ? "Their connected PTINs can see your Learning Hub"
+              : "Only they can see your Learning Hub"}
           </button>
         </div>
       )}
