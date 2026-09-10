@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Settings2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
@@ -34,6 +34,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [draggedType, setDraggedType] = useState<OrganizerFieldType | null>(null);
   const [draggingInCanvas, setDraggingInCanvas] = useState(false);
   const [view, setView] = useState<"build" | "preview">("build");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
   const [customCss, setCustomCss] = useState(template.custom_css ?? "");
   const [savedCustomCss, setSavedCustomCss] = useState(template.custom_css ?? "");
@@ -305,26 +306,40 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
       )}
 
       {!readOnly && (
-        <div className="space-y-3 border-b border-border bg-surface px-4 py-3">
-          <BannerImageUpload
-            workspaceId={template.workspace_id ?? ""}
-            value={bannerImageUrl}
-            onChange={updateBanner}
-          />
-          <label className="block text-xs font-medium uppercase tracking-wide text-muted">
-            Custom CSS (optional)
-            <textarea
-              value={customCss}
-              onChange={(e) => setCustomCss(e.target.value)}
-              onBlur={saveCustomCss}
-              rows={3}
-              placeholder=".field-label { color: #0f172a; }"
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 font-mono text-xs normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <span className="mt-1 block text-[11px] normal-case text-muted">
-              Applied wherever this form is shown to a client -- the public link, the client portal, and any embedded copy.
+        <div className="border-b border-border bg-surface">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-2 text-xs font-medium text-muted hover:text-ink"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Settings2 size={13} aria-hidden="true" /> Template settings (banner, custom CSS)
             </span>
-          </label>
+            {settingsOpen ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+          </button>
+          {settingsOpen && (
+            <div className="space-y-3 px-4 pb-3">
+              <BannerImageUpload
+                workspaceId={template.workspace_id ?? ""}
+                value={bannerImageUrl}
+                onChange={updateBanner}
+              />
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Custom CSS (optional)
+                <textarea
+                  value={customCss}
+                  onChange={(e) => setCustomCss(e.target.value)}
+                  onBlur={saveCustomCss}
+                  rows={3}
+                  placeholder=".field-label { color: #0f172a; }"
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 font-mono text-xs normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <span className="mt-1 block text-[11px] normal-case text-muted">
+                  Applied wherever this form is shown to a client -- the public link, the client portal, and any embedded copy.
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       )}
 
