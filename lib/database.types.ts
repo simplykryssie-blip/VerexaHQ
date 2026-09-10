@@ -5279,6 +5279,53 @@ export type Database = {
           },
         ]
       }
+      learning_live_sessions: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          host_user_id: string
+          id: string
+          is_webinar: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes: number
+          host_user_id: string
+          id?: string
+          is_webinar?: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          host_user_id?: string
+          id?: string
+          is_webinar?: boolean
+          join_url?: string
+          module_id?: string
+          scheduled_start?: string
+          start_url?: string
+          zoom_meeting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_live_sessions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: true
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_module_completions: {
         Row: {
           completed_at: string
@@ -5376,53 +5423,6 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "learning_courses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      learning_live_sessions: {
-        Row: {
-          created_at: string
-          duration_minutes: number
-          host_user_id: string
-          id: string
-          is_webinar: boolean
-          join_url: string
-          module_id: string
-          scheduled_start: string
-          start_url: string
-          zoom_meeting_id: string
-        }
-        Insert: {
-          created_at?: string
-          duration_minutes: number
-          host_user_id: string
-          id?: string
-          is_webinar?: boolean
-          join_url: string
-          module_id: string
-          scheduled_start: string
-          start_url: string
-          zoom_meeting_id: string
-        }
-        Update: {
-          created_at?: string
-          duration_minutes?: number
-          host_user_id?: string
-          id?: string
-          is_webinar?: boolean
-          join_url?: string
-          module_id?: string
-          scheduled_start?: string
-          start_url?: string
-          zoom_meeting_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "learning_live_sessions_module_id_fkey"
-            columns: ["module_id"]
-            isOneToOne: true
-            referencedRelation: "learning_modules"
             referencedColumns: ["id"]
           },
         ]
@@ -6116,6 +6116,7 @@ export type Database = {
           id?: string
           include_in_document_checklist?: boolean
           irs_8821_role?: string | null
+          is_internal_only?: boolean
           is_required?: boolean
           label?: string
           layout_width?: string
@@ -8753,6 +8754,41 @@ export type Database = {
           },
         ]
       }
+      starred_items: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "starred_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_articles: {
         Row: {
           body: string
@@ -9758,6 +9794,41 @@ export type Database = {
           },
         ]
       }
+      workspace_software_links: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_software_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_subscription_invoices: {
         Row: {
           amount_due: number
@@ -9801,41 +9872,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workspace_subscription_invoices_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workspace_software_links: {
-        Row: {
-          created_at: string
-          display_order: number
-          id: string
-          name: string
-          url: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          name: string
-          url: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          display_order?: number
-          id?: string
-          name?: string
-          url?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_software_links_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -10709,6 +10745,7 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -11064,6 +11101,7 @@ export type Database = {
         Args: { p_relationship_type?: string; p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -11827,7 +11865,9 @@ export type Database = {
       }
       learning_hub_reachable_workspaces: {
         Args: { p_owner_workspace_id: string }
-        Returns: { workspace_id: string }[]
+        Returns: {
+          workspace_id: string
+        }[]
       }
       link_public_portal_account: {
         Args: {
@@ -12066,6 +12106,7 @@ export type Database = {
         Args: { p_token: string; p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -12116,6 +12157,7 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -12378,7 +12420,7 @@ export type Database = {
         Returns: undefined
       }
       set_document_request_item_due_date: {
-        Args: { p_due_date: string | null; p_item_status_id: string }
+        Args: { p_due_date: string; p_item_status_id: string }
         Returns: undefined
       }
       set_feature_flag: {
@@ -12478,7 +12520,7 @@ export type Database = {
         Returns: string
       }
       set_signature_request_expiry: {
-        Args: { p_expires_at: string | null; p_signature_request_id: string }
+        Args: { p_expires_at: string; p_signature_request_id: string }
         Returns: undefined
       }
       set_workspace_ghl_connection: {

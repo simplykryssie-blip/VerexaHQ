@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Trash2, Zap } from "lucide-react";
+import { Copy, Star, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
+import { StarButton } from "@/components/library/StarButton";
 import type { LibraryFolderRow } from "@/components/library/types";
 import {
   TriggerFields,
@@ -31,6 +32,7 @@ export type WorkflowRow = {
   folder_id: string | null;
   step_count: number;
   run_count: number;
+  starred: boolean;
 };
 
 function slugify(name: string) {
@@ -77,11 +79,23 @@ export function WorkflowList({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showRetired, setShowRetired] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
 
   const visibleWorkflows = useMemo(
-    () => (selectedFolderId === null ? workflows : workflows.filter((w) => w.folder_id === selectedFolderId)),
-    [workflows, selectedFolderId]
+    () =>
+      workflows
+        .filter(
+          (w) =>
+            (selectedFolderId === null || w.folder_id === selectedFolderId) &&
+            (showRetired ? w.status === "archived" : w.status !== "archived") &&
+            (!starredOnly || w.starred)
+        )
+        .sort((a, b) => (a.starred === b.starred ? 0 : a.starred ? -1 : 1)),
+    [workflows, selectedFolderId, showRetired, starredOnly]
   );
+
+  const retiredCount = useMemo(() => workflows.filter((w) => w.status === "archived").length, [workflows]);
 
   const folderCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -280,13 +294,47 @@ export function WorkflowList({
 
         {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
 
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setStarredOnly((v) => !v)}
+            aria-pressed={starredOnly}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              starredOnly ? "border-amber-300 bg-amber-50 text-amber-600" : "border-border text-muted hover:text-ink"
+            }`}
+          >
+            <Star size={12} fill={starredOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRetired((v) => !v)}
+            aria-pressed={showRetired}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              showRetired ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+            }`}
+          >
+            Retired ({retiredCount})
+          </button>
+        </div>
+
         {visibleWorkflows.length === 0 ? (
-          <EmptyState message={workflows.length === 0 ? "No workflows yet. Create one to automate what happens on an engagement." : "No workflows in this folder."} />
+          <EmptyState
+            message={
+              showRetired
+                ? "No retired workflows."
+                : starredOnly
+                  ? "No starred workflows."
+                  : workflows.length === 0
+                    ? "No workflows yet. Create one to automate what happens on an engagement."
+                    : "No workflows in this folder."
+            }
+          />
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {visibleWorkflows.map((w) => (
               <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <Link href={`/workflows/${w.id}`} className="flex min-w-0 items-center gap-3">
+                <StarButton workspaceId={workspaceId} entityType="automation" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
+                <Link href={`/workflows/${w.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                   <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">

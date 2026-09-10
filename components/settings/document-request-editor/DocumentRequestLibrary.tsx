@@ -25,10 +25,12 @@ export function DocumentRequestLibrary({
   workspaceId,
   templates,
   folders,
+  starredIds,
 }: {
   workspaceId: string;
   templates: DocumentRequestTemplateCard[];
   folders: LibraryFolderRow[];
+  starredIds: Set<string>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -50,6 +52,7 @@ export function DocumentRequestLibrary({
     href: `/templates/document-requests/${t.id}`,
     actionLabel: t.workspace_id ? "Edit" : "View",
     badges: [`${t.itemCount} item${t.itemCount === 1 ? "" : "s"}`, `${t.requiredCount} required`],
+    starred: starredIds.has(t.id),
   }));
 
   async function moveTemplate(card: GalleryCard, folderId: string | null) {
@@ -106,6 +109,7 @@ export function DocumentRequestLibrary({
       <TemplateGallery
         workspaceId={workspaceId}
         itemType="form_template"
+        entityType="document_request_template"
         folders={folders}
         cards={cards}
         icon={FolderInput}

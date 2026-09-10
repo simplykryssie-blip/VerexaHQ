@@ -13,7 +13,11 @@ export default async function WebsitesPage() {
 
   const supabase = createClient();
 
-  const [{ data: websites }, { data: canManage }, { data: folders }] = await Promise.all([
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const [{ data: websites }, { data: canManage }, { data: folders }, { data: starredRows }] = await Promise.all([
     supabase
       .from("site_websites")
       .select("id, name, slug, status, folder_id, site_pages(id)")
@@ -21,7 +25,11 @@ export default async function WebsitesPage() {
       .order("name"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "site_pages.manage" }),
     supabase.from("library_folders").select("id, parent_folder_id, name").eq("workspace_id", workspace.id).eq("item_type", "website").order("name"),
+    user
+      ? supabase.from("starred_items").select("entity_id").eq("user_id", user.id).eq("entity_type", "website")
+      : Promise.resolve({ data: [] as { entity_id: string }[] }),
   ]);
+  const starredIds = new Set((starredRows ?? []).map((r) => r.entity_id));
 
   const cards: WebsiteCard[] = (websites ?? []).map((w) => ({
     id: w.id,
@@ -30,6 +38,7 @@ export default async function WebsitesPage() {
     status: w.status,
     folder_id: w.folder_id,
     page_count: (w.site_pages as unknown as { id: string }[]).length,
+    starred: starredIds.has(w.id),
   }));
 
   const publishedCount = cards.filter((c) => c.status === "published").length;

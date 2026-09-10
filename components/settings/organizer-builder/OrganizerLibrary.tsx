@@ -29,12 +29,14 @@ export function OrganizerLibrary({
   folders,
   isJotformConnected,
   downlineWorkspaces,
+  starredIds,
 }: {
   workspaceId: string;
   templates: OrganizerCard[];
   folders: LibraryFolderRow[];
   isJotformConnected: boolean;
   downlineWorkspaces: DownlineWorkspace[];
+  starredIds: Set<string>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -62,6 +64,7 @@ export function OrganizerLibrary({
       `${t.topLevelFieldCount} fields`,
       ...(t.totalFieldCount !== t.topLevelFieldCount ? [`${t.totalFieldCount} total incl. repeats`] : []),
     ],
+    starred: starredIds.has(t.id),
   }));
 
   async function moveTemplate(card: GalleryCard, folderId: string | null) {
@@ -139,6 +142,7 @@ export function OrganizerLibrary({
       <TemplateGallery
         workspaceId={workspaceId}
         itemType="form_template"
+        entityType="organizer_template"
         folders={folders}
         cards={cards}
         icon={ClipboardList}

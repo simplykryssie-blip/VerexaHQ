@@ -287,7 +287,7 @@ export function SignaturesPanel({
       }
       expiresAt = parsed.toISOString();
     }
-    const { error } = await supabase.rpc("set_signature_request_expiry", { p_signature_request_id: requestId, p_expires_at: expiresAt });
+    const { error } = await supabase.rpc("set_signature_request_expiry", { p_signature_request_id: requestId, p_expires_at: expiresAt as never });
     if (error) {
       toast.show(error.message, "error");
       return;
