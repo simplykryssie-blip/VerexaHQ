@@ -45,7 +45,7 @@ export function BannerImageUpload({
       {value ? (
         <div className="mt-2 flex items-start gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Banner" className="max-h-24 rounded-lg border border-border object-contain" />
+          <img src={value} alt="Banner" className="h-20 w-64 rounded-lg border border-border object-cover" />
           {!disabled && (
             <button
               type="button"
@@ -71,7 +71,9 @@ export function BannerImageUpload({
           </label>
         )
       )}
-      <p className="mt-1 text-xs text-muted">Rendered at the top of the document -- upload something you designed elsewhere.</p>
+      <p className="mt-1 text-xs text-muted">
+        Rendered at the top of the document, cropped to a fixed banner height -- a wide image (roughly 4:1) crops cleanest.
+      </p>
     </div>
   );
 }

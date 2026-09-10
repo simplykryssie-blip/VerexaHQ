@@ -457,7 +457,7 @@ export function PublicOrganizerForm({
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-8">
       {template.banner_image_url && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={template.banner_image_url} alt="" className="-mb-2 w-full rounded-lg object-cover" />
+        <img src={template.banner_image_url} alt="" className="-mb-2 h-32 w-full rounded-lg object-cover" />
       )}
       <div>
         {branding?.logo_url ? (
