@@ -167,6 +167,7 @@ export function FieldCanvas({
   onReorder,
   onMoveField,
   onToggleWidth,
+  onDraggingChange,
   readOnly,
 }: {
   topLevelFields: BuilderField[];
@@ -178,6 +179,11 @@ export function FieldCanvas({
   onReorder: (lane: Lane, fromIndex: number, toIndex: number) => void;
   onMoveField: (lane: Lane, index: number, direction: -1 | 1) => void;
   onToggleWidth: (fieldId: string) => void;
+  /** Reordering an already-placed field is dragged entirely within this
+   *  component (unlike a new field from the palette, tracked one level up
+   *  as draggedType) -- surfaced so the field-properties overlay can also
+   *  stop intercepting pointer events for this kind of drag. */
+  onDraggingChange?: (dragging: boolean) => void;
   readOnly: boolean;
 }) {
   const [draggedField, setDraggedField] = useState<{ id: string; lane: Lane; index: number } | null>(null);
@@ -190,6 +196,8 @@ export function FieldCanvas({
   useEffect(() => {
     function clear() {
       setDropTarget(null);
+      setDraggedField(null);
+      onDraggingChange?.(false);
     }
     window.addEventListener("dragend", clear);
     window.addEventListener("drop", clear);
@@ -197,6 +205,7 @@ export function FieldCanvas({
       window.removeEventListener("dragend", clear);
       window.removeEventListener("drop", clear);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Splits each field block into a top half/bottom half so hovering over
@@ -231,6 +240,7 @@ export function FieldCanvas({
     }
     setDraggedField(null);
     setDropTarget(null);
+    onDraggingChange?.(false);
   }
 
   return (
@@ -251,7 +261,11 @@ export function FieldCanvas({
                 selected={selectedFieldId === field.id}
                 onSelect={() => onSelect(field.id)}
                 isDragging={draggedField?.id === field.id}
-                onDragStart={() => !readOnly && setDraggedField({ id: field.id, lane: null, index })}
+                onDragStart={() => {
+                  if (readOnly) return;
+                  setDraggedField({ id: field.id, lane: null, index });
+                  onDraggingChange?.(true);
+                }}
                 onDragOver={(e) => handleFieldDragOver(e, null, index)}
                 onDrop={() => handleDrop(null)}
                 onToggleWidth={() => onToggleWidth(field.id)}
@@ -272,7 +286,11 @@ export function FieldCanvas({
                         selected={selectedFieldId === child.id}
                         onSelect={() => onSelect(child.id)}
                         isDragging={draggedField?.id === child.id}
-                        onDragStart={() => !readOnly && setDraggedField({ id: child.id, lane: field.id, index: childIndex })}
+                        onDragStart={() => {
+                          if (readOnly) return;
+                          setDraggedField({ id: child.id, lane: field.id, index: childIndex });
+                          onDraggingChange?.(true);
+                        }}
                         onDragOver={(e) => handleFieldDragOver(e, field.id, childIndex)}
                         onDrop={() => handleDrop(field.id)}
                         onToggleWidth={() => onToggleWidth(child.id)}

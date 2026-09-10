@@ -32,6 +32,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [fields, setFields] = useState<BuilderField[]>(initialFields);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedType, setDraggedType] = useState<OrganizerFieldType | null>(null);
+  const [draggingInCanvas, setDraggingInCanvas] = useState(false);
   const [view, setView] = useState<"build" | "preview">("build");
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
   const [name, setName] = useState(template.name);
@@ -321,15 +322,21 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             onReorder={reorder}
             onMoveField={moveField}
             onToggleWidth={toggleFieldWidth}
+            onDraggingChange={setDraggingInCanvas}
             readOnly={readOnly}
           />
           {/* Pops out over the canvas only while a field is selected, instead
               of permanently occupying a quarter of the screen -- matches how
-              JotForm's own properties panel behaves. */}
+              JotForm's own properties panel behaves. It's also switched to
+              pointer-events-none during ANY drag (a new field from the
+              palette, or reordering a placed one) -- otherwise this overlay
+              sits on top of the canvas's own drop zones (z-20) and silently
+              swallows the drop when it lands under the panel's footprint,
+              which is most of the canvas's right side on a typical viewport. */}
           <div
             className={`absolute inset-y-0 right-0 z-20 flex shadow-softHover transition-transform duration-200 ease-out ${
-              selectedField ? "translate-x-0" : "pointer-events-none translate-x-full"
-            }`}
+              selectedField ? "translate-x-0" : "translate-x-full"
+            } ${!selectedField || draggedType || draggingInCanvas ? "pointer-events-none" : ""}`}
           >
             <FieldPropertiesPanel
               field={selectedField}

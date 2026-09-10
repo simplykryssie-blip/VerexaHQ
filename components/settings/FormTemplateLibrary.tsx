@@ -119,7 +119,9 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     .eq("item_type", "form_template")
     .order("name");
 
-  const { data: jotformConnected } = isOrganizers ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId }) : { data: false };
+  const { data: jotformConnected } = !isDocumentRequests
+    ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId })
+    : { data: false };
 
   // Only an ERO or Service Bureau (a "parent" in an active firm connection)
   // can share a template down to a connected firm -- never automatic, and
@@ -218,6 +220,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
               workspaceId={workspaceId}
               templates={engagementLetterCards}
               folders={folders ?? []}
+              isJotformConnected={Boolean(jotformConnected)}
               downlineWorkspaces={downlineWorkspaces}
             />
           )}
