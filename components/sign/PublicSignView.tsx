@@ -130,18 +130,22 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4 sm:p-8">
+    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 sm:p-8">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">{data.workspace_name}</p>
         <h1 className="text-lg font-semibold text-ink">{data.request_title}</h1>
         <p className="text-sm text-muted">Requesting signature from {data.signer_name}</p>
       </div>
 
-      <div className="min-h-[50vh] flex-1 rounded-xl border border-border bg-surfaceMuted p-3">
+      <div className="h-[80vh] min-h-[500px] flex-1 rounded-xl border border-border bg-surfaceMuted p-3">
         {fileError && <p className="text-sm text-danger">{fileError}</p>}
         {!fileError && !fileUrl && <p className="text-sm text-muted">Loading document...</p>}
         {fileUrl && isPreviewable(data.attachment_mime_type) && data.attachment_mime_type === "application/pdf" && (
-          <iframe src={fileUrl} title={data.attachment_file_name} className="h-full min-h-[50vh] w-full rounded-lg border border-border bg-white" />
+          <iframe
+            src={`${fileUrl}#toolbar=1&navpanes=0&view=FitH`}
+            title={data.attachment_file_name}
+            className="h-full w-full rounded-lg border border-border bg-white"
+          />
         )}
         {fileUrl && data.attachment_mime_type?.startsWith("image/") && (
           // eslint-disable-next-line @next/next/no-img-element
