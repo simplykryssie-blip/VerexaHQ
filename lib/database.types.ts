@@ -3002,6 +3002,7 @@ export type Database = {
           category: string | null
           document_request_id: string
           document_request_item_id: string | null
+          due_date: string | null
           fulfilled_by_attachment_id: string | null
           id: string
           is_required: boolean
@@ -3014,6 +3015,7 @@ export type Database = {
           category?: string | null
           document_request_id: string
           document_request_item_id?: string | null
+          due_date?: string | null
           fulfilled_by_attachment_id?: string | null
           id?: string
           is_required?: boolean
@@ -3026,6 +3028,7 @@ export type Database = {
           category?: string | null
           document_request_id?: string
           document_request_item_id?: string | null
+          due_date?: string | null
           fulfilled_by_attachment_id?: string | null
           id?: string
           is_required?: boolean
@@ -12257,6 +12260,10 @@ export type Database = {
       }
       set_config_object_status: {
         Args: { p_id: string; p_status: string; p_table: string }
+        Returns: undefined
+      }
+      set_document_request_item_due_date: {
+        Args: { p_due_date: string | null; p_item_status_id: string }
         Returns: undefined
       }
       set_feature_flag: {

@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { EmptyState } from "@/components/EmptyState";
+import { IconChip } from "@/components/ui/IconChip";
+import { getCategoryStyle } from "@/lib/documentRequests/categoryStyle";
 
 type Template = {
   id: string;
@@ -107,30 +109,57 @@ export function DocumentRequestEditor({ template, items: initialItems }: { templ
     router.refresh();
   }
 
-  async function moveItem(item: Item, direction: "up" | "down") {
-    const sorted = [...items].sort((a, b) => a.display_order - b.display_order);
-    const index = sorted.findIndex((i) => i.id === item.id);
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= sorted.length) return;
-    const other = sorted[swapIndex];
-    setItems((prev) =>
-      prev.map((i) => {
-        if (i.id === item.id) return { ...i, display_order: other.display_order };
-        if (i.id === other.id) return { ...i, display_order: item.display_order };
-        return i;
-      })
-    );
-    const [{ error: err1 }, { error: err2 }] = await Promise.all([
-      supabase.from("document_request_items").update({ display_order: other.display_order }).eq("id", item.id),
-      supabase.from("document_request_items").update({ display_order: item.display_order }).eq("id", other.id),
-    ]);
-    if (err1 || err2) {
-      toast.show(err1?.message ?? err2?.message ?? "Could not reorder", "error");
+  const sortedItems = [...items].sort((a, b) => a.display_order - b.display_order);
+
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  // A drag can end outside any tracked drop target -- clear the indicator
+  // globally so an aborted drag never leaves a stale line on screen.
+  useEffect(() => {
+    function clear() {
+      setDraggedId(null);
+      setDropIndex(null);
     }
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, []);
+
+  async function persistOrder(orderedIds: string[]) {
+    setItems((prev) => prev.map((i) => ({ ...i, display_order: orderedIds.indexOf(i.id) })));
+    const results = await Promise.all(
+      orderedIds.map((id, index) => supabase.from("document_request_items").update({ display_order: index }).eq("id", id))
+    );
+    const err = results.find((r) => r.error)?.error;
+    if (err) toast.show(err.message, "error");
     router.refresh();
   }
 
-  const sortedItems = [...items].sort((a, b) => a.display_order - b.display_order);
+  function handleItemDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const isTopHalf = e.clientY - rect.top < rect.height / 2;
+    setDropIndex(isTopHalf ? index : index + 1);
+  }
+
+  function handleItemDrop() {
+    if (draggedId !== null && dropIndex !== null) {
+      const currentOrder = sortedItems.map((i) => i.id);
+      const fromIndex = currentOrder.indexOf(draggedId);
+      if (fromIndex !== -1) {
+        const without = currentOrder.filter((id) => id !== draggedId);
+        const adjustedIndex = fromIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        without.splice(adjustedIndex, 0, draggedId);
+        persistOrder(without);
+      }
+    }
+    setDraggedId(null);
+    setDropIndex(null);
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -185,66 +214,62 @@ export function DocumentRequestEditor({ template, items: initialItems }: { templ
             {sortedItems.length === 0 ? (
               <EmptyState message="No items yet -- add the documents you want to request below." />
             ) : (
-              <ul className="divide-y divide-border">
-                {sortedItems.map((item, idx) => (
-                  <li key={item.id} className="flex items-start gap-3 py-3">
-                    {!readOnly && (
-                      <div className="mt-0.5 flex flex-col">
-                        <button
-                          type="button"
-                          onClick={() => moveItem(item, "up")}
-                          disabled={idx === 0}
-                          aria-label="Move up"
-                          className="text-muted hover:text-ink disabled:opacity-30"
-                        >
-                          <ChevronUp size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveItem(item, "down")}
-                          disabled={idx === sortedItems.length - 1}
-                          aria-label="Move down"
-                          className="text-muted hover:text-ink disabled:opacity-30"
-                        >
-                          <ChevronDown size={14} />
-                        </button>
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-ink">{item.name}</span>
-                        {item.is_required ? (
-                          <span className="rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium text-accent">Required</span>
-                        ) : (
-                          <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Optional</span>
+              <ul>
+                {sortedItems.map((item, idx) => {
+                  const { icon: CategoryIcon, tone } = getCategoryStyle(item.category);
+                  return (
+                    <li key={item.id}>
+                      {dropIndex === idx && <div className="h-1 rounded-full bg-accent" aria-hidden="true" />}
+                      <div
+                        draggable={!readOnly}
+                        onDragStart={() => setDraggedId(item.id)}
+                        onDragOver={(e) => !readOnly && handleItemDragOver(e, idx)}
+                        onDrop={() => !readOnly && handleItemDrop()}
+                        className={`flex items-start gap-3 border-b border-border py-3 ${!readOnly ? "cursor-grab active:cursor-grabbing" : ""} ${
+                          draggedId === item.id ? "opacity-40" : ""
+                        }`}
+                      >
+                        <IconChip tone={tone} className="mt-0.5">
+                          <CategoryIcon size={16} aria-hidden="true" />
+                        </IconChip>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-ink">{item.name}</span>
+                            {item.is_required ? (
+                              <span className="rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium text-accent">Required</span>
+                            ) : (
+                              <span className="rounded-full bg-surfaceMuted px-2 py-0.5 text-[10px] font-medium text-muted">Optional</span>
+                            )}
+                            {item.category && <span className="text-xs text-muted">{item.category}</span>}
+                          </div>
+                          {item.instructions && <p className="mt-0.5 text-xs text-muted">{item.instructions}</p>}
+                          {item.default_folder_name && <p className="mt-0.5 text-[11px] text-muted">Files into: {item.default_folder_name}</p>}
+                        </div>
+                        {!readOnly && (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingItem(item)}
+                              aria-label={`Edit ${item.name}`}
+                              className="rounded p-1 text-muted hover:bg-accentSoft hover:text-accent"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteItem(item)}
+                              aria-label={`Remove ${item.name}`}
+                              className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         )}
-                        {item.category && <span className="text-xs text-muted">{item.category}</span>}
                       </div>
-                      {item.instructions && <p className="mt-0.5 text-xs text-muted">{item.instructions}</p>}
-                      {item.default_folder_name && <p className="mt-0.5 text-[11px] text-muted">Files into: {item.default_folder_name}</p>}
-                    </div>
-                    {!readOnly && (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditingItem(item)}
-                          aria-label={`Edit ${item.name}`}
-                          className="rounded p-1 text-muted hover:bg-accentSoft hover:text-accent"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteItem(item)}
-                          aria-label={`Remove ${item.name}`}
-                          className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
+                {dropIndex === sortedItems.length && <div className="h-1 rounded-full bg-accent" aria-hidden="true" />}
               </ul>
             )}
           </div>

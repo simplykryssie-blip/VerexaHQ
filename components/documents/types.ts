@@ -45,6 +45,7 @@ export type RequestItemRow = {
   is_required: boolean;
   status: "pending" | "uploaded" | "waived";
   category?: string | null;
+  due_date?: string | null;
 };
 
 export type DocumentRequestRow = {
