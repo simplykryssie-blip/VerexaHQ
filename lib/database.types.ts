@@ -6006,6 +6006,7 @@ export type Database = {
           id: string
           include_in_document_checklist: boolean
           irs_8821_role: string | null
+          is_internal_only: boolean
           is_required: boolean
           label: string
           layout_width: string
@@ -6029,6 +6030,7 @@ export type Database = {
           id?: string
           include_in_document_checklist?: boolean
           irs_8821_role?: string | null
+          is_internal_only?: boolean
           is_required?: boolean
           label: string
           layout_width?: string

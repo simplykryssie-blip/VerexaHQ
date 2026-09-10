@@ -19,6 +19,7 @@ export type BuilderField = {
   include_in_document_checklist: boolean;
   document_checklist_name: string | null;
   document_checklist_category: string | null;
+  is_internal_only: boolean;
 };
 
 /** JotForm-style row-sharing: whether this field shrinks to share its row with a neighbor. */
