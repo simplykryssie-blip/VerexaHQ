@@ -72,7 +72,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
   { label: "IRS Authorizations", href: "/irs-authorizations", icon: ShieldCheck },
-  { label: "Partners", href: "/partners", icon: Handshake },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Learning Hub", href: "/learning", icon: GraduationCap },
@@ -97,7 +96,7 @@ export type NavSection = { label: string; items: NavItem[] };
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Assignments", "Calendar", "Messages"] },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Documents", "Tax Office", "IRS Authorizations", "Partners", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "IRS Authorizations", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 
@@ -164,16 +163,15 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  * Shortcuts into the team-management corner of Settings, surfaced as their
  * own top-level section for an ERO/Service Bureau/multi-office firm --
  * see isEroManagementTier(). These are the same pages Settings already
- * lists (Users & Staff -- which also holds Connections, folded into the
- * same page -- and Firm Profile), just promoted out of a nested settings
- * sub-nav for a workspace that actually runs a team, rather than
- * duplicated pages.
+ * lists (Users & Staff -- which also holds Connections and the Partners
+ * directory, folded into the same page -- and ERO Profile), just promoted
+ * out of a nested settings sub-nav for a workspace that actually runs a
+ * team, rather than duplicated pages.
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Firms", href: "/firms", icon: Building2 },
   { label: "Team", href: "/settings/users", icon: Users },
-  { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
 ];
 
 export const ERO_MANAGEMENT_NAV_SECTION: NavSection = { label: "ERO Management", items: ERO_MANAGEMENT_NAV_ITEMS };
@@ -186,7 +184,7 @@ export type SettingsNavItem = {
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Profile", href: "/settings/profile", icon: UserCircle },
-  { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
   { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
   { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
@@ -209,7 +207,7 @@ const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Profile"] },
   {
     label: "Firm",
-    itemLabels: ["Firm Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions"],
+    itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions"],
   },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];

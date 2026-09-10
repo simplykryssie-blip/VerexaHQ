@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileSignature } from "lucide-react";
+import { FileSignature, Import } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
+import { JotFormDocumentImportModal } from "@/components/settings/engagement-letter-editor/JotFormDocumentImportModal";
 import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
 import { PublishConfirmModal } from "@/components/settings/PublishConfirmModal";
 import type { LibraryFolderRow } from "@/components/library/types";
@@ -25,17 +26,22 @@ export function EngagementLetterLibrary({
   workspaceId,
   templates,
   folders,
+  isJotformConnected,
   downlineWorkspaces,
+  starredIds,
 }: {
   workspaceId: string;
   templates: EngagementLetterCard[];
   folders: LibraryFolderRow[];
+  isJotformConnected: boolean;
   downlineWorkspaces: DownlineWorkspace[];
+  starredIds: Set<string>;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +61,7 @@ export function EngagementLetterLibrary({
       ...(t.requires_signature ? ["Requires signature"] : []),
       `${t.merge_field_count} merge field${t.merge_field_count === 1 ? "" : "s"}`,
     ],
+    starred: starredIds.has(t.id),
   }));
 
   async function moveTemplate(card: GalleryCard, folderId: string | null) {
@@ -121,9 +128,22 @@ export function EngagementLetterLibrary({
 
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setImporting(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted"
+        >
+          <Import size={14} /> Import from JotForm
+        </button>
+      </div>
+
+      {importing && <JotFormDocumentImportModal workspaceId={workspaceId} isConnected={isJotformConnected} onClose={() => setImporting(false)} />}
+
       <TemplateGallery
         workspaceId={workspaceId}
         itemType="form_template"
+        entityType="engagement_letter_template"
         folders={folders}
         cards={cards}
         icon={FileSignature}

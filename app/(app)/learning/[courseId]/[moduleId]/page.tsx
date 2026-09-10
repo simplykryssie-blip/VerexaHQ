@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { LessonViewer } from "@/components/learning/LessonViewer";
 import { QuizPlayer } from "@/components/learning/QuizPlayer";
+import { LiveSessionViewer } from "@/components/learning/LiveSessionViewer";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,15 @@ export default async function ModuleViewerPage({ params }: { params: { courseId:
 
   if (!course || !module_) notFound();
 
+  const { data: liveSession } =
+    module_.module_type === "live_session"
+      ? await supabase
+          .from("learning_live_sessions")
+          .select("scheduled_start, duration_minutes, is_webinar, join_url")
+          .eq("module_id", module_.id)
+          .maybeSingle()
+      : { data: null };
+
   return (
     <>
       <PageHeader backHref={`/learning/${course.id}`} backLabel={course.title} title={module_.title} />
@@ -42,6 +52,17 @@ export default async function ModuleViewerPage({ params }: { params: { courseId:
               videoStoragePath={module_.video_storage_path}
               alreadyComplete={Boolean(completion?.passed)}
             />
+          ) : module_.module_type === "live_session" ? (
+            liveSession ? (
+              <LiveSessionViewer
+                scheduledStart={liveSession.scheduled_start}
+                durationMinutes={liveSession.duration_minutes}
+                isWebinar={liveSession.is_webinar}
+                joinUrl={liveSession.join_url}
+              />
+            ) : (
+              <p className="text-sm text-muted">This live session&apos;s details could not be found.</p>
+            )
           ) : (
             <QuizPlayer moduleId={module_.id} previousScore={completion?.score_percent ?? null} previouslyPassed={completion?.passed ?? null} />
           )}

@@ -106,7 +106,7 @@ export function PricingTableSection({ config }: { config?: PricingTableConfig })
                   </li>
                   <li>+{money(p.per_seat_price_cents)}/month per additional seat</li>
                 </ul>
-                <a href={`/trial-signup?plan=${p.slug}`} className={`vx-btn ${featured ? "vx-white" : "vx-primary"}`} style={{ marginTop: 8 }}>
+                <a href="/trial-signup" className={`vx-btn ${featured ? "vx-white" : "vx-primary"}`} style={{ marginTop: 8 }}>
                   Start 14-Day Trial
                 </a>
               </div>

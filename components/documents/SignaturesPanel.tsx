@@ -263,6 +263,39 @@ export function SignaturesPanel({
     router.refresh();
   }
 
+  async function revokeRequest(requestId: string) {
+    if (!window.confirm("Revoke this signature request? Any pending signing links will stop working.")) return;
+    const { error } = await supabase.rpc("cancel_signature_request", { p_signature_request_id: requestId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Signature request revoked", "info");
+    router.refresh();
+  }
+
+  async function setExpiry(requestId: string) {
+    const input = window.prompt("Signing link expires on (YYYY-MM-DD), or leave blank to remove the expiry:");
+    if (input === null) return;
+    const trimmed = input.trim();
+    let expiresAt: string | null = null;
+    if (trimmed) {
+      const parsed = new Date(`${trimmed}T23:59:59`);
+      if (Number.isNaN(parsed.getTime())) {
+        toast.show("Enter a date as YYYY-MM-DD", "error");
+        return;
+      }
+      expiresAt = parsed.toISOString();
+    }
+    const { error } = await supabase.rpc("set_signature_request_expiry", { p_signature_request_id: requestId, p_expires_at: expiresAt as never });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(expiresAt ? "Expiry set" : "Expiry removed", "success");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
@@ -396,9 +429,21 @@ export function SignaturesPanel({
                     <p className="text-sm font-medium text-ink">{r.title}</p>
                     <p className="text-xs text-muted">{r.attachment_file_name}</p>
                   </div>
-                  <span className={`text-xs capitalize ${overdue ? "text-danger" : "text-muted"}`}>
-                    {overdue ? "Expired" : r.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {audience === "staff" && r.status === "pending" && (
+                      <>
+                        <button type="button" onClick={() => setExpiry(r.id)} className="text-xs font-medium text-accent hover:underline">
+                          Set expiry
+                        </button>
+                        <button type="button" onClick={() => revokeRequest(r.id)} className="text-xs font-medium text-danger hover:underline">
+                          Revoke
+                        </button>
+                      </>
+                    )}
+                    <span className={`text-xs capitalize ${overdue ? "text-danger" : "text-muted"}`}>
+                      {overdue ? "Expired" : r.status}
+                    </span>
+                  </div>
                 </div>
                 <ul className="mt-2 space-y-1.5">
                   {r.signers.map((s) => (
@@ -447,6 +492,11 @@ export function SignaturesPanel({
                       {audience === "staff" && s.attested_at && (
                         <span className="text-[11px] text-muted">
                           Identity confirmed{s.attested_by_name ? ` by ${s.attested_by_name}` : ""} -- {new Date(s.attested_at).toLocaleString()}
+                        </span>
+                      )}
+                      {audience === "staff" && s.status === "pending" && s.expires_at && (
+                        <span className={`text-[11px] ${new Date(s.expires_at) < new Date() ? "text-danger" : "text-muted"}`}>
+                          {new Date(s.expires_at) < new Date() ? "Signing link expired" : `Signing link expires ${new Date(s.expires_at).toLocaleDateString()}`}
                         </span>
                       )}
                     </li>

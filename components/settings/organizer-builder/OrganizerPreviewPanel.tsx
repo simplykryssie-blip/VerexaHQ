@@ -7,6 +7,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { formatSsn, formatEin } from "@/lib/taxIds";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import type { BuilderField } from "./types";
@@ -29,12 +30,14 @@ export function OrganizerPreviewPanel({
   topLevelFields,
   childrenByParent,
   bannerImageUrl,
+  customCss,
 }: {
   templateName: string;
   templateDescription: string | null;
   topLevelFields: BuilderField[];
   childrenByParent: Map<string, BuilderField[]>;
   bannerImageUrl?: string | null;
+  customCss?: string | null;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [repeaterRows, setRepeaterRows] = useState<Record<string, Record<string, string>[]>>({});
@@ -48,10 +51,11 @@ export function OrganizerPreviewPanel({
 
   return (
     <main className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
+      {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
       <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
         {bannerImageUrl && currentIndex === 0 && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+          <img src={bannerImageUrl} alt="" className="h-32 w-full object-cover" />
         )}
         <div className="p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>
@@ -168,9 +172,15 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
 
   if (field.field_type === "section") {
     return (
-      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
-        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
-        {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+      <div className="col-span-12 flex items-start gap-3 border-l-[3px] border-accent py-1 pl-3.5">
+        {field.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={field.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+        )}
+        <div>
+          <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
+          {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+        </div>
       </div>
     );
   }
@@ -272,8 +282,10 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
             type="text"
+            inputMode="numeric"
+            maxLength={field.field_type === "ssn" ? 11 : 10}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => onChange(field.field_type === "ssn" ? formatSsn(e.target.value) : formatEin(e.target.value))}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
             className={inputClass}
           />

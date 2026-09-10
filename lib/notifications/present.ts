@@ -5,6 +5,7 @@ export type NotificationRow = {
   payload: unknown;
   entity_type: string | null;
   entity_id: string | null;
+  workspace_id: string | null;
   created_at: string;
   read_at: string | null;
 };
@@ -21,7 +22,7 @@ const TITLES: Record<string, (p: Payload) => string> = {
   funds_received_reminder: (p) => `Confirm funds received -- Invoice ${str(p, "invoice_number")}`,
   workflow_stage_due: (p) => `Stage "${str(p, "stage_name")}" is due soon`,
   appointment_reminder: (p) => `Reminder: ${str(p, "title", "Appointment")}`,
-  subscription_renewal_reminder: () => "Your Verexa subscription renews soon",
+  subscription_renewal_reminder: () => "Your Verexa HQ CRM subscription renews soon",
   plan_price_change: (p) => `Your plan price is changing${p.effective_date ? ` on ${str(p, "effective_date")}` : ""}`,
   payment_receipt: (p) => `Payment received -- Invoice ${str(p, "invoice_number")}`,
   signature_due: (p) => `${str(p, "document_title", "A document")} needs a signature`,

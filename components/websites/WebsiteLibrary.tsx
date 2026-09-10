@@ -3,13 +3,14 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Globe, Plus } from "lucide-react";
+import { Trash2, Globe, Plus, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
+import { StarButton } from "@/components/library/StarButton";
 import type { LibraryFolderRow } from "@/components/library/types";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button, buttonClasses } from "@/components/ui/Button";
@@ -21,7 +22,7 @@ const WEBSITE_STATUS_TONE: Record<string, BadgeTone> = {
   archived: "neutral",
 };
 
-export type WebsiteCard = { id: string; name: string; slug: string; status: string; folder_id: string | null; page_count: number };
+export type WebsiteCard = { id: string; name: string; slug: string; status: string; folder_id: string | null; page_count: number; starred: boolean };
 
 function slugify(name: string) {
   return (
@@ -55,11 +56,36 @@ export function WebsiteLibrary({
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const visibleWebsites = useMemo(
-    () => (selectedFolderId === null ? websites : websites.filter((w) => w.folder_id === selectedFolderId)),
-    [websites, selectedFolderId]
+    () =>
+      websites
+        .filter(
+          (w) =>
+            (selectedFolderId === null || w.folder_id === selectedFolderId) &&
+            (showArchived ? w.status === "archived" : w.status !== "archived") &&
+            (!starredOnly || w.starred)
+        )
+        .sort((a, b) => (a.starred === b.starred ? 0 : a.starred ? -1 : 1)),
+    [websites, selectedFolderId, showArchived, starredOnly]
   );
+
+  const archivedCount = useMemo(() => websites.filter((w) => w.status === "archived").length, [websites]);
+
+  async function restoreWebsite(id: string, name: string) {
+    setRestoringId(id);
+    const { error } = await supabase.from("site_websites").update({ status: "published" }).eq("id", id);
+    setRestoringId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(`${name} restored`, "success");
+    router.refresh();
+  }
 
   const folderCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -126,13 +152,35 @@ export function WebsiteLibrary({
         rootLabel="All Websites"
       />
       <div className="min-w-0 flex-1">
-        {canManage && (
-          <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setStarredOnly((v) => !v)}
+              aria-pressed={starredOnly}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                starredOnly ? "border-amber-300 bg-amber-50 text-amber-600" : "border-border text-muted hover:text-ink"
+              }`}
+            >
+              <Star size={12} fill={starredOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              aria-pressed={showArchived}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                showArchived ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+              }`}
+            >
+              Archived ({archivedCount})
+            </button>
+          </div>
+          {canManage && (
             <Button size="sm" onClick={() => setCreating(true)}>
               <Plus size={14} aria-hidden="true" /> New website
             </Button>
-          </div>
-        )}
+          )}
+        </div>
 
         {creating && (
           <form onSubmit={createWebsite} className="mt-4 flex items-end gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft">
@@ -168,7 +216,15 @@ export function WebsiteLibrary({
           {visibleWebsites.length === 0 ? (
             <EmptyState
               icon={Globe}
-              message={websites.length === 0 ? "No websites yet -- create one to start building your public site." : "No websites in this folder."}
+              message={
+                showArchived
+                  ? "No archived websites."
+                  : starredOnly
+                    ? "No starred websites."
+                    : websites.length === 0
+                      ? "No websites yet -- create one to start building your public site."
+                      : "No websites in this folder."
+              }
               action={
                 canManage && websites.length === 0 ? (
                   <Button onClick={() => setCreating(true)}>
@@ -182,11 +238,12 @@ export function WebsiteLibrary({
               {visibleWebsites.map((w) => (
                 <div key={w.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <StarButton workspaceId={workspaceId} entityType="website" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
                       <IconChip>
                         <Globe size={16} aria-hidden="true" />
                       </IconChip>
-                      <h3 className="text-sm font-semibold text-ink">{w.name}</h3>
+                      <h3 className="truncate text-sm font-semibold text-ink">{w.name}</h3>
                     </div>
                     {canManage && (
                       <button
@@ -205,7 +262,16 @@ export function WebsiteLibrary({
                     {w.page_count} page{w.page_count === 1 ? "" : "s"}
                   </p>
                   <div className="mt-3">
-                    {canManage ? (
+                    {canManage && w.status === "archived" ? (
+                      <button
+                        type="button"
+                        onClick={() => restoreWebsite(w.id, w.name)}
+                        disabled={restoringId === w.id}
+                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-50"
+                      >
+                        {restoringId === w.id ? "Restoring..." : "Restore"}
+                      </button>
+                    ) : canManage ? (
                       <TemplateStatusCycle table="site_websites" id={w.id} status={w.status} />
                     ) : (
                       <Badge tone={WEBSITE_STATUS_TONE[w.status] ?? "neutral"} className="capitalize">

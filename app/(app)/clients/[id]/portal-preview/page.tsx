@@ -45,7 +45,7 @@ export default async function ClientPortalPreviewPage({ params }: { params: { id
         .order("created_at", { ascending: false }),
       supabase
         .from("document_requests")
-        .select("id, title, due_date, status, items:document_request_item_statuses(id, name, is_required, status)")
+        .select("id, title, due_date, status, items:document_request_item_statuses(id, name, is_required, status, category, due_date)")
         .eq("entity_type", "client")
         .eq("entity_id", client.id)
         .order("created_at", { ascending: false }),

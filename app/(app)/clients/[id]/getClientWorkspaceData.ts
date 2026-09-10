@@ -323,7 +323,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     .from("document_requests")
     .select(
       `id, title, due_date, status, created_at,
-      items:document_request_item_statuses(id, name, is_required, status, category)`
+      items:document_request_item_statuses(id, name, is_required, status, category, due_date)`
     )
     .eq("entity_type", "client")
     .eq("entity_id", client.id)
@@ -337,7 +337,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
           .select(
             `id, title, status, due_date, attachment_id, created_at,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at,
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at, expires_at,
               attested_by_profile:user_profiles!signature_request_signers_attested_by_fkey(display_name))`
           )
           .in("attachment_id", documentIds)

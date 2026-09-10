@@ -12677,10 +12677,6 @@ export type Database = {
         }
         Returns: string
       }
-      start_trial_workspace: {
-        Args: { p_name: string; p_plan_slug?: string }
-        Returns: string
-      }
       submit_organizer_response: {
         Args: { p_response_id: string }
         Returns: undefined

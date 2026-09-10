@@ -1,319 +1,334 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { friendlyAuthError } from "@/lib/authErrors";
+import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { validatePasswordStrength, PASSWORD_REQUIREMENTS_HINT } from "@/lib/passwordStrength";
 import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
-type PlanRow = {
-  slug: string;
-  name: string;
-  base_price_cents: number;
-  included_seats: number;
-};
+const RAIL_FOOT = (
+  <>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+    <span>No card required. Cancel anytime.</span>
+  </>
+);
 
-const DEFAULT_PLAN = "solo";
-
-function money(cents: number) {
-  const dollars = cents / 100;
-  return dollars % 1 === 0 ? `$${dollars.toLocaleString()}` : `$${dollars.toFixed(2)}`;
-}
-
+// Public self-serve trial signup -- creates a real account + a real
+// independent-PTIN workspace with a 14-day trial, no admin step. Structured
+// after app/join/page.tsx (same signed-out/needs-workspace/has-workspace
+// states, same email-confirmation survival trick), minus the invite-token
+// preview/redeem branches since there's no invite here -- just
+// create_trial_workspace instead of accept_firm_connection_invite. See that
+// RPC's migration for why self-serve was reopened only for this one path.
 export default function TrialSignupPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  const [plans, setPlans] = useState<PlanRow[] | null>(null);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [firmName, setFirmName] = useState("");
-  const [planSlug, setPlanSlug] = useState(() => searchParams.get("plan") ?? DEFAULT_PLAN);
-  const [email, setEmail] = useState("");
+  const [authState, setAuthState] = useState<"loading" | "signed-out" | "needs-workspace" | "has-workspace">("loading");
+
+  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-up");
+  const [firstName, setFirstName] = useState(searchParams.get("first_name") ?? "");
+  const [lastName, setLastName] = useState(searchParams.get("last_name") ?? "");
+  const [companyName, setCompanyName] = useState(searchParams.get("company_name") ?? "");
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
-
-  // undefined = still checking; null = signed out; object = signed in
-  const [session, setSession] = useState<
-    "checking" | "signed-out" | { alreadyHasWorkspace: boolean; pendingFirmName: string | null; pendingPlanSlug: string | null }
-  >("checking");
   const [provisioning, setProvisioning] = useState(false);
-  const [provisionError, setProvisionError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  const [manualFirmName, setManualFirmName] = useState("");
+
+  async function provisionTrial(name: string) {
+    setProvisioning(true);
+    setError(null);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const meta = user?.user_metadata as { first_name?: string; last_name?: string } | undefined;
+    const { error: rpcError } = await supabase.rpc("create_trial_workspace", {
+      p_name: name,
+      p_first_name: meta?.first_name ?? undefined,
+      p_last_name: meta?.last_name ?? undefined,
+    });
+    if (rpcError) {
+      setProvisioning(false);
+      setError(rpcError.message);
+      setAuthState("needs-workspace");
+      return;
+    }
+    setReady(true);
+    setTimeout(() => {
+      router.push("/dashboard");
+      router.refresh();
+    }, 1200);
+  }
 
   useEffect(() => {
-    supabase.rpc("get_public_platform_plans").then(({ data }) => setPlans((data as PlanRow[] | null) ?? []));
-  }, [supabase]);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    async function checkAuth() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        setSession("signed-out");
+        setAuthState("signed-out");
         return;
       }
-      const { data: membership } = await supabase.from("workspace_users").select("id").eq("user_id", user.id).limit(1).maybeSingle();
-      setSession({
-        alreadyHasWorkspace: Boolean(membership),
-        pendingFirmName: (user.user_metadata?.pending_trial_firm_name as string | undefined) ?? null,
-        pendingPlanSlug: (user.user_metadata?.pending_trial_plan_slug as string | undefined) ?? null,
-      });
-    });
+      const { data: membership } = await supabase
+        .from("workspace_users")
+        .select("workspace_id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (membership) {
+        router.replace("/dashboard");
+        return;
+      }
+      const { data: portalUser } = await supabase
+        .from("client_portal_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .maybeSingle();
+      if (portalUser) {
+        router.replace("/portal/dashboard");
+        return;
+      }
+      // Brand new user, just confirmed their email -- auto-create their
+      // trial workspace from the name they gave at signup, no separate step.
+      const meta = user.user_metadata as { company_name?: string } | undefined;
+      if (meta?.company_name) {
+        await provisionTrial(meta.company_name);
+      } else {
+        setAuthState("needs-workspace");
+      }
+    }
+    checkAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Returned here from the confirmation email with a real session -- finish
-  // the job by actually creating the trial workspace, then land in it.
-  useEffect(() => {
-    if (session === "checking" || session === "signed-out") return;
-    if (session.alreadyHasWorkspace || !session.pendingFirmName) return;
+  async function submitManualFirmName(e: React.FormEvent) {
+    e.preventDefault();
+    if (!manualFirmName.trim()) return;
+    await provisionTrial(manualFirmName.trim());
+  }
 
-    setProvisioning(true);
-    supabase
-      .rpc("start_trial_workspace", { p_name: session.pendingFirmName, p_plan_slug: session.pendingPlanSlug ?? DEFAULT_PLAN })
-      .then(({ error }) => {
-        if (error) {
-          setProvisioning(false);
-          setProvisionError(error.message);
-          return;
-        }
-        // Hard navigation -- the dashboard's server-side workspace lookup
-        // needs to see the brand-new membership fresh, not a stale
-        // client-side router cache from before it existed.
-        window.location.href = "/dashboard";
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
-
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleAuthSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (!firmName.trim()) {
-      setError("Tell us your firm's name.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    const strengthError = validatePasswordStrength(password, 8);
-    if (strengthError) {
-      setError(strengthError);
+    if (mode === "sign-up") {
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      const strengthError = validatePasswordStrength(password);
+      if (strengthError) {
+        setError(strengthError);
+        return;
+      }
+      if (!companyName.trim()) {
+        setError("Firm name is required.");
+        return;
+      }
+
+      setLoading(true);
+      // pending_trial_next mirrors app/join's pending_invite_next -- see
+      // app/auth/confirm/route.ts's resolveNext(): Supabase's own
+      // /auth/v1/verify redirect can silently strip query params off
+      // emailRedirectTo, so this metadata (written straight to auth.users,
+      // not threaded through the redirect URL) is the fallback that
+      // survives when that happens.
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/trial-signup`,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            company_name: companyName,
+            pending_trial_next: "/trial-signup",
+          },
+        },
+      });
+      setLoading(false);
+
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+      if (data.user && data.user.identities?.length === 0) {
+        setError('An account with this email already exists. Try signing in, or use "Forgot password?" if you need to reset it.');
+        return;
+      }
+      setCheckEmail(true);
       return;
     }
 
     setLoading(true);
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/trial-signup`,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-          pending_trial_firm_name: firmName.trim(),
-          pending_trial_plan_slug: planSlug,
-        },
-      },
-    });
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (signUpError) {
-      setError(signUpError.message);
+    if (signInError) {
+      setError(friendlyAuthError(signInError.message));
       return;
     }
-    // Supabase signals "this email already has an account" via an empty
-    // identities array instead of an error -- no confirmation email goes
-    // out in that case, which otherwise looks exactly like broken delivery.
-    if (data.user && data.user.identities?.length === 0) {
-      setError("An account with this email already exists. Sign in instead.");
-      return;
-    }
-    setCheckEmail(true);
+    router.refresh();
+    window.location.reload();
   }
 
-  if (session === "checking" || plans === null) {
+  if (authState === "loading") {
     return (
-      <Centered center>
-        <p className="text-sm text-muted">Loading...</p>
-      </Centered>
+      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+        <p className={styles.lede}>Loading...</p>
+      </AuthShell>
     );
   }
 
-  if (typeof session === "object") {
-    if (session.alreadyHasWorkspace) {
-      return (
-        <Centered center>
-          <h1 className="text-xl font-semibold text-ink">You&apos;re all set</h1>
-          <p className="mt-3 text-sm text-muted">You already have a Verexa workspace.</p>
-          <Link href="/dashboard" className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
-            Go to your workspace
-          </Link>
-        </Centered>
-      );
-    }
-    if (session.pendingFirmName) {
-      return (
-        <Centered center>
-          <h1 className="text-xl font-semibold text-ink">Setting up your workspace...</h1>
-          <p className="mt-3 text-sm text-muted">This only takes a second.</p>
-          {provisionError && (
-            <>
-              <p className="mt-4 text-sm text-danger">{provisionError}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setProvisionError(null);
-                  setProvisioning(false);
-                  setSession({ ...session });
-                }}
-                disabled={provisioning}
-                className="mt-4 rounded-lg border border-border px-4 py-2 text-sm font-medium text-ink hover:bg-surfaceMuted"
-              >
-                Try again
-              </button>
-            </>
-          )}
-        </Centered>
-      );
-    }
-    // Signed in, but nothing pending -- landed here directly, not via the
-    // trial flow. Nothing to provision; don't guess at creating a workspace.
+  if (ready) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">You&apos;re signed in</h1>
-        <p className="mt-3 text-sm text-muted">Head to your dashboard, or sign out to start a new trial with a different email.</p>
-        <Link href="/dashboard" className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
-          Go to dashboard
-        </Link>
-      </Centered>
+      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+        <h1 className={styles.cardTitle}>You&apos;re in</h1>
+        <p className={styles.lede}>Your trial workspace is ready. Taking you to your dashboard...</p>
+      </AuthShell>
     );
   }
 
   if (checkEmail) {
     return (
-      <Centered center>
-        <h1 className="text-xl font-semibold text-ink">Check your email</h1>
-        <p className="mt-3 text-sm text-muted">
-          Confirm your account via the link sent to <span className="font-medium text-slate">{email}</span> to finish setting up your
-          14-day trial.
+      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+        <h1 className={styles.cardTitle}>Check your email</h1>
+        <p className={styles.lede}>
+          Account created. Confirm your email -- a link has been sent to <strong>{email}</strong> -- and your 14-day trial workspace will
+          be ready as soon as you click it.
         </p>
-      </Centered>
+      </AuthShell>
     );
   }
 
+  if (authState === "needs-workspace") {
+    return (
+      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+        <h1 className={styles.cardTitle}>Almost there</h1>
+        <p className={styles.lede}>Just your firm name to spin up your 14-day trial workspace.</p>
+        <form onSubmit={submitManualFirmName} className={styles.form}>
+          <div className={styles.field}>
+            <label htmlFor="manual_firm_name">Firm name</label>
+            <input
+              id="manual_firm_name"
+              required
+              value={manualFirmName}
+              onChange={(e) => setManualFirmName(e.target.value)}
+              placeholder="Acme Tax Advisors"
+              className={styles.input}
+            />
+          </div>
+          {error && <AuthError>{error}</AuthError>}
+          <button type="submit" disabled={provisioning} className={styles.submit}>
+            {provisioning ? "Setting up..." : "Start my trial"}
+          </button>
+        </form>
+      </AuthShell>
+    );
+  }
+
+  // signed-out: combined sign-up/sign-in.
   return (
-    <Centered>
-      <span className="text-xs font-semibold uppercase tracking-wide text-accent">Free 14-Day Trial</span>
-      <h1 className="mt-1 text-xl font-semibold text-ink">Start your Verexa trial</h1>
-      <p className="mt-1 text-sm text-muted">No credit card required. Full platform access for 14 days.</p>
+    <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+      <h1 className={styles.cardTitle}>Start your 14-day trial</h1>
+      <p className={styles.lede}>
+        {mode === "sign-up" ? "Create your Verexa account -- your trial workspace is ready the moment you confirm your email." : "Sign in to your existing account."}
+      </p>
 
-      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <input
-            required
-            placeholder="First name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-          <input
-            required
-            placeholder="Last name"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-          />
-        </div>
-
-        <input
-          required
-          placeholder="Firm name"
-          value={firmName}
-          onChange={(e) => setFirmName(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-
-        <input
-          required
-          type="email"
-          placeholder="Work email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-
-        {plans.length > 0 && (
-          <div>
-            <span className="mb-1.5 block text-xs font-medium text-slate">Plan</span>
-            <div className="grid grid-cols-3 gap-2">
-              {plans.map((p) => (
-                <button
-                  key={p.slug}
-                  type="button"
-                  onClick={() => setPlanSlug(p.slug)}
-                  className={`rounded-lg border px-2 py-2 text-left text-xs transition ${
-                    planSlug === p.slug ? "border-accent bg-accentSoft" : "border-border hover:border-accent/50"
-                  }`}
-                >
-                  <span className="block font-semibold text-ink">{p.name}</span>
-                  <span className="block text-muted">{money(p.base_price_cents)}/mo</span>
-                </button>
-              ))}
+      <form onSubmit={handleAuthSubmit} className={styles.form}>
+        {mode === "sign-up" && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div className={styles.field}>
+                <label htmlFor="first_name">First name</label>
+                <input id="first_name" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className={styles.input} autoComplete="given-name" />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="last_name">Last name</label>
+                <input id="last_name" required value={lastName} onChange={(e) => setLastName(e.target.value)} className={styles.input} autoComplete="family-name" />
+              </div>
             </div>
+            <div className={styles.field}>
+              <label htmlFor="company_name">Firm name</label>
+              <input
+                id="company_name"
+                required
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Acme Tax Advisors"
+                className={styles.input}
+                autoComplete="organization"
+              />
+            </div>
+          </>
+        )}
+
+        <div className={styles.field}>
+          <label htmlFor="email">Email</label>
+          <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={styles.input} autoComplete="email" />
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="password">Password</label>
+          <PasswordInput
+            id="password"
+            required
+            minLength={mode === "sign-up" ? 8 : undefined}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={styles.input}
+            autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
+          />
+          {mode === "sign-up" && <p className={styles.hint}>{PASSWORD_REQUIREMENTS_HINT}</p>}
+        </div>
+        {mode === "sign-up" && (
+          <div className={styles.field}>
+            <label htmlFor="confirm_password">Confirm password</label>
+            <PasswordInput
+              id="confirm_password"
+              required
+              minLength={8}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={styles.input}
+              autoComplete="new-password"
+            />
           </div>
         )}
 
-        <PasswordInput
-          required
-          minLength={8}
-          placeholder="Choose a password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-        <p className="text-xs text-muted">{passwordRequirementsHint(8)}</p>
+        {error && <AuthError>{error}</AuthError>}
 
-        <PasswordInput
-          required
-          minLength={8}
-          placeholder="Confirm password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-
-        {error && <p className="text-sm text-danger">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent/90 disabled:opacity-60"
-        >
-          {loading ? "Please wait..." : "Start my free trial"}
+        <button type="submit" disabled={loading} className={styles.submit}>
+          {loading ? (mode === "sign-in" ? "Signing in..." : "Starting your trial...") : mode === "sign-in" ? "Sign in" : "Start my trial"}
         </button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-muted">
-        Already have an account?{" "}
-        <Link href="/login" className="text-accent hover:underline">
-          Sign in
-        </Link>
-      </p>
-    </Centered>
-  );
-}
-
-function Centered({ children, center = false }: { children: React.ReactNode; center?: boolean }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">
-      <div className={`w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-sm ${center ? "text-center" : ""}`}>
-        {children}
-      </div>
-    </div>
+      <button
+        type="button"
+        onClick={() => {
+          setError(null);
+          setMode(mode === "sign-in" ? "sign-up" : "sign-in");
+        }}
+        className={styles.link}
+        style={{ marginTop: 16, display: "block", textAlign: "center", width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+      >
+        {mode === "sign-in" ? "New here? Start your trial" : "Already have an account? Sign in"}
+      </button>
+    </AuthShell>
   );
 }

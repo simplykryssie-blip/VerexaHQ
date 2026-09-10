@@ -9,6 +9,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { formatSsn, formatEin, isValidTaxId } from "@/lib/taxIds";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 import { PasswordInput } from "@/components/PasswordInput";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
@@ -33,6 +34,7 @@ type FieldRow = {
   conditional_logic?: unknown;
   client_profile_field?: string | null;
   layout_width?: string | null;
+  image_url?: string | null;
 };
 
 type Branding = {
@@ -44,7 +46,7 @@ type Branding = {
 } | null;
 
 type TemplateData = {
-  template: { id: string; name: string; description: string | null; banner_image_url: string | null };
+  template: { id: string; name: string; description: string | null; banner_image_url: string | null; custom_css?: string | null };
   workspace_name: string;
   requires_portal_signup: boolean;
   password_min_length?: number;
@@ -207,10 +209,21 @@ export function PublicOrganizerForm({
     );
   }
 
+  function invalidTaxIdOnCurrentPage(): FieldRow | undefined {
+    return currentPage.fields.find(
+      (f) => (f.field_type === "ssn" || f.field_type === "ein") && !isValidTaxId(answers[f.id] ?? "")
+    );
+  }
+
   function goNext() {
     const unmet = unmetRequiredOnCurrentPage();
     if (unmet.length > 0) {
       setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    const invalidTaxId = invalidTaxIdOnCurrentPage();
+    if (invalidTaxId) {
+      setError(`${invalidTaxId.label} must be exactly 9 digits.`);
       return;
     }
     setError(null);
@@ -221,6 +234,11 @@ export function PublicOrganizerForm({
     const unmet = unmetRequiredOnCurrentPage();
     if (unmet.length > 0) {
       setError(`Please answer: ${unmet.map((f) => f.label).join(", ")}`);
+      return;
+    }
+    const invalidTaxId = invalidTaxIdOnCurrentPage();
+    if (invalidTaxId) {
+      setError(`${invalidTaxId.label} must be exactly 9 digits.`);
       return;
     }
     submit();
@@ -331,7 +349,15 @@ export function PublicOrganizerForm({
   function finish() {
     const action = onSubmitConfig?.action ?? "inline_thank_you";
     if (action === "custom_url" && onSubmitConfig?.custom_url) {
-      window.location.href = onSubmitConfig.custom_url;
+      // Carry the contact info just given over as query params, so a
+      // destination like the real trial-signup page can prefill instead of
+      // asking for the same name/email twice in one continuous flow.
+      const url = new URL(onSubmitConfig.custom_url, window.location.origin);
+      const nameParts = parseNameValue(name);
+      if (nameParts.first.trim()) url.searchParams.set("first_name", nameParts.first.trim());
+      if (nameParts.last.trim()) url.searchParams.set("last_name", nameParts.last.trim());
+      if (email.trim()) url.searchParams.set("email", email.trim());
+      window.location.href = url.toString();
       return;
     }
     if (action === "next_page" && onNextPage) {
@@ -447,9 +473,10 @@ export function PublicOrganizerForm({
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-8">
+      {template.custom_css && <style dangerouslySetInnerHTML={{ __html: template.custom_css }} />}
       {template.banner_image_url && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={template.banner_image_url} alt="" className="-mb-2 w-full rounded-lg object-cover" />
+        <img src={template.banner_image_url} alt="" className="-mb-2 h-32 w-full rounded-lg object-cover" />
       )}
       <div>
         {branding?.logo_url ? (
@@ -783,9 +810,15 @@ function PublicFieldInput({
 
   if (field.field_type === "section") {
     return (
-      <div className="col-span-12 border-l-[3px] border-accent py-1 pl-3.5">
-        <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
-        {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+      <div className="col-span-12 flex items-start gap-3 border-l-[3px] border-accent py-1 pl-3.5">
+        {field.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={field.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+        )}
+        <div>
+          <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
+          {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+        </div>
       </div>
     );
   }
@@ -936,8 +969,9 @@ function PublicFieldInput({
             id={`field-${field.id}`}
             type="text"
             inputMode="numeric"
+            maxLength={field.field_type === "ssn" ? 11 : 10}
             value={value}
-            onChange={(e) => onChange(field.id, e.target.value)}
+            onChange={(e) => onChange(field.id, field.field_type === "ssn" ? formatSsn(e.target.value) : formatEin(e.target.value))}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
             className={inputClass}
           />

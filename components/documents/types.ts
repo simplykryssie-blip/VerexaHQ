@@ -45,6 +45,7 @@ export type RequestItemRow = {
   is_required: boolean;
   status: "pending" | "uploaded" | "waived";
   category?: string | null;
+  due_date?: string | null;
 };
 
 export type DocumentRequestRow = {
@@ -67,6 +68,9 @@ export type SignerRow = {
    *  Only populated by the staff-facing loaders; the portal never needs it. */
   attested_at?: string | null;
   attested_by_name?: string | null;
+  /** Optional signing-link expiry, set via set_signature_request_expiry.
+   *  Only populated by the staff-facing loaders. */
+  expires_at?: string | null;
 };
 
 export type SignatureRequestRow = {

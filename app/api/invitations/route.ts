@@ -47,10 +47,10 @@ export async function POST(request: Request) {
     to: email,
     sender: "team",
     workspaceId: workspace.id,
-    subject: `You've been invited to join ${workspace.name} on VerexaHQ`,
+    subject: `You've been invited to join ${workspace.name} on Verexa HQ CRM`,
     html: renderEmail({
-      heading: `Join ${workspace.name} on VerexaHQ`,
-      bodyHtml: `<p>You've been invited to join <strong>${workspace.name}</strong>&apos;s workspace on VerexaHQ.</p><p>Click below to accept the invitation and set up your account.</p>`,
+      heading: `Join ${workspace.name} on Verexa HQ CRM`,
+      bodyHtml: `<p>You've been invited to join <strong>${workspace.name}</strong>&apos;s workspace on Verexa HQ CRM.</p><p>Click below to accept the invitation and set up your account.</p>`,
       ctaLabel: "Accept invitation",
       ctaUrl: acceptUrl,
     }),

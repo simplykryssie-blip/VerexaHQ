@@ -5,6 +5,7 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { Tabs } from "@/components/ui/Tabs";
 import { PROFILE_ACCOUNT_TABS } from "@/lib/settingsSubNav";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { SoftwareLinksManager } from "@/components/settings/SoftwareLinksManager";
 import { ProfileForm } from "./ProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ export default async function ProfilePage() {
   // other half of this split).
   const showBusinessInfo = !isEroManagementTier(workspace);
 
-  const [{ data: myProfile }, { data: isAdmin }, firmTaxResult, contactResult, brandingResult] = await Promise.all([
+  const [{ data: myProfile }, { data: isAdmin }, firmTaxResult, contactResult, brandingResult, { data: softwareLinks }] = await Promise.all([
     supabase
       .from("user_profiles")
       .select("first_name, last_name, display_name, avatar_url, phone, ptin_last4, caf_number")
@@ -41,6 +42,9 @@ export default async function ProfilePage() {
       : Promise.resolve({ data: null }),
     showBusinessInfo
       ? supabase.from("branding").select("support_email, support_phone").eq("workspace_id", workspace.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    showBusinessInfo
+      ? supabase.from("workspace_software_links").select("id, name, url").eq("workspace_id", workspace.id).order("display_order")
       : Promise.resolve({ data: null }),
   ]);
 
@@ -77,6 +81,11 @@ export default async function ProfilePage() {
           businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
         />
       </div>
+      {showBusinessInfo && (
+        <div className="mt-6">
+          <SoftwareLinksManager workspaceId={workspace.id} initialLinks={softwareLinks ?? []} />
+        </div>
+      )}
     </div>
   );
 }

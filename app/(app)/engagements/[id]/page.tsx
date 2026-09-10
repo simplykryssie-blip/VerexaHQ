@@ -395,7 +395,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .from("document_requests")
     .select(
       `id, title, due_date, status, created_at, document_request_template_id,
-      items:document_request_item_statuses(id, name, is_required, status, category)`
+      items:document_request_item_statuses(id, name, is_required, status, category, due_date)`
     )
     .eq("entity_type", "engagement")
     .eq("entity_id", engagement.id)
@@ -409,7 +409,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
           .select(
             `id, title, status, due_date, attachment_id, created_at, engagement_letter_template_id,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at,
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at, expires_at,
               attested_by_profile:user_profiles!signature_request_signers_attested_by_fkey(display_name))`
           )
           .in("attachment_id", documentIds)

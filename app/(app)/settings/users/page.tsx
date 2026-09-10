@@ -20,10 +20,12 @@ import { ConnectedPtinRow } from "../connections/ConnectedPtinRow";
 import { RedeemConnectionForm } from "../connections/RedeemConnectionForm";
 import { MyConnectionStatus } from "../connections/MyConnectionStatus";
 import { PeerMessagingToggle } from "../connections/PeerMessagingToggle";
+import { PartnerCard } from "../../partners/PartnerCard";
 
 export const dynamic = 'force-dynamic';
 
 const MEMBER_STATUS_TONE: Record<string, BadgeTone> = { active: "success" };
+const CONNECTION_STATUS_TONE: Record<string, BadgeTone> = { active: "success", pending: "warning", revoked: "danger" };
 
 type MemberRow = WorkspaceMemberWorkload;
 
@@ -242,7 +244,8 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
             <h3 className="font-display text-sm font-semibold text-ink">Connected firms</h3>
             <p className="mt-1 text-sm text-muted">
               Firms connected to you can share a client&apos;s file with you once it&apos;s ready for filing, for your review and
-              approval before it can go to e-file.
+              approval before it can go to e-file. Contact info and your own notes on each firm are below the connection
+              controls.
             </p>
 
             <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
@@ -263,12 +266,38 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
                       allowsBrandingOverride={c.allows_branding_override}
                       defaultReviewerId={c.default_reviewer_id ?? null}
                       restrictPtinStaffAssignment={Boolean(c.restrict_ptin_staff_assignment)}
+                      allowsLearningHubDownlineShare={Boolean(c.allows_learning_hub_downline_share)}
                       reviewerOptions={reviewerOptions}
                     />
                   ))}
                 </ul>
               )}
             </div>
+
+            {(connectedChildren ?? []).length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted">Contact info & notes</h4>
+                <div className="mt-2 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  {(connectedChildren ?? []).map((c) => (
+                    <PartnerCard
+                      key={c.connection_id}
+                      connectionId={c.connection_id}
+                      name={c.name}
+                      statusBadge={
+                        <Badge tone={CONNECTION_STATUS_TONE[c.status] ?? "neutral"} className="capitalize">
+                          {c.status}
+                        </Badge>
+                      }
+                      phone={c.phone}
+                      email={c.primary_contact_email}
+                      website={c.website}
+                      mailingAddress={c.mailing_address}
+                      initialNotes={c.notes}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="mt-4">
               <ConnectionInviteGenerator workspaceId={workspace.id} availableRelationshipTypes={childRelationshipTypes} />

@@ -16,11 +16,19 @@ export function BannerImageUpload({
   value,
   onChange,
   disabled,
+  label = "Banner / letterhead image",
+  helpText = "Rendered at the top of the document, cropped to a fixed banner height -- a wide image (roughly 4:1) crops cleanest.",
+  uploadPathPrefix = "banner",
+  imageClassName = "h-20 w-64 rounded-lg border border-border object-cover",
 }: {
   workspaceId: string;
   value: string | null;
   onChange: (url: string | null) => void;
   disabled?: boolean;
+  label?: string;
+  helpText?: string;
+  uploadPathPrefix?: string;
+  imageClassName?: string;
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -28,7 +36,7 @@ export function BannerImageUpload({
 
   async function upload(file: File) {
     setUploading(true);
-    const path = `${workspaceId}/banner-${Date.now()}-${file.name}`;
+    const path = `${workspaceId}/${uploadPathPrefix}-${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from("branding").upload(path, file, { upsert: true });
     setUploading(false);
     if (error) {
@@ -41,11 +49,11 @@ export function BannerImageUpload({
 
   return (
     <div>
-      <label className="block text-xs font-medium uppercase tracking-wide text-muted">Banner / letterhead image</label>
+      <label className="block text-xs font-medium uppercase tracking-wide text-muted">{label}</label>
       {value ? (
         <div className="mt-2 flex items-start gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Banner" className="max-h-24 rounded-lg border border-border object-contain" />
+          <img src={value} alt="" className={imageClassName} />
           {!disabled && (
             <button
               type="button"
@@ -60,7 +68,7 @@ export function BannerImageUpload({
         !disabled && (
           <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-slate hover:border-accent hover:text-accent">
             <ImagePlus size={14} />
-            {uploading ? "Uploading..." : "Upload a banner image"}
+            {uploading ? "Uploading..." : "Upload an image"}
             <input
               type="file"
               accept="image/*"
@@ -71,7 +79,7 @@ export function BannerImageUpload({
           </label>
         )
       )}
-      <p className="mt-1 text-xs text-muted">Rendered at the top of the document -- upload something you designed elsewhere.</p>
+      <p className="mt-1 text-xs text-muted">{helpText}</p>
     </div>
   );
 }

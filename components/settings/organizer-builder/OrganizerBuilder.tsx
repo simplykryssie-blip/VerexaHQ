@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Settings2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
@@ -32,8 +32,12 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [fields, setFields] = useState<BuilderField[]>(initialFields);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedType, setDraggedType] = useState<OrganizerFieldType | null>(null);
+  const [draggingInCanvas, setDraggingInCanvas] = useState(false);
   const [view, setView] = useState<"build" | "preview">("build");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url);
+  const [customCss, setCustomCss] = useState(template.custom_css ?? "");
+  const [savedCustomCss, setSavedCustomCss] = useState(template.custom_css ?? "");
   const [name, setName] = useState(template.name);
   const [renamingName, setRenamingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
@@ -43,6 +47,17 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     setBannerImageUrl(url);
     const { error } = await supabase.from("organizer_templates").update({ banner_image_url: url }).eq("id", template.id);
     if (error) toast.show(error.message, "error");
+  }
+
+  async function saveCustomCss() {
+    const trimmed = customCss.trim();
+    if (trimmed === savedCustomCss) return;
+    const { error } = await supabase.from("organizer_templates").update({ custom_css: trimmed || null }).eq("id", template.id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    setSavedCustomCss(trimmed);
   }
 
   async function saveName() {
@@ -72,6 +87,14 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     }
   }
   const selectedField = fields.find((f) => f.id === selectedFieldId) ?? null;
+
+  // The preview tab simulates what the client actually sees, so internal-
+  // only fields (staff notes/reminders embedded in the structure) drop out
+  // here the same way they're excluded from the real public/portal fetch.
+  const previewTopLevelFields = topLevelFields.filter((f) => !f.is_internal_only);
+  const previewChildrenByParent = new Map(
+    Array.from(childrenByParent.entries()).map(([parentId, children]) => [parentId, children.filter((f) => !f.is_internal_only)])
+  );
 
   function currentLaneIds(lane: string | null): string[] {
     return lane === null ? topLevelFields.map((f) => f.id) : (childrenByParent.get(lane) ?? []).map((f) => f.id);
@@ -283,12 +306,40 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
       )}
 
       {!readOnly && (
-        <div className="border-b border-border bg-surface px-4 py-3">
-          <BannerImageUpload
-            workspaceId={template.workspace_id ?? ""}
-            value={bannerImageUrl}
-            onChange={updateBanner}
-          />
+        <div className="border-b border-border bg-surface">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-2 text-xs font-medium text-muted hover:text-ink"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Settings2 size={13} aria-hidden="true" /> Template settings (banner, custom CSS)
+            </span>
+            {settingsOpen ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+          </button>
+          {settingsOpen && (
+            <div className="space-y-3 px-4 pb-3">
+              <BannerImageUpload
+                workspaceId={template.workspace_id ?? ""}
+                value={bannerImageUrl}
+                onChange={updateBanner}
+              />
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Custom CSS (optional)
+                <textarea
+                  value={customCss}
+                  onChange={(e) => setCustomCss(e.target.value)}
+                  onBlur={saveCustomCss}
+                  rows={3}
+                  placeholder=".field-label { color: #0f172a; }"
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 font-mono text-xs normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+                <span className="mt-1 block text-[11px] normal-case text-muted">
+                  Applied wherever this form is shown to a client -- the public link, the client portal, and any embedded copy.
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       )}
 
@@ -296,12 +347,13 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
         <OrganizerPreviewPanel
           templateName={name}
           templateDescription={template.description}
-          topLevelFields={topLevelFields}
-          childrenByParent={childrenByParent}
+          topLevelFields={previewTopLevelFields}
+          childrenByParent={previewChildrenByParent}
           bannerImageUrl={bannerImageUrl}
+          customCss={customCss}
         />
       ) : (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex flex-1 overflow-hidden">
           {!readOnly && <FieldPalette onAdd={addFieldFromPalette} onDragType={setDraggedType} hasSelection={Boolean(selectedField)} />}
           <FieldCanvas
             topLevelFields={topLevelFields}
@@ -313,15 +365,32 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             onReorder={reorder}
             onMoveField={moveField}
             onToggleWidth={toggleFieldWidth}
+            onDraggingChange={setDraggingInCanvas}
             readOnly={readOnly}
           />
-          <FieldPropertiesPanel
-            field={selectedField}
-            otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
-            onUpdate={updateField}
-            onDelete={deleteField}
-            readOnly={readOnly}
-          />
+          {/* Pops out over the canvas only while a field is selected, instead
+              of permanently occupying a quarter of the screen -- matches how
+              JotForm's own properties panel behaves. It's also switched to
+              pointer-events-none during ANY drag (a new field from the
+              palette, or reordering a placed one) -- otherwise this overlay
+              sits on top of the canvas's own drop zones (z-20) and silently
+              swallows the drop when it lands under the panel's footprint,
+              which is most of the canvas's right side on a typical viewport. */}
+          <div
+            className={`absolute inset-y-0 right-0 z-20 flex shadow-softHover transition-transform duration-200 ease-out ${
+              selectedField ? "translate-x-0" : "translate-x-full"
+            } ${!selectedField || draggedType || draggingInCanvas ? "pointer-events-none" : ""}`}
+          >
+            <FieldPropertiesPanel
+              field={selectedField}
+              otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
+              onUpdate={updateField}
+              onDelete={deleteField}
+              onClose={() => setSelectedFieldId(null)}
+              readOnly={readOnly}
+              workspaceId={template.workspace_id ?? ""}
+            />
+          </div>
         </div>
       )}
     </div>
