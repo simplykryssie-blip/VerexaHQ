@@ -60,6 +60,8 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { count: pendingClientChangeCount },
     { count: submittedOrganizerCount },
     { count: respondedOrganizerItemCount },
+    { count: visibleLearningCourseCount },
+    { data: softwareLinks },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -113,6 +115,15 @@ export default async function AppLayout({ children, modal }: { children: React.R
       .select("id, organizer_information_requests!inner(workspace_id)", { count: "exact", head: true })
       .eq("status", "client_responded")
       .eq("organizer_information_requests.workspace_id", workspace.id),
+    // An ERO/SB can always author content, so it's worth a nav slot
+    // regardless; an Independent PTIN only gets the slot once
+    // has_learning_hub_access (via a connection) actually makes something
+    // visible to them -- RLS on learning_courses already enforces this, so
+    // the count is just checking reality, not a second permission system.
+    isEroManagementTier(workspace)
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("learning_courses").select("id", { count: "exact", head: true }),
+    supabase.from("workspace_software_links").select("id, name, url").eq("workspace_id", workspace.id).order("display_order"),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -193,6 +204,8 @@ export default async function AppLayout({ children, modal }: { children: React.R
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
             showPartners={(connectedPartnerCount ?? 0) > 0}
+            showLearningHub={isEroManagementTier(workspace) || (visibleLearningCourseCount ?? 0) > 0}
+            softwareLinks={softwareLinks ?? []}
             reviewQueueHasItems={
               (pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0 || (respondedOrganizerItemCount ?? 0) > 0
             }

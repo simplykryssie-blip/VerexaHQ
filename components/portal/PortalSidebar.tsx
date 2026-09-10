@@ -55,7 +55,7 @@ export function PortalSidebar({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={trimmedLogoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
             ) : (
-              <p className="text-sm font-semibold text-ink">{firmName || "VerexaHQ"}</p>
+              <p className="text-sm font-semibold text-ink">{firmName || "Verexa HQ CRM"}</p>
             )}
             <p className="mt-0.5 truncate text-xs text-muted">{clientLabel}</p>
             <span className="mt-2 inline-flex items-center rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">

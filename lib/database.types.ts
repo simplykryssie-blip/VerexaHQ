@@ -4306,6 +4306,7 @@ export type Database = {
       firm_connections: {
         Row: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -4327,6 +4328,7 @@ export type Database = {
         }
         Insert: {
           allows_branding_override?: boolean
+          allows_learning_hub_downline_share?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4348,6 +4350,7 @@ export type Database = {
         }
         Update: {
           allows_branding_override?: boolean
+          allows_learning_hub_downline_share?: boolean
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4687,6 +4690,8 @@ export type Database = {
       }
       firm_tax_profile: {
         Row: {
+          caf_encrypted: string | null
+          caf_last4: string | null
           efin_encrypted: string | null
           efin_hash: string | null
           efin_last4: string | null
@@ -4703,6 +4708,8 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          caf_encrypted?: string | null
+          caf_last4?: string | null
           efin_encrypted?: string | null
           efin_hash?: string | null
           efin_last4?: string | null
@@ -4719,6 +4726,8 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          caf_encrypted?: string | null
+          caf_last4?: string | null
           efin_encrypted?: string | null
           efin_hash?: string | null
           efin_last4?: string | null
@@ -5324,6 +5333,8 @@ export type Database = {
           id: string
           module_type: string
           passing_score_percent: number
+          release_date: string | null
+          release_offset_days: number | null
           title: string
           updated_at: string
           video_storage_path: string | null
@@ -5337,6 +5348,8 @@ export type Database = {
           id?: string
           module_type: string
           passing_score_percent?: number
+          release_date?: string | null
+          release_offset_days?: number | null
           title: string
           updated_at?: string
           video_storage_path?: string | null
@@ -5350,6 +5363,8 @@ export type Database = {
           id?: string
           module_type?: string
           passing_score_percent?: number
+          release_date?: string | null
+          release_offset_days?: number | null
           title?: string
           updated_at?: string
           video_storage_path?: string | null
@@ -5361,6 +5376,53 @@ export type Database = {
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "learning_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learning_live_sessions: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          host_user_id: string
+          id: string
+          is_webinar: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes: number
+          host_user_id: string
+          id?: string
+          is_webinar?: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          host_user_id?: string
+          id?: string
+          is_webinar?: boolean
+          join_url?: string
+          module_id?: string
+          scheduled_start?: string
+          start_url?: string
+          zoom_meeting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_live_sessions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: true
+            referencedRelation: "learning_modules"
             referencedColumns: ["id"]
           },
         ]
@@ -9746,6 +9808,41 @@ export type Database = {
           },
         ]
       }
+      workspace_software_links: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_software_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
@@ -9992,6 +10089,7 @@ export type Database = {
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
+          owner_name: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string
@@ -10024,6 +10122,7 @@ export type Database = {
           mailing_address?: string | null
           name: string
           onboarding_dismissed_at?: string | null
+          owner_name?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug: string
@@ -10056,6 +10155,7 @@ export type Database = {
           mailing_address?: string | null
           name?: string
           onboarding_dismissed_at?: string | null
+          owner_name?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug?: string
@@ -11253,6 +11353,7 @@ export type Database = {
         Args: { p_relationship_types?: string[]; p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
           billing_responsibility: string
           child_workspace_id: string
           connection_id: string
@@ -11675,6 +11776,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      is_module_unlocked: {
+        Args: { p_module_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_notification_enabled: {
         Args: {
           p_channel: string
@@ -11714,6 +11819,10 @@ export type Database = {
       is_workspace_member: {
         Args: { p_workspace_id: string }
         Returns: boolean
+      }
+      learning_hub_reachable_workspaces: {
+        Args: { p_owner_workspace_id: string }
+        Returns: { workspace_id: string }[]
       }
       link_public_portal_account: {
         Args: {
@@ -12142,6 +12251,7 @@ export type Database = {
         Returns: string
       }
       reveal_client_ssn: { Args: { p_client_id: string }; Returns: string }
+      reveal_firm_caf: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_efin: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ein: { Args: { p_workspace_id: string }; Returns: string }
       reveal_firm_ptin: { Args: { p_workspace_id: string }; Returns: string }
@@ -12285,6 +12395,8 @@ export type Database = {
       }
       set_firm_tax_profile: {
         Args: {
+          p_caf?: string
+          p_clear_caf?: boolean
           p_clear_efin?: boolean
           p_clear_ein?: boolean
           p_clear_ptin?: boolean
@@ -12393,6 +12505,7 @@ export type Database = {
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
+          owner_name: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string

@@ -263,6 +263,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
                       allowsBrandingOverride={c.allows_branding_override}
                       defaultReviewerId={c.default_reviewer_id ?? null}
                       restrictPtinStaffAssignment={Boolean(c.restrict_ptin_staff_assignment)}
+                      allowsLearningHubDownlineShare={Boolean(c.allows_learning_hub_downline_share)}
                       reviewerOptions={reviewerOptions}
                     />
                   ))}

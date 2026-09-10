@@ -7,6 +7,7 @@ import { NameInput } from "@/components/NameInput";
 import { parseConditionalLogic, shouldShowField } from "@/lib/organizer/conditionalLogic";
 import { splitIntoPages } from "@/lib/organizer/pages";
 import { formatPhone } from "@/lib/phone";
+import { formatSsn, formatEin } from "@/lib/taxIds";
 import { fieldColSpanClass } from "@/lib/organizer/layoutWidth";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 import type { BuilderField } from "./types";
@@ -272,8 +273,10 @@ function PreviewField({ field, value, onChange }: { field: BuilderField; value: 
         ) : field.field_type === "ssn" || field.field_type === "ein" ? (
           <input
             type="text"
+            inputMode="numeric"
+            maxLength={field.field_type === "ssn" ? 11 : 10}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => onChange(field.field_type === "ssn" ? formatSsn(e.target.value) : formatEin(e.target.value))}
             placeholder={field.field_type === "ssn" ? "XXX-XX-XXXX" : "XX-XXXXXXX"}
             className={inputClass}
           />

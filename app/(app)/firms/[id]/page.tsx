@@ -94,6 +94,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
               allowsBrandingOverride={firm.allows_branding_override}
               defaultReviewerId={firm.default_reviewer_id ?? null}
               restrictPtinStaffAssignment={Boolean(firm.restrict_ptin_staff_assignment)}
+              allowsLearningHubDownlineShare={Boolean(firm.allows_learning_hub_downline_share)}
               reviewerOptions={reviewerOptions}
             />
           </ul>

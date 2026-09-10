@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
+import { Menu, X, ChevronDown, ChevronLeft, ChevronRight, Layers, Check, Home, LogOut, Blocks } from "lucide-react";
 import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS, ERO_MANAGEMENT_NAV_ITEMS, ERO_MANAGEMENT_NAV_SECTION } from "@/lib/nav";
 import { hexToRgba, readableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
@@ -34,6 +34,8 @@ export function Sidebar({
   switchableWorkspaces,
   showMessages,
   showPartners,
+  showLearningHub,
+  softwareLinks,
   showEroManagement,
   currentUser,
   reviewQueueHasItems,
@@ -56,6 +58,10 @@ export function Sidebar({
   showMessages?: boolean;
   /** Partners is only relevant to an ERO/SB with connections to manage -- an independent PTIN has no one to show there. */
   showPartners?: boolean;
+  /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
+  showLearningHub?: boolean;
+  /** Workspace-defined software shortcuts (Settings > ERO Profile / Profile) -- rendered as their own "Software" dropdown group when non-empty, each child opening externally. */
+  softwareLinks?: { id: string; name: string; url: string }[];
   /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (ERO Dashboard, Team -- which also holds Connections -- ERO Profile) to the main nav. Assignments lives in the regular Daily section instead, since every workspace tier needs to reassign work, not just ERO/SB. */
   showEroManagement?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
@@ -84,6 +90,36 @@ export function Sidebar({
   }
   const [open, setOpen] = useState(false);
   const trimmedLogoUrl = useTrimmedLogo(logoUrl);
+
+  // Desktop-only rail collapse -- sticky across page loads via localStorage
+  // since a plain useState resets on every full navigation. Collapsing
+  // shrinks the rail to icon-only width; hovering it while collapsed flies
+  // the full nav out over the page (not pushing content) instead of
+  // requiring a click to see labels again.
+  const [collapsed, setCollapsed] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("verexa-sidebar-collapsed") === "1");
+    } catch {
+      // Private browsing / storage disabled -- default to expanded.
+    }
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("verexa-sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        // Ignore -- collapse still works for this session, just won't persist.
+      }
+      return next;
+    });
+  }
+  // What the rail actually looks like right now, folding "collapsed" and the
+  // temporary hover fly-out into one flag so the render logic below only
+  // ever has to check one thing.
+  const railExpanded = !collapsed || hoverExpanded;
 
   // primaryColor is unused here -- kept in the props/Brand Center settings
   // for the public-form fallback accent, not a sidebar concern.
@@ -192,14 +228,23 @@ export function Sidebar({
         <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />
       )}
 
+      {/* Holds the rail's own space in the page's flex layout while the
+          rail itself switches to fixed positioning to fly out over the
+          content on hover -- without this, the page would reflow to fill
+          the gap the instant the flyout appears, then snap back on
+          mouseleave. */}
+      {collapsed && hoverExpanded && <div className="hidden shrink-0 lg:block lg:w-16" aria-hidden="true" />}
+
       <aside
-        className={`${styles.sidebar} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col font-sans shadow-soft transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
+        onMouseEnter={() => collapsed && setHoverExpanded(true)}
+        onMouseLeave={() => setHoverExpanded(false)}
+        className={`${styles.sidebar} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col font-sans shadow-soft transition-transform duration-200 lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${collapsed && hoverExpanded ? "lg:fixed lg:w-64 lg:shadow-2xl" : collapsed ? "lg:static lg:w-16" : "lg:static lg:w-64"}`}
         style={sidebarStyle}
       >
-        <div className={`${styles.header} flex items-center justify-between px-5 py-5`}>
-          <div>
+        <div className={`${styles.header} flex items-center gap-2 px-5 py-5 ${railExpanded ? "justify-between" : "lg:justify-center lg:px-2"}`}>
+          <div className={railExpanded ? "min-w-0" : "lg:hidden"}>
             {trimmedLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "60px", maxWidth: "220px", objectFit: "contain" }} />
@@ -221,19 +266,34 @@ export function Sidebar({
               Tax Office module
             </span>
           </div>
+          {!railExpanded && (
+            <Image src="/brand/vmark.png" alt={workspaceName} width={22} height={18} priority className="hidden lg:block" />
+          )}
           <button type="button" onClick={() => setOpen(false)} aria-label="Close navigation menu" className={`${styles.workspaceName} lg:hidden`}>
             <X size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Expand navigation menu" : "Collapse navigation menu"}
+            title={collapsed ? "Expand navigation menu" : "Collapse navigation menu"}
+            className={`${styles.navItem} hidden shrink-0 rounded-lg p-1.5 lg:flex`}
+          >
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
 
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
           {navSections.map((section) => (
             <div key={section.label}>
-              <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
+              {railExpanded && (
+                <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
+              )}
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
                   .filter((item) => item.label !== "Partners" || showPartners)
+                  .filter((item) => item.label !== "Learning Hub" || showLearningHub)
                   .map((item) => {
                   const Icon = item.icon;
 
@@ -246,13 +306,20 @@ export function Sidebar({
                           type="button"
                           onClick={() => toggleExpanded(item.label)}
                           aria-expanded={isOpen}
-                          className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                          title={item.label}
+                          className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                            railExpanded ? "" : "lg:justify-center lg:px-2"
+                          }`}
                         >
                           <Icon size={18} strokeWidth={2} className="shrink-0" />
-                          <span className="flex-1 text-left">{item.label}</span>
-                          <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                          {railExpanded && (
+                            <>
+                              <span className="flex-1 text-left">{item.label}</span>
+                              <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                            </>
+                          )}
                         </button>
-                        {isOpen && (
+                        {isOpen && railExpanded && (
                           <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
                             {item.children.map((child) => {
                               const active = child.href === activeNavHref;
@@ -277,7 +344,10 @@ export function Sidebar({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                      title={item.label}
+                      className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                        railExpanded ? "" : "lg:justify-center lg:px-2"
+                      }`}
                     >
                       <span className="relative shrink-0">
                         <Icon size={18} strokeWidth={2} />
@@ -285,7 +355,7 @@ export function Sidebar({
                           <span aria-label="Items waiting on review" className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-danger" style={{ boxShadow: `0 0 0 2px ${effectiveBg}` }} />
                         )}
                       </span>
-                      {item.label}
+                      {railExpanded && item.label}
                     </Link>
                   );
                 })}
@@ -294,21 +364,61 @@ export function Sidebar({
           ))}
         </nav>
 
+        {softwareLinks && softwareLinks.length > 0 && (
+          <div className="px-3 pb-1">
+            <button
+              type="button"
+              onClick={() => toggleExpanded("Software")}
+              aria-expanded={expanded.has("Software")}
+              title="Software"
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
+            >
+              <Blocks size={18} strokeWidth={2} className="shrink-0" />
+              {railExpanded && (
+                <>
+                  <span className="flex-1 text-left">Software</span>
+                  <ChevronDown size={14} className={`shrink-0 transition-transform ${expanded.has("Software") ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+            {expanded.has("Software") && railExpanded && (
+              <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
+                {softwareLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${styles.navItem} block truncate rounded-lg px-3 py-2 text-sm font-medium`}
+                  >
+                    {link.name}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {homeWorkspaceEntry && !homeWorkspaceEntry.isActive && (
           <div className="px-3 pb-1">
             <button
               type="button"
               onClick={() => switchWorkspace(homeWorkspaceEntry.id)}
               disabled={switching}
-              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-default`}
+              title={`Back to ${homeWorkspaceEntry.name}`}
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-default ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
             >
               <Home size={18} strokeWidth={2} className="shrink-0" />
-              Back to {homeWorkspaceEntry.name}
+              {railExpanded && `Back to ${homeWorkspaceEntry.name}`}
             </button>
           </div>
         )}
 
-        {demoWorkspaces.length > 0 && (
+        {demoWorkspaces.length > 0 && railExpanded && (
           <div className="px-3 pb-1">
             <button
               type="button"
@@ -343,19 +453,28 @@ export function Sidebar({
 
         <div className={`${styles.footer} px-3 py-4`} style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
           {currentUser && (
-            <div className="mb-2 flex items-center gap-2.5 px-3 pb-3">
+            <div className={`mb-2 flex items-center gap-2.5 px-3 pb-3 ${railExpanded ? "" : "lg:justify-center lg:px-0"}`}>
               <Avatar name={currentUser.name} url={currentUser.avatarUrl} size="sm" />
-              <div className="min-w-0">
-                <p className={`${styles.workspaceName} truncate text-sm font-medium`} style={{ color: "var(--rail-ink)" }}>
-                  {currentUser.name ?? "Staff"}
-                </p>
-                {currentUser.roleLabel && <p className={`${styles.workspaceName} truncate text-xs`}>{currentUser.roleLabel}</p>}
-              </div>
+              {railExpanded && (
+                <div className="min-w-0">
+                  <p className={`${styles.workspaceName} truncate text-sm font-medium`} style={{ color: "var(--rail-ink)" }}>
+                    {currentUser.name ?? "Staff"}
+                  </p>
+                  {currentUser.roleLabel && <p className={`${styles.workspaceName} truncate text-xs`}>{currentUser.roleLabel}</p>}
+                </div>
+              )}
             </div>
           )}
           <form action="/api/auth/sign-out" method="post">
-            <button type="submit" className={`${styles.signOut} w-full rounded-lg px-3 py-2 text-left text-sm font-medium`}>
-              Sign out
+            <button
+              type="submit"
+              title="Sign out"
+              className={`${styles.signOut} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
+            >
+              <LogOut size={16} strokeWidth={2} className="hidden shrink-0 lg:block" />
+              <span className={railExpanded ? "" : "lg:hidden"}>Sign out</span>
             </button>
           </form>
         </div>

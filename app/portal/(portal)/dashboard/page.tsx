@@ -8,6 +8,7 @@ import { getEngagementProgressMap } from "@/lib/portalEngagementProgress";
 import { EmptyState } from "@/components/EmptyState";
 import { StatTile } from "@/components/ui/StatTile";
 import type { IconChipTone } from "@/components/ui/IconChip";
+import { PortalPendingTasks } from "@/components/portal/PortalPendingTasks";
 
 export const dynamic = "force-dynamic";
 
@@ -31,30 +32,69 @@ export default async function PortalDashboardPage() {
   const { data: myAttachments } = await supabase.from("attachments").select("id").or(entityFilter);
   const attachmentIds = (myAttachments ?? []).map((a) => a.id);
 
-  const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: contactRows }] =
-    await Promise.all([
-      supabase
-        .from("engagements")
-        .select("id, engagement_number, status, due_date, services(name)")
-        .eq("client_id", identity.clientId)
-        .order("open_date", { ascending: false }),
-      supabase
-        .from("document_requests")
-        .select("id, title, due_date, entity_type, entity_id, items:document_request_item_statuses(id, is_required, status)")
-        .eq("status", "open")
-        .or(entityFilter),
-      attachmentIds.length > 0
-        ? supabase
-            .from("signature_requests")
-            .select("id, title, due_date, attachment:attachments!signature_requests_attachment_id_fkey(file_name)")
-            .eq("status", "pending")
-            .in("attachment_id", attachmentIds)
-        : Promise.resolve({ data: [] as { id: string; title: string; due_date: string | null; attachment: { file_name: string } | null }[] }),
-      supabase.from("invoices").select("id, invoice_number, total_amount, amount_paid, status, due_date").eq("client_id", identity.clientId),
-      supabase.rpc("get_portal_client_contact"),
-    ]);
+  const [
+    { data: engagements },
+    { data: openRequests },
+    { data: pendingSignatures },
+    { data: invoices },
+    { data: contactRows },
+    { data: pendingQuotes },
+    { data: pendingOrganizers },
+    { data: myOrganizerResponses },
+    { data: pendingClientTasks },
+  ] = await Promise.all([
+    supabase
+      .from("engagements")
+      .select("id, engagement_number, status, due_date, services(name)")
+      .eq("client_id", identity.clientId)
+      .order("open_date", { ascending: false }),
+    supabase
+      .from("document_requests")
+      .select("id, title, due_date, entity_type, entity_id, items:document_request_item_statuses(id, is_required, status)")
+      .eq("status", "open")
+      .or(entityFilter),
+    attachmentIds.length > 0
+      ? supabase
+          .from("signature_requests")
+          .select("id, title, due_date, attachment:attachments!signature_requests_attachment_id_fkey(file_name)")
+          .eq("status", "pending")
+          .in("attachment_id", attachmentIds)
+      : Promise.resolve({ data: [] as { id: string; title: string; due_date: string | null; attachment: { file_name: string } | null }[] }),
+    supabase.from("invoices").select("id, invoice_number, total_amount, amount_paid, status, due_date").eq("client_id", identity.clientId),
+    supabase.rpc("get_portal_client_contact"),
+    supabase
+      .from("quotes")
+      .select("id, title")
+      .eq("client_id", identity.clientId)
+      .eq("status", "sent")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("organizer_responses")
+      .select("id, organizer_templates(name)")
+      .eq("client_id", identity.clientId)
+      .in("status", ["not_started", "in_progress"])
+      .order("created_at", { ascending: true }),
+    supabase.from("organizer_responses").select("id").eq("client_id", identity.clientId),
+    supabase
+      .from("tasks")
+      .select("id, title, description, due_date, status")
+      .eq("visibility", "client")
+      .neq("status", "completed")
+      .order("due_date", { ascending: true, nullsFirst: false }),
+  ]);
 
   const contact = contactRows?.[0] ?? null;
+
+  const myOrganizerResponseIds = (myOrganizerResponses ?? []).map((r) => r.id);
+  const { data: organizerInfoRequests } =
+    myOrganizerResponseIds.length > 0
+      ? await supabase
+          .from("organizer_information_requests")
+          .select("id, organizer_response_id")
+          .in("organizer_response_id", myOrganizerResponseIds)
+          .in("status", ["active", "viewed"])
+          .order("created_at", { ascending: true })
+      : { data: [] as { id: string; organizer_response_id: string }[] };
 
   const missingDocuments = (openRequests ?? []).reduce(
     (sum, r) => sum + (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length,
@@ -122,6 +162,16 @@ export default async function PortalDashboardPage() {
       </div>
 
       <div className="flex-1 space-y-6 px-8 py-6">
+        <PortalPendingTasks
+          quotes={(pendingQuotes ?? []).map((q) => ({ id: q.id, title: q.title }))}
+          organizers={(pendingOrganizers ?? []).map((o) => ({
+            id: o.id,
+            name: (o.organizer_templates as unknown as { name?: string } | null)?.name ?? null,
+          }))}
+          infoRequests={(organizerInfoRequests ?? []).map((r) => ({ id: r.id, organizerResponseId: r.organizer_response_id }))}
+          tasks={pendingClientTasks ?? []}
+        />
+
         {contact && (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-surface shadow-soft px-4 py-3 text-sm">
             <span className="font-medium text-slate">Your preparer: {contact.name}</span>
