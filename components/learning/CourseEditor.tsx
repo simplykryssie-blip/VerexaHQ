@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus, BookOpen, CheckSquare, Lock, Unlock, CalendarClock } from "lucide-react";
+import { Trash2, Plus, BookOpen, CheckSquare, Lock, Unlock, CalendarClock, Video } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -17,6 +17,7 @@ type ModuleRow = {
   release_date: string | null;
   release_offset_days: number | null;
 };
+type LiveSessionInfo = { scheduledStart: string; isWebinar: boolean };
 
 type ScheduleMode = "always" | "date" | "offset";
 
@@ -37,7 +38,15 @@ function scheduleCaption(m: Pick<ModuleRow, "release_date" | "release_offset_day
   return "Always available";
 }
 
-export function CourseEditor({ course, modules: initialModules }: { course: Course; modules: ModuleRow[] }) {
+export function CourseEditor({
+  course,
+  modules: initialModules,
+  liveSessions = {},
+}: {
+  course: Course;
+  modules: ModuleRow[];
+  liveSessions?: Record<string, LiveSessionInfo>;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
@@ -47,7 +56,7 @@ export function CourseEditor({ course, modules: initialModules }: { course: Cour
   const [status, setStatus] = useState(course.status);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [addingType, setAddingType] = useState<"lesson" | "quiz" | null>(null);
+  const [addingType, setAddingType] = useState<"lesson" | "quiz" | "live_session" | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [modules, setModules] = useState(initialModules);
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
@@ -86,6 +95,28 @@ export function CourseEditor({ course, modules: initialModules }: { course: Cour
     setNewTitle("");
     setAddingType(null);
     router.refresh();
+  }
+
+  async function createLiveSession(payload: { title: string; scheduledStart: string; durationMinutes: number; isWebinar: boolean }) {
+    const res = await fetch("/api/learning/live-sessions/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courseId: course.id, displayOrder: modules.length, ...payload }),
+    });
+    const data = (await res.json()) as { configured?: boolean; reason?: string; error?: string; fallbackNotice?: string | null };
+    if (!res.ok) {
+      toast.show(data.error ?? "Could not create live session", "error");
+      return false;
+    }
+    if (!data.configured) {
+      toast.show(data.reason ?? "Zoom isn't connected", "error");
+      return false;
+    }
+    if (data.fallbackNotice) toast.show(data.fallbackNotice, "info");
+    toast.show("Live session scheduled", "success");
+    setAddingType(null);
+    router.refresh();
+    return true;
   }
 
   async function deleteModule(id: string) {
@@ -245,10 +276,17 @@ export function CourseEditor({ course, modules: initialModules }: { course: Cour
           >
             <CheckSquare size={14} /> Add quiz
           </button>
+          <button
+            type="button"
+            onClick={() => setAddingType("live_session")}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+          >
+            <Video size={14} /> Add live session
+          </button>
         </div>
       </div>
 
-      {addingType && (
+      {(addingType === "lesson" || addingType === "quiz") && (
         <form onSubmit={addModule} className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft">
           <input
             autoFocus
@@ -265,6 +303,10 @@ export function CourseEditor({ course, modules: initialModules }: { course: Cour
             <Plus size={14} />
           </button>
         </form>
+      )}
+
+      {addingType === "live_session" && (
+        <LiveSessionForm defaultTitle={course.title} onCancel={() => setAddingType(null)} onSubmit={createLiveSession} />
       )}
 
       {sortedModules.length === 0 ? (
@@ -284,10 +326,30 @@ export function CourseEditor({ course, modules: initialModules }: { course: Cour
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <Link href={`/learning/manage/${course.id}/${m.id}`} className="flex items-center gap-2 text-sm font-medium text-ink hover:text-accent">
-                    {m.module_type === "quiz" ? <CheckSquare size={14} className="text-accent" /> : <BookOpen size={14} className="text-accent" />}
-                    {m.title}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {m.module_type === "live_session" ? (
+                      <Link href={`/learning/manage/${course.id}`} className="flex items-center gap-2 text-sm font-medium text-ink">
+                        <Video size={14} className="text-accent" />
+                        {m.title}
+                      </Link>
+                    ) : (
+                      <Link href={`/learning/manage/${course.id}/${m.id}`} className="flex items-center gap-2 text-sm font-medium text-ink hover:text-accent">
+                        {m.module_type === "quiz" ? <CheckSquare size={14} className="text-accent" /> : <BookOpen size={14} className="text-accent" />}
+                        {m.title}
+                      </Link>
+                    )}
+                    {m.module_type === "live_session" && liveSessions[m.id] && (
+                      <span className="text-[11px] text-muted">
+                        {new Date(liveSessions[m.id].scheduledStart).toLocaleString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                        {liveSessions[m.id].isWebinar ? " · Webinar" : ""}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -383,5 +445,86 @@ function ScheduleEditor({
         </button>
       </div>
     </div>
+  );
+}
+
+function LiveSessionForm({
+  defaultTitle,
+  onCancel,
+  onSubmit,
+}: {
+  defaultTitle: string;
+  onCancel: () => void;
+  onSubmit: (payload: { title: string; scheduledStart: string; durationMinutes: number; isWebinar: boolean }) => Promise<boolean>;
+}) {
+  const [title, setTitle] = useState(defaultTitle);
+  const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
+  const [durationMinutes, setDurationMinutes] = useState(60);
+  const [isWebinar, setIsWebinar] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !date || !time) return;
+    setSubmitting(true);
+    const scheduledStart = new Date(`${date}T${time}`).toISOString();
+    const ok = await onSubmit({ title: title.trim(), scheduledStart, durationMinutes, isWebinar });
+    setSubmitting(false);
+    if (!ok) return;
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3 rounded-2xl border border-border bg-surface p-4 shadow-soft">
+      <input
+        autoFocus
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Live session topic"
+        className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          className="rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+        <label className="flex items-center gap-1.5 text-sm text-slate">
+          Duration
+          <input
+            type="number"
+            min={15}
+            step={15}
+            value={durationMinutes}
+            onChange={(e) => setDurationMinutes(Math.max(15, Number(e.target.value)))}
+            className="w-20 rounded-lg border border-border px-2 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          min
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-slate">
+          <input type="checkbox" checked={isWebinar} onChange={(e) => setIsWebinar(e.target.checked)} />
+          Webinar
+        </label>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted hover:bg-surfaceMuted">
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={submitting || !title.trim() || !date || !time}
+          className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+        >
+          {submitting ? "Scheduling..." : "Schedule session"}
+        </button>
+      </div>
+    </form>
   );
 }

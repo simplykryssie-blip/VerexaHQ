@@ -5371,6 +5371,53 @@ export type Database = {
           },
         ]
       }
+      learning_live_sessions: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          host_user_id: string
+          id: string
+          is_webinar: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes: number
+          host_user_id: string
+          id?: string
+          is_webinar?: boolean
+          join_url: string
+          module_id: string
+          scheduled_start: string
+          start_url: string
+          zoom_meeting_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          host_user_id?: string
+          id?: string
+          is_webinar?: boolean
+          join_url?: string
+          module_id?: string
+          scheduled_start?: string
+          start_url?: string
+          zoom_meeting_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_live_sessions_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: true
+            referencedRelation: "learning_modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       learning_quiz_options: {
         Row: {
           display_order: number

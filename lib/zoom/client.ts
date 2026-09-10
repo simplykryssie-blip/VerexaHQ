@@ -120,6 +120,43 @@ export async function createZoomMeeting({
 }
 
 /**
+ * Zoom Webinars require a separate paid add-on on top of the base account
+ * -- an account without it gets a plain 4xx from this endpoint. Callers
+ * should treat that as expected and fall back to createZoomMeeting rather
+ * than surfacing it as a hard failure.
+ */
+export async function createZoomWebinar({
+  accessToken,
+  topic,
+  startTimeIso,
+  durationMinutes,
+}: {
+  accessToken: string;
+  topic: string;
+  startTimeIso: string;
+  durationMinutes: number;
+}): Promise<ZoomResult<{ id: number; join_url: string; start_url: string }>> {
+  const res = await fetch(`${ZOOM_API}/users/me/webinars`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      topic,
+      type: 5,
+      start_time: startTimeIso,
+      duration: durationMinutes,
+      timezone: "UTC",
+      settings: { join_before_host: false },
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Zoom responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: number; join_url: string; start_url: string };
+  return { ok: true, data };
+}
+
+/**
  * Verifies Zoom's webhook signature scheme: HMAC-SHA256 over
  * "v0:<timestamp>:<rawBody>" using the app's Secret Token, hex-encoded and
  * prefixed "v0=". Applies to both delivered events and the validation

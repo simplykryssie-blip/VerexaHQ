@@ -36,14 +36,22 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
 
   const completionByModule = new Map((completions ?? []).map((c) => [c.module_id, c]));
 
+  const liveSessionModuleIds = (modules ?? []).filter((m) => m.module_type === "live_session").map((m) => m.id);
+  const { data: liveSessionRows } =
+    liveSessionModuleIds.length > 0
+      ? await supabase.from("learning_live_sessions").select("module_id, scheduled_start").in("module_id", liveSessionModuleIds)
+      : { data: [] };
+  const liveSessionStartByModule = new Map((liveSessionRows ?? []).map((r) => [r.module_id, r.scheduled_start]));
+
   const moduleRows = (modules ?? []).map((m) => ({
     id: m.id,
     title: m.title,
-    moduleType: m.module_type as "lesson" | "quiz",
+    moduleType: m.module_type as "lesson" | "quiz" | "live_session",
     passed: completionByModule.get(m.id)?.passed ?? null,
     scorePercent: completionByModule.get(m.id)?.score_percent ?? null,
     releaseDate: m.release_date,
     releaseOffsetDays: m.release_offset_days,
+    liveSessionStart: liveSessionStartByModule.get(m.id) ?? null,
   }));
 
   return (

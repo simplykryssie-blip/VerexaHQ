@@ -53,6 +53,10 @@ export default async function ManageModulePage({ params }: { params: { courseId:
               videoUrl={module_.video_url}
               videoStoragePath={module_.video_storage_path}
             />
+          ) : module_.module_type === "live_session" ? (
+            <p className="text-sm text-muted">
+              Live sessions don&apos;t have a separate editor -- delete this one from the course page and schedule a new one to change its details.
+            </p>
           ) : (
             <QuizEditor moduleId={module_.id} title={module_.title} passingScorePercent={module_.passing_score_percent} questions={questions} />
           )}
