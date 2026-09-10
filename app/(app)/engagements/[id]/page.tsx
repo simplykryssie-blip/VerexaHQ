@@ -409,7 +409,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
           .select(
             `id, title, status, due_date, attachment_id, created_at, engagement_letter_template_id,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at,
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at, expires_at,
               attested_by_profile:user_profiles!signature_request_signers_attested_by_fkey(display_name))`
           )
           .in("attachment_id", documentIds)

@@ -18,6 +18,7 @@ type SignRequestData = {
   attachment_mime_type: string | null;
   workspace_id: string;
   workspace_name: string;
+  expires_at: string | null;
 };
 
 function isPreviewable(mimeType: string | null) {
@@ -92,6 +93,24 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       return;
     }
     setData((d) => ({ ...d, signer_status: "declined", declined_at: new Date().toISOString(), decline_reason: declineReason.trim() || null }));
+  }
+
+  if (data.signer_status === "pending" && data.request_status === "cancelled") {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
+        <h1 className="text-lg font-semibold text-ink">This signing link has been revoked</h1>
+        <p className="mt-2 text-sm text-muted">Please contact the sender for a new link.</p>
+      </div>
+    );
+  }
+
+  if (data.signer_status === "pending" && data.expires_at && new Date(data.expires_at) < new Date()) {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
+        <h1 className="text-lg font-semibold text-ink">This signing link has expired</h1>
+        <p className="mt-2 text-sm text-muted">Please contact the sender for a new link.</p>
+      </div>
+    );
   }
 
   if (data.signer_status !== "pending") {
