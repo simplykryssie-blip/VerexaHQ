@@ -179,6 +179,8 @@ export function JotFormImportModal({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="JotForm API key"
+              autoComplete="off"
+              name="jotform-api-key"
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             {error && <p className="text-sm text-danger">{error}</p>}
