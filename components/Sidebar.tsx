@@ -33,7 +33,6 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
-  showPartners,
   showLearningHub,
   softwareLinks,
   showEroManagement,
@@ -56,8 +55,6 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
-  /** Partners is only relevant to an ERO/SB with connections to manage -- an independent PTIN has no one to show there. */
-  showPartners?: boolean;
   /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
   showLearningHub?: boolean;
   /** Workspace-defined software shortcuts (Settings > ERO Profile / Profile) -- rendered as their own "Software" dropdown group when non-empty, each child opening externally. */
@@ -292,7 +289,6 @@ export function Sidebar({
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
-                  .filter((item) => item.label !== "Partners" || showPartners)
                   .filter((item) => item.label !== "Learning Hub" || showLearningHub)
                   .map((item) => {
                   const Icon = item.icon;
