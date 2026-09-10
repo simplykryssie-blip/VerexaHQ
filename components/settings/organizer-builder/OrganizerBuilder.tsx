@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
@@ -38,6 +38,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [renamingName, setRenamingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
   const [savingName, setSavingName] = useState(false);
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
 
   async function updateBanner(url: string | null) {
     setBannerImageUrl(url);
@@ -315,13 +316,34 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             onToggleWidth={toggleFieldWidth}
             readOnly={readOnly}
           />
-          <FieldPropertiesPanel
-            field={selectedField}
-            otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
-            onUpdate={updateField}
-            onDelete={deleteField}
-            readOnly={readOnly}
-          />
+          {propertiesCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setPropertiesCollapsed(false)}
+              aria-label="Expand field properties"
+              className="flex w-6 shrink-0 items-center justify-center border-l border-border bg-surface text-muted hover:bg-surfaceMuted hover:text-ink"
+            >
+              <ChevronLeft size={14} />
+            </button>
+          ) : (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setPropertiesCollapsed(true)}
+                aria-label="Collapse field properties"
+                className="absolute -left-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-muted shadow-soft hover:text-ink"
+              >
+                <ChevronRight size={14} />
+              </button>
+              <FieldPropertiesPanel
+                field={selectedField}
+                otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
+                onUpdate={updateField}
+                onDelete={deleteField}
+                readOnly={readOnly}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
