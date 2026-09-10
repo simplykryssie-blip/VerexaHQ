@@ -27,9 +27,10 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
     supabase
       .from("organizer_fields")
       .select(
-        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width"
+        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width, is_internal_only"
       )
       .eq("organizer_template_id", response.organizer_template_id)
+      .eq("is_internal_only", false)
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
     readOnly ? Promise.resolve({ data: null }) : supabase.rpc("get_portal_client_snapshot"),

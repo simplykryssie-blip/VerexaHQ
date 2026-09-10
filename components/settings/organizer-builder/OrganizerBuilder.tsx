@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import type { OrganizerFieldType } from "@/lib/organizer/fieldTypes";
@@ -38,7 +38,6 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const [renamingName, setRenamingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(template.name);
   const [savingName, setSavingName] = useState(false);
-  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false);
 
   async function updateBanner(url: string | null) {
     setBannerImageUrl(url);
@@ -73,6 +72,14 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
     }
   }
   const selectedField = fields.find((f) => f.id === selectedFieldId) ?? null;
+
+  // The preview tab simulates what the client actually sees, so internal-
+  // only fields (staff notes/reminders embedded in the structure) drop out
+  // here the same way they're excluded from the real public/portal fetch.
+  const previewTopLevelFields = topLevelFields.filter((f) => !f.is_internal_only);
+  const previewChildrenByParent = new Map(
+    Array.from(childrenByParent.entries()).map(([parentId, children]) => [parentId, children.filter((f) => !f.is_internal_only)])
+  );
 
   function currentLaneIds(lane: string | null): string[] {
     return lane === null ? topLevelFields.map((f) => f.id) : (childrenByParent.get(lane) ?? []).map((f) => f.id);
@@ -297,12 +304,12 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
         <OrganizerPreviewPanel
           templateName={name}
           templateDescription={template.description}
-          topLevelFields={topLevelFields}
-          childrenByParent={childrenByParent}
+          topLevelFields={previewTopLevelFields}
+          childrenByParent={previewChildrenByParent}
           bannerImageUrl={bannerImageUrl}
         />
       ) : (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex flex-1 overflow-hidden">
           {!readOnly && <FieldPalette onAdd={addFieldFromPalette} onDragType={setDraggedType} hasSelection={Boolean(selectedField)} />}
           <FieldCanvas
             topLevelFields={topLevelFields}
@@ -316,34 +323,23 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             onToggleWidth={toggleFieldWidth}
             readOnly={readOnly}
           />
-          {propertiesCollapsed ? (
-            <button
-              type="button"
-              onClick={() => setPropertiesCollapsed(false)}
-              aria-label="Expand field properties"
-              className="flex w-6 shrink-0 items-center justify-center border-l border-border bg-surface text-muted hover:bg-surfaceMuted hover:text-ink"
-            >
-              <ChevronLeft size={14} />
-            </button>
-          ) : (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setPropertiesCollapsed(true)}
-                aria-label="Collapse field properties"
-                className="absolute -left-3 top-4 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-surface text-muted shadow-soft hover:text-ink"
-              >
-                <ChevronRight size={14} />
-              </button>
-              <FieldPropertiesPanel
-                field={selectedField}
-                otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
-                onUpdate={updateField}
-                onDelete={deleteField}
-                readOnly={readOnly}
-              />
-            </div>
-          )}
+          {/* Pops out over the canvas only while a field is selected, instead
+              of permanently occupying a quarter of the screen -- matches how
+              JotForm's own properties panel behaves. */}
+          <div
+            className={`absolute inset-y-0 right-0 z-20 flex shadow-softHover transition-transform duration-200 ease-out ${
+              selectedField ? "translate-x-0" : "pointer-events-none translate-x-full"
+            }`}
+          >
+            <FieldPropertiesPanel
+              field={selectedField}
+              otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
+              onUpdate={updateField}
+              onDelete={deleteField}
+              onClose={() => setSelectedFieldId(null)}
+              readOnly={readOnly}
+            />
+          </div>
         </div>
       )}
     </div>

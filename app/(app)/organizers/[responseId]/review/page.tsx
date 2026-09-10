@@ -107,7 +107,7 @@ export default async function OrganizerReviewPage({ params }: { params: { respon
       .order("created_at", { ascending: false }),
     supabase
       .from("document_requests")
-      .select(`id, title, due_date, status, created_at, document_request_template_id, items:document_request_item_statuses(id, name, is_required, status)`)
+      .select(`id, title, due_date, status, created_at, document_request_template_id, items:document_request_item_statuses(id, name, is_required, status, category, due_date)`)
       .eq("entity_type", entityType)
       .eq("entity_id", entityId)
       .order("created_at", { ascending: false }),

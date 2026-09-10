@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS, NON_ANSWERABLE_FIELD_TYPES } from "@/lib/organizer/fieldTypes";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
@@ -32,6 +33,7 @@ export function FieldPropertiesPanel({
   otherTopLevelFields,
   onUpdate,
   onDelete,
+  onClose,
   readOnly,
 }: {
   field: BuilderField | null;
@@ -54,9 +56,11 @@ export function FieldPropertiesPanel({
         | "include_in_document_checklist"
         | "document_checklist_name"
         | "document_checklist_category"
+        | "is_internal_only"
       >
     >
   ) => void;
+  onClose: () => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
 }) {
@@ -70,34 +74,51 @@ export function FieldPropertiesPanel({
   }
 
   if (field.field_type === "page_break") {
-    return <PageBreakForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+    return <PageBreakForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} onClose={onClose} readOnly={readOnly} />;
   }
 
-  return <PropertiesForm key={field.id} field={field} otherTopLevelFields={otherTopLevelFields} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+  return (
+    <PropertiesForm
+      key={field.id}
+      field={field}
+      otherTopLevelFields={otherTopLevelFields}
+      onUpdate={onUpdate}
+      onDelete={onDelete}
+      onClose={onClose}
+      readOnly={readOnly}
+    />
+  );
 }
 
 function PageBreakForm({
   field,
   onUpdate,
   onDelete,
+  onClose,
   readOnly,
 }: {
   field: BuilderField;
   onUpdate: (fieldId: string, patch: Partial<Pick<BuilderField, "label">>) => void;
   onDelete: (fieldId: string) => void;
+  onClose: () => void;
   readOnly: boolean;
 }) {
   const [label, setLabel] = useState(field.label);
 
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-ink">Page break</p>
-        {!readOnly && (
-          <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
-            Delete
+        <div className="flex items-center gap-3">
+          {!readOnly && (
+            <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
+              Delete
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Close field properties" className="text-muted hover:text-ink">
+            <X size={14} />
           </button>
-        )}
+        </div>
       </div>
       <p className="mt-1 text-xs text-muted">
         Everything above this splits into its own page; everything below starts a new one. Not a question -- nothing is asked here.
@@ -123,6 +144,7 @@ function PropertiesForm({
   otherTopLevelFields,
   onUpdate,
   onDelete,
+  onClose,
   readOnly,
 }: {
   field: BuilderField;
@@ -145,10 +167,12 @@ function PropertiesForm({
         | "include_in_document_checklist"
         | "document_checklist_name"
         | "document_checklist_category"
+        | "is_internal_only"
       >
     >
   ) => void;
   onDelete: (fieldId: string) => void;
+  onClose: () => void;
   readOnly: boolean;
 }) {
   const [label, setLabel] = useState(field.label);
@@ -187,15 +211,25 @@ function PropertiesForm({
 
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-ink">Field properties</p>
-        {!readOnly && (
-          <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
-            Delete
+        <div className="flex items-center gap-3">
+          {!readOnly && (
+            <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
+              Delete
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Close field properties" className="text-muted hover:text-ink">
+            <X size={14} />
           </button>
-        )}
+        </div>
       </div>
       <p className="mt-1 text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</p>
+      {field.is_internal_only && (
+        <p className="mt-2 inline-flex items-center rounded-full bg-amberSoft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber">
+          Internal only
+        </p>
+      )}
 
       {field.field_type === "rich_text" ? (
         <div className="mt-4">
@@ -246,6 +280,27 @@ function PropertiesForm({
           Required
         </label>
       )}
+
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Internal only</p>
+          <p className="mt-0.5 text-[11px] text-muted">Hidden from the client -- staff only, on the builder and any client-facing form.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={field.is_internal_only}
+          disabled={readOnly}
+          onClick={() => onUpdate(field.id, { is_internal_only: !field.is_internal_only })}
+          className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${
+            field.is_internal_only ? "border-amber bg-amber" : "border-border bg-border"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${field.is_internal_only ? "left-[22px]" : "left-0.5"}`}
+          />
+        </button>
+      </div>
 
       {field.field_type === "file_upload" && (
         <div className="mt-4 border-t border-border pt-4">

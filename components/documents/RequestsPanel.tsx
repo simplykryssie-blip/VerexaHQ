@@ -9,7 +9,74 @@ import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { renderEmail } from "@/lib/email/template";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import type { Audience, DocumentRequestRow, DocumentRequestTemplateOption, EntityType } from "./types";
+import { getCategoryStyle, TONE_BG_CLASSES } from "@/lib/documentRequests/categoryStyle";
+import type { Audience, DocumentRequestRow, DocumentRequestTemplateOption, EntityType, RequestItemRow } from "./types";
+
+/** A real drop target for the file, not just a click-to-browse label --
+ * drag a file anywhere onto it (highlighting to show it'll be accepted) or
+ * click to open the OS file picker instead. */
+function UploadDropzone({ uploading, onUpload }: { uploading: boolean; onUpload: (file: File) => void }) {
+  const [dragOver, setDragOver] = useState(false);
+  return (
+    <label
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) onUpload(file);
+      }}
+      className={`flex cursor-pointer items-center gap-1 rounded-lg border border-dashed px-2 py-1 text-xs font-medium transition ${
+        dragOver ? "border-accent bg-accentSoft text-accent" : "border-border text-accent hover:border-accent hover:bg-accentSoft/50"
+      }`}
+    >
+      <Paperclip size={12} aria-hidden="true" />
+      {uploading ? "Uploading..." : dragOver ? "Drop to upload" : "Upload"}
+      <input type="file" className="sr-only" disabled={uploading} onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
+    </label>
+  );
+}
+
+/** Staff can set/edit a due date on an individual item (e.g. flag an ID
+ * upload as due sooner than the rest of the checklist); clients just see
+ * whatever's been set, read-only, alongside the item. */
+function ItemDueDate({ item, audience, onSetDueDate }: { item: RequestItemRow; audience: Audience; onSetDueDate: (dueDate: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(item.due_date ?? "");
+  const overdue = Boolean(item.due_date) && item.status === "pending" && new Date(item.due_date as string) < new Date();
+
+  if (audience !== "staff") {
+    return item.due_date ? (
+      <span className={`shrink-0 text-[11px] ${overdue ? "text-danger" : "text-muted"}`}>Due {new Date(item.due_date).toLocaleDateString()}</span>
+    ) : null;
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          if (value !== (item.due_date ?? "")) onSetDueDate(value);
+        }}
+        className="shrink-0 rounded border border-border px-1 py-0.5 text-[11px]"
+      />
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => setEditing(true)} className={`shrink-0 text-[11px] hover:underline ${overdue ? "text-danger" : "text-muted"}`}>
+      {item.due_date ? `Due ${new Date(item.due_date).toLocaleDateString()}` : "+ Due date"}
+    </button>
+  );
+}
 
 function RequestProgressBar({ done, total }: { done: number; total: number }) {
   const pct = total === 0 ? 100 : Math.round((done / total) * 100);
@@ -118,6 +185,15 @@ export function RequestsPanel({
     router.refresh();
   }
 
+  async function setItemDueDate(itemId: string, dueDate: string) {
+    const { error } = await supabase.rpc("set_document_request_item_due_date", { p_item_status_id: itemId, p_due_date: dueDate || null });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
   return (
     <div className="space-y-4">
       {audience === "staff" && canCreate && (
@@ -201,35 +277,41 @@ export function RequestsPanel({
                           {group.category && (
                             <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">{group.category}</p>
                           )}
-                          <ul className="mt-1 space-y-1 text-xs text-muted">
-                            {group.items.map((item) => (
-                              <li key={item.id} className="flex items-center justify-between gap-2">
-                                <span>
-                                  {item.name} {item.is_required && <span className="text-muted">(required)</span>}
-                                </span>
-                                {item.status === "pending" ? (
-                                  <span className="flex shrink-0 items-center gap-2">
-                                    <label className="flex cursor-pointer items-center gap-1 text-accent hover:underline">
-                                      <Paperclip size={12} aria-hidden="true" />
-                                      {uploadingItemId === item.id ? "Uploading..." : "Upload"}
-                                      <input
-                                        type="file"
-                                        className="sr-only"
-                                        disabled={uploadingItemId !== null}
-                                        onChange={(e) => e.target.files?.[0] && uploadForItem(item.id, e.target.files[0])}
-                                      />
-                                    </label>
-                                    {audience === "staff" && (
-                                      <button type="button" onClick={() => markReceived(item.id)} className="text-muted hover:text-accent hover:underline">
-                                        Mark received
-                                      </button>
-                                    )}
+                          <ul className="mt-1 space-y-1.5 text-xs text-muted">
+                            {group.items.map((item) => {
+                              const { icon: CategoryIcon, tone } = getCategoryStyle(item.category);
+                              return (
+                                <li key={item.id} className="flex items-center justify-between gap-2">
+                                  <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${TONE_BG_CLASSES[tone]}`}>
+                                      <CategoryIcon size={11} aria-hidden="true" />
+                                    </span>
+                                    <span className="truncate">
+                                      {item.name} {item.is_required && <span className="text-muted">(required)</span>}
+                                    </span>
                                   </span>
-                                ) : (
-                                  <span className="capitalize">{item.status}</span>
-                                )}
-                              </li>
-                            ))}
+                                  {item.status === "pending" ? (
+                                    <span className="flex shrink-0 items-center gap-2">
+                                      <ItemDueDate item={item} audience={audience} onSetDueDate={(d) => setItemDueDate(item.id, d)} />
+                                      <UploadDropzone
+                                        uploading={uploadingItemId === item.id}
+                                        onUpload={(file) => uploadForItem(item.id, file)}
+                                      />
+                                      {audience === "staff" && (
+                                        <button type="button" onClick={() => markReceived(item.id)} className="text-muted hover:text-accent hover:underline">
+                                          Mark received
+                                        </button>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="flex shrink-0 items-center gap-2">
+                                      <ItemDueDate item={item} audience={audience} onSetDueDate={(d) => setItemDueDate(item.id, d)} />
+                                      <span className="capitalize">{item.status}</span>
+                                    </span>
+                                  )}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       ))}
