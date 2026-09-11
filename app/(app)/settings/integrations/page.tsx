@@ -58,12 +58,17 @@ export default async function IntegrationsPage({
     </>
   );
 
+  // Outlook is hidden for now (Microsoft app registration not yet set up) --
+  // the sync code and API routes stay in place so this is a one-line
+  // revert once MICROSOFT_CALENDAR_CLIENT_ID/SECRET are configured.
+  const SHOW_OUTLOOK_CALENDAR = false;
+
   const calendarSection = user && (
     <>
       <h2 className="mt-8 font-display text-base font-semibold text-ink">Calendar</h2>
       <p className="mt-1 text-sm text-muted">
-        Personal to you -- connect your own Google or Outlook calendar so your Verexa appointments show up on it, and so clients can&apos;t book
-        you during something that&apos;s only on your personal calendar.
+        Personal to you -- connect your own Google calendar so your Verexa appointments show up on it, and so clients can&apos;t book you during
+        something that&apos;s only on your personal calendar.
       </p>
       <div className="mt-6 space-y-3">
         <CalendarConnectionCard
@@ -73,13 +78,15 @@ export default async function IntegrationsPage({
           accountEmail={googleConnection?.external_account_email ?? null}
           error={searchParams.google_calendar_error ?? null}
         />
-        <CalendarConnectionCard
-          provider="microsoft"
-          label="Outlook Calendar"
-          status={(microsoftConnection?.status as "connected" | "disconnected" | "revoked" | undefined) ?? "not_connected"}
-          accountEmail={microsoftConnection?.external_account_email ?? null}
-          error={searchParams.microsoft_calendar_error ?? null}
-        />
+        {SHOW_OUTLOOK_CALENDAR && (
+          <CalendarConnectionCard
+            provider="microsoft"
+            label="Outlook Calendar"
+            status={(microsoftConnection?.status as "connected" | "disconnected" | "revoked" | undefined) ?? "not_connected"}
+            accountEmail={microsoftConnection?.external_account_email ?? null}
+            error={searchParams.microsoft_calendar_error ?? null}
+          />
+        )}
       </div>
     </>
   );
