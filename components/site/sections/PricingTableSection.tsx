@@ -100,14 +100,14 @@ export function PricingTableSection({ config }: { config?: PricingTableConfig })
                   <li>
                     {p.included_seats} included seat{p.included_seats === 1 ? "" : "s"}
                   </li>
-                  <li>{p.signup_free_storage_gb} GB storage after conversion</li>
+                  <li>{p.signup_free_storage_gb} GB storage included</li>
                   <li>
-                    {p.signup_free_emails.toLocaleString()} free emails + {p.signup_free_sms.toLocaleString()} free SMS after conversion
+                    {p.signup_free_emails.toLocaleString()} free emails + {p.signup_free_sms.toLocaleString()} free SMS included
                   </li>
                   <li>+{money(p.per_seat_price_cents)}/month per additional seat</li>
                 </ul>
-                <a href="/trial-signup" className={`vx-btn ${featured ? "vx-white" : "vx-primary"}`} style={{ marginTop: 8 }}>
-                  Start 14-Day Trial
+                <a href={`/signup?plan=${p.slug}`} className={`vx-btn ${featured ? "vx-white" : "vx-primary"}`} style={{ marginTop: 8 }}>
+                  Get Started
                 </a>
               </div>
             );

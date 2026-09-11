@@ -8778,6 +8778,44 @@ export type Database = {
           },
         ]
       }
+      software_partners: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          standard_fee: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          standard_fee?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          standard_fee?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "software_partners_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_business_hours: {
         Row: {
           created_at: string
@@ -10884,6 +10922,7 @@ export type Database = {
         Returns: {
           allows_branding_override: boolean
           allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -10900,6 +10939,7 @@ export type Database = {
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
+          software_partner_id: string | null
           status: string
           updated_at: string
         }
@@ -11240,6 +11280,7 @@ export type Database = {
         Returns: {
           allows_branding_override: boolean
           allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -11256,6 +11297,7 @@ export type Database = {
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
+          software_partner_id: string | null
           status: string
           updated_at: string
         }
@@ -11302,8 +11344,13 @@ export type Database = {
         }
         Returns: string
       }
-      create_trial_workspace: {
-        Args: { p_first_name?: string; p_last_name?: string; p_name: string }
+      create_paid_workspace: {
+        Args: {
+          p_first_name?: string
+          p_last_name?: string
+          p_name: string
+          p_plan_slug: string
+        }
         Returns: string
       }
       create_workflow_pipeline: {
@@ -12256,6 +12303,7 @@ export type Database = {
         Returns: {
           allows_branding_override: boolean
           allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -12272,6 +12320,7 @@ export type Database = {
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
+          software_partner_id: string | null
           status: string
           updated_at: string
         }
@@ -12307,6 +12356,7 @@ export type Database = {
         Returns: {
           allows_branding_override: boolean
           allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -12323,6 +12373,7 @@ export type Database = {
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
+          software_partner_id: string | null
           status: string
           updated_at: string
         }

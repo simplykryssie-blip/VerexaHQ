@@ -16,28 +16,74 @@ const RAIL_FOOT = (
       <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2" />
       <path d="M7 4v3.2l2 1.6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
-    <span>No card required. Cancel anytime.</span>
+    <span>Secure checkout via Stripe. Cancel anytime.</span>
   </>
 );
 
-// Public self-serve trial signup -- creates a real account + a real
-// independent-PTIN workspace with a 14-day trial, no admin step. Structured
-// after app/join/page.tsx (same signed-out/needs-workspace/has-workspace
-// states, same email-confirmation survival trick), minus the invite-token
-// preview/redeem branches since there's no invite here -- just
-// create_trial_workspace instead of accept_firm_connection_invite. See that
-// RPC's migration for why self-serve was reopened only for this one path.
-export default function TrialSignupPage() {
+const DEFAULT_PLAN = "solo";
+
+type PlanRow = {
+  slug: string;
+  name: string;
+  base_price_cents: number;
+  included_seats: number;
+};
+
+function money(cents: number) {
+  const dollars = cents / 100;
+  return dollars % 1 === 0 ? `$${dollars.toLocaleString()}` : `$${dollars.toFixed(2)}`;
+}
+
+function PlanPicker({ plans, value, onChange }: { plans: PlanRow[]; value: string; onChange: (slug: string) => void }) {
+  return (
+    <div className={styles.field}>
+      <label>Plan</label>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${plans.length}, 1fr)`, gap: 8 }}>
+        {plans.map((p) => (
+          <button
+            key={p.slug}
+            type="button"
+            onClick={() => onChange(p.slug)}
+            style={{
+              textAlign: "left",
+              borderRadius: 10,
+              padding: "10px 12px",
+              border: value === p.slug ? "1.5px solid var(--accent, #0b7fe0)" : "1px solid var(--border, #e3e7f0)",
+              background: value === p.slug ? "rgba(11,127,224,.06)" : "transparent",
+              cursor: "pointer",
+              font: "inherit",
+            }}
+          >
+            <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>{p.name}</span>
+            <span style={{ display: "block", fontSize: 12, color: "var(--muted, #64748b)" }}>{money(p.base_price_cents)}/mo</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Public self-serve signup -- creates a real account + a real workspace,
+// then requires a paid Stripe subscription before it's usable (no free
+// trial: see 20260925010000_remove_trial_require_paid_signup for why).
+// Structured after app/join/page.tsx (same signed-out/needs-workspace/
+// has-workspace states, same email-confirmation survival trick), minus the
+// invite-token preview/redeem branches since there's no invite here --
+// create_paid_workspace instead of accept_firm_connection_invite, and a
+// Stripe Checkout redirect instead of landing straight in the dashboard.
+export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [authState, setAuthState] = useState<"loading" | "signed-out" | "needs-workspace" | "has-workspace">("loading");
 
+  const [plans, setPlans] = useState<PlanRow[] | null>(null);
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-up");
   const [firstName, setFirstName] = useState(searchParams.get("first_name") ?? "");
   const [lastName, setLastName] = useState(searchParams.get("last_name") ?? "");
   const [companyName, setCompanyName] = useState(searchParams.get("company_name") ?? "");
+  const [planSlug, setPlanSlug] = useState(searchParams.get("plan") ?? DEFAULT_PLAN);
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -45,19 +91,26 @@ export default function TrialSignupPage() {
   const [loading, setLoading] = useState(false);
   const [checkEmail, setCheckEmail] = useState(false);
   const [provisioning, setProvisioning] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const [manualFirmName, setManualFirmName] = useState("");
+  const [manualPlanSlug, setManualPlanSlug] = useState(DEFAULT_PLAN);
 
-  async function provisionTrial(name: string) {
+  useEffect(() => {
+    supabase.rpc("get_public_platform_plans").then(({ data }) => setPlans((data as PlanRow[] | null) ?? []));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function provisionThenCheckout(name: string, plan: string) {
     setProvisioning(true);
     setError(null);
     const {
       data: { user },
     } = await supabase.auth.getUser();
     const meta = user?.user_metadata as { first_name?: string; last_name?: string } | undefined;
-    const { error: rpcError } = await supabase.rpc("create_trial_workspace", {
+    const { error: rpcError } = await supabase.rpc("create_paid_workspace", {
       p_name: name,
+      p_plan_slug: plan,
       p_first_name: meta?.first_name ?? undefined,
       p_last_name: meta?.last_name ?? undefined,
     });
@@ -67,11 +120,20 @@ export default function TrialSignupPage() {
       setAuthState("needs-workspace");
       return;
     }
-    setReady(true);
-    setTimeout(() => {
-      router.push("/dashboard");
-      router.refresh();
-    }, 1200);
+
+    setRedirecting(true);
+    const res = await fetch("/api/signup/checkout", { method: "POST" });
+    const data = (await res.json()) as { url?: string; error?: string };
+    if (!res.ok || !data.url) {
+      setProvisioning(false);
+      setRedirecting(false);
+      setError(data.error ?? "Could not start checkout.");
+      setAuthState("needs-workspace");
+      return;
+    }
+    // Hard navigation to Stripe -- nothing left to do client-side once the
+    // checkout URL exists.
+    window.location.href = data.url;
   }
 
   useEffect(() => {
@@ -105,11 +167,11 @@ export default function TrialSignupPage() {
         router.replace("/portal/dashboard");
         return;
       }
-      // Brand new user, just confirmed their email -- auto-create their
-      // trial workspace from the name they gave at signup, no separate step.
-      const meta = user.user_metadata as { company_name?: string } | undefined;
+      // Brand new user, just confirmed their email -- go straight to
+      // checkout for the plan they picked at signup, no separate step.
+      const meta = user.user_metadata as { company_name?: string; plan_slug?: string } | undefined;
       if (meta?.company_name) {
-        await provisionTrial(meta.company_name);
+        await provisionThenCheckout(meta.company_name, meta.plan_slug ?? DEFAULT_PLAN);
       } else {
         setAuthState("needs-workspace");
       }
@@ -121,7 +183,7 @@ export default function TrialSignupPage() {
   async function submitManualFirmName(e: React.FormEvent) {
     e.preventDefault();
     if (!manualFirmName.trim()) return;
-    await provisionTrial(manualFirmName.trim());
+    await provisionThenCheckout(manualFirmName.trim(), manualPlanSlug);
   }
 
   async function handleAuthSubmit(e: React.FormEvent) {
@@ -144,7 +206,7 @@ export default function TrialSignupPage() {
       }
 
       setLoading(true);
-      // pending_trial_next mirrors app/join's pending_invite_next -- see
+      // pending_signup_next mirrors app/join's pending_invite_next -- see
       // app/auth/confirm/route.ts's resolveNext(): Supabase's own
       // /auth/v1/verify redirect can silently strip query params off
       // emailRedirectTo, so this metadata (written straight to auth.users,
@@ -154,12 +216,13 @@ export default function TrialSignupPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/trial-signup`,
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/signup`,
           data: {
             first_name: firstName,
             last_name: lastName,
             company_name: companyName,
-            pending_trial_next: "/trial-signup",
+            plan_slug: planSlug,
+            pending_signup_next: "/signup",
           },
         },
       });
@@ -188,30 +251,30 @@ export default function TrialSignupPage() {
     window.location.reload();
   }
 
-  if (authState === "loading") {
+  if (authState === "loading" || plans === null) {
     return (
-      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+      <AuthShell eyebrow="Get started" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
         <p className={styles.lede}>Loading...</p>
       </AuthShell>
     );
   }
 
-  if (ready) {
+  if (provisioning || redirecting) {
     return (
-      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
-        <h1 className={styles.cardTitle}>You&apos;re in</h1>
-        <p className={styles.lede}>Your trial workspace is ready. Taking you to your dashboard...</p>
+      <AuthShell eyebrow="Get started" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+        <h1 className={styles.cardTitle}>Taking you to checkout...</h1>
+        <p className={styles.lede}>Add your card to activate your workspace.</p>
       </AuthShell>
     );
   }
 
   if (checkEmail) {
     return (
-      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+      <AuthShell eyebrow="Get started" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
         <h1 className={styles.cardTitle}>Check your email</h1>
         <p className={styles.lede}>
-          Account created. Confirm your email -- a link has been sent to <strong>{email}</strong> -- and your 14-day trial workspace will
-          be ready as soon as you click it.
+          Account created. Confirm your email -- a link has been sent to <strong>{email}</strong> -- and you&apos;ll be taken straight to
+          checkout to activate your workspace.
         </p>
         <button
           type="button"
@@ -231,9 +294,9 @@ export default function TrialSignupPage() {
 
   if (authState === "needs-workspace") {
     return (
-      <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+      <AuthShell eyebrow="Get started" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
         <h1 className={styles.cardTitle}>Almost there</h1>
-        <p className={styles.lede}>Just your firm name to spin up your 14-day trial workspace.</p>
+        <p className={styles.lede}>Just your firm name and plan to set up your workspace and continue to checkout.</p>
         <form onSubmit={submitManualFirmName} className={styles.form}>
           <div className={styles.field}>
             <label htmlFor="manual_firm_name">Firm name</label>
@@ -246,9 +309,10 @@ export default function TrialSignupPage() {
               className={styles.input}
             />
           </div>
+          <PlanPicker plans={plans} value={manualPlanSlug} onChange={setManualPlanSlug} />
           {error && <AuthError>{error}</AuthError>}
           <button type="submit" disabled={provisioning} className={styles.submit}>
-            {provisioning ? "Setting up..." : "Start my trial"}
+            {provisioning ? "Setting up..." : "Continue to checkout"}
           </button>
         </form>
       </AuthShell>
@@ -257,10 +321,10 @@ export default function TrialSignupPage() {
 
   // signed-out: combined sign-up/sign-in.
   return (
-    <AuthShell eyebrow="14-day trial" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
-      <h1 className={styles.cardTitle}>Start your 14-day trial</h1>
+    <AuthShell eyebrow="Get started" railHeading="Run your practice, not paperwork." railSub="One signup, one workspace." railFoot={RAIL_FOOT}>
+      <h1 className={styles.cardTitle}>Create your Verexa account</h1>
       <p className={styles.lede}>
-        {mode === "sign-up" ? "Create your Verexa account -- your trial workspace is ready the moment you confirm your email." : "Sign in to your existing account."}
+        {mode === "sign-up" ? "Pick a plan and set up your workspace -- you'll continue to checkout to activate it." : "Sign in to your existing account."}
       </p>
 
       <form onSubmit={handleAuthSubmit} className={styles.form}>
@@ -288,6 +352,7 @@ export default function TrialSignupPage() {
                 autoComplete="organization"
               />
             </div>
+            <PlanPicker plans={plans} value={planSlug} onChange={setPlanSlug} />
           </>
         )}
 
@@ -326,7 +391,7 @@ export default function TrialSignupPage() {
         {error && <AuthError>{error}</AuthError>}
 
         <button type="submit" disabled={loading} className={styles.submit}>
-          {loading ? (mode === "sign-in" ? "Signing in..." : "Starting your trial...") : mode === "sign-in" ? "Sign in" : "Start my trial"}
+          {loading ? (mode === "sign-in" ? "Signing in..." : "Creating account...") : mode === "sign-in" ? "Sign in" : "Continue"}
         </button>
       </form>
 
@@ -339,7 +404,7 @@ export default function TrialSignupPage() {
         className={styles.link}
         style={{ marginTop: 16, display: "block", textAlign: "center", width: "100%", background: "none", border: "none", cursor: "pointer", font: "inherit" }}
       >
-        {mode === "sign-in" ? "New here? Start your trial" : "Already have an account? Sign in"}
+        {mode === "sign-in" ? "New here? Create an account" : "Already have an account? Sign in"}
       </button>
     </AuthShell>
   );

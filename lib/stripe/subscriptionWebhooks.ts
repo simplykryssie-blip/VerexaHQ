@@ -12,7 +12,7 @@ type StripeSubscription = {
   current_period_end: number;
   trial_end: number | null;
   cancel_at_period_end?: boolean;
-  metadata?: { workspace_id?: string };
+  metadata?: { workspace_id?: string; plan_slug?: string };
   items: { data: Array<{ id: string; price: { id: string } }> };
 };
 
@@ -126,7 +126,14 @@ export async function handleSubscriptionCreated(
   if (!workspaceId) return { skipped: "missing workspace_id metadata" };
 
   const priceId = subscription.items.data[0]?.price?.id;
-  const { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("stripe_price_id", priceId).maybeSingle();
+  let { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("stripe_price_id", priceId).maybeSingle();
+  // Platform plans don't have real Stripe Price objects yet (their checkout
+  // session is built from an ad-hoc price_data line item, same as Packages
+  // -- see createSubscriptionCheckoutSession) -- fall back to the plan slug
+  // the checkout route stamped into this subscription's own metadata.
+  if (!plan && subscription.metadata?.plan_slug) {
+    ({ data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("slug", subscription.metadata.plan_slug).maybeSingle());
+  }
   if (!plan) return { skipped: "no plan matches this subscription's price" };
 
   await supabase.from("workspace_subscriptions").upsert(
