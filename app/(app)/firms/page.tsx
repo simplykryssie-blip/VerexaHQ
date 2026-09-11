@@ -1,27 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Building2, ArrowRight } from "lucide-react";
+import { Building2, ArrowRight, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE, CONNECTED_CHILD_TIER_LABEL } from "@/lib/firmConnections";
 import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 
 export const dynamic = "force-dynamic";
-
-const CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE: Record<string, string[]> = {
-  ero_office: ["ero_ptin"],
-  service_bureau: ["service_bureau_ero", "service_bureau_ptin"],
-  multi_office_firm: ["ero_ptin"],
-};
-
-const CONNECTED_CHILD_TIER_LABEL: Record<string, string> = {
-  ero_ptin: "PTIN",
-  service_bureau_ero: "ERO",
-  service_bureau_ptin: "PTIN",
-};
 
 // Firms connected to this workspace, as their own first-class section --
 // separate from Clients, since a connected firm is a whole other workspace
@@ -36,6 +25,31 @@ export default async function FirmsPage() {
   if (!isEroManagementTier(workspace)) redirect("/dashboard");
 
   const supabase = createClient();
+  // Same permission Settings > Users & Staff already requires before it
+  // shows this same connected-firms data (including, on the detail page,
+  // real payout/production financials) -- this standalone page shouldn't
+  // be a second, unguarded door to it.
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
+  if (!canView) {
+    return (
+      <>
+        <PageHero
+          icon={Building2}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>connected firms</HeroHighlight>.
+            </>
+          }
+          subtitle="Firms connected to you -- their info, production, package, and payout ledger."
+        />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState icon={Lock} message="You don't have permission to view connected firms." />
+        </div>
+      </>
+    );
+  }
+
   const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
 
   const { data: connectedFirms } = childRelationshipTypes.length

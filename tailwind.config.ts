@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import containerQueries from "@tailwindcss/container-queries";
+import typography from "@tailwindcss/typography";
 
 const config: Config = {
   // lib/** is included because a few shared helpers (e.g.
@@ -92,7 +93,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [containerQueries],
+  plugins: [containerQueries, typography],
 };
 
 export default config;

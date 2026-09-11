@@ -38,6 +38,7 @@ import {
   type InvoiceRow,
   type PaymentRow,
   type BankProductTransactionRow,
+  type BankAssignment,
   type ActivityRow,
   type StaffOption,
   type OrganizerResponseRow,
@@ -92,6 +93,8 @@ export function EngagementWorkspace({
   invoices,
   payments,
   bankProductTransactions,
+  isBankProduct,
+  bankAssignment,
   timeline,
   progress,
   staffOptions,
@@ -126,6 +129,8 @@ export function EngagementWorkspace({
   invoices: InvoiceRow[];
   payments: PaymentRow[];
   bankProductTransactions: BankProductTransactionRow[];
+  isBankProduct: boolean;
+  bankAssignment: BankAssignment | null;
   timeline: ActivityRow[];
   progress: ProgressRow | null;
   staffOptions: StaffOption[];
@@ -274,6 +279,8 @@ export function EngagementWorkspace({
                 invoices={invoices}
                 payments={payments}
                 bankProductTransactions={bankProductTransactions}
+                isBankProduct={isBankProduct}
+                bankAssignment={bankAssignment}
               />
             )}
             {tab === "Notes" && <NotesTab engagementId={engagement.id} workspaceId={workspace.id} notes={notes} />}

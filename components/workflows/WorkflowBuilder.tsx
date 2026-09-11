@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDown,
@@ -1827,6 +1827,21 @@ export function WorkflowBuilder({
   const [testClient, setTestClient] = useState<ClientOption | null>(null);
   const [runningTest, setRunningTest] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
+
+  // These mirror server props into local state so edits feel instant, but a
+  // plain useState initializer only runs once -- without this, revisiting
+  // this page after a fresh server fetch (e.g. via the browser's back
+  // button, or another save committing first) could show a stale trigger
+  // type/config/enabled/status/conditions snapshot instead of what's
+  // actually saved. Same defect already found and fixed in the organizer
+  // and document-request builders.
+  useEffect(() => {
+    setCurrentTriggerType(triggerType);
+    setConfig(triggerConfig);
+    setEnabled(isEnabled);
+    setWorkflowStatus(status);
+    setConditions(normalizeToConditionGroups(initialConditions));
+  }, [triggerType, triggerConfig, isEnabled, status, initialConditions]);
 
   async function saveTrigger() {
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));

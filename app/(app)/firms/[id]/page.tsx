@@ -1,26 +1,16 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE, CONNECTED_CHILD_TIER_LABEL } from "@/lib/firmConnections";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
 import { FirmDetailClient } from "@/components/firms/FirmDetailClient";
+import { EmptyState } from "@/components/EmptyState";
 
 export const dynamic = "force-dynamic";
-
-const CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE: Record<string, string[]> = {
-  ero_office: ["ero_ptin"],
-  service_bureau: ["service_bureau_ero", "service_bureau_ptin"],
-  multi_office_firm: ["ero_ptin"],
-};
-
-const CONNECTED_CHILD_TIER_LABEL: Record<string, string> = {
-  ero_ptin: "PTIN",
-  service_bureau_ero: "ERO",
-  service_bureau_ptin: "PTIN",
-};
 
 export default async function FirmDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
@@ -28,14 +18,31 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   if (!isEroManagementTier(workspace)) redirect("/dashboard");
 
   const supabase = createClient();
+  // Same permission the Firms list page and Settings > Users & Staff already
+  // require -- this detail page is the one that actually shows the connected
+  // firm's payout ledger and production numbers, so it needs the check too.
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
+  if (!canView) {
+    return (
+      <div className="max-w-4xl">
+        <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
+          <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
+        </Link>
+        <EmptyState icon={Lock} message="You don't have permission to view connected firms." />
+      </div>
+    );
+  }
+
   const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
 
-  const [{ data: connectedFirms }, { members }, { data: packages }] = await Promise.all([
+  const [{ data: connectedFirms }, { members }, { data: packages }, { data: banks }, { data: softwareList }] = await Promise.all([
     childRelationshipTypes.length
       ? supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
       : Promise.resolve({ data: [] as never[] }),
     getWorkspaceMemberWorkload(supabase, workspace.id),
     supabase.from("firm_packages").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("bank_partners").select("id, name").eq("workspace_id", workspace.id).eq("is_active", true).order("name"),
+    supabase.from("software_partners").select("id, name").eq("workspace_id", workspace.id).eq("is_active", true).order("name"),
   ]);
 
   const firm = (connectedFirms ?? []).find((f) => f.connection_id === params.id);
@@ -49,7 +56,9 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
       : Promise.resolve({ data: null }),
     supabase
       .from("firm_payouts")
-      .select("id, period_start, period_end, gross_prep_fees, gross_bank_product_rebates, ero_share_amount, amount_owed_to_ptin, status, paid_at")
+      .select(
+        "id, period_start, period_end, gross_prep_fees, gross_bank_product_rebates, gross_bank_fees, gross_addon_fees, gross_transmission_fees, gross_paperwork_fees, ero_share_amount, amount_owed_to_ptin, status, paid_at"
+      )
       .eq("connection_id", firm.connection_id)
       .order("period_start", { ascending: false }),
   ]);
@@ -74,6 +83,10 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         }}
         packageId={firm.package_id}
         packages={packages ?? []}
+        bankPartnerId={firm.bank_partner_id}
+        banks={banks ?? []}
+        softwarePartnerId={firm.software_partner_id}
+        softwareList={softwareList ?? []}
         production={production as Record<string, unknown> | null}
         payouts={payouts ?? []}
         isActive={firm.status === "active"}

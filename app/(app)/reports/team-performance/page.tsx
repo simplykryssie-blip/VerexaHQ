@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
@@ -26,6 +27,10 @@ type StaffPipelineRow = {
 export default async function TeamPerformanceReportPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
+  // Multi-preparer report -- not meaningful for a solo PTIN practice, same
+  // reasoning the Reports index page already greys this card out for
+  // (see MULTI_PREPARER_REPORT_SLUGS in app/(app)/reports/page.tsx).
+  if (workspace.workspace_type === "independent_ptin") redirect("/reports");
 
   const supabase = createClient();
   const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.view" });

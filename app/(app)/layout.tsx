@@ -62,6 +62,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { count: respondedOrganizerItemCount },
     { count: visibleLearningCourseCount },
     { data: softwareLinks },
+    { data: myEroConnection },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -117,6 +118,11 @@ export default async function AppLayout({ children, modal }: { children: React.R
       ? Promise.resolve({ count: null as number | null })
       : supabase.from("learning_courses").select("id", { count: "exact", head: true }),
     supabase.from("workspace_software_links").select("id, name, url").eq("workspace_id", workspace.id).order("display_order"),
+    // Whether this workspace itself sits underneath a parent firm (a
+    // connected PTIN under an ERO, or an ERO under a Service Bureau) -- the
+    // Partner Dashboard nav item only makes sense when there's an upstream
+    // connection with a split/production to see.
+    supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -197,6 +203,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
             showLearningHub={isEroManagementTier(workspace) || (visibleLearningCourseCount ?? 0) > 0}
+            showPartnerDashboard={(myEroConnection ?? []).length > 0}
             softwareLinks={softwareLinks ?? []}
             reviewQueueHasItems={
               (pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0 || (respondedOrganizerItemCount ?? 0) > 0

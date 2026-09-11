@@ -674,6 +674,63 @@ export function ReviewTab({
 
 // --------------------------------------------------------------- Billing
 
+export type BankAssignment = {
+  bankPartnerName: string | null;
+  bankFee: number | null;
+  transmissionFee: number | null;
+  paperworkFee: number | null;
+  addonFee: number | null;
+  softwarePartnerName: string | null;
+  softwareFee: number | null;
+};
+
+function IsBankProductToggle({ engagementId, isBankProduct }: { engagementId: string; isBankProduct: boolean }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [saving, setSaving] = useState(false);
+
+  async function toggle() {
+    setSaving(true);
+    const { error } = await supabase.from("engagements").update({ is_bank_product: !isBankProduct }).eq("id", engagementId);
+    setSaving(false);
+    if (!error) router.refresh();
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-sm text-slate">
+      <input type="checkbox" checked={isBankProduct} onChange={toggle} disabled={saving} className="h-4 w-4 rounded border-border text-accent focus:ring-accent" />
+      This return is bank-product funded
+    </label>
+  );
+}
+
+// The gross amount the client was billed says nothing about what actually
+// lands with the preparer once a bank product's own fees come out --
+// showing only that gross number reads as an exaggerated take, so once a
+// return is marked bank-product funded, show both side by side.
+function BankProductNetSummary({ invoices, bankProductTransactions }: { invoices: InvoiceRow[]; bankProductTransactions: BankProductTransactionRow[] }) {
+  const billed = invoices.reduce((sum, i) => sum + i.total_amount, 0);
+  const netAdjustment = bankProductTransactions.reduce((sum, b) => {
+    const fees = (b.bank_fee ?? 0) + (b.transmission_fee ?? 0) + (b.paperwork_fee ?? 0) + (b.addon_fee ?? 0) + (b.software_fee ?? 0);
+    return sum + (b.rebate_amount ?? 0) - fees;
+  }, 0);
+  const net = billed + netAdjustment;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-surfaceMuted px-3 py-2 text-sm">
+      <span className="text-muted">
+        Billed <span className="font-medium text-slate">{money(billed)}</span>
+      </span>
+      <span className="text-muted">
+        Net to you <span className="font-medium text-ink">{money(net)}</span>
+      </span>
+      {netAdjustment !== 0 && (
+        <span className="text-xs text-muted">({netAdjustment > 0 ? "+" : ""}{money(netAdjustment)} from bank product fees/rebates)</span>
+      )}
+    </div>
+  );
+}
+
 export function BillingTab({
   clientId,
   clientName,
@@ -685,6 +742,8 @@ export function BillingTab({
   invoices,
   payments,
   bankProductTransactions,
+  isBankProduct,
+  bankAssignment,
 }: {
   clientId: string;
   clientName: string;
@@ -696,6 +755,8 @@ export function BillingTab({
   invoices: InvoiceRow[];
   payments: PaymentRow[];
   bankProductTransactions: BankProductTransactionRow[];
+  isBankProduct: boolean;
+  bankAssignment: BankAssignment | null;
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -925,32 +986,58 @@ export function BillingTab({
       </Section>
 
       <Section title="Bank Products">
+        {canManageBilling && (
+          <div className="mb-3">
+            <IsBankProductToggle engagementId={engagementId} isBankProduct={isBankProduct} />
+          </div>
+        )}
+        {isBankProduct && (invoices.length > 0 || bankProductTransactions.length > 0) && (
+          <div className="mb-3">
+            <BankProductNetSummary invoices={invoices} bankProductTransactions={bankProductTransactions} />
+          </div>
+        )}
         {bankProductTransactions.length === 0 ? (
           <EmptyState message="No refund transfers or advances recorded for this return yet." />
         ) : (
           <ul className="divide-y divide-border">
-            {bankProductTransactions.map((b) => (
-              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span className="text-slate">
-                  {b.bank_partner} <span className="text-muted">({b.product_type.replace("_", " ")})</span>
-                </span>
-                <div className="flex items-center gap-3">
-                  <span className="text-muted">Rebate {money(b.rebate_amount)}</span>
-                  {canManageBilling ? (
-                    <BankProductStatusSelect id={b.id} status={b.status} />
-                  ) : (
-                    <Badge tone="neutral" className="capitalize">
-                      {b.status}
-                    </Badge>
-                  )}
-                </div>
-              </li>
-            ))}
+            {bankProductTransactions.map((b) => {
+              const fees: [string, number | null][] = [
+                ["Prep", b.prep_fee_collected],
+                ["Bank", b.bank_fee],
+                ["Add-on", b.addon_fee],
+                ["Transmission", b.transmission_fee],
+                ["Paperwork", b.paperwork_fee],
+                ["Software", b.software_fee],
+                ["Rebate", b.rebate_amount],
+              ];
+              const setFees = fees.filter(([, v]) => v != null);
+              return (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="text-slate">
+                    {b.bank_partner} <span className="text-muted">({b.product_type.replace("_", " ")})</span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted">
+                      {setFees.length === 0
+                        ? "No fees recorded"
+                        : setFees.map(([label, v]) => `${label} ${money(v)}`).join(" · ")}
+                    </span>
+                    {canManageBilling ? (
+                      <BankProductStatusSelect id={b.id} status={b.status} />
+                    ) : (
+                      <Badge tone="neutral" className="capitalize">
+                        {b.status}
+                      </Badge>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
         {canManageBilling && (
           <div className="mt-2">
-            <BankProductTransactionForm workspaceId={workspaceId} engagementId={engagementId} />
+            <BankProductTransactionForm workspaceId={workspaceId} engagementId={engagementId} bankAssignment={bankAssignment} />
           </div>
         )}
       </Section>
@@ -1157,6 +1244,9 @@ export type BankProductTransactionRow = {
   prep_fee_collected: number | null;
   bank_fee: number | null;
   addon_fee: number | null;
+  transmission_fee: number | null;
+  paperwork_fee: number | null;
+  software_fee: number | null;
   rebate_amount: number | null;
   disbursement_method: string | null;
   status: string;
