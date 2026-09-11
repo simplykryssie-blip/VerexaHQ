@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -52,6 +52,16 @@ export function BookingAvailabilityForm({
   const [minNoticeHours, setMinNoticeHours] = useState(String(initialMinNoticeHours));
   const [bufferMinutes, setBufferMinutes] = useState(String(initialBufferMinutes));
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTimezone(initialTimezone);
+    setHours(initialHours);
+    setSlotMinutes(initialSlotMinutes);
+    setHolidays(initialHolidays);
+    setWindowDays(String(initialWindowDays));
+    setMinNoticeHours(String(initialMinNoticeHours));
+    setBufferMinutes(String(initialBufferMinutes));
+  }, [initialTimezone, initialHours, initialSlotMinutes, initialHolidays, initialWindowDays, initialMinNoticeHours, initialBufferMinutes]);
 
   function addHoliday() {
     if (!newHolidayStart) return;
