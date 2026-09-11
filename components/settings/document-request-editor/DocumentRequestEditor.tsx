@@ -51,6 +51,15 @@ export function DocumentRequestEditor({ template, items: initialItems }: { templ
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [items, setItems] = useState(initialItems);
 
+  // initialItems is a fresh array from the server on every router.refresh(),
+  // but useState only reads its initializer once -- without this, the list
+  // (and the display_order math in addItem below) stays stuck on whatever
+  // was on screen at first load until a full page reload remounts this
+  // component with new state.
+  useEffect(() => {
+    setItems(initialItems);
+  }, [initialItems]);
+
   async function saveHeader() {
     setSavingHeader(true);
     const { error } = await supabase.from("document_request_templates").update({ name, description: description || null }).eq("id", template.id);
