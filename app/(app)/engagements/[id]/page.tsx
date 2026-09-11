@@ -119,7 +119,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .from("engagements")
     .select(
       `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage, case_type,
-      client_id, service_id,
+      client_id, service_id, is_bank_product,
       clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id, primary_email, primary_phone),
       services(name),
       assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
@@ -149,6 +149,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     { data: documentFolders },
     { data: canShare },
     { data: activeEroConnection },
+    { data: myEroConnectionRows },
   ] = await Promise.all([
     supabase
       .from("pipeline_runs")
@@ -204,7 +205,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase
       .from("bank_product_transactions")
       .select(
-        "id, bank_partner, product_type, prep_fee_collected, bank_fee, addon_fee, transmission_fee, paperwork_fee, rebate_amount, disbursement_method, status, created_at"
+        "id, bank_partner, product_type, prep_fee_collected, bank_fee, addon_fee, transmission_fee, paperwork_fee, software_fee, rebate_amount, disbursement_method, status, created_at"
       )
       .eq("engagement_id", engagement.id)
       .order("created_at", { ascending: false }),
@@ -231,7 +232,38 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .eq("relationship_type", "ero_ptin")
       .eq("status", "active")
       .maybeSingle(),
+    supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
   ]);
+
+  // Whatever bank/software the ERO has assigned to this PTIN -- prefills
+  // BankProductTransactionForm's fee fields (still editable per return)
+  // instead of every return retyping the same standard numbers. Null for
+  // an independent workspace or one with nothing assigned yet.
+  const myEroConnection = (myEroConnectionRows ?? [])[0] ?? null;
+  const [{ data: assignedBank }, { data: assignedSoftware }] = await Promise.all([
+    myEroConnection?.bank_partner_id
+      ? supabase
+          .from("bank_partners")
+          .select("name, standard_bank_fee, standard_transmission_fee, standard_paperwork_fee, standard_addon_fee")
+          .eq("id", myEroConnection.bank_partner_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    myEroConnection?.software_partner_id
+      ? supabase.from("software_partners").select("name, standard_fee").eq("id", myEroConnection.software_partner_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const bankAssignment =
+    assignedBank || assignedSoftware
+      ? {
+          bankPartnerName: assignedBank?.name ?? null,
+          bankFee: assignedBank?.standard_bank_fee ?? null,
+          transmissionFee: assignedBank?.standard_transmission_fee ?? null,
+          paperworkFee: assignedBank?.standard_paperwork_fee ?? null,
+          addonFee: assignedBank?.standard_addon_fee ?? null,
+          softwarePartnerName: assignedSoftware?.name ?? null,
+          softwareFee: assignedSoftware?.standard_fee ?? null,
+        }
+      : null;
 
   const workflowRunIds = (workflowRuns ?? []).map((r) => r.id);
   const [{ data: stages }, { data: slaRows }] = await Promise.all([
@@ -491,6 +523,8 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       invoices={(invoices ?? []) as never}
       payments={(payments ?? []) as never}
       bankProductTransactions={(bankProductTransactions ?? []) as never}
+      isBankProduct={Boolean(engagement.is_bank_product)}
+      bankAssignment={bankAssignment}
       timeline={activity ?? []}
       progress={(progressRows ?? null) as never}
       staffOptions={staffOptions as never}
