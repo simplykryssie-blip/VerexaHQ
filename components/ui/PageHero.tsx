@@ -30,7 +30,7 @@ export function PageHero({
             <Icon size={18} aria-hidden="true" />
           </IconChip>
           <div>
-            <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">{heading}</h1>
+            <h1 className="font-display text-[28px] font-semibold leading-normal text-ink">{heading}</h1>
             <p className="mt-1.5 max-w-[60ch] text-sm text-slate">{subtitle}</p>
           </div>
         </div>

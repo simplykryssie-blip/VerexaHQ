@@ -8,16 +8,44 @@ import { useToast } from "@/components/Toast";
 const inputClass = "rounded-lg border border-border px-2 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "flex flex-col gap-1 text-xs text-muted";
 
-export function BankProductTransactionForm({ workspaceId, engagementId }: { workspaceId: string; engagementId: string }) {
+export type BankProductAssignment = {
+  bankPartnerName: string | null;
+  bankFee: number | null;
+  transmissionFee: number | null;
+  paperworkFee: number | null;
+  addonFee: number | null;
+  softwarePartnerName: string | null;
+  softwareFee: number | null;
+};
+
+function feeString(n: number | null | undefined) {
+  return n == null ? "" : String(n);
+}
+
+export function BankProductTransactionForm({
+  workspaceId,
+  engagementId,
+  bankAssignment,
+}: {
+  workspaceId: string;
+  engagementId: string;
+  bankAssignment?: BankProductAssignment | null;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [bankPartner, setBankPartner] = useState("");
+  // The ERO's assigned bank/software (if any) prefills these -- still just
+  // a starting point, every field stays editable for a return that came in
+  // different from the standard schedule.
+  const [bankPartner, setBankPartner] = useState(bankAssignment?.bankPartnerName ?? "");
   const [productType, setProductType] = useState<"refund_transfer" | "refund_advance" | "other">("refund_transfer");
   const [prepFee, setPrepFee] = useState("");
-  const [bankFee, setBankFee] = useState("");
-  const [addonFee, setAddonFee] = useState("");
+  const [bankFee, setBankFee] = useState(feeString(bankAssignment?.bankFee));
+  const [addonFee, setAddonFee] = useState(feeString(bankAssignment?.addonFee));
+  const [transmissionFee, setTransmissionFee] = useState(feeString(bankAssignment?.transmissionFee));
+  const [paperworkFee, setPaperworkFee] = useState(feeString(bankAssignment?.paperworkFee));
+  const [softwareFee, setSoftwareFee] = useState(feeString(bankAssignment?.softwareFee));
   const [rebate, setRebate] = useState("");
   const [disbursementMethod, setDisbursementMethod] = useState<"" | "check" | "direct_deposit" | "prepaid_card">("");
   const [status, setStatus] = useState<"pending" | "funded" | "disbursed" | "rejected">("pending");
@@ -25,11 +53,14 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
   const [saving, setSaving] = useState(false);
 
   function reset() {
-    setBankPartner("");
+    setBankPartner(bankAssignment?.bankPartnerName ?? "");
     setProductType("refund_transfer");
     setPrepFee("");
-    setBankFee("");
-    setAddonFee("");
+    setBankFee(feeString(bankAssignment?.bankFee));
+    setAddonFee(feeString(bankAssignment?.addonFee));
+    setTransmissionFee(feeString(bankAssignment?.transmissionFee));
+    setPaperworkFee(feeString(bankAssignment?.paperworkFee));
+    setSoftwareFee(feeString(bankAssignment?.softwareFee));
     setRebate("");
     setDisbursementMethod("");
     setStatus("pending");
@@ -57,6 +88,9 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
       prep_fee_collected: prepFee ? Number(prepFee) : null,
       bank_fee: bankFee ? Number(bankFee) : null,
       addon_fee: addonFee ? Number(addonFee) : null,
+      transmission_fee: transmissionFee ? Number(transmissionFee) : null,
+      paperwork_fee: paperworkFee ? Number(paperworkFee) : null,
+      software_fee: softwareFee ? Number(softwareFee) : null,
       rebate_amount: rebate ? Number(rebate) : null,
       disbursement_method: disbursementMethod || null,
       status,
@@ -84,6 +118,12 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
 
   return (
     <form onSubmit={save} className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-border bg-surfaceMuted p-3">
+      {bankAssignment && (
+        <p className="w-full text-xs text-muted">
+          Fees prefilled from your assigned {[bankAssignment.bankPartnerName, bankAssignment.softwarePartnerName].filter(Boolean).join(" / ")} --
+          adjust anything that was different on this return.
+        </p>
+      )}
       <label className={labelClass}>
         Bank partner
         <input
@@ -114,6 +154,25 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
       <label className={labelClass}>
         Add-on fee
         <input type="number" min={0} step="0.01" value={addonFee} onChange={(e) => setAddonFee(e.target.value)} className={`${inputClass} w-24`} />
+      </label>
+      <label className={labelClass}>
+        Transmission fee
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={transmissionFee}
+          onChange={(e) => setTransmissionFee(e.target.value)}
+          className={`${inputClass} w-24`}
+        />
+      </label>
+      <label className={labelClass}>
+        Paperwork fee
+        <input type="number" min={0} step="0.01" value={paperworkFee} onChange={(e) => setPaperworkFee(e.target.value)} className={`${inputClass} w-24`} />
+      </label>
+      <label className={labelClass}>
+        Software fee
+        <input type="number" min={0} step="0.01" value={softwareFee} onChange={(e) => setSoftwareFee(e.target.value)} className={`${inputClass} w-24`} />
       </label>
       <label className={labelClass}>
         Rebate to us

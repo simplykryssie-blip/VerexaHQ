@@ -5,6 +5,7 @@ import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderPortalInviteEmail } from "@/lib/email/portalInvite";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getEffectiveBranding } from "@/lib/branding";
+import { PORTAL_INVITE_EMAIL_DEFAULT } from "@/lib/notifications/systemTemplateDefaults";
 
 export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
@@ -48,14 +49,10 @@ export async function POST(request: Request) {
     getEffectiveBranding(workspace.id),
   ]);
 
-  if (!template) {
-    return NextResponse.json({ ok: false, sent: false, error: "Portal invite email template is missing." }, { status: 500 });
-  }
-
   const clientFirstName = (invitedName ?? "").trim().split(/\s+/)[0] ?? "";
 
   const { subject, html } = renderPortalInviteEmail(
-    { subject: template.subject, body: template.body_html },
+    template ? { subject: template.subject, body: template.body_html } : PORTAL_INVITE_EMAIL_DEFAULT,
     {
       clientFirstName,
       firmName: workspace.name,

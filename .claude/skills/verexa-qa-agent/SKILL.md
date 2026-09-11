@@ -129,7 +129,7 @@ client-side validation, visual state): use Playwright via Bash. Example:
 node -e "
 const { chromium } = require('playwright');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell' });
   const page = await browser.newPage();
   await page.goto('https://<the deployed app url>/sign/<token>');
   // ... interact, assert, screenshot ...
@@ -142,6 +142,76 @@ const { chromium } = require('playwright');
 `node_modules` or needs a one-off `npm install playwright` in a scratch
 dir -- it is not currently a project dependency, only the browser binary is
 pre-installed.)
+
+## Step 3b: test for stale state after navigation, not just fresh loads
+
+This is a distinct test category from Step 3's business-logic checks, and
+it's mandatory on every run that touches a builder/editor page -- add it to
+your run scope even if it wasn't explicitly requested. It exists because a
+real bug class slipped past this agent entirely on 2026-09-11: five
+components (the organizer/form builder, the document-request checklist
+editor, the automation/workflow builder, and two settings forms) all copied
+server data into local React state once (`useState(initialX)`) with no
+effect to re-sync it. The database was always correct -- what broke was the
+*screen*, which could keep showing a stale, pre-edit snapshot after
+navigating away and back (most reliably via the browser's own Back button,
+which can restore a cached DOM without the app re-fetching anything). Every
+prior QA run had tested these pages by loading them fresh and checking the
+resulting state matched the database -- which always passed, because a
+fresh load reads real props. The bug only shows up on a *revisit*, which no
+run had scripted.
+
+**Why this needed its own step**: Step 3's method -- read the code, then
+test what it actually does -- correctly covers business rules (permissions,
+validation, trigger conditions). It does not naturally cover "does the UI
+stay honest after a specific navigation sequence," because that's a
+rendering defect, not a logic defect. Don't assume fixing a bug like this
+once means the pattern is gone -- check for it explicitly, every run, on
+any page you haven't already confirmed re-syncs.
+
+**How to test it** (Playwright, since this requires simulating a real
+navigation, not just an RPC call):
+
+1. Identify candidate pages: any "builder"/"editor"/settings-form page that
+   accepts server-fetched data as props. A fast starting checklist --
+   `grep -rn "useState(initial" --include=*.tsx` and `grep -rln
+   "useState<.*>(template\." --include=*.tsx` -- but don't stop at the
+   literal `initial` prefix; also check components whose top-level
+   `useState` calls read a renamed destructured prop (e.g. `const { items:
+   initialItems }`) or a prop used directly (`useState(template.name)`).
+   For each hit, confirm whether a `useEffect` nearby re-syncs that state
+   when the prop reference changes -- no effect means it's untested until
+   you test it here.
+2. For each candidate page, script this exact sequence:
+   - `page.goto()` the page, make a real edit (toggle a setting, add a
+     field/item, change a value), save it, and wait for the save's own
+     success signal (a toast, or poll the database directly via Supabase
+     MCP `execute_sql` until the row reflects the change).
+   - Navigate away: `page.goto()` a different page in the app.
+   - Navigate back with `page.goBack()` specifically (not a fresh
+     `page.goto()` of the same URL) -- this is the path that actually
+     exercises the browser's cached-snapshot behavior; a fresh `goto()` can
+     pass even when `goBack()` fails.
+   - Read the value shown on screen and compare it against a direct
+     `execute_sql` read of the same row. A mismatch is the finding --
+     `p_expected_behavior` is "the screen matches what's saved (queried via
+     execute_sql)", `p_actual_behavior` is the literal mismatch you saw,
+     `p_category` is `'ui'`, and severity follows the usual rubric (a
+     silently-reverted automation trigger or lost conditional logic is
+     `high`; a cosmetic settings-form revert is `medium`).
+   - Fingerprint as `qa:stale-state:<component-file-name>`, e.g.
+     `qa:stale-state:OrganizerBuilder`.
+3. Before concluding a page is clean, also verify directly against the
+   database (not just the second page load) that your edit actually
+   persisted -- if the UI and the database *agree* but both show the old
+   value, that's a different bug (the save silently failed), and belongs
+   under Step 3's business-logic testing, not this one.
+
+Playwright launch note: `/opt/pw-browsers/chromium` (Step 3's default
+`executablePath`) crashes on this image with "Old Headless mode has been
+removed from the Chrome binary" -- use
+`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`
+instead for any browser test, not just this one.
 
 ## Step 4: capture evidence, sanitized
 

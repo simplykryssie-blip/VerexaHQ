@@ -10,14 +10,19 @@ const inputClass = "mt-1 w-full max-w-xs rounded-lg border border-border px-3 py
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
 const cardClass = "rounded-2xl border border-border bg-surface p-4 shadow-soft";
 
-type FirmInfo = { phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
+type FirmInfo = { ownerName: string | null; phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
 type PackageOption = { id: string; name: string };
+type PartnerOption = { id: string; name: string };
 type Payout = {
   id: string;
   period_start: string;
   period_end: string;
   gross_prep_fees: number;
   gross_bank_product_rebates: number;
+  gross_bank_fees: number;
+  gross_addon_fees: number;
+  gross_transmission_fees: number;
+  gross_paperwork_fees: number;
   ero_share_amount: number;
   amount_owed_to_ptin: number;
   status: string;
@@ -60,12 +65,187 @@ function PackagePicker({ connectionId, packageId, packages }: { connectionId: st
   );
 }
 
+// Fees a preparer/ERO collects outside the base prep fee -- bank fee,
+// add-on fee, transmission fee, paperwork fee. Purely informational (they
+// don't affect the revenue-share split, which is prep fees + bank product
+// rebates only) and only shown when a firm actually has one recorded --
+// not every ERO offers bank products or charges these at all.
+const OTHER_FEE_FIELDS: [string, string][] = [
+  ["gross_bank_fees", "Bank fees"],
+  ["gross_addon_fees", "Add-on fees"],
+  ["gross_transmission_fees", "Transmission fees"],
+  ["gross_paperwork_fees", "Paperwork fees"],
+];
+
+function BankPicker({ connectionId, bankPartnerId, banks }: { connectionId: string; bankPartnerId: string | null; banks: PartnerOption[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+
+  async function change(value: string) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update({ bank_partner_id: value || null }).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <label className={labelClass}>
+      Bank
+      <select defaultValue={bankPartnerId ?? ""} onChange={(e) => change(e.target.value)} disabled={saving} className={inputClass}>
+        <option value="">No bank assigned</option>
+        {banks.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SoftwarePicker({
+  connectionId,
+  softwarePartnerId,
+  softwareList,
+}: {
+  connectionId: string;
+  softwarePartnerId: string | null;
+  softwareList: PartnerOption[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+
+  async function change(value: string) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update({ software_partner_id: value || null }).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <label className={labelClass}>
+      Software
+      <select defaultValue={softwarePartnerId ?? ""} onChange={(e) => change(e.target.value)} disabled={saving} className={inputClass}>
+        <option value="">No software assigned</option>
+        {softwareList.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+// Your own record of this firm -- software packages, tax programs, general
+// notes -- separate from anything the firm enters about itself. Saved as
+// comma-separated free text and parsed into an array, matching the level of
+// input control the rest of this page uses (no bespoke tag-picker widget
+// for what's normally a handful of short entries).
+function arrayToText(values: string[] | null | undefined) {
+  return (values ?? []).join(", ");
+}
+function textToArray(value: string) {
+  return value
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function PartnerAdminNotes({
+  connectionId,
+  partnerSoftwareUsed,
+  partnerTaxPrograms,
+  notes,
+}: {
+  connectionId: string;
+  partnerSoftwareUsed: string[];
+  partnerTaxPrograms: string[];
+  notes: string | null;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [softwareText, setSoftwareText] = useState(arrayToText(partnerSoftwareUsed));
+  const [taxProgramsText, setTaxProgramsText] = useState(arrayToText(partnerTaxPrograms));
+  const [notesText, setNotesText] = useState(notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save(patch: Record<string, unknown>) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update(patch as never).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className={cardClass}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink">Your notes on this firm</p>
+      <p className="mt-1 text-xs text-muted">Private to you -- the firm doesn&apos;t see or control any of this.</p>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className={labelClass}>
+          Software packages
+          <input
+            type="text"
+            value={softwareText}
+            onChange={(e) => setSoftwareText(e.target.value)}
+            onBlur={() => save({ partner_software_used: textToArray(softwareText) })}
+            placeholder="e.g. QuickBooks, Gusto"
+            disabled={saving}
+            className={`${inputClass} max-w-none`}
+          />
+        </label>
+        <label className={labelClass}>
+          Tax programs
+          <input
+            type="text"
+            value={taxProgramsText}
+            onChange={(e) => setTaxProgramsText(e.target.value)}
+            onBlur={() => save({ partner_tax_programs: textToArray(taxProgramsText) })}
+            placeholder="e.g. Drake, ProSeries"
+            disabled={saving}
+            className={`${inputClass} max-w-none`}
+          />
+        </label>
+      </div>
+      <label className={`${labelClass} mt-4 block`}>
+        Notes
+        <textarea
+          value={notesText}
+          onChange={(e) => setNotesText(e.target.value)}
+          onBlur={() => save({ notes: notesText.trim() || null })}
+          rows={3}
+          disabled={saving}
+          className={`${inputClass} max-w-none`}
+        />
+      </label>
+    </div>
+  );
+}
+
 function ProductionStats({ production }: { production: Record<string, unknown> | null }) {
   if (!production) {
     return <p className="text-sm text-muted">Production data isn&apos;t available until the connection is active.</p>;
   }
   const engagementsByStatus = (production.engagements_by_status as Record<string, number>) ?? {};
   const bankProducts = (production.bank_products as { product_type: string; bank_partner: string; count: number; total_rebate: number }[]) ?? [];
+  const otherFees = OTHER_FEE_FIELDS.filter(([key]) => Number(production[key] ?? 0) > 0);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -92,6 +272,19 @@ function ProductionStats({ production }: { production: Record<string, unknown> |
             <dd className="font-medium text-slate">{money(production.gross_bank_product_rebates as number)}</dd>
           </div>
         </dl>
+        {otherFees.length > 0 && (
+          <div className="mt-3 border-t border-border pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Other fees collected (not split)</p>
+            <dl className="mt-1.5 space-y-1 text-xs text-slate">
+              {otherFees.map(([key, label]) => (
+                <div key={key} className="flex justify-between">
+                  <dt className="text-muted">{label}</dt>
+                  <dd className="font-medium">{money(production[key] as number)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
         {Object.keys(engagementsByStatus).length > 0 && (
           <div className="mt-3 border-t border-border pt-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Engagements by status</p>
@@ -193,7 +386,9 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
             <thead className="bg-surfaceMuted text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-3 py-2 text-left">Period</th>
-                <th className="px-3 py-2 text-right">Gross production</th>
+                <th className="px-3 py-2 text-right">Gross collected</th>
+                <th className="px-3 py-2 text-right">Fees deducted</th>
+                <th className="px-3 py-2 text-right">Net production</th>
                 <th className="px-3 py-2 text-right">Your share</th>
                 <th className="px-3 py-2 text-right">Owed to firm</th>
                 <th className="px-3 py-2 text-left">Status</th>
@@ -201,31 +396,44 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {payouts.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-3 py-2 text-slate">
-                    {p.period_start} - {p.period_end}
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate">{money(p.gross_prep_fees + p.gross_bank_product_rebates)}</td>
-                  <td className="px-3 py-2 text-right text-slate">{money(p.ero_share_amount)}</td>
-                  <td className="px-3 py-2 text-right font-medium text-ink">{money(p.amount_owed_to_ptin)}</td>
-                  <td className="px-3 py-2">
-                    <Badge tone={p.status === "paid" ? "success" : p.status === "disputed" ? "danger" : "neutral"}>{p.status}</Badge>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {p.status === "pending" && (
-                      <button
-                        type="button"
-                        onClick={() => markPaid(p.id)}
-                        disabled={markingPaid === p.id}
-                        className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
-                      >
-                        {markingPaid === p.id ? "Saving..." : "Mark paid"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {payouts.map((p) => {
+                const grossCollected = p.gross_prep_fees + p.gross_bank_product_rebates;
+                const feesDeducted = p.gross_bank_fees + p.gross_addon_fees + p.gross_transmission_fees + p.gross_paperwork_fees;
+                // Derived from the two numbers the split actually came from
+                // (ero_share_amount + amount_owed_to_ptin), rather than
+                // grossCollected - feesDeducted, so this always matches
+                // exactly what generate_firm_payout computed -- the fee
+                // deduction floors at 0 server-side and this stays in sync
+                // with that even in the rare case fees exceed rebates.
+                const netProduction = p.ero_share_amount + p.amount_owed_to_ptin;
+                return (
+                  <tr key={p.id}>
+                    <td className="px-3 py-2 text-slate">
+                      {p.period_start} - {p.period_end}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate">{money(grossCollected)}</td>
+                    <td className="px-3 py-2 text-right text-slate">{feesDeducted > 0 ? `-${money(feesDeducted)}` : money(0)}</td>
+                    <td className="px-3 py-2 text-right text-slate">{money(netProduction)}</td>
+                    <td className="px-3 py-2 text-right text-slate">{money(p.ero_share_amount)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-ink">{money(p.amount_owed_to_ptin)}</td>
+                    <td className="px-3 py-2">
+                      <Badge tone={p.status === "paid" ? "success" : p.status === "disputed" ? "danger" : "neutral"}>{p.status}</Badge>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {p.status === "pending" && (
+                        <button
+                          type="button"
+                          onClick={() => markPaid(p.id)}
+                          disabled={markingPaid === p.id}
+                          className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
+                        >
+                          {markingPaid === p.id ? "Saving..." : "Mark paid"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -239,6 +447,13 @@ export function FirmDetailClient({
   firmInfo,
   packageId,
   packages,
+  bankPartnerId,
+  banks,
+  softwarePartnerId,
+  softwareList,
+  partnerSoftwareUsed,
+  partnerTaxPrograms,
+  notes,
   production,
   payouts,
   isActive,
@@ -248,6 +463,13 @@ export function FirmDetailClient({
   firmInfo: FirmInfo;
   packageId: string | null;
   packages: PackageOption[];
+  bankPartnerId: string | null;
+  banks: PartnerOption[];
+  softwarePartnerId: string | null;
+  softwareList: PartnerOption[];
+  partnerSoftwareUsed: string[];
+  partnerTaxPrograms: string[];
+  notes: string | null;
   production: Record<string, unknown> | null;
   payouts: Payout[];
   isActive: boolean;
@@ -257,6 +479,10 @@ export function FirmDetailClient({
       <div className={cardClass}>
         <p className="text-xs font-semibold uppercase tracking-wide text-ink">Firm info</p>
         <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className={labelClass}>Owner name</dt>
+            <dd className="text-slate">{firmInfo.ownerName ?? "--"}</dd>
+          </div>
           <div>
             <dt className={labelClass}>Contact email</dt>
             <dd className="text-slate">{firmInfo.primaryContactEmail ?? "--"}</dd>
@@ -274,10 +500,19 @@ export function FirmDetailClient({
             <dd className="text-slate">{firmInfo.mailingAddress ?? "--"}</dd>
           </div>
         </dl>
-        <div className="mt-4 border-t border-border pt-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <PackagePicker connectionId={connectionId} packageId={packageId} packages={packages} />
+          <BankPicker connectionId={connectionId} bankPartnerId={bankPartnerId} banks={banks} />
+          <SoftwarePicker connectionId={connectionId} softwarePartnerId={softwarePartnerId} softwareList={softwareList} />
         </div>
       </div>
+
+      <PartnerAdminNotes
+        connectionId={connectionId}
+        partnerSoftwareUsed={partnerSoftwareUsed}
+        partnerTaxPrograms={partnerTaxPrograms}
+        notes={notes}
+      />
 
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink">Production</p>

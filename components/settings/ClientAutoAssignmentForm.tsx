@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
@@ -31,6 +31,11 @@ export function ClientAutoAssignmentForm({
   const [pool, setPool] = useState<string[]>(initialPool);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMode(initialMode === "round_robin" ? "round_robin" : "owner");
+    setPool(initialPool);
+  }, [initialMode, initialPool]);
 
   async function save(nextMode: Mode, nextPool: string[]) {
     setSaving(true);

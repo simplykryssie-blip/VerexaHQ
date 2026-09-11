@@ -13,6 +13,22 @@ const PARENT_TIER_LABEL: Record<string, string> = {
   service_bureau_ptin: "Service Bureau",
 };
 
+// ConnectionInviteGenerator hands the ERO/SB a full /join?token=... link to
+// send, not a bare code -- but this box is the fallback for someone who
+// already has an account and would naturally paste the whole link here
+// instead of retyping just the token. get_firm_connection_invite_preview
+// expects a bare uuid, so pull the token out of a pasted URL before it ever
+// reaches that call; a plain pasted token passes through unchanged.
+function extractInviteToken(raw: string): string {
+  const value = raw.trim();
+  try {
+    const url = new URL(value);
+    return url.searchParams.get("token") ?? value;
+  } catch {
+    return value;
+  }
+}
+
 export function RedeemConnectionForm({ workspaceId, initialToken }: { workspaceId: string; initialToken?: string }) {
   const router = useRouter();
   const supabase = createClient();
@@ -31,8 +47,10 @@ export function RedeemConnectionForm({ workspaceId, initialToken }: { workspaceI
     setPreviewError(null);
     setPreview(null);
     if (!value.trim()) return;
+    const cleanToken = extractInviteToken(value);
+    setToken(cleanToken);
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_firm_connection_invite_preview", { p_token: value.trim() });
+    const { data, error } = await supabase.rpc("get_firm_connection_invite_preview", { p_token: cleanToken });
     setLoading(false);
     if (error || !data || data.length === 0) {
       setPreviewError("This invite link is invalid.");
@@ -43,7 +61,7 @@ export function RedeemConnectionForm({ workspaceId, initialToken }: { workspaceI
 
   async function connect() {
     setLoading(true);
-    const { error } = await supabase.rpc("redeem_firm_connection_invite", { p_token: token.trim(), p_workspace_id: workspaceId });
+    const { error } = await supabase.rpc("redeem_firm_connection_invite", { p_token: extractInviteToken(token), p_workspace_id: workspaceId });
     setLoading(false);
     if (error) {
       toast.show(error.message, "error");
@@ -59,7 +77,7 @@ export function RedeemConnectionForm({ workspaceId, initialToken }: { workspaceI
         <input
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder="Paste your invite code"
+          placeholder="Paste your invite link or code"
           className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
         <button
