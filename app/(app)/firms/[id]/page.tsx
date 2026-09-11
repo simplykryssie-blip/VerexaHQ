@@ -76,6 +76,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         connectionId={firm.connection_id}
         parentWorkspaceId={workspace.id}
         firmInfo={{
+          ownerName: firm.owner_name,
           phone: firm.phone,
           primaryContactEmail: firm.primary_contact_email,
           website: firm.website,
@@ -87,6 +88,9 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         banks={banks ?? []}
         softwarePartnerId={firm.software_partner_id}
         softwareList={softwareList ?? []}
+        partnerSoftwareUsed={firm.partner_software_used ?? []}
+        partnerTaxPrograms={firm.partner_tax_programs ?? []}
+        notes={firm.notes}
         production={production as Record<string, unknown> | null}
         payouts={payouts ?? []}
         isActive={firm.status === "active"}

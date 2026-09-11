@@ -5,6 +5,7 @@ import { renderPortalInviteEmail } from "@/lib/email/portalInvite";
 import { reportSystemFailure, isAccountLevelResendError } from "@/lib/systemFailures";
 import { getAppUrl } from "@/lib/appUrl";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { PORTAL_INVITE_EMAIL_DEFAULT } from "@/lib/notifications/systemTemplateDefaults";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -210,14 +211,14 @@ async function sendOne(supabase: ReturnType<typeof createServiceClient>, job: Pe
     const ownBranding = connection?.allows_branding_override ? (context.brandingByWorkspaceId.get(job.workspace_id) ?? null) : null;
     const firmLogoUrl = ownBranding?.email_header_logo_url ?? ownBranding?.logo_url ?? eroBranding?.email_header_logo_url ?? eroBranding?.logo_url ?? null;
 
-    const template =
+    const customTemplate =
       context.templateCandidates.find((t) => t.workspace_id === job.workspace_id) ?? context.templateCandidates.find((t) => t.workspace_id === null) ?? null;
-    if (!template) throw new Error("Portal invite email template is missing");
+    const template = customTemplate ? { subject: customTemplate.subject, body: customTemplate.body_html } : PORTAL_INVITE_EMAIL_DEFAULT;
 
     const acceptUrl = `${getAppUrl()}/portal/accept-invitation?token=${portalUser.invitation_token}`;
 
     const { subject, html } = renderPortalInviteEmail(
-      { subject: template.subject, body: template.body_html },
+      template,
       {
         clientFirstName: (portalUser.invited_name ?? "").trim().split(/\s+/)[0] ?? "",
         firmName: workspace?.name ?? "",
