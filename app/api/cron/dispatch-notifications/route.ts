@@ -5,6 +5,7 @@ import { sendSmsViaTwilio } from "@/lib/sms/twilio";
 import { renderTemplate } from "@/lib/templates/render";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { SYSTEM_EMAIL_TEMPLATE_DEFAULTS, SYSTEM_SMS_TEMPLATE_DEFAULTS } from "@/lib/notifications/systemTemplateDefaults";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -268,7 +269,7 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
     if (job.channel === "Email") {
       if (!job.recipient_email) throw new Error("Job has no recipient_email");
       if (!workspaceId) throw new Error("Job has no workspace_id");
-      const template = pickTemplate(context.emailTemplatesBySlug.get(job.template_key), workspaceId);
+      const template = pickTemplate(context.emailTemplatesBySlug.get(job.template_key), workspaceId) ?? SYSTEM_EMAIL_TEMPLATE_DEFAULTS[job.template_key] ?? null;
       if (!template) throw new Error(`No published email template for key "${job.template_key}"`);
       if (!portalInviteLink && referencesToken(template.subject + template.body_html, "portal_invite_link")) {
         throw new Error("This template uses the portal invite link, but no active, unexpired invitation exists for this client. Send a portal invite first, then retry.");
@@ -300,7 +301,7 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
     } else if (job.channel === "SMS") {
       if (!job.recipient_phone) throw new Error("Job has no recipient_phone");
       if (!workspaceId) throw new Error("Job has no workspace_id");
-      const template = pickTemplate(context.smsTemplatesBySlug.get(job.template_key), workspaceId);
+      const template = pickTemplate(context.smsTemplatesBySlug.get(job.template_key), workspaceId) ?? SYSTEM_SMS_TEMPLATE_DEFAULTS[job.template_key] ?? null;
       if (!template) throw new Error(`No published SMS template for key "${job.template_key}"`);
       if (!portalInviteLink && referencesToken(template.body, "portal_invite_link")) {
         throw new Error("This template uses the portal invite link, but no active, unexpired invitation exists for this client. Send a portal invite first, then retry.");
