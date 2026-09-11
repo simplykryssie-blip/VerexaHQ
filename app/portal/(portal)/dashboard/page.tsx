@@ -156,7 +156,7 @@ export default async function PortalDashboardPage() {
         />
         <div className="relative">
           <p className="text-xs font-semibold uppercase tracking-wide text-white/50">{branding.displayName ?? "Your firm"}</p>
-          <h1 className="mt-3 max-w-[24ch] font-display text-[26px] font-semibold leading-tight">Welcome back, {identity.clientLabel}.</h1>
+          <h1 className="mt-3 max-w-[24ch] font-display text-[26px] font-semibold leading-normal">Welcome back, {identity.clientLabel}.</h1>
           <p className="mt-2 max-w-[48ch] text-sm text-white/70">{heroSub}</p>
         </div>
       </div>
