@@ -929,23 +929,38 @@ export function BillingTab({
           <EmptyState message="No refund transfers or advances recorded for this return yet." />
         ) : (
           <ul className="divide-y divide-border">
-            {bankProductTransactions.map((b) => (
-              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                <span className="text-slate">
-                  {b.bank_partner} <span className="text-muted">({b.product_type.replace("_", " ")})</span>
-                </span>
-                <div className="flex items-center gap-3">
-                  <span className="text-muted">Rebate {money(b.rebate_amount)}</span>
-                  {canManageBilling ? (
-                    <BankProductStatusSelect id={b.id} status={b.status} />
-                  ) : (
-                    <Badge tone="neutral" className="capitalize">
-                      {b.status}
-                    </Badge>
-                  )}
-                </div>
-              </li>
-            ))}
+            {bankProductTransactions.map((b) => {
+              const fees: [string, number | null][] = [
+                ["Prep", b.prep_fee_collected],
+                ["Bank", b.bank_fee],
+                ["Add-on", b.addon_fee],
+                ["Transmission", b.transmission_fee],
+                ["Paperwork", b.paperwork_fee],
+                ["Rebate", b.rebate_amount],
+              ];
+              const setFees = fees.filter(([, v]) => v != null);
+              return (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="text-slate">
+                    {b.bank_partner} <span className="text-muted">({b.product_type.replace("_", " ")})</span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted">
+                      {setFees.length === 0
+                        ? "No fees recorded"
+                        : setFees.map(([label, v]) => `${label} ${money(v)}`).join(" · ")}
+                    </span>
+                    {canManageBilling ? (
+                      <BankProductStatusSelect id={b.id} status={b.status} />
+                    ) : (
+                      <Badge tone="neutral" className="capitalize">
+                        {b.status}
+                      </Badge>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
         {canManageBilling && (
@@ -1157,6 +1172,8 @@ export type BankProductTransactionRow = {
   prep_fee_collected: number | null;
   bank_fee: number | null;
   addon_fee: number | null;
+  transmission_fee: number | null;
+  paperwork_fee: number | null;
   rebate_amount: number | null;
   disbursement_method: string | null;
   status: string;

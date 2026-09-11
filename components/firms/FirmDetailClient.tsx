@@ -60,12 +60,25 @@ function PackagePicker({ connectionId, packageId, packages }: { connectionId: st
   );
 }
 
+// Fees a preparer/ERO collects outside the base prep fee -- bank fee,
+// add-on fee, transmission fee, paperwork fee. Purely informational (they
+// don't affect the revenue-share split, which is prep fees + bank product
+// rebates only) and only shown when a firm actually has one recorded --
+// not every ERO offers bank products or charges these at all.
+const OTHER_FEE_FIELDS: [string, string][] = [
+  ["gross_bank_fees", "Bank fees"],
+  ["gross_addon_fees", "Add-on fees"],
+  ["gross_transmission_fees", "Transmission fees"],
+  ["gross_paperwork_fees", "Paperwork fees"],
+];
+
 function ProductionStats({ production }: { production: Record<string, unknown> | null }) {
   if (!production) {
     return <p className="text-sm text-muted">Production data isn&apos;t available until the connection is active.</p>;
   }
   const engagementsByStatus = (production.engagements_by_status as Record<string, number>) ?? {};
   const bankProducts = (production.bank_products as { product_type: string; bank_partner: string; count: number; total_rebate: number }[]) ?? [];
+  const otherFees = OTHER_FEE_FIELDS.filter(([key]) => Number(production[key] ?? 0) > 0);
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -92,6 +105,19 @@ function ProductionStats({ production }: { production: Record<string, unknown> |
             <dd className="font-medium text-slate">{money(production.gross_bank_product_rebates as number)}</dd>
           </div>
         </dl>
+        {otherFees.length > 0 && (
+          <div className="mt-3 border-t border-border pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Other fees collected (not split)</p>
+            <dl className="mt-1.5 space-y-1 text-xs text-slate">
+              {otherFees.map(([key, label]) => (
+                <div key={key} className="flex justify-between">
+                  <dt className="text-muted">{label}</dt>
+                  <dd className="font-medium">{money(production[key] as number)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
         {Object.keys(engagementsByStatus).length > 0 && (
           <div className="mt-3 border-t border-border pt-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Engagements by status</p>

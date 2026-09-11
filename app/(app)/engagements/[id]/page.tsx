@@ -203,7 +203,9 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase.from("invoices").select("*").eq("engagement_id", engagement.id).order("created_at", { ascending: false }),
     supabase
       .from("bank_product_transactions")
-      .select("id, bank_partner, product_type, prep_fee_collected, bank_fee, addon_fee, rebate_amount, disbursement_method, status, created_at")
+      .select(
+        "id, bank_partner, product_type, prep_fee_collected, bank_fee, addon_fee, transmission_fee, paperwork_fee, rebate_amount, disbursement_method, status, created_at"
+      )
       .eq("engagement_id", engagement.id)
       .order("created_at", { ascending: false }),
     supabase

@@ -18,6 +18,8 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
   const [prepFee, setPrepFee] = useState("");
   const [bankFee, setBankFee] = useState("");
   const [addonFee, setAddonFee] = useState("");
+  const [transmissionFee, setTransmissionFee] = useState("");
+  const [paperworkFee, setPaperworkFee] = useState("");
   const [rebate, setRebate] = useState("");
   const [disbursementMethod, setDisbursementMethod] = useState<"" | "check" | "direct_deposit" | "prepaid_card">("");
   const [status, setStatus] = useState<"pending" | "funded" | "disbursed" | "rejected">("pending");
@@ -30,6 +32,8 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
     setPrepFee("");
     setBankFee("");
     setAddonFee("");
+    setTransmissionFee("");
+    setPaperworkFee("");
     setRebate("");
     setDisbursementMethod("");
     setStatus("pending");
@@ -57,6 +61,8 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
       prep_fee_collected: prepFee ? Number(prepFee) : null,
       bank_fee: bankFee ? Number(bankFee) : null,
       addon_fee: addonFee ? Number(addonFee) : null,
+      transmission_fee: transmissionFee ? Number(transmissionFee) : null,
+      paperwork_fee: paperworkFee ? Number(paperworkFee) : null,
       rebate_amount: rebate ? Number(rebate) : null,
       disbursement_method: disbursementMethod || null,
       status,
@@ -114,6 +120,21 @@ export function BankProductTransactionForm({ workspaceId, engagementId }: { work
       <label className={labelClass}>
         Add-on fee
         <input type="number" min={0} step="0.01" value={addonFee} onChange={(e) => setAddonFee(e.target.value)} className={`${inputClass} w-24`} />
+      </label>
+      <label className={labelClass}>
+        Transmission fee
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={transmissionFee}
+          onChange={(e) => setTransmissionFee(e.target.value)}
+          className={`${inputClass} w-24`}
+        />
+      </label>
+      <label className={labelClass}>
+        Paperwork fee
+        <input type="number" min={0} step="0.01" value={paperworkFee} onChange={(e) => setPaperworkFee(e.target.value)} className={`${inputClass} w-24`} />
       </label>
       <label className={labelClass}>
         Rebate to us

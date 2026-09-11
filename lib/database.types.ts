@@ -1343,10 +1343,12 @@ export type Database = {
           disbursement_method: string | null
           engagement_id: string
           id: string
+          paperwork_fee: number | null
           prep_fee_collected: number | null
           product_type: string
           rebate_amount: number | null
           status: string
+          transmission_fee: number | null
           updated_at: string
           workspace_id: string
         }
@@ -1360,10 +1362,12 @@ export type Database = {
           disbursement_method?: string | null
           engagement_id: string
           id?: string
+          paperwork_fee?: number | null
           prep_fee_collected?: number | null
           product_type: string
           rebate_amount?: number | null
           status?: string
+          transmission_fee?: number | null
           updated_at?: string
           workspace_id: string
         }
@@ -1377,10 +1381,12 @@ export type Database = {
           disbursement_method?: string | null
           engagement_id?: string
           id?: string
+          paperwork_fee?: number | null
           prep_fee_collected?: number | null
           product_type?: string
           rebate_amount?: number | null
           status?: string
+          transmission_fee?: number | null
           updated_at?: string
           workspace_id?: string
         }
