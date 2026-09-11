@@ -117,11 +117,11 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
   { label: "Billing", href: "/platform-admin/billing", icon: CreditCard },
   { label: "Systems", href: "/platform-admin/systems", icon: Wrench },
   { label: "AI Agents", href: "/platform-admin/ai-agents", icon: Sparkles },
-  // Contacts/Engagements/Review Queue/Messages are the platform-admin
+  // Accounts/Engagements/Review Queue/Messages are the platform-admin
   // equivalents of the client-facing CRM nav's own tabs of the same name --
   // account holders instead of clients, terms/privacy acceptance instead of
   // client work, admin to-dos instead of client review items.
-  { label: "Contacts", href: "/platform-admin/accounts", icon: Users },
+  { label: "Accounts", href: "/platform-admin/accounts", icon: Users },
   { label: "Engagements", href: "/platform-admin/agreements", icon: Briefcase },
   { label: "Review Queue", href: "/platform-admin/review", icon: ClipboardCheck },
   { label: "Messages", href: "/messages", icon: MessageSquare },
