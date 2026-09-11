@@ -13,12 +13,17 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   // the RPC round-trip for it.
   const showFirmProfile =
     !workspace || isEroManagementTier(workspace) || Boolean(await getMyEroConnection(createClient(), workspace.id));
+  // Packages (partnership tiers offered to connected firms) only makes
+  // sense for an ERO/Service Bureau -- the page itself already redirects an
+  // Independent PTIN straight to Services, so the nav link shouldn't be
+  // there to click in the first place.
+  const hidePackages = !workspace || !isEroManagementTier(workspace);
 
   return (
     <>
       <PageHeader title="Settings" description="Configure your workspace." />
       <div className="flex flex-1 flex-col lg:flex-row">
-        <SettingsNav hideFirmProfile={!showFirmProfile} />
+        <SettingsNav hideFirmProfile={!showFirmProfile} hidePackages={hidePackages} />
         <div className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</div>
       </div>
     </>
