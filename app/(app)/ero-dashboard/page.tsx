@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, Briefcase, Clock, Receipt, ArrowRight, Building2 } from "lucide-react";
+import { Users, Briefcase, Clock, Receipt, ArrowRight, Building2, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getDashboardData } from "@/lib/dashboard/data";
@@ -12,6 +12,7 @@ import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelin
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Avatar } from "@/components/Avatar";
+import { EmptyState } from "@/components/EmptyState";
 import type { WorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,31 @@ export default async function EroDashboardPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+  // This is a firm-wide rollup of every staff member's workload plus
+  // overdue invoices -- the same category of data the near-identical
+  // Team Performance/Staff Productivity reports already gate on
+  // engagements.view, so this page shouldn't be the one place that skips it.
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.view" });
+  if (!canView) {
+    return (
+      <>
+        <PageHero
+          icon={Building2}
+          tone="violet"
+          heading={
+            <>
+              Your <HeroHighlight>ERO dashboard</HeroHighlight>.
+            </>
+          }
+          subtitle={`Team-wide workload and pipeline for ${workspace.name}.`}
+        />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState icon={Lock} message="You don't have permission to view the ERO dashboard." />
+        </div>
+      </>
+    );
+  }
+
   const [data, { members }] = await Promise.all([
     getDashboardData(workspace.id),
     getWorkspaceMemberWorkload(supabase, workspace.id),

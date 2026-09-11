@@ -1,12 +1,13 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
 import { FirmDetailClient } from "@/components/firms/FirmDetailClient";
+import { EmptyState } from "@/components/EmptyState";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,21 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   if (!isEroManagementTier(workspace)) redirect("/dashboard");
 
   const supabase = createClient();
+  // Same permission the Firms list page and Settings > Users & Staff already
+  // require -- this detail page is the one that actually shows the connected
+  // firm's payout ledger and production numbers, so it needs the check too.
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
+  if (!canView) {
+    return (
+      <div className="max-w-4xl">
+        <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
+          <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
+        </Link>
+        <EmptyState icon={Lock} message="You don't have permission to view connected firms." />
+      </div>
+    );
+  }
+
   const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
 
   const [{ data: connectedFirms }, { members }, { data: packages }] = await Promise.all([

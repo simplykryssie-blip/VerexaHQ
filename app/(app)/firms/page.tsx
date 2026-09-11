@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Building2, ArrowRight } from "lucide-react";
+import { Building2, ArrowRight, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
@@ -36,6 +36,31 @@ export default async function FirmsPage() {
   if (!isEroManagementTier(workspace)) redirect("/dashboard");
 
   const supabase = createClient();
+  // Same permission Settings > Users & Staff already requires before it
+  // shows this same connected-firms data (including, on the detail page,
+  // real payout/production financials) -- this standalone page shouldn't
+  // be a second, unguarded door to it.
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
+  if (!canView) {
+    return (
+      <>
+        <PageHero
+          icon={Building2}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>connected firms</HeroHighlight>.
+            </>
+          }
+          subtitle="Firms connected to you -- their info, production, package, and payout ledger."
+        />
+        <div className="flex-1 px-8 py-6">
+          <EmptyState icon={Lock} message="You don't have permission to view connected firms." />
+        </div>
+      </>
+    );
+  }
+
   const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
 
   const { data: connectedFirms } = childRelationshipTypes.length
