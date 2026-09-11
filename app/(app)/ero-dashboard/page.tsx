@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { Users, Briefcase, Clock, Receipt, ArrowRight, Building2, Lock } from "lucide-react";
+import { Users, Briefcase, Clock, Receipt, ArrowRight, Building2, Lock, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE } from "@/lib/firmConnections";
 import { getDashboardData } from "@/lib/dashboard/data";
 import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
@@ -13,7 +15,14 @@ import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { Avatar } from "@/components/Avatar";
 import { EmptyState } from "@/components/EmptyState";
+import { StatTile } from "@/components/ui/StatTile";
 import type { WorkspaceMemberWorkload } from "@/lib/workspaceStaff";
+
+function money(n: number | null | undefined) {
+  return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+type PendingPayoutRow = { id: string; connectionId: string; firmName: string; period_start: string; period_end: string; amount_owed_to_ptin: number };
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +56,42 @@ export default async function EroDashboardPage() {
     );
   }
 
-  const [data, { members }] = await Promise.all([
+  // Connected-partner financials are a step beyond plain workload/pipeline
+  // visibility -- gated on the same permission the Firms pages already
+  // require, so this rollup doesn't become a second, unguarded door to
+  // another firm's payout numbers.
+  const { data: canViewFirms } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
+  const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
+  const showPartnerPayouts = isEroManagementTier(workspace) && Boolean(canViewFirms) && childRelationshipTypes.length > 0;
+
+  const [data, { members }, { data: connectedFirms }] = await Promise.all([
     getDashboardData(workspace.id),
     getWorkspaceMemberWorkload(supabase, workspace.id),
+    showPartnerPayouts
+      ? supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
+      : Promise.resolve({ data: [] as { connection_id: string; name: string; status: string }[] }),
   ]);
+
+  const { data: pendingPayouts } = showPartnerPayouts
+    ? await supabase
+        .from("firm_payouts")
+        .select("id, connection_id, period_start, period_end, amount_owed_to_ptin")
+        .eq("parent_workspace_id", workspace.id)
+        .eq("status", "pending")
+        .order("period_start", { ascending: false })
+    : { data: [] as { id: string; connection_id: string; period_start: string; period_end: string; amount_owed_to_ptin: number }[] };
+
+  const firmNameByConnectionId = new Map((connectedFirms ?? []).map((f) => [f.connection_id, f.name]));
+  const pendingPayoutRows: PendingPayoutRow[] = (pendingPayouts ?? []).map((p) => ({
+    id: p.id,
+    connectionId: p.connection_id,
+    firmName: firmNameByConnectionId.get(p.connection_id) ?? "Unknown firm",
+    period_start: p.period_start,
+    period_end: p.period_end,
+    amount_owed_to_ptin: p.amount_owed_to_ptin,
+  }));
+  const totalPendingOwed = pendingPayoutRows.reduce((sum, p) => sum + p.amount_owed_to_ptin, 0);
+  const activePartnerCount = (connectedFirms ?? []).filter((f) => f.status === "active").length;
 
   // A wider "attention required" window than a single preparer's daily feed
   // (PrioritiesWidget's own default of 5) -- this is the firm-wide view, so
@@ -130,6 +171,52 @@ export default async function EroDashboardPage() {
         <div className="mt-4">
           <EngagementPipelineWidget stages={data.engagementPipeline} />
         </div>
+
+        {showPartnerPayouts && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-base font-semibold text-ink">Partner Payouts</h2>
+              <Link href="/firms" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                View all firms <ArrowRight size={12} aria-hidden="true" />
+              </Link>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <StatTile icon={Building2} tone="accent" label="Active partners" value={activePartnerCount} />
+              <StatTile icon={Wallet} tone="amber" label="Pending payouts" value={pendingPayoutRows.length} />
+              <StatTile icon={Wallet} tone="rose" label="Total pending owed" value={money(totalPendingOwed)} />
+            </div>
+            {pendingPayoutRows.length > 0 && (
+              <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+                <table className="w-full text-sm">
+                  <thead className="bg-surfaceMuted text-xs uppercase tracking-wide text-muted">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Firm</th>
+                      <th className="px-3 py-2 text-left">Period</th>
+                      <th className="px-3 py-2 text-right">Owed</th>
+                      <th className="px-3 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {pendingPayoutRows.map((p) => (
+                      <tr key={p.id}>
+                        <td className="px-3 py-2 text-slate">{p.firmName}</td>
+                        <td className="px-3 py-2 text-muted">
+                          {p.period_start} - {p.period_end}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-ink">{money(p.amount_owed_to_ptin)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Link href={`/firms/${p.connectionId}`} className="text-xs font-medium text-accent hover:underline">
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <PrioritiesWidget items={priorities} />

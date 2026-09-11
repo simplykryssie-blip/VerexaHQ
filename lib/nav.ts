@@ -57,6 +57,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Contacts", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
   { label: "Billing", href: "/billing", icon: Receipt },
+  { label: "Partner Dashboard", href: "/partner-dashboard", icon: Wallet },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
   { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
@@ -95,7 +96,10 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Review Queue", "Assignments", "Calendar", "Messages"] },
+  {
+    label: "Daily",
+    itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Partner Dashboard", "Review Queue", "Assignments", "Calendar", "Messages"],
+  },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
   { label: "Reference", itemLabels: ["Documents", "Tax Office", "IRS Authorizations", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },

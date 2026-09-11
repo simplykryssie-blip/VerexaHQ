@@ -4,24 +4,13 @@ import { ArrowLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE, CONNECTED_CHILD_TIER_LABEL } from "@/lib/firmConnections";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
 import { FirmDetailClient } from "@/components/firms/FirmDetailClient";
 import { EmptyState } from "@/components/EmptyState";
 
 export const dynamic = "force-dynamic";
-
-const CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE: Record<string, string[]> = {
-  ero_office: ["ero_ptin"],
-  service_bureau: ["service_bureau_ero", "service_bureau_ptin"],
-  multi_office_firm: ["ero_ptin"],
-};
-
-const CONNECTED_CHILD_TIER_LABEL: Record<string, string> = {
-  ero_ptin: "PTIN",
-  service_bureau_ero: "ERO",
-  service_bureau_ptin: "PTIN",
-};
 
 export default async function FirmDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();

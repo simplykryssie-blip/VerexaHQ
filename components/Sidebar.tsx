@@ -34,6 +34,7 @@ export function Sidebar({
   switchableWorkspaces,
   showMessages,
   showLearningHub,
+  showPartnerDashboard,
   softwareLinks,
   showEroManagement,
   currentUser,
@@ -57,6 +58,8 @@ export function Sidebar({
   showMessages?: boolean;
   /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
   showLearningHub?: boolean;
+  /** Only relevant to a workspace connected upstream to a parent firm (get_my_ero_connection returns a row) -- an unconnected workspace has no split/production to see. */
+  showPartnerDashboard?: boolean;
   /** Workspace-defined software shortcuts (Settings > ERO Profile / Profile) -- rendered as their own "Software" dropdown group when non-empty, each child opening externally. */
   softwareLinks?: { id: string; name: string; url: string }[];
   /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (ERO Dashboard, Team -- which also holds Connections -- ERO Profile) to the main nav. Assignments lives in the regular Daily section instead, since every workspace tier needs to reassign work, not just ERO/SB. */
@@ -290,6 +293,7 @@ export function Sidebar({
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
                   .filter((item) => item.label !== "Learning Hub" || showLearningHub)
+                  .filter((item) => item.label !== "Partner Dashboard" || showPartnerDashboard)
                   .map((item) => {
                   const Icon = item.icon;
 
