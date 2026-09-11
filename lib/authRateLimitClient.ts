@@ -2,7 +2,7 @@
 // login and forgot-password forms. Fails open (returns true = allowed) on
 // any network/parse error so an infra hiccup on the rate limiter can never
 // wedge the sign-in button in a permanent "please wait" state.
-export async function checkRateLimitClientSide(action: "login" | "password-reset", email: string): Promise<boolean> {
+export async function checkRateLimitClientSide(action: "login" | "password-reset" | "signup", email: string): Promise<boolean> {
   try {
     const response = await fetch("/api/auth/rate-limit", {
       method: "POST",
