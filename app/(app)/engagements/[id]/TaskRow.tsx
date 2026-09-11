@@ -42,6 +42,11 @@ export function TaskRow({ task }: { task: TaskRowType }) {
           />
           <span className={completed ? "text-muted line-through" : "text-slate"}>{task.title}</span>
           {task.priority && <span className="text-xs capitalize text-muted">({task.priority})</span>}
+          {task.visibility === "client" && (
+            <span className="rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+              Client visible
+            </span>
+          )}
         </label>
         {task.due_date && <span className="text-xs text-muted">{new Date(task.due_date).toLocaleDateString()}</span>}
       </div>
@@ -53,7 +58,9 @@ export function TaskRow({ task }: { task: TaskRowType }) {
               Depends on: {blockedBy.map((d) => d.depends_on_title).join(", ")}
             </span>
           )}
-          {task.description && <p className="mt-0.5">{task.description}</p>}
+          {task.description && (
+            <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: task.description }} />
+          )}
         </div>
       )}
     </li>

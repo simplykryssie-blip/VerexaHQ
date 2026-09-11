@@ -1,14 +1,40 @@
 import { createClient } from "@/lib/supabase/server";
-import { Lock, ShieldAlert, ShieldEllipsis, KeyRound } from "lucide-react";
+import { Lock, ShieldAlert, ShieldEllipsis, KeyRound, Bug } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
+import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 import { PlatformAdminTabs } from "../PlatformAdminTabs";
+import type { BadgeTone } from "@/components/ui/Badge";
+
+// A generic pending/processing/done/failed vocabulary shared loosely across
+// the cron job queues below -- falls back to neutral for anything queue-specific.
+const QUEUE_STATUS_TONE: Record<string, BadgeTone> = {
+  pending: "warning",
+  processing: "accent",
+  processed: "success",
+  sent: "success",
+  completed: "success",
+  failed: "danger",
+};
 import { SystemCredentialsManager } from "./SystemCredentialsManager";
+import { AutomationFailuresManager } from "./AutomationFailuresManager";
+import { CronJobHealthManager, type CronJobHealthRow } from "./CronJobHealthManager";
+import { EXPECTED_INTERVAL_MINUTES, isStale } from "@/lib/cron/expectedIntervals";
+import { fetchRecentSentryIssues } from "@/lib/sentry/api";
 
 export const dynamic = "force-dynamic";
 
 const FAILURE_PAGE_SIZE = 100;
+const CRON_RUN_LOOKBACK = 1000;
+
+const SENTRY_LEVEL_TONE: Record<string, BadgeTone> = {
+  fatal: "danger",
+  error: "danger",
+  warning: "warning",
+  info: "neutral",
+  debug: "neutral",
+};
 
 function statusCounts(rows: { status: string }[]) {
   const counts = new Map<string, number>();
@@ -45,6 +71,8 @@ export default async function PlatformAdminSystemsPage() {
     { data: engagementLetterJobs },
     { data: webhookJobs },
     { data: credentials },
+    { data: failedAutomationRuns },
+    { data: cronRuns },
   ] = await Promise.all([
     supabase
       .from("system_failure_log")
@@ -58,7 +86,33 @@ export default async function PlatformAdminSystemsPage() {
     supabase.from("pending_engagement_letter_sends").select("status"),
     supabase.from("automation_webhook_deliveries").select("status"),
     supabase.from("platform_system_credentials").select("id, system_name, username, notes, updated_at").order("system_name"),
+    supabase.rpc("get_platform_failed_automation_runs", { p_limit: 50 }),
+    supabase
+      .from("cron_job_runs")
+      .select("job_key, status, completed_at, error_message")
+      .order("completed_at", { ascending: false })
+      .limit(CRON_RUN_LOOKBACK),
   ]);
+
+  const sentryIssues = await fetchRecentSentryIssues();
+
+  const latestRunByJobKey = new Map<string, { status: "success" | "failure"; completed_at: string; error_message: string | null }>();
+  for (const run of cronRuns ?? []) {
+    if (!latestRunByJobKey.has(run.job_key)) latestRunByJobKey.set(run.job_key, run as { status: "success" | "failure"; completed_at: string; error_message: string | null });
+  }
+  const cronJobHealth: CronJobHealthRow[] = Object.entries(EXPECTED_INTERVAL_MINUTES).map(([jobKey, intervalMinutes]) => {
+    const latest = latestRunByJobKey.get(jobKey);
+    const lastSuccessAt = latest?.status === "success" ? latest.completed_at : null;
+    return {
+      jobKey,
+      intervalMinutes,
+      lastStatus: latest?.status ?? null,
+      lastRunAt: latest?.completed_at ?? null,
+      lastErrorMessage: latest?.status === "failure" ? latest.error_message : null,
+      isStale: isStale(lastSuccessAt, intervalMinutes),
+    };
+  });
+  cronJobHealth.sort((a, b) => Number(b.isStale) - Number(a.isStale));
 
   const workspaceIds = Array.from(new Set((failures ?? []).map((f) => f.workspace_id).filter((id): id is string => Boolean(id))));
   const failureWorkspaceNameById = new Map((workspaces ?? []).filter((w) => workspaceIds.includes(w.id)).map((w) => [w.id, w.name]));
@@ -112,6 +166,86 @@ export default async function PlatformAdminSystemsPage() {
         </div>
 
         <div>
+          <h3 className="mb-1 font-display text-sm font-semibold text-ink">Automation failures</h3>
+          <p className="mb-3 text-xs text-muted">Workflow runs that hit an error mid-execution, across every workspace. Retry once the underlying issue is fixed.</p>
+          <AutomationFailuresManager runs={failedAutomationRuns ?? []} />
+        </div>
+
+        <div>
+          <h3 className="mb-1 flex items-center gap-1.5 font-display text-sm font-semibold text-ink">
+            <Bug size={14} /> Application errors (Sentry)
+          </h3>
+          <p className="mb-3 text-xs text-muted">
+            Unresolved runtime errors caught by Sentry across the whole app in the last 24 hours -- unhandled exceptions and crashes, not the
+            business-logic failures logged above.
+          </p>
+          {!sentryIssues.ok ? (
+            <div className="rounded-2xl border border-border bg-surfaceMuted p-4 text-xs text-muted">
+              {sentryIssues.reason === "Sentry API access is not configured for this environment." ? (
+                <>
+                  <p className="font-medium text-ink">Not connected</p>
+                  <p className="mt-1">
+                    Set <code className="rounded bg-surface px-1 py-0.5 font-mono">SENTRY_ORG</code>,{" "}
+                    <code className="rounded bg-surface px-1 py-0.5 font-mono">SENTRY_PROJECT</code>, and{" "}
+                    <code className="rounded bg-surface px-1 py-0.5 font-mono">SENTRY_API_TOKEN</code> (an internal integration token with Issue &amp;
+                    Event read scope, from Sentry &gt; Settings &gt; Auth Tokens) to see live errors here.
+                  </p>
+                </>
+              ) : (
+                <p className="text-danger">{sentryIssues.reason}</p>
+              )}
+            </div>
+          ) : sentryIssues.data.length === 0 ? (
+            <div className="rounded-2xl border border-border bg-surface shadow-soft">
+              <EmptyState icon={Bug} message="No unresolved errors in the last 24 hours." />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-border bg-surface shadow-soft">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
+                    <th className="px-5 py-3 font-medium">Error</th>
+                    <th className="px-5 py-3 font-medium">Level</th>
+                    <th className="px-5 py-3 font-medium">Events</th>
+                    <th className="px-5 py-3 font-medium">Users affected</th>
+                    <th className="px-5 py-3 font-medium">Last seen</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {sentryIssues.data.map((issue) => (
+                    <tr key={issue.id} className="transition-colors hover:bg-surfaceMuted">
+                      <td className="px-5 py-3 text-slate">
+                        <a href={issue.permalink} target="_blank" rel="noreferrer" className="font-medium text-accent hover:underline">
+                          {issue.title}
+                        </a>
+                        {issue.culprit && <p className="mt-0.5 font-mono text-xs text-muted">{issue.culprit}</p>}
+                      </td>
+                      <td className="px-5 py-3">
+                        <Badge tone={SENTRY_LEVEL_TONE[issue.level] ?? "neutral"} className="capitalize">
+                          {issue.level}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-3 text-slate">{issue.count}</td>
+                      <td className="px-5 py-3 text-slate">{issue.userCount}</td>
+                      <td className="px-5 py-3 text-slate">{new Date(issue.lastSeen).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h3 className="mb-1 font-display text-sm font-semibold text-ink">Cron job health</h3>
+          <p className="mb-3 text-xs text-muted">
+            Every scheduled job&apos;s last successful run. &quot;Stale&quot; means it hasn&apos;t succeeded within roughly twice its expected interval --
+            check Vercel&apos;s function logs for why, or run it manually here.
+          </p>
+          <CronJobHealthManager jobs={cronJobHealth} />
+        </div>
+
+        <div>
           <h3 className="mb-3 font-display text-sm font-semibold text-ink">Job queues</h3>
           <p className="mb-3 text-xs text-muted">
             Counts by status only -- for the full run history of what the cron workers actually did, check Vercel&apos;s function logs. A queue with a
@@ -125,8 +259,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(calendarCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -140,8 +276,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(notificationCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -155,8 +293,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(portalInviteCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -170,8 +310,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(engagementLetterCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -185,8 +327,10 @@ export default async function PlatformAdminSystemsPage() {
                   <li className="text-muted">Empty.</li>
                 ) : (
                   Array.from(webhookCounts.entries()).map(([status, count]) => (
-                    <li key={status} className="flex items-center justify-between capitalize">
-                      <span>{status}</span>
+                    <li key={status} className="flex items-center justify-between">
+                      <Badge tone={QUEUE_STATUS_TONE[status] ?? "neutral"} className="capitalize">
+                        {status}
+                      </Badge>
                       <span className="font-medium text-ink">{count}</span>
                     </li>
                   ))
@@ -220,7 +364,7 @@ export default async function PlatformAdminSystemsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {failureRows.map((f) => (
-                    <tr key={f.id} className="hover:bg-surfaceMuted">
+                    <tr key={f.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="whitespace-nowrap px-5 py-3 text-slate">{new Date(f.created_at).toLocaleString()}</td>
                       <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate">{f.source}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-slate">
@@ -258,10 +402,14 @@ export default async function PlatformAdminSystemsPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {workspaces.map((w) => (
-                    <tr key={w.id} className="hover:bg-surfaceMuted">
+                    <tr key={w.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3 text-slate">{w.name}</td>
                       <td className="px-5 py-3 text-slate">{w.workspace_type}</td>
-                      <td className="px-5 py-3 text-slate capitalize">{w.status}</td>
+                      <td className="px-5 py-3">
+                        <Badge tone={WORKSPACE_STATUS_TONE[w.status] ?? "neutral"} className="capitalize">
+                          {w.status}
+                        </Badge>
+                      </td>
                       <td className="px-5 py-3 text-slate">{new Date(w.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}

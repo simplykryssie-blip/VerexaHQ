@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { Badge } from "@/components/ui/Badge";
 
 type ActionRow = { id: string; action: string; comment: string | null; created_at: string };
 
@@ -83,7 +84,7 @@ export function ReviewQueueItem({
             {clientName} {engagementNumber ? `-- ${engagementNumber}` : ""}
           </p>
           <p className="text-xs text-muted">
-            From {fromWorkspaceName} {status === "corrections_requested" && <span className="text-warning">-- corrections requested</span>}
+            From {fromWorkspaceName} {status === "corrections_requested" && <Badge tone="warning" className="ml-1">Corrections requested</Badge>}
           </p>
           {engagementId && (
             <Link href={`/engagements/${engagementId}`} className="mt-1 inline-block text-xs text-accent hover:underline">

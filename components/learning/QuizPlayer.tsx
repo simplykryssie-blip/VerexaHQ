@@ -110,7 +110,7 @@ export function QuizPlayer({
       {shown && (
         <div
           className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
-            shown.passed ? "bg-green-50 text-success" : "bg-red-50 text-danger"
+            shown.passed ? "bg-success/10 text-success" : "bg-danger/10 text-danger"
           }`}
         >
           {shown.passed ? <CheckCircle2 size={15} /> : <XCircle size={15} />}

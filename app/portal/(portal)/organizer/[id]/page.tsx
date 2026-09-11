@@ -15,7 +15,7 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
   const supabase = createClient();
   const { data: response } = await supabase
     .from("organizer_responses")
-    .select("id, status, organizer_template_id, workspace_id, client_id, engagement_id, organizer_templates(name)")
+    .select("id, status, organizer_template_id, workspace_id, client_id, engagement_id, organizer_templates(name, custom_css)")
     .eq("id", params.id)
     .eq("client_id", identity.clientId)
     .maybeSingle();
@@ -23,14 +23,30 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 
   const readOnly = response.status === "submitted" || response.status === "reviewed";
 
-  const [{ data: fields }, { data: answers }, { data: snapshot }] = await Promise.all([
+  const [{ data: fields }, { data: answers }, { data: snapshot }, { data: infoRequestItems }] = await Promise.all([
     supabase
       .from("organizer_fields")
-      .select("id, field_type, label, help_text, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field")
+      .select(
+        "id, field_type, label, help_text, body_html, is_required, options, parent_field_id, display_order, conditional_logic, client_profile_field, layout_width, is_internal_only, image_url"
+      )
       .eq("organizer_template_id", response.organizer_template_id)
+      .eq("is_internal_only", false)
       .order("display_order"),
     supabase.from("organizer_response_answers").select("organizer_field_id, value, instance_index").eq("organizer_response_id", response.id),
     readOnly ? Promise.resolve({ data: null }) : supabase.rpc("get_portal_client_snapshot"),
+    // Per-field flags -- these are what actually let a client respond to a
+    // specific question even when the rest of the organizer is read-only
+    // (status submitted/reviewed). approved/resolved items are already
+    // reflected in the answer itself, so there's nothing left to show. The
+    // banner listing the original flagged-request message lives only in
+    // the sitewide sticky banner now -- once a client is on this page
+    // actually answering questions, the live checklist below (built from
+    // these items) is what matters, not the static text.
+    supabase
+      .from("organizer_information_request_items")
+      .select("id, organizer_field_id, instance_index, note, status, was_answered_when_flagged, decision_note, organizer_information_requests!inner(organizer_response_id)")
+      .eq("organizer_information_requests.organizer_response_id", response.id)
+      .in("status", ["pending", "client_responded", "rejected"]),
   ]);
 
   // Mapped fields (client_profile_field set on the builder side) that don't
@@ -50,13 +66,21 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
         .filter((a) => a.value !== null)
     : [];
 
-  const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Organizer";
+  const template = response.organizer_templates as unknown as { name?: string; custom_css?: string | null } | null;
+  const templateName = template?.name ?? "Form";
 
   return (
     <>
+      {template?.custom_css && <style dangerouslySetInnerHTML={{ __html: template.custom_css }} />}
       <PageHeader
         title={templateName}
-        description={readOnly ? "This organizer has been submitted and can no longer be edited." : "Fill in what you can -- you can save progress and come back."}
+        description={
+          readOnly
+            ? (infoRequestItems ?? []).length > 0
+              ? "This form has been submitted -- respond to the flagged questions below."
+              : "This form has been submitted and can no longer be edited."
+            : "Fill in what you can -- you can save progress and come back."
+        }
       />
       <div className="max-w-2xl flex-1 px-8 py-6">
         <OrganizerForm
@@ -68,6 +92,15 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
           workspaceId={response.workspace_id}
           entityType={response.engagement_id ? "engagement" : "client"}
           entityId={response.engagement_id ?? response.client_id}
+          infoRequestItems={(infoRequestItems ?? []).map((i) => ({
+            id: i.id,
+            organizer_field_id: i.organizer_field_id,
+            instance_index: i.instance_index,
+            note: i.note,
+            status: i.status as "pending" | "client_responded" | "rejected",
+            was_answered_when_flagged: i.was_answered_when_flagged,
+            decision_note: i.decision_note,
+          }))}
         />
       </div>
     </>
@@ -75,6 +108,10 @@ export default async function PortalOrganizerDetailPage({ params }: { params: { 
 }
 
 function prefillValueFor(clientProfileField: string, snapshot: BasicInfoSnapshot): string | null {
+  // SSN is never prefilled -- it's an encrypted, staff-reveal-gated value.
+  // The client_profile_field='ssn' mapping only proposes a write (subject to
+  // review), it doesn't read one back into the form.
+  if (clientProfileField === "ssn") return null;
   if (clientProfileField === "full_name") {
     if (!snapshot.first_name && !snapshot.last_name) return null;
     return stringifyNameValue({

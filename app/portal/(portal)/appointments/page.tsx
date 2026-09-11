@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { BookAppointment } from "@/components/portal/BookAppointment";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { getBookingSettings } from "@/lib/bookingSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -42,12 +43,14 @@ export default async function PortalAppointmentsPage() {
     .eq("status", "published")
     .order("name");
 
+  const { windowDays } = await getBookingSettings(serviceClient, identity.workspaceId);
+
   return (
     <>
       <PageHeader
         title="Appointments"
         description="Your upcoming and past appointments with your firm."
-        actions={<BookAppointment services={bookableServices ?? []} />}
+        actions={<BookAppointment services={bookableServices ?? []} windowDays={windowDays} />}
       />
       <div className="flex-1 px-8 py-6">
         {(appointments ?? []).length === 0 ? (

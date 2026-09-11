@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, MinusCircle, X, User } from "lucide-react";
+import { CheckCircle2, XCircle, MinusCircle, X, User, FlaskConical } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { actionIcon, ACTION_TYPES } from "@/components/workflows/WorkflowBuilder";
 
@@ -12,6 +12,7 @@ type RunHeader = {
   completed_at: string | null;
   engagement_number: string | null;
   client_name: string | null;
+  is_test: boolean;
 };
 
 type LogRow = {
@@ -56,7 +57,7 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
       const [{ data: runRow, error: runError }, { data: logRows, error: logsError }] = await Promise.all([
         supabase
           .from("automation_runs")
-          .select("id, status, started_at, completed_at, engagements(engagement_number), clients(first_name, last_name, business_name)")
+          .select("id, status, started_at, completed_at, is_test, engagements(engagement_number), clients(first_name, last_name, business_name)")
           .eq("id", runId)
           .maybeSingle(),
         supabase
@@ -76,6 +77,7 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
         status: runRow.status,
         started_at: runRow.started_at,
         completed_at: runRow.completed_at,
+        is_test: Boolean(runRow.is_test),
         engagement_number: (runRow.engagements as unknown as { engagement_number: string | null } | null)?.engagement_number ?? null,
         client_name: clientLabelFor(runRow.clients as unknown as { first_name: string | null; last_name: string | null; business_name: string | null } | null),
       });
@@ -115,7 +117,14 @@ export function RunDetailPanel({ runId, onClose }: { runId: string; onClose: () 
               <User size={16} />
             </span>
             <div>
-              <h2 className="text-base font-semibold text-ink">{title}</h2>
+              <h2 className="flex items-center gap-2 text-base font-semibold text-ink">
+                {title}
+                {run?.is_test && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accentSoft px-2 py-0.5 text-[11px] font-medium text-accent">
+                    <FlaskConical size={11} /> Test run
+                  </span>
+                )}
+              </h2>
               {run && (
                 <p className="text-xs text-muted">
                   {run.status === "running" ? "In progress" : run.status === "failed" ? "Failed" : run.status === "completed" ? "Completed" : run.status}

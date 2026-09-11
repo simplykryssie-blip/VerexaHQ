@@ -15,8 +15,10 @@ function displayValue(fieldType: string, raw: unknown): string {
     return digits.length >= 4 ? `****${digits.slice(-4)}` : "on file";
   }
   if (fieldType === "signature" && typeof raw === "object") {
-    const sig = raw as { typed_name?: string; signed_at?: string };
-    return sig.typed_name ? `Signed by ${sig.typed_name}${sig.signed_at ? ` on ${new Date(sig.signed_at).toLocaleDateString()}` : ""}` : "Signed";
+    const sig = raw as { typed_name?: string; signature_image_path?: string; signed_at?: string };
+    const signedOn = sig.signed_at ? ` on ${new Date(sig.signed_at).toLocaleDateString()}` : "";
+    if (sig.typed_name) return `Signed by ${sig.typed_name}${signedOn}`;
+    return sig.signature_image_path ? `Signed (drawn signature)${signedOn}` : "Signed";
   }
   if (fieldType === "name") return formatNameValue(raw);
   if (fieldType === "address") return formatAddressValue(raw);
@@ -63,10 +65,10 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!response) {
-    return NextResponse.json({ error: "Organizer response not found" }, { status: 404 });
+    return NextResponse.json({ error: "Form response not found" }, { status: 404 });
   }
   if (response.status !== "submitted" && response.status !== "reviewed") {
-    return NextResponse.json({ error: "This organizer has not been submitted yet" }, { status: 400 });
+    return NextResponse.json({ error: "This form has not been submitted yet" }, { status: 400 });
   }
   if (response.filed_as_attachment) {
     return NextResponse.json({ ok: true, alreadyFiled: true });
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
     .filter((r): r is { order: number; instance: number; label: string; value: string } => r !== null)
     .sort((a, b) => a.order - b.order || a.instance - b.instance);
 
-  const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Organizer";
+  const templateName = (response.organizer_templates as unknown as { name?: string } | null)?.name ?? "Form";
   const submittedLabel = response.submitted_at ? new Date(response.submitted_at).toLocaleDateString() : "";
   const pdfBytes = await buildOrganizerPdf(templateName, submittedLabel, rows);
 

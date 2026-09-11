@@ -42,13 +42,14 @@ function htmlToParagraphs(html: string): string[] {
 // no visible connection to any document, let alone a signature line.
 //
 // Pass `signedBy` for an already-signed document (e.g. filing a completed
-// public-link signature) to embed the real drawn signature image + typed
-// name instead of a blank "sign here" line.
+// public-link signature) to embed the real signature instead of a blank
+// "sign here" line -- the drawn image when the signer drew one, or the
+// typed name rendered as text when they typed instead.
 export async function renderLetterPdf(
   title: string,
   bodyHtml: string,
   signerLabel: string,
-  signedBy?: { signatureImageBytes: Uint8Array; typedName: string; signedAtLabel: string },
+  signedBy?: { signatureImageBytes: Uint8Array | null; typedName: string; signedAtLabel: string },
   bannerImageBytes?: Uint8Array
 ): Promise<Uint8Array> {
   const pdf = await TextPdf.create();
@@ -64,8 +65,10 @@ export async function renderLetterPdf(
     pdf.paragraph(paragraph);
   }
   pdf.spacer(20);
-  if (signedBy) {
+  if (signedBy?.signatureImageBytes) {
     await pdf.signatureImage(signedBy.signatureImageBytes, signedBy.typedName, signedBy.signedAtLabel);
+  } else if (signedBy?.typedName) {
+    pdf.signatureTyped(signedBy.typedName, signedBy.signedAtLabel);
   } else {
     pdf.signatureLine(`Signature -- ${signerLabel}`);
   }

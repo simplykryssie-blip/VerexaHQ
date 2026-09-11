@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { presentNotification, type NotificationRow } from "@/lib/notifications/present";
 import { IconButton } from "@/components/ui/IconButton";
-import { Card } from "@/components/ui/Card";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -15,18 +15,25 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
+  // Deliberately not scoped to the current workspace -- a notification
+  // whose entity lives in a workspace other than whatever's currently
+  // active would otherwise be invisible here even though it's real (e.g.
+  // a marketing-site lead-capture submission landing in the platform-home
+  // workspace while the viewer has a different workspace active). RLS
+  // (notification_queue_select) already scopes every row to the caller's
+  // own recipient_user_id regardless of workspace, so this is just
+  // trusting that same boundary instead of narrowing it further client-side.
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("notification_queue")
-      .select("id, event_type, template_key, payload, entity_type, entity_id, created_at, read_at")
+      .select("id, event_type, template_key, payload, entity_type, entity_id, workspace_id, created_at, read_at")
       .eq("recipient_user_id", userId)
-      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(30);
     setNotifications((data as NotificationRow[] | null) ?? []);
-  }, [supabase, userId, workspaceId]);
+  }, [supabase, userId]);
 
   useEffect(() => {
     load();
@@ -34,18 +41,15 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
     return () => clearInterval(interval);
   }, [load]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
+  // If the notification's own workspace isn't the one currently active,
+  // switch to it first -- most destination pages (e.g. /clients/[id])
+  // resolve their data against the active workspace, so navigating there
+  // without switching would 404 or show someone else's record instead.
+  // A hard navigation (not router.push) after switching, since the active
+  // workspace drives server-rendered layout data that a soft nav wouldn't
+  // re-fetch -- matches how Sidebar's own workspace switcher does it.
   async function handleClick(n: NotificationRow) {
     if (!n.read_at) {
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
@@ -53,12 +57,28 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
     }
     const { href } = presentNotification(n);
     setOpen(false);
-    if (href) router.push(href);
+    if (!href) return;
+
+    if (n.workspace_id && n.workspace_id !== workspaceId) {
+      const res = await fetch("/api/workspace/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: n.workspace_id }),
+      });
+      if (res.ok) {
+        window.location.href = href;
+        return;
+      }
+      // Switch failed (e.g. no longer a member) -- fall through to a plain
+      // in-app nav, which fails the same way this always has.
+    }
+    router.push(href);
   }
 
   async function markAllRead() {
     setNotifications((prev) => prev.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })));
-    await supabase.rpc("mark_all_notifications_read", { p_workspace_id: workspaceId });
+    const workspaceIds = Array.from(new Set(notifications.map((n) => n.workspace_id).filter((id): id is string => Boolean(id))));
+    await Promise.all(workspaceIds.map((id) => supabase.rpc("mark_all_notifications_read", { p_workspace_id: id })));
   }
 
   return (
@@ -73,7 +93,7 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
       </IconButton>
 
       {open && (
-        <Card padded={false} className="absolute right-0 top-full z-30 mt-2 w-80 shadow-lg">
+        <DropdownPanel className="right-0 top-full mt-2 w-80">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <p className="text-sm font-semibold text-ink">Notifications</p>
             {unreadCount > 0 && (
@@ -107,7 +127,7 @@ export function NotificationBell({ workspaceId, userId }: { workspaceId: string;
               </ul>
             )}
           </div>
-        </Card>
+        </DropdownPanel>
       )}
     </div>
   );

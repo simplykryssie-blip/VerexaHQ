@@ -9,69 +9,170 @@ import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import { Bold, Italic, List, ListOrdered, Heading2, SeparatorHorizontal, Table2, ListChecks, Trash2 } from "lucide-react";
+import Underline from "@tiptap/extension-underline";
+import TextAlign from "@tiptap/extension-text-align";
+import {
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  List,
+  ListOrdered,
+  Heading1,
+  Heading2,
+  Heading3,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Quote,
+  Code,
+  Link as LinkIcon,
+  Undo2,
+  Redo2,
+  SeparatorHorizontal,
+  Table2,
+  ListChecks,
+  Trash2,
+} from "lucide-react";
 import { PageBreak } from "@/lib/tiptap/pageBreak";
 
-function ToolbarButton({ active, onClick, label, children }: { active: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
+function ToolbarButton({
+  active,
+  disabled,
+  onClick,
+  label,
+  children,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       aria-pressed={active}
-      className={`rounded-md p-1.5 transition ${active ? "bg-accentSoft text-accent" : "text-muted hover:bg-surfaceMuted hover:text-ink"}`}
+      title={label}
+      className={`rounded-md p-1.5 transition disabled:cursor-not-allowed disabled:opacity-30 ${
+        active ? "bg-accentSoft text-accent" : "text-muted hover:bg-surfaceMuted hover:text-ink"
+      }`}
     >
       {children}
     </button>
   );
 }
 
+function ToolbarGroup({ children }: { children: React.ReactNode }) {
+  return <div className="flex items-center gap-0.5 border-r border-border pr-1.5 last:border-r-0 last:pr-0">{children}</div>;
+}
+
+function setLink(editor: Editor) {
+  const previousUrl = (editor.getAttributes("link").href as string | undefined) ?? "";
+  const url = window.prompt("Link URL", previousUrl);
+  if (url === null) return;
+  if (url === "") {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    return;
+  }
+  editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+}
+
 function Toolbar({ editor, extra, rounded, allowPageBreak }: { editor: Editor; extra?: React.ReactNode; rounded: string; allowPageBreak: boolean }) {
   return (
     <div className={`sticky top-0 z-10 flex items-center justify-between gap-1 border-b border-border bg-surfaceMuted px-2 py-1.5 ${rounded}`}>
-      <div className="flex items-center gap-1">
-        <ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} label="Bold">
-          <Bold size={14} />
-        </ToolbarButton>
-        <ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} label="Italic">
-          <Italic size={14} />
-        </ToolbarButton>
-        <ToolbarButton active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="Heading">
-          <Heading2 size={14} />
-        </ToolbarButton>
-        <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} label="Bullet list">
-          <List size={14} />
-        </ToolbarButton>
-        <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} label="Numbered list">
-          <ListOrdered size={14} />
-        </ToolbarButton>
-        {allowPageBreak && (
-          <>
-            <ToolbarButton active={false} onClick={() => editor.chain().focus().setPageBreak().run()} label="Insert page break">
-              <SeparatorHorizontal size={14} />
-            </ToolbarButton>
-            <ToolbarButton
-              active={editor.isActive("taskList")}
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
-              label="Insert checklist"
-            >
-              <ListChecks size={14} />
-            </ToolbarButton>
-            {editor.isActive("table") ? (
-              <ToolbarButton active={false} onClick={() => editor.chain().focus().deleteTable().run()} label="Remove table">
-                <Trash2 size={14} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ToolbarGroup>
+          <ToolbarButton active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} label="Bold">
+            <Bold size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} label="Italic">
+            <Italic size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("underline")} onClick={() => editor.chain().focus().toggleUnderline().run()} label="Underline">
+            <UnderlineIcon size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} label="Heading 1">
+            <Heading1 size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="Heading 2">
+            <Heading2 size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} label="Heading 3">
+            <Heading3 size={14} />
+          </ToolbarButton>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <ToolbarButton active={editor.isActive({ textAlign: "left" })} onClick={() => editor.chain().focus().setTextAlign("left").run()} label="Align left">
+            <AlignLeft size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive({ textAlign: "center" })} onClick={() => editor.chain().focus().setTextAlign("center").run()} label="Align center">
+            <AlignCenter size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive({ textAlign: "right" })} onClick={() => editor.chain().focus().setTextAlign("right").run()} label="Align right">
+            <AlignRight size={14} />
+          </ToolbarButton>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <ToolbarButton active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} label="Bullet list">
+            <List size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} label="Numbered list">
+            <ListOrdered size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} label="Quote">
+            <Quote size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} label="Code block">
+            <Code size={14} />
+          </ToolbarButton>
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <ToolbarButton active={editor.isActive("link")} onClick={() => setLink(editor)} label="Insert link">
+            <LinkIcon size={14} />
+          </ToolbarButton>
+          {allowPageBreak && (
+            <>
+              <ToolbarButton active={false} onClick={() => editor.chain().focus().setPageBreak().run()} label="Insert page break">
+                <SeparatorHorizontal size={14} />
               </ToolbarButton>
-            ) : (
               <ToolbarButton
-                active={false}
-                onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-                label="Insert table"
+                active={editor.isActive("taskList")}
+                onClick={() => editor.chain().focus().toggleTaskList().run()}
+                label="Insert checklist"
               >
-                <Table2 size={14} />
+                <ListChecks size={14} />
               </ToolbarButton>
-            )}
-          </>
-        )}
+              {editor.isActive("table") ? (
+                <ToolbarButton active={false} onClick={() => editor.chain().focus().deleteTable().run()} label="Remove table">
+                  <Trash2 size={14} />
+                </ToolbarButton>
+              ) : (
+                <ToolbarButton
+                  active={false}
+                  onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+                  label="Insert table"
+                >
+                  <Table2 size={14} />
+                </ToolbarButton>
+              )}
+            </>
+          )}
+        </ToolbarGroup>
+
+        <ToolbarGroup>
+          <ToolbarButton active={false} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()} label="Undo">
+            <Undo2 size={14} />
+          </ToolbarButton>
+          <ToolbarButton active={false} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()} label="Redo">
+            <Redo2 size={14} />
+          </ToolbarButton>
+        </ToolbarGroup>
       </div>
       {extra}
     </div>
@@ -105,10 +206,11 @@ export function RichTextEditor({
   /** Rendered right-aligned inside the formatting toolbar -- e.g. a merge-field picker, so it sits where staff are actually typing instead of somewhere they have to scroll to find. */
   toolbarExtra?: React.ReactNode;
 }) {
+  const textAlign = TextAlign.configure({ types: ["heading", "paragraph"] });
   const editor = useEditor({
     extensions: allowPageBreak
-      ? [StarterKit, PageBreak, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, TaskList, TaskItem.configure({ nested: true })]
-      : [StarterKit],
+      ? [StarterKit, Underline, textAlign, PageBreak, Table.configure({ resizable: false }), TableRow, TableHeader, TableCell, TaskList, TaskItem.configure({ nested: true })]
+      : [StarterKit, Underline, textAlign],
     content,
     editable,
     immediatelyRender: false,

@@ -51,5 +51,5 @@ export default async function RootPage() {
   const data = await loadHomePage();
   if (!data) redirect("/dashboard");
 
-  return <PublicSitePage workspaceSlug={HOME_WORKSPACE_SLUG} websiteSlug={HOME_WEBSITE_SLUG} data={data} />;
+  return <PublicSitePage workspaceSlug={HOME_WORKSPACE_SLUG} websiteSlug={HOME_WEBSITE_SLUG} data={data} showLoginLink />;
 }

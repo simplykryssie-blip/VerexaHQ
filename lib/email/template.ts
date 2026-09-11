@@ -18,7 +18,7 @@ export function renderEmail({
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:16px;overflow:hidden;">
             <tr>
               <td style="padding:24px 32px;border-bottom:1px solid #e5e7eb;">
-                <span style="font-size:16px;font-weight:600;color:#111827;">VerexaHQ</span>
+                <span style="font-size:16px;font-weight:600;color:#111827;">Verexa HQ CRM</span>
               </td>
             </tr>
             <tr>
@@ -40,7 +40,7 @@ export function renderEmail({
             </tr>
             <tr>
               <td style="padding:20px 32px;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.6;color:#9ca3af;">
-                VerexaHQ &middot; Questions? Reply to this email or contact support@verexahq.com.
+                Verexa HQ CRM &middot; Questions? Reply to this email or contact support@verexahq.com.
               </td>
             </tr>
           </table>

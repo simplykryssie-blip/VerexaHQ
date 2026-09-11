@@ -7,7 +7,11 @@
  * real domain" instead of silently sending users to localhost.
  */
 export function getAppUrl(request?: Request): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  // Trailing slash stripped so callers can always safely do `${getAppUrl()}/path` --
+  // a NEXT_PUBLIC_APP_URL configured with one (e.g. "https://verexahq.com/")
+  // would otherwise silently double up into "https://verexahq.com//path" in every
+  // link built from it (portal invites, organizer links, etc.).
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL.replace(/\/+$/, "");
   if (request) return new URL(request.url).origin;
   return "http://localhost:3000";
 }

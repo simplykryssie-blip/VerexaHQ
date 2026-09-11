@@ -58,7 +58,7 @@ export default async function DashboardPage() {
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "appointments.manage" }),
     supabase.from("workspaces").select("onboarding_dismissed_at, stripe_connected_account_id").eq("id", workspace.id).maybeSingle(),
     user
-      ? supabase.from("user_profiles").select("seen_onboarding_steps, first_name, avatar_url").eq("id", user.id).maybeSingle()
+      ? supabase.from("user_profiles").select("seen_onboarding_steps, first_name, display_name, avatar_url").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
         key: "profile",
         label: "Complete your profile",
         description: "Add your name and a photo so colleagues recognize you in messages.",
-        href: "/settings/firm-profile",
+        href: "/settings/profile",
         complete: profileComplete,
       },
       ...(showEroSteps
@@ -180,14 +180,14 @@ export default async function DashboardPage() {
               key: "connections",
               label: "Send connection invites",
               description: "Invite the PTINs you work with to connect to your ERO.",
-              href: "/settings/connections",
+              href: "/settings/users",
               complete: (connectionCount ?? 0) > 0,
             },
           ]
         : []),
       {
         key: "organizer",
-        label: "Add or create organizers",
+        label: "Add or create forms",
         description: "Build the questions clients answer before you start their work.",
         href: "/templates",
         complete: (organizerCount ?? 0) > 0,
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
       {
         key: "automations",
         label: "Create your automations",
-        description: "Decide what happens automatically -- welcome emails, sending an organizer, moving a client into a pipeline.",
+        description: "Decide what happens automatically -- welcome emails, sending a form, moving a client into a pipeline.",
         href: "/workflows",
         complete: (automationCount ?? 0) > 0,
       },
@@ -212,6 +212,8 @@ export default async function DashboardPage() {
   return (
     <DashboardShell
       workspaceName={workspace.name}
+      generatedAt={new Date().toISOString()}
+      greetingName={profileRow?.display_name ?? profileRow?.first_name ?? null}
       isAdmin={workspace.is_owner}
       widgets={mergedWidgets}
       data={data}

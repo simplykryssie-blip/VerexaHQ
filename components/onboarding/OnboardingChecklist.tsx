@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Circle, HelpCircle, X } from "lucide-react";
+import { CheckCircle2, Circle, HelpCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/Modal";
 
@@ -25,7 +25,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   profile: {
     whatItDoes: "Your name and photo are how colleagues recognize you across the app -- on internal messages, the staff directory, and anywhere else your activity shows up.",
     howItWorks: "Once set, your photo and name show up automatically next to anything you do -- no separate setup needed per feature.",
-    howToSetUp: "Go to Firm Profile, upload a photo, and fill in your name if it's not already there.",
+    howToSetUp: "Go to Profile, upload a photo, and fill in your name if it's not already there.",
   },
   roles: {
     whatItDoes: "Roles control what each person on your team can see and do -- e.g. a preparer might not need access to billing, while a reviewer needs to approve returns.",
@@ -48,13 +48,13 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
     howToSetUp: "Go to Settings > Security, turn on two-factor authentication for your own account, and review the workspace's password, session, and lockout policy.",
   },
   organizer: {
-    whatItDoes: "An intake form (organizer) is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
+    whatItDoes: "An intake form is the questionnaire a client fills out before you start their work -- their info, documents needed, and anything specific to that service.",
     howItWorks: "Once a client submits it, their answers show up on their engagement automatically, and you can route different forms to different services if one form covers more than one type of work.",
-    howToSetUp: "Go to Templates, create a new organizer, add the questions you need, then attach it to a service's stage so it's pre-selected when staff send it from an engagement at that stage.",
+    howToSetUp: "Go to Templates, create a new form, add the questions you need, then attach it to a service's stage so it's pre-selected when staff send it from an engagement at that stage.",
   },
   pipeline: {
     whatItDoes: "A pipeline is the stages a piece of work moves through -- e.g. \"Info gathered\" -> \"In prep\" -> \"Review\" -> \"Delivered.\" Every engagement you open moves through one.",
-    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching an organizer, document checklist, or engagement letter to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
+    howItWorks: "Build a pipeline once and reuse it for every engagement of that type, attaching a form, document checklist, or signable document to whichever stage needs it. If you also want pricing or billing tied to it, you can wrap the same pipeline in a Service later -- but the pipeline works fine on its own.",
     howToSetUp: "Go to Pipelines, create one, and add its stages. Nothing about opening an engagement requires a service first.",
   },
   invite: {
@@ -64,7 +64,7 @@ const STEP_EXPLAINERS: Record<string, StepExplainer> = {
   },
   automations: {
     whatItDoes: "Automations let you decide what should happen automatically instead of a staff member remembering to do it -- e.g. when a client creates a portal account, send them a welcome email and load their intake form. Every office runs differently, so the trigger and the actions are both yours to pick.",
-    howItWorks: "You choose a trigger (a client signs up, an organizer is submitted, an engagement is created, an appointment's status changes) and then one or more actions to run when it fires (send an email or text, create a task, push an intake form, start the engagement's pipeline). Nothing sends unless you build it -- there's no automation running until you create one.",
+    howItWorks: "You choose a trigger (a client signs up, a form is submitted, an engagement is created, an appointment's status changes) and then one or more actions to run when it fires (send an email or text, create a task, push an intake form, start the engagement's pipeline). Nothing sends unless you build it -- there's no automation running until you create one.",
     howToSetUp: "Go to Workflows, click New workflow, pick a trigger, then add the steps you want to happen. You can pause or edit it any time, and each run shows up in that workflow's history so you can see it actually fired.",
   },
 };
@@ -88,10 +88,16 @@ export function OnboardingChecklist({
   const supabase = createClient();
   const [dismissing, setDismissing] = useState(false);
   const [hidden, setHidden] = useState(false);
+  // Closing the popup (the Modal's own Cancel/Escape/backdrop) is local to
+  // this page load, not a permanent dismissal -- it reopens next time the
+  // dashboard loads, same as today, but a staff member without permission
+  // to permanently dismiss (see canDismiss) can still get it off their
+  // screen for the current visit instead of being stuck with it.
+  const [closedForNow, setClosedForNow] = useState(false);
   const [seen, setSeen] = useState<Set<string>>(new Set(seenSteps));
   const [popupStep, setPopupStep] = useState<OnboardingStep | null>(null);
 
-  if (hidden) return null;
+  if (hidden || closedForNow) return null;
 
   const doneCount = steps.filter((s) => s.complete).length;
   const allDone = doneCount === steps.length;
@@ -137,28 +143,10 @@ export function OnboardingChecklist({
   const explainer = popupStep ? STEP_EXPLAINERS[popupStep.key] : null;
 
   return (
-    <div className="mb-4 rounded-2xl border border-border bg-surface shadow-soft p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-ink">{allDone ? "You're all set up" : "Get your firm set up"}</h2>
-          <p className="mt-0.5 text-xs text-muted">
-            {allDone
-              ? "You've completed every setup step. This card won't show again once dismissed."
-              : `${doneCount} of ${steps.length} steps complete`}
-          </p>
-        </div>
-        {canDismiss && (
-          <button
-            type="button"
-            onClick={dismiss}
-            disabled={dismissing}
-            aria-label="Dismiss setup checklist"
-            className="rounded p-1 text-muted hover:text-ink disabled:opacity-50"
-          >
-            <X size={16} />
-          </button>
-        )}
-      </div>
+    <Modal title={allDone ? "You're all set up" : "Get your firm set up"} onClose={() => setClosedForNow(true)} size="xl">
+      <p className="-mt-2 text-xs text-muted">
+        {allDone ? "You've completed every setup step." : `${doneCount} of ${steps.length} steps complete`}
+      </p>
 
       {!allDone && (
         <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surfaceMuted">
@@ -166,7 +154,7 @@ export function OnboardingChecklist({
         </div>
       )}
 
-      <ul className="mt-4 divide-y divide-border">
+      <ul className="mt-4 max-h-[60vh] divide-y divide-border overflow-y-auto">
         {steps.map((step) => (
           <li key={step.key} className="flex items-center justify-between gap-3 py-2.5">
             <div className="flex items-start gap-2.5">
@@ -205,6 +193,14 @@ export function OnboardingChecklist({
         ))}
       </ul>
 
+      {canDismiss && (
+        <div className="mt-4 flex justify-end border-t border-border pt-3">
+          <button type="button" onClick={dismiss} disabled={dismissing} className="text-xs font-medium text-muted hover:text-ink disabled:opacity-50">
+            Don&apos;t show this again
+          </button>
+        </div>
+      )}
+
       {popupStep && explainer && (
         <Modal title={popupStep.label} onClose={() => setPopupStep(null)}>
           <div className="space-y-3 text-sm text-slate">
@@ -235,6 +231,6 @@ export function OnboardingChecklist({
           </div>
         </Modal>
       )}
-    </div>
+    </Modal>
   );
 }

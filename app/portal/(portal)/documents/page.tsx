@@ -21,7 +21,7 @@ export default async function PortalDocumentsPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("document_requests")
-      .select("id, title, due_date, status, created_at, items:document_request_item_statuses(id, name, is_required, status)")
+      .select("id, title, due_date, status, created_at, items:document_request_item_statuses(id, name, is_required, status, category, due_date)")
       .eq("entity_type", "client")
       .eq("entity_id", identity.clientId)
       .order("created_at", { ascending: false }),

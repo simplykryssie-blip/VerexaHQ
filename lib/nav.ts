@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
+  UserCheck,
   Users,
   Briefcase,
   Calendar,
@@ -17,8 +18,8 @@ import {
   Bell,
   Flag,
   ScrollText,
+  Wallet,
   Zap,
-  Link2,
   ClipboardCheck,
   LifeBuoy,
   Kanban,
@@ -28,6 +29,13 @@ import {
   CreditCard,
   Wrench,
   Package,
+  Palette,
+  Receipt,
+  Handshake,
+  Sparkles,
+  CalendarOff,
+  UserCircle,
+  MapPin,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -48,7 +56,10 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Contacts", href: "/clients", icon: Users },
   { label: "Engagements", href: "/engagements", icon: Briefcase },
+  { label: "Billing", href: "/billing", icon: Receipt },
+  { label: "Partner Dashboard", href: "/partner-dashboard", icon: Wallet },
   { label: "Review Queue", href: "/review-queue", icon: ClipboardCheck },
+  { label: "Assignments", href: "/assignments", icon: UserCheck },
   { label: "Pipelines", href: "/pipelines", icon: Kanban },
   { label: "Workflows", href: "/workflows", icon: Zap },
   {
@@ -62,6 +73,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Calendar", href: "/calendar", icon: Calendar },
   { label: "Documents", href: "/documents", icon: FolderOpen },
   { label: "Tax Office", href: "/tax", icon: Landmark },
+  { label: "IRS Authorizations", href: "/irs-authorizations", icon: ShieldCheck },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Learning Hub", href: "/learning", icon: GraduationCap },
@@ -84,9 +96,12 @@ export type NavSection = { label: string; items: NavItem[] };
  * derived from NAV_ITEMS (by label) so there's one list of items, not two that can drift.
  */
 const NAV_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Daily", itemLabels: ["Dashboard", "Contacts", "Engagements", "Review Queue", "Messages"] },
+  {
+    label: "Daily",
+    itemLabels: ["Dashboard", "Contacts", "Engagements", "Billing", "Partner Dashboard", "Review Queue", "Assignments", "Calendar", "Messages"],
+  },
   { label: "Build", itemLabels: ["Pipelines", "Workflows", "Websites", "Templates"] },
-  { label: "Reference", itemLabels: ["Calendar", "Documents", "Tax Office", "Reports", "Learning Hub"] },
+  { label: "Reference", itemLabels: ["Documents", "Tax Office", "IRS Authorizations", "Reports", "Learning Hub"] },
   { label: "Admin", itemLabels: ["Support", "Settings"] },
 ];
 
@@ -106,11 +121,12 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/platform-admin", icon: LayoutDashboard },
   { label: "Billing", href: "/platform-admin/billing", icon: CreditCard },
   { label: "Systems", href: "/platform-admin/systems", icon: Wrench },
-  // Contacts/Engagements/Review Queue/Messages are the platform-admin
+  { label: "AI Agents", href: "/platform-admin/ai-agents", icon: Sparkles },
+  // Accounts/Engagements/Review Queue/Messages are the platform-admin
   // equivalents of the client-facing CRM nav's own tabs of the same name --
   // account holders instead of clients, terms/privacy acceptance instead of
   // client work, admin to-dos instead of client review items.
-  { label: "Contacts", href: "/platform-admin/accounts", icon: Users },
+  { label: "Accounts", href: "/platform-admin/accounts", icon: Users },
   { label: "Engagements", href: "/platform-admin/agreements", icon: Briefcase },
   { label: "Review Queue", href: "/platform-admin/review", icon: ClipboardCheck },
   { label: "Messages", href: "/messages", icon: MessageSquare },
@@ -122,9 +138,6 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
       { label: "Workflows", href: "/workflows" },
     ],
   },
-  // Verexa HQ also runs its own public marketing site, so unlike Tax
-  // Office (genuinely irrelevant to a platform-admin workspace), Websites
-  // stays reachable here too.
   {
     label: "Websites",
     icon: Globe,
@@ -151,6 +164,23 @@ export const PLATFORM_HOME_NAV_ITEMS: NavItem[] = [
 
 export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", items: PLATFORM_HOME_NAV_ITEMS }];
 
+/**
+ * Shortcuts into the team-management corner of Settings, surfaced as their
+ * own top-level section for an ERO/Service Bureau/multi-office firm --
+ * see isEroManagementTier(). These are the same pages Settings already
+ * lists (Users & Staff -- which also holds Connections and the Partners
+ * directory, folded into the same page -- and ERO Profile), just promoted
+ * out of a nested settings sub-nav for a workspace that actually runs a
+ * team, rather than duplicated pages.
+ */
+export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
+  { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
+  { label: "Firms", href: "/firms", icon: Building2 },
+  { label: "Team", href: "/settings/users", icon: Users },
+];
+
+export const ERO_MANAGEMENT_NAV_SECTION: NavSection = { label: "ERO Management", items: ERO_MANAGEMENT_NAV_ITEMS };
+
 export type SettingsNavItem = {
   label: string;
   href: string;
@@ -158,13 +188,19 @@ export type SettingsNavItem = {
 };
 
 export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
-  { label: "Firm Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "Profile", href: "/settings/profile", icon: UserCircle },
+  { label: "ERO Profile", href: "/settings/firm-profile", icon: Building2 },
+  { label: "Plan & Usage", href: "/settings/plan-usage", icon: CreditCard },
+  { label: "Branding", href: "/settings/brand-center", icon: Palette },
   { label: "Services", href: "/settings/services", icon: Package },
+  { label: "Locations", href: "/settings/locations", icon: MapPin },
+  { label: "Packages", href: "/settings/packages", icon: Handshake },
+  { label: "Banks & Software", href: "/settings/bank-partners", icon: Wallet },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
-  { label: "Connections", href: "/settings/connections", icon: Link2 },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
   { label: "Security", href: "/settings/security", icon: ShieldCheck },
+  { label: "Availability", href: "/settings/availability", icon: CalendarOff },
   { label: "Integrations", href: "/settings/integrations", icon: Plug },
   { label: "Notifications", href: "/settings/notifications", icon: Bell },
   { label: "Feature Flags", href: "/settings/feature-flags", icon: Flag },
@@ -174,8 +210,11 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 export type SettingsNavSection = { label: string; items: SettingsNavItem[] };
 
 const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
-  { label: "Personal", itemLabels: ["Security", "Notifications"] },
-  { label: "Firm", itemLabels: ["Firm Profile", "Services", "Users & Staff", "Roles & Permissions", "Tags", "Connections"] },
+  { label: "Personal", itemLabels: ["Profile"] },
+  {
+    label: "Firm",
+    itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Services", "Packages", "Banks & Software", "Users & Staff", "Roles & Permissions"],
+  },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];
 
@@ -183,3 +222,13 @@ export const SETTINGS_NAV_SECTIONS: SettingsNavSection[] = SETTINGS_SECTION_MEMB
   label: section.label,
   items: section.itemLabels.map((label) => SETTINGS_NAV_ITEMS.find((item) => item.label === label)).filter((item): item is SettingsNavItem => Boolean(item)),
 }));
+
+// Security/Availability/Notifications and Locations/Tags used to be their
+// own top-level nav entries; they're now tabs reachable from Profile and
+// Services respectively (see lib/settingsSubNav.ts), so the sidebar link
+// for the parent should still read as "active" while on one of those
+// sub-pages instead of going dark.
+export const SETTINGS_GROUPED_HREFS: Record<string, string[]> = {
+  "/settings/profile": ["/settings/profile", "/settings/security", "/settings/availability", "/settings/notifications"],
+  "/settings/services": ["/settings/services", "/settings/locations", "/settings/tags"],
+};

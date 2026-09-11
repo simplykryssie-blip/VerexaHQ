@@ -1,25 +1,43 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { LayoutTemplate } from "lucide-react";
-import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { LayoutTemplate, FileText, ListChecks, ClipboardList, Share2 } from "lucide-react";
+import { Tabs } from "@/components/ui/Tabs";
+import { StatTile } from "@/components/ui/StatTile";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { OrganizerLibrary, type OrganizerCard } from "@/components/settings/organizer-builder/OrganizerLibrary";
 import { EngagementLetterLibrary, type EngagementLetterCard } from "@/components/settings/engagement-letter-editor/EngagementLetterLibrary";
+import { DocumentRequestLibrary, type DocumentRequestTemplateCard } from "@/components/settings/document-request-editor/DocumentRequestLibrary";
 import { PendingTemplateShares, type PendingShare } from "@/components/settings/PendingTemplateShares";
 import type { DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
 
-export type FormTemplateTabKey = "engagement-letter" | "organizers";
+export type FormTemplateTabKey = "engagement-letter" | "organizers" | "document-requests";
 
 // Split out from the old generic TemplateLibrary so this route's bundle never
 // pulls in the Email/SMS composer's Tiptap dependency -- see EmailSmsLibrary
 // for that side.
 export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { workspaceId: string; activeTabParam?: string }) {
-  const activeTab: FormTemplateTabKey = activeTabParam === "organizers" ? "organizers" : "engagement-letter";
+  const activeTab: FormTemplateTabKey =
+    activeTabParam === "organizers" ? "organizers" : activeTabParam === "document-requests" ? "document-requests" : "engagement-letter";
   const isOrganizers = activeTab === "organizers";
+  const isDocumentRequests = activeTab === "document-requests";
 
   const supabase = createClient();
   const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
 
-  const { data: engagementLetterTemplates } = !isOrganizers
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { data: starredRows } = user
+    ? await supabase
+        .from("starred_items")
+        .select("entity_type, entity_id")
+        .eq("user_id", user.id)
+        .in("entity_type", ["organizer_template", "engagement_letter_template", "document_request_template"])
+    : { data: [] as { entity_type: string; entity_id: string }[] };
+  const starredOrganizerIds = new Set((starredRows ?? []).filter((r) => r.entity_type === "organizer_template").map((r) => r.entity_id));
+  const starredLetterIds = new Set((starredRows ?? []).filter((r) => r.entity_type === "engagement_letter_template").map((r) => r.entity_id));
+  const starredDocumentRequestIds = new Set((starredRows ?? []).filter((r) => r.entity_type === "document_request_template").map((r) => r.entity_id));
+
+  const { data: engagementLetterTemplates } = !isOrganizers && !isDocumentRequests
     ? await supabase
         .from("engagement_letter_templates")
         .select("id, name, status, workspace_id, folder_id, requires_signature, merge_fields")
@@ -61,6 +79,53 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     };
   });
 
+  const { data: documentRequestTemplates } = isDocumentRequests
+    ? await supabase
+        .from("document_request_templates")
+        .select("id, name, description, status, workspace_id, folder_id")
+        .or(orFilter)
+        .order("name")
+    : { data: null };
+
+  const documentRequestTemplateIds = (documentRequestTemplates ?? []).map((t) => t.id);
+  const { data: documentRequestItems } =
+    isDocumentRequests && documentRequestTemplateIds.length > 0
+      ? await supabase.from("document_request_items").select("id, document_request_template_id, is_required").in("document_request_template_id", documentRequestTemplateIds)
+      : { data: [] as { id: string; document_request_template_id: string; is_required: boolean }[] };
+
+  const documentRequestCards: DocumentRequestTemplateCard[] = (documentRequestTemplates ?? []).map((t) => {
+    const itemsForTemplate = (documentRequestItems ?? []).filter((i) => i.document_request_template_id === t.id);
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description,
+      status: t.status,
+      workspace_id: t.workspace_id,
+      folder_id: t.folder_id,
+      itemCount: itemsForTemplate.length,
+      requiredCount: itemsForTemplate.filter((i) => i.is_required).length,
+    };
+  });
+
+  // The stat row always shows all three counts regardless of which tab is
+  // active -- the active tab's count comes free from the cards array already
+  // fetched above; the other two get a cheap head-only count query instead
+  // of pulling their full rows.
+  const [{ count: engagementLetterCountRaw }, { count: organizerCountRaw }, { count: documentRequestCountRaw }] = await Promise.all([
+    !isOrganizers && !isDocumentRequests
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("engagement_letter_templates").select("id", { count: "exact", head: true }).or(orFilter),
+    isOrganizers
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("organizer_templates").select("id", { count: "exact", head: true }).or(orFilter),
+    isDocumentRequests
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("document_request_templates").select("id", { count: "exact", head: true }).or(orFilter),
+  ]);
+  const engagementLetterCount = !isOrganizers && !isDocumentRequests ? engagementLetterCards.length : engagementLetterCountRaw ?? 0;
+  const organizerCount = isOrganizers ? organizerCards.length : organizerCountRaw ?? 0;
+  const documentRequestCount = isDocumentRequests ? documentRequestCards.length : documentRequestCountRaw ?? 0;
+
   const { data: folders } = await supabase
     .from("library_folders")
     .select("id, parent_folder_id, name")
@@ -68,7 +133,9 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     .eq("item_type", "form_template")
     .order("name");
 
-  const { data: jotformConnected } = isOrganizers ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId }) : { data: false };
+  const { data: jotformConnected } = !isDocumentRequests
+    ? await supabase.rpc("is_workspace_jotform_connected", { p_workspace_id: workspaceId })
+    : { data: false };
 
   // Only an ERO or Service Bureau (a "parent" in an active firm connection)
   // can share a template down to a connected firm -- never automatic, and
@@ -111,54 +178,70 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     sharedByFirmName: (r.workspaces as unknown as { name?: string } | null)?.name ?? "A connected firm",
   }));
 
-  const tabs: { key: FormTemplateTabKey; label: string }[] = [
-    { key: "engagement-letter", label: "Engagement Letters" },
-    { key: "organizers", label: "Organizers" },
+  const pendingLetterShareCount = pendingShares.filter((s) => s.objectType === "engagement_letter_templates").length;
+  const pendingOrganizerShareCount = pendingShares.filter((s) => s.objectType === "organizer_templates").length;
+
+  const tabs: { key: FormTemplateTabKey; label: string; badge?: number }[] = [
+    { key: "engagement-letter", label: "Documents", badge: pendingLetterShareCount },
+    { key: "organizers", label: "Forms", badge: pendingOrganizerShareCount },
+    { key: "document-requests", label: "Document Requests" },
   ];
 
+  const heroSub =
+    pendingShares.length > 0
+      ? `${pendingShares.length} shared template${pendingShares.length === 1 ? "" : "s"} waiting for your review.`
+      : `${engagementLetterCount + organizerCount + documentRequestCount} templates across documents, forms, and requests.`;
+
   return (
-    <div className="max-w-6xl">
-      <SettingsSectionHeader
+    <>
+      <PageHero
         icon={LayoutTemplate}
-        title="Form Templates"
-        description="Engagement letter and organizer templates. See Email & SMS in the Templates menu for message templates."
+        tone="violet"
+        heading={
+          <>
+            Your <HeroHighlight>template library</HeroHighlight>.
+          </>
+        }
+        subtitle={heroSub}
       />
 
-      <div className="mt-4">
-        <nav className="flex gap-1 border-b border-border">
-          {tabs.map((t) => (
-            <Link
-              key={t.key}
-              href={`/templates?tab=${t.key}`}
-              className={`whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${
-                activeTab === t.key ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={FileText} tone="accent" label="Document templates" value={engagementLetterCount} />
+          <StatTile icon={ListChecks} tone="emerald" label="Form templates" value={organizerCount} />
+          <StatTile icon={ClipboardList} tone="amber" label="Document request templates" value={documentRequestCount} />
+          <StatTile icon={Share2} tone="rose" label="Pending shares" value={pendingShares.length} />
+        </div>
 
-      <div className="mt-4">
-        <PendingTemplateShares shares={pendingShares} />
-        {isOrganizers ? (
-          <OrganizerLibrary
-            workspaceId={workspaceId}
-            templates={organizerCards}
-            folders={folders ?? []}
-            isJotformConnected={Boolean(jotformConnected)}
-            downlineWorkspaces={downlineWorkspaces}
-          />
-        ) : (
-          <EngagementLetterLibrary
-            workspaceId={workspaceId}
-            templates={engagementLetterCards}
-            folders={folders ?? []}
-            downlineWorkspaces={downlineWorkspaces}
-          />
-        )}
+        <div>
+          <Tabs tabs={tabs.map((t) => ({ id: t.key, label: t.label, badge: t.badge, href: `/templates?tab=${t.key}` }))} active={activeTab} />
+        </div>
+
+        <div>
+          <PendingTemplateShares shares={pendingShares} />
+          {isOrganizers ? (
+            <OrganizerLibrary
+              workspaceId={workspaceId}
+              templates={organizerCards}
+              folders={folders ?? []}
+              isJotformConnected={Boolean(jotformConnected)}
+              downlineWorkspaces={downlineWorkspaces}
+              starredIds={starredOrganizerIds}
+            />
+          ) : isDocumentRequests ? (
+            <DocumentRequestLibrary workspaceId={workspaceId} templates={documentRequestCards} folders={folders ?? []} starredIds={starredDocumentRequestIds} />
+          ) : (
+            <EngagementLetterLibrary
+              workspaceId={workspaceId}
+              templates={engagementLetterCards}
+              folders={folders ?? []}
+              isJotformConnected={Boolean(jotformConnected)}
+              downlineWorkspaces={downlineWorkspaces}
+              starredIds={starredLetterIds}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

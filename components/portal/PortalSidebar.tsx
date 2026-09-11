@@ -12,11 +12,16 @@ export function PortalSidebar({
   pendingCount,
   logoUrl,
   firmName,
+  accentIsCustom,
 }: {
   clientLabel: string;
   pendingCount: number;
   logoUrl?: string | null;
   firmName?: string | null;
+  /** True once the firm has set its own Brand Center accent color -- the active
+   * nav pill then stays a flat tint of that color instead of picking up the
+   * default blue-to-lime brand gradient, same rule the staff sidebar follows. */
+  accentIsCustom?: boolean;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -50,7 +55,7 @@ export function PortalSidebar({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={trimmedLogoUrl} alt={firmName ?? "Firm logo"} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
             ) : (
-              <p className="text-sm font-semibold text-ink">{firmName || "VerexaHQ"}</p>
+              <p className="text-sm font-semibold text-ink">{firmName || "Verexa HQ CRM"}</p>
             )}
             <p className="mt-0.5 truncate text-xs text-muted">{clientLabel}</p>
             <span className="mt-2 inline-flex items-center rounded-full bg-accentSoft px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
@@ -71,7 +76,11 @@ export function PortalSidebar({
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-                  active ? "bg-accentSoft text-accent" : "text-slate hover:bg-surfaceMuted hover:text-ink"
+                  active
+                    ? accentIsCustom
+                      ? "bg-accentSoft text-accent"
+                      : "bg-gradient-to-r from-accent to-brandLime font-semibold text-ink"
+                    : "text-slate hover:bg-surfaceMuted hover:text-ink"
                 }`}
               >
                 <Icon size={18} strokeWidth={2} />

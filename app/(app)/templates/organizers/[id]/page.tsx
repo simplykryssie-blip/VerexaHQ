@@ -14,13 +14,13 @@ export default async function OrganizerBuilderPage({ params }: { params: { id: s
   const [{ data: template }, { data: fields }] = await Promise.all([
     supabase
       .from("organizer_templates")
-      .select("id, name, slug, description, status, workspace_id, public_token, is_public, requires_portal_signup, banner_image_url")
+      .select("id, name, slug, description, status, workspace_id, public_token, is_public, requires_portal_signup, banner_image_url, custom_css")
       .eq("id", params.id)
       .maybeSingle(),
     supabase
       .from("organizer_fields")
       .select(
-        "id, organizer_template_id, parent_field_id, field_type, label, help_text, display_order, is_required, options, conditional_logic, client_profile_field, relationship_role"
+        "id, organizer_template_id, parent_field_id, field_type, label, help_text, body_html, display_order, is_required, options, conditional_logic, client_profile_field, relationship_role, irs_8821_role, layout_width, include_in_document_checklist, document_checklist_name, document_checklist_category, is_internal_only, image_url"
       )
       .eq("organizer_template_id", params.id)
       .order("display_order"),

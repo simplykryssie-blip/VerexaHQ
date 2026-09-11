@@ -1,7 +1,14 @@
 import type { Config } from "tailwindcss";
+import containerQueries from "@tailwindcss/container-queries";
+import typography from "@tailwindcss/typography";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  // lib/** is included because a few shared helpers (e.g.
+  // lib/organizer/layoutWidth.ts) assemble Tailwind class strings that are
+  // never typed literally inside app/ or components/ -- without this, the
+  // JIT scanner never sees those classes and silently never generates the
+  // CSS for them.
+  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -14,12 +21,35 @@ const config: Config = {
         accent: "rgb(var(--brand-accent-rgb, 11 127 224) / <alpha-value>)",
         accentSoft: "rgb(var(--brand-accent-soft-rgb, 232 243 254) / <alpha-value>)",
         surface: "#FFFFFF",
-        surfaceMuted: "#F7F8FA",
-        border: "#E7E9EE",
+        // Cool, slightly-blue neutral (matches the `border`/`ink` slate
+        // family below) rather than a warm/sage tint -- a warm-biased canvas
+        // reads as dated next to crisp white cards, especially under warm
+        // indoor lighting or a screen's own color cast.
+        surfaceMuted: "#F8FAFC",
+        border: "#E3E7F0",
         muted: "#64748B",
+        // The lime-green from the second half of the real Verexa "V" mark
+        // (public/brand/vmark.png), tempered down from the mark's own acid
+        // #D4F905 so it stays legible as a UI color at real sizes rather
+        // than just a glossy logo highlight. Pairs with `accent` (which
+        // already resolves to the mark's blue by default, or a workspace's
+        // own Brand Center color when set) as the second stop of the one
+        // brand gradient -- see Sidebar.module.css's --nav-active-bg for
+        // where that gradient is actually used.
+        brandLime: "#A4D22B",
+        // Second stop of the Dashboard hero's "Welcome back" gradient -- a
+        // lightened tint of the workspace's own accent color (see
+        // --brand-gradient-to-rgb in app/(app)/layout.tsx), so it's always
+        // in the same hue family as `accent` instead of an independently
+        // picked color that might clash. Falls back to the same brandLime
+        // hex above for any workspace that hasn't set an accent color.
+        brandGradientTo: "rgb(var(--brand-gradient-to-rgb, 164 210 43) / <alpha-value>)",
         success: "#16A34A",
+        successSoft: "#E3F4E9",
         warning: "#D97706",
+        warningSoft: "#FAEFE1",
         danger: "#DC2626",
+        dangerSoft: "#FBE5E5",
         // Categorical icon-chip palette -- for tagging *kinds* of things (a
         // stat card's subject, an activity feed row's action type), never
         // status. Kept separate from success/warning/danger, which stay
@@ -63,7 +93,7 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [containerQueries, typography],
 };
 
 export default config;

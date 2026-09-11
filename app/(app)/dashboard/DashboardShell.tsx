@@ -2,22 +2,46 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Settings2, Eye, EyeOff, ArrowUp, ArrowDown, DollarSign, Briefcase, Receipt, FileWarning, MessageSquare, ListChecks } from "lucide-react";
+import Link from "next/link";
+import {
+  Settings2,
+  Eye,
+  EyeOff,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
+  DollarSign,
+  Briefcase,
+  Receipt,
+  FileWarning,
+  MessageSquare,
+  ListChecks,
+  Plus,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { PageHeader } from "@/components/PageHeader";
-import { KpiWidget } from "@/components/widgets/KpiWidget";
+import { Button } from "@/components/ui/Button";
+import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
 import { CalendarWidget } from "@/components/widgets/CalendarWidget";
 import { RecentActivityWidget } from "@/components/widgets/RecentActivityWidget";
 import { ReviewQueueWidget } from "@/components/widgets/ReviewQueueWidget";
+import { TopServicesWidget } from "@/components/widgets/TopServicesWidget";
+import { EngagementPipelineWidget } from "@/components/widgets/EngagementPipelineWidget";
+import { StageBreakdownWidget } from "@/components/widgets/StageBreakdownWidget";
+import { DeadlineRiskWidget } from "@/components/widgets/DeadlineRiskWidget";
+import { UnassignedEngagementsWidget } from "@/components/widgets/UnassignedEngagementsWidget";
+import { OverdueRequestsWidget } from "@/components/widgets/OverdueRequestsWidget";
+import { FailedAutomationRunsWidget } from "@/components/widgets/FailedAutomationRunsWidget";
 import { WidgetShell } from "@/components/widgets/WidgetShell";
+import { IconChip } from "@/components/ui/IconChip";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
+import { FreshnessBadge } from "@/components/dashboard/FreshnessBadge";
 import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
-import { isWidgetType, type WidgetType } from "@/lib/dashboard/widgets";
+import { isWidgetType, WIDE_WIDGET_TYPES, WIDGET_SECTIONS, type WidgetType } from "@/lib/dashboard/widgets";
 
 export type WidgetRow = { id: string; widget_type: string; title: string | null; display_order: number; is_visible: boolean };
 
@@ -25,8 +49,19 @@ function money(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Real percentage change only -- returns undefined (no trend shown) rather
+// than a fabricated number when there's no honest baseline to compare against
+// (equal values, or a previous value of zero where "% change" is undefined).
+function trendFor(current: number, previous: number, suffix: string, sentiment?: "positive" | "negative"): KpiTrend | undefined {
+  if (previous <= 0 || current === previous) return undefined;
+  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
+  return { direction: current > previous ? "up" : "down", label: `${pct}% ${suffix}`, sentiment };
+}
+
 export function DashboardShell({
   workspaceName,
+  generatedAt,
+  greetingName,
   isAdmin,
   widgets,
   data,
@@ -37,6 +72,13 @@ export function DashboardShell({
   seenOnboardingSteps,
 }: {
   workspaceName: string;
+  /** ISO timestamp taken at the start of this server render -- see
+   *  FreshnessBadge for why the display formatting happens client-side. */
+  generatedAt: string;
+  /** For the greeting hero -- the same display_name shown in the sidebar, so
+   *  the two never disagree. Null falls back to the workspace name so a
+   *  staff member who hasn't set one yet still gets a real greeting. */
+  greetingName: string | null;
   /** Only gates the "Invite Staff" quick action (see quickActionPermissions
    *  below) -- widget visibility/order stays per-user (user_widget_preferences),
    *  not admin-only. */
@@ -56,6 +98,8 @@ export function DashboardShell({
   const [rows, setRows] = useState(widgets);
   const [customizing, setCustomizing] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const sorted = [...rows].sort((a, b) => a.display_order - b.display_order);
   const visible = sorted.filter((w) => w.is_visible);
@@ -85,23 +129,25 @@ export function DashboardShell({
     router.refresh();
   }
 
-  async function move(row: WidgetRow, direction: -1 | 1) {
-    const idx = sorted.findIndex((r) => r.id === row.id);
-    const swapWith = sorted[idx + direction];
-    if (!swapWith) return;
+  // Drag-to-reorder replaces the old up/down buttons -- dropping a widget
+  // anywhere in the list moves it there directly instead of one step at a
+  // time. Reassigns every row's display_order sequentially (not just the
+  // two that swapped) since a drop can move an item across several
+  // positions in one gesture.
+  async function reorder(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const current = [...sorted];
+    const fromIndex = current.findIndex((r) => r.id === draggedId);
+    const toIndex = current.findIndex((r) => r.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
 
-    setSaving(row.id);
-    setRows((prev) =>
-      prev.map((r) => {
-        if (r.id === row.id) return { ...r, display_order: swapWith.display_order };
-        if (r.id === swapWith.id) return { ...r, display_order: row.display_order };
-        return r;
-      })
-    );
-    await Promise.all([
-      savePreference(row.id, { display_order: swapWith.display_order }),
-      savePreference(swapWith.id, { display_order: row.display_order }),
-    ]);
+    const [moved] = current.splice(fromIndex, 1);
+    current.splice(toIndex, 0, moved);
+    const reindexed = current.map((r, i) => ({ ...r, display_order: i }));
+
+    setSaving(draggedId);
+    setRows((prev) => prev.map((r) => reindexed.find((x) => x.id === r.id) ?? r));
+    await Promise.all(reindexed.map((r) => savePreference(r.id, { display_order: r.display_order })));
     setSaving(null);
     router.refresh();
   }
@@ -115,7 +161,8 @@ export function DashboardShell({
             value={money(data.kpis.revenueThisMonth)}
             icon={DollarSign}
             chip="emerald"
-            reportHref="/reports/financial"
+            reportHref="/billing"
+            trend={trendFor(data.kpis.revenueThisMonth, data.kpis.revenueLastMonth, "vs last month")}
           />
         );
       case "kpis":
@@ -123,20 +170,35 @@ export function DashboardShell({
           <WidgetShell title="Engagements & Tasks">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-accentSoft text-accent">
+                <IconChip tone="accent" className="mb-3">
                   <Briefcase size={17} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Open Engagements</p>
-                <p className="mt-1 font-display text-2xl font-semibold tabular-nums text-ink">{data.kpis.openEngagements}</p>
+                <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{data.kpis.openEngagements}</p>
               </div>
               <div>
-                <span className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-amberSoft text-amber">
+                <IconChip tone="amber" className="mb-3">
                   <ListChecks size={17} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Tasks Due Today</p>
-                <p className={`mt-1 font-display text-2xl font-semibold tabular-nums ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}>
+                <p
+                  className={`mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight ${data.kpis.tasksDueToday > 0 ? "text-warning" : "text-ink"}`}
+                >
                   {data.kpis.tasksDueToday}
                 </p>
+                {(() => {
+                  // Fewer outstanding tasks than yesterday's same bucket is good news, so a
+                  // "down" trend here is positive -- the reverse of revenue's convention.
+                  const trend = trendFor(data.kpis.tasksDueToday, data.kpis.tasksDueYesterday, "vs yesterday", data.kpis.tasksDueToday < data.kpis.tasksDueYesterday ? "positive" : "negative");
+                  if (!trend) return null;
+                  const Icon = trend.direction === "up" ? ArrowUp : ArrowDown;
+                  return (
+                    <p className={`mt-1 flex items-center gap-1 text-xs font-medium ${trend.sentiment === "positive" ? "text-success" : "text-danger"}`}>
+                      <Icon size={12} aria-hidden="true" />
+                      {trend.label}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
           </WidgetShell>
@@ -149,7 +211,7 @@ export function DashboardShell({
             tone={data.kpis.outstandingInvoicesCount > 0 ? "warning" : "default"}
             icon={Receipt}
             chip="rose"
-            reportHref="/reports/financial?filter=outstanding"
+            reportHref="/billing?filter=unpaid"
           />
         );
       case "missing_documents":
@@ -160,7 +222,7 @@ export function DashboardShell({
             tone={data.kpis.missingDocumentsCount > 0 ? "warning" : "default"}
             icon={FileWarning}
             chip="amber"
-            reportHref="/reports/documents"
+            reportHref="/reports/documents?report=missing"
           />
         );
       case "messages":
@@ -175,29 +237,68 @@ export function DashboardShell({
         return <CalendarWidget items={data.calendarItems} />;
       case "recent_activity":
         return <RecentActivityWidget items={data.recentActivity} />;
+      case "top_services":
+        return <TopServicesWidget services={data.topServices} />;
+      case "engagement_pipeline":
+        return <EngagementPipelineWidget stages={data.engagementPipeline} />;
+      case "stage_breakdown":
+        return <StageBreakdownWidget stages={data.engagementPipeline} />;
+      case "deadline_risk":
+        return <DeadlineRiskWidget items={data.deadlineRisk} />;
+      case "unassigned_engagements":
+        return <UnassignedEngagementsWidget items={data.unassignedEngagements} />;
+      case "overdue_requests":
+        return <OverdueRequestsWidget items={data.overdueRequests} />;
+      case "failed_automations":
+        return <FailedAutomationRunsWidget items={data.failedAutomationRuns} />;
       default:
         return null;
     }
   }
 
+  const resolvedGreetingName = greetingName ?? workspaceName;
+  const urgentCount = priorities.length;
+  const heroSub =
+    urgentCount > 0
+      ? `${urgentCount} thing${urgentCount === 1 ? "" : "s"} need${urgentCount === 1 ? "s" : ""} your attention today.`
+      : "Nothing urgent today -- you're caught up.";
+
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description={`Welcome back to ${workspaceName}.`}
-        actions={
-          <button
-            type="button"
-            onClick={() => setCustomizing((v) => !v)}
-            aria-pressed={customizing}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-              customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
-            }`}
-          >
-            <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
-          </button>
-        }
-      />
+      <div className="relative overflow-hidden border-b border-border px-8 py-9">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandGradientTo opacity-20 blur-3xl"
+        />
+        <div className="relative flex items-start justify-between gap-6">
+          <div>
+            <h1 className="font-display text-[28px] font-semibold leading-normal text-ink">
+              Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{resolvedGreetingName}</span>.
+            </h1>
+            <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
+            <div className="mt-3">
+              <FreshnessBadge generatedAt={generatedAt} />
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCustomizing((v) => !v)}
+              aria-pressed={customizing}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
+              }`}
+            >
+              <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
+            </button>
+            <Link href="/engagements/new">
+              <Button size="sm">
+                <Plus size={14} aria-hidden="true" /> New Engagement
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
 
       <div className="flex-1 px-8 py-6">
         {onboardingSteps && onboardingSteps.length > 0 && (
@@ -213,48 +314,75 @@ export function DashboardShell({
 
         {customizing && (
           <div className="mb-4 rounded-xl border border-border bg-surfaceMuted p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">Widget layout -- drag to reorder</h2>
             <ul className="mt-2 divide-y divide-border">
-              {sorted.map((row, i) => (
-                <li key={row.id} className="flex items-center justify-between py-2 text-sm">
-                  <span className={row.is_visible ? "text-slate" : "text-muted line-through"}>{row.title ?? row.widget_type}</span>
+              {sorted.map((row) => (
+                <li
+                  key={row.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", row.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDraggingId(row.id);
+                  }}
+                  onDragEnd={() => {
+                    setDraggingId(null);
+                    setDragOverId(null);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                    if (dragOverId !== row.id) setDragOverId(row.id);
+                  }}
+                  onDragLeave={() => setDragOverId((id) => (id === row.id ? null : id))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const draggedId = e.dataTransfer.getData("text/plain");
+                    setDragOverId(null);
+                    if (draggedId) reorder(draggedId, row.id);
+                  }}
+                  className={`flex cursor-grab items-center justify-between py-2 text-sm transition active:cursor-grabbing ${
+                    draggingId === row.id ? "opacity-40" : ""
+                  } ${dragOverId === row.id && draggingId !== row.id ? "border-t-2 border-accent" : ""}`}
+                >
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={i === 0 || saving === row.id}
-                      onClick={() => move(row, -1)}
-                      aria-label={`Move ${row.title ?? row.widget_type} up`}
-                      className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowUp size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={i === sorted.length - 1 || saving === row.id}
-                      onClick={() => move(row, 1)}
-                      aria-label={`Move ${row.title ?? row.widget_type} down`}
-                      className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                    >
-                      <ArrowDown size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving === row.id}
-                      onClick={() => toggleVisible(row)}
-                      aria-label={row.is_visible ? `Hide ${row.title ?? row.widget_type}` : `Show ${row.title ?? row.widget_type}`}
-                      className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
-                    >
-                      {row.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                    </button>
+                    <GripVertical size={14} className="shrink-0 text-muted" aria-hidden="true" />
+                    <span className={row.is_visible ? "text-slate" : "text-muted line-through"}>{row.title ?? row.widget_type}</span>
                   </div>
+                  <button
+                    type="button"
+                    disabled={saving === row.id}
+                    onClick={() => toggleVisible(row)}
+                    aria-label={row.is_visible ? `Hide ${row.title ?? row.widget_type}` : `Show ${row.title ?? row.widget_type}`}
+                    className="rounded p-1 text-muted hover:text-ink disabled:opacity-30"
+                  >
+                    {row.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((row) => (isWidgetType(row.widget_type) ? <div key={row.id}>{renderWidget(row.widget_type)}</div> : null))}
+        <div className="space-y-8">
+          {WIDGET_SECTIONS.map((section) => {
+            const sectionRows = visible.filter((row) => isWidgetType(row.widget_type) && section.types.includes(row.widget_type));
+            if (sectionRows.length === 0) return null;
+            return (
+              <div key={section.label}>
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{section.label}</h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {sectionRows.map((row) =>
+                    isWidgetType(row.widget_type) ? (
+                      <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
+                        {renderWidget(row.widget_type)}
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>

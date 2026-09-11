@@ -1,29 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Card } from "@/components/ui/Card";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 type Result = { id: string; label: string; sub: string };
 
 export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
   const supabase = createClient();
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   useEffect(() => {
     const q = query.trim();
@@ -81,7 +73,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
       </div>
 
       {open && query.trim().length >= 2 && (
-        <Card padded={false} className="absolute left-0 top-full z-30 mt-1 w-full shadow-lg">
+        <DropdownPanel className="left-0 top-full mt-1 w-full">
           {loading ? (
             <p className="px-3 py-3 text-sm text-muted">Searching…</p>
           ) : results.length === 0 ? (
@@ -102,7 +94,7 @@ export function GlobalSearch({ workspaceId }: { workspaceId: string }) {
               ))}
             </ul>
           )}
-        </Card>
+        </DropdownPanel>
       )}
     </div>
   );

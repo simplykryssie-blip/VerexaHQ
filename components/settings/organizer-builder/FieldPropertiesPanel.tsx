@@ -1,11 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { CHOICE_FIELD_TYPES, FIELD_TYPE_LABELS, NON_ANSWERABLE_FIELD_TYPES } from "@/lib/organizer/fieldTypes";
 import { normalizeOptions } from "@/lib/organizer/formatValue";
 import { parseConditionalLogic, type LogicOperator, type Rule, type ShowIf } from "@/lib/organizer/conditionalLogic";
 import { CLIENT_PROFILE_FIELDS_BY_TYPE, CLIENT_PROFILE_FIELD_LABELS } from "@/lib/organizer/clientProfileFields";
 import { RELATIONSHIP_ROLES_BY_TYPE, RELATIONSHIP_ROLE_LABELS } from "@/lib/organizer/relationshipRoles";
+import { IRS_8821_ROLES_BY_TYPE, IRS_8821_ROLE_LABELS } from "@/lib/organizer/irs8821Roles";
+import { isWidthEligible } from "@/lib/organizer/layoutWidth";
+import { RichTextEditor } from "@/components/settings/RichTextEditor";
+import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import type { BuilderField } from "./types";
 
 const OPERATOR_LABELS: Record<LogicOperator, string> = {
@@ -29,16 +34,39 @@ export function FieldPropertiesPanel({
   otherTopLevelFields,
   onUpdate,
   onDelete,
+  onClose,
   readOnly,
+  workspaceId,
 }: {
   field: BuilderField | null;
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
+    patch: Partial<
+      Pick<
+        BuilderField,
+        | "label"
+        | "help_text"
+        | "body_html"
+        | "is_required"
+        | "options"
+        | "conditional_logic"
+        | "client_profile_field"
+        | "relationship_role"
+        | "irs_8821_role"
+        | "layout_width"
+        | "include_in_document_checklist"
+        | "document_checklist_name"
+        | "document_checklist_category"
+        | "is_internal_only"
+        | "image_url"
+      >
+    >
   ) => void;
+  onClose: () => void;
   onDelete: (fieldId: string) => void;
   readOnly: boolean;
+  workspaceId: string;
 }) {
   if (!field) {
     return (
@@ -50,34 +78,52 @@ export function FieldPropertiesPanel({
   }
 
   if (field.field_type === "page_break") {
-    return <PageBreakForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+    return <PageBreakForm key={field.id} field={field} onUpdate={onUpdate} onDelete={onDelete} onClose={onClose} readOnly={readOnly} />;
   }
 
-  return <PropertiesForm key={field.id} field={field} otherTopLevelFields={otherTopLevelFields} onUpdate={onUpdate} onDelete={onDelete} readOnly={readOnly} />;
+  return (
+    <PropertiesForm
+      key={field.id}
+      field={field}
+      otherTopLevelFields={otherTopLevelFields}
+      onUpdate={onUpdate}
+      onDelete={onDelete}
+      onClose={onClose}
+      readOnly={readOnly}
+      workspaceId={workspaceId}
+    />
+  );
 }
 
 function PageBreakForm({
   field,
   onUpdate,
   onDelete,
+  onClose,
   readOnly,
 }: {
   field: BuilderField;
   onUpdate: (fieldId: string, patch: Partial<Pick<BuilderField, "label">>) => void;
   onDelete: (fieldId: string) => void;
+  onClose: () => void;
   readOnly: boolean;
 }) {
   const [label, setLabel] = useState(field.label);
 
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-ink">Page break</p>
-        {!readOnly && (
-          <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
-            Delete
+        <div className="flex items-center gap-3">
+          {!readOnly && (
+            <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
+              Delete
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Close field properties" className="text-muted hover:text-ink">
+            <X size={14} />
           </button>
-        )}
+        </div>
       </div>
       <p className="mt-1 text-xs text-muted">
         Everything above this splits into its own page; everything below starts a new one. Not a question -- nothing is asked here.
@@ -103,19 +149,44 @@ function PropertiesForm({
   otherTopLevelFields,
   onUpdate,
   onDelete,
+  onClose,
   readOnly,
+  workspaceId,
 }: {
   field: BuilderField;
   otherTopLevelFields: BuilderField[];
   onUpdate: (
     fieldId: string,
-    patch: Partial<Pick<BuilderField, "label" | "help_text" | "is_required" | "options" | "conditional_logic" | "client_profile_field" | "relationship_role">>
+    patch: Partial<
+      Pick<
+        BuilderField,
+        | "label"
+        | "help_text"
+        | "body_html"
+        | "is_required"
+        | "options"
+        | "conditional_logic"
+        | "client_profile_field"
+        | "relationship_role"
+        | "irs_8821_role"
+        | "layout_width"
+        | "include_in_document_checklist"
+        | "document_checklist_name"
+        | "document_checklist_category"
+        | "is_internal_only"
+        | "image_url"
+      >
+    >
   ) => void;
   onDelete: (fieldId: string) => void;
+  onClose: () => void;
   readOnly: boolean;
+  workspaceId: string;
 }) {
   const [label, setLabel] = useState(field.label);
   const [helpText, setHelpText] = useState(field.help_text ?? "");
+  const [checklistName, setChecklistName] = useState(field.document_checklist_name ?? "");
+  const [checklistCategory, setChecklistCategory] = useState(field.document_checklist_category ?? "");
   const options = normalizeOptions(field.options);
   const showIf = parseConditionalLogic(field.conditional_logic).show_if ?? null;
 
@@ -148,39 +219,62 @@ function PropertiesForm({
 
   return (
     <aside className="w-72 shrink-0 overflow-y-auto border-l border-border bg-surface p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-ink">Field properties</p>
-        {!readOnly && (
-          <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
-            Delete
+        <div className="flex items-center gap-3">
+          {!readOnly && (
+            <button type="button" onClick={() => onDelete(field.id)} className="text-xs font-medium text-danger hover:underline">
+              Delete
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Close field properties" className="text-muted hover:text-ink">
+            <X size={14} />
           </button>
-        )}
+        </div>
       </div>
       <p className="mt-1 text-xs text-muted">{FIELD_TYPE_LABELS[field.field_type]}</p>
+      {field.is_internal_only && (
+        <p className="mt-2 inline-flex items-center rounded-full bg-amberSoft px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber">
+          Internal only
+        </p>
+      )}
 
-      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
-        Label
-        <input
-          value={label}
-          disabled={readOnly}
-          onChange={(e) => setLabel(e.target.value)}
-          onBlur={() => label !== field.label && onUpdate(field.id, { label })}
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-        />
-      </label>
+      {field.field_type === "rich_text" ? (
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Content</p>
+          <div className="mt-1.5">
+            <RichTextEditor content={field.body_html ?? ""} onChange={(html) => onUpdate(field.id, { body_html: html })} editable={!readOnly} bare />
+          </div>
+        </div>
+      ) : field.field_type !== "checkbox" ? (
+        <>
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+            Label
+            <input
+              value={label}
+              disabled={readOnly}
+              onChange={(e) => setLabel(e.target.value)}
+              onBlur={() => label !== field.label && onUpdate(field.id, { label })}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            />
+          </label>
 
-      <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
-        Help text
-        <textarea
-          value={helpText}
-          disabled={readOnly}
-          onChange={(e) => setHelpText(e.target.value)}
-          onBlur={() => helpText !== (field.help_text ?? "") && onUpdate(field.id, { help_text: helpText || null })}
-          rows={2}
-          placeholder="Optional guidance shown under the question"
-          className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
-        />
-      </label>
+          <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+            Help text
+            <textarea
+              value={helpText}
+              disabled={readOnly}
+              onChange={(e) => setHelpText(e.target.value)}
+              onBlur={() => helpText !== (field.help_text ?? "") && onUpdate(field.id, { help_text: helpText || null })}
+              rows={2}
+              placeholder="Optional guidance shown under the question"
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+            />
+          </label>
+        </>
+      ) : (
+        <p className="mt-4 text-[11px] text-muted">Add each checkbox&apos;s text below -- no separate question label needed.</p>
+      )}
 
       {!NON_ANSWERABLE_FIELD_TYPES.has(field.field_type) && (
         <label className="mt-4 flex items-center gap-2 text-sm text-slate">
@@ -193,6 +287,120 @@ function PropertiesForm({
           />
           Required
         </label>
+      )}
+
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Internal only</p>
+          <p className="mt-0.5 text-[11px] text-muted">Hidden from the client -- staff only, on the builder and any client-facing form.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={field.is_internal_only}
+          disabled={readOnly}
+          onClick={() => onUpdate(field.id, { is_internal_only: !field.is_internal_only })}
+          className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${
+            field.is_internal_only ? "border-amber bg-amber" : "border-border bg-border"
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${field.is_internal_only ? "left-[22px]" : "left-0.5"}`}
+          />
+        </button>
+      </div>
+
+      {field.field_type === "section" && (
+        <div className="mt-4 border-t border-border pt-4">
+          <BannerImageUpload
+            workspaceId={workspaceId}
+            value={field.image_url}
+            onChange={(url) => onUpdate(field.id, { image_url: url })}
+            disabled={readOnly}
+            label="Heading image (optional)"
+            helpText="Shown alongside this heading wherever it appears in the document."
+            uploadPathPrefix="heading"
+            imageClassName="h-16 w-16 rounded-lg border border-border object-cover"
+          />
+        </div>
+      )}
+
+      {field.field_type === "file_upload" && (
+        <div className="mt-4 border-t border-border pt-4">
+          <label className="flex items-center gap-2 text-sm text-slate">
+            <input
+              type="checkbox"
+              checked={field.include_in_document_checklist}
+              disabled={readOnly}
+              onChange={(e) => onUpdate(field.id, { include_in_document_checklist: e.target.checked })}
+              className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            />
+            Add to document checklist when submitted
+          </label>
+          <p className="mt-1 text-xs text-muted">
+            When the client submits, this becomes a checklist item automatically -- already checked off if they uploaded
+            something here, left open if they didn&apos;t. Skipped entirely if this question was hidden for them.
+          </p>
+
+          {field.include_in_document_checklist && (
+            <div className="mt-3 space-y-3">
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Checklist name (optional)
+                <input
+                  value={checklistName}
+                  disabled={readOnly}
+                  onChange={(e) => setChecklistName(e.target.value)}
+                  onBlur={() =>
+                    checklistName !== (field.document_checklist_name ?? "") &&
+                    onUpdate(field.id, { document_checklist_name: checklistName || null })
+                  }
+                  placeholder={field.label}
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+                />
+                <span className="mt-1 block text-[11px] normal-case text-muted">Defaults to the question label above.</span>
+              </label>
+              <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                Category (optional)
+                <input
+                  value={checklistCategory}
+                  disabled={readOnly}
+                  onChange={(e) => setChecklistCategory(e.target.value)}
+                  onBlur={() =>
+                    checklistCategory !== (field.document_checklist_category ?? "") &&
+                    onUpdate(field.id, { document_checklist_category: checklistCategory || null })
+                  }
+                  placeholder="e.g. Income"
+                  className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
+      {isWidthEligible(field.field_type) && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted">Shrink to half width</p>
+            <p className="mt-0.5 text-[11px] text-muted">Sits side by side with the next half-width field.</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={field.layout_width === "half"}
+            disabled={readOnly}
+            onClick={() => onUpdate(field.id, { layout_width: field.layout_width === "half" ? "full" : "half" })}
+            className={`relative h-6 w-11 shrink-0 rounded-full border transition disabled:opacity-60 ${
+              field.layout_width === "half" ? "border-accent bg-accent" : "border-border bg-border"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                field.layout_width === "half" ? "left-[22px]" : "left-0.5"
+              }`}
+            />
+          </button>
+        </div>
       )}
 
       {CLIENT_PROFILE_FIELDS_BY_TYPE[field.field_type] && (
@@ -240,6 +448,29 @@ function PropertiesForm({
             by what the question is actually asking -- only pick one if this question truly captures that piece of information
             about a spouse or dependent. For dependents, put the tagged fields (name, date of birth, relationship) inside a
             repeating section so each repeat becomes a separate person; spouse fields should stay outside any repeating section.
+          </span>
+        </label>
+      )}
+
+      {IRS_8821_ROLES_BY_TYPE[field.field_type] && (
+        <label className="mt-4 block text-xs font-medium uppercase tracking-wide text-muted">
+          Feeds an IRS 8821 authorization
+          <select
+            value={field.irs_8821_role ?? ""}
+            disabled={readOnly}
+            onChange={(e) => onUpdate(field.id, { irs_8821_role: e.target.value || null })}
+            className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+          >
+            <option value="">None</option>
+            {IRS_8821_ROLES_BY_TYPE[field.field_type]!.map((role) => (
+              <option key={role} value={role}>
+                {IRS_8821_ROLE_LABELS[role]}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] normal-case text-muted">
+            When staff create an IRS Form 8821 authorization for a client who already submitted this form, this
+            answer pre-fills the matching field instead of being re-typed.
           </span>
         </label>
       )}

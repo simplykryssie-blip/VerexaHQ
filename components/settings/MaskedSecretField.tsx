@@ -46,15 +46,15 @@ export function MaskedSecretField({
   }
 
   return (
-    <div className="grid grid-cols-[minmax(0,140px)_1fr_auto] items-center gap-4 px-5 py-4">
-      <div>
+    <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
+      <div className="sm:w-36 sm:flex-shrink-0">
         <span className="text-sm font-semibold text-ink">{label}</span>
         {helpText && <span className="mt-0.5 block text-xs leading-snug text-muted">{helpText}</span>}
       </div>
 
-      <div className="flex min-w-0 items-center gap-2.5">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
         {last4 && !clear && (
-          <span className="whitespace-nowrap rounded-lg bg-accentSoft px-2.5 py-1.5 font-mono text-xs font-medium text-accent">
+          <span className="whitespace-nowrap rounded-full bg-accentSoft px-3 py-1.5 font-mono text-xs font-medium text-accent">
             {revealed ?? `••••${last4}`}
           </span>
         )}
@@ -62,12 +62,12 @@ export function MaskedSecretField({
           value={newValue}
           onChange={(e) => onNewValueChange(e.target.value)}
           disabled={clear}
-          placeholder={last4 ? "Enter a new value to replace it" : "Not set"}
-          className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 font-mono text-xs text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted disabled:opacity-60"
+          placeholder={last4 ? "Replace value" : "Not set"}
+          className="min-w-0 flex-1 truncate text-ellipsis rounded-lg border border-border bg-surface px-3 py-1.5 font-mono text-xs text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted disabled:opacity-60"
         />
       </div>
 
-      <div className="flex items-center gap-3.5 whitespace-nowrap text-xs">
+      <div className="flex flex-shrink-0 items-center gap-3.5 whitespace-nowrap text-xs sm:justify-end">
         {last4 && !clear && (
           <button
             type="button"
@@ -94,7 +94,7 @@ export function MaskedSecretField({
         )}
       </div>
 
-      {revealError && <p className="col-span-full -mt-1 text-xs text-danger">{revealError}</p>}
+      {revealError && <p className="w-full -mt-1 text-xs text-danger">{revealError}</p>}
     </div>
   );
 }

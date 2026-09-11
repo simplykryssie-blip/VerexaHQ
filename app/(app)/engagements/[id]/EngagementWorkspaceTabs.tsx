@@ -23,36 +23,13 @@ import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import type { ActionPermissions } from "@/lib/actionPermissions";
-import { ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
-
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {action}
-      </div>
-      <div className="px-5 py-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-0.5 text-slate">{value ?? "--"}</p>
-    </div>
-  );
-}
+import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
+import { BankProductTransactionForm } from "@/components/billing/BankProductTransactionForm";
+import { BankProductStatusSelect } from "@/components/billing/BankProductStatusSelect";
+import { ReactivateQuoteButton } from "@/components/billing/ReactivateQuoteButton";
+import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -129,9 +106,9 @@ export function OverviewTab({
 
         {progress && (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <ProgressBar label="Overall progress" pct={progress.overall_progress_pct} />
-            <ProgressBar label="Task progress" pct={progress.task_progress_pct} />
-            <ProgressBar label="Document progress" pct={progress.document_progress_pct} />
+            <ProgressStat label="Overall progress" pct={progress.overall_progress_pct} />
+            <ProgressStat label="Task progress" pct={progress.task_progress_pct} />
+            <ProgressStat label="Document progress" pct={progress.document_progress_pct} />
           </div>
         )}
       </Section>
@@ -177,9 +154,9 @@ export function OverviewTab({
         </div>
       </div>
 
-      <Section title="Organizers">
+      <Section title="Forms">
         {organizerResponses.length === 0 ? (
-          <EmptyState message="No organizer sent yet -- use Send Organizer above to assign one." />
+          <EmptyState message="No form sent yet -- use Send Form above to assign one." />
         ) : (
           <div className="space-y-3">
             {organizerResponses.map((o) => (
@@ -207,12 +184,12 @@ export function OverviewTab({
   );
 }
 
-function ProgressBar({ label, pct }: { label: string; pct: number }) {
+function ProgressStat({ label, pct }: { label: string; pct: number }) {
   return (
     <div className="rounded-lg border border-border p-3">
       <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-surfaceMuted">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
+      <div className="mt-2">
+        <ProgressBar percent={pct} />
       </div>
       <p className="mt-1 text-xs text-muted">{Math.round(pct)}%</p>
     </div>
@@ -246,15 +223,17 @@ export function WorkflowTab({ stages }: { stages: StageRow[] }) {
             </thead>
             <tbody className="divide-y divide-border">
               {stages.map((s) => (
-                <tr key={s.id} className="hover:bg-surfaceMuted">
-                  <td className="px-4 py-2 font-medium text-ink">{s.stage_name}</td>
-                  <td className="px-4 py-2 text-slate">{s.status}</td>
-                  <td className="px-4 py-2">
+                <tr key={s.id} className="transition-colors hover:bg-surfaceMuted">
+                  <td className="px-4 py-2.5 font-medium text-ink">{s.stage_name}</td>
+                  <td className="px-4 py-2.5">
+                    <Badge tone={STAGE_STATUS_TONE[s.status] ?? "neutral"}>{s.status}</Badge>
+                  </td>
+                  <td className="px-4 py-2.5">
                     {s.sla_category && <SlaBadge category={s.sla_category} />}
                   </td>
-                  <td className="px-4 py-2 text-slate">{staffName(s.reviewer)}</td>
-                  <td className="px-4 py-2 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2.5 text-slate">{staffName(s.reviewer)}</td>
+                  <td className="px-4 py-2.5 text-slate">{s.due_date ? new Date(s.due_date).toLocaleDateString() : "--"}</td>
+                  <td className="px-4 py-2.5">
                     {s.status !== "Completed" && s.status !== "Skipped" && <StageReviewActions stageId={s.id} />}
                   </td>
                 </tr>
@@ -272,6 +251,13 @@ const SLA_TONE: Record<string, BadgeTone> = {
   Completed: "neutral",
   Overdue: "danger",
   Exceeded: "warning",
+};
+
+const STAGE_STATUS_TONE: Record<string, BadgeTone> = {
+  Waiting: "warning",
+  "In Progress": "accent",
+  Completed: "success",
+  Skipped: "neutral",
 };
 
 function SlaBadge({ category }: { category: string }) {
@@ -319,6 +305,7 @@ export function TasksTab({
 export function MessagesTab({
   workspaceId,
   engagementId,
+  clientId,
   primaryEmail,
   primaryPhone,
   permissions,
@@ -327,6 +314,7 @@ export function MessagesTab({
 }: {
   workspaceId: string;
   engagementId: string;
+  clientId: string | null;
   primaryEmail: string | null;
   primaryPhone: string | null;
   permissions: Pick<ActionPermissions, "messagesSend" | "messagesInternalNote">;
@@ -443,7 +431,7 @@ export function MessagesTab({
         const res = await fetch("/api/sms/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: primaryPhone, body }),
+          body: JSON.stringify({ to: primaryPhone, body, clientId }),
         });
         const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
         if (!data.sent) toast.show(`Message saved, but the SMS wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
@@ -660,7 +648,9 @@ export function ReviewTab({
               <li key={s.id} className="py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-slate">{s.shared_with?.name ?? "Workspace"}</span>
-                  <span className="capitalize text-muted">{s.status.replace(/_/g, " ")}</span>
+                  <Badge tone={ENGAGEMENT_SHARE_STATUS_TONE[s.status] ?? "neutral"} className="capitalize">
+                    {s.status.replace(/_/g, " ")}
+                  </Badge>
                 </div>
                 {reviewActions
                   .filter((r) => r.engagement_share_id === s.id)
@@ -684,6 +674,63 @@ export function ReviewTab({
 
 // --------------------------------------------------------------- Billing
 
+export type BankAssignment = {
+  bankPartnerName: string | null;
+  bankFee: number | null;
+  transmissionFee: number | null;
+  paperworkFee: number | null;
+  addonFee: number | null;
+  softwarePartnerName: string | null;
+  softwareFee: number | null;
+};
+
+function IsBankProductToggle({ engagementId, isBankProduct }: { engagementId: string; isBankProduct: boolean }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [saving, setSaving] = useState(false);
+
+  async function toggle() {
+    setSaving(true);
+    const { error } = await supabase.from("engagements").update({ is_bank_product: !isBankProduct }).eq("id", engagementId);
+    setSaving(false);
+    if (!error) router.refresh();
+  }
+
+  return (
+    <label className="flex items-center gap-2 text-sm text-slate">
+      <input type="checkbox" checked={isBankProduct} onChange={toggle} disabled={saving} className="h-4 w-4 rounded border-border text-accent focus:ring-accent" />
+      This return is bank-product funded
+    </label>
+  );
+}
+
+// The gross amount the client was billed says nothing about what actually
+// lands with the preparer once a bank product's own fees come out --
+// showing only that gross number reads as an exaggerated take, so once a
+// return is marked bank-product funded, show both side by side.
+function BankProductNetSummary({ invoices, bankProductTransactions }: { invoices: InvoiceRow[]; bankProductTransactions: BankProductTransactionRow[] }) {
+  const billed = invoices.reduce((sum, i) => sum + i.total_amount, 0);
+  const netAdjustment = bankProductTransactions.reduce((sum, b) => {
+    const fees = (b.bank_fee ?? 0) + (b.transmission_fee ?? 0) + (b.paperwork_fee ?? 0) + (b.addon_fee ?? 0) + (b.software_fee ?? 0);
+    return sum + (b.rebate_amount ?? 0) - fees;
+  }, 0);
+  const net = billed + netAdjustment;
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-surfaceMuted px-3 py-2 text-sm">
+      <span className="text-muted">
+        Billed <span className="font-medium text-slate">{money(billed)}</span>
+      </span>
+      <span className="text-muted">
+        Net to you <span className="font-medium text-ink">{money(net)}</span>
+      </span>
+      {netAdjustment !== 0 && (
+        <span className="text-xs text-muted">({netAdjustment > 0 ? "+" : ""}{money(netAdjustment)} from bank product fees/rebates)</span>
+      )}
+    </div>
+  );
+}
+
 export function BillingTab({
   clientId,
   clientName,
@@ -694,6 +741,9 @@ export function BillingTab({
   quotes,
   invoices,
   payments,
+  bankProductTransactions,
+  isBankProduct,
+  bankAssignment,
 }: {
   clientId: string;
   clientName: string;
@@ -704,6 +754,9 @@ export function BillingTab({
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   payments: PaymentRow[];
+  bankProductTransactions: BankProductTransactionRow[];
+  isBankProduct: boolean;
+  bankAssignment: BankAssignment | null;
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -802,9 +855,13 @@ export function BillingTab({
                   {q.quote_number} -- {q.title}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {q.status} -- {money(q.total_amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={BILLING_DOCUMENT_STATUS_TONE[q.status] ?? "neutral"} className="capitalize">
+                      {q.status}
+                    </Badge>
+                    {money(q.total_amount)}
                   </span>
+                  {canManageBilling && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                   {canManageBilling && (
                     <button
                       type="button"
@@ -816,6 +873,7 @@ export function BillingTab({
                   )}
                   <PreviewButton
                     kind="quote"
+                    workspaceId={workspaceId}
                     firmName={workspaceName}
                     clientName={clientName}
                     number={q.quote_number}
@@ -848,8 +906,11 @@ export function BillingTab({
                   <div className="flex items-center justify-between">
                     <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
                     <div className="flex items-center gap-3">
-                      <span className="capitalize text-muted">
-                        {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                      <span className="flex items-center gap-2 text-muted">
+                        <Badge tone={BILLING_DOCUMENT_STATUS_TONE[i.status] ?? "neutral"} className="capitalize">
+                          {i.status}
+                        </Badge>
+                        {money(i.total_amount)} ({money(i.amount_paid)} paid)
                       </span>
                       {canManageBilling && i.status !== "paid" && i.status !== "void" && (
                         <button
@@ -862,6 +923,7 @@ export function BillingTab({
                       )}
                       <PreviewButton
                         kind="invoice"
+                        workspaceId={workspaceId}
                         firmName={workspaceName}
                         clientName={clientName}
                         number={i.invoice_number}
@@ -902,10 +964,16 @@ export function BillingTab({
           <ul className="divide-y divide-border">
             {payments.map((p) => (
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
+                <span className="text-slate">
+                  {new Date(p.payment_date).toLocaleDateString()}
+                  {p.payment_method && ` -- ${PAYMENT_METHOD_LABEL[p.payment_method] ?? p.payment_method}`}
+                </span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {p.status} -- {money(p.amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
+                      {p.status}
+                    </Badge>
+                    {money(p.amount)}
                   </span>
                   {canManageBilling && p.status !== "refunded" && p.stripe_payment_intent_id && (
                     <RefundButton paymentId={p.id} amount={p.amount} />
@@ -914,6 +982,63 @@ export function BillingTab({
               </li>
             ))}
           </ul>
+        )}
+      </Section>
+
+      <Section title="Bank Products">
+        {canManageBilling && (
+          <div className="mb-3">
+            <IsBankProductToggle engagementId={engagementId} isBankProduct={isBankProduct} />
+          </div>
+        )}
+        {isBankProduct && (invoices.length > 0 || bankProductTransactions.length > 0) && (
+          <div className="mb-3">
+            <BankProductNetSummary invoices={invoices} bankProductTransactions={bankProductTransactions} />
+          </div>
+        )}
+        {bankProductTransactions.length === 0 ? (
+          <EmptyState message="No refund transfers or advances recorded for this return yet." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {bankProductTransactions.map((b) => {
+              const fees: [string, number | null][] = [
+                ["Prep", b.prep_fee_collected],
+                ["Bank", b.bank_fee],
+                ["Add-on", b.addon_fee],
+                ["Transmission", b.transmission_fee],
+                ["Paperwork", b.paperwork_fee],
+                ["Software", b.software_fee],
+                ["Rebate", b.rebate_amount],
+              ];
+              const setFees = fees.filter(([, v]) => v != null);
+              return (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                  <span className="text-slate">
+                    {b.bank_partner} <span className="text-muted">({b.product_type.replace("_", " ")})</span>
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted">
+                      {setFees.length === 0
+                        ? "No fees recorded"
+                        : setFees.map(([label, v]) => `${label} ${money(v)}`).join(" · ")}
+                    </span>
+                    {canManageBilling ? (
+                      <BankProductStatusSelect id={b.id} status={b.status} />
+                    ) : (
+                      <Badge tone="neutral" className="capitalize">
+                        {b.status}
+                      </Badge>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {canManageBilling && (
+          <div className="mt-2">
+            <BankProductTransactionForm workspaceId={workspaceId} engagementId={engagementId} bankAssignment={bankAssignment} />
+          </div>
         )}
       </Section>
     </div>
@@ -1065,6 +1190,7 @@ export type TaskRow = {
   priority: string | null;
   due_date: string | null;
   completed_at: string | null;
+  visibility: string;
   assigned_staff: StaffRef;
   dependencies: TaskDependency[];
 };
@@ -1110,7 +1236,30 @@ export type InvoiceRow = {
   issue_date: string | null;
   notes: string | null;
 };
-export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; stripe_payment_intent_id: string | null };
+export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; payment_method: string | null; stripe_payment_intent_id: string | null };
+export type BankProductTransactionRow = {
+  id: string;
+  bank_partner: string;
+  product_type: string;
+  prep_fee_collected: number | null;
+  bank_fee: number | null;
+  addon_fee: number | null;
+  transmission_fee: number | null;
+  paperwork_fee: number | null;
+  software_fee: number | null;
+  rebate_amount: number | null;
+  disbursement_method: string | null;
+  status: string;
+  created_at: string;
+};
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  stripe: "Card",
+  check: "Check",
+  cash: "Cash",
+  bank_transfer: "Bank transfer",
+  other: "Other",
+};
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
 import type {
   OrganizerFieldAnswer,

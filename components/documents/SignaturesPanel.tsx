@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PenLine, X, Link as LinkIcon } from "lucide-react";
+import { PenLine, X, Link as LinkIcon, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -10,6 +10,9 @@ import { createSignatureRequestFromTemplate } from "@/lib/documents/createSignat
 import { uploadSignatureImageClient } from "@/lib/documents/uploadSignatureImage";
 import { renderEmail } from "@/lib/email/template";
 import { SignaturePad } from "@/components/SignaturePad";
+import { DateField } from "@/components/DateField";
+import { Badge } from "@/components/ui/Badge";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { Audience, DocumentRow, EngagementLetterTemplateOption, EntityType, SignatureRequestRow } from "./types";
 
 function parseSigners(raw: string) {
@@ -35,6 +38,7 @@ export function SignaturesPanel({
   workspaceId,
   audience = "staff",
   canCreate = true,
+  additionalSigners = [],
 }: {
   signatureRequests: SignatureRequestRow[];
   documents: DocumentRow[];
@@ -47,6 +51,10 @@ export function SignaturesPanel({
   workspaceId: string;
   audience?: Audience;
   canCreate?: boolean;
+  // Linked contacts (spouse, business co-owner, etc.) offered as one-click
+  // "add as signer" options -- e.g. a client filing jointly with a spouse,
+  // or a business needing a second officer's signature.
+  additionalSigners?: AdditionalSignerOption[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -62,11 +70,19 @@ export function SignaturesPanel({
   // name/email into a bare textarea from scratch.
   const [signersRaw, setSignersRaw] = useState(clientName ? `${clientName}, ${clientEmail ?? ""}` : "");
   const [error, setError] = useState<string | null>(null);
+  const [addedSignerNames, setAddedSignerNames] = useState<Set<string>>(new Set());
   const [signingId, setSigningId] = useState<string | null>(null);
   const [typedName, setTypedName] = useState("");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
   const [signingError, setSigningError] = useState<string | null>(null);
   const [submittingSignature, setSubmittingSignature] = useState(false);
+
+  function addSigner(signer: AdditionalSignerOption) {
+    if (addedSignerNames.has(signer.name)) return;
+    const line = `${signer.name}, ${signer.email ?? ""}`;
+    setSignersRaw((prev) => (prev.trim() ? `${prev.replace(/\n+$/, "")}\n${line}` : line));
+    setAddedSignerNames((prev) => new Set(prev).add(signer.name));
+  }
 
   async function createRequest(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +114,7 @@ export function SignaturesPanel({
         entityId,
         template,
         clientName,
+        clientEmail,
         firmName,
         signers,
         title,
@@ -156,6 +173,7 @@ export function SignaturesPanel({
     setTemplateId("");
     setDueDate("");
     setSignersRaw("");
+    setAddedSignerNames(new Set());
     router.refresh();
   }
 
@@ -167,27 +185,28 @@ export function SignaturesPanel({
   }
 
   async function submitSignature() {
-    if (!signingId || !typedName.trim()) return;
+    if (!signingId) return;
+    // Staff mode stays typed-only (recording a signature captured in person
+    // or via another channel); portal mode requires both typed and drawn.
+    const usingDrawnMode = audience === "portal";
+    if (usingDrawnMode ? !typedName.trim() || !drawnDataUrl : !typedName.trim()) return;
     setSigningError(null);
 
-    let signatureType: "typed" | "drawn" = "typed";
     let signatureImagePath: string | undefined;
 
-    if (audience === "portal") {
-      if (!drawnDataUrl) return;
+    if (usingDrawnMode) {
       const request = signatureRequests.find((r) => r.signers.some((s) => s.id === signingId));
       if (!request) {
         setSigningError("Could not find this signing request.");
         return;
       }
       setSubmittingSignature(true);
-      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, request.id, drawnDataUrl);
+      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, request.id, drawnDataUrl as string);
       if ("error" in uploadResult) {
         setSubmittingSignature(false);
         setSigningError(uploadResult.error);
         return;
       }
-      signatureType = "drawn";
       signatureImagePath = uploadResult.path;
     } else {
       setSubmittingSignature(true);
@@ -195,7 +214,7 @@ export function SignaturesPanel({
 
     const { error } = await supabase.rpc("record_signature", {
       p_signer_id: signingId,
-      p_signature_type: signatureType,
+      p_signature_type: usingDrawnMode ? "drawn" : "typed",
       p_typed_name: typedName.trim(),
       p_signature_image_path: signatureImagePath,
     });
@@ -215,6 +234,24 @@ export function SignaturesPanel({
     toast.show("Signing link copied -- send it to anyone, no account needed", "success");
   }
 
+  // IRS Pub 1345 requires identity verification before a document like an
+  // 8879 can be e-signed -- either the signer is physically present with a
+  // staff member who's confirmed who they are, or the process uses real
+  // identity-proofing (KBA) for a remote signer. This app doesn't have KBA
+  // yet, so the "present + verified" path is gated behind an explicit
+  // attestation instead of assuming presence just because staff is the one
+  // opening the signing flow.
+  async function attestPresence(signerId: string) {
+    if (!window.confirm("Confirm: you are physically present with this signer and have verified their identity.")) return;
+    const { error } = await supabase.rpc("attest_signature_presence", { p_signer_id: signerId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Identity confirmed", "success");
+    router.refresh();
+  }
+
   async function decline(signerId: string) {
     const reason = window.prompt("Reason for declining (optional):") ?? undefined;
     const { error } = await supabase.rpc("decline_signature", { p_signer_id: signerId, p_reason: reason || undefined });
@@ -223,6 +260,39 @@ export function SignaturesPanel({
       return;
     }
     toast.show("Signature declined", "info");
+    router.refresh();
+  }
+
+  async function revokeRequest(requestId: string) {
+    if (!window.confirm("Revoke this signature request? Any pending signing links will stop working.")) return;
+    const { error } = await supabase.rpc("cancel_signature_request", { p_signature_request_id: requestId });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Signature request revoked", "info");
+    router.refresh();
+  }
+
+  async function setExpiry(requestId: string) {
+    const input = window.prompt("Signing link expires on (YYYY-MM-DD), or leave blank to remove the expiry:");
+    if (input === null) return;
+    const trimmed = input.trim();
+    let expiresAt: string | null = null;
+    if (trimmed) {
+      const parsed = new Date(`${trimmed}T23:59:59`);
+      if (Number.isNaN(parsed.getTime())) {
+        toast.show("Enter a date as YYYY-MM-DD", "error");
+        return;
+      }
+      expiresAt = parsed.toISOString();
+    }
+    const { error } = await supabase.rpc("set_signature_request_expiry", { p_signature_request_id: requestId, p_expires_at: expiresAt as never });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(expiresAt ? "Expiry set" : "Expiry removed", "success");
     router.refresh();
   }
 
@@ -241,7 +311,7 @@ export function SignaturesPanel({
           <form onSubmit={createRequest} className="mt-3 space-y-3">
             <input
               required
-              placeholder="Title (e.g. Engagement letter)"
+              placeholder="Title (e.g. Document)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -265,7 +335,7 @@ export function SignaturesPanel({
             {source === "template" ? (
               templates.length === 0 ? (
                 <p className="text-xs text-muted">
-                  No engagement letter templates are published yet -- add one in Settings &gt; Templates, or switch to Uploaded file.
+                  No document templates are published yet -- add one in Settings &gt; Templates, or switch to Uploaded file.
                 </p>
               ) : (
                 <select
@@ -301,12 +371,7 @@ export function SignaturesPanel({
                 ))}
               </select>
             )}
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <DateField value={dueDate || null} onApply={(next) => setDueDate(next ?? "")} placeholder="Due date (optional)" className="w-full" />
             <div>
               <label className="block text-xs font-medium text-muted">
                 Who signs this -- one per line, as &quot;Name, email@example.com&quot;
@@ -324,6 +389,24 @@ export function SignaturesPanel({
                   ? `Pre-filled with ${clientName}. Add another line to include additional signers (e.g. a spouse).`
                   : "This is who the signing link goes to -- add one signer per line."}
               </p>
+              {additionalSigners.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {additionalSigners.map((s) => (
+                    <button
+                      key={s.name}
+                      type="button"
+                      disabled={addedSignerNames.has(s.name)}
+                      onClick={() => addSigner(s)}
+                      className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-accent hover:bg-accentSoft disabled:cursor-default disabled:border-transparent disabled:bg-surfaceMuted disabled:text-muted"
+                      title={s.email ?? "No email on file -- you'll need to add one, or share the signing link directly"}
+                    >
+                      {addedSignerNames.has(s.name) ? "Added: " : "+ "}
+                      {s.name} <span className="capitalize text-muted">({s.label})</span>
+                      {!s.email && !addedSignerNames.has(s.name) && " -- no email"}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
@@ -346,39 +429,74 @@ export function SignaturesPanel({
                     <p className="text-sm font-medium text-ink">{r.title}</p>
                     <p className="text-xs text-muted">{r.attachment_file_name}</p>
                   </div>
-                  <span className={`text-xs capitalize ${overdue ? "text-danger" : "text-muted"}`}>
-                    {overdue ? "Expired" : r.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {audience === "staff" && r.status === "pending" && (
+                      <>
+                        <button type="button" onClick={() => setExpiry(r.id)} className="text-xs font-medium text-accent hover:underline">
+                          Set expiry
+                        </button>
+                        <button type="button" onClick={() => revokeRequest(r.id)} className="text-xs font-medium text-danger hover:underline">
+                          Revoke
+                        </button>
+                      </>
+                    )}
+                    <span className={`text-xs capitalize ${overdue ? "text-danger" : "text-muted"}`}>
+                      {overdue ? "Expired" : r.status}
+                    </span>
+                  </div>
                 </div>
                 <ul className="mt-2 space-y-1.5">
                   {r.signers.map((s) => (
-                    <li key={s.id} className="flex items-center justify-between text-xs">
-                      <span className="text-slate">
-                        {s.signer_name} {s.signer_email && <span className="text-muted">({s.signer_email})</span>}
-                      </span>
-                      {s.status === "pending" ? (
-                        <span className="flex items-center gap-2">
-                          {audience === "staff" && (
+                    <li key={s.id} className="flex flex-col gap-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate">
+                          {s.signer_name} {s.signer_email && <span className="text-muted">({s.signer_email})</span>}
+                        </span>
+                        {s.status === "pending" ? (
+                          audience === "staff" && !s.attested_at ? (
                             <button
                               type="button"
-                              onClick={() => copySigningLink(s.access_token)}
-                              className="flex items-center gap-1 text-accent hover:underline"
-                              title="Copy a public signing link -- no account needed"
+                              onClick={() => attestPresence(s.id)}
+                              className="flex items-center gap-1 font-medium text-amber hover:underline"
+                              title="Required before you can hand off a signing link or record this signature"
                             >
-                              <LinkIcon size={12} /> Copy link
+                              <ShieldCheck size={12} /> Confirm identity to unlock signing
                             </button>
-                          )}
-                          <button type="button" onClick={() => setSigningId(s.id)} className="flex items-center gap-1 text-accent hover:underline">
-                            <PenLine size={12} /> {audience === "portal" ? "Sign now" : "Mark signed"}
-                          </button>
-                          <button type="button" onClick={() => decline(s.id)} className="text-danger hover:underline">
-                            Decline
-                          </button>
+                          ) : (
+                            <span className="flex items-center gap-2">
+                              {audience === "staff" && (
+                                <button
+                                  type="button"
+                                  onClick={() => copySigningLink(s.access_token)}
+                                  className="flex items-center gap-1 text-accent hover:underline"
+                                  title="Copy a public signing link -- no account needed"
+                                >
+                                  <LinkIcon size={12} /> Copy link
+                                </button>
+                              )}
+                              <button type="button" onClick={() => setSigningId(s.id)} className="flex items-center gap-1 text-accent hover:underline">
+                                <PenLine size={12} /> {audience === "portal" ? "Sign now" : "Mark signed"}
+                              </button>
+                              <button type="button" onClick={() => decline(s.id)} className="text-danger hover:underline">
+                                Decline
+                              </button>
+                            </span>
+                          )
+                        ) : (
+                          <Badge tone={s.status === "declined" ? "danger" : "success"} className="capitalize">
+                            {s.status}
+                            {s.signed_at && ` -- ${new Date(s.signed_at).toLocaleDateString()}`}
+                          </Badge>
+                        )}
+                      </div>
+                      {audience === "staff" && s.attested_at && (
+                        <span className="text-[11px] text-muted">
+                          Identity confirmed{s.attested_by_name ? ` by ${s.attested_by_name}` : ""} -- {new Date(s.attested_at).toLocaleString()}
                         </span>
-                      ) : (
-                        <span className={`capitalize ${s.status === "declined" ? "text-danger" : "text-green-700"}`}>
-                          {s.status}
-                          {s.signed_at && ` -- ${new Date(s.signed_at).toLocaleDateString()}`}
+                      )}
+                      {audience === "staff" && s.status === "pending" && s.expires_at && (
+                        <span className={`text-[11px] ${new Date(s.expires_at) < new Date() ? "text-danger" : "text-muted"}`}>
+                          {new Date(s.expires_at) < new Date() ? "Signing link expired" : `Signing link expires ${new Date(s.expires_at).toLocaleDateString()}`}
                         </span>
                       )}
                     </li>
@@ -426,7 +544,7 @@ export function SignaturesPanel({
             <button
               type="button"
               onClick={submitSignature}
-              disabled={submittingSignature || !typedName.trim() || (audience === "portal" && !drawnDataUrl)}
+              disabled={submittingSignature || (audience === "portal" ? !typedName.trim() || !drawnDataUrl : !typedName.trim())}
               className="mt-3 w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
             >
               {submittingSignature ? "Signing..." : "Confirm signature"}

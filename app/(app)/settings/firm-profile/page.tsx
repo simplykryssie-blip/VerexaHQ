@@ -1,158 +1,143 @@
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { Building2, FileText } from "lucide-react";
-import { EmptyState } from "@/components/EmptyState";
+import { Building2 } from "lucide-react";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { SettingsCard } from "@/components/settings/SettingsCard";
-import { DEFAULT_BUSINESS_HOURS, DEFAULT_SLOT_MINUTES, type BusinessHours } from "@/lib/businessHours";
+import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { getMyEroConnection } from "@/lib/firmConnection";
+import { PackageCheckoutCard, type PackagePurchaseRow } from "@/components/settings/PackageCheckoutCard";
+import type { OptionGroupRow } from "@/components/settings/PackageOptionGroupsEditor";
+import { SoftwareLinksManager } from "@/components/settings/SoftwareLinksManager";
 import { FirmProfileForm } from "./FirmProfileForm";
-import { getEffectiveBranding } from "@/lib/branding";
 
-export const dynamic = 'force-dynamic';
-
-const EFIN_WORKSPACE_TYPES = new Set(["ero_office", "service_bureau", "multi_office_firm"]);
+export const dynamic = "force-dynamic";
 
 export default async function FirmProfilePage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const eroTier = isEroManagementTier(workspace);
 
-  const [
-    { data: profile },
-    { data: contact },
-    { data: branding },
-    { data: settings },
-    effectiveBranding,
-    { data: myProfile },
-    { data: isAdmin },
-    { data: canManageSettings },
-  ] = await Promise.all([
-      supabase
-        .from("firm_tax_profile")
-        .select("ein_last4, efin_last4, ptin_last4, supported_filing_states, updated_at")
-        .eq("workspace_id", workspace.id)
-        .maybeSingle(),
-      supabase
-        .from("workspaces")
-        .select("phone, website, mailing_address, primary_contact_email")
-        .eq("id", workspace.id)
-        .single(),
-      supabase
-        .from("branding")
-        .select("display_name, sidebar_logo_url, primary_color, secondary_color, support_email, support_phone")
-        .eq("workspace_id", workspace.id)
-        .maybeSingle(),
-      supabase.from("system_settings").select("key, value, updated_at").eq("workspace_id", workspace.id).order("key"),
-      getEffectiveBranding(workspace.id),
-      user
-        ? supabase.from("user_profiles").select("first_name, last_name, display_name, avatar_url, phone, ptin_last4").eq("id", user.id).maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
-      supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "settings.manage" }),
-    ]);
+  // A PTIN-tier workspace has no firm identity of its own to show here --
+  // its own business info and EIN live on Profile instead (see that page's
+  // own comment). This page only exists for it once it's connected to an
+  // ERO/service bureau, and then shows *that* firm's info, read-only --
+  // it isn't the PTIN holder's own data to edit.
+  if (!eroTier) {
+    const connection = await getMyEroConnection(supabase, workspace.id);
+    if (!connection) redirect("/settings/profile");
 
-  const showEfin = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
-  // PTIN belongs to whichever entity the workspace actually represents: for a
-  // solo preparer the workspace IS them, so it's a firm-level field; for an
-  // ERO/SB, each individual staff member holds their own PTIN, so it's a
-  // personal field on their own profile instead.
-  const showFirmPtin = workspace.workspace_type === "independent_ptin";
-  const showStaffPtin = !showFirmPtin;
+    const { data: softwareLinks } = await supabase
+      .from("workspace_software_links")
+      .select("id, name, url")
+      .eq("workspace_id", workspace.id)
+      .order("display_order");
 
-  const businessHours = (settings?.find((s) => s.key === "business_hours")?.value as BusinessHours | undefined) ?? DEFAULT_BUSINESS_HOURS;
-  const slotMinutes = (settings?.find((s) => s.key === "booking_slot_minutes")?.value as number | undefined) ?? DEFAULT_SLOT_MINUTES;
-  const holidays = (settings?.find((s) => s.key === "holidays")?.value as string[] | undefined) ?? [];
+    let pkg: { id: string; name: string; description: string | null; flat_price: number | null; billing_cadence: string | null } | null = null;
+    let optionGroups: OptionGroupRow[] = [];
+    let purchase: PackagePurchaseRow | null = null;
+
+    if (connection.package_id) {
+      const [{ data: pkgRow }, { data: groupRows }, { data: purchaseRow }] = await Promise.all([
+        supabase.from("firm_packages").select("id, name, description, flat_price, billing_cadence").eq("id", connection.package_id).maybeSingle(),
+        supabase
+          .from("firm_package_option_groups")
+          .select("id, name, min_select, max_select, display_order, firm_package_options(id, label, display_order)")
+          .eq("package_id", connection.package_id)
+          .order("display_order"),
+        supabase
+          .from("firm_package_purchases")
+          .select("status, billing_cadence, amount, selected_option_ids, current_period_end")
+          .eq("connection_id", connection.connection_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      pkg = pkgRow;
+      optionGroups = (groupRows ?? []).map((g) => ({
+        id: g.id,
+        name: g.name,
+        min_select: g.min_select,
+        max_select: g.max_select,
+        display_order: g.display_order,
+        options: ((g.firm_package_options ?? []) as { id: string; label: string; display_order: number }[]).sort(
+          (a, b) => a.display_order - b.display_order,
+        ),
+      }));
+      purchase = purchaseRow;
+    }
+
+    return (
+      <div className="max-w-2xl">
+        <SettingsSectionHeader
+          icon={Building2}
+          title="ERO Profile"
+          description={`You're connected to ${connection.name} -- their firm info is shown here for reference. Your own info lives on your Profile page instead.`}
+        />
+        <div className="mt-6">
+          <SettingsCard title={connection.name} description="Managed by the firm you're connected to -- not editable from here.">
+            <dl className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-muted">Phone</dt>
+                <dd className="mt-0.5 text-slate">{connection.phone || "Not set"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-muted">Email</dt>
+                <dd className="mt-0.5 text-slate">{connection.primary_contact_email || "Not set"}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs uppercase tracking-wide text-muted">Website</dt>
+                <dd className="mt-0.5 text-slate">{connection.website || "Not set"}</dd>
+              </div>
+            </dl>
+          </SettingsCard>
+        </div>
+        {pkg && (
+          <div className="mt-6">
+            <PackageCheckoutCard connectionId={connection.connection_id} pkg={pkg} groups={optionGroups} purchase={purchase} />
+          </div>
+        )}
+        <div className="mt-6">
+          <SoftwareLinksManager workspaceId={workspace.id} initialLinks={softwareLinks ?? []} />
+        </div>
+      </div>
+    );
+  }
+
+  const [{ data: profile }, { data: contact }, { data: branding }, { data: isAdmin }, { data: softwareLinks }] = await Promise.all([
+    supabase.from("firm_tax_profile").select("ein_last4, efin_last4, ptin_last4, caf_last4, updated_at").eq("workspace_id", workspace.id).maybeSingle(),
+    supabase.from("workspaces").select("name, owner_name, phone, website, mailing_address, primary_contact_email").eq("id", workspace.id).single(),
+    supabase.from("branding").select("support_email, support_phone").eq("workspace_id", workspace.id).maybeSingle(),
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "workspace.manage" }),
+    supabase.from("workspace_software_links").select("id, name, url").eq("workspace_id", workspace.id).order("display_order"),
+  ]);
 
   return (
     <div className="max-w-2xl">
-      <SettingsSectionHeader
-        icon={Building2}
-        title="Firm Profile"
-        description="Your profile, your firm's identity, and your workspace preferences -- all in one place, one Save."
-      />
+      <SettingsSectionHeader icon={Building2} title="ERO Profile" description="Your firm's identity -- shared across every user in this workspace." />
 
-      {user && (
-        <div className="mt-6">
-          <FirmProfileForm
-            userId={user.id}
-            workspaceId={workspace.id}
-            firstName={myProfile?.first_name ?? null}
-            lastName={myProfile?.last_name ?? null}
-            displayName={myProfile?.display_name ?? null}
-            avatarUrl={myProfile?.avatar_url ?? null}
-            personalPhone={myProfile?.phone ?? null}
-            showPtin={showStaffPtin}
-            ptinLast4={myProfile?.ptin_last4 ?? null}
-            businessName={branding?.display_name ?? null}
-            website={contact?.website ?? null}
-            mailingAddress={contact?.mailing_address ?? null}
-            businessPhone={branding?.support_phone ?? contact?.phone ?? null}
-            businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
-            logoUrl={branding?.sidebar_logo_url ?? null}
-            primaryColor={branding?.primary_color ?? "#0F172A"}
-            secondaryColor={branding?.secondary_color ?? "#2563EB"}
-            isWhitelabeledByEro={effectiveBranding.isWhitelabeledByEro}
-            eroName={effectiveBranding.eroName ?? null}
-            isOwner={workspace.is_owner}
-            isAdmin={Boolean(isAdmin)}
-            canManageSettings={Boolean(canManageSettings)}
-            showEin
-            showEfin={showEfin}
-            showFirmPtin={showFirmPtin}
-            einLast4={profile?.ein_last4 ?? null}
-            efinLast4={profile?.efin_last4 ?? null}
-            firmPtinLast4={profile?.ptin_last4 ?? null}
-            supportedFilingStates={profile?.supported_filing_states ?? []}
-            initialHours={businessHours}
-            initialSlotMinutes={slotMinutes}
-            initialHolidays={holidays}
-          />
-        </div>
-      )}
-
-      {!isAdmin && (
-        <div className="mt-6 max-w-2xl">
-          <SettingsCard
-            title="Tax identifiers"
-            description="EIN, EFIN, and PTIN are encrypted at rest -- only the last 4 digits are ever shown by default, and revealing the full value is audit-logged. Only a workspace admin can edit these."
-          >
-            {!profile ? (
-              <EmptyState icon={FileText} message="No firm tax profile set up yet." />
-            ) : (
-              <dl className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted">EIN</dt>
-                  <dd className="mt-0.5 text-slate">{profile.ein_last4 ? `••••${profile.ein_last4}` : "Not set"}</dd>
-                </div>
-                {showEfin && (
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-muted">EFIN</dt>
-                    <dd className="mt-0.5 text-slate">{profile.efin_last4 ? `••••${profile.efin_last4}` : "Not set"}</dd>
-                  </div>
-                )}
-                {showFirmPtin && (
-                  <div>
-                    <dt className="text-xs uppercase tracking-wide text-muted">PTIN</dt>
-                    <dd className="mt-0.5 text-slate">{profile.ptin_last4 ? `••••${profile.ptin_last4}` : "Not set"}</dd>
-                  </div>
-                )}
-                <div className="col-span-2">
-                  <dt className="text-xs uppercase tracking-wide text-muted">Supported filing states</dt>
-                  <dd className="mt-0.5 text-slate">
-                    {profile.supported_filing_states && profile.supported_filing_states.length > 0
-                      ? profile.supported_filing_states.join(", ")
-                      : "None set"}
-                  </dd>
-                </div>
-              </dl>
-            )}
-          </SettingsCard>
-        </div>
-      )}
+      <div className="mt-6">
+        <FirmProfileForm
+          workspaceId={workspace.id}
+          firmName={contact?.name ?? ""}
+          ownerName={contact?.owner_name ?? null}
+          website={contact?.website ?? null}
+          mailingAddress={contact?.mailing_address ?? null}
+          businessPhone={branding?.support_phone ?? contact?.phone ?? null}
+          businessEmail={branding?.support_email ?? contact?.primary_contact_email ?? null}
+          isOwner={workspace.is_owner}
+          isAdmin={Boolean(isAdmin)}
+          einLast4={profile?.ein_last4 ?? null}
+          efinLast4={profile?.efin_last4 ?? null}
+          ptinLast4={profile?.ptin_last4 ?? null}
+          cafLast4={profile?.caf_last4 ?? null}
+        />
+      </div>
+      <div className="mt-6">
+        <SoftwareLinksManager workspaceId={workspace.id} initialLinks={softwareLinks ?? []} />
+      </div>
     </div>
   );
 }

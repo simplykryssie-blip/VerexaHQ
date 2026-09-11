@@ -6,6 +6,7 @@ import { InvoicePreview, type PreviewLineItem } from "./InvoicePreview";
 
 export function PreviewButton({
   kind,
+  workspaceId,
   firmName,
   clientName,
   number,
@@ -20,6 +21,7 @@ export function PreviewButton({
   status,
 }: {
   kind: "invoice" | "quote";
+  workspaceId: string;
   firmName: string;
   clientName: string;
   number: string | null;
@@ -43,6 +45,7 @@ export function PreviewButton({
         <Modal title={kind === "invoice" ? "Invoice preview" : "Quote preview"} onClose={() => setOpen(false)} size="xl">
           <InvoicePreview
             kind={kind}
+            workspaceId={workspaceId}
             firmName={firmName}
             clientName={clientName}
             number={number}

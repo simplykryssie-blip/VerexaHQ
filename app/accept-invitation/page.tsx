@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,10 @@ type Preview = {
   role_name: string;
   account_exists: boolean;
   password_min_length: number;
+  grant_platform_it: boolean;
 };
 
 export default function AcceptInvitationPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const supabase = createClient();
@@ -66,8 +67,11 @@ export default function AcceptInvitationPage() {
       return;
     }
     setAccepted(true);
-    router.push("/dashboard");
-    router.refresh();
+    // Hard navigation, not router.push -- accept_workspace_invitation_by_token
+    // just changed this session's workspace membership, and /dashboard's
+    // server-side workspace lookup needs to see that fresh rather than risk
+    // a stale client-side router cache.
+    window.location.href = "/dashboard";
   }
 
   async function handleAuthSubmit(e: React.FormEvent) {
@@ -149,6 +153,10 @@ export default function AcceptInvitationPage() {
   }
 
   if (preview.status !== "pending") {
+    // Already signed in as the exact person this invite was for -- send
+    // them straight to their workspace instead of a "Back to sign in" link
+    // that makes an already-successful invite look broken.
+    const alreadySignedInAsInvitee = Boolean(currentUserEmail) && currentUserEmail!.toLowerCase() === preview.email.toLowerCase();
     return (
       <Centered center>
         <h1 className="text-xl font-semibold text-ink">
@@ -157,9 +165,15 @@ export default function AcceptInvitationPage() {
         <p className="mt-3 text-sm text-muted">
           This invitation to join {preview.workspace_name} is {preview.status}.
         </p>
-        <Link href="/login" className="mt-6 inline-block text-sm text-accent hover:underline">
-          Back to sign in
-        </Link>
+        {alreadySignedInAsInvitee ? (
+          <Link href="/dashboard" className="mt-6 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90">
+            Go to your workspace
+          </Link>
+        ) : (
+          <Link href="/login" className="mt-6 inline-block text-sm text-accent hover:underline">
+            Back to sign in
+          </Link>
+        )}
       </Centered>
     );
   }
@@ -209,7 +223,8 @@ export default function AcceptInvitationPage() {
       <Centered center>
         <h1 className="text-xl font-semibold text-ink">Join {preview.workspace_name}</h1>
         <p className="mt-3 text-sm text-muted">
-          You&apos;ve been invited as {preview.role_name}. Accept to join this workspace.
+          You&apos;ve been invited as {preview.role_name}
+          {preview.grant_platform_it ? ", with IT tools access" : ""}. Accept to join this workspace.
         </p>
         {error && <p className="mt-3 text-sm text-danger">{error}</p>}
         <button
@@ -228,7 +243,8 @@ export default function AcceptInvitationPage() {
     <Centered>
       <h1 className="text-xl font-semibold text-ink">Join {preview.workspace_name}</h1>
       <p className="mt-1 text-sm text-muted">
-        You&apos;ve been invited as {preview.role_name}. Create an account or sign in with{" "}
+        You&apos;ve been invited as {preview.role_name}
+        {preview.grant_platform_it ? ", with IT tools access" : ""}. Create an account or sign in with{" "}
         <span className="font-medium text-slate">{preview.email}</span> to accept.
       </p>
 
@@ -259,8 +275,7 @@ export default function AcceptInvitationPage() {
           className="w-full rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-sm text-muted"
         />
 
-        <input
-          type="password"
+        <PasswordInput
           required
           minLength={mode === "sign-up" ? preview.password_min_length : undefined}
           placeholder={mode === "sign-up" ? "Choose a password" : "Password"}
@@ -278,8 +293,7 @@ export default function AcceptInvitationPage() {
         )}
 
         {mode === "sign-up" && (
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             placeholder="Confirm password"

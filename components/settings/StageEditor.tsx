@@ -333,7 +333,7 @@ export function StageEditor({
   }
 
   async function handleDeleteClick(stage: ProcessStage) {
-    const count = engagementCountsByStage[stage.id] ?? 0;
+    const count = engagementCountsByStage[stage.name] ?? 0;
     if (count > 0) {
       setDeleteTarget(stage);
       return;
@@ -415,7 +415,7 @@ export function StageEditor({
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addFirstStage()}
-                placeholder="First stage name (e.g. Intake & Organizer)"
+                placeholder="First stage name (e.g. Intake & Form)"
                 className="flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <button
@@ -448,7 +448,7 @@ export function StageEditor({
   return (
     <div className="space-y-3">
       {stages.map((stage, index) => {
-        const count = engagementCountsByStage[stage.id] ?? 0;
+        const count = engagementCountsByStage[stage.name] ?? 0;
         const leads = leadsByStage[stage.id] ?? [];
         return (
           <div key={stage.id} className="rounded-2xl border border-border bg-surface shadow-soft p-4">
@@ -556,7 +556,7 @@ export function StageEditor({
       {deleteTarget && (
         <DeleteStageDialog
           stageName={deleteTarget.name}
-          affectedCount={engagementCountsByStage[deleteTarget.id] ?? 0}
+          affectedCount={engagementCountsByStage[deleteTarget.name] ?? 0}
           otherStages={stages.filter((s) => s.id !== deleteTarget.id).map((s) => ({ id: s.id, name: s.name }))}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={confirmDeleteWithDestination}

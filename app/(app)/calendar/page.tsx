@@ -1,13 +1,14 @@
-import { Lock } from "lucide-react";
+import { Lock, CalendarDays, Clock3, Briefcase, ListTodo } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import type { CalendarItem } from "./CalendarView";
 import { CalendarPageClient } from "./CalendarPageClient";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
-import type { AppointmentRow, ClientOption, EngagementOption, StaffOption } from "@/components/appointments/types";
+import type { AppointmentRow, ClientOption, EngagementOption, StaffOption, ServiceOption } from "@/components/appointments/types";
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +29,16 @@ export default async function CalendarPage() {
   if (!canView) {
     return (
       <>
-        <PageHeader title="Calendar" description="Engagement and task due dates, and appointments, across your workspace." />
+        <PageHero
+          icon={CalendarDays}
+          tone="accent"
+          heading={
+            <>
+              Your <HeroHighlight>calendar</HeroHighlight>.
+            </>
+          }
+          subtitle="Engagement and task due dates, and appointments, across your workspace."
+        />
         <div className="flex-1 px-8 py-6">
           <EmptyState icon={Lock} message="You don't have permission to view the calendar." />
         </div>
@@ -36,7 +46,7 @@ export default async function CalendarPage() {
     );
   }
 
-  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows] =
+  const [{ data: engagements }, { data: tasks }, { data: appointmentRows }, { data: clientRows }, { data: engagementOptions }, staffRows, { data: timeOffRows }, { data: serviceRows }] =
     await Promise.all([
       supabase
         .from("engagements")
@@ -64,6 +74,17 @@ export default async function CalendarPage() {
         .is("merged_into_client_id", null),
       supabase.from("engagements").select("id, engagement_number, client_id").eq("workspace_id", workspace.id),
       getWorkspaceStaff(supabase, workspace.id),
+      supabase
+        .from("staff_time_off")
+        .select("user_id, start_date, end_date")
+        .eq("workspace_id", workspace.id)
+        .gte("end_date", new Date().toISOString().slice(0, 10)),
+      supabase
+        .from("services")
+        .select("id, name, estimated_duration_minutes, booking_location_type, booking_meeting_url, allow_overlapping_bookings")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "published")
+        .order("name"),
     ]);
 
   const appointments: AppointmentRow[] = (appointmentRows ?? []).map((a: any) => ({
@@ -97,6 +118,7 @@ export default async function CalendarPage() {
     label: e.engagement_number ?? "Engagement",
   }));
   const staff: StaffOption[] = staffRows.map((s) => ({ id: s.user_id, label: s.display_name ?? "Staff member" }));
+  const services: ServiceOption[] = serviceRows ?? [];
 
   const items: CalendarItem[] = [
     ...(engagements ?? []).map((e) => ({
@@ -124,13 +146,30 @@ export default async function CalendarPage() {
       })),
   ];
 
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const upcomingAppointments = appointments.filter((a) => a.status !== "cancelled" && new Date(a.start_at) >= now).length;
+  const todaysAppointments = appointments.filter((a) => a.status !== "cancelled" && a.start_at.slice(0, 10) === todayStr).length;
+
   return (
     <>
-      <PageHeader
-        title="Calendar"
-        description="Engagement and task due dates, and appointments, in one place."
+      <PageHero
+        icon={CalendarDays}
+        tone="accent"
+        heading={
+          <>
+            Your <HeroHighlight>calendar</HeroHighlight>.
+          </>
+        }
+        subtitle="Engagement and task due dates, and appointments, in one place."
       />
-      <div className="flex-1 px-8 py-6">
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile icon={Clock3} tone="accent" label="Upcoming appointments" value={upcomingAppointments} />
+          <StatTile icon={CalendarDays} tone="emerald" label="Today" value={todaysAppointments} />
+          <StatTile icon={Briefcase} tone="violet" label="Engagements due" value={(engagements ?? []).length} />
+          <StatTile icon={ListTodo} tone="amber" label="Tasks due" value={(tasks ?? []).length} />
+        </div>
         <CalendarPageClient
           workspaceId={workspace.id}
           items={items}
@@ -138,6 +177,8 @@ export default async function CalendarPage() {
           clients={clients}
           engagements={engagementOpts}
           staff={staff}
+          services={services}
+          staffTimeOff={timeOffRows ?? []}
           canManage={Boolean(canManage)}
           currentUserId={user?.id ?? null}
         />

@@ -44,6 +44,8 @@ export type RequestItemRow = {
   name: string;
   is_required: boolean;
   status: "pending" | "uploaded" | "waived";
+  category?: string | null;
+  due_date?: string | null;
 };
 
 export type DocumentRequestRow = {
@@ -62,6 +64,13 @@ export type SignerRow = {
   status: "pending" | "signed" | "declined";
   signed_at: string | null;
   access_token: string;
+  /** Staff presence/identity attestation -- see attest_signature_presence.
+   *  Only populated by the staff-facing loaders; the portal never needs it. */
+  attested_at?: string | null;
+  attested_by_name?: string | null;
+  /** Optional signing-link expiry, set via set_signature_request_expiry.
+   *  Only populated by the staff-facing loaders. */
+  expires_at?: string | null;
 };
 
 export type SignatureRequestRow = {
@@ -79,4 +88,13 @@ export type ActivityRow = { id: string; description: string; created_at: string 
 
 export type DocumentRequestTemplateOption = { id: string; name: string };
 
-export type EngagementLetterTemplateOption = { id: string; name: string; body_html: string; banner_image_url?: string | null };
+export type EngagementLetterTemplateOption = {
+  id: string;
+  name: string;
+  body_html: string;
+  banner_image_url?: string | null;
+  source_type?: string;
+  pdf_storage_path?: string | null;
+  pdf_field_mode?: string | null;
+  pdf_field_mappings?: unknown;
+};

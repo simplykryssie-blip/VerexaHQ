@@ -2,13 +2,14 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { REPORT_CATEGORIES } from "@/lib/reportCategories";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { IconChip } from "@/components/ui/IconChip";
 
 export const dynamic = "force-dynamic";
 
-// Staff productivity is a multi-preparer concept -- not meaningful for a
-// solo PTIN practice, so it's greyed out (visible, not clickable) there
-// instead of just being one more empty report.
-const STAFF_REPORT_SLUG = "staff-productivity";
+// Staff productivity and team performance are both multi-preparer concepts --
+// not meaningful for a solo PTIN practice, so they're greyed out (visible,
+// not clickable) there instead of just being one more empty report.
+const MULTI_PREPARER_REPORT_SLUGS = new Set(["staff-productivity", "team-performance"]);
 
 export default async function ReportsPage() {
   const workspace = await getCurrentWorkspace();
@@ -20,7 +21,7 @@ export default async function ReportsPage() {
       <div className="flex-1 px-8 py-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {REPORT_CATEGORIES.map((c) => {
-            const disabled = hideStaffReport && c.slug === STAFF_REPORT_SLUG;
+            const disabled = hideStaffReport && MULTI_PREPARER_REPORT_SLUGS.has(c.slug);
             if (disabled) {
               return (
                 <div
@@ -42,11 +43,11 @@ export default async function ReportsPage() {
               <Link
                 key={c.slug}
                 href={`/reports/${c.slug}`}
-                className="flex items-start gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 transition hover:border-accent hover:shadow-sm"
+                className="flex items-start gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 transition hover:border-accent hover:shadow-softHover"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
+                <IconChip tone={c.tone}>
                   <c.icon size={18} strokeWidth={2} aria-hidden="true" />
-                </span>
+                </IconChip>
                 <div>
                   <h2 className="text-sm font-semibold text-ink">{c.title}</h2>
                   <p className="mt-1 text-sm text-muted">{c.description}</p>

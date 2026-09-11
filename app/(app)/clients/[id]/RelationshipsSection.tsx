@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Pencil, Trash2 } from "lucide-react";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 import type { RelationshipRow } from "./ClientWorkspaceTabs";
 
 const INDIVIDUAL_RELATIONSHIP_TYPES = ["spouse", "dependent", "parent", "child", "other"];
@@ -64,6 +65,7 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
   const [selectedClient, setSelectedClient] = useState<ClientSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const searchRef = useDropdownDismiss<HTMLLabelElement>(results.length > 0, () => setResults([]));
 
   async function search(q: string) {
     setQuery(q);
@@ -156,7 +158,7 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
             />
           </label>
         )}
-        <label className="relative flex flex-col gap-1 text-xs text-muted">
+        <label ref={searchRef} className="relative flex flex-col gap-1 text-xs text-muted">
           Search existing clients
           <input
             value={selectedClient ? selectedClient.label : query}
@@ -174,23 +176,25 @@ export function LinkExistingClientForm({ clientId, workspaceId }: { clientId: st
             </button>
           )}
           {results.length > 0 && (
-            <ul className="absolute top-full z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-sm">
-              {results.map((r) => (
-                <li key={r.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedClient(r);
-                      setQuery(r.label);
-                      setResults([]);
-                    }}
-                    className="block w-full px-2 py-1.5 text-left text-sm text-slate hover:bg-surfaceMuted"
-                  >
-                    {r.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <DropdownPanel className="top-full mt-1 w-full">
+              <ul>
+                {results.map((r) => (
+                  <li key={r.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedClient(r);
+                        setQuery(r.label);
+                        setResults([]);
+                      }}
+                      className="block w-full px-2 py-1.5 text-left text-sm text-slate hover:bg-surfaceMuted"
+                    >
+                      {r.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </DropdownPanel>
           )}
         </label>
       </div>
@@ -221,6 +225,7 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
   const [ssn, setSsn] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const searchRef = useDropdownDismiss<HTMLLabelElement>(results.length > 0, () => setResults([]));
 
   async function search(q: string) {
     setQuery(q);
@@ -326,7 +331,7 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
             />
           </label>
         )}
-        <label className="relative flex flex-col gap-1 text-xs text-muted">
+        <label ref={searchRef} className="relative flex flex-col gap-1 text-xs text-muted">
           Name (search clients or type new)
           <input
             value={selectedClient ? selectedClient.label : query}
@@ -345,15 +350,17 @@ export function AddRelationshipForm({ clientId, workspaceId }: { clientId: strin
             </button>
           )}
           {results.length > 0 && (
-            <ul className="absolute top-full z-10 mt-1 w-full rounded-lg border border-border bg-surface shadow-sm">
-              {results.map((r) => (
-                <li key={r.id}>
-                  <button type="button" onClick={() => pick(r)} className="block w-full px-2 py-1.5 text-left text-sm text-slate hover:bg-surfaceMuted">
-                    {r.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <DropdownPanel className="top-full mt-1 w-full">
+              <ul>
+                {results.map((r) => (
+                  <li key={r.id}>
+                    <button type="button" onClick={() => pick(r)} className="block w-full px-2 py-1.5 text-left text-sm text-slate hover:bg-surfaceMuted">
+                      {r.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </DropdownPanel>
           )}
         </label>
       </div>

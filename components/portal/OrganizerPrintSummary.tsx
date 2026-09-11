@@ -20,17 +20,19 @@ function formatAnswer(field: FieldRow, value: string | undefined): string {
   }
   if (field.field_type === "signature") {
     try {
-      const parsed = JSON.parse(value) as { typed_name?: string; signed_at?: string };
-      return parsed.typed_name ? `Signed by ${parsed.typed_name} on ${new Date(parsed.signed_at ?? "").toLocaleDateString()}` : "--";
+      const parsed = JSON.parse(value) as { typed_name?: string; signature_image_path?: string; signed_at?: string };
+      const signedOn = parsed.signed_at ? ` on ${new Date(parsed.signed_at).toLocaleDateString()}` : "";
+      if (parsed.typed_name) return `Signed by ${parsed.typed_name}${signedOn}`;
+      if (parsed.signature_image_path) return `Signed (drawn signature)${signedOn}`;
+      return "--";
     } catch {
       return "--";
     }
   }
-  if (field.field_type === "checkbox") return value === "true" ? "Yes" : "No";
   if (field.field_type === "dropdown" || field.field_type === "radio_button") {
     return normalizeOptions(field.options).find((o) => o.value === value)?.label ?? value;
   }
-  if (field.field_type === "multiple_choice") {
+  if (field.field_type === "multiple_choice" || field.field_type === "checkbox") {
     const options = normalizeOptions(field.options);
     return value
       .split(",")

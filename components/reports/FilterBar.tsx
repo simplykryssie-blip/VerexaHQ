@@ -20,15 +20,22 @@ export function FilterBar({
   const [saveName, setSaveName] = useState("");
   const [saved, setSaved] = useState(() => listSavedFilters(reportKey));
 
+  // router.replace() alone can serve a stale cached RSC payload for this
+  // route instead of re-running the server query with the new search
+  // params -- Next's client Router Cache doesn't reliably treat a
+  // search-params-only navigation to the same pathname as "new". refresh()
+  // forces the server component to actually re-fetch against the new URL.
   function updateParam(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
     router.replace(`${pathname}?${params.toString()}`);
+    router.refresh();
   }
 
   function applyQuery(query: string) {
     router.replace(`${pathname}?${query}`);
+    router.refresh();
   }
 
   return (

@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge } from "@/components/ui/Badge";
 import { GhlImportPanel } from "./GhlImportPanel";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: string; isConnected: boolean }) {
   const router = useRouter();
@@ -25,6 +26,23 @@ export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: s
       return;
     }
     setConnecting(true);
+
+    // Verify against GoHighLevel's own API before saving anything -- a bad
+    // token or Location ID (e.g. an email address pasted in by mistake)
+    // used to save silently and only fail later, when someone tried to
+    // actually import contacts.
+    const verifyRes = await fetch("/api/ghl/verify-connection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey: apiKey.trim(), locationId: locationId.trim() }),
+    });
+    const verifyData = (await verifyRes.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+    if (!verifyRes.ok || !verifyData?.ok) {
+      setConnecting(false);
+      setError(verifyData?.error ?? "Could not verify this connection with GoHighLevel.");
+      return;
+    }
+
     const { error: rpcError } = await supabase.rpc("set_workspace_ghl_connection", {
       p_workspace_id: workspaceId,
       p_api_key: apiKey.trim(),
@@ -78,17 +96,21 @@ export function GhlConnectionCard({ workspaceId, isConnected }: { workspaceId: s
           </button>
         ) : (
           <form onSubmit={connect} className="flex flex-wrap items-start gap-2">
-            <input
-              type="password"
+            <PasswordInput
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Private Integration Token"
-              className="w-64 rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              wrapperClassName="w-64"
+              autoComplete="off"
+              name="ghl-private-integration-token"
+              className="w-full rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <input
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
               placeholder="Location ID"
+              autoComplete="off"
+              name="ghl-location-id"
               className="w-40 rounded-lg border border-border px-3 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
             <button

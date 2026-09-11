@@ -60,9 +60,16 @@ export async function GET(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const meta = user.user_metadata as { pending_invite_next?: string; pending_invite_token?: string } | undefined;
+      const meta = user.user_metadata as {
+        pending_invite_next?: string;
+        pending_invite_token?: string;
+        pending_signup_next?: string;
+      } | undefined;
       if (meta?.pending_invite_next && meta?.pending_invite_token) {
         return `${meta.pending_invite_next}?token=${encodeURIComponent(meta.pending_invite_token)}`;
+      }
+      if (meta?.pending_signup_next) {
+        return meta.pending_signup_next;
       }
       const { data: portalUser } = await supabase
         .from("client_portal_users")

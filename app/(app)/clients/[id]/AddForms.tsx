@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { Pencil, Trash2 } from "lucide-react";
 import type { ContactRow, AddressRow } from "./ClientWorkspaceTabs";
+import { US_STATES } from "@/lib/usStates";
+
+const STATE_OPTIONS = US_STATES.map((s) => ({ value: s.code, label: s.name }));
 
 type Ids = { clientId: string; workspaceId: string };
 
@@ -138,7 +141,7 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
         },
         { name: "street", label: "Street", required: true },
         { name: "city", label: "City" },
-        { name: "state", label: "State" },
+        { name: "state", label: "State", type: "select", options: STATE_OPTIONS },
         { name: "zip", label: "ZIP" },
       ]}
       onSubmit={async (v) => {
@@ -183,7 +186,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
         { name: "address_type", label: "Type", type: "select", required: true, options: ADDRESS_TYPE_OPTIONS },
         { name: "street", label: "Street", required: true },
         { name: "city", label: "City" },
-        { name: "state", label: "State" },
+        { name: "state", label: "State", type: "select", options: STATE_OPTIONS },
         { name: "zip", label: "ZIP" },
       ]}
       trigger={(openForm) => (

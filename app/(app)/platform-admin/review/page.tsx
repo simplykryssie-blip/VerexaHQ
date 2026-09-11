@@ -82,7 +82,7 @@ export default async function PlatformReviewQueuePage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {needsAttention.map((s) => (
-                    <tr key={s.workspace_id} className="hover:bg-surfaceMuted">
+                    <tr key={s.workspace_id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3">
                         <Link href={`/platform-admin/${s.workspace_id}`} className="font-medium text-accent hover:underline">
                           {realWorkspaceById.get(s.workspace_id) ?? s.workspace_id}
@@ -122,7 +122,7 @@ export default async function PlatformReviewQueuePage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {upcomingCancellations.map((s) => (
-                    <tr key={s.workspace_id} className="hover:bg-surfaceMuted">
+                    <tr key={s.workspace_id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="px-5 py-3">
                         <Link href={`/platform-admin/${s.workspace_id}`} className="font-medium text-accent hover:underline">
                           {realWorkspaceById.get(s.workspace_id) ?? s.workspace_id}
@@ -159,7 +159,7 @@ export default async function PlatformReviewQueuePage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {failureRows.map((f) => (
-                    <tr key={f.id} className="hover:bg-surfaceMuted">
+                    <tr key={f.id} className="transition-colors hover:bg-surfaceMuted">
                       <td className="whitespace-nowrap px-5 py-3 text-slate">{new Date(f.created_at).toLocaleString()}</td>
                       <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-slate">{f.source}</td>
                       <td className="whitespace-nowrap px-5 py-3 text-slate">

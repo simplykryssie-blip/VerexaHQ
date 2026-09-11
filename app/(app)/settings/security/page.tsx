@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Tabs } from "@/components/ui/Tabs";
+import { PROFILE_ACCOUNT_TABS } from "@/lib/settingsSubNav";
 import { SecurityForm } from "./SecurityForm";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { MfaSetup } from "./MfaSetup";
@@ -32,9 +34,12 @@ export default async function SecurityPage() {
   return (
     <div className="max-w-2xl">
       <SettingsSectionHeader icon={ShieldCheck} title="Security" description="Your account password and this workspace's security policy." />
+      <div className="mt-4">
+        <Tabs tabs={PROFILE_ACCOUNT_TABS} active="security" />
+      </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft p-5">
-        <h3 className="text-sm font-semibold text-ink">Change your password</h3>
+        <h3 className="font-display text-sm font-semibold text-ink">Change your password</h3>
         <p className="mt-1 text-sm text-muted">Update the password for your own account.</p>
         <div className="mt-4">
           <ChangePasswordForm minLength={policy?.password_min_length ?? 8} />
@@ -42,7 +47,7 @@ export default async function SecurityPage() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft p-5">
-        <h3 className="text-sm font-semibold text-ink">Two-factor authentication</h3>
+        <h3 className="font-display text-sm font-semibold text-ink">Two-factor authentication</h3>
         <p className="mt-1 text-sm text-muted">Protect your own account with an authenticator app.</p>
         <div className="mt-4">
           <MfaSetup />
@@ -50,10 +55,12 @@ export default async function SecurityPage() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft p-5">
-        <h3 className="text-sm font-semibold text-ink">Workspace security policy</h3>
+        <h3 className="font-display text-sm font-semibold text-ink">Workspace security policy</h3>
         <p className="mt-1 text-sm text-muted">Password, session, lockout, and MFA policy for everyone in this workspace.</p>
         <div className="mt-4">
-          {!policy ? (
+          {!canManageSecurity ? (
+            <EmptyState icon={Lock} message="You don't have permission to manage this workspace's security policy." />
+          ) : !policy ? (
             <EmptyState icon={ShieldCheck} message="No security policy configured yet -- defaults apply." />
           ) : (
             <SecurityForm workspaceId={workspace.id} policy={policy} />

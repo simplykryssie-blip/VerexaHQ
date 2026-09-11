@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { getWorkspaceStaff } from "@/lib/workspaceStaff";
 import { ServiceForm, type ServiceRow, type Option } from "@/components/settings/ServiceForm";
 
 export const dynamic = "force-dynamic";
@@ -26,19 +27,26 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
     { data: categories },
     { data: pipelines },
     { data: organizerTemplates },
+    { data: engagementLetterTemplates },
     { data: documentRequestTemplates },
     { data: documentFolderTemplates },
+    { data: locations },
     { data: canManage },
+    staff,
   ] = await Promise.all([
     supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
     supabase.from("processes").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("engagement_letter_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_request_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
     supabase.from("document_folder_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("booking_locations").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
     supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+    getWorkspaceStaff(supabase, workspace.id),
   ]);
 
   const asOptions = (rows: { id: string; name: string }[] | null): Option[] => rows ?? [];
+  const staffOptions: Option[] = staff.map((s) => ({ id: s.user_id, name: s.display_name ?? "Staff member" }));
 
   return (
     <div className="max-w-2xl">
@@ -49,11 +57,15 @@ export default async function ServiceDetailPage({ params }: { params: { id: stri
       <div className="mt-4">
         <ServiceForm
           service={service as ServiceRow}
+          workspaceSlug={workspace.slug}
           categories={asOptions(categories)}
           pipelines={asOptions(pipelines)}
           organizerTemplates={asOptions(organizerTemplates)}
+          engagementLetterTemplates={asOptions(engagementLetterTemplates)}
           documentRequestTemplates={asOptions(documentRequestTemplates)}
           documentFolderTemplates={asOptions(documentFolderTemplates)}
+          staffOptions={staffOptions}
+          locationOptions={asOptions(locations)}
           canManage={Boolean(canManage)}
         />
       </div>

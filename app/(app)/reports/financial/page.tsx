@@ -9,6 +9,8 @@ import { ExportButtons } from "@/components/reports/ExportButtons";
 import { SimpleBarChart } from "@/components/reports/SimpleBarChart";
 import { EmptyState } from "@/components/EmptyState";
 import { Lock } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { BILLING_DOCUMENT_STATUS_TONE } from "@/lib/billingStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -109,7 +111,16 @@ export default async function FinancialReportPage({
       sortValue: (r) => r.invoice_number ?? "",
     },
     { key: "client", label: "Client", render: (r) => r.clientLabel, sortValue: (r) => r.clientLabel },
-    { key: "status", label: "Status", render: (r) => <span className="capitalize">{r.status}</span>, sortValue: (r) => r.status },
+    {
+      key: "status",
+      label: "Status",
+      render: (r) => (
+        <Badge tone={BILLING_DOCUMENT_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+          {r.status}
+        </Badge>
+      ),
+      sortValue: (r) => r.status,
+    },
     { key: "total", label: "Total", align: "right", render: (r) => money(r.total_amount), sortValue: (r) => r.total_amount },
     { key: "paid", label: "Paid", align: "right", render: (r) => money(r.amount_paid), sortValue: (r) => r.amount_paid },
     {

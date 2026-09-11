@@ -2,12 +2,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, FileCheck, Check, X, HelpCircle } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, ChevronRight, FileCheck, ArrowRight, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { OrganizerAnswerReveal } from "./OrganizerAnswerReveal";
 
-export type OrganizerFieldAnswer = { fieldId: string; answerId: string | null; label: string; fieldType: string; display: string; maskable: boolean };
+export type OrganizerFieldAnswer = {
+  fieldId: string;
+  answerId: string | null;
+  label: string;
+  fieldType: string;
+  display: string;
+  maskable: boolean;
+  documentStatus?: string;
+};
+
+const DOCUMENT_STATUS_BADGE: Record<string, { label: string; tone: string }> = {
+  uploaded: { label: "Requested • Received", tone: "bg-emeraldSoft text-emerald" },
+  pending: { label: "Requested • Missing", tone: "bg-amberSoft text-amber" },
+  waived: { label: "Requested • Waived", tone: "bg-surfaceMuted text-muted" },
+};
 export type OrganizerRepeaterGroup = { fieldId: string; label: string; instances: { index: number; fields: OrganizerFieldAnswer[] }[] };
 export type OrganizerReviewStatus = "Pending" | "In Review" | "Approved" | "Rejected" | "Corrections Requested";
 export type OrganizerResponseDetail = {
@@ -37,6 +52,12 @@ const REVIEW_BADGE_TONE: Record<OrganizerReviewStatus, string> = {
 // Clicking anywhere on the row expands/collapses the answers -- the
 // content was previously only rendered inline with no way to open/close
 // it, which read as "nothing happens when I click this."
+//
+// Full per-question review (approve/deny/needs-info, information-request
+// lifecycle, activity, assignment) lives on its own page --
+// /organizers/[responseId]/review -- so this card only shows a compact
+// status summary + entry point into it, rather than duplicating those
+// actions inline.
 export function OrganizerResponseCard({
   response,
   workspaceServices,
@@ -50,29 +71,7 @@ export function OrganizerResponseCard({
   const [open, setOpen] = useState(false);
   const [filing, setFiling] = useState(false);
   const [pickingService, setPickingService] = useState(false);
-  const [reviewing, setReviewing] = useState<OrganizerReviewStatus | null>(null);
-
-  async function setReview(status: OrganizerReviewStatus, notePrompt?: string) {
-    let note: string | null = null;
-    if (notePrompt) {
-      const entered = window.prompt(notePrompt);
-      if (entered === null) return; // cancelled -- leave the review status as-is
-      note = entered.trim() || null;
-    }
-    setReviewing(status);
-    const { error } = await supabase.rpc("set_organizer_response_review_status", {
-      p_response_id: response.id,
-      p_status: status,
-      p_note: note ?? undefined,
-    });
-    setReviewing(null);
-    if (error) {
-      toast.show(error.message, "error");
-      return;
-    }
-    toast.show(`Marked ${status}.`, "success");
-    router.refresh();
-  }
+  const [removing, setRemoving] = useState(false);
 
   async function pickService(serviceId: string) {
     if (!serviceId) return;
@@ -89,6 +88,25 @@ export function OrganizerResponseCard({
 
   const hasAnswers = response.status === "submitted" || response.status === "reviewed";
 
+  async function removeResponse(e: React.MouseEvent) {
+    e.stopPropagation();
+    const confirmed = window.confirm(
+      hasAnswers
+        ? "This form has already been submitted with answers. Removing it will permanently delete those answers. Are you sure?"
+        : "Remove this form? The client will no longer see it in their portal."
+    );
+    if (!confirmed) return;
+    setRemoving(true);
+    const { error } = await supabase.from("organizer_responses").delete().eq("id", response.id);
+    setRemoving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Form removed.", "success");
+    router.refresh();
+  }
+
   async function fileNow(e: React.MouseEvent) {
     e.stopPropagation();
     setFiling(true);
@@ -100,13 +118,13 @@ export function OrganizerResponseCard({
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!data.ok) {
-        toast.show(data.error ?? "Could not file this organizer.", "error");
+        toast.show(data.error ?? "Could not file this form.", "error");
         return;
       }
       toast.show("Filed to Documents.", "success");
       window.location.reload();
     } catch {
-      toast.show("Could not file this organizer.", "error");
+      toast.show("Could not file this form.", "error");
     } finally {
       setFiling(false);
     }
@@ -131,7 +149,7 @@ export function OrganizerResponseCard({
               onClick={fileNow}
               disabled={filing}
               className="inline-flex items-center gap-1 rounded-full border border-accent px-2 py-0.5 text-[11px] font-medium text-accent hover:bg-accentSoft disabled:opacity-60"
-              title="File this organizer's answers into Documents"
+              title="File this form's answers into Documents"
             >
               <FileCheck size={11} /> {filing ? "Filing..." : "File to Documents"}
             </button>
@@ -140,6 +158,15 @@ export function OrganizerResponseCard({
             {response.status.replace("_", " ")}
             {response.submitted_at && ` -- submitted ${new Date(response.submitted_at).toLocaleDateString()}`}
           </span>
+          <button
+            type="button"
+            onClick={removeResponse}
+            disabled={removing}
+            title="Remove this assigned form"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-muted hover:border-danger hover:text-danger disabled:opacity-60"
+          >
+            <Trash2 size={11} /> {removing ? "Removing..." : "Remove"}
+          </button>
         </span>
       </button>
 
@@ -193,32 +220,12 @@ export function OrganizerResponseCard({
             </span>
           )}
           {response.review_status && response.review_note && <span className="text-xs text-muted">&quot;{response.review_note}&quot;</span>}
-          <span className="ml-auto flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setReview("Approved")}
-              disabled={reviewing !== null}
-              className="inline-flex items-center gap-1 rounded-full border border-emerald px-2 py-0.5 text-[11px] font-medium text-emerald hover:bg-emeraldSoft disabled:opacity-60"
-            >
-              <Check size={11} /> {reviewing === "Approved" ? "Saving..." : "Approve"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setReview("Corrections Requested", "What's needed from the client?")}
-              disabled={reviewing !== null}
-              className="inline-flex items-center gap-1 rounded-full border border-amber px-2 py-0.5 text-[11px] font-medium text-amber hover:bg-amberSoft disabled:opacity-60"
-            >
-              <HelpCircle size={11} /> {reviewing === "Corrections Requested" ? "Saving..." : "Needs Info"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setReview("Rejected", "Reason for denying (optional):")}
-              disabled={reviewing !== null}
-              className="inline-flex items-center gap-1 rounded-full border border-rose px-2 py-0.5 text-[11px] font-medium text-rose hover:bg-roseSoft disabled:opacity-60"
-            >
-              <X size={11} /> {reviewing === "Rejected" ? "Saving..." : "Deny"}
-            </button>
-          </span>
+          <Link
+            href={`/organizers/${response.id}/review`}
+            className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            Review <ArrowRight size={12} />
+          </Link>
         </div>
       )}
 
@@ -227,7 +234,12 @@ export function OrganizerResponseCard({
           {(response.topLevel ?? []).map((f) => (
             <div key={f.fieldId} className="flex items-start justify-between gap-4 text-sm">
               <span className="text-muted">{f.label}</span>
-              <span className="text-right text-slate">
+              <span className="flex items-center gap-2 text-right text-slate">
+                {f.documentStatus && DOCUMENT_STATUS_BADGE[f.documentStatus] && (
+                  <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${DOCUMENT_STATUS_BADGE[f.documentStatus].tone}`}>
+                    {DOCUMENT_STATUS_BADGE[f.documentStatus].label}
+                  </span>
+                )}
                 {f.maskable && f.answerId ? <OrganizerAnswerReveal answerId={f.answerId} masked={f.display} /> : f.display}
               </span>
             </div>
@@ -263,7 +275,7 @@ export function OrganizerResponseCard({
           ))}
 
           {(response.topLevel ?? []).length === 0 && (response.repeaters ?? []).length === 0 && (
-            <p className="text-xs text-muted">No answers were recorded on this organizer.</p>
+            <p className="text-xs text-muted">No answers were recorded on this form.</p>
           )}
         </div>
       )}

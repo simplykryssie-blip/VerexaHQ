@@ -74,7 +74,71 @@ export const MERGE_FIELD_GROUPS: { group: string; fields: MergeFieldDef[] }[] = 
       // portal (a reminder, a status update), as opposed to the dedicated
       // portal-invite-email flow, which has always sent its own tokenized
       // accept-invitation link automatically.
-      { token: "portal_link", label: "Client portal link", kind: "auto", source: "app portal sign-in page", sample: "https://verexahq.com/portal/login" },
+      {
+        token: "portal_link",
+        label: "Portal sign-in link (for returning clients)",
+        kind: "auto",
+        source: "app portal sign-in page",
+        sample: "https://verexahq.com/portal/login",
+      },
+      // The one-time, tokenized accept-invitation link -- only resolves when
+      // the client has a live, unexpired invitation; dispatch-notifications
+      // refuses to send a message that uses this token if no such invitation
+      // exists, rather than sending a broken/empty link.
+      {
+        token: "portal_invite_link",
+        label: "Portal invite link (first-time account setup)",
+        kind: "auto",
+        source: "client_portal_users (requires an active, unexpired invitation)",
+        sample: "https://verexahq.com/portal/accept-invitation?token=...",
+      },
+    ],
+  },
+  {
+    group: "Preparer",
+    fields: [
+      {
+        token: "preparer_caf_number",
+        label: "Preparer's CAF number",
+        kind: "auto",
+        source: "user_profiles.caf_number (the staff member sending this document)",
+        sample: "1234-56789R",
+      },
+    ],
+  },
+  {
+    group: "IRS Form 8821",
+    fields: [
+      {
+        token: "designee_name",
+        label: "Designee name",
+        kind: "auto",
+        source: "the staff member chosen as designee on the authorization",
+        sample: "Jordan Blake, EA",
+      },
+      {
+        token: "designee_caf_number",
+        label: "Designee CAF number",
+        kind: "auto",
+        source: "user_profiles.caf_number (of the chosen designee)",
+        sample: "1234-56789R",
+      },
+      { token: "tax_matter_1_type", label: "Tax matter 1 -- type", kind: "auto", source: "authorization tax matter row 1", sample: "Income" },
+      { token: "tax_matter_1_form", label: "Tax matter 1 -- form number", kind: "auto", source: "authorization tax matter row 1", sample: "1040" },
+      { token: "tax_matter_1_years", label: "Tax matter 1 -- year(s)/period(s)", kind: "auto", source: "authorization tax matter row 1", sample: "2023, 2024" },
+      { token: "tax_matter_1_matters", label: "Tax matter 1 -- specific matters", kind: "auto", source: "authorization tax matter row 1", sample: "" },
+      { token: "tax_matter_2_type", label: "Tax matter 2 -- type", kind: "auto", source: "authorization tax matter row 2", sample: "Employment" },
+      { token: "tax_matter_2_form", label: "Tax matter 2 -- form number", kind: "auto", source: "authorization tax matter row 2", sample: "941" },
+      { token: "tax_matter_2_years", label: "Tax matter 2 -- year(s)/period(s)", kind: "auto", source: "authorization tax matter row 2", sample: "2024" },
+      { token: "tax_matter_2_matters", label: "Tax matter 2 -- specific matters", kind: "auto", source: "authorization tax matter row 2", sample: "" },
+      { token: "tax_matter_3_type", label: "Tax matter 3 -- type", kind: "auto", source: "authorization tax matter row 3", sample: "" },
+      { token: "tax_matter_3_form", label: "Tax matter 3 -- form number", kind: "auto", source: "authorization tax matter row 3", sample: "" },
+      { token: "tax_matter_3_years", label: "Tax matter 3 -- year(s)/period(s)", kind: "auto", source: "authorization tax matter row 3", sample: "" },
+      { token: "tax_matter_3_matters", label: "Tax matter 3 -- specific matters", kind: "auto", source: "authorization tax matter row 3", sample: "" },
+      { token: "tax_matter_4_type", label: "Tax matter 4 -- type", kind: "auto", source: "authorization tax matter row 4", sample: "" },
+      { token: "tax_matter_4_form", label: "Tax matter 4 -- form number", kind: "auto", source: "authorization tax matter row 4", sample: "" },
+      { token: "tax_matter_4_years", label: "Tax matter 4 -- year(s)/period(s)", kind: "auto", source: "authorization tax matter row 4", sample: "" },
+      { token: "tax_matter_4_matters", label: "Tax matter 4 -- specific matters", kind: "auto", source: "authorization tax matter row 4", sample: "" },
     ],
   },
   {

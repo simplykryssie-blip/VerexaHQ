@@ -7,13 +7,24 @@ export type BuilderField = {
   field_type: OrganizerFieldType;
   label: string;
   help_text: string | null;
+  body_html: string | null;
   display_order: number;
   is_required: boolean;
   options: unknown;
   conditional_logic: unknown;
   client_profile_field: string | null;
   relationship_role: string | null;
+  irs_8821_role: string | null;
+  layout_width: LayoutWidth;
+  include_in_document_checklist: boolean;
+  document_checklist_name: string | null;
+  document_checklist_category: string | null;
+  is_internal_only: boolean;
+  image_url: string | null;
 };
+
+/** JotForm-style row-sharing: whether this field shrinks to share its row with a neighbor. */
+export type LayoutWidth = "full" | "half";
 
 export type BuilderTemplate = {
   id: string;
@@ -26,4 +37,5 @@ export type BuilderTemplate = {
   is_public: boolean;
   requires_portal_signup: boolean;
   banner_image_url: string | null;
+  custom_css: string | null;
 };

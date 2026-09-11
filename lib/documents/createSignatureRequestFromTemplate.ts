@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { renderTemplate } from "@/lib/templates/render";
 import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
 import { fetchImageBytes } from "@/lib/documents/fetchImageBytes";
+import { renderPdfTemplate, type PdfFieldMapping } from "@/lib/documents/renderPdfTemplate";
 
 export async function createSignatureRequestFromTemplate({
   supabase,
@@ -10,6 +11,7 @@ export async function createSignatureRequestFromTemplate({
   entityId,
   template,
   clientName,
+  clientEmail,
   firmName,
   signers,
   title,
@@ -19,29 +21,61 @@ export async function createSignatureRequestFromTemplate({
   workspaceId: string;
   entityType: string;
   entityId: string;
-  template: { id: string; name: string; body_html: string; banner_image_url?: string | null };
+  template: {
+    id: string;
+    name: string;
+    body_html: string;
+    banner_image_url?: string | null;
+    source_type?: string;
+    pdf_storage_path?: string | null;
+    pdf_field_mode?: string | null;
+    pdf_field_mappings?: unknown;
+  };
   clientName?: string;
+  clientEmail?: string | null;
   firmName?: string;
   signers: { signer_name: string; signer_email: string | null }[];
   title: string;
   dueDate?: string | null;
 }): Promise<{ requestId: string } | { error: string }> {
-  const mergedHtml = renderTemplate(template.body_html, {
+  const {
+    data: { user: sendingUser },
+  } = await supabase.auth.getUser();
+  const { data: senderProfile } = sendingUser
+    ? await supabase.from("user_profiles").select("caf_number").eq("id", sendingUser.id).maybeSingle()
+    : { data: null };
+
+  const mergeValues = {
     client_name: clientName ?? "",
+    client_email: clientEmail ?? "",
     firm_name: firmName ?? "",
     firm_address: "",
     firm_phone: "",
-  });
+    current_date: new Date().toLocaleDateString(),
+    preparer_caf_number: senderProfile?.caf_number ?? "",
+  };
   // A rendered PDF (not the raw HTML) so the signing page can actually
   // preview it -- it only knows how to render PDFs and images -- and so it
   // has a real, visible signature line rather than a bare "type your name"
   // box with no document underneath it.
   const signerLabel = signers[0]?.signer_name || clientName || "Client";
-  const bannerImageBytes = await fetchImageBytes(template.banner_image_url);
-  const pdfBytes = await renderLetterPdf(template.name, mergedHtml, signerLabel, undefined, bannerImageBytes ?? undefined);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+
+  let pdfBytes: Uint8Array;
+  if (template.source_type === "pdf" && template.pdf_storage_path && template.pdf_field_mode) {
+    const { data: sourceFile, error: downloadErr } = await supabase.storage.from("document-templates").download(template.pdf_storage_path);
+    if (downloadErr || !sourceFile) return { error: downloadErr?.message ?? "Could not load the uploaded PDF for this document." };
+    pdfBytes = await renderPdfTemplate({
+      sourceBytes: new Uint8Array(await sourceFile.arrayBuffer()),
+      fieldMode: template.pdf_field_mode as "acroform" | "overlay",
+      fieldMappings: (template.pdf_field_mappings as PdfFieldMapping[] | null) ?? [],
+      values: mergeValues,
+    });
+  } else {
+    const mergedHtml = renderTemplate(template.body_html, mergeValues);
+    const bannerImageBytes = await fetchImageBytes(template.banner_image_url);
+    pdfBytes = await renderLetterPdf(template.name, mergedHtml, signerLabel, undefined, bannerImageBytes ?? undefined);
+  }
+
   const fileName = `${template.name}.pdf`;
   const path = `${workspaceId}/${entityId}/${Date.now()}-${fileName}`;
   const blob = new Blob([pdfBytes as unknown as BlobPart], { type: "application/pdf" });
@@ -58,9 +92,9 @@ export async function createSignatureRequestFromTemplate({
       storage_path: path,
       mime_type: "application/pdf",
       file_size_bytes: blob.size,
-      uploaded_by: user?.id,
+      uploaded_by: sendingUser?.id,
       visibility: "internal",
-      category: "Engagement Letter",
+      category: "Signed Document",
     })
     .select("id")
     .single();

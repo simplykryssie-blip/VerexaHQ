@@ -1,18 +1,33 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
+import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
+import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
+import { ModalSlotGate } from "@/components/ModalSlotGate";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+// Per-workspace favicon: the auto-generated square derivative of a
+// workspace's uploaded business logo, falling back to Verexa's own mark so
+// every workspace still gets a real tab icon before uploading one.
+export async function generateMetadata(): Promise<Metadata> {
+  const workspace = await getCurrentWorkspace();
+  if (!workspace) return {};
+  const branding = await getEffectiveBranding(workspace.id);
+  return { icons: { icon: branding.faviconUrl ?? "/brand/vmark.png" } };
+}
+
+export default async function AppLayout({ children, modal }: { children: React.ReactNode; modal: React.ReactNode }) {
   const workspace = await getCurrentWorkspace();
 
   if (!workspace) {
@@ -38,6 +53,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { data: canUseNetworkMessaging },
     { count: teammateCount },
     { data: hasAcceptedTerms },
+    { data: billingCardRows },
+    { data: currentProfile },
+    { data: currentMembership },
+    { data: roles },
+    { count: pendingClientChangeCount },
+    { count: submittedOrganizerCount },
+    { count: respondedOrganizerItemCount },
+    { count: visibleLearningCourseCount },
+    { data: softwareLinks },
+    { data: myEroConnection },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -58,6 +83,46 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     workspace.is_owner
       ? supabase.rpc("has_accepted_platform_terms", { p_version: LEGAL_VERSION })
       : Promise.resolve({ data: true }),
+    // Only the owner is prompted -- matches who can actually act on it
+    // (FirmProfileForm gates the Stripe/billing fields on isOwner too).
+    workspace.is_owner ? supabase.rpc("needs_billing_card", { p_workspace_id: workspace.id }) : Promise.resolve({ data: null }),
+    // For the sidebar footer / header avatar -- no FK PostgREST can embed
+    // between workspace_users and user_profiles (both independently
+    // reference auth.users), same reason getWorkspaceStaff joins manually.
+    user ? supabase.from("user_profiles").select("display_name, avatar_url").eq("id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+    user
+      ? supabase.from("workspace_users").select("role_id").eq("workspace_id", workspace.id).eq("user_id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("roles").select("id, name").or(`workspace_id.is.null,workspace_id.eq.${workspace.id}`),
+    // Powers the Review Queue nav item's red dot. Doesn't include cross-firm
+    // engagement_shares (an ERO/SB-only, permission-gated section on that
+    // page) -- checking that permission on every single page load isn't
+    // worth it just for a dot; the three most common cases (client-submitted
+    // info changes, submitted organizers, client responses to flagged
+    // organizer questions) cover it for everyone else.
+    supabase.from("client_pending_changes").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "pending"),
+    supabase.from("organizer_responses").select("id", { count: "exact", head: true }).eq("workspace_id", workspace.id).eq("status", "submitted"),
+    // organizer_information_request_items has no workspace_id of its own --
+    // scoped through the parent request, same as review-queue's own query.
+    supabase
+      .from("organizer_information_request_items")
+      .select("id, organizer_information_requests!inner(workspace_id)", { count: "exact", head: true })
+      .eq("status", "client_responded")
+      .eq("organizer_information_requests.workspace_id", workspace.id),
+    // An ERO/SB can always author content, so it's worth a nav slot
+    // regardless; an Independent PTIN only gets the slot once
+    // has_learning_hub_access (via a connection) actually makes something
+    // visible to them -- RLS on learning_courses already enforces this, so
+    // the count is just checking reality, not a second permission system.
+    isEroManagementTier(workspace)
+      ? Promise.resolve({ count: null as number | null })
+      : supabase.from("learning_courses").select("id", { count: "exact", head: true }),
+    supabase.from("workspace_software_links").select("id, name, url").eq("workspace_id", workspace.id).order("display_order"),
+    // Whether this workspace itself sits underneath a parent firm (a
+    // connected PTIN under an ERO, or an ERO under a Service Bureau) -- the
+    // Partner Dashboard nav item only makes sense when there's an upstream
+    // connection with a split/production to see.
+    supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -70,6 +135,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
+  const billingCard = (billingCardRows ?? [])[0] ?? null;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
   // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
@@ -87,6 +153,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .sort((a, b) => (a.isHome === b.isHome ? 0 : a.isHome ? -1 : 1) || (DEMO_SORT_ORDER[a.workspaceType] ?? 99) - (DEMO_SORT_ORDER[b.workspaceType] ?? 99));
   }
 
+  const roleName = currentMembership?.role_id ? (roles ?? []).find((r) => r.id === currentMembership.role_id)?.name ?? null : null;
+  const currentUser = user
+    ? {
+        name: currentProfile?.display_name ?? null,
+        avatarUrl: currentProfile?.avatar_url ?? null,
+        roleLabel: workspace.is_owner ? "Owner" : roleName,
+      }
+    : null;
+
   const brandVars: React.CSSProperties = {};
   if (branding.secondaryColor) {
     const accentRgb = hexToRgbTriplet(branding.secondaryColor);
@@ -94,11 +169,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (accentRgb) (brandVars as Record<string, string>)["--brand-accent-rgb"] = accentRgb;
     if (accentSoftRgb) (brandVars as Record<string, string>)["--brand-accent-soft-rgb"] = accentSoftRgb;
   }
+  // Second stop of the Dashboard hero's gradient (see brandGradientTo in
+  // tailwind.config.ts) -- a lightened tint of the SAME accent color, not an
+  // independently-chosen second color. Two unrelated brand colors (e.g. an
+  // indigo accent paired with an amber fallback color) can blend into a
+  // muddy middle when used as gradient stops; tinting one color toward white
+  // guarantees the gradient always stays in the same hue family and reads
+  // clean, for any workspace's accent choice.
+  if (branding.secondaryColor) {
+    const gradientToRgb = lightenHexToRgbTriplet(branding.secondaryColor, 0.45);
+    if (gradientToRgb) (brandVars as Record<string, string>)["--brand-gradient-to-rgb"] = gradientToRgb;
+  }
 
   return (
     <div style={brandVars}>
       <ToastProvider>
-        <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 15} loginPath="/login" />
+        <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 60} loginPath="/login" />
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white"
@@ -111,16 +197,34 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             logoUrl={branding.sidebarLogoUrl}
             primaryColor={branding.primaryColor}
             secondaryColor={branding.secondaryColor}
+            bgColor={branding.sidebarBgColor}
+            textColor={branding.sidebarTextColor}
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
+            showLearningHub={isEroManagementTier(workspace) || (visibleLearningCourseCount ?? 0) > 0}
+            showPartnerDashboard={(myEroConnection ?? []).length > 0}
+            softwareLinks={softwareLinks ?? []}
+            reviewQueueHasItems={
+              (pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0 || (respondedOrganizerItemCount ?? 0) > 0
+            }
+            showEroManagement={isEroManagementTier(workspace)}
+            currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
-            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} />
+            <ScrollToTopOnNavigate containerId="main-content" />
+            <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
+            <BillingCardPrompt
+              needed={Boolean(billingCard?.needed)}
+              urgent={Boolean(billingCard?.urgent)}
+              daysUntilPeriodEnd={billingCard?.days_until_period_end ?? null}
+              periodEnd={billingCard?.period_end ?? null}
+            />
             {children}
           </main>
         </div>
+        <ModalSlotGate>{modal}</ModalSlotGate>
       </ToastProvider>
     </div>
   );

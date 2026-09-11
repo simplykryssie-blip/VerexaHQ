@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FileText, AlertTriangle, PenLine, Receipt, Phone, Mail } from "lucide-react";
+import { FileText, AlertTriangle, PenLine, Receipt, Phone, Mail, MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getPortalIdentity } from "@/lib/portal";
-import { PageHeader } from "@/components/PageHeader";
+import { getEffectiveBranding } from "@/lib/branding";
+import { getEngagementProgressMap } from "@/lib/portalEngagementProgress";
 import { EmptyState } from "@/components/EmptyState";
+import { StatTile } from "@/components/ui/StatTile";
+import type { IconChipTone } from "@/components/ui/IconChip";
+import { PortalPendingTasks } from "@/components/portal/PortalPendingTasks";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +17,11 @@ export default async function PortalDashboardPage() {
   if (!identity) redirect("/portal/login");
 
   const supabase = createClient();
+  const branding = await getEffectiveBranding(identity.workspaceId);
+  // The brand gradient (blue-to-lime) is only for a firm that hasn't set its
+  // own accent -- one that has gets a flat tint of that color instead, same
+  // rule the staff sidebar and dashboard hero already follow.
+  const isDefaultBrand = !branding.secondaryColor;
 
   const { data: myEngagements } = await supabase.from("engagements").select("id").eq("client_id", identity.clientId);
   const engagementIds = (myEngagements ?? []).map((e) => e.id);
@@ -23,48 +32,146 @@ export default async function PortalDashboardPage() {
   const { data: myAttachments } = await supabase.from("attachments").select("id").or(entityFilter);
   const attachmentIds = (myAttachments ?? []).map((a) => a.id);
 
-  const [{ data: engagements }, { data: openRequests }, { data: pendingSignatures }, { data: invoices }, { data: activity }, { data: contactRows }] =
-    await Promise.all([
-      supabase
-        .from("engagements")
-        .select("id, engagement_number, status, due_date, services(name)")
-        .eq("client_id", identity.clientId)
-        .order("open_date", { ascending: false }),
-      supabase
-        .from("document_requests")
-        .select("id, title, due_date, items:document_request_item_statuses(id, is_required, status)")
-        .eq("status", "open")
-        .or(entityFilter),
-      attachmentIds.length > 0
-        ? supabase
-            .from("signature_requests")
-            .select("id, title, due_date, attachment:attachments!signature_requests_attachment_id_fkey(file_name)")
-            .eq("status", "pending")
-            .in("attachment_id", attachmentIds)
-        : Promise.resolve({ data: [] as { id: string; title: string; due_date: string | null; attachment: { file_name: string } | null }[] }),
-      supabase.from("invoices").select("id, invoice_number, total_amount, amount_paid, status, due_date").eq("client_id", identity.clientId),
-      supabase
-        .from("activity_log")
-        .select("id, description, created_at")
-        .or(entityFilter)
-        .order("created_at", { ascending: false })
-        .limit(8),
-      supabase.rpc("get_portal_client_contact"),
-    ]);
+  const [
+    { data: engagements },
+    { data: openRequests },
+    { data: pendingSignatures },
+    { data: invoices },
+    { data: contactRows },
+    { data: pendingQuotes },
+    { data: pendingOrganizers },
+    { data: myOrganizerResponses },
+    { data: pendingClientTasks },
+  ] = await Promise.all([
+    supabase
+      .from("engagements")
+      .select("id, engagement_number, status, due_date, services(name)")
+      .eq("client_id", identity.clientId)
+      .order("open_date", { ascending: false }),
+    supabase
+      .from("document_requests")
+      .select("id, title, due_date, entity_type, entity_id, items:document_request_item_statuses(id, is_required, status)")
+      .eq("status", "open")
+      .or(entityFilter),
+    attachmentIds.length > 0
+      ? supabase
+          .from("signature_requests")
+          .select("id, title, due_date, attachment:attachments!signature_requests_attachment_id_fkey(file_name)")
+          .eq("status", "pending")
+          .in("attachment_id", attachmentIds)
+      : Promise.resolve({ data: [] as { id: string; title: string; due_date: string | null; attachment: { file_name: string } | null }[] }),
+    supabase.from("invoices").select("id, invoice_number, total_amount, amount_paid, status, due_date").eq("client_id", identity.clientId),
+    supabase.rpc("get_portal_client_contact"),
+    supabase
+      .from("quotes")
+      .select("id, title")
+      .eq("client_id", identity.clientId)
+      .eq("status", "sent")
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("organizer_responses")
+      .select("id, organizer_templates(name)")
+      .eq("client_id", identity.clientId)
+      .in("status", ["not_started", "in_progress"])
+      .order("created_at", { ascending: true }),
+    supabase.from("organizer_responses").select("id").eq("client_id", identity.clientId),
+    supabase
+      .from("tasks")
+      .select("id, title, description, due_date, status")
+      .eq("visibility", "client")
+      .neq("status", "completed")
+      .order("due_date", { ascending: true, nullsFirst: false }),
+  ]);
 
   const contact = contactRows?.[0] ?? null;
+
+  const myOrganizerResponseIds = (myOrganizerResponses ?? []).map((r) => r.id);
+  const { data: organizerInfoRequests } =
+    myOrganizerResponseIds.length > 0
+      ? await supabase
+          .from("organizer_information_requests")
+          .select("id, organizer_response_id")
+          .in("organizer_response_id", myOrganizerResponseIds)
+          .in("status", ["active", "viewed"])
+          .order("created_at", { ascending: true })
+      : { data: [] as { id: string; organizer_response_id: string }[] };
 
   const missingDocuments = (openRequests ?? []).reduce(
     (sum, r) => sum + (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length,
     0
   );
   const outstandingBalance = (invoices ?? []).reduce((sum, inv) => sum + Math.max(inv.total_amount - inv.amount_paid, 0), 0);
+  const today = new Date();
+  const overdueInvoiceCount = (invoices ?? []).filter(
+    (inv) => inv.due_date && new Date(inv.due_date) < today && inv.total_amount - inv.amount_paid > 0
+  ).length;
   const activeEngagements = (engagements ?? []).filter((e) => e.status !== "Completed" && e.status !== "Archived");
+  const progressMap = await getEngagementProgressMap((engagements ?? []).map((e) => e.id));
+
+  // The active engagement closest to needing attention -- the one with the
+  // nearest due date, or the most recently opened one if none have a due
+  // date yet -- is what the hero and progress card speak to directly.
+  const primaryEngagement =
+    [...activeEngagements].sort((a, b) => {
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    })[0] ?? null;
+  const primaryServiceName = (primaryEngagement?.services as unknown as { name?: string } | null)?.name ?? "engagement";
+  const primaryProgress = primaryEngagement ? progressMap.get(primaryEngagement.id) : undefined;
+  const primaryStageLabel = primaryProgress?.stageName ?? primaryEngagement?.status ?? "";
+  const primaryProgressPercent = primaryProgress?.percent ?? null;
+  const primaryMissingItems = primaryEngagement
+    ? (openRequests ?? [])
+        .filter((r) => r.entity_type === "engagement" && r.entity_id === primaryEngagement.id)
+        .reduce((sum, r) => sum + (r.items ?? []).filter((i) => i.is_required && i.status === "pending").length, 0)
+    : 0;
+  const progressNote =
+    primaryMissingItems > 0
+      ? `${primaryMissingItems} document${primaryMissingItems === 1 ? "" : "s"} still needed before this can move forward.`
+      : primaryEngagement
+        ? "We'll reach out if we need anything from you."
+        : "";
+
+  const attentionCount = missingDocuments + (pendingSignatures ?? []).length + overdueInvoiceCount;
+  const heroSub = primaryEngagement
+    ? `Your ${primaryServiceName} is ${primaryStageLabel.toLowerCase()}.${
+        attentionCount > 0
+          ? ` ${attentionCount} thing${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention.`
+          : " You're all caught up."
+      }`
+    : attentionCount > 0
+      ? `${attentionCount} thing${attentionCount === 1 ? "" : "s"} need${attentionCount === 1 ? "s" : ""} your attention.`
+      : "You're all caught up -- nothing needs your attention right now.";
 
   return (
     <>
-      <PageHeader title={`Welcome, ${identity.clientLabel}`} description="Here's what's happening with your account." />
+      <div className="relative overflow-hidden bg-ink px-8 py-9 text-white">
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full opacity-30 blur-3xl ${
+            isDefaultBrand ? "bg-gradient-to-br from-accent to-brandLime" : "bg-accent"
+          }`}
+        />
+        <div className="relative">
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/50">{branding.displayName ?? "Your firm"}</p>
+          <h1 className="mt-3 max-w-[24ch] font-display text-[26px] font-semibold leading-normal">Welcome back, {identity.clientLabel}.</h1>
+          <p className="mt-2 max-w-[48ch] text-sm text-white/70">{heroSub}</p>
+        </div>
+      </div>
+
       <div className="flex-1 space-y-6 px-8 py-6">
+        <PortalPendingTasks
+          quotes={(pendingQuotes ?? []).map((q) => ({ id: q.id, title: q.title }))}
+          organizers={(pendingOrganizers ?? []).map((o) => ({
+            id: o.id,
+            name: (o.organizer_templates as unknown as { name?: string } | null)?.name ?? null,
+          }))}
+          infoRequests={(organizerInfoRequests ?? []).map((r) => ({ id: r.id, organizerResponseId: r.organizer_response_id }))}
+          tasks={pendingClientTasks ?? []}
+        />
+
         {contact && (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-surface shadow-soft px-4 py-3 text-sm">
             <span className="font-medium text-slate">Your preparer: {contact.name}</span>
@@ -83,11 +190,61 @@ export default async function PortalDashboardPage() {
           </div>
         )}
 
+        {primaryEngagement && primaryProgressPercent !== null && (
+          <div className="flex items-center gap-5 rounded-2xl border border-border bg-surface p-5 shadow-soft">
+            <div
+              className="flex h-[74px] w-[74px] shrink-0 items-center justify-center rounded-full"
+              style={{
+                background: isDefaultBrand
+                  ? `conic-gradient(rgb(var(--brand-accent-rgb, 11 127 224)) 0deg, #A4D22B ${primaryProgressPercent * 3.6}deg, #E3E7F0 ${primaryProgressPercent * 3.6}deg)`
+                  : `conic-gradient(rgb(var(--brand-accent-rgb, 11 127 224)) ${primaryProgressPercent * 3.6}deg, #E3E7F0 ${primaryProgressPercent * 3.6}deg)`,
+              }}
+            >
+              <div className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-surface font-display text-sm font-semibold text-ink">
+                {primaryProgressPercent}%
+              </div>
+            </div>
+            <div>
+              <h3 className="font-display text-base font-semibold text-ink">
+                {primaryServiceName} &mdash; {primaryStageLabel}
+              </h3>
+              {progressNote && <p className="mt-1 text-sm text-slate">{progressNote}</p>}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard icon={FileText} label="Active engagements" value={activeEngagements.length} href="/portal/engagements" />
-          <StatCard icon={AlertTriangle} label="Missing documents" value={missingDocuments} href="/portal/documents" />
-          <StatCard icon={PenLine} label="Pending signatures" value={(pendingSignatures ?? []).length} href="/portal/documents" />
-          <StatCard icon={Receipt} label="Balance due" value={`$${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} href="/portal/billing" />
+          <StatCard icon={FileText} tone="emerald" label="Active engagements" value={activeEngagements.length} href="/portal/engagements" />
+          <StatCard icon={AlertTriangle} tone="amber" label="Missing documents" value={missingDocuments} href="/portal/documents" />
+          <StatCard icon={PenLine} tone="violet" label="Pending signatures" value={(pendingSignatures ?? []).length} href="/portal/documents" />
+          <StatCard
+            icon={Receipt}
+            tone="rose"
+            label="Balance due"
+            value={`$${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            href="/portal/billing"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ActionCard
+            icon={FileText}
+            isDefaultBrand={isDefaultBrand}
+            title={missingDocuments > 0 ? `${missingDocuments} document${missingDocuments === 1 ? "" : "s"} needed` : "Documents are all in"}
+            description={
+              missingDocuments > 0 ? "Upload what's outstanding so we can keep things moving." : "Nothing outstanding on your end right now."
+            }
+            ctaLabel="View documents"
+            href="/portal/documents"
+          />
+          <ActionCard
+            icon={MessageCircle}
+            isDefaultBrand={isDefaultBrand}
+            title={contact ? `Message ${contact.name.split(" ")[0]}` : "Message your preparer"}
+            description="Questions about your return? Send a message and we'll get back to you."
+            ctaLabel="Send a message"
+            href="/portal/messages"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -103,23 +260,7 @@ export default async function PortalDashboardPage() {
                       <p className="font-medium text-slate">{(e.services as unknown as { name?: string } | null)?.name ?? "Engagement"}</p>
                       <p className="text-xs text-muted">{e.engagement_number}</p>
                     </div>
-                    <span className="text-xs capitalize text-muted">{e.status}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-border bg-surface shadow-soft">
-            <h2 className="border-b border-border px-4 py-3 text-sm font-semibold text-ink">Recent activity</h2>
-            {(activity ?? []).length === 0 ? (
-              <EmptyState message="No activity yet." />
-            ) : (
-              <ul className="divide-y divide-border">
-                {(activity ?? []).map((a) => (
-                  <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <span className="text-slate">{a.description}</span>
-                    <span className="text-xs text-muted">{new Date(a.created_at).toLocaleDateString()}</span>
+                    <span className="text-xs capitalize text-muted">{progressMap.get(e.id)?.stageName ?? e.status}</span>
                   </li>
                 ))}
               </ul>
@@ -135,14 +276,60 @@ export default async function PortalDashboardPage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, href }: { icon: React.ElementType; label: string; value: React.ReactNode; href: string }) {
+function StatCard({
+  icon,
+  tone,
+  label,
+  value,
+  href,
+}: {
+  icon: React.ElementType;
+  tone: IconChipTone;
+  label: string;
+  value: React.ReactNode;
+  href: string;
+}) {
   return (
-    <Link href={href} className="rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:border-accent">
-      <div className="flex items-center gap-2 text-muted">
-        <Icon size={16} aria-hidden="true" />
-        <p className="text-xs uppercase tracking-wide">{label}</p>
-      </div>
-      <p className="mt-1 text-2xl font-semibold text-ink">{value}</p>
+    <Link href={href}>
+      <StatTile icon={icon} tone={tone} label={label} value={value} />
     </Link>
+  );
+}
+
+function ActionCard({
+  icon: Icon,
+  isDefaultBrand,
+  title,
+  description,
+  ctaLabel,
+  href,
+}: {
+  icon: React.ElementType;
+  isDefaultBrand: boolean;
+  title: string;
+  description: string;
+  ctaLabel: string;
+  href: string;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5 shadow-soft">
+      <div
+        className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+          isDefaultBrand ? "bg-gradient-to-br from-accent to-brandLime" : "bg-accentSoft"
+        }`}
+      >
+        <Icon size={18} className={isDefaultBrand ? "text-ink/80" : "text-accent"} aria-hidden="true" />
+      </div>
+      <div>
+        <h4 className="font-display text-[15px] font-semibold text-ink">{title}</h4>
+        <p className="mt-1 text-sm text-slate">{description}</p>
+      </div>
+      <Link
+        href={href}
+        className="mt-auto inline-flex w-fit items-center rounded-lg border border-border bg-surfaceMuted px-3 py-1.5 text-xs font-semibold text-ink transition hover:border-accent hover:text-accent"
+      >
+        {ctaLabel}
+      </Link>
+    </div>
   );
 }

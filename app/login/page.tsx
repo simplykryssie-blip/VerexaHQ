@@ -8,6 +8,7 @@ import { checkRateLimitClientSide } from "@/lib/authRateLimitClient";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -299,9 +300,8 @@ export default function LoginPage() {
         </div>
         <div className={styles.field}>
           <label htmlFor="password">Password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}

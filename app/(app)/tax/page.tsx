@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { Landmark, FileCheck2, FileClock, CalendarClock, AlertTriangle, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { PageHeader } from "@/components/PageHeader";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { buildEntityLabelMap, clientLabel } from "@/lib/documentEntityLabels";
+import { Badge } from "@/components/ui/Badge";
+import { ENGAGEMENT_STATUS_TONE } from "@/lib/engagementStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +62,19 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
   const description = showsNetworkRollup
     ? "Return status, review queue, notices, and season metrics -- rolled up across your firm and every connected PTIN."
     : "Return status, review queue, notices, and season metrics.";
+
+  const hero = (
+    <PageHero
+      icon={Landmark}
+      tone="accent"
+      heading={
+        <>
+          Your <HeroHighlight>tax office</HeroHighlight>.
+        </>
+      }
+      subtitle={description}
+    />
+  );
 
   if (activeTab === "returns") {
     type ReturnRow = {
@@ -128,11 +145,21 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         .filter((r): r is ReturnRow => r !== null);
     }
 
+    const filedCount = rows.filter((r) => r.returnStatus === "filed").length;
+    const notFiledCount = rows.filter((r) => r.returnStatus === "not_filed").length;
+    const extendedCount = rows.filter((r) => r.isExtended).length;
+
     return (
       <>
-        <PageHeader title="Tax Office" description={description} />
+        {hero}
         {tabNav}
-        <div className="flex-1 px-8 py-6">
+        <div className="flex-1 space-y-6 px-8 py-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <StatTile icon={FileCheck2} tone="accent" label="Total returns" value={rows.length} />
+            <StatTile icon={FileCheck2} tone="emerald" label="Filed" value={filedCount} />
+            <StatTile icon={FileClock} tone="amber" label="Not filed" value={notFiledCount} />
+            <StatTile icon={CalendarClock} tone="violet" label="Extended" value={extendedCount} />
+          </div>
           {rows.length === 0 ? (
             <EmptyState message="No tax details recorded yet -- fill them in from an engagement's Tax tab." />
           ) : (
@@ -145,14 +172,14 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                     <th className="px-4 py-2 text-left font-medium">Return</th>
                     <th className="px-4 py-2 text-left font-medium">Tax year</th>
                     <th className="px-4 py-2 text-left font-medium">Status</th>
-                    <th className="px-4 py-2 text-left font-medium">Filed</th>
+                    <th className="px-4 py-2 text-left font-medium">Return status</th>
                     <th className="px-4 py-2 text-left font-medium">Refund / Balance</th>
                     <th className="px-4 py-2 text-left font-medium">Due</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.map((r) => (
-                    <tr key={r.engagementId} className="hover:bg-surfaceMuted">
+                    <tr key={r.engagementId} className="transition-colors hover:bg-surfaceMuted">
                       {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                       <td className="px-4 py-2">
                         <Link href={`/engagements/${r.engagementId}`} className="font-medium text-accent hover:underline">
@@ -163,7 +190,11 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                         {r.returnType ?? "--"} {r.isExtended && <span className="text-xs text-warning">(extended)</span>}
                       </td>
                       <td className="px-4 py-2 text-slate">{r.taxYear ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate capitalize">{r.status}</td>
+                      <td className="px-4 py-2">
+                        <Badge tone={ENGAGEMENT_STATUS_TONE[r.status] ?? "neutral"} className="capitalize">
+                          {r.status}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-2 text-slate">{RETURN_STATUS_LABEL[r.returnStatus] ?? r.returnStatus}</td>
                       <td className="px-4 py-2 text-slate">
                         {r.federalRefund ? (
@@ -195,11 +226,17 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         : { data: [] as { id: string; first_name: string | null; last_name: string | null; business_name: string | null; client_type: string }[] };
     const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
 
+    const overdueCount = (rows ?? []).filter((r) => r.due_date && new Date(r.due_date) < new Date()).length;
+
     return (
       <>
-        <PageHeader title="Tax Office" description={description} />
+        {hero}
         {tabNav}
-        <div className="flex-1 px-8 py-6">
+        <div className="flex-1 space-y-6 px-8 py-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+            <StatTile icon={FileClock} tone="accent" label="In reviewer queue" value={(rows ?? []).length} />
+            <StatTile icon={AlertTriangle} tone="rose" label="Overdue" value={overdueCount} />
+          </div>
           {(rows ?? []).length === 0 ? (
             <EmptyState message="Nothing is waiting on a reviewer right now." />
           ) : (
@@ -207,7 +244,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {(rows ?? []).map((r) => {
                 const overdue = r.due_date && new Date(r.due_date) < new Date();
                 return (
-                  <li key={r.workflow_stage_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={r.workflow_stage_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <Link href={`/engagements/${r.engagement_id}`} className="font-medium text-accent hover:underline">
                         {clientLabel(clientById.get(r.client_id ?? "") ?? null)}
@@ -277,11 +314,19 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       });
     }
 
+    const openCount = rows.filter((n) => n.status === "open").length;
+    const overdueCount = rows.filter((n) => n.status === "open" && n.responseDueDate && new Date(n.responseDueDate) < new Date()).length;
+
     return (
       <>
-        <PageHeader title="Tax Office" description={description} />
+        {hero}
         {tabNav}
-        <div className="flex-1 px-8 py-6">
+        <div className="flex-1 space-y-6 px-8 py-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <StatTile icon={FileCheck2} tone="accent" label="Total notices" value={rows.length} />
+            <StatTile icon={FileClock} tone="amber" label="Open" value={openCount} />
+            <StatTile icon={AlertTriangle} tone="rose" label="Overdue response" value={overdueCount} />
+          </div>
           {rows.length === 0 ? (
             <EmptyState message="No IRS notices on file." />
           ) : (
@@ -289,7 +334,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {rows.map((n) => {
                 const overdue = n.status === "open" && n.responseDueDate && new Date(n.responseDueDate) < new Date();
                 return (
-                  <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       {n.href ? (
                         <Link href={n.href} className="font-medium text-accent hover:underline">
@@ -361,11 +406,17 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         .filter((r): r is ExtensionRow => r !== null);
     }
 
+    const overdueCount = rows.filter((r) => r.extensionDueDate && new Date(r.extensionDueDate) < new Date()).length;
+
     return (
       <>
-        <PageHeader title="Tax Office" description={description} />
+        {hero}
         {tabNav}
-        <div className="flex-1 px-8 py-6">
+        <div className="flex-1 space-y-6 px-8 py-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+            <StatTile icon={CalendarClock} tone="accent" label="Extended returns" value={rows.length} />
+            <StatTile icon={AlertTriangle} tone="rose" label="Overdue" value={overdueCount} />
+          </div>
           {rows.length === 0 ? (
             <EmptyState message="No extended returns on file." />
           ) : (
@@ -373,7 +424,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               {rows.map((r) => {
                 const overdue = r.extensionDueDate && new Date(r.extensionDueDate) < new Date();
                 return (
-                  <li key={r.engagementId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                  <li key={r.engagementId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                     <div>
                       <Link href={`/engagements/${r.engagementId}`} className="font-medium text-accent hover:underline">
                         {r.clientName}
@@ -403,7 +454,6 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
     taxYear: number;
     totalReturns: number;
     filed: number;
-    readyToFile: number;
     notFiled: number;
     extended: number;
     amended: number;
@@ -419,7 +469,6 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       taxYear: r.tax_year,
       totalReturns: r.total_returns,
       filed: r.filed,
-      readyToFile: r.ready_to_file,
       notFiled: r.not_filed,
       extended: r.extended,
       amended: r.amended,
@@ -435,7 +484,6 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         taxYear: r.tax_year,
         totalReturns: r.total_returns ?? 0,
         filed: r.filed ?? 0,
-        readyToFile: r.ready_to_file ?? 0,
         notFiled: r.not_filed ?? 0,
         extended: r.extended ?? 0,
         amended: r.amended ?? 0,
@@ -443,11 +491,20 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       }));
   }
 
+  const totalReturns = yearRows.reduce((sum, r) => sum + r.totalReturns, 0);
+  const totalFiled = yearRows.reduce((sum, r) => sum + r.filed, 0);
+  const totalOpenNotices = yearRows.reduce((sum, r) => sum + r.openNotices, 0);
+
   return (
     <>
-      <PageHeader title="Tax Office" description={description} />
+      {hero}
       {tabNav}
-      <div className="flex-1 px-8 py-6">
+      <div className="flex-1 space-y-6 px-8 py-6">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <StatTile icon={TrendingUp} tone="accent" label="Total returns" value={totalReturns} />
+          <StatTile icon={FileCheck2} tone="emerald" label="Filed" value={totalFiled} />
+          <StatTile icon={AlertTriangle} tone="rose" label="Open notices" value={totalOpenNotices} />
+        </div>
         {yearRows.length === 0 ? (
           <EmptyState message="No tax-year data yet." />
         ) : (
@@ -459,7 +516,6 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
                   <th className="px-4 py-2 text-left font-medium">Tax year</th>
                   <th className="px-4 py-2 text-right font-medium">Total returns</th>
                   <th className="px-4 py-2 text-right font-medium">Filed</th>
-                  <th className="px-4 py-2 text-right font-medium">Ready to file</th>
                   <th className="px-4 py-2 text-right font-medium">Not filed</th>
                   <th className="px-4 py-2 text-right font-medium">Extended</th>
                   <th className="px-4 py-2 text-right font-medium">Amended</th>
@@ -468,12 +524,11 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
               </thead>
               <tbody className="divide-y divide-border">
                 {yearRows.map((r) => (
-                  <tr key={r.key} className="hover:bg-surfaceMuted">
+                  <tr key={r.key} className="transition-colors hover:bg-surfaceMuted">
                     {showsNetworkRollup && <td className="px-4 py-2 text-slate">{r.firmName}</td>}
                     <td className="px-4 py-2 font-medium text-ink">{r.taxYear}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.totalReturns}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.filed}</td>
-                    <td className="px-4 py-2 text-right text-slate">{r.readyToFile}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.notFiled}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.extended}</td>
                     <td className="px-4 py-2 text-right text-slate">{r.amended}</td>

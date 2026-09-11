@@ -7,9 +7,9 @@ const CANVAS_HEIGHT = 160;
 
 /** A typed-name input AND a hand-drawn canvas signature -- both required,
  * shown together rather than as alternate modes. Reused by every
- * client-facing signing flow (engagement letters, generic document signing)
- * so the experience is consistent everywhere someone has to sign
- * something. */
+ * client-facing signing flow (engagement letters, generic document signing,
+ * the organizer signature field) so the experience is consistent everywhere
+ * someone has to sign something. */
 export function SignaturePad({
   typedName,
   onTypedNameChange,
@@ -84,7 +84,7 @@ export function SignaturePad({
           value={typedName}
           onChange={(e) => onTypedNameChange(e.target.value)}
           placeholder="Full name"
-          className="mt-2 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          className="mt-2 w-full rounded-lg border border-border px-3 py-2 font-serif text-lg italic focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
       </div>
       <div>

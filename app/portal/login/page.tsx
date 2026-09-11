@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { friendlyAuthError } from "@/lib/authErrors";
 import { AuthShell, AuthError, authStyles as styles } from "@/components/auth/AuthShell";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export const dynamic = "force-dynamic";
 
@@ -89,9 +90,8 @@ export default function PortalLoginPage() {
         </div>
         <div className={styles.field}>
           <label htmlFor="password">Password</label>
-          <input
+          <PasswordInput
             id="password"
-            type="password"
             required
             minLength={6}
             value={password}

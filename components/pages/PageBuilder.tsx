@@ -2,15 +2,18 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, RefreshCw, Settings } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { slugify } from "@/lib/slugify";
+import { getLiveUrl } from "@/lib/websites/liveUrl";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { SectionPalette } from "./SectionPalette";
 import { SectionCanvas } from "./SectionCanvas";
 import { SectionPropertiesPanel } from "./SectionPropertiesPanel";
 import { SectionPreview } from "./SectionPreview";
-import type { BuilderPage, BuilderSection, SectionType, WorkspaceServiceOption } from "./types";
+import { PageSettingsPanel } from "./PageSettingsPanel";
+import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption, BookableServiceOption, StaffOption } from "./types";
 
 const DEBOUNCE_MS = 600;
 
@@ -18,18 +21,26 @@ export function PageBuilder({
   workspaceSlug,
   websiteId,
   websiteSlug,
+  customDomain,
+  domainVerified,
   page,
   initialSections,
   canManage,
-  workspaceServices,
+  organizerTemplates,
+  bookableServices,
+  staff,
 }: {
   workspaceSlug: string;
   websiteId: string;
   websiteSlug: string;
+  customDomain: string | null;
+  domainVerified: boolean;
   page: BuilderPage;
   initialSections: BuilderSection[];
   canManage: boolean;
-  workspaceServices: WorkspaceServiceOption[];
+  organizerTemplates: OrganizerTemplateOption[];
+  bookableServices: BookableServiceOption[];
+  staff: StaffOption[];
 }) {
   const supabase = createClient();
   const toast = useToast();
@@ -38,17 +49,27 @@ export function PageBuilder({
   const [sections, setSections] = useState<BuilderSection[]>([...initialSections].sort((a, b) => a.display_order - b.display_order));
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [view, setView] = useState<"build" | "preview">("build");
+  const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState(page.background_color);
+  const [customCss, setCustomCss] = useState(page.custom_css);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId) ?? null;
 
-  async function commitTitleSlug() {
+  // Accepts an explicit slug override so the "Match name" button can commit
+  // its freshly-computed value immediately -- state set just beforehand
+  // (setSlug) isn't visible yet inside this same event handler.
+  async function commitTitleSlug(slugOverride?: string) {
     const trimmedTitle = title.trim() || page.title;
-    const trimmedSlug = slug.trim() || page.slug;
+    // Always sanitized before it can reach the database -- a slug with
+    // spaces or mixed case (e.g. typed straight into the field) silently
+    // breaks the live URL ("this page isn't available") instead of erroring,
+    // so this is the one place that can never be skipped.
+    const cleanSlug = slugify((slugOverride ?? slug).trim() || trimmedTitle);
     setTitle(trimmedTitle);
-    setSlug(trimmedSlug);
-    if (trimmedTitle === page.title && trimmedSlug === page.slug) return;
-    const { error } = await supabase.from("site_pages").update({ title: trimmedTitle, slug: trimmedSlug }).eq("id", page.id);
+    setSlug(cleanSlug);
+    if (trimmedTitle === page.title && cleanSlug === page.slug) return;
+    const { error } = await supabase.from("site_pages").update({ title: trimmedTitle, slug: cleanSlug }).eq("id", page.id);
     if (error) toast.show(error.message, "error");
   }
 
@@ -106,7 +127,7 @@ export function PageBuilder({
     }, DEBOUNCE_MS);
   }
 
-  const liveUrl = `/site/${workspaceSlug}/${websiteSlug}/${slug}`;
+  const liveUrl = getLiveUrl({ pageSlug: slug, workspaceSlug, websiteSlug, customDomain, domainVerified });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -119,7 +140,7 @@ export function PageBuilder({
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              onBlur={commitTitleSlug}
+              onBlur={() => commitTitleSlug()}
               className="w-56 truncate rounded-lg border border-transparent px-2 py-1 text-center text-sm font-semibold text-ink hover:border-border focus:border-accent focus:outline-none"
             />
           ) : (
@@ -127,12 +148,32 @@ export function PageBuilder({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={`/site-preview/${page.id}`}
+            target="_blank"
+            rel="noreferrer"
+            title="Opens this draft in a new tab, rendered exactly like the published site will look"
+            className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+          >
+            <ExternalLink size={12} /> Full preview
+          </a>
           {page.status === "published" && (
             <a href={liveUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
               <ExternalLink size={12} /> View live
             </a>
           )}
           {canManage && <TemplateStatusCycle table="site_pages" id={page.id} status={page.status} />}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setPageSettingsOpen(true)}
+              title="Page settings"
+              aria-label="Page settings"
+              className="rounded-lg border border-border p-1.5 text-muted hover:border-accent hover:text-accent"
+            >
+              <Settings size={14} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setView((v) => (v === "build" ? "preview" : "build"))}
@@ -150,21 +191,34 @@ export function PageBuilder({
             <input
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              onBlur={commitTitleSlug}
+              onBlur={() => commitTitleSlug()}
               className="w-40 rounded border border-border px-1.5 py-0.5 text-ink focus:border-accent focus:outline-none"
             />
           </label>
+          <button
+            type="button"
+            onClick={() => {
+              const next = slugify(title);
+              setSlug(next);
+              commitTitleSlug(next);
+            }}
+            title="Set the URL slug to match the page name"
+            className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted hover:border-accent hover:text-accent"
+          >
+            <RefreshCw size={11} /> Match name
+          </button>
           <span className="truncate text-muted">{liveUrl}</span>
         </div>
       )}
 
       {view === "preview" ? (
-        <div className="flex-1 overflow-y-auto bg-white">
+        <div className="flex-1 overflow-y-auto" style={{ background: backgroundColor || "#ffffff" }}>
+          {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
           {sections
             .slice()
             .sort((a, b) => a.display_order - b.display_order)
             .map((s) => (
-              <SectionPreview key={s.id} section={s} />
+              <SectionPreview key={s.id} section={s} services={bookableServices} staff={staff} customCss={customCss} />
             ))}
         </div>
       ) : (
@@ -176,18 +230,34 @@ export function PageBuilder({
             onSelect={setSelectedSectionId}
             onMove={moveSection}
             onDelete={deleteSection}
+            services={bookableServices}
+            staff={staff}
+            customCss={customCss}
+            backgroundColor={backgroundColor}
           />
           {canManage && (
             <SectionPropertiesPanel
               workspaceId={page.workspace_id}
-              websiteId={websiteId}
               section={selectedSection}
               onUpdate={updateSectionConfig}
-              workspaceServices={workspaceServices}
+              organizerTemplates={organizerTemplates}
+              bookableServices={bookableServices}
+              staff={staff}
               canAdvanceToNextPage={Boolean(page.funnel_id)}
             />
           )}
         </div>
+      )}
+
+      {pageSettingsOpen && (
+        <PageSettingsPanel
+          page={{ ...page, title, slug }}
+          onClose={() => setPageSettingsOpen(false)}
+          onSaved={(patch) => {
+            setBackgroundColor(patch.background_color);
+            setCustomCss(patch.custom_css);
+          }}
+        />
       )}
     </div>
   );

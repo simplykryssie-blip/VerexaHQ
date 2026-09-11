@@ -14,3 +14,35 @@ export const ENGAGEMENT_STATUS_OPTIONS = [
   "Completed",
   "Archived",
 ];
+
+// What each status *means*, not a decorative color -- done is done,
+// blocked-on-someone is a wait, everything else is active/in motion.
+export const ENGAGEMENT_STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = {
+  New: "accent",
+  "Waiting On Client": "warning",
+  "Waiting On Staff": "warning",
+  "In Progress": "accent",
+  "Waiting On Review": "warning",
+  "Corrections Requested": "danger",
+  Approved: "accent",
+  "Waiting On Signature": "warning",
+  "Waiting On Payment": "warning",
+  "Ready To Release": "accent",
+  Completed: "success",
+  Archived: "neutral",
+};
+
+export const ENGAGEMENT_PRIORITY_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = {
+  Low: "neutral",
+  Medium: "accent",
+  High: "warning",
+  Urgent: "danger",
+};
+
+// Status of an engagement_shares row (a filing shared with a connected ERO
+// for review) -- shared between the engagement detail page and Review Queue.
+export const ENGAGEMENT_SHARE_STATUS_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = {
+  pending: "warning",
+  corrections_requested: "danger",
+  approved: "success",
+};

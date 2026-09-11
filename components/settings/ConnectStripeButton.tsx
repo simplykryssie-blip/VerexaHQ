@@ -23,6 +23,7 @@ export function ConnectStripeButton({ connectStatus, error }: { connectStatus: s
   const router = useRouter();
   const toast = useToast();
   const [disconnecting, setDisconnecting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   async function disconnect() {
     setDisconnecting(true);
@@ -39,7 +40,23 @@ export function ConnectStripeButton({ connectStatus, error }: { connectStatus: s
     }
   }
 
+  async function refreshStatus() {
+    setRefreshing(true);
+    try {
+      const res = await fetch("/api/stripe/connect/refresh", { method: "POST" });
+      const data = (await res.json()) as { ok?: boolean; status?: string; error?: string };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Couldn't refresh Stripe status.");
+      toast.show(`Status: ${CONNECT_STATUS_LABEL[data.status ?? ""] ?? data.status}`, "success");
+      router.refresh();
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : "Couldn't refresh Stripe status.", "error");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   const isConnected = connectStatus !== "not_connected";
+  const isFullyActive = connectStatus === "active";
 
   return (
     <div className="px-5 py-4">
@@ -55,14 +72,26 @@ export function ConnectStripeButton({ connectStatus, error }: { connectStatus: s
             {CONNECT_STATUS_LABEL[connectStatus] ?? connectStatus}
           </Badge>
           {isConnected ? (
-            <button
-              type="button"
-              onClick={disconnect}
-              disabled={disconnecting}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:bg-surfaceMuted disabled:opacity-60"
-            >
-              {disconnecting ? "Disconnecting..." : "Disconnect"}
-            </button>
+            <>
+              {!isFullyActive && (
+                <button
+                  type="button"
+                  onClick={refreshStatus}
+                  disabled={refreshing}
+                  className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:bg-surfaceMuted disabled:opacity-60"
+                >
+                  {refreshing ? "Checking..." : "Refresh status"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={disconnect}
+                disabled={disconnecting}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:bg-surfaceMuted disabled:opacity-60"
+              >
+                {disconnecting ? "Disconnecting..." : "Disconnect"}
+              </button>
+            </>
           ) : (
             <a
               href="/api/stripe/connect/start"

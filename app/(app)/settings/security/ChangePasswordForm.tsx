@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { validatePasswordStrength, passwordRequirementsHint } from "@/lib/passwordStrength";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function ChangePasswordForm({ minLength = 8 }: { minLength?: number }) {
   const supabase = createClient();
@@ -47,9 +48,8 @@ export function ChangePasswordForm({ minLength = 8 }: { minLength?: number }) {
         <label className="block text-sm font-semibold text-ink" htmlFor="new_password">
           New password
         </label>
-        <input
+        <PasswordInput
           id="new_password"
-          type="password"
           required
           minLength={minLength}
           value={newPassword}
@@ -59,7 +59,8 @@ export function ChangePasswordForm({ minLength = 8 }: { minLength?: number }) {
           }}
           placeholder="Create a password"
           autoComplete="new-password"
-          className="mt-1.5 w-full rounded-lg border border-border px-3 py-2.5 text-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+          wrapperClassName="mt-1.5"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
         />
         <p className="mt-1 text-xs text-muted">{passwordRequirementsHint(minLength)}</p>
       </div>
@@ -67,9 +68,8 @@ export function ChangePasswordForm({ minLength = 8 }: { minLength?: number }) {
         <label className="block text-sm font-semibold text-ink" htmlFor="confirm_new_password">
           Confirm new password
         </label>
-        <input
+        <PasswordInput
           id="confirm_new_password"
-          type="password"
           required
           minLength={minLength}
           value={confirmPassword}
@@ -79,7 +79,8 @@ export function ChangePasswordForm({ minLength = 8 }: { minLength?: number }) {
           }}
           placeholder="Confirm your password"
           autoComplete="new-password"
-          className="mt-1.5 w-full rounded-lg border border-border px-3 py-2.5 text-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
+          wrapperClassName="mt-1.5"
+          className="w-full rounded-lg border border-border px-3 py-2.5 text-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25"
         />
       </div>
 

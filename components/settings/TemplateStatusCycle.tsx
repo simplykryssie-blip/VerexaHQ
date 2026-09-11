@@ -4,12 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { badgeClasses, type BadgeTone } from "@/components/ui/Badge";
 
 const NEXT_STATUS: Record<string, string> = { draft: "published", published: "archived", archived: "draft" };
-const STATUS_STYLE: Record<string, string> = {
-  draft: "bg-surfaceMuted text-muted",
-  published: "bg-green-100 text-green-700",
-  archived: "bg-surfaceMuted text-muted",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  published: "success",
+  archived: "neutral",
 };
 
 export function TemplateStatusCycle({
@@ -22,9 +23,10 @@ export function TemplateStatusCycle({
     | "sms_templates"
     | "engagement_letter_templates"
     | "services"
-    | "pricing_rules"
-    | "billing_rules"
+    | "firm_packages"
     | "organizer_templates"
+    | "site_popups"
+    | "document_request_templates"
     | "processes"
     | "site_pages"
     | "site_funnels"
@@ -53,7 +55,7 @@ export function TemplateStatusCycle({
       type="button"
       onClick={cycle}
       disabled={saving}
-      className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize transition hover:opacity-80 disabled:opacity-60 ${STATUS_STYLE[status] ?? "bg-surfaceMuted text-muted"}`}
+      className={badgeClasses(STATUS_TONE[status] ?? "neutral", "capitalize transition hover:opacity-80 disabled:opacity-60")}
     >
       {status}
     </button>

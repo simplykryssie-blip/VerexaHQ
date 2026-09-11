@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, Filter } from "lucide-react";
+import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 
 export function TagFilterControl({
   tags,
@@ -15,11 +16,12 @@ export function TagFilterControl({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   const filtered = tags.filter((t) => t.toLowerCase().includes(query.toLowerCase()));
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -29,44 +31,41 @@ export function TagFilterControl({
         {activeTag ? `Tag: ${activeTag}` : "Filter by tag"}
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-1 w-64 rounded-2xl border border-border bg-surface p-2 shadow-lg">
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tags..."
-              className="mb-1.5 w-full rounded-lg border border-border px-2 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            <div className="max-h-64 overflow-y-auto">
+        <DropdownPanel className="left-0 mt-1 w-64 p-2">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search tags..."
+            className="mb-1.5 w-full rounded-lg border border-border px-2 py-1.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          <div className="max-h-64 overflow-y-auto">
+            <Link
+              href={baseHref}
+              onClick={() => setOpen(false)}
+              className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition hover:bg-surfaceMuted ${
+                !activeTag ? "text-accent" : "text-slate"
+              }`}
+            >
+              <span>All</span>
+              {!activeTag && <Check size={13} aria-hidden="true" />}
+            </Link>
+            {filtered.map((t) => (
               <Link
-                href={baseHref}
+                key={t}
+                href={`${baseHref}&tag=${encodeURIComponent(t)}`}
                 onClick={() => setOpen(false)}
                 className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition hover:bg-surfaceMuted ${
-                  !activeTag ? "text-accent" : "text-slate"
+                  activeTag === t ? "text-accent" : "text-slate"
                 }`}
               >
-                <span>All</span>
-                {!activeTag && <Check size={13} aria-hidden="true" />}
+                <span>{t}</span>
+                {activeTag === t && <Check size={13} aria-hidden="true" />}
               </Link>
-              {filtered.map((t) => (
-                <Link
-                  key={t}
-                  href={`${baseHref}&tag=${encodeURIComponent(t)}`}
-                  onClick={() => setOpen(false)}
-                  className={`flex items-center justify-between rounded-lg px-2 py-1.5 text-left text-xs transition hover:bg-surfaceMuted ${
-                    activeTag === t ? "text-accent" : "text-slate"
-                  }`}
-                >
-                  <span>{t}</span>
-                  {activeTag === t && <Check size={13} aria-hidden="true" />}
-                </Link>
-              ))}
-              {filtered.length === 0 && <p className="px-2 py-1.5 text-xs text-muted">No matching tags.</p>}
-            </div>
+            ))}
+            {filtered.length === 0 && <p className="px-2 py-1.5 text-xs text-muted">No matching tags.</p>}
           </div>
-        </>
+        </DropdownPanel>
       )}
     </div>
   );

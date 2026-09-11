@@ -1,4 +1,5 @@
 import type { DashboardData } from "./data";
+import { taskHref } from "@/lib/taskLink";
 
 export type PriorityItem = {
   id: string;
@@ -15,7 +16,7 @@ export type PriorityItem = {
  * later, it should still be able to produce a ranked list shaped like
  * PriorityItem[] so callers (the widget) don't have to change.
  */
-export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
+export function computeTodaysPriorities(data: DashboardData, limit = 5): PriorityItem[] {
   const items: PriorityItem[] = [];
 
   for (const t of data.overdueTasks) {
@@ -24,7 +25,7 @@ export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
       id: `task-${t.id}`,
       label: t.title,
       detail: `Task overdue by ${daysOverdue} day${daysOverdue === 1 ? "" : "s"}`,
-      href: t.engagement_id ? `/engagements/${t.engagement_id}` : `/clients/${t.client_id}`,
+      href: taskHref(t) ?? `/clients/${t.client_id}`,
       weight: 100 + daysOverdue,
     });
   }
@@ -65,10 +66,10 @@ export function computeTodaysPriorities(data: DashboardData): PriorityItem[] {
       id: `due-today-${t.id}`,
       label: t.title,
       detail: "Due today",
-      href: t.engagement_id ? `/engagements/${t.engagement_id}` : `/clients/${t.client_id}`,
+      href: taskHref(t) ?? `/clients/${t.client_id}`,
       weight: 40,
     });
   }
 
-  return items.sort((a, b) => b.weight - a.weight).slice(0, 5);
+  return items.sort((a, b) => b.weight - a.weight).slice(0, limit);
 }

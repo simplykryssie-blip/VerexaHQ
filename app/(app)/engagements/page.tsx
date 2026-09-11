@@ -6,6 +6,10 @@ import { EmptyState } from "@/components/EmptyState";
 import { Pager } from "@/components/Pager";
 import { clientLabel } from "@/lib/documentEntityLabels";
 import { EngagementBoard, type BoardEngagement } from "@/components/engagements/EngagementBoard";
+import { Badge } from "@/components/ui/Badge";
+import { buttonClasses } from "@/components/ui/Button";
+import { Avatar } from "@/components/Avatar";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
 
 export const dynamic = 'force-dynamic';
 
@@ -64,10 +68,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
         description="The actual work you're doing for clients -- one engagement per service per client, each moving through its own pipeline."
         actions={
           canCreate ? (
-            <Link
-              href="/engagements/new"
-              className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-            >
+            <Link href="/engagements/new" className={buttonClasses()}>
               + New Engagement
             </Link>
           ) : null
@@ -100,7 +101,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
         ) : view === "board" ? (
           <EngagementBoard engagements={boardItems} />
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+          <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
@@ -125,16 +126,25 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
                       : [c.first_name, c.last_name].filter(Boolean).join(" ")
                     : "--";
                   return (
-                    <tr key={e.id} className="hover:bg-surfaceMuted">
-                      <td className="px-5 py-3">
+                    <tr key={e.id} className="transition-colors hover:bg-surfaceMuted">
+                      <td className="px-5 py-3.5">
                         <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
                           {e.engagement_number}
                         </Link>
                       </td>
-                      <td className="px-5 py-3 text-slate">{clientName}</td>
-                      <td className="px-5 py-3 text-slate">{e.status}</td>
-                      <td className="px-5 py-3 text-slate">{e.priority}</td>
-                      <td className="px-5 py-3 text-slate">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar name={clientName !== "--" ? clientName : null} size="sm" />
+                          <span className="text-slate">{clientName}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <Badge tone={ENGAGEMENT_STATUS_TONE[e.status] ?? "neutral"}>{e.status}</Badge>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {e.priority ? <Badge tone={ENGAGEMENT_PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge> : <span className="text-muted">--</span>}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate">
                         {e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}
                       </td>
                     </tr>

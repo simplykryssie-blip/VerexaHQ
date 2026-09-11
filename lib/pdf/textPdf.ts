@@ -44,13 +44,15 @@ export class TextPdf {
   private pdfDoc: PDFDocument;
   private font: PDFFont;
   private fontBold: PDFFont;
+  private fontItalic: PDFFont;
   private page: PDFPage;
   private y: number;
 
-  private constructor(pdfDoc: PDFDocument, font: PDFFont, fontBold: PDFFont) {
+  private constructor(pdfDoc: PDFDocument, font: PDFFont, fontBold: PDFFont, fontItalic: PDFFont) {
     this.pdfDoc = pdfDoc;
     this.font = font;
     this.fontBold = fontBold;
+    this.fontItalic = fontItalic;
     this.page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     this.y = PAGE_HEIGHT - MARGIN;
   }
@@ -59,7 +61,8 @@ export class TextPdf {
     const pdfDoc = await PDFDocument.create();
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    return new TextPdf(pdfDoc, font, fontBold);
+    const fontItalic = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+    return new TextPdf(pdfDoc, font, fontBold, fontItalic);
   }
 
   private ensureSpace(needed: number) {
@@ -164,6 +167,22 @@ export class TextPdf {
     this.y -= 12;
     this.page.drawText(sanitizeForPdf(typedName), { x: MARGIN, y: this.y, size: 11, font: this.fontBold, color: rgb(0.1, 0.1, 0.1) });
     this.y -= 14;
+    this.page.drawText(`Signed ${sanitizeForPdf(signedAtLabel)}`, { x: MARGIN, y: this.y, size: 9, font: this.font, color: rgb(0.45, 0.45, 0.45) });
+    this.y -= 16;
+  }
+
+  // Text counterpart to signatureImage() -- for a signer who chose to type
+  // their name rather than draw it, so a typed-only signature still shows
+  // up as an actual signature in the filed PDF instead of falling back to
+  // signatureLine()'s blank "sign here" line meant for an unsigned document.
+  signatureTyped(typedName: string, signedAtLabel: string) {
+    const maxWidth = 220;
+    this.ensureSpace(80);
+    this.y -= 10;
+    this.page.drawText(sanitizeForPdf(typedName), { x: MARGIN, y: this.y - 20, size: 22, font: this.fontItalic, color: rgb(0.1, 0.1, 0.1) });
+    this.y -= 30;
+    this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: MARGIN + maxWidth, y: this.y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
+    this.y -= 12;
     this.page.drawText(`Signed ${sanitizeForPdf(signedAtLabel)}`, { x: MARGIN, y: this.y, size: 9, font: this.font, color: rgb(0.45, 0.45, 0.45) });
     this.y -= 16;
   }

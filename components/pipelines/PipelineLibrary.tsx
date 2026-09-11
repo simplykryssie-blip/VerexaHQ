@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Star, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -11,6 +11,7 @@ import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
+import { StarButton } from "@/components/library/StarButton";
 import type { LibraryFolderRow } from "@/components/library/types";
 
 const PIPELINE_STATUS_TONE: Record<string, BadgeTone> = {
@@ -26,8 +27,11 @@ export type PipelineCard = {
   workspace_id: string | null;
   folder_id: string | null;
   stage_count: number;
+  starred: boolean;
 };
 
+// "All statuses" deliberately excludes archived -- reaching an archived
+// pipeline is its own explicit filter, same as any other status pill.
 const STATUS_FILTERS = [
   { value: "all", label: "All statuses" },
   { value: "draft", label: "Draft" },
@@ -40,11 +44,15 @@ export function PipelineLibrary({
   pipelines,
   folders,
   canManage,
+  creating,
+  onCreatingChange,
 }: {
   workspaceId: string;
   pipelines: PipelineCard[];
   folders: LibraryFolderRow[];
   canManage: boolean;
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -52,24 +60,40 @@ export function PipelineLibrary({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
-      pipelines.filter(
-        (p) =>
-          (!query || p.name.toLowerCase().includes(query.toLowerCase())) &&
-          (status === "all" || p.status === status) &&
-          (selectedFolderId === null || p.folder_id === selectedFolderId)
-      ),
-    [pipelines, query, status, selectedFolderId]
+      pipelines
+        .filter(
+          (p) =>
+            (!query || p.name.toLowerCase().includes(query.toLowerCase())) &&
+            (status === "all" ? p.status !== "archived" : p.status === status) &&
+            (!starredOnly || p.starred) &&
+            (selectedFolderId === null || p.folder_id === selectedFolderId)
+        )
+        .sort((a, b) => (a.starred === b.starred ? 0 : a.starred ? -1 : 1)),
+    [pipelines, query, status, starredOnly, selectedFolderId]
   );
+
+  async function restorePipeline(id: string, name: string) {
+    setRestoringId(id);
+    const { error } = await supabase.from("processes").update({ status: "published" }).eq("id", id);
+    setRestoringId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(`${name} restored`, "success");
+    router.refresh();
+  }
 
   const folderCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -164,15 +188,16 @@ export function PipelineLibrary({
               </option>
             ))}
           </select>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90"
-            >
-              + New pipeline
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setStarredOnly((v) => !v)}
+            aria-pressed={starredOnly}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition ${
+              starredOnly ? "border-amber-300 bg-amber-50 text-amber-600" : "border-border text-muted hover:text-ink"
+            }`}
+          >
+            <Star size={12} fill={starredOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred
+          </button>
         </div>
 
         {deleteError && <p className="mt-2 text-sm text-danger">{deleteError}</p>}
@@ -183,9 +208,12 @@ export function PipelineLibrary({
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filtered.map((p) => (
-                <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface shadow-soft p-4">
+                <div key={p.id} className="flex flex-col rounded-2xl border border-border bg-surface shadow-soft p-4 transition hover:shadow-softHover">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-ink">{p.name}</h3>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      {p.workspace_id && <StarButton workspaceId={workspaceId} entityType="pipeline" entityId={p.id} starred={p.starred} label={p.name} alwaysVisible />}
+                      <h3 className="truncate text-sm font-semibold text-ink">{p.name}</h3>
+                    </div>
                     {canManage && (
                       <div className="flex shrink-0 items-center gap-2">
                         <button
@@ -215,7 +243,16 @@ export function PipelineLibrary({
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                    {p.workspace_id ? (
+                    {p.workspace_id && p.status === "archived" ? (
+                      <button
+                        type="button"
+                        onClick={() => restorePipeline(p.id, p.name)}
+                        disabled={restoringId === p.id}
+                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-50"
+                      >
+                        {restoringId === p.id ? "Restoring..." : "Restore"}
+                      </button>
+                    ) : p.workspace_id ? (
                       <TemplateStatusCycle table="processes" id={p.id} status={p.status} />
                     ) : (
                       <Badge tone={PIPELINE_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
@@ -248,7 +285,7 @@ export function PipelineLibrary({
             <form onSubmit={createPipeline} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-sm font-semibold text-ink">New pipeline</h2>
-                <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
+                <button type="button" onClick={() => onCreatingChange(false)} className="text-lg text-muted hover:text-ink">
                   &times;
                 </button>
               </div>
@@ -264,7 +301,7 @@ export function PipelineLibrary({
                 {error && <p className="text-sm text-danger">{error}</p>}
               </div>
               <div className="mt-4 flex justify-end gap-2">
-                <button type="button" onClick={() => setCreating(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
+                <button type="button" onClick={() => onCreatingChange(false)} className="rounded-lg px-3 py-1.5 text-sm text-slate hover:bg-surfaceMuted">
                   Cancel
                 </button>
                 <button

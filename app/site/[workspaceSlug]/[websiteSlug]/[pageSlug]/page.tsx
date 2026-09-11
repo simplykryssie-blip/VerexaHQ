@@ -6,6 +6,14 @@ import type { SitePageData } from "@/components/site/types";
 
 export const dynamic = "force-dynamic";
 
+// Matches app/page.tsx's HOME_WORKSPACE_SLUG -- that route only special-cases
+// the bare "/" apex for Verexa's own homepage, so every other page of
+// Verexa's own site (About, Pricing, ...) came through here instead and
+// never got showLoginLink, even though it's Verexa's own visitors -- not a
+// tenant firm's -- who should see a way to log into their account from any
+// page, not just the home page.
+const VEREXA_OWN_WORKSPACE_SLUG = "verexa-hq-crm";
+
 type Params = { workspaceSlug: string; websiteSlug: string; pageSlug: string };
 
 // Deduped with React's request cache so generateMetadata and the page body
@@ -43,5 +51,12 @@ export default async function PublicSiteRoutePage({ params }: { params: Params }
     );
   }
 
-  return <PublicSitePage workspaceSlug={params.workspaceSlug} websiteSlug={params.websiteSlug} data={data} />;
+  return (
+    <PublicSitePage
+      workspaceSlug={params.workspaceSlug}
+      websiteSlug={params.websiteSlug}
+      data={data}
+      showLoginLink={params.workspaceSlug === VEREXA_OWN_WORKSPACE_SLUG}
+    />
+  );
 }

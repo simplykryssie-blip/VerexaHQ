@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TemplateGallery, type GalleryCard } from "@/components/settings/TemplateGallery";
 import { JotFormImportModal } from "@/components/settings/organizer-builder/JotFormImportModal";
 import { ShareTemplateModal, type DownlineWorkspace } from "@/components/settings/ShareTemplateModal";
+import { PublishConfirmModal } from "@/components/settings/PublishConfirmModal";
 import type { LibraryFolderRow } from "@/components/library/types";
 import { slugify } from "@/lib/roleSlug";
 import { useToast } from "@/components/Toast";
@@ -28,12 +29,14 @@ export function OrganizerLibrary({
   folders,
   isJotformConnected,
   downlineWorkspaces,
+  starredIds,
 }: {
   workspaceId: string;
   templates: OrganizerCard[];
   folders: LibraryFolderRow[];
   isJotformConnected: boolean;
   downlineWorkspaces: DownlineWorkspace[];
+  starredIds: Set<string>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -45,6 +48,8 @@ export function OrganizerLibrary({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sharingCard, setSharingCard] = useState<GalleryCard | null>(null);
+  const [pendingPublish, setPendingPublish] = useState<{ id: string; name: string } | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const cards: GalleryCard[] = templates.map((t) => ({
     id: t.id,
@@ -59,6 +64,7 @@ export function OrganizerLibrary({
       `${t.topLevelFieldCount} fields`,
       ...(t.totalFieldCount !== t.topLevelFieldCount ? [`${t.totalFieldCount} total incl. repeats`] : []),
     ],
+    starred: starredIds.has(t.id),
   }));
 
   async function moveTemplate(card: GalleryCard, folderId: string | null) {
@@ -80,21 +86,24 @@ export function OrganizerLibrary({
       const { data, error } = await supabase
         .from("organizer_templates")
         .insert({ workspace_id: workspaceId, name, slug, description: description || null, status: "draft" })
-        .select("id")
+        .select("id, name")
         .single();
       if (!error && data) {
         setSaving(false);
-        router.push(`/templates/organizers/${data.id}`);
+        setCreating(false);
+        setName("");
+        setDescription("");
+        setPendingPublish(data as { id: string; name: string });
         return;
       }
       if (error?.code !== "23505") {
         setSaving(false);
-        setError(error?.message ?? "Could not create organizer.");
+        setError(error?.message ?? "Could not create form.");
         return;
       }
     }
     setSaving(false);
-    setError("Could not create organizer -- try a slightly different name.");
+    setError("Could not create form -- try a slightly different name.");
   }
 
   async function deleteTemplate(card: GalleryCard) {
@@ -106,13 +115,13 @@ export function OrganizerLibrary({
       // this organizer, rather than silently orphaning their real answers.
       toast.show(
         error.code === "23503"
-          ? "Can't delete -- a client has already submitted answers for this organizer. Archive it instead."
+          ? "Can't delete -- a client has already submitted answers for this form. Archive it instead."
           : error.message,
         "error"
       );
       return;
     }
-    toast.show("Organizer deleted", "success");
+    toast.show("Form deleted", "success");
     router.refresh();
   }
 
@@ -133,13 +142,14 @@ export function OrganizerLibrary({
       <TemplateGallery
         workspaceId={workspaceId}
         itemType="form_template"
+        entityType="organizer_template"
         folders={folders}
         cards={cards}
         icon={ClipboardList}
         statusTable="organizer_templates"
-        searchPlaceholder="Search organizer templates..."
-        emptyMessage="No organizer templates match."
-        createTileLabel="Create new organizer"
+        searchPlaceholder="Search form templates..."
+        emptyMessage="No form templates match."
+        createTileLabel="Create new form"
         onCreateClick={() => setCreating(true)}
         onDeleteClick={deleteTemplate}
         onShareClick={downlineWorkspaces.length > 0 ? (card) => setSharingCard(card) : undefined}
@@ -160,7 +170,7 @@ export function OrganizerLibrary({
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 px-4 py-8">
           <form onSubmit={createTemplate} className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-softHover">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-semibold text-ink">New organizer</h2>
+              <h2 className="font-display text-sm font-semibold text-ink">New form</h2>
               <button type="button" onClick={() => setCreating(false)} className="text-lg text-muted hover:text-ink">
                 ×
               </button>
@@ -196,6 +206,30 @@ export function OrganizerLibrary({
             </div>
           </form>
         </div>
+      )}
+
+      {pendingPublish && (
+        <PublishConfirmModal
+          templateName={pendingPublish.name}
+          publishing={publishing}
+          onSkip={() => {
+            const id = pendingPublish.id;
+            setPendingPublish(null);
+            router.push(`/templates/organizers/${id}`);
+          }}
+          onPublish={async () => {
+            setPublishing(true);
+            const { error } = await supabase.from("organizer_templates").update({ status: "published" }).eq("id", pendingPublish.id);
+            setPublishing(false);
+            if (error) {
+              toast.show(error.message, "error");
+              return;
+            }
+            const id = pendingPublish.id;
+            setPendingPublish(null);
+            router.push(`/templates/organizers/${id}`);
+          }}
+        />
       )}
     </div>
   );

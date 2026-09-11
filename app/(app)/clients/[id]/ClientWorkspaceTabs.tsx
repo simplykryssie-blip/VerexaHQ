@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Briefcase, CheckSquare, Receipt, ArrowUpRight, FileText, ClipboardCheck, PenLine, RefreshCw, StickyNote, DollarSign, Mail, HelpCircle } from "lucide-react";
+import { taskHref } from "@/lib/taskLink";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +21,7 @@ import { PaymentPlanList, type PaymentPlanRow } from "@/components/billing/Payme
 import { RecordPaymentForm } from "@/components/billing/RecordPaymentForm";
 import { PreviewButton } from "@/components/billing/PreviewButton";
 import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
+import { ReactivateQuoteButton } from "@/components/billing/ReactivateQuoteButton";
 import { AddRelationshipForm, LinkExistingClientForm, RelationshipsList } from "./RelationshipsSection";
 import { ClientAssignmentForm } from "./ClientAssignmentForm";
 import { AddAppointmentForm } from "./AddAppointmentForm";
@@ -46,35 +49,18 @@ import { EditClientProfileForm } from "./EditClientProfileForm";
 import { TagsEditor } from "./TagsEditor";
 import { ServiceInterestControl } from "./ServiceInterestControl";
 import type { ActionPermissions } from "@/lib/actionPermissions";
+import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
+import { Badge } from "@/components/ui/Badge";
+import { StatTile } from "@/components/ui/StatTile";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
+import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface shadow-soft">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 className="text-sm font-semibold text-ink">{title}</h2>
-        {action}
-      </div>
-      <div className="px-5 py-3">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-muted">{label}</dt>
-      <dd className="mt-0.5 text-slate">{value ?? "--"}</dd>
-    </div>
-  );
-}
+// Mirrors lib/dashboard/data.ts's ENGAGEMENT_PIPELINE_STATUSES (which can't be
+// imported here -- it pulls in a server-only Supabase client, breaking this
+// client component's build) -- same real engagements.status list, minus the
+// terminal "put away" Archived bucket a progress bar has no use for.
+const ENGAGEMENT_PIPELINE_STATUSES = ENGAGEMENT_STATUS_OPTIONS.filter((s) => s !== "Archived");
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -117,6 +103,7 @@ export function OverviewTab({
   onCreateInvoice,
   onShowNotes,
   onCreateNote,
+  onShowTasks,
 }: {
   client: {
     id: string;
@@ -166,6 +153,7 @@ export function OverviewTab({
   onCreateInvoice: () => void;
   onShowNotes: () => void;
   onCreateNote: () => void;
+  onShowTasks: () => void;
 }) {
   const portalByEmail = new Map(portalUsers.filter((p) => p.invited_email).map((p) => [p.invited_email.toLowerCase(), p]));
   const matchedPortalIds = new Set(
@@ -185,22 +173,42 @@ export function OverviewTab({
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
   const recentNotes = [...notes].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
 
+  // The open engagement closest to needing attention -- nearest due date, or
+  // the first open one if none have a due date yet -- is what the highlighted
+  // progress bar below speaks to.
+  const primaryEngagement =
+    [...openEngagements].sort((a, b) => {
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    })[0] ?? null;
+  const primaryStatusIndex = primaryEngagement
+    ? ENGAGEMENT_PIPELINE_STATUSES.indexOf(primaryEngagement.status as (typeof ENGAGEMENT_PIPELINE_STATUSES)[number])
+    : -1;
+  const primaryProgressPercent = primaryStatusIndex >= 0 ? Math.round((primaryStatusIndex / (ENGAGEMENT_PIPELINE_STATUSES.length - 1)) * 100) : null;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Current engagements</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{openEngagements.length}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Open tasks</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{openTasks.length}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <p className="text-xs uppercase tracking-wide text-muted">Outstanding balance</p>
-          <p className="mt-1 text-2xl font-semibold text-ink">{money(outstandingBalance)}</p>
-        </div>
+        <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+        <StatTile icon={CheckSquare} tone="amber" label="Open tasks" value={openTasks.length} onClick={onShowTasks} />
+        <StatTile icon={Receipt} tone="rose" label="Outstanding balance" value={money(outstandingBalance)} onClick={onCreateInvoice} />
       </div>
+
+      {primaryEngagement && primaryProgressPercent !== null && (
+        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-ink">
+              {primaryEngagement.services?.name ?? "Engagement"} &mdash; {primaryEngagement.status}
+            </p>
+            <p className="text-sm font-semibold text-ink">{primaryProgressPercent}%</p>
+          </div>
+          <div className="mt-2">
+            <ProgressBar percent={primaryProgressPercent} tone="gradient" />
+          </div>
+        </div>
+      )}
 
       <Section
         title="Identifying info"
@@ -220,7 +228,7 @@ export function OverviewTab({
             >
               View portal
             </Link>
-            <EditClientProfileForm client={client} />
+            <EditClientProfileForm client={client} portalUsers={portalUsers} />
           </div>
         }
       >
@@ -298,6 +306,33 @@ export function OverviewTab({
               </ul>
             )}
           </div>
+        </div>
+
+        <div className="mt-4 border-t border-border pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
+            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
+          </div>
+          {addresses.length === 0 ? (
+            <EmptyState message="No additional addresses." />
+          ) : (
+            <ul className="divide-y divide-border">
+              {addresses.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
+                  <span>
+                    <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
+                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
+                    {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {!a.is_primary && <SetAddressPrimaryButton addressId={a.id} />}
+                    <EditAddressForm address={a} />
+                    <DeleteAddressButton addressId={a.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="mt-4 border-t border-border pt-4">
@@ -427,33 +462,6 @@ export function OverviewTab({
         </div>
         )}
 
-        <div className="mt-4 border-t border-border pt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Addresses</h3>
-            <AddAddressForm clientId={client.id} workspaceId={workspaceId} />
-          </div>
-          {addresses.length === 0 ? (
-            <EmptyState message="No additional addresses." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {addresses.map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
-                  <span>
-                    <span className="mr-2 capitalize text-muted">{a.address_type}:</span>
-                    {[a.street, a.city, a.state, a.zip].filter(Boolean).join(", ")}
-                    {a.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
-                  </span>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {!a.is_primary && <SetAddressPrimaryButton addressId={a.id} />}
-                    <EditAddressForm address={a} />
-                    <DeleteAddressButton addressId={a.id} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
         {client.client_type === "individual" && (
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
@@ -468,9 +476,14 @@ export function OverviewTab({
       <Section
         title="Engagements"
         action={
-          <Link href={`/engagements/new?clientId=${client.id}`} className="text-xs font-medium text-accent hover:underline">
-            + New Engagement
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href={`/clients/${client.id}/irs-authorizations/new`} className="text-xs font-medium text-accent hover:underline">
+              + New IRS Authorization
+            </Link>
+            <Link href={`/engagements/new?clientId=${client.id}`} className="text-xs font-medium text-accent hover:underline">
+              + New Engagement
+            </Link>
+          </div>
         }
       >
         {engagements.length === 0 ? (
@@ -498,15 +511,17 @@ export function OverviewTab({
                     showStaffRoles && e.reviewer?.id && e.reviewer.id !== client.default_reviewer?.id;
                   const taxYear = engagementTaxYear(e);
                   return (
-                    <tr key={e.id} className="hover:bg-surfaceMuted">
-                      <td className="px-4 py-2">
+                    <tr key={e.id} className="transition-colors hover:bg-surfaceMuted">
+                      <td className="px-4 py-2.5">
                         <Link href={`/engagements/${e.id}`} className="font-medium text-accent hover:underline">
                           {e.engagement_number ?? "Engagement"}
                         </Link>
                       </td>
-                      <td className="px-4 py-2 text-slate">{e.services?.name ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate">{e.status}</td>
-                      <td className="px-4 py-2 text-slate">
+                      <td className="px-4 py-2.5 text-slate">{e.services?.name ?? "--"}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge tone={ENGAGEMENT_STATUS_TONE[e.status] ?? "neutral"}>{e.status}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate">
                         {e.assigned_staff?.display_name ?? "Unassigned"}
                         {staffDiffers && (
                           <span className="ml-1 text-xs text-warning" title="Differs from this client's default relationship manager">
@@ -514,7 +529,7 @@ export function OverviewTab({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-slate">
+                      <td className="px-4 py-2.5 text-slate">
                         {e.reviewer?.display_name ?? "--"}
                         {reviewerDiffers && (
                           <span className="ml-1 text-xs text-warning" title="Differs from this client's default reviewer">
@@ -522,9 +537,11 @@ export function OverviewTab({
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-slate">{e.priority ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate">{taxYear ?? "--"}</td>
-                      <td className="px-4 py-2 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
+                      <td className="px-4 py-2.5">
+                        {e.priority ? <Badge tone={ENGAGEMENT_PRIORITY_TONE[e.priority] ?? "neutral"}>{e.priority}</Badge> : <span className="text-muted">--</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate">{taxYear ?? "--"}</td>
+                      <td className="px-4 py-2.5 text-slate">{e.due_date ? new Date(e.due_date).toLocaleDateString() : "--"}</td>
                     </tr>
                   );
                 })}
@@ -535,7 +552,7 @@ export function OverviewTab({
       </Section>
 
       {organizerResponses.length > 0 && (
-        <Section title="Organizers">
+        <Section title="Forms">
           <div className="space-y-3">
             {organizerResponses.map((o) => (
               <OrganizerResponseCard key={o.id} response={o} workspaceServices={workspaceServices} />
@@ -746,7 +763,7 @@ export function MessagesTab({
         const res = await fetch("/api/sms/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: primaryPhone, body }),
+          body: JSON.stringify({ to: primaryPhone, body, clientId }),
         });
         const data = (await res.json()) as { sent?: boolean; reason?: string; error?: string };
         if (!data.sent) toast.show(`Message saved, but the SMS wasn't delivered: ${data.reason ?? data.error ?? "unknown error"}`, "error");
@@ -990,9 +1007,13 @@ export function BillingTab({
                   {q.quote_number} -- {q.title}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {q.status} -- {money(q.total_amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={BILLING_DOCUMENT_STATUS_TONE[q.status] ?? "neutral"} className="capitalize">
+                      {q.status}
+                    </Badge>
+                    {money(q.total_amount)}
                   </span>
+                  {canManageBilling && q.status === "cancelled" && <ReactivateQuoteButton quoteId={q.id} />}
                   {canManageBilling && (
                     <button
                       type="button"
@@ -1004,6 +1025,7 @@ export function BillingTab({
                   )}
                   <PreviewButton
                     kind="quote"
+                    workspaceId={workspaceId}
                     firmName={workspaceName}
                     clientName={clientName}
                     number={q.quote_number}
@@ -1037,8 +1059,11 @@ export function BillingTab({
                   <div className="flex items-center justify-between">
                     <span className="text-slate">{i.invoice_number ?? "Invoice"}</span>
                     <div className="flex items-center gap-3">
-                      <span className="capitalize text-muted">
-                        {i.status} -- {money(i.total_amount)} ({money(i.amount_paid)} paid)
+                      <span className="flex items-center gap-2 text-muted">
+                        <Badge tone={BILLING_DOCUMENT_STATUS_TONE[i.status] ?? "neutral"} className="capitalize">
+                          {i.status}
+                        </Badge>
+                        {money(i.total_amount)} ({money(i.amount_paid)} paid)
                       </span>
                       {canManageBilling && i.status !== "paid" && i.status !== "void" && (
                         <button
@@ -1051,6 +1076,7 @@ export function BillingTab({
                       )}
                       <PreviewButton
                         kind="invoice"
+                        workspaceId={workspaceId}
                         firmName={workspaceName}
                         clientName={clientName}
                         number={i.invoice_number}
@@ -1074,6 +1100,7 @@ export function BillingTab({
                         workspaceId={workspaceId}
                         clientId={clientId}
                         balanceDue={i.total_amount - i.amount_paid}
+                        pendingInstallments={plans.filter((p) => p.status === "pending")}
                       />
                       {plans.length === 0 && (
                         <CreatePaymentPlanForm invoiceId={i.id} workspaceId={workspaceId} balanceDue={i.total_amount - i.amount_paid} />
@@ -1095,10 +1122,16 @@ export function BillingTab({
           <ul className="divide-y divide-border">
             {payments.map((p) => (
               <li key={p.id} className="flex items-center justify-between py-2 text-sm">
-                <span className="text-slate">{new Date(p.payment_date).toLocaleDateString()}</span>
+                <span className="text-slate">
+                  {new Date(p.payment_date).toLocaleDateString()}
+                  {p.payment_method && ` -- ${PAYMENT_METHOD_LABEL[p.payment_method] ?? p.payment_method}`}
+                </span>
                 <div className="flex items-center gap-3">
-                  <span className="capitalize text-muted">
-                    {p.status} -- {money(p.amount)}
+                  <span className="flex items-center gap-2 text-muted">
+                    <Badge tone={PAYMENT_STATUS_TONE[p.status] ?? "neutral"} className="capitalize">
+                      {p.status}
+                    </Badge>
+                    {money(p.amount)}
                   </span>
                   {canManageBilling && p.status !== "refunded" && p.stripe_payment_intent_id && (
                     <RefundButton paymentId={p.id} amount={p.amount} />
@@ -1115,19 +1148,47 @@ export function BillingTab({
 
 // ----------------------------------------------------------------- Timeline
 
+// Only what a staff member would actually call "an event" -- documents,
+// organizer activity, signatures, notes, payments, email, and status
+// changes. No pipeline-stage or automation-run noise, since activity_log
+// never records those against a client in the first place.
+const TIMELINE_ICON: Record<string, typeof FileText> = {
+  DOCUMENT_UPLOADED: FileText,
+  DOCUMENT_DELETED: FileText,
+  DOCUMENT_REQUEST_CREATED: FileText,
+  ENGAGEMENT_CREATED: Briefcase,
+  ORGANIZER_INFO_REQUESTED: ClipboardCheck,
+  ORGANIZER_REVIEWED: ClipboardCheck,
+  ORGANIZER_SUBMITTED: ClipboardCheck,
+  organizer_submitted: ClipboardCheck,
+  SIGNATURE_SIGNED: PenLine,
+  STATUS_CHANGE: RefreshCw,
+  NOTE_ADDED: StickyNote,
+  PAYMENT_RECEIVED: DollarSign,
+  EMAIL_SENT: Mail,
+};
+
 export function TimelineTab({ timeline }: { timeline: ActivityRow[] }) {
   return (
     <Section title="Timeline">
       {timeline.length === 0 ? (
         <EmptyState message="No activity recorded yet." />
       ) : (
-        <ul className="space-y-3">
-          {timeline.map((a) => (
-            <li key={a.id} className="flex items-center justify-between text-sm">
-              <span className="text-slate">{a.description}</span>
-              <span className="text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>
-            </li>
-          ))}
+        <ul className="space-y-2">
+          {timeline.map((a) => {
+            const Icon = TIMELINE_ICON[a.activity_type] ?? HelpCircle;
+            return (
+              <li key={a.id} className="flex items-start gap-2.5 rounded-xl border border-border bg-surfaceMuted px-3 py-2.5">
+                <span className="mt-0.5 shrink-0 text-muted">
+                  <Icon size={15} aria-hidden="true" />
+                </span>
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="truncate text-sm text-slate">{a.description}</span>
+                  <span className="shrink-0 text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </Section>
@@ -1165,6 +1226,79 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
   );
 }
 
+export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  async function complete(task: TaskRow) {
+    setPendingId(task.id);
+    const { error } = await supabase
+      .from("tasks")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", task.id);
+    setPendingId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Task completed", "success");
+    router.refresh();
+  }
+
+  const sorted = [...tasks].sort((a, b) => {
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    if (a.due_date) return -1;
+    if (b.due_date) return 1;
+    return 0;
+  });
+
+  return (
+    <Section title="Tasks">
+      {sorted.length === 0 ? (
+        <EmptyState message="No open tasks for this client." />
+      ) : (
+        <ul className="divide-y divide-border">
+          {sorted.map((t) => {
+            const href = taskHref(t);
+            const linksElsewhere = href && href !== `/clients/${clientId}`;
+            return (
+              <li key={t.id} className="flex items-start gap-3 py-3">
+                <input
+                  type="checkbox"
+                  disabled={pendingId === t.id}
+                  onChange={() => complete(t)}
+                  className="mt-1 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                  aria-label={`Mark "${t.title}" complete`}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium text-ink">{t.title}</p>
+                    {t.priority && <span className="text-xs capitalize text-muted">({t.priority})</span>}
+                  </div>
+                  {t.description && (
+                    <div className="prose prose-sm mt-0.5 max-w-none text-xs text-muted" dangerouslySetInnerHTML={{ __html: t.description }} />
+                  )}
+                  <div className="mt-1 flex items-center gap-3 text-xs text-muted">
+                    {t.due_date && <span>Due {new Date(t.due_date).toLocaleDateString()}</span>}
+                    {linksElsewhere && (
+                      <Link href={href} className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                        {t.related_organizer_response_id ? "Open form review" : "Open engagement"}
+                        <ArrowUpRight size={12} aria-hidden="true" />
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
 // ------------------------------------------------------------------- Types
 
 export type ContactRow = { id: string; first_name: string | null; last_name: string | null; title: string | null; email: string | null; phone: string | null; is_primary: boolean };
@@ -1191,7 +1325,17 @@ export type RelationshipRow = {
 };
 export type NoteRow = { id: string; subject: string | null; body: string; is_pinned: boolean; is_internal: boolean; is_private: boolean; created_at: string };
 export type ActivityRow = { id: string; description: string; activity_type: string; created_at: string };
-export type TaskRow = { id: string; title: string; status: string; due_date: string | null; engagement_id: string | null };
+export type TaskRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string | null;
+  due_date: string | null;
+  engagement_id: string | null;
+  client_id: string | null;
+  related_organizer_response_id: string | null;
+};
 export type QuoteRow = {
   id: string;
   quote_number: string | null;
@@ -1220,7 +1364,15 @@ export type InvoiceRow = {
   issue_date: string | null;
   notes: string | null;
 };
-export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; stripe_payment_intent_id: string | null };
+export type PaymentRow = { id: string; status: string; amount: number; payment_date: string; payment_method: string | null; stripe_payment_intent_id: string | null };
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  stripe: "Card",
+  check: "Check",
+  cash: "Cash",
+  bank_transfer: "Bank transfer",
+  other: "Other",
+};
 export type MessageThreadRow = { id: string; subject: string | null; channel: string };
 export type MessageRow = {
   id: string;

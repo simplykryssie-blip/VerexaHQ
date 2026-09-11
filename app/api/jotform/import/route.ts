@@ -7,18 +7,18 @@ export const dynamic = "force-dynamic";
 
 // JotForm's public API returns questions keyed by qid, not as an array:
 // { responseCode, message, content: { "3": {...}, "5": {...} } }.
-// Structural elements (headers, dividers, page breaks, submit buttons,
-// captcha) are not real answerable fields and are skipped entirely.
+// Submit buttons, captcha, dividers, and a few other structural elements
+// have no equivalent in the organizer builder and are skipped entirely.
+// control_head/control_text/control_pagebreak DO have equivalents (Heading,
+// Paragraph, Page break -- see STRUCTURAL_TYPE_MAP below) and must not be
+// skipped, or the whole element silently disappears on import.
 const SKIP_TYPES = new Set([
-  "control_head",
   "control_button",
   "control_divider",
-  "control_pagebreak",
   "control_captcha",
   "control_hidden",
   "control_collapse",
   "control_image",
-  "control_text",
 ]);
 
 // Maps a JotForm question type to one of the field types our organizer
@@ -41,6 +41,15 @@ const TYPE_MAP: Record<string, string> = {
   control_fullname: "short_text",
 };
 
+// Structural JotForm elements -- these don't collect an answer, so they map
+// to our organizer builder's own non-answerable structural types (Heading,
+// Paragraph, Page break) instead of going through TYPE_MAP/approximation.
+const STRUCTURAL_TYPE_MAP: Record<string, "section" | "rich_text" | "page_break"> = {
+  control_head: "section",
+  control_text: "rich_text",
+  control_pagebreak: "page_break",
+};
+
 type JotFormQuestion = {
   qid?: string;
   text?: string;
@@ -48,6 +57,8 @@ type JotFormQuestion = {
   order?: string;
   required?: string;
   options?: string;
+  // control_head's subheading, shown under the heading text.
+  subLabel?: string;
 };
 
 function extractFormId(input: string): string | null {
@@ -126,15 +137,42 @@ export async function POST(request: Request) {
       break;
     }
     if (error?.code !== "23505") {
-      return NextResponse.json({ ok: false, error: error?.message ?? "Could not create the organizer template." }, { status: 500 });
+      return NextResponse.json({ ok: false, error: error?.message ?? "Could not create the form template." }, { status: 500 });
     }
   }
   if (!template) {
-    return NextResponse.json({ ok: false, error: "Could not create the organizer template -- try again." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not create the form template -- try again." }, { status: 500 });
   }
 
   const approximated: string[] = [];
   const fieldsToInsert = questions.map((q, index) => {
+    const structuralType = STRUCTURAL_TYPE_MAP[q.type ?? ""];
+    if (structuralType) {
+      // These are non-answerable structural blocks (Heading/Paragraph/Page
+      // break) -- no options, no required flag, and control_text's content
+      // goes in body_html (already HTML) rather than label.
+      if (structuralType === "rich_text") {
+        return {
+          organizer_template_id: template!.id,
+          field_type: structuralType,
+          label: "Text block",
+          body_html: q.text || "",
+          display_order: index,
+          is_required: false,
+          options: [],
+        };
+      }
+      return {
+        organizer_template_id: template!.id,
+        field_type: structuralType,
+        label: q.text || (structuralType === "page_break" ? "Page break" : "Heading"),
+        help_text: structuralType === "section" ? q.subLabel || null : null,
+        display_order: index,
+        is_required: false,
+        options: [],
+      };
+    }
+
     const mapped = TYPE_MAP[q.type ?? ""];
     if (!mapped) approximated.push(q.text || q.type || "untitled field");
     const options = q.options

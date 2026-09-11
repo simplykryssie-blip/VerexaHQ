@@ -19,6 +19,13 @@ export type WidgetType =
   | "quick_actions"
   | "calendar"
   | "recent_activity"
+  | "top_services"
+  | "engagement_pipeline"
+  | "stage_breakdown"
+  | "deadline_risk"
+  | "unassigned_engagements"
+  | "overdue_requests"
+  | "failed_automations"
   // Reserved in the DB constraint for future modules -- no live data
   // source yet, so nothing renders them today.
   | "returns_due"
@@ -39,6 +46,36 @@ export const IMPLEMENTED_WIDGET_TYPES: WidgetType[] = [
   "quick_actions",
   "calendar",
   "recent_activity",
+  "top_services",
+  "engagement_pipeline",
+  "stage_breakdown",
+  "deadline_risk",
+  "unassigned_engagements",
+  "overdue_requests",
+  "failed_automations",
+];
+
+/** Widgets that are inherently a wide strip rather than a card -- span the full dashboard grid row instead of one cell. */
+export const WIDE_WIDGET_TYPES: Set<WidgetType> = new Set(["engagement_pipeline"]);
+
+/**
+ * Groups the flat widget list into labeled sections for display -- purely a
+ * render-time grouping (the underlying dashboard_widgets rows stay one flat
+ * ordered list, so "Customize" reordering/hiding is unaffected). A widget's
+ * section is fixed by its type, not user-configurable, since it reflects
+ * what kind of information it is (a running number vs. something needing
+ * action vs. reference/planning context) rather than a layout preference.
+ */
+export const WIDGET_SECTIONS: { label: string; types: WidgetType[] }[] = [
+  { label: "Key Metrics", types: ["revenue", "kpis", "collections", "missing_documents", "messages"] },
+  {
+    label: "Action Queue",
+    types: ["todays_work", "review_queue", "deadline_risk", "unassigned_engagements", "overdue_requests", "failed_automations"],
+  },
+  {
+    label: "Reports & Planning",
+    types: ["quick_actions", "calendar", "recent_activity", "top_services", "engagement_pipeline", "stage_breakdown"],
+  },
 ];
 
 export function isWidgetType(value: string): value is WidgetType {

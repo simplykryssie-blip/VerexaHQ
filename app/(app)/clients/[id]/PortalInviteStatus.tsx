@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { Copy } from "lucide-react";
 import type { PendingPortalInviteRow, PortalUserRow } from "./ClientWorkspaceTabs";
 
 // Surfaces portal-invite status/action at the client level regardless of
@@ -107,6 +108,34 @@ export function PortalInviteStatus({
     router.refresh();
   }
 
+  async function copyInviteLink() {
+    if (!existing) return;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const acceptUrl = `${appUrl}/portal/accept-invitation?token=${existing.invitation_token}`;
+    await navigator.clipboard.writeText(acceptUrl);
+    toast.show("Invitation link copied", "success");
+  }
+
+  // Suspend blocks an already-active login without touching the account
+  // itself -- getPortalIdentity() only ever accepts status = 'active', so
+  // this alone is what locks them out. Distinct from "revoked", which means
+  // the invite token itself is dead and needs a full reissue.
+  async function setStatus(next: "suspended" | "active" | "revoked") {
+    if (!existing) return;
+    setInviting(true);
+    const { error } = await supabase.from("client_portal_users").update({ status: next }).eq("id", existing.id);
+    setInviting(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(
+      next === "suspended" ? "Portal access suspended" : next === "active" ? "Portal access reactivated" : "Portal access revoked",
+      "success"
+    );
+    router.refresh();
+  }
+
   if (existing) {
     if (latestInvite?.status === "pending") {
       return <span className="text-xs text-muted">Portal: invite queued, not sent yet</span>;
@@ -139,6 +168,58 @@ export function PortalInviteStatus({
             className="font-medium text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80 disabled:opacity-60"
           >
             {inviting ? "Reissuing..." : "Reissue invite"}
+          </button>
+        </span>
+      );
+    }
+    if (existing.status === "invited") {
+      return (
+        <span className="inline-flex items-center gap-2 text-xs">
+          <span className="text-muted">Portal: invitation sent</span>
+          <button
+            type="button"
+            onClick={copyInviteLink}
+            className="inline-flex items-center gap-1 font-medium text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80"
+          >
+            <Copy size={11} /> Copy link
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatus("revoked")}
+            disabled={inviting}
+            className="font-medium text-danger underline decoration-dotted underline-offset-2 hover:text-danger/80 disabled:opacity-60"
+          >
+            Revoke
+          </button>
+        </span>
+      );
+    }
+    if (existing.status === "suspended") {
+      return (
+        <span className="inline-flex items-center gap-2 text-xs">
+          <span className="text-warning">Portal: access suspended</span>
+          <button
+            type="button"
+            onClick={() => setStatus("active")}
+            disabled={inviting}
+            className="font-medium text-accent underline decoration-dotted underline-offset-2 hover:text-accent/80 disabled:opacity-60"
+          >
+            {inviting ? "Reactivating..." : "Reactivate"}
+          </button>
+        </span>
+      );
+    }
+    if (existing.status === "active") {
+      return (
+        <span className="inline-flex items-center gap-2 text-xs">
+          <span className="text-success">Portal: active</span>
+          <button
+            type="button"
+            onClick={() => setStatus("suspended")}
+            disabled={inviting}
+            className="font-medium text-muted underline decoration-dotted underline-offset-2 hover:text-ink disabled:opacity-60"
+          >
+            Suspend
           </button>
         </span>
       );

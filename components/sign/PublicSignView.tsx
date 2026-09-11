@@ -18,6 +18,7 @@ type SignRequestData = {
   attachment_mime_type: string | null;
   workspace_id: string;
   workspace_name: string;
+  expires_at: string | null;
 };
 
 function isPreviewable(mimeType: string | null) {
@@ -63,12 +64,13 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       setError(result.error ?? "Could not save your signature.");
       return;
     }
+    const signatureImagePath: string = result.path;
 
     const { error: rpcError } = await supabase.rpc("record_signature_by_token", {
       p_token: token,
       p_signature_type: "drawn",
       p_typed_name: typedName.trim(),
-      p_signature_image_path: result.path,
+      p_signature_image_path: signatureImagePath,
     });
     setSubmitting(false);
     if (rpcError) {
@@ -93,6 +95,24 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
     setData((d) => ({ ...d, signer_status: "declined", declined_at: new Date().toISOString(), decline_reason: declineReason.trim() || null }));
   }
 
+  if (data.signer_status === "pending" && data.request_status === "cancelled") {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
+        <h1 className="text-lg font-semibold text-ink">This signing link has been revoked</h1>
+        <p className="mt-2 text-sm text-muted">Please contact the sender for a new link.</p>
+      </div>
+    );
+  }
+
+  if (data.signer_status === "pending" && data.expires_at && new Date(data.expires_at) < new Date()) {
+    return (
+      <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
+        <h1 className="text-lg font-semibold text-ink">This signing link has expired</h1>
+        <p className="mt-2 text-sm text-muted">Please contact the sender for a new link.</p>
+      </div>
+    );
+  }
+
   if (data.signer_status !== "pending") {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-border bg-surface p-8 text-center">
@@ -110,18 +130,22 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4 p-4 sm:p-8">
+    <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 sm:p-8">
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted">{data.workspace_name}</p>
         <h1 className="text-lg font-semibold text-ink">{data.request_title}</h1>
         <p className="text-sm text-muted">Requesting signature from {data.signer_name}</p>
       </div>
 
-      <div className="min-h-[50vh] flex-1 rounded-xl border border-border bg-surfaceMuted p-3">
+      <div className="h-[80vh] min-h-[500px] flex-1 rounded-xl border border-border bg-surfaceMuted p-3">
         {fileError && <p className="text-sm text-danger">{fileError}</p>}
         {!fileError && !fileUrl && <p className="text-sm text-muted">Loading document...</p>}
         {fileUrl && isPreviewable(data.attachment_mime_type) && data.attachment_mime_type === "application/pdf" && (
-          <iframe src={fileUrl} title={data.attachment_file_name} className="h-full min-h-[50vh] w-full rounded-lg border border-border bg-white" />
+          <iframe
+            src={`${fileUrl}#toolbar=1&navpanes=0&view=FitH`}
+            title={data.attachment_file_name}
+            className="h-full w-full rounded-lg border border-border bg-white"
+          />
         )}
         {fileUrl && data.attachment_mime_type?.startsWith("image/") && (
           // eslint-disable-next-line @next/next/no-img-element

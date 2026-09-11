@@ -2,13 +2,18 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Share2, Trash2, type LucideIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Search, Share2, Star, Trash2, type LucideIcon } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { IconChip } from "@/components/ui/IconChip";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
-import type { LibraryFolderRow } from "@/components/library/types";
+import { StarButton } from "@/components/library/StarButton";
+import type { LibraryFolderRow, StarEntityType } from "@/components/library/types";
 
 const TEMPLATE_STATUS_TONE: Record<string, BadgeTone> = {
   draft: "neutral",
@@ -26,8 +31,12 @@ export type GalleryCard = {
   badges: string[];
   href: string;
   actionLabel: string;
+  starred: boolean;
 };
 
+// "All" deliberately excludes archived -- an archived template is meant to
+// disappear from the normal working view, not just get a label. Reaching it
+// is its own explicit filter, same as clicking any other status pill.
 const STATUS_FILTERS = [
   { value: "all", label: "All" },
   { value: "draft", label: "Draft" },
@@ -42,6 +51,7 @@ const STATUS_FILTERS = [
 export function TemplateGallery({
   workspaceId,
   itemType,
+  entityType,
   folders,
   cards,
   icon: Icon,
@@ -56,10 +66,11 @@ export function TemplateGallery({
 }: {
   workspaceId: string;
   itemType: "form_template";
+  entityType: StarEntityType;
   folders: LibraryFolderRow[];
   cards: GalleryCard[];
   icon: LucideIcon;
-  statusTable: "organizer_templates" | "engagement_letter_templates";
+  statusTable: "organizer_templates" | "engagement_letter_templates" | "document_request_templates";
   searchPlaceholder: string;
   emptyMessage: string;
   createTileLabel: string;
@@ -70,20 +81,40 @@ export function TemplateGallery({
   onShareClick?: (card: GalleryCard) => void;
   onMoveClick: (card: GalleryCard, folderId: string | null) => void;
 }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [starredOnly, setStarredOnly] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
-      cards.filter(
-        (c) =>
-          (!query || c.name.toLowerCase().includes(query.toLowerCase())) &&
-          (status === "all" || c.status === status) &&
-          (selectedFolderId === null || c.folder_id === selectedFolderId)
-      ),
-    [cards, query, status, selectedFolderId]
+      cards
+        .filter(
+          (c) =>
+            (!query || c.name.toLowerCase().includes(query.toLowerCase())) &&
+            (status === "all" ? c.status !== "archived" : c.status === status) &&
+            (!starredOnly || c.starred) &&
+            (selectedFolderId === null || c.folder_id === selectedFolderId)
+        )
+        .sort((a, b) => (a.starred === b.starred ? 0 : a.starred ? -1 : 1)),
+    [cards, query, status, starredOnly, selectedFolderId]
   );
+
+  async function restore(card: GalleryCard) {
+    setRestoringId(card.id);
+    const { error } = await supabase.from(statusTable).update({ status: "published" }).eq("id", card.id);
+    setRestoringId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(`${card.name} restored`, "success");
+    router.refresh();
+  }
 
   const folderCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -132,6 +163,16 @@ export function TemplateGallery({
                 </button>
               ))}
             </div>
+            <button
+              type="button"
+              onClick={() => setStarredOnly((v) => !v)}
+              aria-pressed={starredOnly}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                starredOnly ? "border-amber-300 bg-amber-50 text-amber-600" : "border-border text-muted hover:text-ink"
+              }`}
+            >
+              <Star size={12} fill={starredOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred
+            </button>
           </div>
           <button
             type="button"
@@ -146,12 +187,13 @@ export function TemplateGallery({
           {filtered.length === 0 ? (
             <EmptyState icon={Search} message={cards.length > 0 ? emptyMessage : "No templates yet -- create one to get started."} />
           ) : (
-            <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
               {filtered.map((c) => (
-                <div key={c.id} className="group flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-border bg-surfaceMuted text-muted">
-                    <Icon size={14} aria-hidden="true" />
-                  </span>
+                <div key={c.id} className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surfaceMuted">
+                  {!c.isSystem && <StarButton workspaceId={workspaceId} entityType={entityType} entityId={c.id} starred={c.starred} label={c.name} />}
+                  <IconChip tone="accent">
+                    <Icon size={16} aria-hidden="true" />
+                  </IconChip>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -166,6 +208,15 @@ export function TemplateGallery({
                       <Badge tone={TEMPLATE_STATUS_TONE[c.status] ?? "neutral"} className="capitalize">
                         {c.status}
                       </Badge>
+                    ) : c.status === "archived" ? (
+                      <button
+                        type="button"
+                        onClick={() => restore(c)}
+                        disabled={restoringId === c.id}
+                        className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-slate transition hover:border-accent hover:text-accent disabled:opacity-50"
+                      >
+                        {restoringId === c.id ? "Restoring..." : "Restore"}
+                      </button>
                     ) : (
                       <TemplateStatusCycle table={statusTable} id={c.id} status={c.status} />
                     )}

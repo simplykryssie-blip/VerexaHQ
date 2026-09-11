@@ -2,10 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Copy, Plus, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { WEEKDAYS, type BusinessHours } from "@/lib/businessHours";
+
+const WEEKDAY_LABELS: Record<keyof BusinessHours, string> = {
+  sunday: "Sun",
+  monday: "Mon",
+  tuesday: "Tue",
+  wednesday: "Wed",
+  thursday: "Thu",
+  friday: "Fri",
+  saturday: "Sat",
+};
 
 const inputClass = "mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -23,33 +34,26 @@ export type ServiceRow = {
   service_category_id: string | null;
   process_id: string | null;
   organizer_template_id: string | null;
+  engagement_letter_template_id: string | null;
   document_request_template_id: string | null;
   document_folder_template_id: string | null;
-  pricing_rule_id: string | null;
-  billing_rule_id: string | null;
   default_price: number | null;
   estimated_duration_minutes: number | null;
   display_order: number;
   is_bookable: boolean;
   is_portal_visible: boolean;
-  requires_organizer: boolean;
-  requires_engagement_letter: boolean;
-  requires_documents: boolean;
-  requires_signature: boolean;
-  requires_review: boolean;
-  requires_invoice: boolean;
-  requires_payment_before_release: boolean;
+  season_start: string | null;
+  season_end: string | null;
+  allowed_weekdays: number[] | null;
+  booking_location_type: string;
+  booking_meeting_url: string | null;
+  zoom_host_user_id: string | null;
+  allow_overlapping_bookings: boolean;
+  booking_location_id: string | null;
+  booking_min_notice_hours_override: number | null;
+  booking_buffer_minutes_override: number | null;
+  booking_window_days_override: number | null;
 };
-
-const REQUIREMENT_FIELDS: { key: keyof ServiceRow; label: string }[] = [
-  { key: "requires_organizer", label: "Requires an organizer" },
-  { key: "requires_engagement_letter", label: "Requires an engagement letter" },
-  { key: "requires_documents", label: "Requires documents" },
-  { key: "requires_signature", label: "Requires signature" },
-  { key: "requires_review", label: "Requires review" },
-  { key: "requires_invoice", label: "Requires an invoice" },
-  { key: "requires_payment_before_release", label: "Requires payment before release" },
-];
 
 function OptionSelect({
   value,
@@ -78,19 +82,27 @@ function OptionSelect({
 
 export function ServiceForm({
   service,
+  workspaceSlug,
   categories,
   pipelines,
   organizerTemplates,
+  engagementLetterTemplates,
   documentRequestTemplates,
   documentFolderTemplates,
+  staffOptions,
+  locationOptions,
   canManage,
 }: {
   service: ServiceRow;
+  workspaceSlug: string;
   categories: Option[];
   pipelines: Option[];
   organizerTemplates: Option[];
+  engagementLetterTemplates: Option[];
   documentRequestTemplates: Option[];
   documentFolderTemplates: Option[];
+  staffOptions: Option[];
+  locationOptions: Option[];
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -106,24 +118,67 @@ export function ServiceForm({
   const [categoryId, setCategoryId] = useState(service.service_category_id ?? "");
   const [processId, setProcessId] = useState(service.process_id ?? "");
   const [organizerTemplateId, setOrganizerTemplateId] = useState(service.organizer_template_id ?? "");
+  const [engagementLetterTemplateId, setEngagementLetterTemplateId] = useState(service.engagement_letter_template_id ?? "");
   const [documentRequestTemplateId, setDocumentRequestTemplateId] = useState(service.document_request_template_id ?? "");
   const [documentFolderTemplateId, setDocumentFolderTemplateId] = useState(service.document_folder_template_id ?? "");
+  const [defaultPrice, setDefaultPrice] = useState(service.default_price != null ? String(service.default_price) : "");
+  const [estimatedDuration, setEstimatedDuration] = useState(
+    service.estimated_duration_minutes != null ? String(service.estimated_duration_minutes) : ""
+  );
   const [displayOrder, setDisplayOrder] = useState(String(service.display_order));
   const [isBookable, setIsBookable] = useState(service.is_bookable);
   const [isPortalVisible, setIsPortalVisible] = useState(service.is_portal_visible);
-  const [requirements, setRequirements] = useState(
-    Object.fromEntries(REQUIREMENT_FIELDS.map((f) => [f.key, Boolean(service[f.key])])) as Record<string, boolean>
+  const [seasonStart, setSeasonStart] = useState(service.season_start ?? "");
+  const [seasonEnd, setSeasonEnd] = useState(service.season_end ?? "");
+  const [allowedWeekdays, setAllowedWeekdays] = useState<number[]>(service.allowed_weekdays ?? []);
+  const [bookingLocationType, setBookingLocationType] = useState(service.booking_location_type);
+  const [bookingMeetingUrl, setBookingMeetingUrl] = useState(service.booking_meeting_url ?? "");
+  const [zoomHostUserId, setZoomHostUserId] = useState(service.zoom_host_user_id ?? "");
+  const [allowOverlappingBookings, setAllowOverlappingBookings] = useState(service.allow_overlapping_bookings);
+  const [bookingLocationId, setBookingLocationId] = useState(service.booking_location_id ?? "");
+  const [minNoticeOverride, setMinNoticeOverride] = useState(
+    service.booking_min_notice_hours_override != null ? String(service.booking_min_notice_hours_override) : ""
   );
+  const [bufferOverride, setBufferOverride] = useState(
+    service.booking_buffer_minutes_override != null ? String(service.booking_buffer_minutes_override) : ""
+  );
+  const [windowOverride, setWindowOverride] = useState(
+    service.booking_window_days_override != null ? String(service.booking_window_days_override) : ""
+  );
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Everything below defaults collapsed -- pricing and document templates
+  // aren't part of the core Service -> Pipeline -> Organizer flow a normal
+  // tax professional sets up day to day, but stay reachable for firms that
+  // use them. Auto-opens if any of them already has something set, so
+  // existing configuration isn't hidden from whoever's looking at it.
+  const hasAdvancedConfig = Boolean(
+    documentRequestTemplateId || documentFolderTemplateId || engagementLetterTemplateId || defaultPrice || estimatedDuration
+  );
+  const [showAdvanced, setShowAdvanced] = useState(hasAdvancedConfig);
 
   function markDirty<T>(setter: (v: T) => void) {
     return (v: T) => {
       setter(v);
       setDirty(true);
     };
+  }
+
+  function toggleWeekday(dayIndex: number) {
+    setAllowedWeekdays((prev) => (prev.includes(dayIndex) ? prev.filter((d) => d !== dayIndex) : [...prev, dayIndex].sort()));
+    setDirty(true);
+  }
+
+  const bookingLink = typeof window !== "undefined" ? `${window.location.origin}/book/${workspaceSlug}?service=${service.id}` : "";
+
+  function copyBookingLink() {
+    navigator.clipboard.writeText(bookingLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
   }
 
   async function addCategory(e: React.FormEvent) {
@@ -152,8 +207,14 @@ export function ServiceForm({
   }
 
   async function save() {
-    setSaving(true);
     setError(null);
+    const trimmedSeasonStart = seasonStart.trim();
+    const trimmedSeasonEnd = seasonEnd.trim();
+    if (Boolean(trimmedSeasonStart) !== Boolean(trimmedSeasonEnd)) {
+      setError("Set both a start and end date for the booking season, or leave both blank.");
+      return;
+    }
+    setSaving(true);
     const { error: updateError } = await supabase
       .from("services")
       .update({
@@ -163,12 +224,25 @@ export function ServiceForm({
         service_category_id: categoryId || null,
         process_id: processId || null,
         organizer_template_id: organizerTemplateId || null,
+        engagement_letter_template_id: engagementLetterTemplateId || null,
         document_request_template_id: documentRequestTemplateId || null,
         document_folder_template_id: documentFolderTemplateId || null,
+        default_price: defaultPrice.trim() ? Number(defaultPrice) : null,
+        estimated_duration_minutes: estimatedDuration.trim() ? Number(estimatedDuration) : null,
         display_order: Number(displayOrder) || 0,
         is_bookable: isBookable,
         is_portal_visible: isPortalVisible,
-        ...requirements,
+        season_start: trimmedSeasonStart || null,
+        season_end: trimmedSeasonEnd || null,
+        allowed_weekdays: allowedWeekdays.length > 0 ? allowedWeekdays : null,
+        booking_location_type: bookingLocationType,
+        booking_meeting_url: bookingLocationType === "link" ? bookingMeetingUrl.trim() || null : null,
+        zoom_host_user_id: bookingLocationType === "zoom" ? zoomHostUserId || null : null,
+        allow_overlapping_bookings: allowOverlappingBookings,
+        booking_location_id: bookingLocationId || null,
+        booking_min_notice_hours_override: minNoticeOverride.trim() ? Number(minNoticeOverride) : null,
+        booking_buffer_minutes_override: bufferOverride.trim() ? Number(bufferOverride) : null,
+        booking_window_days_override: windowOverride.trim() ? Number(windowOverride) : null,
       })
       .eq("id", service.id);
     setSaving(false);
@@ -255,63 +329,111 @@ export function ServiceForm({
       </div>
 
       <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline &amp; templates</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pipeline, form &amp; engagement letter</p>
         <p className="mt-1 text-[11px] text-muted">
-          When a client&apos;s most recent service interest resolves to this service, automations that move a lead to its
-          service pipeline use the pipeline set here.
+          When a client selects this service, this is what routes them: the pipeline their engagement moves through, the
+          form they fill out, and the engagement letter they sign.
         </p>
         <label className={`${labelClass} mt-3`}>
           Pipeline
           <OptionSelect value={processId} onChange={markDirty(setProcessId)} options={pipelines} noneLabel="No pipeline" disabled={!canManage} />
         </label>
         <label className={`${labelClass} mt-3`}>
-          Organizer
+          Form
           <OptionSelect
             value={organizerTemplateId}
             onChange={markDirty(setOrganizerTemplateId)}
             options={organizerTemplates}
-            noneLabel="No organizer"
+            noneLabel="No form"
             disabled={!canManage}
           />
         </label>
         <label className={`${labelClass} mt-3`}>
-          Document request template
+          Engagement letter
           <OptionSelect
-            value={documentRequestTemplateId}
-            onChange={markDirty(setDocumentRequestTemplateId)}
-            options={documentRequestTemplates}
-            noneLabel="No document request template"
-            disabled={!canManage}
-          />
-        </label>
-        <label className={`${labelClass} mt-3`}>
-          Document folder template
-          <OptionSelect
-            value={documentFolderTemplateId}
-            onChange={markDirty(setDocumentFolderTemplateId)}
-            options={documentFolderTemplates}
-            noneLabel="No document folder template"
+            value={engagementLetterTemplateId}
+            onChange={markDirty(setEngagementLetterTemplateId)}
+            options={engagementLetterTemplates}
+            noneLabel="No engagement letter"
             disabled={!canManage}
           />
         </label>
       </div>
 
-      <div className={sectionClass}>
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Requirements</p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {REQUIREMENT_FIELDS.map((f) => (
-            <label key={f.key} className="flex items-center gap-2 text-sm text-slate">
-              <input
-                type="checkbox"
-                checked={requirements[f.key]}
-                onChange={(e) => markDirty(setRequirements)({ ...requirements, [f.key]: e.target.checked })}
-                disabled={!canManage}
-                className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-              />
-              {f.label}
-            </label>
-          ))}
-        </div>
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-slate"
+        >
+          <ChevronDown size={12} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+          Advanced -- document templates, pricing
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-3 space-y-4 rounded-xl border border-border bg-surfaceMuted p-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Document templates</p>
+              <label className={`${labelClass} mt-3`}>
+                Document request template
+                <OptionSelect
+                  value={documentRequestTemplateId}
+                  onChange={markDirty(setDocumentRequestTemplateId)}
+                  options={documentRequestTemplates}
+                  noneLabel="No document request template"
+                  disabled={!canManage}
+                />
+              </label>
+              <label className={`${labelClass} mt-3`}>
+                Document folder template
+                <OptionSelect
+                  value={documentFolderTemplateId}
+                  onChange={markDirty(setDocumentFolderTemplateId)}
+                  options={documentFolderTemplates}
+                  noneLabel="No document folder template"
+                  disabled={!canManage}
+                />
+              </label>
+              <label className={`${labelClass} mt-3`}>
+                Signable document template
+                <OptionSelect
+                  value={engagementLetterTemplateId}
+                  onChange={markDirty(setEngagementLetterTemplateId)}
+                  options={engagementLetterTemplates}
+                  noneLabel="No document template"
+                  disabled={!canManage}
+                />
+              </label>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Pricing</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <label className={labelClass}>
+                  Default price
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={defaultPrice}
+                    onChange={(e) => markDirty(setDefaultPrice)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+                <label className={labelClass}>
+                  Estimated duration (minutes)
+                  <input
+                    type="number"
+                    value={estimatedDuration}
+                    onChange={(e) => markDirty(setEstimatedDuration)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className={sectionClass}>
@@ -338,6 +460,231 @@ export function ServiceForm({
             Visible in the public/portal service picker
           </label>
         </div>
+
+        {isBookable && (
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink">Booking window</p>
+            <p className="mt-1 text-[11px] text-muted">
+              Leave blank to keep this bookable year-round on any day the firm is open. Set a season for something like
+              tax review (e.g. Jan 1 - Apr 15) -- it turns off automatically outside that window and comes back next
+              year on its own.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <label className={labelClass}>
+                Season starts (MM-DD)
+                <input
+                  placeholder="01-01"
+                  pattern="\d{2}-\d{2}"
+                  value={seasonStart}
+                  onChange={(e) => markDirty(setSeasonStart)(e.target.value)}
+                  disabled={!canManage}
+                  className={inputClass}
+                />
+              </label>
+              <label className={labelClass}>
+                Season ends (MM-DD)
+                <input
+                  placeholder="04-15"
+                  pattern="\d{2}-\d{2}"
+                  value={seasonEnd}
+                  onChange={(e) => markDirty(setSeasonEnd)(e.target.value)}
+                  disabled={!canManage}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+            <p className={`${labelClass} mt-3`}>Allowed days</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {WEEKDAYS.map((day, i) => (
+                <button
+                  key={day}
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => toggleWeekday(i)}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-medium transition ${
+                    allowedWeekdays.includes(i) ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  {WEEKDAY_LABELS[day]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-muted">
+              {allowedWeekdays.length === 0 ? "No day restriction -- bookable any day the firm is open." : "Only bookable on the days selected above."}
+            </p>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Meeting location</p>
+              <p className="mt-1 text-[11px] text-muted">
+                What happens once a client books this service -- call them back, hand them a fixed meeting link (Zoom,
+                Google Meet, or anything else), or auto-generate a fresh Zoom meeting for every booking.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => markDirty(setBookingLocationType)("call")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    bookingLocationType === "call" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  We&apos;ll call you
+                </button>
+                <button
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => markDirty(setBookingLocationType)("link")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    bookingLocationType === "link" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  Fixed meeting link
+                </button>
+                <button
+                  type="button"
+                  disabled={!canManage}
+                  onClick={() => markDirty(setBookingLocationType)("zoom")}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                    bookingLocationType === "zoom" ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+                  }`}
+                >
+                  Zoom (unique per booking)
+                </button>
+              </div>
+              {bookingLocationType === "link" && (
+                <label className={`${labelClass} mt-3`}>
+                  Meeting URL
+                  <input
+                    placeholder="https://zoom.us/j/..."
+                    value={bookingMeetingUrl}
+                    onChange={(e) => markDirty(setBookingMeetingUrl)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+              )}
+              {bookingLocationType === "zoom" && (
+                <>
+                  <label className={`${labelClass} mt-3`}>
+                    Zoom host
+                    <OptionSelect
+                      value={zoomHostUserId}
+                      onChange={markDirty(setZoomHostUserId)}
+                      options={staffOptions}
+                      noneLabel="Select a staff member..."
+                      disabled={!canManage}
+                    />
+                  </label>
+                  <p className="mt-1 text-[11px] text-muted">
+                    A brand-new Zoom meeting is created for every booking, so no two clients ever share a link -- even
+                    if they book the same time slot with different staff. This host&apos;s connected Zoom account
+                    creates the meeting when the client books through the general or this service&apos;s own link. If
+                    the client instead books a staff member&apos;s personal link, that staff member&apos;s own
+                    connected Zoom account is used automatically. Each staff member connects their Zoom account under
+                    Settings &gt; Integrations.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Office &amp; booking rules</p>
+              <label className={`${labelClass} mt-3`}>
+                Office / location
+                <OptionSelect
+                  value={bookingLocationId}
+                  onChange={markDirty(setBookingLocationId)}
+                  options={locationOptions}
+                  noneLabel="Use the workspace default hours"
+                  disabled={!canManage}
+                />
+              </label>
+              <p className="mt-1 text-[11px] text-muted">
+                Assign this service to one of your offices to use that office&apos;s hours and timezone instead of the
+                workspace default. Manage offices under Settings &gt; Locations.
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-3">
+                <label className={labelClass}>
+                  Min notice (hrs)
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Default"
+                    value={minNoticeOverride}
+                    onChange={(e) => markDirty(setMinNoticeOverride)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+                <label className={labelClass}>
+                  Buffer (min)
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Default"
+                    value={bufferOverride}
+                    onChange={(e) => markDirty(setBufferOverride)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+                <label className={labelClass}>
+                  Booking window (days)
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Default"
+                    value={windowOverride}
+                    onChange={(e) => markDirty(setWindowOverride)(e.target.value)}
+                    disabled={!canManage}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
+              <p className="mt-1 text-[11px] text-muted">Leave any of these blank to use the workspace-wide default set under Settings &gt; Availability.</p>
+            </div>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <label className="flex items-start gap-2 text-sm text-slate">
+                <input
+                  type="checkbox"
+                  checked={allowOverlappingBookings}
+                  onChange={(e) => markDirty(setAllowOverlappingBookings)(e.target.checked)}
+                  disabled={!canManage}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                />
+                <span>
+                  Allow this service to be double-booked
+                  <span className="mt-1 block text-[11px] text-muted">
+                    By default, once a time slot is taken (online or on the internal Calendar), it&apos;s off-limits to
+                    everyone else. Turn this on for a service where overlapping is fine -- e.g. a quick optional
+                    consult call -- so booking it never blocks or gets blocked by anything else already on the
+                    calendar.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Booking link</p>
+              <p className="mt-1 text-[11px] text-muted">
+                Share this link directly with a lead who already knows they want this service -- it skips straight to
+                picking a time.
+              </p>
+              <div className="mt-2 flex items-center gap-1.5">
+                <input readOnly value={bookingLink} className={`${inputClass} mt-0 text-muted`} onFocus={(e) => e.target.select()} />
+                <button
+                  type="button"
+                  onClick={copyBookingLink}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-2 text-xs font-medium text-muted hover:border-accent hover:text-accent"
+                >
+                  <Copy size={13} /> {linkCopied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <label className={`${labelClass} mt-3 max-w-[10rem]`}>
           Display order
           <input

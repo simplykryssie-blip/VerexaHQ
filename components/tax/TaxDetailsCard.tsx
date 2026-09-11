@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { DateField } from "@/components/DateField";
 
 export type TaxDetailRow = {
   tax_year: number | null;
@@ -19,6 +20,9 @@ export type TaxDetailRow = {
   updated_at?: string;
 } | null;
 
+// This firm doesn't e-file or transmit returns, so the e-file-specific
+// states (transmitted/accepted/rejected) aren't offered -- every return is
+// either not yet filed, ready to file, or filed.
 const RETURN_STATUSES = ["not_filed", "ready_to_file", "filed"] as const;
 
 const FILING_STATUSES = [
@@ -177,7 +181,7 @@ export function TaxDetailsCard({
         </div>
         <div>
           <label htmlFor="return_status" className="block text-xs font-medium text-muted">
-            Filing status
+            Return status
           </label>
           <select
             id="return_status"
@@ -237,13 +241,9 @@ export function TaxDetailsCard({
             <label htmlFor="extension_due_date" className="block text-xs font-medium text-muted">
               Extended due date
             </label>
-            <input
-              id="extension_due_date"
-              type="date"
-              value={extensionDueDate}
-              onChange={(e) => setExtensionDueDate(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            />
+            <div className="mt-1">
+              <DateField value={extensionDueDate || null} onApply={(next) => setExtensionDueDate(next ?? "")} className="w-full" />
+            </div>
           </div>
         )}
       </div>

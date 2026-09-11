@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { Avatar } from "@/components/Avatar";
 import { WorkspaceStatusActions, AssignSubscriptionForm } from "./WorkspaceAdminActions";
+import { Badge } from "@/components/ui/Badge";
+import { WORKSPACE_STATUS_TONE } from "@/lib/workspaceStatus";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,18 @@ const WORKSPACE_TYPE_LABELS: Record<string, string> = {
   service_bureau: "Service Bureau",
   multi_office_firm: "Multi-Office Firm",
   platform_admin: "Platform Admin",
+};
+
+const CHILD_TIER_LABEL: Record<string, string> = {
+  ero_ptin: "PTIN",
+  service_bureau_ero: "ERO",
+  service_bureau_ptin: "PTIN",
+};
+
+const PARENT_TIER_LABEL: Record<string, string> = {
+  ero_ptin: "ERO",
+  service_bureau_ero: "Service Bureau",
+  service_bureau_ptin: "Service Bureau",
 };
 
 function money(cents: number | null) {
@@ -71,12 +85,12 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
         .from("firm_connections")
         .select("id, status, relationship_type, workspaces:child_workspace_id(id, name)")
         .eq("parent_workspace_id", workspace.id)
-        .eq("relationship_type", "ero_ptin"),
+        .in("relationship_type", ["ero_ptin", "service_bureau_ero", "service_bureau_ptin"]),
       supabase
         .from("firm_connections")
         .select("id, status, relationship_type, workspaces:parent_workspace_id(id, name)")
         .eq("child_workspace_id", workspace.id)
-        .eq("relationship_type", "ero_ptin"),
+        .in("relationship_type", ["ero_ptin", "service_bureau_ero", "service_bureau_ptin"]),
       supabase.from("platform_subscription_plans").select("id, name").eq("is_active", true).order("name"),
     ]);
 
@@ -99,7 +113,11 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
           <dl className="mt-3 grid grid-cols-2 gap-4 rounded-2xl border border-border bg-surface shadow-soft p-5 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Status</dt>
-              <dd className="mt-0.5 capitalize text-slate">{workspace.status}</dd>
+              <dd className="mt-0.5">
+                <Badge tone={WORKSPACE_STATUS_TONE[workspace.status] ?? "neutral"} className="capitalize">
+                  {workspace.status}
+                </Badge>
+              </dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-muted">Suspension reason</dt>
@@ -252,14 +270,16 @@ export default async function PlatformAdminWorkspaceDetailPage({ params }: { par
                 {(asParent ?? []).map((c) => (
                   <li key={c.id} className="flex items-center justify-between px-5 py-3">
                     <span className="text-slate">
-                      Connected PTIN: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}
+                      Connected {CHILD_TIER_LABEL[c.relationship_type] ?? "firm"}: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}
                     </span>
                     <span className="text-xs capitalize text-muted">{c.status}</span>
                   </li>
                 ))}
                 {(asChild ?? []).map((c) => (
                   <li key={c.id} className="flex items-center justify-between px-5 py-3">
-                    <span className="text-slate">Connected to ERO: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}</span>
+                    <span className="text-slate">
+                      Connected to {PARENT_TIER_LABEL[c.relationship_type] ?? "firm"}: {(c.workspaces as unknown as { name: string } | null)?.name ?? "--"}
+                    </span>
                     <span className="text-xs capitalize text-muted">{c.status}</span>
                   </li>
                 ))}

@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { DuplicateClientModal } from "@/components/DuplicateClientModal";
 import { saveClientDraft, loadClientDraft, clearClientDraft } from "@/lib/clientDraft";
 import { formatPhone } from "@/lib/phone";
+import { digitsOnly, formatSsn, formatEin } from "@/lib/taxIds";
 import { useToast } from "@/components/Toast";
+import { US_STATES } from "@/lib/usStates";
 
 const DRAFT_KEY = "new-client-button";
 
@@ -49,28 +51,28 @@ const CONTACT_TITLE_OPTIONS = [
   { value: "other", label: "Other" },
 ];
 
-function digitsOnly(value: string) {
-  return value.replace(/\D/g, "").slice(0, 9);
-}
-
-function formatSsnOrItin(value: string) {
-  const d = digitsOnly(value);
-  return [d.slice(0, 3), d.slice(3, 5), d.slice(5, 9)].filter(Boolean).join("-");
-}
-
-function formatEin(value: string) {
-  const d = digitsOnly(value);
-  return [d.slice(0, 2), d.slice(2, 9)].filter(Boolean).join("-");
-}
+type StaffOption = { id: string; display_name: string | null };
 
 export function NewClientButton({
   workspaceId,
   workspaceName,
   serviceCategories,
+  isOwner = false,
+  staffOptions = [],
+  accountHolderName = "Me",
 }: {
   workspaceId: string;
   workspaceName: string;
   serviceCategories: ServiceCategory[];
+  /** Only the account owner gets an "assign to" choice -- any other staff
+   *  member adding a client is always assigned to themselves automatically
+   *  (see resolve_client_relationship_manager), no picker needed. */
+  isOwner?: boolean;
+  staffOptions?: StaffOption[];
+  /** The current viewer's own name -- whenever this picker renders, the
+   *  viewer IS the account holder, so the default option is labeled with
+   *  their real name instead of a generic "Me". */
+  accountHolderName?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -96,6 +98,7 @@ export function NewClientButton({
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [assignToStaffId, setAssignToStaffId] = useState("");
   const [ssn, setSsn] = useState("");
   const [itin, setItin] = useState("");
   const [ein, setEin] = useState("");
@@ -265,6 +268,18 @@ export function NewClientButton({
     }
 
     setLoading(true);
+
+    // Only relevant when the owner explicitly picked someone else -- the
+    // auto-assign trigger on clients already handled the default case
+    // (assigned to whoever created it, or the owner) the moment the row
+    // was inserted above.
+    if (isOwner && assignToStaffId) {
+      const { error: assignError } = await supabase
+        .from("clients")
+        .update({ relationship_manager_id: assignToStaffId })
+        .eq("id", result.client_id);
+      if (assignError) toast.show(`Client created, but the assignment couldn't be saved: ${assignError.message}`, "error");
+    }
 
     const { error: addressError } = await supabase.from("client_addresses").insert({
       client_id: result.client_id,
@@ -461,6 +476,24 @@ export function NewClientButton({
                 ))}
               </div>
 
+              {isOwner && staffOptions.length > 0 && (
+                <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+                  Assign to
+                  <select
+                    value={assignToStaffId}
+                    onChange={(e) => setAssignToStaffId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  >
+                    <option value="">{accountHolderName} (default)</option>
+                    {staffOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.display_name ?? "Staff"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               {clientType === "individual" ? (
                 <div className="grid grid-cols-2 gap-3">
                   <input
@@ -495,7 +528,7 @@ export function NewClientButton({
                     maxLength={11}
                     placeholder="SSN (optional, XXX-XX-XXXX)"
                     value={ssn}
-                    onChange={(e) => setSsn(formatSsnOrItin(e.target.value))}
+                    onChange={(e) => setSsn(formatSsn(e.target.value))}
                     className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <input
@@ -503,7 +536,7 @@ export function NewClientButton({
                     maxLength={11}
                     placeholder="ITIN (optional, XXX-XX-XXXX)"
                     value={itin}
-                    onChange={(e) => setItin(formatSsnOrItin(e.target.value))}
+                    onChange={(e) => setItin(formatSsn(e.target.value))}
                     className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                 </div>
@@ -555,13 +588,21 @@ export function NewClientButton({
                       onChange={(e) => setCity(e.target.value)}
                       className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
                     />
-                    <input
+                    <select
                       required
-                      placeholder="State"
                       value={state}
                       onChange={(e) => setState(e.target.value)}
                       className="rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                    >
+                      <option value="" disabled>
+                        State
+                      </option>
+                      {US_STATES.map((s) => (
+                        <option key={s.code} value={s.code}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
                     <input
                       required
                       placeholder="ZIP"

@@ -24,6 +24,7 @@ export function AddTaskForm({
       label="Add Task"
       fields={[
         { name: "title", label: "Title", required: true },
+        { name: "description", label: "Description", type: "richtext" },
         {
           name: "priority",
           label: "Priority",
@@ -42,6 +43,15 @@ export function AddTaskForm({
           options: staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Staff" })),
         },
         { name: "due_date", label: "Task due date" },
+        {
+          name: "visibility",
+          label: "Visible to",
+          type: "select",
+          options: [
+            { value: "internal", label: "Staff only" },
+            { value: "client", label: "Staff and client (shows in portal)" },
+          ],
+        },
         ...(tasks.length > 0
           ? [
               {
@@ -54,15 +64,18 @@ export function AddTaskForm({
           : []),
       ]}
       onSubmit={async (v) => {
+        const description = v.description && v.description.replace(/<[^>]+>/g, "").trim() ? v.description : null;
         const { data: task, error } = await supabase
           .from("tasks")
           .insert({
             workspace_id: workspaceId,
             engagement_id: engagementId,
             title: v.title,
+            description,
             priority: v.priority || null,
             assigned_staff_id: v.assigned_staff_id || null,
             due_date: v.due_date || null,
+            visibility: v.visibility || "internal",
             status: "pending",
           })
           .select("id")

@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown, Layers, Check, Home } from "lucide-react";
-import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS } from "@/lib/nav";
-import { hexToRgba } from "@/lib/color";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Menu, X, ChevronDown, ChevronLeft, ChevronRight, Layers, Check, Home, LogOut, Blocks } from "lucide-react";
+import { NAV_ITEMS, NAV_SECTIONS, PLATFORM_HOME_NAV_ITEMS, PLATFORM_HOME_NAV_SECTIONS, ERO_MANAGEMENT_NAV_ITEMS, ERO_MANAGEMENT_NAV_SECTION } from "@/lib/nav";
+import { hexToRgba, readableTextColor } from "@/lib/color";
 import { useTrimmedLogo } from "@/lib/useTrimmedLogo";
+import { Avatar } from "@/components/Avatar";
 import styles from "./Sidebar.module.css";
 
 const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
@@ -16,19 +17,37 @@ const WORKSPACE_TYPE_SHORT_LABELS: Record<string, string> = {
   service_bureau: "SB",
 };
 
+// The rail's own default look, used whenever a workspace hasn't set a custom
+// bgColor -- flows through the exact same readableTextColor/hexToRgba
+// derivation a custom color would, rather than relying on separate CSS-module
+// fallbacks, so there is only ever one place this math happens.
+const DEFAULT_RAIL_BG = "#0F172A";
+
 export function Sidebar({
   workspaceName,
   logoUrl,
   primaryColor,
   secondaryColor,
+  bgColor,
+  textColor,
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  showLearningHub,
+  showPartnerDashboard,
+  softwareLinks,
+  showEroManagement,
+  currentUser,
+  reviewQueueHasItems,
 }: {
   workspaceName: string;
   logoUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  /** Custom sidebar background from Branding. Falls back to DEFAULT_RAIL_BG (dark) when unset. */
+  bgColor?: string | null;
+  /** Resolved by getEffectiveBranding() -- either an explicit override or auto-picked for contrast against bgColor. */
+  textColor?: string | null;
   /** True only while the active workspace is Verexa's own is_platform_home
    *  workspace -- swaps the whole nav for the platform-admin tooling instead
    *  of the client-facing CRM nav every other (real or demo) workspace gets. */
@@ -37,8 +56,21 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
+  /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
+  showLearningHub?: boolean;
+  /** Only relevant to a workspace connected upstream to a parent firm (get_my_ero_connection returns a row) -- an unconnected workspace has no split/production to see. */
+  showPartnerDashboard?: boolean;
+  /** Workspace-defined software shortcuts (Settings > ERO Profile / Profile) -- rendered as their own "Software" dropdown group when non-empty, each child opening externally. */
+  softwareLinks?: { id: string; name: string; url: string }[];
+  /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (ERO Dashboard, Team -- which also holds Connections -- ERO Profile) to the main nav. Assignments lives in the regular Daily section instead, since every workspace tier needs to reassign work, not just ERO/SB. */
+  showEroManagement?: boolean;
+  /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
+  currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
+  /** True when anything is sitting in Review Queue -- client info changes, submitted organizers, or (for an ERO/SB) shared engagements awaiting a decision -- shown as a small dot on the nav item so staff don't have to open the page to find out. */
+  reviewQueueHasItems?: boolean;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [switching, setSwitching] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
 
@@ -59,19 +91,54 @@ export function Sidebar({
   const [open, setOpen] = useState(false);
   const trimmedLogoUrl = useTrimmedLogo(logoUrl);
 
-  // primaryColor is unused here now that the sidebar is a light surface --
-  // it's kept in the props/Brand Center settings for a future use (e.g. a
-  // portal accent) rather than driving a colored rail background.
-  //
-  // There's no per-workspace text-color override anymore either: that only
-  // ever made sense back when the rail's own background was a custom color
-  // and could get dark enough to need light text. Now that the sidebar is
-  // always this same light surface, applying a stored override can only
-  // ever make text harder to read against it (a leftover light value renders
-  // as near-invisible on the light background) with no upside, so the app
-  // no longer reads or applies branding.sidebar_text_color at all.
-  const navItems = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_ITEMS : NAV_ITEMS;
-  const navSections = isPlatformHomeWorkspace ? PLATFORM_HOME_NAV_SECTIONS : NAV_SECTIONS;
+  // Desktop-only rail collapse -- sticky across page loads via localStorage
+  // since a plain useState resets on every full navigation. Collapsing
+  // shrinks the rail to icon-only width; hovering it while collapsed flies
+  // the full nav out over the page (not pushing content) instead of
+  // requiring a click to see labels again.
+  const [collapsed, setCollapsed] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem("verexa-sidebar-collapsed") === "1");
+    } catch {
+      // Private browsing / storage disabled -- default to expanded.
+    }
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("verexa-sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        // Ignore -- collapse still works for this session, just won't persist.
+      }
+      return next;
+    });
+  }
+  // What the rail actually looks like right now, folding "collapsed" and the
+  // temporary hover fly-out into one flag so the render logic below only
+  // ever has to check one thing.
+  const railExpanded = !collapsed || hoverExpanded;
+
+  // primaryColor is unused here -- kept in the props/Brand Center settings
+  // for the public-form fallback accent, not a sidebar concern.
+  // Verexa HQ's own platform-admin nav has no tier concept -- ERO Management
+  // only ever layers onto the regular client-facing nav.
+  const showEro = showEroManagement && !isPlatformHomeWorkspace;
+  const navItems = isPlatformHomeWorkspace
+    ? PLATFORM_HOME_NAV_ITEMS
+    : showEro
+      ? [...NAV_ITEMS, ...ERO_MANAGEMENT_NAV_ITEMS]
+      : NAV_ITEMS;
+  const navSections = isPlatformHomeWorkspace
+    ? PLATFORM_HOME_NAV_SECTIONS
+    : showEro
+      ? (() => {
+          const adminIndex = NAV_SECTIONS.findIndex((s) => s.label === "Admin");
+          return [...NAV_SECTIONS.slice(0, adminIndex), ERO_MANAGEMENT_NAV_SECTION, ...NAV_SECTIONS.slice(adminIndex)];
+        })()
+      : NAV_SECTIONS;
 
   // Verexa HQ CRM is home base, not one more option in a list of demos --
   // it gets its own pinned "back to" link (shown only while elsewhere), and
@@ -80,18 +147,54 @@ export function Sidebar({
   const demoWorkspaces = switchableWorkspaces?.filter((w) => !w.isHome) ?? [];
 
   const sidebarStyle: React.CSSProperties = {};
+  // No custom bgColor -- rather than falling back to the CSS module's light
+  // default, the rail defaults dark, going through this same derivation a
+  // custom color would (see readableTextColor / hexToRgba below).
+  const effectiveBg = bgColor ?? DEFAULT_RAIL_BG;
+  const effectiveTextColor = textColor ?? readableTextColor(effectiveBg);
+  const isDarkBg = effectiveTextColor === "#FFFFFF";
   if (secondaryColor) {
     (sidebarStyle as Record<string, string>)["--blue-bright"] = secondaryColor;
-    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = hexToRgba(secondaryColor, 0.1) ?? secondaryColor;
+    // A flat 10% tint reads confidently on a light rail but washes out on a
+    // dark one -- bump it the same way the rail-border/rail-hover tokens
+    // already scale for isDarkBg, so the active-item pill keeps the same
+    // visual weight regardless of rail color.
+    const softTint = hexToRgba(secondaryColor, isDarkBg ? 0.18 : 0.1) ?? secondaryColor;
+    (sidebarStyle as Record<string, string>)["--blue-bright-soft"] = softTint;
+    // A workspace that's picked its own color gets exactly that color as a
+    // flat active-item pill, same as always -- the CSS module's brand
+    // gradient default (blue-to-lime) is only for a workspace that hasn't
+    // customized anything, not blended with an arbitrary chosen color.
+    (sidebarStyle as Record<string, string>)["--nav-active-bg"] = softTint;
+    (sidebarStyle as Record<string, string>)["--nav-active-ink"] = secondaryColor;
   }
+  (sidebarStyle as Record<string, string>)["--rail-bg"] = effectiveBg;
+  (sidebarStyle as Record<string, string>)["--rail-ink"] = effectiveTextColor;
+  (sidebarStyle as Record<string, string>)["--rail-muted"] = isDarkBg ? "rgba(255, 255, 255, 0.65)" : "#64748b";
+  (sidebarStyle as Record<string, string>)["--rail-section"] = isDarkBg ? "rgba(255, 255, 255, 0.45)" : "#9aa1ae";
+  (sidebarStyle as Record<string, string>)["--rail-border"] = isDarkBg ? "rgba(255, 255, 255, 0.14)" : "#e3e7f0";
+  (sidebarStyle as Record<string, string>)["--rail-hover"] = isDarkBg ? "rgba(255, 255, 255, 0.08)" : "#f4f6fb";
 
   // Flatten every navigable href (top-level items + group children) so the
   // longest-prefix-match logic works regardless of nesting, and a group's
-  // children can be matched the same way leaf items always were.
+  // children can be matched the same way leaf items always were. A handful
+  // of hrefs (e.g. Contacts' Leads/Individual/Business children) share one
+  // pathname and differ only by query string, so a match there also has to
+  // check that every query param the href asks for is present in the
+  // current URL -- pathname alone can't tell those apart.
   const allHrefs = navItems.flatMap((item) => ("children" in item ? item.children.map((c) => c.href) : [item.href]));
   const activeNavHref = allHrefs
-    .filter((href) => pathname === href || pathname.startsWith(href + "/"))
-    .sort((a, b) => b.length - a.length)[0];
+    .filter((href) => {
+      const [hrefPath, hrefQuery] = href.split("?");
+      if (pathname !== hrefPath && !pathname.startsWith(hrefPath + "/")) return false;
+      if (!hrefQuery) return true;
+      return Array.from(new URLSearchParams(hrefQuery).entries()).every(([key, value]) => searchParams.get(key) === value);
+    })
+    .sort((a, b) => {
+      const aSpecific = a.includes("?") ? 1 : 0;
+      const bSpecific = b.includes("?") ? 1 : 0;
+      return aSpecific !== bSpecific ? bSpecific - aSpecific : b.length - a.length;
+    })[0];
 
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(navItems.filter((item) => "children" in item && item.children.some((c) => c.href === activeNavHref)).map((item) => item.label))
@@ -125,17 +228,26 @@ export function Sidebar({
         <div className="fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />
       )}
 
+      {/* Holds the rail's own space in the page's flex layout while the
+          rail itself switches to fixed positioning to fly out over the
+          content on hover -- without this, the page would reflow to fill
+          the gap the instant the flyout appears, then snap back on
+          mouseleave. */}
+      {collapsed && hoverExpanded && <div className="hidden shrink-0 lg:block lg:w-16" aria-hidden="true" />}
+
       <aside
-        className={`${styles.sidebar} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col font-sans shadow-soft transition-transform duration-200 lg:static lg:h-screen lg:translate-x-0 ${
+        onMouseEnter={() => collapsed && setHoverExpanded(true)}
+        onMouseLeave={() => setHoverExpanded(false)}
+        className={`${styles.sidebar} fixed inset-y-0 left-0 z-40 flex h-[100dvh] w-64 shrink-0 flex-col font-sans shadow-soft transition-transform duration-200 lg:h-screen lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        } ${collapsed && hoverExpanded ? "lg:fixed lg:w-64 lg:shadow-2xl" : collapsed ? "lg:static lg:w-16" : "lg:static lg:w-64"}`}
         style={sidebarStyle}
       >
-        <div className={`${styles.header} flex items-center justify-between px-5 py-5`}>
-          <div>
+        <div className={`${styles.header} flex items-center gap-2 px-5 py-5 ${railExpanded ? "justify-between" : "lg:justify-center lg:px-2"}`}>
+          <div className={railExpanded ? "min-w-0" : "lg:hidden"}>
             {trimmedLogoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "44px", maxWidth: "200px", objectFit: "contain" }} />
+              <img src={trimmedLogoUrl} alt={workspaceName} style={{ display: "block", maxHeight: "60px", maxWidth: "220px", objectFit: "contain" }} />
             ) : (
               <>
                 <Image src="/brand/vmark.png" alt="" width={22} height={18} priority style={{ marginBottom: 6 }} />
@@ -154,18 +266,34 @@ export function Sidebar({
               Tax Office module
             </span>
           </div>
+          {!railExpanded && (
+            <Image src="/brand/vmark.png" alt={workspaceName} width={22} height={18} priority className="hidden lg:block" />
+          )}
           <button type="button" onClick={() => setOpen(false)} aria-label="Close navigation menu" className={`${styles.workspaceName} lg:hidden`}>
             <X size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Expand navigation menu" : "Collapse navigation menu"}
+            title={collapsed ? "Expand navigation menu" : "Collapse navigation menu"}
+            className={`${styles.navItem} hidden shrink-0 rounded-lg p-1.5 lg:flex`}
+          >
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
 
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
           {navSections.map((section) => (
             <div key={section.label}>
-              <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
+              {railExpanded && (
+                <p className={`${styles.sectionLabel} px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider`}>{section.label}</p>
+              )}
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
+                  .filter((item) => item.label !== "Learning Hub" || showLearningHub)
+                  .filter((item) => item.label !== "Partner Dashboard" || showPartnerDashboard)
                   .map((item) => {
                   const Icon = item.icon;
 
@@ -178,13 +306,20 @@ export function Sidebar({
                           type="button"
                           onClick={() => toggleExpanded(item.label)}
                           aria-expanded={isOpen}
-                          className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                          title={item.label}
+                          className={`${hasActiveChild ? styles.navItemActive : styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                            railExpanded ? "" : "lg:justify-center lg:px-2"
+                          }`}
                         >
                           <Icon size={18} strokeWidth={2} className="shrink-0" />
-                          <span className="flex-1 text-left">{item.label}</span>
-                          <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                          {railExpanded && (
+                            <>
+                              <span className="flex-1 text-left">{item.label}</span>
+                              <ChevronDown size={14} className={`shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                            </>
+                          )}
                         </button>
-                        {isOpen && (
+                        {isOpen && railExpanded && (
                           <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
                             {item.children.map((child) => {
                               const active = child.href === activeNavHref;
@@ -209,10 +344,18 @@ export function Sidebar({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium`}
+                      title={item.label}
+                      className={`${active ? styles.navItemActive : styles.navItem} flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                        railExpanded ? "" : "lg:justify-center lg:px-2"
+                      }`}
                     >
-                      <Icon size={18} strokeWidth={2} className="shrink-0" />
-                      {item.label}
+                      <span className="relative shrink-0">
+                        <Icon size={18} strokeWidth={2} />
+                        {item.label === "Review Queue" && reviewQueueHasItems && (
+                          <span aria-label="Items waiting on review" className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-danger" style={{ boxShadow: `0 0 0 2px ${effectiveBg}` }} />
+                        )}
+                      </span>
+                      {railExpanded && item.label}
                     </Link>
                   );
                 })}
@@ -221,21 +364,61 @@ export function Sidebar({
           ))}
         </nav>
 
+        {softwareLinks && softwareLinks.length > 0 && (
+          <div className="px-3 pb-1">
+            <button
+              type="button"
+              onClick={() => toggleExpanded("Software")}
+              aria-expanded={expanded.has("Software")}
+              title="Software"
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
+            >
+              <Blocks size={18} strokeWidth={2} className="shrink-0" />
+              {railExpanded && (
+                <>
+                  <span className="flex-1 text-left">Software</span>
+                  <ChevronDown size={14} className={`shrink-0 transition-transform ${expanded.has("Software") ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+            {expanded.has("Software") && railExpanded && (
+              <div className={`${styles.subNav} ml-4 mt-1 space-y-1 border-l pl-3`}>
+                {softwareLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`${styles.navItem} block truncate rounded-lg px-3 py-2 text-sm font-medium`}
+                  >
+                    {link.name}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {homeWorkspaceEntry && !homeWorkspaceEntry.isActive && (
           <div className="px-3 pb-1">
             <button
               type="button"
               onClick={() => switchWorkspace(homeWorkspaceEntry.id)}
               disabled={switching}
-              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-default`}
+              title={`Back to ${homeWorkspaceEntry.name}`}
+              className={`${styles.navItem} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-default ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
             >
               <Home size={18} strokeWidth={2} className="shrink-0" />
-              Back to {homeWorkspaceEntry.name}
+              {railExpanded && `Back to ${homeWorkspaceEntry.name}`}
             </button>
           </div>
         )}
 
-        {demoWorkspaces.length > 0 && (
+        {demoWorkspaces.length > 0 && railExpanded && (
           <div className="px-3 pb-1">
             <button
               type="button"
@@ -269,9 +452,29 @@ export function Sidebar({
         )}
 
         <div className={`${styles.footer} px-3 py-4`} style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}>
+          {currentUser && (
+            <div className={`mb-2 flex items-center gap-2.5 px-3 pb-3 ${railExpanded ? "" : "lg:justify-center lg:px-0"}`}>
+              <Avatar name={currentUser.name} url={currentUser.avatarUrl} size="sm" />
+              {railExpanded && (
+                <div className="min-w-0">
+                  <p className={`${styles.workspaceName} truncate text-sm font-medium`} style={{ color: "var(--rail-ink)" }}>
+                    {currentUser.name ?? "Staff"}
+                  </p>
+                  {currentUser.roleLabel && <p className={`${styles.workspaceName} truncate text-xs`}>{currentUser.roleLabel}</p>}
+                </div>
+              )}
+            </div>
+          )}
           <form action="/api/auth/sign-out" method="post">
-            <button type="submit" className={`${styles.signOut} w-full rounded-lg px-3 py-2 text-left text-sm font-medium`}>
-              Sign out
+            <button
+              type="submit"
+              title="Sign out"
+              className={`${styles.signOut} flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium ${
+                railExpanded ? "" : "lg:justify-center lg:px-2"
+              }`}
+            >
+              <LogOut size={16} strokeWidth={2} className="hidden shrink-0 lg:block" />
+              <span className={railExpanded ? "" : "lg:hidden"}>Sign out</span>
             </button>
           </form>
         </div>

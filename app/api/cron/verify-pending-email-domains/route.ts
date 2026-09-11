@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { syncResendDomainStatus } from "@/lib/email/domains";
+import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ function isAuthorized(request: Request) {
 // not yet verified, re-checks against Resend, and self-heals the stored
 // domain name to whatever Resend actually has on file if it ever drifts
 // (the root cause of an earlier stuck-pending case).
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -53,3 +54,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked, verified });
 }
+
+export const GET = withJobLogging("verify-pending-email-domains", handleGET);

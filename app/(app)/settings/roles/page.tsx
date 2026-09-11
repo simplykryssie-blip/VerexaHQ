@@ -5,10 +5,10 @@ import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHead
 import { SettingsCard } from "@/components/settings/SettingsCard";
 import { RolesManager } from "@/components/settings/RolesManager";
 import { WorkspaceStaffDefaultsForm } from "@/components/settings/WorkspaceStaffDefaultsForm";
+import { ClientAutoAssignmentForm } from "@/components/settings/ClientAutoAssignmentForm";
+import { isEroManagementTier } from "@/lib/workspaceCapabilities";
 
 export const dynamic = "force-dynamic";
-
-const EFIN_WORKSPACE_TYPES = new Set(["ero_office", "service_bureau", "multi_office_firm"]);
 
 export default async function RolesPage() {
   const workspace = await getCurrentWorkspace();
@@ -33,7 +33,7 @@ export default async function RolesPage() {
   // Client-level Relationship manager/Reviewer/Compliance officer only show
   // for an ERO/Service Bureau (see ClientWorkspace.tsx's showStaffRoles) --
   // presetting a default for them makes sense on the exact same workspaces.
-  const showStaffDefaults = EFIN_WORKSPACE_TYPES.has(workspace.workspace_type);
+  const showStaffDefaults = isEroManagementTier(workspace);
   const [{ data: staffDefaults }, { data: activeMembers }] = showStaffDefaults
     ? await Promise.all([
         supabase
@@ -41,7 +41,8 @@ export default async function RolesPage() {
           .select(
             `default_relationship_manager:user_profiles!workspaces_default_relationship_manager_id_fkey(id, display_name),
             default_reviewer:user_profiles!workspaces_default_reviewer_id_fkey(id, display_name),
-            default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name)`
+            default_compliance_officer:user_profiles!workspaces_default_compliance_officer_id_fkey(id, display_name),
+            client_assignment_mode, client_assignment_staff_pool`
           )
           .eq("id", workspace.id)
           .single(),
@@ -118,6 +119,20 @@ export default async function RolesPage() {
               staffOptions={staffOptions}
             />
           </SettingsCard>
+
+          <div className="mt-6">
+            <SettingsCard
+              title="New client assignment"
+              description="Who a client actually gets assigned to the moment they enter the CRM through anything other than a staff member adding their own client -- a public intake form, a portal signup, or any automated path. A staff member adding their own client is always assigned to themselves, no matter what's set here."
+            >
+              <ClientAutoAssignmentForm
+                workspaceId={workspace.id}
+                mode={(staffDefaults as unknown as { client_assignment_mode?: string } | null)?.client_assignment_mode ?? "owner"}
+                staffPool={(staffDefaults as unknown as { client_assignment_staff_pool?: string[] } | null)?.client_assignment_staff_pool ?? []}
+                staffOptions={staffOptions}
+              />
+            </SettingsCard>
+          </div>
         </div>
       )}
     </div>

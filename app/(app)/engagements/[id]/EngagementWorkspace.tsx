@@ -7,9 +7,13 @@ import { DeleteEngagementButton } from "./DeleteEngagementButton";
 import type { ActionPermissions } from "@/lib/actionPermissions";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRequestRow, DocumentRow, SignatureRequestRow } from "@/components/documents/types";
+import type { AdditionalSignerOption } from "@/lib/documents/getAdditionalSignerOptions";
 import type { TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { IrsNoticesPanel, type IrsNoticeRow } from "@/components/tax/IrsNoticesPanel";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
+import { Badge } from "@/components/ui/Badge";
+import { Tabs } from "@/components/ui/Tabs";
+import { ENGAGEMENT_STATUS_TONE } from "@/lib/engagementStatus";
 import {
   OverviewTab,
   WorkflowTab,
@@ -33,6 +37,8 @@ import {
   type QuoteRow,
   type InvoiceRow,
   type PaymentRow,
+  type BankProductTransactionRow,
+  type BankAssignment,
   type ActivityRow,
   type StaffOption,
   type OrganizerResponseRow,
@@ -86,12 +92,16 @@ export function EngagementWorkspace({
   quotes,
   invoices,
   payments,
+  bankProductTransactions,
+  isBankProduct,
+  bankAssignment,
   timeline,
   progress,
   staffOptions,
   taxDetail,
   irsNotices,
   taxYears,
+  additionalSigners,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -118,12 +128,16 @@ export function EngagementWorkspace({
   quotes: QuoteRow[];
   invoices: InvoiceRow[];
   payments: PaymentRow[];
+  bankProductTransactions: BankProductTransactionRow[];
+  isBankProduct: boolean;
+  bankAssignment: BankAssignment | null;
   timeline: ActivityRow[];
   progress: ProgressRow | null;
   staffOptions: StaffOption[];
   taxDetail: TaxDetailRow;
   irsNotices: IrsNoticeRow[];
   taxYears: number[];
+  additionalSigners: AdditionalSignerOption[];
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -153,7 +167,9 @@ export function EngagementWorkspace({
               </a>
             )}
             {engagement.services?.name && <span>{engagement.services.name}</span>}
-            <span className="capitalize">{engagement.status}</span>
+            <Badge tone={ENGAGEMENT_STATUS_TONE[engagement.status] ?? "neutral"} className="capitalize">
+              {engagement.status}
+            </Badge>
             <span>Assigned: {engagement.assigned_staff?.display_name ?? "Unassigned"}</span>
             {showStaffRoles && <span>Reviewer: {engagement.reviewer?.display_name ?? "Unassigned"}</span>}
             {engagement.due_date && <span>Due {new Date(engagement.due_date).toLocaleDateString()}</span>}
@@ -176,23 +192,13 @@ export function EngagementWorkspace({
 
       <div className="flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto">
-          <nav className="flex gap-1 overflow-x-auto border-b border-border bg-surface px-8">
-            {visibleTabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                className={`whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ${
-                  tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                {t}
-                {t === "Review" && reviewCount > 0 && (
-                  <span className="ml-1.5 rounded-full bg-accentSoft px-1.5 py-0.5 text-[10px] text-accent">{reviewCount}</span>
-                )}
-              </button>
-            ))}
-          </nav>
+          <div className="bg-surface px-8">
+            <Tabs
+              tabs={visibleTabs.map((t) => ({ id: t, label: t, badge: t === "Review" ? reviewCount : undefined }))}
+              active={tab}
+              onChange={(id) => setTab(id as Tab)}
+            />
+          </div>
 
           <div className="px-8 py-6">
             {tab === "Details" && (
@@ -236,12 +242,14 @@ export function EngagementWorkspace({
                 activity={timeline}
                 canRequestDocuments={permissions.documentsRequest}
                 canRequestSignatures={permissions.signaturesRequest}
+                additionalSigners={additionalSigners}
               />
             )}
             {tab === "Messages" && (
               <MessagesTab
                 workspaceId={workspace.id}
                 engagementId={engagement.id}
+                clientId={client?.id ?? null}
                 primaryEmail={client?.primary_email ?? null}
                 primaryPhone={client?.primary_phone ?? null}
                 permissions={permissions}
@@ -270,6 +278,9 @@ export function EngagementWorkspace({
                 quotes={quotes}
                 invoices={invoices}
                 payments={payments}
+                bankProductTransactions={bankProductTransactions}
+                isBankProduct={isBankProduct}
+                bankAssignment={bankAssignment}
               />
             )}
             {tab === "Notes" && <NotesTab engagementId={engagement.id} workspaceId={workspace.id} notes={notes} />}

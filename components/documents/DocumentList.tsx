@@ -46,16 +46,19 @@ export function DocumentList({
   const toast = useToast();
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
   const allTags = useMemo(() => Array.from(new Set(documents.flatMap((d) => d.tags ?? []))), [documents]);
+  const allCategories = useMemo(() => Array.from(new Set(documents.map((d) => d.category).filter((c): c is string => Boolean(c)))).sort(), [documents]);
 
   const visible = documents.filter((d) => {
     if (d.is_archived !== showArchived) return false;
     if (tagFilter && !(d.tags ?? []).includes(tagFilter)) return false;
+    if (categoryFilter && d.category !== categoryFilter) return false;
     if (search && !d.file_name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -153,9 +156,21 @@ export function DocumentList({
           aria-label="Search documents"
           className="w-56 rounded-lg border border-border px-3 py-1.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
         />
+        {allCategories.map((category) => (
+          <button
+            key={`category-${category}`}
+            type="button"
+            onClick={() => setCategoryFilter(categoryFilter === category ? null : category)}
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+              categoryFilter === category ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+            }`}
+          >
+            {category}
+          </button>
+        ))}
         {allTags.map((tag) => (
           <button
-            key={tag}
+            key={`tag-${tag}`}
             type="button"
             onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
             className={`rounded-full px-2.5 py-1 text-xs font-medium transition ${

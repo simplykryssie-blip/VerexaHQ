@@ -3,11 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Trash2, Workflow, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { IconChip } from "@/components/ui/IconChip";
+
+const STATUS_TONE: Record<string, BadgeTone> = { draft: "neutral", published: "success", archived: "neutral" };
 
 export type FunnelCard = { id: string; name: string; status: string; page_count: number };
 
@@ -69,9 +74,9 @@ export function FunnelLibrary({
     <div>
       {canManage && (
         <div className="flex justify-end">
-          <button type="button" onClick={() => setCreating(true)} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
-            + New funnel
-          </button>
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus size={14} aria-hidden="true" /> New funnel
+          </Button>
         </div>
       )}
 
@@ -87,33 +92,45 @@ export function FunnelLibrary({
               className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
           </label>
-          <button type="submit" disabled={saving} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
+          <Button type="submit" disabled={saving}>
             {saving ? "Creating..." : "Create"}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => {
               setCreating(false);
               setName("");
               setError(null);
             }}
-            className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-slate hover:border-accent hover:text-ink"
           >
             Cancel
-          </button>
+          </Button>
         </form>
       )}
       {error && <p className="mt-2 text-sm text-danger">{error}</p>}
 
       <div className="mt-4">
         {funnels.length === 0 ? (
-          <EmptyState message="No funnels yet." />
+          <EmptyState
+            icon={Workflow}
+            message="No funnels yet -- chain pages together into a linear sequence."
+            action={canManage ? <Button onClick={() => setCreating(true)}><Plus size={14} aria-hidden="true" /> New funnel</Button> : undefined}
+          />
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {funnels.map((f) => (
-              <div key={f.id} className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft">
+              <div
+                key={f.id}
+                className="flex flex-col rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover"
+              >
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-ink">{f.name}</h3>
+                  <div className="flex items-center gap-2.5">
+                    <IconChip tone="amber">
+                      <Workflow size={16} aria-hidden="true" />
+                    </IconChip>
+                    <h3 className="text-sm font-semibold text-ink">{f.name}</h3>
+                  </div>
                   {canManage && (
                     <button
                       type="button"
@@ -126,20 +143,19 @@ export function FunnelLibrary({
                     </button>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-2 text-xs text-muted">
                   {f.page_count} page{f.page_count === 1 ? "" : "s"}
                 </p>
                 <div className="mt-3">
                   {canManage ? (
                     <TemplateStatusCycle table="site_funnels" id={f.id} status={f.status} />
                   ) : (
-                    <span className="rounded-full bg-surfaceMuted px-2.5 py-1 text-xs font-medium capitalize text-muted">{f.status}</span>
+                    <Badge tone={STATUS_TONE[f.status] ?? "neutral"} className="capitalize">
+                      {f.status}
+                    </Badge>
                   )}
                 </div>
-                <Link
-                  href={`/websites/${websiteId}/funnels/${f.id}`}
-                  className="mt-4 inline-flex items-center justify-center rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-ink"
-                >
+                <Link href={`/websites/${websiteId}/funnels/${f.id}`} className={buttonClasses("secondary", "sm", "mt-4")}>
                   {canManage ? "Manage" : "View"}
                 </Link>
               </div>

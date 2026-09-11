@@ -15,9 +15,12 @@ type Plan = {
   base_price_cents: number;
   included_seats: number;
   per_seat_price_cents: number;
-  email_overage_rate_cents: number;
+  email_overage_rate_cents_per_1000: number;
   sms_overage_rate_cents: number;
   storage_overage_rate_cents: number;
+  signup_free_emails: number;
+  signup_free_sms: number;
+  signup_free_storage_gb: number;
   currency: string;
   is_active: boolean;
 };
@@ -30,6 +33,9 @@ type FormState = {
   emailRate: string;
   smsRate: string;
   storageRate: string;
+  freeEmails: string;
+  freeSms: string;
+  freeStorageGb: string;
   isActive: boolean;
 };
 
@@ -41,6 +47,9 @@ const EMPTY_FORM: FormState = {
   emailRate: "0",
   smsRate: "0",
   storageRate: "0",
+  freeEmails: "0",
+  freeSms: "0",
+  freeStorageGb: "0",
   isActive: true,
 };
 
@@ -78,9 +87,12 @@ function PlanForm({ initial, planId, onDone }: { initial: FormState; planId?: st
       base_price_cents: dollarsToCents(form.basePrice),
       included_seats: parseInt(form.includedSeats, 10) || 0,
       per_seat_price_cents: dollarsToCents(form.perSeatPrice),
-      email_overage_rate_cents: dollarsToCents(form.emailRate),
+      email_overage_rate_cents_per_1000: dollarsToCents(form.emailRate),
       sms_overage_rate_cents: dollarsToCents(form.smsRate),
       storage_overage_rate_cents: dollarsToCents(form.storageRate),
+      signup_free_emails: parseInt(form.freeEmails, 10) || 0,
+      signup_free_sms: parseInt(form.freeSms, 10) || 0,
+      signup_free_storage_gb: parseFloat(form.freeStorageGb) || 0,
       is_active: form.isActive,
     };
     const { error } = planId
@@ -139,10 +151,10 @@ function PlanForm({ initial, planId, onDone }: { initial: FormState; planId?: st
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-medium text-slate">Per email over included ($)</label>
+          <label className="block text-xs font-medium text-slate">Per 1,000 emails over included ($)</label>
           <input
             type="number"
-            step="0.001"
+            step="0.01"
             value={form.emailRate}
             onChange={(e) => setForm((f) => ({ ...f, emailRate: e.target.value }))}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -167,6 +179,39 @@ function PlanForm({ initial, planId, onDone }: { initial: FormState; planId?: st
             onChange={(e) => setForm((f) => ({ ...f, storageRate: e.target.value }))}
             className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+        </div>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-slate">Free amount granted once, at signup (never refills -- usage beyond it is billed at the overage rates above)</p>
+        <div className="mt-1 grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs text-muted">Free emails, ever</label>
+            <input
+              type="number"
+              value={form.freeEmails}
+              onChange={(e) => setForm((f) => ({ ...f, freeEmails: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-muted">Free SMS, ever</label>
+            <input
+              type="number"
+              value={form.freeSms}
+              onChange={(e) => setForm((f) => ({ ...f, freeSms: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-muted">Free storage ceiling (GB)</label>
+            <input
+              type="number"
+              step="0.1"
+              value={form.freeStorageGb}
+              onChange={(e) => setForm((f) => ({ ...f, freeStorageGb: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+            />
+          </div>
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-slate">
@@ -207,9 +252,12 @@ export function PlansManager({ plans }: { plans: Plan[] }) {
       basePrice: centsToDollars(p.base_price_cents),
       includedSeats: String(p.included_seats),
       perSeatPrice: centsToDollars(p.per_seat_price_cents),
-      emailRate: centsToDollars(p.email_overage_rate_cents),
+      emailRate: centsToDollars(p.email_overage_rate_cents_per_1000),
       smsRate: centsToDollars(p.sms_overage_rate_cents),
       storageRate: centsToDollars(p.storage_overage_rate_cents),
+      freeEmails: String(p.signup_free_emails),
+      freeSms: String(p.signup_free_sms),
+      freeStorageGb: String(p.signup_free_storage_gb),
       isActive: p.is_active,
     };
   }

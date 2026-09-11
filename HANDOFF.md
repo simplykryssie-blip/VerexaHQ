@@ -6,6 +6,518 @@ system is actually built (schema, auth, permissions, every module), see
 `PLATFORM.md` in this same repo root — that's the living architecture
 reference. This file is just "what happened recently and what's still open."
 
+## ⚠️ Branch divergence, discovered 2026-08-31 — read this before trusting anything below
+
+This file's addenda describe work done on **two different branches that
+have not been merged into each other**:
+
+- The 2026-08-29 addendum immediately below happened on
+  `claude/verexa-schema-mismatch-i8c19u`, merged into **`main`**.
+- The 2026-08-31 addendum (further down, newest-first) happened on
+  **`claude/verexa-remove-services-vaqbfx`**, which forked from `main` at
+  commit `1d50a9e` (2026-08-27) and was never merged back.
+
+As of 2026-08-31: `main` has **111 commits** (89 touching real app
+code/migrations) that `claude/verexa-remove-services-vaqbfx` does not have
+— including the entire 2026-08-29 redesign addendum below, plus whatever
+else shipped on `main` in that window that has no addendum entry at all
+(111 commits is far more than the 5 items documented on 2026-08-29 — this
+file does not have full coverage of everything on `main` since 08-27).
+Conversely, `claude/verexa-remove-services-vaqbfx` has **22 commits** `main`
+does not have (the 2026-08-31 addendum's work: tax-prep pipeline
+finishing touches, platform billing dunning, the ERO/PTIN Partners
+directory, Settings consolidation).
+
+**Practical consequence**: if `main` is still what deploys to production
+(per the push/merge policy documented further down in this file — confirm
+that policy is still in force, don't assume), then **none of the
+2026-08-31 addendum's work is live**, and conversely the redesign work
+described in the 2026-08-29 addendum is **not present in
+`claude/verexa-remove-services-vaqbfx`'s code** even though it's described
+in this same file. Don't assume either branch's file tree matches what
+this document describes without checking which branch you're actually on.
+**This needs a human decision (merge direction, or keep separate) before
+either branch is trusted as "the" current state — flag it, don't guess.**
+
+**Update, same day, after a first investigation pass**: attempted the git
+merge (`main` → `claude/verexa-remove-services-vaqbfx`), hit 9 real file
+conflicts (Users/Connections/Sidebar/nav and friends), and aborted rather
+than resolve them blind once it became clear the scope was much bigger
+than a settings page — `main` has done a full "unified pipeline tracking"
+schema cutover (new `pipeline_runs`/`pipeline_stages` tables; `main`
+**dropped** `lead_pipeline_runs`, `lead_pipeline_stages`, `workflow_runs`,
+`workflow_stages` outright, migration
+`20260825163000_unified_pipeline_cutover.sql`), removed the e-file
+transmission feature, rebuilt the organizer review workspace, added a
+document request template builder, AI operator admin tooling, and more —
+roughly 90 migrations' worth of real architectural work, not just the
+5-item redesign addendum.
+
+**Confirmed against the live database** (one shared Supabase project,
+`daxpavvsotvsyqqntddc`, across every branch): the cutover migration has
+actually run — `lead_pipeline_runs`/`lead_pipeline_stages`/`workflow_runs`/
+`workflow_stages` are gone, only `pipeline_runs`/`pipeline_stages` exist
+now. `main`'s reviewer-queue views (`v_reviewer_queue`,
+`v_workflow_sla_status`) still exist and still expose a
+`workflow_stage_id` column name for backward compatibility, so most code
+built against the old naming still reads fine through those views.
+
+**One real, confirmed bug this caused, found and fixed**:
+`lib/dashboard/data.ts`'s `getDashboardData()` (loaded on every Dashboard
+page view) was already half-migrated *before this divergence was even
+discovered* — it queried the new `pipeline_runs` table for
+`workflowRuns`/`entity_type='engagement'`, but the review-queue stage
+lookup right below it still queried the old, now-nonexistent
+`workflow_stages` table by `workflow_run_id`. That query would fail on
+every single Dashboard load. Fixed (repointed at
+`pipeline_stages`/`pipeline_run_id`) and pushed separately from this
+handoff-doc work. **This means `claude/verexa-remove-services-vaqbfx`'s
+own internal consistency was already compromised before the Aug 27
+divergence was even a factor** — worth a broader sweep for other
+half-migrated references if anyone picks this up (search for
+`workflow_run`/`workflow_stage`/`lead_pipeline` outside of migration
+files, the same way this one was found).
+
+**Update, same day, second attempt: merge completed.** At the user's
+explicit request ("I want it fully merged and corrected"), re-ran
+`git merge origin/main`, resolved all 10 real conflicts by hand (`lib/
+nav.ts`, `components/Sidebar.tsx`, `app/(app)/layout.tsx`, `app/(app)/
+settings/{connections,users,roles}/page.tsx`, `components/documents/
+RequestsPanel.tsx`, `components/portal/OrganizerForm.tsx`, this file), and
+regenerated `lib/database.types.ts` from scratch via `generate_typescript_types`
+against the live DB rather than hand-merging it (both branches' migrations
+were already live in the one shared database, so a fresh introspection is
+strictly more correct than reconciling two divergent hand-edited copies).
+Key resolution decisions:
+- **Users & Staff + Connections**: main had independently built a richer,
+  3-tier version of Connections (`ero_ptin`/`service_bureau_ero`/
+  `service_bureau_ptin`, not just `ero_ptin`) and a separate, more capable
+  Users page (`getWorkspaceMemberWorkload`, per-user detail pages at
+  `/settings/users/[userId]`) than the 2026-08-31 addendum's merge below
+  had. Re-applied the "combine into one page" decision (below) on top of
+  main's richer components instead of my rougher pre-merge ones -- same
+  page/nav consolidation, better underlying data. This also meant
+  generalizing `get_ero_connected_partners`/`get_my_ero_connection` (the
+  RLS-bug-fix RPCs from the addendum below) to accept all three
+  relationship-type tiers, not just `ero_ptin` -- migration
+  `20260912060000_generalize_connections_rpcs_to_all_tiers.sql`. The
+  Partners page keeps calling the same RPC with no changes (its default
+  arg is still `ero_ptin`-only, matching its narrower ERO-specific scope).
+- **`ERO_MANAGEMENT_NAV_ITEMS`** (main's new nav section for ERO/SB/
+  multi-office workspaces) had its own separate "Connections" entry
+  pointing at `/settings/connections` -- removed, since "Team" now points
+  at the same merged `/settings/users` page.
+- Everything else (RequestsPanel's category-grouping vs. main's shared
+  `ProgressBar`/interactive item rendering; OrganizerForm's
+  `answerToString` vs. main's newly-extracted `lib/organizer/formatValue.ts`
+  helper) resolved by keeping the more complete side and wiring it through
+  the newer shared helper where one existed, not by picking one side
+  wholesale.
+
+**Verification, completed**: a repo-wide sweep for any other
+`workflow_run`/`workflow_stage`/`lead_pipeline` references outside
+migration files found nothing beyond the `lib/dashboard/data.ts` fix
+already logged above. `lib/database.types.ts` was regenerated fresh from
+the live DB (`generate_typescript_types`) rather than hand-merged, since
+both branches' migrations were already applied there. The merge also
+surfaced two genuine duplicate-declaration bugs from a silent (non-
+conflicting) git auto-merge -- both branches had independently built the
+same "engagement letter on services" feature at slightly different nearby
+lines, so git merged both copies in without flagging a conflict. Fixed in
+`components/settings/ServiceForm.tsx` and `app/(app)/settings/services/
+[id]/page.tsx` (duplicate `engagement_letter_template_id`/
+`engagementLetterTemplates` declarations). `npm install` picked up
+`pdfjs-dist`, new on `main` for the PDF template overlay editor. `tsc
+--noEmit`, `eslint .`, and `npm run build` all pass clean across the full
+merged app (every route from both branches builds, including `/partners`,
+`/ero-dashboard`, `/assignments`, `/settings/users/[userId]`,
+`/organizers/[responseId]/review`, `/platform-admin/ai-agents`).
+**Not yet done**: pushing this merge, and a real click-through test in a
+browser (this was a code-level merge verification only) -- check whether
+those happened after this note, since it was written before either.
+
+## Addendum — 2026-09-03: Manus audit triage/fixes, production data cleanup, F-05 test-project setup (blocked on missing baseline schema)
+
+Branch: `claude/verexa-remove-services-vaqbfx`. The user fed this session a
+series of external AI-generated ("Manus") audit reports run against the
+live production app and the real MKB Financial Group LLC workspace. Every
+finding was checked against actual source code or live Vercel telemetry
+before acting — several audit claims turned out to be wrong or overstated
+(see below) and were not "fixed" on the audit's say-so alone.
+
+**Fixed and pushed:**
+1. **F-04, identity inconsistency**: the Dashboard greeting used
+   `first_name` while the sidebar used `display_name`, so a staff member
+   who only set a display name saw a different name in each place. Per
+   the user's explicit call ("Display name should win"), `app/(app)/
+   dashboard/page.tsx` and `DashboardShell.tsx` now source the greeting
+   from `display_name` (falling back to `first_name`, then workspace
+   name). The separate `profileComplete` onboarding-gate check still
+   uses `first_name` on purpose — different concern, `display_name`
+   defaults to email so it's always truthy and can't gate on it.
+2. **F-06, Tiptap npm advisory**: all 9 `@tiptap/*` packages bumped
+   `^3.29.2` → `^3.31.0` (`npm install --force` needed — transient
+   ERESOLVE from npm validating peer deps mid-transaction, safe here
+   since every package moved to the same target version). Verified via
+   `npm ls @tiptap/core` (fully deduped) and `npm audit`. The other
+   advisories surfaced alongside it (`tar`, `@mapbox/node-pre-gyp`,
+   `canvas`) were deliberately left alone — fixing them needs a breaking
+   `pdfjs-dist` major bump, out of scope for this pass.
+3. **F-07, lint finding**: raw `<img>` for the MFA QR code in
+   `app/(app)/settings/security/MfaSetup.tsx` — added the same
+   `eslint-disable-next-line @next/next/no-img-element` pattern already
+   used in `components/Avatar.tsx` (it's a `data:` SVG URI from
+   Supabase's MFA enroll response, not an optimizable remote asset).
+4. **F-01/F-09, cron queue timeout risk**: three `/api/cron/*` routes
+   (`run-pending-automation-steps`, `send-pending-engagement-letters`,
+   `send-pending-portal-invites`) process a batch of up to 20-50 rows
+   serially inside `maxDuration=60`; a batch of normal-latency jobs could
+   still exceed 60s cumulatively even though two of the three already had
+   a per-job 25s timeout guard. Added a shared pattern to all three: track
+   `startedAt`, check elapsed against `DEADLINE_MS = 45_000` at the top of
+   each loop iteration, `break` early and leave the rest for the next cron
+   tick (safe/idempotent — nothing is marked processed until it actually
+   completes). The audit had also flagged `fire-date-reminder-automations`
+   and `check-stale-automation-queues` as having the same issue — checked
+   both, they don't share this pattern, left untouched.
+5. **`tests/critical-paths.test.ts`**: previously used
+   `describe.skipIf(!canRun)`, so CI reported green with **zero**
+   critical-path coverage actually run whenever Supabase test env vars
+   were absent (always, until today — see below). Changed to fail loudly
+   with a clear message instead of skipping silently. This was
+   deliberately decoupled from actually getting the suite runnable (item
+   below) so CI stops lying regardless of how long the test-project setup
+   takes.
+
+**Investigated, found not to be a real/actionable bug:**
+- **F-02**: a Next.js RSC TypeError on `/clients.rsc` in Vercel's runtime
+  error telemetry. Stack trace is entirely inside Next's own compiled
+  runtime (`next/dist/compiled/...`), not attributable to a specific line
+  of app code, and hasn't recurred since. Logged as "resolved by
+  non-recurrence," not fabricated a speculative fix.
+- **F-08**, misspelled Firm Profile URL: explicitly the user's own
+  website to fix ("I will change my personal website") — no code action.
+- **F-10**, authorization/tenant-isolation testing: needs the user to
+  provision a second restricted-role staff test account before it's
+  actionable. Not started.
+
+**Production data cleanup (MKB Financial Group LLC workspace,
+`9d3e27c8-e7ed-4db0-a0ce-9b2fa0fe23c7`)**, all at the user's explicit
+request, after confirming no payments were attached before deleting
+anything: removed the `$1` test invoice (`INV-2026-000001`), the "Test
+Payment ZZZ" lead, and the "QA Synthetic Release Test" client + its
+engagement `ENG-2026-000001` (an earlier audit run's own leftover
+synthetic data) — including the `engagement_tax_details`/
+`document_requests`/`attachments`/`notes`/`activity_log` rows scoped to
+those entities, and a follow-up `audit_log` sweep for the audit-trail
+entries the deletes themselves generated. Verified zero remaining rows
+for all of it, including a workspace-wide `clients` count.
+
+**F-05 (make the critical-path suite actually runnable) — in progress,
+currently blocked on the missing-baseline issue below (org-access problem
+is resolved, see update at the bottom of this section).** The user
+originally created a dedicated Supabase test project for this under a
+*different* Supabase account than the one this app normally uses —
+`verexahq-test`, ref `vnyxoubbnuyzywlqmhlh`, org `awcioqmvramifkuxfccm`.
+That turned out to belong to an entirely separate Supabase login (not
+`mkbfinancialgroup@gmail.com`, the account that owns production), which
+is why the Supabase MCP connector kept flipping between seeing one org or
+the other and never both — **that project is now orphaned and should be
+deleted directly from whichever Supabase login it's under, once the user
+tracks that login down; nothing else depends on it.** A replacement was
+created in the *correct* org instead: **`verexahq-test`, ref
+`uzdlqioslnqqikiouksg`, org `nmkuapcamjwfrnulutkd`** (same org and region,
+`us-east-2`, as production) — confirmed reachable and schema-empty (0
+migrations, 0 tables) as of 2026-09-03. Use this ref going forward, not
+the old one.
+
+Plan: rather than replaying all 385 incremental migration files on top of
+a reconstructed pre-`20260805230613` baseline (see why that baseline is
+missing below), the simpler and more robust approach is to take a single
+full schema-only snapshot of production's *current* live schema (which
+already incorporates every migration ever applied) and apply that one
+snapshot directly to the fresh test project — no replay needed. A
+background agent was dispatched mid-session to generate that snapshot via
+read-only SQL introspection against production (no pg_dump/psql access
+available, so it's using Postgres's own catalog-reflection functions —
+`pg_get_functiondef`, `pg_get_constraintdef`, etc.); check whether
+`supabase/migrations/00000000000000_baseline_schema_snapshot_for_fresh_
+projects.sql` exists and was committed, or whether that agent's result
+is still pending / needs to be picked up.
+
+**Real, confirmed blocker found while attempting this — the migrations
+folder cannot build the schema from scratch.** Verified independently
+(not just an agent's claim):
+```
+grep -ohE "CREATE TABLE (IF NOT EXISTS )?public\.[a-z_]+" supabase/migrations/*.sql | sort -u | wc -l
+# → 0 matches for any core table (workspaces, clients, invoices,
+#   engagements, user_profiles, ...); only ~50 newer feature tables
+#   (ai_agent_*, learning_*, library_folders, ...) are ever CREATE TABLE'd
+#   anywhere in the 385 files at all.
+```
+The earliest migration by filename, `20260805230613_invoice_quote_sent_at_
+sync.sql`, already assumes `public.invoices` exists. Git history explains
+why: commit `2b126bc` ("Reconcile supabase/migrations/ against the live
+project's actual applied history", 2026-08-15) documents an "Aug 3
+platform_foundation rebuild" and describes deleting ~20 pre-rebuild
+migration files that referenced the schema it replaced — but **no
+replacement migration that actually creates the rebuilt core schema was
+ever committed**. It looks like that rebuild was applied straight to
+production (dashboard/SQL editor or similar) and never captured as a
+migration file. There's no `schema.sql`/`pg_dump` baseline anywhere in the
+repo either — `lib/database.types.ts` exists but is generated TS types
+only (no constraints/RLS/functions/triggers), not a usable substitute.
+
+**Org-access problem: resolved.** Earlier in this session the Supabase MCP
+connector kept flipping between seeing production's org
+(`nmkuapcamjwfrnulutkd`) and the orphaned test project's org
+(`awcioqmvramifkuxfccm`), never both, and a reconnect attempt aimed at
+fixing that left the connector reporting "connected" via `ListConnectors`
+while `mcp__Supabase__*` tools still wouldn't load via `ToolSearch` for a
+while. That's moot now — since the replacement `verexahq-test`
+(`uzdlqioslnqqikiouksg`) was created directly inside production's own org,
+there's no more org-switching needed; a normal Supabase MCP connection to
+this account reaches both projects at once. If a future session somehow
+can't see both `daxpavvsotvsyqqntddc` and `uzdlqioslnqqikiouksg` via
+`mcp__Supabase__list_projects`, something regressed — don't assume it's
+expected.
+
+**Still open / next steps for F-05, in order:**
+1. Confirm/pick up the baseline-snapshot agent's result — either
+   `supabase/migrations/00000000000000_baseline_schema_snapshot_for_fresh_
+   projects.sql` already exists and was committed (check git log), or
+   generate it fresh using the same read-only-introspection approach
+   against `daxpavvsotvsyqqntddc` if it doesn't.
+2. Apply that single snapshot file to `uzdlqioslnqqikiouksg`
+   (`verexahq-test`) via `apply_migration`. Expect this to need a round or
+   two of fixing errors on first apply (object-ordering issues are likely
+   — the snapshot was generated via SQL introspection without a live
+   target to test against, see the agent's own reported risk areas) — that
+   is normal, not a sign the approach is wrong.
+3. Verify schema parity against production (`list_tables` on both,
+   `get_advisors` sanity check on the test project).
+4. Set `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` for
+   `uzdlqioslnqqikiouksg` in `.env.local` and CI secrets, confirm
+   `tests/critical-paths.test.ts` actually passes against it (it currently
+   correctly fails, since those env vars aren't set anywhere yet).
+
+## Addendum — 2026-08-31: tax-prep pipeline finishing touches, platform billing dunning, ERO/PTIN Partners directory, Settings consolidation
+
+Branch: `claude/verexa-remove-services-vaqbfx` (forked from `main` at
+`1d50a9e`, 2026-08-27 — see the divergence warning above, this branch was
+never merged back into `main`). Roughly in order:
+
+1. **Tax-prep pipeline finishing touches**: built out the previously-empty
+   post-conversion prep pipeline (5 stages), added a status-tag lifecycle
+   across the pipeline, made new-client relationship-manager assignment
+   actually real, added an ERO Review decline path with its own
+   disengagement email, untangled the Missing Info workflow canvas and
+   gave its reminder chain explicit Yes/No branches, added staff
+   presence/identity attestation before in-person signing, auto-derived
+   document checklists from organizer file uploads (grouped by category),
+   added organizer rename UI and surfaced the engagement letter on
+   services.
+2. **Platform billing**: seeded Verexa's own subscription plans
+   (`platform_subscription_plans`: Solo/Team/Firm), built real
+   usage-overage billing (one-time free bucket + monthly Stripe charge for
+   email/SMS/storage overage — replaced an earlier arrears-billing attempt
+   after explicit correction: "no, prepaid top-ups, not arrears"), added
+   `payment_method` (stripe/check/cash/bank_transfer/other) to manual
+   payment recording, and documented the missing
+   `STRIPE_CONNECT_CLIENT_ID` in `.env.local.example`.
+3. **New: platform-wide card-on-file + pre-cycle billing dunning.**
+   Previously billing-failure handling was 100% reactive (Stripe
+   auto-charges on the renewal date, runs its own Smart Retries, Verexa
+   only suspends once Stripe marks a subscription "unpaid"). Now: a Setup
+   Checkout flow collects a saved card
+   (`workspace_subscriptions.default_payment_method_id` + cached
+   brand/last4/exp), an in-app modal (`BillingCardPrompt`, gated by a new
+   `needs_billing_card` RPC) prompts for a card once a workspace is
+   responsible for its own billing with none on file, and a new hourly
+   cron (`/api/cron/check-billing-cycles`, using true America/Chicago
+   calendar dates so day boundaries land on true CST/CDT midnight
+   year-round) reminds at 5 days out, attempts an off-session charge at 3
+   days out (final retry at day 0, credited to the Stripe customer's
+   balance rather than double-charging on the real renewal invoice — see
+   `createCustomerBalanceCredit` in `lib/stripe/client.ts` for why that's
+   safe), and suspends the workspace if nothing succeeded once the cycle
+   ends — independent of how long Stripe's own retries would otherwise
+   take. **Not yet exercised against a real Stripe subscription** — no
+   workspace currently has a live `workspace_subscriptions` row with a
+   real `stripe_customer_id`.
+4. **ERO demo rebuild for a live demo**: refreshed the PTIN demo workspace
+   (Summit Tax & Financial Services) from MKB's live config, seeded an
+   active `firm_connections` row + real tax-return data, renamed the ERO
+   demo workspace to "Ascend Tax Office," and built it a full
+   recruiting/onboarding pipeline (application organizer with a
+   conditionally-shown "already on Verexa?" branch, a signature-required
+   partnership agreement, a 7-stage process, 7 stage-triggered
+   automations). **Deliberately human-in-the-loop, not fully automatic**,
+   for two real engine limitations found along the way: the condition
+   system can't branch on a specific organizer answer's value, and
+   `create_engagement`/`send_engagement_letter`'s automation actions only
+   work on an `organizer.submitted`-triggered run with a resolved
+   service — a mechanism with zero real production usage before this.
+5. **Fixed a real cross-workspace bug** found while building the item
+   below: the connected-partner name lookup (both directions — an ERO
+   seeing a PTIN's name, a PTIN seeing their ERO's name) went through a
+   plain embedded select that only resolves if the viewer happens to also
+   be a member of the other workspace (true for the demo accounts sharing
+   one owner, false for any real separately-owned pair) — would silently
+   show "Pending invite"/"your ERO" for a genuinely active connection.
+   Fixed with two new `SECURITY DEFINER` RPCs,
+   `get_ero_connected_partners` and `get_my_ero_connection`.
+6. **New: ERO/PTIN Partners directory** (`/partners`, nav-gated to
+   workspaces with at least one `ero_ptin` connection) — a dedicated area,
+   separate from the Contacts tab, showing each connected PTIN's business
+   contact info (live from their own Firm Profile) plus a free-text notes
+   field the ERO maintains privately (`firm_connections.notes`).
+7. **Settings consolidation**: merged Connections into Users & Staff — one
+   page, one nav item (`/settings/users`). `/settings/connections` now
+   redirects there (preserving `?token=`) rather than 404ing.
+
+## Addendum — 2026-08-29: QA agent run, onboarding popup, and a full visual/branding redesign
+
+Five separate pieces of work this session, roughly in the order they happened.
+Everything below is committed, merged into `main`, and the working branch
+(`claude/verexa-schema-mismatch-i8c19u`) was reset to `main` after each merge
+— note this is a **different branch** from `claude/verexa-tax-office-v2-mhd9mo`
+referenced elsewhere in this file; check which one is actually current before
+assuming either is stale.
+
+1. **QA Agent run against the 5 ERO Workspace features (PRs #154–158).**
+   Ran in Demo - ERO Office. Real browser E2E turned out to be impossible in
+   this sandbox — the outbound agent-proxy hard-blocks CONNECT to
+   `daxpavvsotvsyqqntddc.supabase.co` for generic browser/curl traffic
+   (confirmed via `curl http://127.0.0.1:37941/__agentproxy/status`, which
+   lists it under `recentRelayFailures` as `connect_rejected`). Only the
+   dedicated Supabase MCP tool channel can reach that host. Pivoted to
+   RPC/RLS-level verification instead — 0 defects found. All synthetic test
+   data (a fake `auth.users` row, a client/engagement/task fixture set)
+   was created, verified, then fully deleted afterward. **If a future
+   session needs real browser E2E against the live app, expect this same
+   proxy block and plan for RPC-level verification instead, not more time
+   spent trying to route around it.**
+
+2. **Learning Hub visibility: fixed, then explicitly reverted.** The user
+   flagged that Learning Hub shouldn't show on Independent PTIN workspaces.
+   Shipped a fix (PR #159, hide unless connected to an ERO) after confirming
+   via AskUserQuestion that a genuinely-connected demo PTIN needed to keep
+   seeing it. The user then said "Disregard that" — cleanly reverted via
+   `git revert -m 1` (PR #160, merged). **Current live behavior: Learning
+   Hub shows unconditionally for every workspace, same as before either
+   change.** Don't re-attempt this fix without the user asking again.
+
+3. **Staff onboarding checklist → popup.** `components/onboarding/
+   OnboardingChecklist.tsx` no longer renders as an inline banner pinned to
+   the top of the dashboard — it's now a real `Modal` (PR #161). The
+   permanent "Don't show this again" DB-backed dismiss is unchanged; a new
+   local-only `closedForNow` state just lets someone close the popup for
+   the current page load without triggering that permanent dismiss.
+
+4. **A from-scratch visual/branding redesign, in phases, all now shipped:**
+   the user compared Verexa's actual UI unfavorably to SuiteDash ("a space I
+   can create in") vs. TaxNitro ("just boring work") and asked for a real
+   redesign, not a coat of paint. Key discovery that grounded everything
+   below: **`public/brand/vmark.png`** (the real Verexa "V" logo) has a
+   genuine vivid blue-to-lime gradient (`~#0EA5FF` → `~#D4F905`, tempered to
+   `#A4D22B` for UI use) that the live product had never actually used
+   anywhere — every screen was flat single-blue. That gradient, applied as
+   a **default-unless-branded** treatment (any workspace with its own Brand
+   Center `secondaryColor` set keeps a flat tint of that color instead —
+   never gets the gradient forced on, so no white-labeled firm's look
+   changes), is the throughline for every phase below.
+   - **Phase 1 (PR #162):** `tailwind.config.ts` gained `brandLime` (`#A4D22B`)
+     and a warmer `surfaceMuted` (`#F4F6EF`, a sage tint instead of flat
+     gray). Sidebar's active-nav-item pill defaults to the blue-to-lime
+     gradient (`Sidebar.module.css`'s `--nav-active-bg`), falling back to a
+     flat tint of `secondaryColor` when one's set (`Sidebar.tsx`).
+   - **Phase 2 (PR #163):** Dashboard's page header became a dark hero band
+     (`bg-ink`) with a gradient-text personalized greeting ("Welcome back,
+     {first name}") and a real, computed "N things need your attention"
+     subtitle — no fabricated copy. `EngagementPipelineWidget` highlights
+     whichever non-Completed stage currently has the most engagements in it
+     with the same gradient, a real computed signal, not decoration.
+   - **Phase 3 (PR #164):** Client Portal dashboard
+     (`app/portal/(portal)/dashboard/page.tsx`) got the same dark-hero
+     treatment plus a new conic-gradient progress ring showing a **real**
+     stage-based completion percentage for the client's nearest active
+     engagement (derived from `ENGAGEMENT_PIPELINE_STATUSES`' position in
+     the pipeline, same as the dashboard widget), categorical stat tiles,
+     and two action cards (documents / message preparer) using real counts
+     and the actual preparer's name. Portal sidebar's active-nav pill picked
+     up the same gradient-or-flat-tint rule as the staff sidebar.
+   - **Design-system pass (PR #165):** the user shared a Verexa-branded
+     reference mockup (apparently a white-labeled SuiteDash trial — same
+     "VEREXA" branding, purple accent, light sidebar) showing a dashboard +
+     client detail + organizer review layout they liked, and asked for it
+     applied across "the entire look of the CRM," not just the pages shown.
+     Resolved via AskUserQuestion before building: **keep the dark
+     sidebar and dark dashboard hero already shipped** (don't revert to the
+     mockup's light sidebar), and build the promo banner as a **simple
+     static dismissible card, no carousel/rotation/content management**.
+     An inventory pass (two Explore agents) found the app already had most
+     of the mockup's structural pieces (`WidgetShell`, `IconChip`, `Badge`,
+     `SectionCard`, `KpiWidget`, the `TopServicesWidget` donut technique) —
+     this was a consolidation pass, not a rebuild:
+     - New shared primitives under `components/ui/`: **`Tabs`** (one
+       underline tab bar, replacing three near-identical hand-rolled ones in
+       `ClientWorkspace.tsx`/`EngagementWorkspaceTabs.tsx`/`MessagesTabs.tsx`
+       — `MessagesTabs` was deliberately left on its own pill style, it's a
+       filter switcher not a content-section tab bar); **`ProgressBar`**
+       (replaces two private duplicates in `EngagementWorkspaceTabs.tsx` and
+       `components/documents/RequestsPanel.tsx`, adds an opt-in
+       `tone="gradient"` for one intentional highlight per page);
+       **`StatTile`** (replaces local `StatCard` duplicates on
+       `app/(app)/documents/page.tsx` and the portal dashboard);
+       **`Sparkline`** (built, following `TopServicesWidget`'s
+       stroke/`currentColor` SVG technique, but **deliberately left unwired**
+       — neither `lib/dashboard/data.ts` nor `lib/dashboard/
+       businessSnapshot.ts` compute any real day-by-day series anywhere in
+       the codebase, and fabricating one would violate the app's own
+       data-honesty convention for trend indicators, same reasoning as
+       `KpiWidget`'s trend prop).
+     - Clients page (`app/(app)/clients/[id]/ClientWorkspace.tsx` +
+       `ClientWorkspaceTabs.tsx` + `QuickActions.tsx`): Overview tab's three
+       stat tiles now use categorical `IconChip` tones instead of plain
+       numbers; a new progress bar shows the real stage-based completion
+       percent for the client's nearest active engagement with the brand
+       gradient; the right rail's bare `<h3>/<ul>` sections are now
+       `SectionCard`s; two new cards were added — **Quick Actions** (Send
+       Organizer, reusing the real `QuickActions` component via a new
+       `variant="row"` prop, plus Upload Document/Send Message/Create
+       Invoice/Add Note as tab-switch shortcuts) and **Notes** (shows the
+       single most recent note with an Add Note shortcut).
+     - `PromoBanner` (`components/dashboard/PromoBanner.tsx` — this
+       component and its exact copy, "Focus on what matters. We'll handle
+       the rest...", already existed on the dashboard from earlier
+       dashboard-widget work; it just wasn't dismissible) gained a local
+       `useState` dismiss with an X button. `AppHeader.tsx` gained a
+       `HelpCircle` icon linking to `/support`, between the notification
+       bell and avatar.
+   - **Verification method used throughout**: since real browser E2E is
+     blocked (see item 1), every visual phase was checked via a disposable
+     `app/dev-preview-*/page.tsx` route rendering the real component with
+     mock data, temporarily added to `ALWAYS_PUBLIC_PATHS` in
+     `lib/supabase/middleware.ts`, screenshotted with a scratch Playwright
+     install (`executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/
+     chrome'`, `args: ['--headless=new']` — the npm `playwright` package's
+     bundled Chromium revision doesn't match what's pre-installed here) —
+     then fully deleted before committing. **Reuse this exact pattern for
+     any future visual work in this sandbox** rather than re-discovering it.
+
+5. **Explicitly deferred, not started**: Engagements, Billing, Review Queue,
+   and Documents pages were found already close to the new design system in
+   the inventory pass above (most already use `Badge`/`IconChip`/the
+   `rounded-2xl border-border bg-surface shadow-soft` card shell) and are
+   the natural next round if the user wants to keep going on "the entire
+   CRM" — mostly consolidation onto the new `Tabs`/`ProgressBar`/`StatTile`
+   primitives rather than new design work. `EngagementBoard.tsx`,
+   `BillingHub.tsx`, and the Review Queue's `ReviewQueueItem`/
+   `ReviewQueueClientChangeItem` sub-components were flagged by the
+   inventory but not read in depth — read them first before touching that
+   round.
+
 ## Addendum — 2026-08-23: "New Leads Enter CRM" finished
 
 The owner asked for a specific lead-intake automation (trigger on
@@ -754,6 +1266,27 @@ un-promoted previews.
      own dedicated login(s) or she demos from her own platform-admin
      access, and whether a demo workspace should be visually/behaviorally
      marked as such anywhere staff or a prospect could see it.
-- No other known gaps as of this session. If picking this back up, ask the
-  user what's next rather than assuming — she drives this by describing
-  real usage friction, not by a pre-written roadmap.
+- No other known gaps as of the 2026-08-13/29 sessions on `main`. If
+  picking this back up, ask the user what's next rather than assuming —
+  she drives this by describing real usage friction, not by a pre-written
+  roadmap.
+- **Open as of the 2026-08-31 session on `claude/verexa-remove-services-vaqbfx`** (see that addendum near the top of this file):
+  1. **Real Stripe keys still need to be added** — both the platform
+     subscription keys and the Stripe Connect keys (`STRIPE_SECRET_KEY`,
+     `STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_CLIENT_ID`, and the Connect
+     webhook secret) into Vercel's environment variables. The user asked
+     for instructions on how to do this; nothing else is blocking it on
+     the code side — Connect OAuth, the checkout/webhook flows, and the
+     new billing dunning system are all built and just waiting on real
+     keys. Until then, `isStripeConfigured()` gates every Stripe call off
+     cleanly (no crashes, just skipped).
+  2. **Meeting with her IT person about system monitoring** — mentioned
+     once early in a prior session, never followed up. Still open.
+  3. **Minor, not requested**: no "record a payment" action exists
+     directly on the top-level Billing hub (`/billing`) — only
+     per-invoice, from a Client or Engagement page. Low priority.
+  4. **The branch-divergence problem itself** (see the warning near the
+     top of this file) is the biggest open item — it needs a human
+     decision on merge direction before either branch can be trusted as
+     current, and before any more work piles up on either side making
+     reconciliation harder.

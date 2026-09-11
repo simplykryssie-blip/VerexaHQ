@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { updateSubscriptionItemPrice } from "@/lib/stripe/client";
+import { updateSubscriptionItemPrice, retrieveSetupIntentPaymentMethod, retrieveCardDetails, setCustomerDefaultPaymentMethod } from "@/lib/stripe/client";
 import type { Database } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
@@ -12,7 +12,7 @@ type StripeSubscription = {
   current_period_end: number;
   trial_end: number | null;
   cancel_at_period_end?: boolean;
-  metadata?: { workspace_id?: string };
+  metadata?: { workspace_id?: string; plan_slug?: string };
   items: { data: Array<{ id: string; price: { id: string } }> };
 };
 
@@ -30,7 +30,7 @@ type StripeInvoice = {
 type PlanSnapshot = {
   base_price_cents: number;
   per_seat_price_cents: number;
-  email_overage_rate_cents: number;
+  email_overage_rate_cents_per_1000: number;
   storage_overage_rate_cents: number;
   sms_overage_rate_cents: number;
   currency: string;
@@ -44,7 +44,7 @@ function toIso(unixSeconds: number | null): string | null {
 function snapshotFromPlan(plan: {
   base_price_cents: number;
   per_seat_price_cents: number;
-  email_overage_rate_cents: number;
+  email_overage_rate_cents_per_1000: number;
   storage_overage_rate_cents: number;
   sms_overage_rate_cents: number;
   currency: string;
@@ -52,7 +52,7 @@ function snapshotFromPlan(plan: {
   return {
     base_price_cents: plan.base_price_cents,
     per_seat_price_cents: plan.per_seat_price_cents,
-    email_overage_rate_cents: plan.email_overage_rate_cents,
+    email_overage_rate_cents_per_1000: plan.email_overage_rate_cents_per_1000,
     storage_overage_rate_cents: plan.storage_overage_rate_cents,
     sms_overage_rate_cents: plan.sms_overage_rate_cents,
     currency: plan.currency,
@@ -126,7 +126,14 @@ export async function handleSubscriptionCreated(
   if (!workspaceId) return { skipped: "missing workspace_id metadata" };
 
   const priceId = subscription.items.data[0]?.price?.id;
-  const { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("stripe_price_id", priceId).maybeSingle();
+  let { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("stripe_price_id", priceId).maybeSingle();
+  // Platform plans don't have real Stripe Price objects yet (their checkout
+  // session is built from an ad-hoc price_data line item, same as Packages
+  // -- see createSubscriptionCheckoutSession) -- fall back to the plan slug
+  // the checkout route stamped into this subscription's own metadata.
+  if (!plan && subscription.metadata?.plan_slug) {
+    ({ data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("slug", subscription.metadata.plan_slug).maybeSingle());
+  }
   if (!plan) return { skipped: "no plan matches this subscription's price" };
 
   await supabase.from("workspace_subscriptions").upsert(
@@ -148,6 +155,11 @@ export async function handleSubscriptionCreated(
   // A brand-new subscription always clears whatever billing lock the
   // workspace was under -- a past-due pause or a prior cancellation.
   await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
+
+  // One-time only, per grant_workspace_usage_meters -- a workspace that
+  // already has meter rows (e.g. re-subscribing after a cancellation) does
+  // not get a second free bucket.
+  await supabase.rpc("grant_workspace_usage_meters", { p_workspace_id: workspaceId });
 
   return {};
 }
@@ -257,6 +269,47 @@ export async function handleTrialWillEnd(
     })
     .select()
     .single();
+
+  return {};
+}
+
+/**
+ * A workspace admin completed the "Add a card" hosted Setup Checkout
+ * (createSetupCheckoutSession, mode "setup" -- saves a payment method
+ * without charging anything). Resolves the resulting setup intent down to
+ * a payment method, makes it the customer's default so Stripe's own
+ * automatic renewal charge uses it too, and caches display details on
+ * workspace_subscriptions for the billing UI.
+ */
+export async function handleSetupCheckoutCompleted(
+  supabase: ReturnType<typeof createServiceClient>,
+  session: { id: string; customer: string | { id: string }; setup_intent: string | { id: string } | null; metadata?: { workspace_id?: string } }
+): Promise<{ skipped?: string }> {
+  const workspaceId = session.metadata?.workspace_id;
+  if (!workspaceId) return { skipped: "missing workspace_id metadata" };
+  if (!session.setup_intent) return { skipped: "session has no setup_intent" };
+
+  const setupIntentId = typeof session.setup_intent === "string" ? session.setup_intent : session.setup_intent.id;
+  const stripeCustomerId = customerId(session.customer);
+
+  const pmResult = await retrieveSetupIntentPaymentMethod(setupIntentId);
+  if (!pmResult.ok) return { skipped: pmResult.reason };
+
+  const cardResult = await retrieveCardDetails(pmResult.data.paymentMethodId);
+  if (!cardResult.ok) return { skipped: cardResult.reason };
+
+  await setCustomerDefaultPaymentMethod({ customerId: stripeCustomerId, paymentMethodId: pmResult.data.paymentMethodId });
+
+  await supabase
+    .from("workspace_subscriptions")
+    .update({
+      default_payment_method_id: pmResult.data.paymentMethodId,
+      card_brand: cardResult.data.brand,
+      card_last4: cardResult.data.last4,
+      card_exp_month: cardResult.data.expMonth,
+      card_exp_year: cardResult.data.expYear,
+    })
+    .eq("workspace_id", workspaceId);
 
   return {};
 }

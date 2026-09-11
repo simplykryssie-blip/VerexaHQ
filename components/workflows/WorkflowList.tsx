@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Plus, Trash2, Zap } from "lucide-react";
+import { Copy, Star, Trash2, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/Toast";
 import { LibraryFolderPane } from "@/components/library/LibraryFolderPane";
 import { FolderMoveSelect } from "@/components/library/FolderMoveSelect";
+import { StarButton } from "@/components/library/StarButton";
 import type { LibraryFolderRow } from "@/components/library/types";
 import {
   TriggerFields,
@@ -31,6 +32,7 @@ export type WorkflowRow = {
   folder_id: string | null;
   step_count: number;
   run_count: number;
+  starred: boolean;
 };
 
 function slugify(name: string) {
@@ -51,6 +53,8 @@ export function WorkflowList({
   services = [],
   pipelines = [],
   tagOptions = [],
+  open,
+  onOpenChange,
 }: {
   workspaceId: string;
   workflows: WorkflowRow[];
@@ -60,11 +64,12 @@ export function WorkflowList({
   services?: TemplateOption[];
   pipelines?: PipelineOption[];
   tagOptions?: string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState("engagement.status_changed");
   const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>(defaultTriggerConfig("engagement.status_changed"));
@@ -74,11 +79,23 @@ export function WorkflowList({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
+  const [showRetired, setShowRetired] = useState(false);
+  const [starredOnly, setStarredOnly] = useState(false);
 
   const visibleWorkflows = useMemo(
-    () => (selectedFolderId === null ? workflows : workflows.filter((w) => w.folder_id === selectedFolderId)),
-    [workflows, selectedFolderId]
+    () =>
+      workflows
+        .filter(
+          (w) =>
+            (selectedFolderId === null || w.folder_id === selectedFolderId) &&
+            (showRetired ? w.status === "archived" : w.status !== "archived") &&
+            (!starredOnly || w.starred)
+        )
+        .sort((a, b) => (a.starred === b.starred ? 0 : a.starred ? -1 : 1)),
+    [workflows, selectedFolderId, showRetired, starredOnly]
   );
+
+  const retiredCount = useMemo(() => workflows.filter((w) => w.status === "archived").length, [workflows]);
 
   const folderCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -121,17 +138,78 @@ export function WorkflowList({
       setError(insertError.message);
       return;
     }
+    onOpenChange(false);
     toast.show("Workflow created", "success");
     router.push(`/workflows/${data.id}`);
   }
 
   async function toggleEnabled(id: string, current: boolean) {
+    // Only turning ON needs a check -- pausing an already-broken workflow
+    // is always safe.
+    if (!current) {
+      const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: id });
+      if (validationError) {
+        toast.show(validationError.message, "error");
+        return;
+      }
+      if (issues && issues.length > 0) {
+        const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+        window.alert(`Can't activate this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+        return;
+      }
+    }
+
     const { error } = await supabase.from("automations").update({ is_enabled: !current }).eq("id", id);
     if (error) {
       toast.show(error.message, "error");
       return;
     }
     toast.show(current ? "Workflow paused" : "Workflow activated", "success");
+    router.refresh();
+  }
+
+  // First publish out of Draft -- same validation gate as activating a
+  // paused workflow, since this is the first moment it becomes eligible to
+  // fire at all (new workflows are created status='draft' is_enabled=false
+  // precisely so they can't fire mid-edit).
+  async function publish(id: string) {
+    const { data: issues, error: validationError } = await supabase.rpc("validate_automation", { p_automation_id: id });
+    if (validationError) {
+      toast.show(validationError.message, "error");
+      return;
+    }
+    if (issues && issues.length > 0) {
+      const lines = issues.map((i) => (i.step_order > 0 ? `Step ${i.step_order} (${i.display_name}): ${i.issue}` : i.issue));
+      window.alert(`Can't publish this workflow yet -- fix these first:\n\n${lines.map((l) => `- ${l}`).join("\n")}`);
+      return;
+    }
+    const { error } = await supabase.from("automations").update({ status: "published", is_enabled: true }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Workflow published and active", "success");
+    router.refresh();
+  }
+
+  async function retire(id: string) {
+    if (!window.confirm("Retire this workflow? It stops firing and moves out of the active list. You can bring it back as a draft later.")) return;
+    const { error } = await supabase.from("automations").update({ status: "archived", is_enabled: false }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Workflow retired", "success");
+    router.refresh();
+  }
+
+  async function reactivate(id: string) {
+    const { error } = await supabase.from("automations").update({ status: "draft", is_enabled: false }).eq("id", id);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Workflow restored as a draft -- publish it when it's ready", "success");
     router.refresh();
   }
 
@@ -180,14 +258,6 @@ export function WorkflowList({
         rootLabel="All Workflows"
       />
       <div className="min-w-0 flex-1 space-y-4">
-        {canManage && (
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => setOpen((v) => !v)}>
-              <Plus size={14} /> New workflow
-            </Button>
-          </div>
-        )}
-
         {open && (
           <form onSubmit={create} className="space-y-3 rounded-2xl border border-border bg-surface shadow-soft p-4">
             <label className="flex flex-col gap-1 text-xs text-muted">
@@ -212,7 +282,7 @@ export function WorkflowList({
             />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="tertiary" size="sm" onClick={() => setOpen(false)}>
+              <Button type="button" variant="tertiary" size="sm" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" size="sm" disabled={saving}>
@@ -224,13 +294,47 @@ export function WorkflowList({
 
         {deleteError && <p className="text-sm text-danger">{deleteError}</p>}
 
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setStarredOnly((v) => !v)}
+            aria-pressed={starredOnly}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              starredOnly ? "border-amber-300 bg-amber-50 text-amber-600" : "border-border text-muted hover:text-ink"
+            }`}
+          >
+            <Star size={12} fill={starredOnly ? "currentColor" : "none"} aria-hidden="true" /> Starred
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowRetired((v) => !v)}
+            aria-pressed={showRetired}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+              showRetired ? "border-accent bg-accentSoft text-accent" : "border-border text-muted hover:text-ink"
+            }`}
+          >
+            Retired ({retiredCount})
+          </button>
+        </div>
+
         {visibleWorkflows.length === 0 ? (
-          <EmptyState message={workflows.length === 0 ? "No workflows yet. Create one to automate what happens on an engagement." : "No workflows in this folder."} />
+          <EmptyState
+            message={
+              showRetired
+                ? "No retired workflows."
+                : starredOnly
+                  ? "No starred workflows."
+                  : workflows.length === 0
+                    ? "No workflows yet. Create one to automate what happens on an engagement."
+                    : "No workflows in this folder."
+            }
+          />
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {visibleWorkflows.map((w) => (
               <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <Link href={`/workflows/${w.id}`} className="flex min-w-0 items-center gap-3">
+                <StarButton workspaceId={workspaceId} entityType="automation" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
+                <Link href={`/workflows/${w.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                   <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
@@ -244,24 +348,46 @@ export function WorkflowList({
                   </div>
                 </Link>
                 <div className="flex shrink-0 items-center gap-3">
-                  <span className={`text-xs font-medium ${w.is_enabled && w.step_count > 0 ? "text-success" : "text-muted"}`}>
-                    {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
-                  </span>
+                  {w.status === "draft" ? (
+                    <Badge tone="warning">Draft</Badge>
+                  ) : w.status === "archived" ? (
+                    <Badge tone="neutral">Retired</Badge>
+                  ) : (
+                    <Badge tone={w.is_enabled ? (w.step_count === 0 ? "warning" : "success") : "neutral"}>
+                      {w.is_enabled ? (w.step_count === 0 ? "Active, but does nothing" : "Active") : "Paused"}
+                    </Badge>
+                  )}
                   {canManage && (
                     <>
                       <FolderMoveSelect folders={folders} value={w.folder_id} onChange={(folderId) => moveWorkflow(w.id, folderId)} />
-                      <button
-                        type="button"
-                        onClick={() => toggleEnabled(w.id, w.is_enabled)}
-                        className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-slate hover:bg-surfaceMuted"
-                      >
-                        {w.is_enabled ? "Pause" : "Activate"}
-                      </button>
+                      {w.status === "draft" ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => publish(w.id)}
+                          className="!border-accent !text-accent hover:!bg-accentSoft"
+                        >
+                          Publish
+                        </Button>
+                      ) : w.status === "archived" ? (
+                        <Button size="sm" variant="secondary" onClick={() => reactivate(w.id)}>
+                          Restore as draft
+                        </Button>
+                      ) : (
+                        <>
+                          <Button size="sm" variant="secondary" onClick={() => toggleEnabled(w.id, w.is_enabled)}>
+                            {w.is_enabled ? "Pause" : "Activate"}
+                          </Button>
+                          <Button size="sm" variant="tertiary" onClick={() => retire(w.id)}>
+                            Retire
+                          </Button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => duplicate(w.id, w.name)}
                         disabled={duplicatingId === w.id}
-                        className="text-muted hover:text-ink disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
                         aria-label="Duplicate workflow"
                       >
                         <Copy size={14} />
@@ -270,7 +396,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => remove(w.id)}
                         disabled={deletingId === w.id}
-                        className="text-muted hover:text-danger disabled:opacity-50"
+                        className="rounded-lg p-1.5 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
                         aria-label="Delete workflow"
                       >
                         <Trash2 size={14} />

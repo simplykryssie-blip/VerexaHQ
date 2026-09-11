@@ -4,6 +4,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { loadActionPermissions } from "@/lib/actionPermissions";
 import { formatAddressValue, formatNameValue } from "@/lib/organizer/formatValue";
 import { getWorkspaceStaff } from "@/lib/workspaceStaff";
+import { getAdditionalSignerOptions } from "@/lib/documents/getAdditionalSignerOptions";
 import { EngagementWorkspace } from "./EngagementWorkspace";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +56,7 @@ function maskLast4(value: unknown): string {
   return last4 ? `••• •• ${last4}` : "--";
 }
 
-function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow | undefined) {
+function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow | undefined, documentStatus?: string) {
   const maskable = (field.field_type === "ssn" || field.field_type === "ein") && answer !== undefined && answer.value !== null;
   return {
     fieldId: field.id,
@@ -64,10 +65,20 @@ function buildFieldAnswer(field: OrganizerFieldRow, answer: OrganizerAnswerRow |
     fieldType: field.field_type,
     display: maskable ? maskLast4(answer?.value) : formatOrganizerValue(field.field_type, answer?.value),
     maskable,
+    documentStatus,
   };
 }
 
-function buildOrganizerResponseDetail(responseId: string, templateId: string, allAnswers: OrganizerAnswerRow[], allFields: OrganizerFieldRow[]) {
+// documentStatusByField maps organizer_field_id -> its auto-created document
+// checklist item status, so a tracked file_upload question can show
+// "already requested" right on the answer.
+function buildOrganizerResponseDetail(
+  responseId: string,
+  templateId: string,
+  allAnswers: OrganizerAnswerRow[],
+  allFields: OrganizerFieldRow[],
+  documentStatusByField?: Map<string, string>
+) {
   const templateFields = allFields.filter((f) => f.organizer_template_id === templateId);
   const responseAnswers = allAnswers.filter((a) => a.organizer_response_id === responseId);
 
@@ -76,7 +87,7 @@ function buildOrganizerResponseDetail(responseId: string, templateId: string, al
       (f) => !f.parent_field_id && f.field_type !== "repeating_section" && f.field_type !== "page_break" && f.field_type !== "section" && f.field_type !== "rich_text"
     )
     .sort((a, b) => a.display_order - b.display_order)
-    .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id)));
+    .map((f) => buildFieldAnswer(f, responseAnswers.find((a) => a.organizer_field_id === f.id), documentStatusByField?.get(f.id)));
 
   const repeaters = templateFields
     .filter((f) => f.field_type === "repeating_section" && !f.parent_field_id)
@@ -108,7 +119,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .from("engagements")
     .select(
       `id, engagement_number, status, priority, review_status, due_date, open_date, completed_date, current_stage, case_type,
-      client_id, service_id,
+      client_id, service_id, is_bank_product,
       clients(id, first_name, last_name, business_name, client_type, relationship_manager_id, default_reviewer_id, default_compliance_officer_id, primary_email, primary_phone),
       services(name),
       assigned_staff:user_profiles!engagements_assigned_staff_id_fkey(id, display_name),
@@ -131,12 +142,14 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     { data: statusHistory },
     { data: quotes },
     { data: invoices },
+    { data: bankProductTransactions },
     { data: activity },
     { data: progressRows },
     staffMembers,
     { data: documentFolders },
     { data: canShare },
     { data: activeEroConnection },
+    { data: myEroConnectionRows },
   ] = await Promise.all([
     supabase
       .from("pipeline_runs")
@@ -146,7 +159,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase
       .from("tasks")
       .select(
-        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id,
+        `id, title, description, status, priority, due_date, completed_at, workflow_stage_id, visibility,
         assigned_staff:user_profiles!tasks_assigned_staff_id_fkey(id, display_name)`
       )
       .eq("engagement_id", engagement.id)
@@ -190,6 +203,13 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase.from("quotes").select("*").eq("engagement_id", engagement.id).order("created_at", { ascending: false }),
     supabase.from("invoices").select("*").eq("engagement_id", engagement.id).order("created_at", { ascending: false }),
     supabase
+      .from("bank_product_transactions")
+      .select(
+        "id, bank_partner, product_type, prep_fee_collected, bank_fee, addon_fee, transmission_fee, paperwork_fee, software_fee, rebate_amount, disbursement_method, status, created_at"
+      )
+      .eq("engagement_id", engagement.id)
+      .order("created_at", { ascending: false }),
+    supabase
       .from("activity_log")
       .select("id, description, activity_type, created_at")
       .eq("entity_type", "engagement")
@@ -212,7 +232,38 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .eq("relationship_type", "ero_ptin")
       .eq("status", "active")
       .maybeSingle(),
+    supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
   ]);
+
+  // Whatever bank/software the ERO has assigned to this PTIN -- prefills
+  // BankProductTransactionForm's fee fields (still editable per return)
+  // instead of every return retyping the same standard numbers. Null for
+  // an independent workspace or one with nothing assigned yet.
+  const myEroConnection = (myEroConnectionRows ?? [])[0] ?? null;
+  const [{ data: assignedBank }, { data: assignedSoftware }] = await Promise.all([
+    myEroConnection?.bank_partner_id
+      ? supabase
+          .from("bank_partners")
+          .select("name, standard_bank_fee, standard_transmission_fee, standard_paperwork_fee, standard_addon_fee")
+          .eq("id", myEroConnection.bank_partner_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    myEroConnection?.software_partner_id
+      ? supabase.from("software_partners").select("name, standard_fee").eq("id", myEroConnection.software_partner_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const bankAssignment =
+    assignedBank || assignedSoftware
+      ? {
+          bankPartnerName: assignedBank?.name ?? null,
+          bankFee: assignedBank?.standard_bank_fee ?? null,
+          transmissionFee: assignedBank?.standard_transmission_fee ?? null,
+          paperworkFee: assignedBank?.standard_paperwork_fee ?? null,
+          addonFee: assignedBank?.standard_addon_fee ?? null,
+          softwarePartnerName: assignedSoftware?.name ?? null,
+          softwareFee: assignedSoftware?.standard_fee ?? null,
+        }
+      : null;
 
   const workflowRunIds = (workflowRuns ?? []).map((r) => r.id);
   const [{ data: stages }, { data: slaRows }] = await Promise.all([
@@ -320,7 +371,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
 
   const { data: engagementLetterTemplates } = await supabase
     .from("engagement_letter_templates")
-    .select("id, name, body_html, banner_image_url")
+    .select("id, name, body_html, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings")
     .eq("workspace_id", workspace.id)
     .eq("status", "published")
     .order("name");
@@ -352,9 +403,25 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
         }),
   ]);
 
+  const { data: checklistStatusRows } = await supabase
+    .from("document_request_item_statuses")
+    .select("organizer_field_id, status, document_requests!inner(entity_type, entity_id)")
+    .eq("document_requests.entity_type", "engagement")
+    .eq("document_requests.entity_id", engagement.id)
+    .not("organizer_field_id", "is", null);
+  const documentStatusByField = new Map(
+    (checklistStatusRows ?? []).filter((r) => r.organizer_field_id).map((r) => [r.organizer_field_id as string, r.status])
+  );
+
   const organizerResponsesWithDetail = (organizerResponses ?? []).map((r) => {
     if (r.status !== "submitted" && r.status !== "reviewed") return { ...r, topLevel: undefined, repeaters: undefined };
-    const { topLevel, repeaters } = buildOrganizerResponseDetail(r.id, r.organizer_template_id, organizerAnswerRows ?? [], organizerFieldRows ?? []);
+    const { topLevel, repeaters } = buildOrganizerResponseDetail(
+      r.id,
+      r.organizer_template_id,
+      organizerAnswerRows ?? [],
+      organizerFieldRows ?? [],
+      documentStatusByField
+    );
     return { ...r, topLevel, repeaters };
   });
 
@@ -362,7 +429,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     .from("document_requests")
     .select(
       `id, title, due_date, status, created_at, document_request_template_id,
-      items:document_request_item_statuses(id, name, is_required, status)`
+      items:document_request_item_statuses(id, name, is_required, status, category, due_date)`
     )
     .eq("entity_type", "engagement")
     .eq("entity_id", engagement.id)
@@ -376,7 +443,8 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
           .select(
             `id, title, status, due_date, attachment_id, created_at, engagement_letter_template_id,
             attachment:attachments!signature_requests_attachment_id_fkey(file_name),
-            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token)`
+            signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token, attested_at, expires_at,
+              attested_by_profile:user_profiles!signature_request_signers_attested_by_fkey(display_name))`
           )
           .in("attachment_id", documentIds)
           .order("created_at", { ascending: false })
@@ -399,7 +467,10 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     attachment_id: r.attachment_id,
     attachment_file_name: r.attachment?.file_name ?? "Document",
     created_at: r.created_at,
-    signers: r.signers ?? [],
+    signers: (r.signers ?? []).map((s: any) => ({
+      ...s,
+      attested_by_name: s.attested_by_profile?.display_name ?? null,
+    })),
   }));
 
   const [{ data: taxDetail }, { data: irsNotices }, { data: taxYears }] = await Promise.all([
@@ -413,6 +484,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     supabase.from("tax_years").select("year").order("year", { ascending: false }),
   ]);
   const permissions = await loadActionPermissions(supabase, workspace.id);
+  const additionalSigners = engagement.client_id ? await getAdditionalSignerOptions(supabase, engagement.client_id) : [];
 
   return (
     <EngagementWorkspace
@@ -431,13 +503,14 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
         id: o.id,
         status: o.status,
         submitted_at: o.submitted_at,
-        template_name: o.organizer_templates?.name ?? "Organizer",
+        template_name: o.organizer_templates?.name ?? "Form",
         filed_as_attachment: o.filed_as_attachment,
         topLevel: o.topLevel,
         repeaters: o.repeaters,
       }))}
       engagementLetterTemplates={engagementLetterTemplates ?? []}
       signatureRequests={signatureRequests}
+      additionalSigners={additionalSigners}
       notes={notes ?? []}
       messageThreads={messageThreads ?? []}
       messages={(messages ?? []) as never}
@@ -449,6 +522,9 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       quotes={(quotes ?? []) as never}
       invoices={(invoices ?? []) as never}
       payments={(payments ?? []) as never}
+      bankProductTransactions={(bankProductTransactions ?? []) as never}
+      isBankProduct={Boolean(engagement.is_bank_product)}
+      bankAssignment={bankAssignment}
       timeline={activity ?? []}
       progress={(progressRows ?? null) as never}
       staffOptions={staffOptions as never}

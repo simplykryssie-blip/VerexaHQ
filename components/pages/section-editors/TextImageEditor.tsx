@@ -8,12 +8,10 @@ type TextImageConfig = { heading?: string; html?: string; image_url?: string; im
 
 export function TextImageEditor({
   workspaceId,
-  websiteId,
   config,
   onChange,
 }: {
   workspaceId: string;
-  websiteId: string;
   config: TextImageConfig;
   onChange: (patch: Partial<TextImageConfig>) => void;
 }) {
@@ -31,7 +29,6 @@ export function TextImageEditor({
       </div>
       <SectionImageUpload
         workspaceId={workspaceId}
-        websiteId={websiteId}
         value={config.image_url}
         onChange={(url) => onChange({ image_url: url ?? undefined })}
       />

@@ -1,3 +1,5 @@
+import { formatPhone } from "@/lib/phone";
+
 export type AddressParts = { street: string; street2: string; city: string; state: string; zip: string };
 
 const EMPTY_ADDRESS: AddressParts = { street: "", street2: "", city: "", state: "", zip: "" };
@@ -139,6 +141,19 @@ export function formatNameValue(value: unknown): string {
       // Fall through to plain-string handling below.
     }
   }
+  return value === null || value === undefined ? "" : String(value);
+}
+
+/**
+ * Normalizes a raw stored answer into the same flat string shape conditional
+ * logic and the answers-map state in the organizer form use -- shared by the
+ * client-facing form and the server-side document-checklist sync so both
+ * agree on what a given field's answer "is" for comparison purposes.
+ */
+export function answerToString(fieldType: string | undefined, value: unknown): string {
+  if (fieldType === "address") return coerceAddressAnswerToString(value);
+  if (fieldType === "name") return coerceNameAnswerToString(value);
+  if (fieldType === "phone") return formatPhone(String(value ?? ""));
   return value === null || value === undefined ? "" : String(value);
 }
 

@@ -1,16 +1,37 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { ScrollText } from "lucide-react";
+import { ScrollText, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
 export const dynamic = 'force-dynamic';
+
+const SEVERITY_TONE: Record<string, BadgeTone> = {
+  info: "neutral",
+  warning: "warning",
+  critical: "danger",
+  error: "danger",
+};
 
 export default async function AuditLogsPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const supabase = createClient();
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "audit.view" });
+
+  if (!canView) {
+    return (
+      <div className="max-w-3xl">
+        <SettingsSectionHeader icon={ScrollText} title="Audit Logs" description="The last 50 audit events for this workspace." />
+        <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft">
+          <EmptyState icon={Lock} message="You don't have permission to view the audit log." />
+        </div>
+      </div>
+    );
+  }
+
   const { data: logs } = await supabase
     .from("audit_log")
     .select("id, action, entity_type, severity, created_at")
@@ -37,10 +58,14 @@ export default async function AuditLogsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {logs.map((l) => (
-                <tr key={l.id}>
+                <tr key={l.id} className="transition-colors hover:bg-surfaceMuted">
                   <td className="px-5 py-3 text-slate">{l.action}</td>
                   <td className="px-5 py-3 text-slate">{l.entity_type}</td>
-                  <td className="px-5 py-3 capitalize text-slate">{l.severity}</td>
+                  <td className="px-5 py-3">
+                    <Badge tone={SEVERITY_TONE[l.severity] ?? "neutral"} className="capitalize">
+                      {l.severity}
+                    </Badge>
+                  </td>
                   <td className="px-5 py-3 text-xs text-muted">{new Date(l.created_at).toLocaleString()}</td>
                 </tr>
               ))}
