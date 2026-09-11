@@ -476,7 +476,7 @@ export function PublicOrganizerForm({
       {template.custom_css && <style dangerouslySetInnerHTML={{ __html: template.custom_css }} />}
       {template.banner_image_url && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={template.banner_image_url} alt="" className="-mb-2 h-32 w-full rounded-lg object-cover" />
+        <img src={template.banner_image_url} alt="" className="-mb-2 h-32 w-full rounded-lg object-cover object-top" />
       )}
       <div>
         {branding?.logo_url ? (
