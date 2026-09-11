@@ -9932,44 +9932,6 @@ export type Database = {
           },
         ]
       }
-      software_partners: {
-        Row: {
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          standard_fee: number | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          standard_fee?: number | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          standard_fee?: number | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "software_partners_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workspace_software_links: {
         Row: {
           created_at: string
