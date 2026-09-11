@@ -41,7 +41,7 @@ import { useToast } from "@/components/Toast";
 import { OnboardingChecklist, type OnboardingStep } from "@/components/onboarding/OnboardingChecklist";
 import type { DashboardData } from "@/lib/dashboard/data";
 import type { PriorityItem } from "@/lib/dashboard/priorities";
-import { isWidgetType, WIDE_WIDGET_TYPES, type WidgetType } from "@/lib/dashboard/widgets";
+import { isWidgetType, WIDE_WIDGET_TYPES, WIDGET_SECTIONS, type WidgetType } from "@/lib/dashboard/widgets";
 
 export type WidgetRow = { id: string; widget_type: string; title: string | null; display_order: number; is_visible: boolean };
 
@@ -272,7 +272,7 @@ export function DashboardShell({
         />
         <div className="relative flex items-start justify-between gap-6">
           <div>
-            <h1 className="font-display text-[28px] font-semibold leading-tight text-ink">
+            <h1 className="font-display text-[28px] font-semibold leading-normal text-ink">
               Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{resolvedGreetingName}</span>.
             </h1>
             <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
@@ -364,14 +364,25 @@ export function DashboardShell({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((row) =>
-            isWidgetType(row.widget_type) ? (
-              <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
-                {renderWidget(row.widget_type)}
+        <div className="space-y-8">
+          {WIDGET_SECTIONS.map((section) => {
+            const sectionRows = visible.filter((row) => isWidgetType(row.widget_type) && section.types.includes(row.widget_type));
+            if (sectionRows.length === 0) return null;
+            return (
+              <div key={section.label}>
+                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{section.label}</h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {sectionRows.map((row) =>
+                    isWidgetType(row.widget_type) ? (
+                      <div key={row.id} className={WIDE_WIDGET_TYPES.has(row.widget_type) ? "sm:col-span-2 lg:col-span-3" : undefined}>
+                        {renderWidget(row.widget_type)}
+                      </div>
+                    ) : null
+                  )}
+                </div>
               </div>
-            ) : null
-          )}
+            );
+          })}
         </div>
       </div>
     </>

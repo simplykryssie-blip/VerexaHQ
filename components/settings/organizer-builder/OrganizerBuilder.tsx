@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronUp, Pencil, Settings2 } from "lucide-react";
@@ -30,6 +30,15 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
   const router = useRouter();
   const toast = useToast();
   const [fields, setFields] = useState<BuilderField[]>(initialFields);
+
+  // initialFields only changes when this page is genuinely revisited with a
+  // fresh server fetch (a real navigation, not a same-session edit -- those
+  // go through setFields directly above) -- without this, a stale snapshot
+  // from before your edits (e.g. from the browser's back-button cache) could
+  // silently reassert itself over what's actually saved.
+  useEffect(() => {
+    setFields(initialFields);
+  }, [initialFields]);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [draggedType, setDraggedType] = useState<OrganizerFieldType | null>(null);
   const [draggingInCanvas, setDraggingInCanvas] = useState(false);
@@ -382,6 +391,7 @@ export function OrganizerBuilder({ template, initialFields, readOnly }: { templa
             } ${!selectedField || draggedType || draggingInCanvas ? "pointer-events-none" : ""}`}
           >
             <FieldPropertiesPanel
+              key={selectedField?.id}
               field={selectedField}
               otherTopLevelFields={topLevelFields.filter((f) => f.id !== selectedFieldId && f.field_type !== "page_break")}
               onUpdate={updateField}

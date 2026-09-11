@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { ScrollText } from "lucide-react";
+import { ScrollText, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -19,6 +19,19 @@ export default async function AuditLogsPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
+  const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "audit.view" });
+
+  if (!canView) {
+    return (
+      <div className="max-w-3xl">
+        <SettingsSectionHeader icon={ScrollText} title="Audit Logs" description="The last 50 audit events for this workspace." />
+        <div className="mt-6 rounded-2xl border border-border bg-surface shadow-soft">
+          <EmptyState icon={Lock} message="You don't have permission to view the audit log." />
+        </div>
+      </div>
+    );
+  }
+
   const { data: logs } = await supabase
     .from("audit_log")
     .select("id, action, entity_type, severity, created_at")

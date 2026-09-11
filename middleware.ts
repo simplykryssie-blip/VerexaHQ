@@ -21,14 +21,28 @@ function isAppHostname(hostname: string): boolean {
   return false;
 }
 
+// Client-facing document/booking links a workspace can hand out or embed
+// anywhere -- an email, a text, a link on their own branded domain. These
+// must always resolve to the real page they point to, even on a hostname
+// this middleware doesn't recognize as the app itself; otherwise a firm
+// that sets up a custom domain and shares one of these links (or embeds it
+// in an iframe on their own site) would have it silently swapped for the
+// custom-domain marketing-site resolver instead of the actual form/letter/
+// booking page. Mirrors the client-facing subset of ALWAYS_PUBLIC_PATHS in
+// lib/supabase/middleware.ts (auth/reset-password/etc. aren't included --
+// those are staff-facing app URLs, not links meant to be shared externally).
+const CROSS_DOMAIN_SAFE_PATH_PREFIXES = ["/o/", "/e/", "/sign/", "/book/", "/api/o/", "/api/e/"];
+
 export async function middleware(request: NextRequest) {
   // The raw Host header, not request.nextUrl.hostname -- in local dev,
   // Next constructs nextUrl from the server's bound listen address rather
   // than the incoming Host, so it never reflects a custom domain there.
   // The header itself is reliable in both dev and production.
   const hostname = (request.headers.get("host") ?? request.nextUrl.hostname).split(":")[0];
+  const pathname = request.nextUrl.pathname;
+  const isCrossDomainSafePath = CROSS_DOMAIN_SAFE_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
-  if (!isAppHostname(hostname)) {
+  if (!isAppHostname(hostname) && !isCrossDomainSafePath) {
     // Site page slugs are a single flat segment (site_pages.slug has no
     // nesting), so only the first path segment is ever meaningful; the bare
     // domain root maps to the "home" page by convention.

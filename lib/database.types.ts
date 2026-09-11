@@ -4381,6 +4381,8 @@ export type Database = {
           notes: string | null
           package_id: string | null
           parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -4405,6 +4407,8 @@ export type Database = {
           notes?: string | null
           package_id?: string | null
           parent_workspace_id: string
+          partner_software_used?: string[]
+          partner_tax_programs?: string[]
           relationship_type: string
           responded_at?: string | null
           responded_by?: string | null
@@ -4429,6 +4433,8 @@ export type Database = {
           notes?: string | null
           package_id?: string | null
           parent_workspace_id?: string
+          partner_software_used?: string[]
+          partner_tax_programs?: string[]
           relationship_type?: string
           responded_at?: string | null
           responded_by?: string | null
@@ -10896,6 +10902,8 @@ export type Database = {
           notes: string | null
           package_id: string | null
           parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -11254,6 +11262,8 @@ export type Database = {
           notes: string | null
           package_id: string | null
           parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -11553,7 +11563,10 @@ export type Database = {
           mailing_address: string
           name: string
           notes: string
+          owner_name: string
           package_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
           phone: string
           primary_contact_email: string
           relationship_type: string
@@ -12277,6 +12290,8 @@ export type Database = {
           notes: string | null
           package_id: string | null
           parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -12330,6 +12345,8 @@ export type Database = {
           notes: string | null
           package_id: string | null
           parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
           relationship_type: string
           responded_at: string | null
           responded_by: string | null

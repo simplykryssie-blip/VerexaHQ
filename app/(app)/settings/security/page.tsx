@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Lock } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { Tabs } from "@/components/ui/Tabs";
@@ -58,7 +58,9 @@ export default async function SecurityPage() {
         <h3 className="font-display text-sm font-semibold text-ink">Workspace security policy</h3>
         <p className="mt-1 text-sm text-muted">Password, session, lockout, and MFA policy for everyone in this workspace.</p>
         <div className="mt-4">
-          {!policy ? (
+          {!canManageSecurity ? (
+            <EmptyState icon={Lock} message="You don't have permission to manage this workspace's security policy." />
+          ) : !policy ? (
             <EmptyState icon={ShieldCheck} message="No security policy configured yet -- defaults apply." />
           ) : (
             <SecurityForm workspaceId={workspace.id} policy={policy} />
