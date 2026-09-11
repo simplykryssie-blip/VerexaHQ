@@ -10,7 +10,7 @@ const inputClass = "mt-1 w-full max-w-xs rounded-lg border border-border px-3 py
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
 const cardClass = "rounded-2xl border border-border bg-surface p-4 shadow-soft";
 
-type FirmInfo = { phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
+type FirmInfo = { ownerName: string | null; phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
 type PackageOption = { id: string; name: string };
 type PartnerOption = { id: string; name: string };
 type Payout = {
@@ -146,6 +146,96 @@ function SoftwarePicker({
         ))}
       </select>
     </label>
+  );
+}
+
+// Your own record of this firm -- software packages, tax programs, general
+// notes -- separate from anything the firm enters about itself. Saved as
+// comma-separated free text and parsed into an array, matching the level of
+// input control the rest of this page uses (no bespoke tag-picker widget
+// for what's normally a handful of short entries).
+function arrayToText(values: string[] | null | undefined) {
+  return (values ?? []).join(", ");
+}
+function textToArray(value: string) {
+  return value
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function PartnerAdminNotes({
+  connectionId,
+  partnerSoftwareUsed,
+  partnerTaxPrograms,
+  notes,
+}: {
+  connectionId: string;
+  partnerSoftwareUsed: string[];
+  partnerTaxPrograms: string[];
+  notes: string | null;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [softwareText, setSoftwareText] = useState(arrayToText(partnerSoftwareUsed));
+  const [taxProgramsText, setTaxProgramsText] = useState(arrayToText(partnerTaxPrograms));
+  const [notesText, setNotesText] = useState(notes ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save(patch: Record<string, unknown>) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update(patch as never).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className={cardClass}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink">Your notes on this firm</p>
+      <p className="mt-1 text-xs text-muted">Private to you -- the firm doesn&apos;t see or control any of this.</p>
+      <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className={labelClass}>
+          Software packages
+          <input
+            type="text"
+            value={softwareText}
+            onChange={(e) => setSoftwareText(e.target.value)}
+            onBlur={() => save({ partner_software_used: textToArray(softwareText) })}
+            placeholder="e.g. QuickBooks, Gusto"
+            disabled={saving}
+            className={`${inputClass} max-w-none`}
+          />
+        </label>
+        <label className={labelClass}>
+          Tax programs
+          <input
+            type="text"
+            value={taxProgramsText}
+            onChange={(e) => setTaxProgramsText(e.target.value)}
+            onBlur={() => save({ partner_tax_programs: textToArray(taxProgramsText) })}
+            placeholder="e.g. Drake, ProSeries"
+            disabled={saving}
+            className={`${inputClass} max-w-none`}
+          />
+        </label>
+      </div>
+      <label className={`${labelClass} mt-4 block`}>
+        Notes
+        <textarea
+          value={notesText}
+          onChange={(e) => setNotesText(e.target.value)}
+          onBlur={() => save({ notes: notesText.trim() || null })}
+          rows={3}
+          disabled={saving}
+          className={`${inputClass} max-w-none`}
+        />
+      </label>
+    </div>
   );
 }
 
@@ -361,6 +451,9 @@ export function FirmDetailClient({
   banks,
   softwarePartnerId,
   softwareList,
+  partnerSoftwareUsed,
+  partnerTaxPrograms,
+  notes,
   production,
   payouts,
   isActive,
@@ -374,6 +467,9 @@ export function FirmDetailClient({
   banks: PartnerOption[];
   softwarePartnerId: string | null;
   softwareList: PartnerOption[];
+  partnerSoftwareUsed: string[];
+  partnerTaxPrograms: string[];
+  notes: string | null;
   production: Record<string, unknown> | null;
   payouts: Payout[];
   isActive: boolean;
@@ -383,6 +479,10 @@ export function FirmDetailClient({
       <div className={cardClass}>
         <p className="text-xs font-semibold uppercase tracking-wide text-ink">Firm info</p>
         <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className={labelClass}>Owner name</dt>
+            <dd className="text-slate">{firmInfo.ownerName ?? "--"}</dd>
+          </div>
           <div>
             <dt className={labelClass}>Contact email</dt>
             <dd className="text-slate">{firmInfo.primaryContactEmail ?? "--"}</dd>
@@ -406,6 +506,13 @@ export function FirmDetailClient({
           <SoftwarePicker connectionId={connectionId} softwarePartnerId={softwarePartnerId} softwareList={softwareList} />
         </div>
       </div>
+
+      <PartnerAdminNotes
+        connectionId={connectionId}
+        partnerSoftwareUsed={partnerSoftwareUsed}
+        partnerTaxPrograms={partnerTaxPrograms}
+        notes={notes}
+      />
 
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink">Production</p>
