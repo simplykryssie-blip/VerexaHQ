@@ -18,6 +18,10 @@ type Payout = {
   period_end: string;
   gross_prep_fees: number;
   gross_bank_product_rebates: number;
+  gross_bank_fees: number;
+  gross_addon_fees: number;
+  gross_transmission_fees: number;
+  gross_paperwork_fees: number;
   ero_share_amount: number;
   amount_owed_to_ptin: number;
   status: string;
@@ -219,7 +223,9 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
             <thead className="bg-surfaceMuted text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-3 py-2 text-left">Period</th>
-                <th className="px-3 py-2 text-right">Gross production</th>
+                <th className="px-3 py-2 text-right">Gross collected</th>
+                <th className="px-3 py-2 text-right">Fees deducted</th>
+                <th className="px-3 py-2 text-right">Net production</th>
                 <th className="px-3 py-2 text-right">Your share</th>
                 <th className="px-3 py-2 text-right">Owed to firm</th>
                 <th className="px-3 py-2 text-left">Status</th>
@@ -227,31 +233,44 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {payouts.map((p) => (
-                <tr key={p.id}>
-                  <td className="px-3 py-2 text-slate">
-                    {p.period_start} - {p.period_end}
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate">{money(p.gross_prep_fees + p.gross_bank_product_rebates)}</td>
-                  <td className="px-3 py-2 text-right text-slate">{money(p.ero_share_amount)}</td>
-                  <td className="px-3 py-2 text-right font-medium text-ink">{money(p.amount_owed_to_ptin)}</td>
-                  <td className="px-3 py-2">
-                    <Badge tone={p.status === "paid" ? "success" : p.status === "disputed" ? "danger" : "neutral"}>{p.status}</Badge>
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    {p.status === "pending" && (
-                      <button
-                        type="button"
-                        onClick={() => markPaid(p.id)}
-                        disabled={markingPaid === p.id}
-                        className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
-                      >
-                        {markingPaid === p.id ? "Saving..." : "Mark paid"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {payouts.map((p) => {
+                const grossCollected = p.gross_prep_fees + p.gross_bank_product_rebates;
+                const feesDeducted = p.gross_bank_fees + p.gross_addon_fees + p.gross_transmission_fees + p.gross_paperwork_fees;
+                // Derived from the two numbers the split actually came from
+                // (ero_share_amount + amount_owed_to_ptin), rather than
+                // grossCollected - feesDeducted, so this always matches
+                // exactly what generate_firm_payout computed -- the fee
+                // deduction floors at 0 server-side and this stays in sync
+                // with that even in the rare case fees exceed rebates.
+                const netProduction = p.ero_share_amount + p.amount_owed_to_ptin;
+                return (
+                  <tr key={p.id}>
+                    <td className="px-3 py-2 text-slate">
+                      {p.period_start} - {p.period_end}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate">{money(grossCollected)}</td>
+                    <td className="px-3 py-2 text-right text-slate">{feesDeducted > 0 ? `-${money(feesDeducted)}` : money(0)}</td>
+                    <td className="px-3 py-2 text-right text-slate">{money(netProduction)}</td>
+                    <td className="px-3 py-2 text-right text-slate">{money(p.ero_share_amount)}</td>
+                    <td className="px-3 py-2 text-right font-medium text-ink">{money(p.amount_owed_to_ptin)}</td>
+                    <td className="px-3 py-2">
+                      <Badge tone={p.status === "paid" ? "success" : p.status === "disputed" ? "danger" : "neutral"}>{p.status}</Badge>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {p.status === "pending" && (
+                        <button
+                          type="button"
+                          onClick={() => markPaid(p.id)}
+                          disabled={markingPaid === p.id}
+                          className="text-xs font-medium text-accent hover:underline disabled:opacity-60"
+                        >
+                          {markingPaid === p.id ? "Saving..." : "Mark paid"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

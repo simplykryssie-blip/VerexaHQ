@@ -65,7 +65,9 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
       : Promise.resolve({ data: null }),
     supabase
       .from("firm_payouts")
-      .select("id, period_start, period_end, gross_prep_fees, gross_bank_product_rebates, ero_share_amount, amount_owed_to_ptin, status, paid_at")
+      .select(
+        "id, period_start, period_end, gross_prep_fees, gross_bank_product_rebates, gross_bank_fees, gross_addon_fees, gross_transmission_fees, gross_paperwork_fees, ero_share_amount, amount_owed_to_ptin, status, paid_at"
+      )
       .eq("connection_id", firm.connection_id)
       .order("period_start", { ascending: false }),
   ]);

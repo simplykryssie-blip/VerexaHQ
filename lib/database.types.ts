@@ -4625,8 +4625,12 @@ export type Database = {
           connection_id: string
           created_at: string
           ero_share_amount: number
+          gross_addon_fees: number
+          gross_bank_fees: number
           gross_bank_product_rebates: number
+          gross_paperwork_fees: number
           gross_prep_fees: number
+          gross_transmission_fees: number
           id: string
           paid_at: string | null
           paid_by: string | null
@@ -4643,8 +4647,12 @@ export type Database = {
           connection_id: string
           created_at?: string
           ero_share_amount?: number
+          gross_addon_fees?: number
+          gross_bank_fees?: number
           gross_bank_product_rebates?: number
+          gross_paperwork_fees?: number
           gross_prep_fees?: number
+          gross_transmission_fees?: number
           id?: string
           paid_at?: string | null
           paid_by?: string | null
@@ -4661,8 +4669,12 @@ export type Database = {
           connection_id?: string
           created_at?: string
           ero_share_amount?: number
+          gross_addon_fees?: number
+          gross_bank_fees?: number
           gross_bank_product_rebates?: number
+          gross_paperwork_fees?: number
           gross_prep_fees?: number
+          gross_transmission_fees?: number
           id?: string
           paid_at?: string | null
           paid_by?: string | null
