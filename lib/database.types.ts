@@ -1332,6 +1332,53 @@ export type Database = {
           },
         ]
       }
+      bank_partners: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          standard_addon_fee: number | null
+          standard_bank_fee: number | null
+          standard_paperwork_fee: number | null
+          standard_transmission_fee: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          standard_addon_fee?: number | null
+          standard_bank_fee?: number | null
+          standard_paperwork_fee?: number | null
+          standard_transmission_fee?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          standard_addon_fee?: number | null
+          standard_bank_fee?: number | null
+          standard_paperwork_fee?: number | null
+          standard_transmission_fee?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_partners_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bank_product_transactions: {
         Row: {
           addon_fee: number | null
@@ -1347,6 +1394,7 @@ export type Database = {
           prep_fee_collected: number | null
           product_type: string
           rebate_amount: number | null
+          software_fee: number | null
           status: string
           transmission_fee: number | null
           updated_at: string
@@ -1366,6 +1414,7 @@ export type Database = {
           prep_fee_collected?: number | null
           product_type: string
           rebate_amount?: number | null
+          software_fee?: number | null
           status?: string
           transmission_fee?: number | null
           updated_at?: string
@@ -1385,6 +1434,7 @@ export type Database = {
           prep_fee_collected?: number | null
           product_type?: string
           rebate_amount?: number | null
+          software_fee?: number | null
           status?: string
           transmission_fee?: number | null
           updated_at?: string
@@ -4131,6 +4181,7 @@ export type Database = {
           engagement_number: string | null
           id: string
           internal_reference: string | null
+          is_bank_product: boolean
           open_date: string | null
           owner_workspace_id: string | null
           priority: Database["public"]["Enums"]["engagement_priority"] | null
@@ -4158,6 +4209,7 @@ export type Database = {
           engagement_number?: string | null
           id?: string
           internal_reference?: string | null
+          is_bank_product?: boolean
           open_date?: string | null
           owner_workspace_id?: string | null
           priority?: Database["public"]["Enums"]["engagement_priority"] | null
@@ -4185,6 +4237,7 @@ export type Database = {
           engagement_number?: string | null
           id?: string
           internal_reference?: string | null
+          is_bank_product?: boolean
           open_date?: string | null
           owner_workspace_id?: string | null
           priority?: Database["public"]["Enums"]["engagement_priority"] | null
@@ -4316,6 +4369,7 @@ export type Database = {
         Row: {
           allows_branding_override: boolean
           allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
           billing_responsibility: string
           child_workspace_id: string | null
           created_at: string
@@ -4332,12 +4386,14 @@ export type Database = {
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
+          software_partner_id: string | null
           status: string
           updated_at: string
         }
         Insert: {
           allows_branding_override?: boolean
           allows_learning_hub_downline_share?: boolean
+          bank_partner_id?: string | null
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4354,12 +4410,14 @@ export type Database = {
           responded_by?: string | null
           restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
+          software_partner_id?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           allows_branding_override?: boolean
           allows_learning_hub_downline_share?: boolean
+          bank_partner_id?: string | null
           billing_responsibility?: string
           child_workspace_id?: string | null
           created_at?: string
@@ -4376,10 +4434,18 @@ export type Database = {
           responded_by?: string | null
           restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
+          software_partner_id?: string | null
           status?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "firm_connections_bank_partner_id_fkey"
+            columns: ["bank_partner_id"]
+            isOneToOne: false
+            referencedRelation: "bank_partners"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "firm_connections_child_workspace_id_fkey"
             columns: ["child_workspace_id"]
@@ -4399,6 +4465,13 @@ export type Database = {
             columns: ["parent_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_connections_software_partner_id_fkey"
+            columns: ["software_partner_id"]
+            isOneToOne: false
+            referencedRelation: "software_partners"
             referencedColumns: ["id"]
           },
         ]
@@ -9821,6 +9894,44 @@ export type Database = {
           },
         ]
       }
+      software_partners: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          standard_fee: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          standard_fee?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          standard_fee?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "software_partners_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_software_links: {
         Row: {
           created_at: string
@@ -11423,6 +11534,8 @@ export type Database = {
         Returns: {
           allows_branding_override: boolean
           allows_learning_hub_downline_share: boolean
+          bank_partner_id: string
+          bank_partner_name: string
           billing_responsibility: string
           child_workspace_id: string
           connection_id: string
@@ -11438,6 +11551,8 @@ export type Database = {
           responded_at: string
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
+          software_partner_id: string
+          software_partner_name: string
           status: string
           website: string
         }[]
@@ -11580,15 +11695,22 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: {
           allows_branding_override: boolean
+          bank_partner_id: string
+          bank_partner_name: string
           billing_responsibility: string
           connection_id: string
           ero_workspace_id: string
           name: string
           package_id: string
+          package_name: string
           phone: string
           primary_contact_email: string
           relationship_type: string
+          revenue_share_percent: number
+          revenue_share_scope: string
           shares_communications_identity: boolean
+          software_partner_id: string
+          software_partner_name: string
           website: string
         }[]
       }

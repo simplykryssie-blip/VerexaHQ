@@ -18,6 +18,7 @@ import {
   Bell,
   Flag,
   ScrollText,
+  Wallet,
   Zap,
   ClipboardCheck,
   LifeBuoy,
@@ -190,6 +191,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { label: "Services", href: "/settings/services", icon: Package },
   { label: "Locations", href: "/settings/locations", icon: MapPin },
   { label: "Packages", href: "/settings/packages", icon: Handshake },
+  { label: "Banks & Software", href: "/settings/bank-partners", icon: Wallet },
   { label: "Users & Staff", href: "/settings/users", icon: Users },
   { label: "Roles & Permissions", href: "/settings/roles", icon: KeyRound },
   { label: "Tags", href: "/settings/tags", icon: Tags },
@@ -207,7 +209,7 @@ const SETTINGS_SECTION_MEMBERS: { label: string; itemLabels: string[] }[] = [
   { label: "Personal", itemLabels: ["Profile"] },
   {
     label: "Firm",
-    itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Services", "Packages", "Users & Staff", "Roles & Permissions"],
+    itemLabels: ["ERO Profile", "Plan & Usage", "Branding", "Services", "Packages", "Banks & Software", "Users & Staff", "Roles & Permissions"],
   },
   { label: "System", itemLabels: ["Integrations", "Feature Flags", "Audit Logs"] },
 ];

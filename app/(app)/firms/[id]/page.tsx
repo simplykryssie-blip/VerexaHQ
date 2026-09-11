@@ -46,12 +46,14 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
 
   const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
 
-  const [{ data: connectedFirms }, { members }, { data: packages }] = await Promise.all([
+  const [{ data: connectedFirms }, { members }, { data: packages }, { data: banks }, { data: softwareList }] = await Promise.all([
     childRelationshipTypes.length
       ? supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
       : Promise.resolve({ data: [] as never[] }),
     getWorkspaceMemberWorkload(supabase, workspace.id),
     supabase.from("firm_packages").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    supabase.from("bank_partners").select("id, name").eq("workspace_id", workspace.id).eq("is_active", true).order("name"),
+    supabase.from("software_partners").select("id, name").eq("workspace_id", workspace.id).eq("is_active", true).order("name"),
   ]);
 
   const firm = (connectedFirms ?? []).find((f) => f.connection_id === params.id);
@@ -92,6 +94,10 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         }}
         packageId={firm.package_id}
         packages={packages ?? []}
+        bankPartnerId={firm.bank_partner_id}
+        banks={banks ?? []}
+        softwarePartnerId={firm.software_partner_id}
+        softwareList={softwareList ?? []}
         production={production as Record<string, unknown> | null}
         payouts={payouts ?? []}
         isActive={firm.status === "active"}

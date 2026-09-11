@@ -12,6 +12,7 @@ const cardClass = "rounded-2xl border border-border bg-surface p-4 shadow-soft";
 
 type FirmInfo = { phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
 type PackageOption = { id: string; name: string };
+type PartnerOption = { id: string; name: string };
 type Payout = {
   id: string;
   period_start: string;
@@ -75,6 +76,78 @@ const OTHER_FEE_FIELDS: [string, string][] = [
   ["gross_transmission_fees", "Transmission fees"],
   ["gross_paperwork_fees", "Paperwork fees"],
 ];
+
+function BankPicker({ connectionId, bankPartnerId, banks }: { connectionId: string; bankPartnerId: string | null; banks: PartnerOption[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+
+  async function change(value: string) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update({ bank_partner_id: value || null }).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <label className={labelClass}>
+      Bank
+      <select defaultValue={bankPartnerId ?? ""} onChange={(e) => change(e.target.value)} disabled={saving} className={inputClass}>
+        <option value="">No bank assigned</option>
+        {banks.map((b) => (
+          <option key={b.id} value={b.id}>
+            {b.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SoftwarePicker({
+  connectionId,
+  softwarePartnerId,
+  softwareList,
+}: {
+  connectionId: string;
+  softwarePartnerId: string | null;
+  softwareList: PartnerOption[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+
+  async function change(value: string) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update({ software_partner_id: value || null }).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <label className={labelClass}>
+      Software
+      <select defaultValue={softwarePartnerId ?? ""} onChange={(e) => change(e.target.value)} disabled={saving} className={inputClass}>
+        <option value="">No software assigned</option>
+        {softwareList.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function ProductionStats({ production }: { production: Record<string, unknown> | null }) {
   if (!production) {
@@ -284,6 +357,10 @@ export function FirmDetailClient({
   firmInfo,
   packageId,
   packages,
+  bankPartnerId,
+  banks,
+  softwarePartnerId,
+  softwareList,
   production,
   payouts,
   isActive,
@@ -293,6 +370,10 @@ export function FirmDetailClient({
   firmInfo: FirmInfo;
   packageId: string | null;
   packages: PackageOption[];
+  bankPartnerId: string | null;
+  banks: PartnerOption[];
+  softwarePartnerId: string | null;
+  softwareList: PartnerOption[];
   production: Record<string, unknown> | null;
   payouts: Payout[];
   isActive: boolean;
@@ -319,8 +400,10 @@ export function FirmDetailClient({
             <dd className="text-slate">{firmInfo.mailingAddress ?? "--"}</dd>
           </div>
         </dl>
-        <div className="mt-4 border-t border-border pt-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <PackagePicker connectionId={connectionId} packageId={packageId} packages={packages} />
+          <BankPicker connectionId={connectionId} bankPartnerId={bankPartnerId} banks={banks} />
+          <SoftwarePicker connectionId={connectionId} softwarePartnerId={softwarePartnerId} softwareList={softwareList} />
         </div>
       </div>
 
