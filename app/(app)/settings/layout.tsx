@@ -2,7 +2,7 @@ import { SettingsNav } from "./SettingsNav";
 import { PageHeader } from "@/components/PageHeader";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { getMyEroConnection } from "@/lib/firmConnection";
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -13,11 +13,11 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   // the RPC round-trip for it.
   const showFirmProfile =
     !workspace || isEroManagementTier(workspace) || Boolean(await getMyEroConnection(createClient(), workspace.id));
-  // Packages (partnership tiers offered to connected firms) only makes
-  // sense for an ERO/Service Bureau -- the page itself already redirects an
-  // Independent PTIN straight to Services, so the nav link shouldn't be
-  // there to click in the first place.
-  const hidePackages = !workspace || !isEroManagementTier(workspace);
+  // Packages (a sellable software/banking bundle) only makes sense for a
+  // Service Bureau -- an ERO manages connected PTINs too but never resells
+  // a package. The page itself already redirects anyone else to Services,
+  // so the nav link shouldn't be there to click in the first place.
+  const hidePackages = !workspace || !isServiceBureauTier(workspace);
 
   return (
     <>

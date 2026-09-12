@@ -17,3 +17,11 @@ const ERO_MANAGEMENT_WORKSPACE_TYPES = new Set(["ero_office", "service_bureau", 
 export function isEroManagementTier(workspace: WorkspaceTypeLike): boolean {
   return ERO_MANAGEMENT_WORKSPACE_TYPES.has(workspace.workspace_type);
 }
+
+// Only a Service Bureau resells software/banking packages to the firms
+// connected under it -- an ERO or multi-office firm still manages connected
+// PTINs (isEroManagementTier), but never sells a package, so package
+// building/assignment is gated on this narrower tier instead.
+export function isServiceBureauTier(workspace: WorkspaceTypeLike): boolean {
+  return workspace.workspace_type === "service_bureau";
+}
