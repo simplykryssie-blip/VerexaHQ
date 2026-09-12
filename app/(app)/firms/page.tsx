@@ -74,7 +74,7 @@ export default async function FirmsPage() {
         subtitle="Firms connected to you -- their info, production, package, and payout ledger."
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={Building2} tone="accent" label="Connected firms" value={firms.length} />
           <StatTile icon={Building2} tone="emerald" label="Active" value={activeCount} />
           <StatTile icon={Building2} tone="violet" label="EROs" value={eroCount} />

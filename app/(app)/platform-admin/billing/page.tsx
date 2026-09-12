@@ -125,7 +125,7 @@ export default async function PlatformAdminBillingPage() {
       <div className="flex-1 space-y-6 px-8 py-6">
         <PlatformAdminTabs active="billing" />
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           {[
             { label: "Est. monthly recurring", value: formatCents(estimatedMonthlyCents) },
             { label: "Active", value: activeCount },

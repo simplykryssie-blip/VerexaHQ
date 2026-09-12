@@ -213,7 +213,7 @@ export default async function PortalDashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatCard icon={FileText} tone="emerald" label="Active engagements" value={activeEngagements.length} href="/portal/engagements" />
           <StatCard icon={AlertTriangle} tone="amber" label="Missing documents" value={missingDocuments} href="/portal/documents" />
           <StatCard icon={PenLine} tone="violet" label="Pending signatures" value={(pendingSignatures ?? []).length} href="/portal/documents" />
