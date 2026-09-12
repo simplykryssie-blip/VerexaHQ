@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import type { DocumentFolderRow, DocumentRow } from "@/components/documents/types";
+import { Modal } from "@/components/Modal";
+import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
 
 const inputClass = "mt-1 w-full max-w-xs rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -584,6 +586,74 @@ function FirmTasks({
   );
 }
 
+type FirmInvoiceRow = { id: string; invoice_number: string | null; total_amount: number; amount_paid: number; status: string; due_date: string | null };
+
+// A flat ad hoc fee a firm charges a connected firm (e.g. an ERO charging a
+// PTIN for software access/mentorship) -- no package or self-checkout menu
+// involved, just a plain invoice, same as billing any client. Some
+// firms charge this and some don't, so this is purely opt-in per bill.
+function FirmInvoices({
+  connectionId,
+  workspaceId,
+  firmOwnName,
+  firmClientName,
+  invoices,
+}: {
+  connectionId: string;
+  workspaceId: string;
+  firmOwnName: string;
+  firmClientName: string;
+  invoices: FirmInvoiceRow[];
+}) {
+  const [showModal, setShowModal] = useState(false);
+  const router = useRouter();
+
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Invoices</p>
+        <button
+          type="button"
+          onClick={() => setShowModal(true)}
+          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
+        >
+          Bill this firm
+        </button>
+      </div>
+      {invoices.length === 0 ? (
+        <EmptyState message="No invoices sent to this firm yet." />
+      ) : (
+        <ul className="mt-2 divide-y divide-border">
+          {invoices.map((inv) => (
+            <li key={inv.id} className="flex items-center justify-between py-3 text-sm">
+              <span className="text-slate">{inv.invoice_number ?? "Invoice"}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-muted">{money(inv.total_amount)}</span>
+                <Badge tone={inv.status === "paid" ? "success" : inv.status === "partially_paid" ? "warning" : "neutral"}>{inv.status}</Badge>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {showModal && (
+        <Modal title="New invoice" onClose={() => setShowModal(false)} size="xl">
+          <InvoiceQuoteForm
+            kind="invoice"
+            workspaceId={workspaceId}
+            firmConnectionId={connectionId}
+            firmName={firmOwnName}
+            clientName={firmClientName}
+            onDone={() => {
+              setShowModal(false);
+              router.refresh();
+            }}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // Your own record of this firm -- software packages, tax programs, general
 // notes -- separate from anything the firm enters about itself. Saved as
 // comma-separated free text and parsed into an array, matching the level of
@@ -1051,6 +1121,7 @@ export function FirmDetailClient({
   firmName,
   tasks,
   staffOptions,
+  invoices,
 }: {
   connectionId: string;
   parentWorkspaceId: string;
@@ -1086,6 +1157,7 @@ export function FirmDetailClient({
   firmName: string;
   tasks: TaskRow[];
   staffOptions: StaffOption[];
+  invoices: FirmInvoiceRow[];
 }) {
   return (
     <div className="mt-4 space-y-6">
@@ -1146,6 +1218,8 @@ export function FirmDetailClient({
       <FirmContacts connectionId={connectionId} contacts={contacts} />
 
       <FirmTasks connectionId={connectionId} workspaceId={workspaceId} tasks={tasks} staffOptions={staffOptions} />
+
+      <FirmInvoices connectionId={connectionId} workspaceId={workspaceId} firmOwnName={firmName} firmClientName={firmInfo.name} invoices={invoices} />
 
       <PartnerAdminNotes
         connectionId={connectionId}

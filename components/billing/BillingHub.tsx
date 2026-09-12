@@ -51,7 +51,8 @@ export type BillingInvoiceRow = {
   issue_date: string | null;
   due_date: string | null;
   notes: string | null;
-  client_id: string;
+  client_id: string | null;
+  firm_connection_id: string | null;
   client_name: string;
 };
 
@@ -61,7 +62,8 @@ export type BillingPaymentRow = {
   amount: number;
   payment_date: string;
   payment_method: string | null;
-  client_id: string;
+  client_id: string | null;
+  firm_connection_id: string | null;
   client_name: string;
 };
 
@@ -262,7 +264,7 @@ export function BillingHub({
               {(unpaidOnly ? outstandingInvoices : invoices).map((i) => (
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                   <div className="min-w-0">
-                    <Link href={`/clients/${i.client_id}`} className="font-medium text-accent hover:underline">
+                    <Link href={i.client_id ? `/clients/${i.client_id}` : `/firms/${i.firm_connection_id}`} className="font-medium text-accent hover:underline">
                       {i.client_name}
                     </Link>
                     <p className="text-xs text-muted">{i.invoice_number ?? "Invoice"}</p>
@@ -312,7 +314,7 @@ export function BillingHub({
               {payments.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm transition-colors hover:bg-surfaceMuted">
                   <div className="min-w-0">
-                    <Link href={`/clients/${p.client_id}`} className="font-medium text-accent hover:underline">
+                    <Link href={p.client_id ? `/clients/${p.client_id}` : `/firms/${p.firm_connection_id}`} className="font-medium text-accent hover:underline">
                       {p.client_name}
                     </Link>
                     <p className="text-xs text-muted">
@@ -398,7 +400,8 @@ export function BillingHub({
           <InvoiceQuoteForm
             kind="invoice"
             workspaceId={workspaceId}
-            clientId={editingInvoice.client_id}
+            clientId={editingInvoice.client_id ?? undefined}
+            firmConnectionId={editingInvoice.firm_connection_id ?? undefined}
             firmName={workspaceName}
             clientName={editingInvoice.client_name}
             editing={editingInvoice as EditingInvoiceQuote}

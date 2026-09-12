@@ -95,6 +95,12 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
     .eq("firm_connection_id", firm.connection_id)
     .order("due_date", { ascending: true, nullsFirst: false });
 
+  const { data: firmInvoices } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, total_amount, amount_paid, status, due_date")
+    .eq("firm_connection_id", firm.connection_id)
+    .order("created_at", { ascending: false });
+
   const staffById = new Map(members.map((m) => [m.user_id, { id: m.user_id, display_name: m.display_name }]));
   const documents: DocumentRow[] = (attachments ?? []).map((d) => ({
     ...d,
@@ -153,6 +159,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         firmName={workspace.name}
         tasks={tasks ?? []}
         staffOptions={reviewerOptions}
+        invoices={firmInvoices ?? []}
       />
 
       {firm.status === "active" && firm.source !== "manual" && (

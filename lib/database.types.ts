@@ -5031,13 +5031,14 @@ export type Database = {
       invoices: {
         Row: {
           amount_paid: number
-          client_id: string
+          client_id: string | null
           created_at: string
           created_by: string | null
           discount_amount: number
           due_date: string | null
           engagement_id: string | null
           expected_deposit_date: string | null
+          firm_connection_id: string | null
           id: string
           invoice_number: string | null
           issue_date: string
@@ -5056,13 +5057,14 @@ export type Database = {
         }
         Insert: {
           amount_paid?: number
-          client_id: string
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           discount_amount?: number
           due_date?: string | null
           engagement_id?: string | null
           expected_deposit_date?: string | null
+          firm_connection_id?: string | null
           id?: string
           invoice_number?: string | null
           issue_date?: string
@@ -5081,13 +5083,14 @@ export type Database = {
         }
         Update: {
           amount_paid?: number
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           discount_amount?: number
           due_date?: string | null
           engagement_id?: string | null
           expected_deposit_date?: string | null
+          firm_connection_id?: string | null
           id?: string
           invoice_number?: string | null
           issue_date?: string
@@ -5139,6 +5142,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "invoices_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "invoices_workspace_id_fkey"
@@ -6920,9 +6930,10 @@ export type Database = {
       payments: {
         Row: {
           amount: number
-          client_id: string
+          client_id: string | null
           created_at: string
           currency: string
+          firm_connection_id: string | null
           id: string
           invoice_id: string | null
           notes: string | null
@@ -6939,9 +6950,10 @@ export type Database = {
         }
         Insert: {
           amount: number
-          client_id: string
+          client_id?: string | null
           created_at?: string
           currency?: string
+          firm_connection_id?: string | null
           id?: string
           invoice_id?: string | null
           notes?: string | null
@@ -6958,9 +6970,10 @@ export type Database = {
         }
         Update: {
           amount?: number
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           currency?: string
+          firm_connection_id?: string | null
           id?: string
           invoice_id?: string | null
           notes?: string | null
@@ -6981,6 +6994,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
             referencedColumns: ["id"]
           },
           {
