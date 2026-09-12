@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { PackageOptionGroupsEditor, type OptionGroupRow } from "@/components/settings/PackageOptionGroupsEditor";
+import { PackageEditForm } from "@/components/settings/PackageEditForm";
 
 export const dynamic = "force-dynamic";
 
@@ -13,12 +14,15 @@ export default async function PackageDetailPage({ params }: { params: { id: stri
 
   const supabase = createClient();
 
-  const { data: pkg } = await supabase
-    .from("firm_packages")
-    .select("id, name, description, flat_price, billing_cadence")
-    .eq("id", params.id)
-    .eq("workspace_id", workspace.id)
-    .maybeSingle();
+  const [{ data: pkg }, { data: canManage }] = await Promise.all([
+    supabase
+      .from("firm_packages")
+      .select("id, name, description, flat_price, billing_cadence, revenue_share_percent, revenue_share_scope")
+      .eq("id", params.id)
+      .eq("workspace_id", workspace.id)
+      .maybeSingle(),
+    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
+  ]);
 
   if (!pkg) notFound();
 
@@ -44,8 +48,7 @@ export default async function PackageDetailPage({ params }: { params: { id: stri
       <Link href="/settings/packages" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={14} aria-hidden="true" /> Back to Packages
       </Link>
-      <h1 className="font-display text-lg font-semibold text-ink">{pkg.name}</h1>
-      {pkg.description && <p className="mt-1 text-sm text-muted">{pkg.description}</p>}
+      <PackageEditForm pkg={pkg} canManage={Boolean(canManage)} />
       <div className="mt-6">
         <PackageOptionGroupsEditor packageId={pkg.id} groups={optionGroups} />
       </div>
