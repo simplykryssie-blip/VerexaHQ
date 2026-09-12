@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportSystemFailure } from "@/lib/systemFailures";
+import { withSupabaseRetry } from "@/lib/supabase/withRetry";
 
 // Wraps a cron route's GET handler so every run -- success or failure --
 // leaves a row in cron_job_runs (job_key, status, duration). That's what
@@ -32,14 +33,16 @@ export function withJobLogging(jobKey: string, handler: (request: Request) => Pr
 
     const logRun = async (status: "success" | "failure", errorMessage: string | null) => {
       const completedAt = new Date();
-      const { error } = await supabase.from("cron_job_runs").insert({
-        job_key: jobKey,
-        status,
-        started_at: startedAt.toISOString(),
-        completed_at: completedAt.toISOString(),
-        duration_ms: completedAt.getTime() - startedAt.getTime(),
-        error_message: errorMessage,
-      });
+      const { error } = await withSupabaseRetry(() =>
+        supabase.from("cron_job_runs").insert({
+          job_key: jobKey,
+          status,
+          started_at: startedAt.toISOString(),
+          completed_at: completedAt.toISOString(),
+          duration_ms: completedAt.getTime() - startedAt.getTime(),
+          error_message: errorMessage,
+        })
+      );
       if (error) console.error(`withJobLogging(${jobKey}): could not log run`, error);
     };
 

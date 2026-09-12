@@ -24,7 +24,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
   if (!canView) {
     return (
-      <div className="max-w-4xl">
+      <div className="max-w-4xl px-8 py-6">
         <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
           <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
         </Link>
@@ -59,7 +59,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   const reviewerOptions = members.map((m) => ({ id: m.user_id, display_name: m.display_name }));
 
   const [{ data: production }, { data: payouts }] = await Promise.all([
-    firm.status === "active"
+    firm.status === "active" && firm.child_workspace_id
       ? supabase.rpc("get_firm_production", { p_connection_id: firm.connection_id })
       : Promise.resolve({ data: null }),
     supabase
@@ -72,7 +72,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   ]);
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl px-8 py-6">
       <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
       </Link>
@@ -84,7 +84,9 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         connectionId={firm.connection_id}
         parentWorkspaceId={workspace.id}
         relationshipType={firm.relationship_type}
+        source={firm.source}
         firmInfo={{
+          name: firm.name,
           ownerName: firm.owner_name,
           phone: firm.phone,
           primaryContactEmail: firm.primary_contact_email,
@@ -112,7 +114,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         isActive={firm.status === "active"}
       />
 
-      {firm.status === "active" && (
+      {firm.status === "active" && firm.source !== "manual" && (
         <div className="mt-8 border-t border-border pt-6">
           <h2 className="font-display text-sm font-semibold text-ink">Connection settings</h2>
           <ul className="mt-3 divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">

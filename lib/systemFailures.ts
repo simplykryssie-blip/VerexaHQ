@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { withSupabaseRetry } from "@/lib/supabase/withRetry";
 
 // A failure a workspace's own staff can't do anything about -- a missing
 // system template, a missing env var, a Resend/storage outage, an
@@ -14,12 +15,14 @@ export async function reportSystemFailure(
   options?: { workspaceId?: string; context?: Record<string, unknown> }
 ) {
   const supabase = createServiceClient();
-  const { error } = await supabase.from("system_failure_log").insert({
-    source,
-    message,
-    workspace_id: options?.workspaceId ?? null,
-    context: (options?.context ?? null) as never,
-  });
+  const { error } = await withSupabaseRetry(() =>
+    supabase.from("system_failure_log").insert({
+      source,
+      message,
+      workspace_id: options?.workspaceId ?? null,
+      context: (options?.context ?? null) as never,
+    })
+  );
   if (error) {
     // Logging the failure itself failed -- nothing further to fall back
     // to except the runtime logs, which is what this whole mechanism

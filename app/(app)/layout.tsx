@@ -211,7 +211,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             showEroManagement={isEroManagementTier(workspace)}
             currentUser={currentUser}
           />
-          <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pt-14 lg:pt-0">
+          <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-16 pt-14 lg:pt-0">
             <ScrollToTopOnNavigate containerId="main-content" />
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
