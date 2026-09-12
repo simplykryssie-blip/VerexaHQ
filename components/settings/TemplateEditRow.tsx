@@ -62,6 +62,25 @@ export function TemplateEditRow({
   const subjectInputRef = useRef<HTMLInputElement | null>(null);
   const smsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // A click that lands just outside the modal (easy to do by accident on a
+  // long template -- the box doesn't fill the screen) used to discard
+  // everything typed with zero warning, same for Escape. Guard every path
+  // that closes this modal behind one confirm whenever something's actually
+  // changed, for both email and SMS -- they share this same modal/close
+  // wiring, so one fix covers both.
+  const isDirty =
+    name !== template.name ||
+    subject !== (template.subject ?? "") ||
+    bodyHtml !== (template.body_html ?? "") ||
+    smsBody !== (template.body ?? "") ||
+    bannerImageUrl !== (template.banner_image_url ?? null) ||
+    customCss !== (template.custom_css ?? "");
+
+  function requestClose() {
+    if (isDirty && !window.confirm("Discard your unsaved changes to this template?")) return;
+    onClose();
+  }
+
   const smsLength = smsBody.length;
   const smsSegments = Math.max(1, Math.ceil(smsLength / SMS_SEGMENT_LENGTH) || 1);
   // Bubble width tracks the longest line instead of staying a fixed box,
@@ -125,7 +144,7 @@ export function TemplateEditRow({
   }
 
   return (
-    <Modal title={isSystem ? template.name : `Edit ${template.name}`} onClose={onClose} size="xl">
+    <Modal title={isSystem ? template.name : `Edit ${template.name}`} onClose={requestClose} size="xl">
       <div className="space-y-3">
         <input
           value={name}
@@ -271,7 +290,7 @@ export function TemplateEditRow({
 
         {!isSystem && (
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted">
+            <button type="button" onClick={requestClose} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate hover:bg-surfaceMuted">
               Cancel
             </button>
             <button
