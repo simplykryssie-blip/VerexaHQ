@@ -185,6 +185,8 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "document_request.status", label: "Document request status", group: "Document request", valueKind: "select", options: DOCUMENT_REQUEST_STATUS_OPTIONS, ops: LIST_OPS },
   { key: "document_request.all_required_complete", label: "All required documents received", group: "Document request", valueKind: "boolean", ops: ["eq"] },
 
+  { key: "run.document_signed", label: "Document signed? (sent by \"Send a document for signature\")", group: "Workflow", valueKind: "boolean", ops: ["eq"] },
+
   { key: "package_purchase.package_name", label: "Package name", group: "Package purchase", valueKind: "text", ops: SELECT_OPS },
   { key: "package_purchase.billing_cadence", label: "Package billing cadence", group: "Package purchase", valueKind: "select", options: ["monthly", "annual", "one_time"], ops: SELECT_OPS },
 ];

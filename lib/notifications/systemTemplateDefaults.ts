@@ -98,6 +98,19 @@ Please log in to your portal to review and respond:
 Thank you,
 Your tax team`,
   },
+  "document-signature-request": {
+    subject: "Please sign: {{title}}",
+    body_html: `Hello,
+
+{{firm_name}} has sent you a document that needs your signature: {{title}}.
+
+Please review and sign it using the secure link below:
+
+{{sign_link}}
+
+Thank you,
+{{firm_name}}`,
+  },
 };
 
 export const SYSTEM_SMS_TEMPLATE_DEFAULTS: Record<string, { body: string }> = {

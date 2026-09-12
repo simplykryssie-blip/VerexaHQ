@@ -44,6 +44,8 @@ import {
   ShieldCheck,
   ShieldX,
   FlaskConical,
+  FileCheck2,
+  Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -158,6 +160,7 @@ export const ACTION_TYPES = [
   { value: "send_organizer_template", label: "Push a form to the client's portal", category: "documents_organizers", description: "Send an intake form to the client's portal.", keywords: "intake form organizer" },
   { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (form-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
   { value: "send_engagement_letter", label: "Send the document for signature", category: "tax_workflow", description: "Queue the document for e-signature.", keywords: "signature sign document letter" },
+  { value: "send_document_for_signature", label: "Send a document for signature", category: "documents_organizers", description: "Upload a document once and send it to whoever this workflow is about -- a client, or a connected firm during onboarding -- for e-signature. Works without an engagement.", keywords: "signature sign document firm onboarding connection ero ptin" },
   { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
   { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
   { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
@@ -217,6 +220,7 @@ export function actionIcon(type: string) {
   if (type === "send_organizer_template") return <BookOpen size={15} />;
   if (type === "create_engagement") return <Workflow size={15} />;
   if (type === "send_engagement_letter") return <FileSignature size={15} />;
+  if (type === "send_document_for_signature") return <FileCheck2 size={15} />;
   if (type === "change_stage") return <ArrowRightCircle size={15} />;
   if (type === "send_document_request") return <FolderInput size={15} />;
   if (type === "assign_user") return <UserCog size={15} />;
@@ -389,6 +393,7 @@ export function StepCard({
   // Organizer/engagement letter templates need their full builder page to get
   // real content -- point staff at it right after the quick-create stub saves.
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -422,6 +427,45 @@ export function StepCard({
   function setField(key: string, value: string) {
     setConfig((c) => ({ ...c, [key]: value }));
     setSaved(false);
+  }
+
+  // Uploaded once, directly, when the step is configured -- unlike
+  // send_engagement_letter's per-recipient rendered PDF, this same static
+  // file is what gets sent on every run of this step, so there's nothing
+  // for execute_automation_step (pure SQL, no Storage access) to render at
+  // send time -- it just points a new signature_requests row at this
+  // attachment_id.
+  async function uploadSignatureDocument(file: File) {
+    setUploadingDocument(true);
+    const path = `${workspaceId}/${step.id}/${Date.now()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
+    if (uploadErr) {
+      setUploadingDocument(false);
+      toast.show(uploadErr.message, "error");
+      return;
+    }
+    const { data, error: insertErr } = await supabase
+      .from("attachments")
+      .insert({
+        workspace_id: workspaceId,
+        entity_type: "document",
+        entity_id: step.id,
+        file_name: file.name,
+        storage_path: path,
+        mime_type: file.type || null,
+        file_size_bytes: file.size,
+        visibility: "internal",
+        category: "Signed Document",
+      })
+      .select("id")
+      .single();
+    setUploadingDocument(false);
+    if (insertErr || !data) {
+      toast.show(insertErr?.message ?? "Could not save this document", "error");
+      return;
+    }
+    setField("attachment_id", (data as { id: string }).id);
+    setField("attachment_name", file.name);
   }
 
   function changeDelayUnit(nextUnit: "minutes" | "days") {
@@ -1184,6 +1228,44 @@ export function StepCard({
               second signer. Does nothing if none is on file.
             </span>
           </label>
+        )}
+
+        {actionType === "send_document_for_signature" && (
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Document to send
+              <div className="flex items-center gap-2">
+                <label
+                  className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:bg-surfaceMuted ${
+                    !canManage || uploadingDocument ? "pointer-events-none opacity-60" : ""
+                  }`}
+                >
+                  <Upload size={13} />
+                  {uploadingDocument ? "Uploading..." : config.attachment_id ? "Replace document" : "Upload a document"}
+                  <input
+                    type="file"
+                    disabled={!canManage || uploadingDocument}
+                    onChange={(e) => e.target.files?.[0] && uploadSignatureDocument(e.target.files[0])}
+                    className="sr-only"
+                  />
+                </label>
+                {config.attachment_name ? <span className="text-xs normal-case text-ink">{config.attachment_name as string}</span> : null}
+              </div>
+              <span className="text-[11px] normal-case text-muted">
+                Uploaded once here -- every run of this step sends this same document. Goes to the client on a client-facing
+                workflow, or to the connected firm when this fires from an ERO/PTIN onboarding trigger with no client attached
+                (e.g. &quot;A connected firm purchases a package&quot;).
+              </span>
+            </label>
+            <MergeableField
+              label="Signature request title"
+              fieldKey="title"
+              config={config}
+              setField={setField}
+              canManage={canManage}
+              placeholder="Please sign this document"
+            />
+          </>
         )}
 
         {actionType === "change_stage" && (
