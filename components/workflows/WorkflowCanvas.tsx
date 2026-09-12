@@ -561,6 +561,21 @@ function positionForNewStep(anchor: WorkflowStepRow | null, siblings: WorkflowSt
   return { x: maxSiblingX + COLUMN_WIDTH, y: anchorY + ROW_HEIGHT };
 }
 
+// Nudges a candidate spot straight down, one row at a time, until it clears
+// every existing step -- used where a position is computed relative to a
+// single other step (e.g. "one column right of the original") rather than
+// relative to actual siblings, so it has no other way to know the spot is
+// already taken.
+function findFreePosition(x: number, y: number, existing: WorkflowStepRow[]): { x: number; y: number } {
+  let candidateY = y;
+  const occupied = (cy: number) =>
+    existing.some((s) => Math.abs((s.canvas_x ?? TRUNK_X) - x) < 40 && Math.abs((s.canvas_y ?? 140) - cy) < 40);
+  while (occupied(candidateY)) {
+    candidateY += ROW_HEIGHT;
+  }
+  return { x, y: candidateY };
+}
+
 function CanvasInner({
   workspaceId,
   automationId,
@@ -868,6 +883,7 @@ function CanvasInner({
   async function duplicateStep(stepId: string) {
     const original = steps.find((s) => s.id === stepId);
     if (!original) return;
+    const position = findFreePosition((original.canvas_x ?? TRUNK_X) + COLUMN_WIDTH, original.canvas_y ?? 140, steps);
     const { data: newStep, error } = await supabase
       .from("automation_steps")
       .insert({
@@ -877,8 +893,8 @@ function CanvasInner({
         action_config: original.action_config,
         delay_minutes: original.delay_minutes,
         display_name: original.display_name ? `${original.display_name} (copy)` : null,
-        canvas_x: (original.canvas_x ?? TRUNK_X) + COLUMN_WIDTH,
-        canvas_y: original.canvas_y ?? 140,
+        canvas_x: position.x,
+        canvas_y: position.y,
       } as never)
       .select("id")
       .single();
@@ -967,6 +983,20 @@ function CanvasInner({
       steps.reduce<WorkflowStepRow | null>((latest, s) => (!latest || s.display_order > latest.display_order ? s : latest), null);
     const anchorOutgoing = anchor ? edgeRows.filter((e) => e.from_step_id === anchor.id) : [];
     const canAutoConnect = Boolean(anchor) && (anchor!.action_type === "condition" || anchorOutgoing.length === 0);
+
+    // The anchor is a non-condition step that already has a next step --
+    // there's nowhere to auto-append it. Rather than dropping a disconnected
+    // orphan on top of the canvas's default position (the old behavior),
+    // splice the new step into that existing connection, same as clicking
+    // the connector's own "+" button.
+    if (anchor && !canAutoConnect) {
+      const existingEdge = anchorOutgoing.find((e) => e.to_step_id !== null);
+      if (existingEdge) {
+        await insertStepOnEdge(existingEdge.id, actionType);
+        return;
+      }
+    }
+
     const siblings = canAutoConnect ? (anchorOutgoing.map((e) => steps.find((s) => s.id === e.to_step_id)).filter(Boolean) as WorkflowStepRow[]) : [];
     const position = positionForNewStep(canAutoConnect ? anchor : null, siblings);
 
