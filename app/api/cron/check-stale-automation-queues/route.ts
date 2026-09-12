@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { reportSystemFailure } from "@/lib/systemFailures";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { withSupabaseRetry } from "@/lib/supabase/withRetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -82,13 +83,15 @@ type WaitActionConfig = { wait_mode?: string; wait_timeout_days?: number } | nul
 async function findStaleAutomationSteps(supabase: ReturnType<typeof createServiceClient>) {
   const cutoffIso = new Date(Date.now() - STALE_AFTER_MINUTES * 60 * 1000).toISOString();
 
-  const { data: rows, error } = await supabase
-    .from("automation_pending_steps")
-    .select("id, workspace_id, scheduled_for, automation_steps(action_config)")
-    .eq("status", "pending_delay")
-    .lt("scheduled_for", cutoffIso)
-    .order("scheduled_for", { ascending: true })
-    .limit(MAX_ROWS_PER_QUEUE);
+  const { data: rows, error } = await withSupabaseRetry(() =>
+    supabase
+      .from("automation_pending_steps")
+      .select("id, workspace_id, scheduled_for, automation_steps(action_config)")
+      .eq("status", "pending_delay")
+      .lt("scheduled_for", cutoffIso)
+      .order("scheduled_for", { ascending: true })
+      .limit(MAX_ROWS_PER_QUEUE)
+  );
 
   if (error) {
     console.error("check-stale-automation-queues: could not query automation_pending_steps", error);
@@ -123,12 +126,14 @@ async function findStale(supabase: ReturnType<typeof createServiceClient>, check
   // defeats supabase-js's literal-string select typing -- fall back to an
   // untyped query builder for this one dynamic call and cast the result.
   const query = supabase.from(check.table) as any;
-  const { data: rows, error } = await query
-    .select(`id, workspace_id, ${check.ageColumn}`)
-    .eq(check.statusColumn, check.statusValue)
-    .lt(check.ageColumn, cutoffIso)
-    .order(check.ageColumn, { ascending: true })
-    .limit(MAX_ROWS_PER_QUEUE);
+  const { data: rows, error } = await withSupabaseRetry<any[]>(() =>
+    query
+      .select(`id, workspace_id, ${check.ageColumn}`)
+      .eq(check.statusColumn, check.statusValue)
+      .lt(check.ageColumn, cutoffIso)
+      .order(check.ageColumn, { ascending: true })
+      .limit(MAX_ROWS_PER_QUEUE)
+  );
 
   if (error) {
     console.error(`check-stale-automation-queues: could not query ${check.table}`, error);

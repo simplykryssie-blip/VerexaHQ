@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { syncResendDomainStatus } from "@/lib/email/domains";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { withSupabaseRetry } from "@/lib/supabase/withRetry";
 
 export const dynamic = "force-dynamic";
 
@@ -23,11 +24,9 @@ async function handleGET(request: Request) {
   }
 
   const supabase = createServiceClient();
-  const { data: pending, error } = await supabase
-    .from("workspace_email_domains")
-    .select("id, resend_domain_id")
-    .neq("status", "verified")
-    .limit(200);
+  const { data: pending, error } = await withSupabaseRetry(() =>
+    supabase.from("workspace_email_domains").select("id, resend_domain_id").neq("status", "verified").limit(200)
+  );
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
