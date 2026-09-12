@@ -4374,15 +4374,18 @@ export type Database = {
           child_workspace_id: string | null
           created_at: string
           default_reviewer_id: string | null
+          filed_under_connection_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          onboarding_stage: string | null
           package_id: string | null
           parent_workspace_id: string
           partner_software_used: string[]
           partner_tax_programs: string[]
+          preparer_credential: string | null
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -4400,15 +4403,18 @@ export type Database = {
           child_workspace_id?: string | null
           created_at?: string
           default_reviewer_id?: string | null
+          filed_under_connection_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
           notes?: string | null
+          onboarding_stage?: string | null
           package_id?: string | null
           parent_workspace_id: string
           partner_software_used?: string[]
           partner_tax_programs?: string[]
+          preparer_credential?: string | null
           relationship_type: string
           responded_at?: string | null
           responded_by?: string | null
@@ -4426,15 +4432,18 @@ export type Database = {
           child_workspace_id?: string | null
           created_at?: string
           default_reviewer_id?: string | null
+          filed_under_connection_id?: string | null
           id?: string
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
           notes?: string | null
+          onboarding_stage?: string | null
           package_id?: string | null
           parent_workspace_id?: string
           partner_software_used?: string[]
           partner_tax_programs?: string[]
+          preparer_credential?: string | null
           relationship_type?: string
           responded_at?: string | null
           responded_by?: string | null
@@ -4457,6 +4466,13 @@ export type Database = {
             columns: ["child_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_connections_filed_under_connection_id_fkey"
+            columns: ["filed_under_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
             referencedColumns: ["id"]
           },
           {
@@ -10895,15 +10911,18 @@ export type Database = {
           child_workspace_id: string | null
           created_at: string
           default_reviewer_id: string | null
+          filed_under_connection_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          onboarding_stage: string | null
           package_id: string | null
           parent_workspace_id: string
           partner_software_used: string[]
           partner_tax_programs: string[]
+          preparer_credential: string | null
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -11255,15 +11274,18 @@ export type Database = {
           child_workspace_id: string | null
           created_at: string
           default_reviewer_id: string | null
+          filed_under_connection_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          onboarding_stage: string | null
           package_id: string | null
           parent_workspace_id: string
           partner_software_used: string[]
           partner_tax_programs: string[]
+          preparer_credential: string | null
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -11560,15 +11582,22 @@ export type Database = {
           connection_id: string
           created_at: string
           default_reviewer_id: string
+          downstream_ptin_count: number
+          efin_last4: string
+          filed_under_connection_id: string
+          filed_under_name: string
           mailing_address: string
           name: string
           notes: string
+          onboarding_stage: string
           owner_name: string
           package_id: string
           partner_software_used: string[]
           partner_tax_programs: string[]
           phone: string
+          preparer_credential: string
           primary_contact_email: string
+          ptin_last4: string
           relationship_type: string
           responded_at: string
           restrict_ptin_staff_assignment: boolean
@@ -12283,15 +12312,18 @@ export type Database = {
           child_workspace_id: string | null
           created_at: string
           default_reviewer_id: string | null
+          filed_under_connection_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          onboarding_stage: string | null
           package_id: string | null
           parent_workspace_id: string
           partner_software_used: string[]
           partner_tax_programs: string[]
+          preparer_credential: string | null
           relationship_type: string
           responded_at: string | null
           responded_by: string | null
@@ -12338,15 +12370,18 @@ export type Database = {
           child_workspace_id: string | null
           created_at: string
           default_reviewer_id: string | null
+          filed_under_connection_id: string | null
           id: string
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
           notes: string | null
+          onboarding_stage: string | null
           package_id: string | null
           parent_workspace_id: string
           partner_software_used: string[]
           partner_tax_programs: string[]
+          preparer_credential: string | null
           relationship_type: string
           responded_at: string | null
           responded_by: string | null

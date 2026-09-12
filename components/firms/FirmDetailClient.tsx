@@ -239,6 +239,146 @@ function PartnerAdminNotes({
   );
 }
 
+const ONBOARDING_STAGES: [string, string][] = [
+  ["invited", "Invited"],
+  ["agreement_signed", "Agreement signed"],
+  ["software_provisioned", "Software provisioned"],
+  ["live", "Live"],
+];
+const PREPARER_CREDENTIALS: [string, string][] = [
+  ["ea", "Enrolled Agent (EA)"],
+  ["cpa", "CPA"],
+  ["attorney", "Attorney"],
+  ["unenrolled", "Unenrolled preparer"],
+  ["other", "Other"],
+];
+
+// The one-stop card for everything specific to *this kind* of partner --
+// EFIN/PTIN last-4 comes read-only from their own firm_tax_profile (they
+// control the real number; you're only ever shown the last 4 for
+// identification), while onboarding stage, credential, and "files under"
+// are your own record, same privacy stance as PartnerAdminNotes below.
+function PartnerDetails({
+  connectionId,
+  relationshipType,
+  efinLast4,
+  ptinLast4,
+  onboardingStage,
+  preparerCredential,
+  filedUnderConnectionId,
+  eroOptions,
+  downstreamPtinCount,
+}: {
+  connectionId: string;
+  relationshipType: string;
+  efinLast4: string | null;
+  ptinLast4: string | null;
+  onboardingStage: string | null;
+  preparerCredential: string | null;
+  filedUnderConnectionId: string | null;
+  eroOptions: PartnerOption[];
+  downstreamPtinCount: number | null;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+  const isEro = relationshipType === "service_bureau_ero";
+  const isPtin = relationshipType === "service_bureau_ptin" || relationshipType === "ero_ptin";
+
+  async function save(patch: Record<string, unknown>) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update(patch as never).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <div className={cardClass}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink">{isEro ? "ERO details" : isPtin ? "PTIN details" : "Partner details"}</p>
+      <p className="mt-1 text-xs text-muted">Onboarding stage, credential, and filing links are your own record -- the firm doesn&apos;t see or control any of this.</p>
+      <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        {isEro && (
+          <>
+            <div>
+              <dt className={labelClass}>EFIN on file</dt>
+              <dd className="text-slate">{efinLast4 ? `••••${efinLast4}` : "Not disclosed"}</dd>
+            </div>
+            <div>
+              <dt className={labelClass}>Connected PTINs under them</dt>
+              <dd className="text-slate">{downstreamPtinCount ?? 0}</dd>
+            </div>
+          </>
+        )}
+        {isPtin && (
+          <div>
+            <dt className={labelClass}>PTIN on file</dt>
+            <dd className="text-slate">{ptinLast4 ? `••••${ptinLast4}` : "Not disclosed"}</dd>
+          </div>
+        )}
+      </dl>
+      <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
+        <label className={labelClass}>
+          Onboarding stage
+          <select
+            defaultValue={onboardingStage ?? ""}
+            onChange={(e) => save({ onboarding_stage: e.target.value || null })}
+            disabled={saving}
+            className={inputClass}
+          >
+            <option value="">Not set</option>
+            {ONBOARDING_STAGES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {isPtin && (
+          <>
+            <label className={labelClass}>
+              Credential
+              <select
+                defaultValue={preparerCredential ?? ""}
+                onChange={(e) => save({ preparer_credential: e.target.value || null })}
+                disabled={saving}
+                className={inputClass}
+              >
+                <option value="">Not set</option>
+                {PREPARER_CREDENTIALS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={labelClass}>
+              Files under
+              <select
+                defaultValue={filedUnderConnectionId ?? ""}
+                onChange={(e) => save({ filed_under_connection_id: e.target.value || null })}
+                disabled={saving}
+                className={inputClass}
+              >
+                <option value="">No connected ERO</option>
+                {eroOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProductionStats({ production }: { production: Record<string, unknown> | null }) {
   if (!production) {
     return <p className="text-sm text-muted">Production data isn&apos;t available until the connection is active.</p>;
@@ -444,6 +584,7 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
 
 export function FirmDetailClient({
   connectionId,
+  relationshipType,
   firmInfo,
   packageId,
   packages,
@@ -454,12 +595,20 @@ export function FirmDetailClient({
   partnerSoftwareUsed,
   partnerTaxPrograms,
   notes,
+  efinLast4,
+  ptinLast4,
+  onboardingStage,
+  preparerCredential,
+  filedUnderConnectionId,
+  eroOptions,
+  downstreamPtinCount,
   production,
   payouts,
   isActive,
 }: {
   connectionId: string;
   parentWorkspaceId: string;
+  relationshipType: string;
   firmInfo: FirmInfo;
   packageId: string | null;
   packages: PackageOption[];
@@ -470,6 +619,13 @@ export function FirmDetailClient({
   partnerSoftwareUsed: string[];
   partnerTaxPrograms: string[];
   notes: string | null;
+  efinLast4: string | null;
+  ptinLast4: string | null;
+  onboardingStage: string | null;
+  preparerCredential: string | null;
+  filedUnderConnectionId: string | null;
+  eroOptions: PartnerOption[];
+  downstreamPtinCount: number | null;
   production: Record<string, unknown> | null;
   payouts: Payout[];
   isActive: boolean;
@@ -506,6 +662,18 @@ export function FirmDetailClient({
           <SoftwarePicker connectionId={connectionId} softwarePartnerId={softwarePartnerId} softwareList={softwareList} />
         </div>
       </div>
+
+      <PartnerDetails
+        connectionId={connectionId}
+        relationshipType={relationshipType}
+        efinLast4={efinLast4}
+        ptinLast4={ptinLast4}
+        onboardingStage={onboardingStage}
+        preparerCredential={preparerCredential}
+        filedUnderConnectionId={filedUnderConnectionId}
+        eroOptions={eroOptions}
+        downstreamPtinCount={downstreamPtinCount}
+      />
 
       <PartnerAdminNotes
         connectionId={connectionId}

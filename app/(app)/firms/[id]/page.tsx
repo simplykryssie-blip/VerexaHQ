@@ -48,6 +48,14 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   const firm = (connectedFirms ?? []).find((f) => f.connection_id === params.id);
   if (!firm) notFound();
 
+  // The "filed under" picker only makes sense for a PTIN connection, offered
+  // against this same parent's other connected EROs -- for a service bureau,
+  // connectedFirms already has both types in one list (see
+  // CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE), so no extra query is needed.
+  const eroOptions = (connectedFirms ?? [])
+    .filter((f) => f.relationship_type === "service_bureau_ero" && f.connection_id !== firm.connection_id)
+    .map((f) => ({ id: f.connection_id, name: f.name }));
+
   const reviewerOptions = members.map((m) => ({ id: m.user_id, display_name: m.display_name }));
 
   const [{ data: production }, { data: payouts }] = await Promise.all([
@@ -75,6 +83,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
       <FirmDetailClient
         connectionId={firm.connection_id}
         parentWorkspaceId={workspace.id}
+        relationshipType={firm.relationship_type}
         firmInfo={{
           ownerName: firm.owner_name,
           phone: firm.phone,
@@ -91,6 +100,13 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         partnerSoftwareUsed={firm.partner_software_used ?? []}
         partnerTaxPrograms={firm.partner_tax_programs ?? []}
         notes={firm.notes}
+        efinLast4={firm.efin_last4}
+        ptinLast4={firm.ptin_last4}
+        onboardingStage={firm.onboarding_stage}
+        preparerCredential={firm.preparer_credential}
+        filedUnderConnectionId={firm.filed_under_connection_id}
+        eroOptions={eroOptions}
+        downstreamPtinCount={firm.downstream_ptin_count}
         production={production as Record<string, unknown> | null}
         payouts={payouts ?? []}
         isActive={firm.status === "active"}
