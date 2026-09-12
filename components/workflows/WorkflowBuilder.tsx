@@ -397,6 +397,7 @@ export function StepCard({
   // real content -- point staff at it right after the quick-create stub saves.
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
   const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [tagDraft, setTagDraft] = useState("");
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -490,8 +491,24 @@ export function StepCard({
   // after that auto-save and yank away the "now edit your new template"
   // editor before it ever had a chance to show.
   async function save(configOverride?: Record<string, unknown>, options?: { silent?: boolean }) {
-    const configToSave = configOverride ?? config;
+    let configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
+      // Folds in whatever's still sitting in the "Add a tag..." box, typed
+      // but never confirmed with Enter or a dropdown click -- clicking this
+      // very Save button is itself the outside-click that would normally
+      // commit it, but that commit and this save fire in the same event
+      // batch, so the tag list state it updates isn't visible yet to the
+      // `config` this function already closed over. Reading the draft
+      // directly here (kept in sync on every keystroke, not just on
+      // commit) sidesteps that race entirely.
+      const draftTag = tagDraft.trim();
+      if (draftTag) {
+        const existingTags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
+        if (!existingTags.includes(draftTag)) {
+          configToSave = { ...configToSave, tags: [...existingTags, draftTag] };
+          setConfig(configToSave);
+        }
+      }
       const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
       if (tags.length > 0 && !(await ensureTagsConfirmed(supabase, workspaceId, tags))) return;
     }
@@ -1707,6 +1724,7 @@ export function StepCard({
                 setConfig((c) => ({ ...c, tags: v }));
                 setSaved(false);
               }}
+              onDraftChange={setTagDraft}
               tagOptions={tagOptions}
             />
           </label>
@@ -1918,6 +1936,7 @@ export function WorkflowBuilder({
   const [conditions, setConditions] = useState<ConditionGroup[]>(() => normalizeToConditionGroups(initialConditions));
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
+  const [triggerTagDraft, setTriggerTagDraft] = useState("");
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(initialActivityOpen);
   const [testModalOpen, setTestModalOpen] = useState(false);
@@ -1941,9 +1960,26 @@ export function WorkflowBuilder({
   }, [triggerType, triggerConfig, isEnabled, status, initialConditions]);
 
   async function saveTrigger() {
+    // Same race as StepCard's add_tag/remove_tag save: clicking "Save
+    // trigger" right after typing a tag (no Enter, no dropdown click) is
+    // itself the outside-click that would commit it, but that commit and
+    // this save happen in the same event batch -- fold in whatever's still
+    // sitting in the box before reading `config`.
+    let effectiveConfig = config;
+    if (currentTriggerType === "client.tag_added") {
+      const draftTag = triggerTagDraft.trim();
+      if (draftTag) {
+        const existingTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
+        if (!existingTags.includes(draftTag)) {
+          effectiveConfig = { ...effectiveConfig, tags: [...existingTags, draftTag] };
+          setConfig(effectiveConfig);
+        }
+      }
+    }
+
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
     if (currentTriggerType === "client.tag_added") {
-      const triggerTags = (config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : []);
+      const triggerTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
       triggerTags.forEach((t) => tagsToConfirm.add(t));
     }
     if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return;
@@ -1951,7 +1987,7 @@ export function WorkflowBuilder({
     setSavingTrigger(true);
     const { error } = await supabase
       .from("automations")
-      .update({ trigger_type: currentTriggerType, trigger_config: config as never, conditions: conditions as never })
+      .update({ trigger_type: currentTriggerType, trigger_config: effectiveConfig as never, conditions: conditions as never })
       .eq("id", automationId);
     setSavingTrigger(false);
     if (error) {
@@ -2207,6 +2243,7 @@ export function WorkflowBuilder({
               tagOptions={tagOptions}
               webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
               disabled={!canManage}
+              onTagDraftChange={setTriggerTagDraft}
             />
 
             <div className="mt-4 border-t border-border pt-3">
