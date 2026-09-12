@@ -403,7 +403,8 @@ export function StepCard({
     if (!slug) return;
     setLoadingTemplate(true);
     const table = kind === "email" ? "email_templates" : "sms_templates";
-    const columns = kind === "email" ? "id, name, status, workspace_id, subject, body_html" : "id, name, status, workspace_id, body";
+    const columns =
+      kind === "email" ? "id, name, status, workspace_id, subject, body_html, banner_image_url, custom_css" : "id, name, status, workspace_id, body";
     const { data, error: fetchError } = await supabase
       .from(table)
       .select(columns)
@@ -435,7 +436,13 @@ export function StepCard({
   // silently relying on stale closure state -- setConfig() doesn't apply
   // until the next render, so reading `config` right after calling it would
   // still see the old value.
-  async function save(configOverride?: Record<string, unknown>) {
+  // `silent` skips onSaved() -- used only by the auto-save right after
+  // creating a template inline (see the email/sms onSuccess handlers below).
+  // onSaved() closes/deselects this whole step panel (that's the right
+  // behavior for the real Save button), which used to fire immediately
+  // after that auto-save and yank away the "now edit your new template"
+  // editor before it ever had a chance to show.
+  async function save(configOverride?: Record<string, unknown>, options?: { silent?: boolean }) {
     const configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
       const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
@@ -470,7 +477,7 @@ export function StepCard({
       return;
     }
     setSaved(true);
-    onSaved();
+    if (!options?.silent) onSaved();
   }
 
   async function move(direction: "up" | "down") {
@@ -764,8 +771,10 @@ export function StepCard({
                     // separate Save button (for the template row itself) --
                     // save the step right away so picking/creating a
                     // template is never lost if the user closes that modal
-                    // without also clicking "Save step" below it.
-                    void save(nextConfig);
+                    // without also clicking "Save step" below it. Silent:
+                    // the real onSaved() closes/deselects this whole panel,
+                    // which would yank away the editor about to open below.
+                    void save(nextConfig, { silent: true });
                   }}
                 />
               </div>
@@ -843,8 +852,10 @@ export function StepCard({
                     // separate Save button (for the template row itself) --
                     // save the step right away so picking/creating a
                     // template is never lost if the user closes that modal
-                    // without also clicking "Save step" below it.
-                    void save(nextConfig);
+                    // without also clicking "Save step" below it. Silent:
+                    // the real onSaved() closes/deselects this whole panel,
+                    // which would yank away the editor about to open below.
+                    void save(nextConfig, { silent: true });
                   }}
                 />
               </div>

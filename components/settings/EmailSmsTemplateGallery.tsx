@@ -31,6 +31,8 @@ type TemplateRow = {
   subject?: string | null;
   body_html?: string | null;
   body?: string | null;
+  banner_image_url?: string | null;
+  custom_css?: string | null;
 };
 
 const STATUS_FILTERS = [
