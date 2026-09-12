@@ -110,21 +110,28 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   // The stat row always shows all three counts regardless of which tab is
   // active -- the active tab's count comes free from the cards array already
   // fetched above; the other two get a cheap head-only count query instead
-  // of pulling their full rows.
+  // of pulling their full rows. Archived templates are excluded from every
+  // count here, matching the gallery's own default "All" view (TemplateGallery
+  // deliberately hides archived unless that filter pill is picked) -- otherwise
+  // the stat tile would claim a template that the list right below it doesn't show.
   const [{ count: engagementLetterCountRaw }, { count: organizerCountRaw }, { count: documentRequestCountRaw }] = await Promise.all([
     !isOrganizers && !isDocumentRequests
       ? Promise.resolve({ count: null as number | null })
-      : supabase.from("engagement_letter_templates").select("id", { count: "exact", head: true }).or(orFilter),
+      : supabase.from("engagement_letter_templates").select("id", { count: "exact", head: true }).or(orFilter).neq("status", "archived"),
     isOrganizers
       ? Promise.resolve({ count: null as number | null })
-      : supabase.from("organizer_templates").select("id", { count: "exact", head: true }).or(orFilter),
+      : supabase.from("organizer_templates").select("id", { count: "exact", head: true }).or(orFilter).neq("status", "archived"),
     isDocumentRequests
       ? Promise.resolve({ count: null as number | null })
-      : supabase.from("document_request_templates").select("id", { count: "exact", head: true }).or(orFilter),
+      : supabase.from("document_request_templates").select("id", { count: "exact", head: true }).or(orFilter).neq("status", "archived"),
   ]);
-  const engagementLetterCount = !isOrganizers && !isDocumentRequests ? engagementLetterCards.length : engagementLetterCountRaw ?? 0;
-  const organizerCount = isOrganizers ? organizerCards.length : organizerCountRaw ?? 0;
-  const documentRequestCount = isDocumentRequests ? documentRequestCards.length : documentRequestCountRaw ?? 0;
+  const engagementLetterCount = !isOrganizers && !isDocumentRequests
+    ? engagementLetterCards.filter((c) => c.status !== "archived").length
+    : engagementLetterCountRaw ?? 0;
+  const organizerCount = isOrganizers ? organizerCards.filter((c) => c.status !== "archived").length : organizerCountRaw ?? 0;
+  const documentRequestCount = isDocumentRequests
+    ? documentRequestCards.filter((c) => c.status !== "archived").length
+    : documentRequestCountRaw ?? 0;
 
   const { data: folders } = await supabase
     .from("library_folders")
@@ -206,7 +213,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
       />
 
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={FileText} tone="accent" label="Document templates" value={engagementLetterCount} />
           <StatTile icon={ListChecks} tone="emerald" label="Form templates" value={organizerCount} />
           <StatTile icon={ClipboardList} tone="amber" label="Document request templates" value={documentRequestCount} />
