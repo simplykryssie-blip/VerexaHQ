@@ -3,11 +3,13 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Editor } from "@tiptap/react";
+import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Modal } from "@/components/Modal";
 import { RichTextEditor, insertTextAtCursor } from "@/components/settings/RichTextEditor";
 import { MergeFieldPicker } from "@/components/settings/MergeFieldPicker";
+import { BannerImageUpload } from "@/components/settings/BannerImageUpload";
 import { insertAtFieldCursor } from "@/lib/insertAtFieldCursor";
 import { slugify } from "@/lib/roleSlug";
 
@@ -21,6 +23,8 @@ type TemplateRow = {
   subject?: string | null;
   body_html?: string | null;
   body?: string | null;
+  banner_image_url?: string | null;
+  custom_css?: string | null;
 };
 
 const SMS_SEGMENT_LENGTH = 160;
@@ -51,6 +55,9 @@ export function TemplateEditRow({
   const [subject, setSubject] = useState(template.subject ?? "");
   const [bodyHtml, setBodyHtml] = useState(template.body_html ?? "");
   const [smsBody, setSmsBody] = useState(template.body ?? "");
+  const [bannerImageUrl, setBannerImageUrl] = useState(template.banner_image_url ?? null);
+  const [customCss, setCustomCss] = useState(template.custom_css ?? "");
+  const [showPreview, setShowPreview] = useState(false);
   const editorRef = useRef<Editor | null>(null);
   const subjectInputRef = useRef<HTMLInputElement | null>(null);
   const smsTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -67,7 +74,10 @@ export function TemplateEditRow({
     setSaving(true);
     setError(null);
     const table = kind === "email" ? "email_templates" : "sms_templates";
-    const patch = kind === "email" ? { name, subject, body_html: bodyHtml } : { name, body: smsBody };
+    const patch =
+      kind === "email"
+        ? { name, subject, body_html: bodyHtml, banner_image_url: bannerImageUrl, custom_css: customCss.trim() || null }
+        : { name, body: smsBody };
     const { error: updateError } = await supabase.from(table).update(patch as never).eq("id", template.id);
     setSaving(false);
     if (updateError) {
@@ -93,7 +103,7 @@ export function TemplateEditRow({
           name: `${template.name} (copy)`,
           slug,
           status: "draft",
-          ...(kind === "email" ? { subject, body_html: bodyHtml } : { body: smsBody }),
+          ...(kind === "email" ? { subject, body_html: bodyHtml, banner_image_url: bannerImageUrl, custom_css: customCss.trim() || null } : { body: smsBody }),
         } as never)
         .select("*")
         .single();
@@ -140,35 +150,83 @@ export function TemplateEditRow({
         )}
 
         {kind === "email" ? (
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
-              <span className="shrink-0 text-xs font-medium text-muted">Subject</span>
-              <input
-                ref={subjectInputRef}
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                disabled={isSystem}
-                placeholder="Write a subject line..."
-                className="w-full border-0 bg-transparent text-sm font-medium text-ink placeholder:font-normal placeholder:text-muted focus:outline-none disabled:bg-transparent"
+          <>
+            <BannerImageUpload
+              workspaceId={workspaceId}
+              value={bannerImageUrl}
+              disabled={isSystem}
+              label="Banner image (optional)"
+              helpText="Rendered above the subject/body when this email is sent -- a logo header, letterhead, etc."
+              uploadPathPrefix="email-banner"
+              onChange={setBannerImageUrl}
+            />
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
+              <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+                <span className="shrink-0 text-xs font-medium text-muted">Subject</span>
+                <input
+                  ref={subjectInputRef}
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  disabled={isSystem}
+                  placeholder="Write a subject line..."
+                  className="w-full border-0 bg-transparent text-sm font-medium text-ink placeholder:font-normal placeholder:text-muted focus:outline-none disabled:bg-transparent"
+                />
+                {!isSystem && (
+                  <MergeFieldPicker
+                    label="Insert"
+                    onInsert={(token) => insertAtFieldCursor(subjectInputRef.current, subject, token, setSubject)}
+                  />
+                )}
+              </div>
+              <RichTextEditor
+                content={bodyHtml}
+                editable={!isSystem}
+                bare
+                onEditorReady={(editor) => (editorRef.current = editor)}
+                onChange={setBodyHtml}
+                toolbarExtra={
+                  <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
+                }
               />
-              {!isSystem && (
-                <MergeFieldPicker
-                  label="Insert"
-                  onInsert={(token) => insertAtFieldCursor(subjectInputRef.current, subject, token, setSubject)}
+            </div>
+
+            <label className="block text-xs font-medium uppercase tracking-wide text-muted">
+              Custom CSS (optional)
+              <textarea
+                value={customCss}
+                disabled={isSystem}
+                onChange={(e) => setCustomCss(e.target.value)}
+                rows={4}
+                placeholder=".signature { color: #0f172a; }"
+                className="mt-1 w-full rounded-lg border border-border px-3 py-2 font-mono text-xs normal-case focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted"
+              />
+              <span className="mt-1 block text-[11px] normal-case text-muted">
+                Sent as a &lt;style&gt; block with the email. Renders fine in Gmail, Apple Mail, and Outlook.com; very old Outlook desktop
+                has limited CSS support no matter how it&apos;s delivered, so keep critical layout to what the editor above already does.
+              </span>
+            </label>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowPreview((v) => !v)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
+              >
+                {showPreview ? <EyeOff size={13} /> : <Eye size={13} />}
+                {showPreview ? "Hide preview" : "Preview banner + CSS as it will send"}
+              </button>
+              {showPreview && (
+                <iframe
+                  title="Email preview"
+                  className="mt-2 h-96 w-full rounded-lg border border-border bg-white"
+                  sandbox=""
+                  srcDoc={`${customCss ? `<style>${customCss}</style>` : ""}${
+                    bannerImageUrl ? `<img src="${bannerImageUrl}" alt="" style="max-width:100%;display:block;margin:0 auto 16px;" />` : ""
+                  }${bodyHtml}`}
                 />
               )}
             </div>
-            <RichTextEditor
-              content={bodyHtml}
-              editable={!isSystem}
-              bare
-              onEditorReady={(editor) => (editorRef.current = editor)}
-              onChange={setBodyHtml}
-              toolbarExtra={
-                <MergeFieldPicker onInsert={(token) => editorRef.current && insertTextAtCursor(editorRef.current, token)} />
-              }
-            />
-          </div>
+          </>
         ) : (
           <div className="rounded-xl border border-border bg-surfaceMuted p-4">
             <div className="flex items-center justify-between">

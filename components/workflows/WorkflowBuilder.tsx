@@ -403,7 +403,8 @@ export function StepCard({
     if (!slug) return;
     setLoadingTemplate(true);
     const table = kind === "email" ? "email_templates" : "sms_templates";
-    const columns = kind === "email" ? "id, name, status, workspace_id, subject, body_html" : "id, name, status, workspace_id, body";
+    const columns =
+      kind === "email" ? "id, name, status, workspace_id, subject, body_html, banner_image_url, custom_css" : "id, name, status, workspace_id, body";
     const { data, error: fetchError } = await supabase
       .from(table)
       .select(columns)

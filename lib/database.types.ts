@@ -3480,10 +3480,12 @@ export type Database = {
       }
       email_templates: {
         Row: {
+          banner_image_url: string | null
           body_html: string
           category: string | null
           created_at: string
           created_by: string | null
+          custom_css: string | null
           folder_id: string | null
           id: string
           merge_fields: Json
@@ -3496,10 +3498,12 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          banner_image_url?: string | null
           body_html?: string
           category?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           folder_id?: string | null
           id?: string
           merge_fields?: Json
@@ -3512,10 +3516,12 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          banner_image_url?: string | null
           body_html?: string
           category?: string | null
           created_at?: string
           created_by?: string | null
+          custom_css?: string | null
           folder_id?: string | null
           id?: string
           merge_fields?: Json

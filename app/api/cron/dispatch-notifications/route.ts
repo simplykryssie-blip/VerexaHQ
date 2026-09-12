@@ -98,7 +98,13 @@ type NotificationJob = {
   entity_id: string | null;
 };
 
-type EmailTemplateCandidate = { workspace_id: string | null; subject: string; body_html: string };
+type EmailTemplateCandidate = {
+  workspace_id: string | null;
+  subject: string;
+  body_html: string;
+  banner_image_url: string | null;
+  custom_css: string | null;
+};
 type SmsTemplateCandidate = { workspace_id: string | null; body: string };
 type PortalInvite = { invitation_token: string; token_expires_at: string | null; invited_at: string | null };
 
@@ -149,11 +155,13 @@ async function resolveDispatchContext(supabase: ReturnType<typeof createServiceC
     emailSlugs.length > 0
       ? supabase
           .from("email_templates")
-          .select("slug, workspace_id, subject, body_html")
+          .select("slug, workspace_id, subject, body_html, banner_image_url, custom_css")
           .in("slug", emailSlugs)
           .eq("status", "published")
           .or(`workspace_id.is.null,workspace_id.in.(${workspaceIds.join(",") || "00000000-0000-0000-0000-000000000000"})`)
-      : Promise.resolve({ data: [] as { slug: string; workspace_id: string | null; subject: string; body_html: string }[] }),
+      : Promise.resolve({
+          data: [] as { slug: string; workspace_id: string | null; subject: string; body_html: string; banner_image_url: string | null; custom_css: string | null }[],
+        }),
     smsSlugs.length > 0
       ? supabase
           .from("sms_templates")
@@ -276,7 +284,15 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
       }
 
       const subject = renderTemplate(template.subject, payload);
-      const html = renderTemplate(template.body_html, payload);
+      const bannerImageUrl = (template as { banner_image_url?: string | null }).banner_image_url ?? null;
+      const customCss = (template as { custom_css?: string | null }).custom_css ?? null;
+      // No HTML boilerplate or CSS-inlining step exists anywhere in this
+      // pipeline -- this goes to Resend exactly as built here. A bare
+      // <style> block renders fine in Gmail/Apple Mail/Outlook.com; very old
+      // Outlook desktop has always had limited CSS support regardless.
+      const styleHtml = customCss ? `<style>${customCss}</style>` : "";
+      const bannerHtml = bannerImageUrl ? `<img src="${bannerImageUrl}" alt="" style="max-width:100%;display:block;margin:0 auto 16px;" />` : "";
+      const html = `${styleHtml}${bannerHtml}${renderTemplate(template.body_html, payload)}`;
       const result = await sendEmailViaResend({ to: job.recipient_email, subject, html, workspaceId });
       if (result.reason === undefined) await recordProviderCheck("email", result.sent, result.error);
 
