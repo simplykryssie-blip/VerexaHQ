@@ -55,7 +55,7 @@ export function OrganizerPreviewPanel({
       <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-border bg-surface shadow-soft">
         {bannerImageUrl && currentIndex === 0 && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={bannerImageUrl} alt="" className="h-32 w-full object-cover object-top" />
+          <img src={bannerImageUrl} alt="" className="w-full h-auto max-h-40 object-contain" />
         )}
         <div className="p-8">
         <p className="text-xs font-semibold uppercase tracking-wide text-accent">Client preview</p>

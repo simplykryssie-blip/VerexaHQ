@@ -10,15 +10,18 @@ export default async function EngagementLetterEditorPage({ params }: { params: {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const { data: template } = await supabase
-    .from("engagement_letter_templates")
-    .select(
-      "id, name, slug, status, workspace_id, body_html, requires_signature, merge_fields, public_token, is_public, requires_portal_signup, banner_image_url, custom_css, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings"
-    )
-    .eq("id", params.id)
-    .maybeSingle();
+  const [{ data: template }, { data: firm }] = await Promise.all([
+    supabase
+      .from("engagement_letter_templates")
+      .select(
+        "id, name, slug, status, workspace_id, body_html, requires_signature, merge_fields, public_token, is_public, requires_portal_signup, banner_image_url, custom_css, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings"
+      )
+      .eq("id", params.id)
+      .maybeSingle(),
+    supabase.from("workspaces").select("name, mailing_address, phone").eq("id", workspace.id).maybeSingle(),
+  ]);
 
   if (!template) notFound();
 
-  return <EngagementLetterEditor template={template} />;
+  return <EngagementLetterEditor template={template} firmName={firm?.name} firmAddress={firm?.mailing_address} firmPhone={firm?.phone} />;
 }

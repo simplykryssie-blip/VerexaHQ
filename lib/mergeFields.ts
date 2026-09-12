@@ -164,3 +164,13 @@ export function extractMergeFieldTokens(html: string): string[] {
 export function interpolateSample(html: string): string {
   return html.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => SAMPLE_VALUE_BY_TOKEN[token] ?? `[${token}]`);
 }
+
+/** Same sandbox preview, but tokens with a real, always-known value for the
+ * current workspace (the firm's own name/address/phone -- never ambiguous,
+ * unlike client/engagement fields which have no real value until one is
+ * picked) resolve to that instead of a fake placeholder. Showing another
+ * firm's sample name on your own template preview reads as broken, not as
+ * an obvious placeholder the way "Jordan Blake" does. */
+export function interpolatePreview(html: string, overrides: Record<string, string | null | undefined>): string {
+  return html.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token) => overrides[token] || SAMPLE_VALUE_BY_TOKEN[token] || `[${token}]`);
+}

@@ -36,7 +36,17 @@ export type EngagementLetterTemplateRow = {
   pdf_field_mappings: unknown;
 };
 
-export function EngagementLetterEditor({ template }: { template: EngagementLetterTemplateRow }) {
+export function EngagementLetterEditor({
+  template,
+  firmName,
+  firmAddress,
+  firmPhone,
+}: {
+  template: EngagementLetterTemplateRow;
+  firmName?: string | null;
+  firmAddress?: string | null;
+  firmPhone?: string | null;
+}) {
   const supabase = createClient();
   const toast = useToast();
   const readOnly = !template.workspace_id;
@@ -142,7 +152,15 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
 
       <div className="flex-1 overflow-y-auto bg-surfaceMuted p-6">
         {view === "preview" && sourceType === "richtext" ? (
-          <EngagementLetterPreview bodyHtml={bodyHtml} requiresSignature={requiresSignature} bannerImageUrl={bannerImageUrl} customCss={customCss} />
+          <EngagementLetterPreview
+            bodyHtml={bodyHtml}
+            requiresSignature={requiresSignature}
+            bannerImageUrl={bannerImageUrl}
+            customCss={customCss}
+            firmName={firmName}
+            firmAddress={firmAddress}
+            firmPhone={firmPhone}
+          />
         ) : (
           <div className="mx-auto max-w-[720px] space-y-4">
             <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
@@ -270,7 +288,7 @@ export function EngagementLetterEditor({ template }: { template: EngagementLette
                 {bannerImageUrl && (
                   <div className="mx-auto max-w-[720px] overflow-hidden rounded-t-sm">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+                    <img src={bannerImageUrl} alt="" className="w-full h-auto" />
                   </div>
                 )}
                 <RichTextEditor
