@@ -38,7 +38,18 @@ export function TagNameInput({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
+  // Clicking away is how most people expect to "finish" typing a tag --
+  // without this, a name typed but never confirmed with Enter or a dropdown
+  // click (e.g. clicking straight to the Save button next to this field)
+  // silently vanished, since onChange alone never reaches TagListInput's
+  // committed `value` array. Only affects callers that pass onCommit
+  // (TagListInput); ConditionsEditor's single free-typed field doesn't, so
+  // this is a no-op there.
+  const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => {
+    const trimmed = value.trim();
+    if (onCommit && trimmed) onCommit(trimmed);
+    setOpen(false);
+  });
   const listId = useId();
 
   const q = value.trim().toLowerCase();
