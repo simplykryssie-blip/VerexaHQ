@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE, CONNECTED_CHILD_TIER_LABEL } from "@/lib/firmConnections";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
@@ -93,8 +93,11 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
           website: firm.website,
           mailingAddress: firm.mailing_address,
         }}
+        canAssignPackages={isServiceBureauTier(workspace)}
         packageId={firm.package_id}
         packages={packages ?? []}
+        revenueSharePercent={firm.revenue_share_percent}
+        revenueShareScope={firm.revenue_share_scope}
         bankPartnerId={firm.bank_partner_id}
         banks={banks ?? []}
         softwarePartnerId={firm.software_partner_id}

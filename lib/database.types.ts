@@ -4402,6 +4402,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
@@ -4438,6 +4440,8 @@ export type Database = {
           responded_at?: string | null
           responded_by?: string | null
           restrict_ptin_staff_assignment?: boolean
+          revenue_share_percent?: number | null
+          revenue_share_scope?: string | null
           shares_communications_identity?: boolean
           software_partner_id?: string | null
           source?: string
@@ -4474,6 +4478,8 @@ export type Database = {
           responded_at?: string | null
           responded_by?: string | null
           restrict_ptin_staff_assignment?: boolean
+          revenue_share_percent?: number | null
+          revenue_share_scope?: string | null
           shares_communications_identity?: boolean
           software_partner_id?: string | null
           source?: string
@@ -10960,6 +10966,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
@@ -11073,6 +11081,10 @@ export type Database = {
       }
       archive_config_object_share: {
         Args: { p_share_id: string }
+        Returns: undefined
+      }
+      assign_firm_package: {
+        Args: { p_connection_id: string; p_package_id: string }
         Returns: undefined
       }
       assign_learning_course: {
@@ -11330,6 +11342,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
@@ -11396,6 +11410,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
@@ -11697,6 +11713,8 @@ export type Database = {
           relationship_type: string
           responded_at: string
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number
+          revenue_share_scope: string
           shares_communications_identity: boolean
           software_partner_id: string
           software_partner_name: string
@@ -12146,6 +12164,10 @@ export type Database = {
         Args: { p_entity_id: string; p_entity_type: string }
         Returns: boolean
       }
+      is_service_bureau_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       is_valid_config_table: { Args: { p_table: string }; Returns: boolean }
       is_workspace_admin: { Args: { p_workspace_id: string }; Returns: boolean }
       is_workspace_ghl_connected: {
@@ -12431,6 +12453,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
@@ -12496,6 +12520,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
@@ -13111,6 +13137,8 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string

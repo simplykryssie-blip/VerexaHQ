@@ -110,7 +110,7 @@ function PackagePicker({ connectionId, packageId, packages }: { connectionId: st
 
   async function change(value: string) {
     setSaving(true);
-    const { error } = await supabase.from("firm_connections").update({ package_id: value || null }).eq("id", connectionId);
+    const { error } = await supabase.rpc("assign_firm_package", { p_connection_id: connectionId, p_package_id: (value || null) as never });
     setSaving(false);
     if (error) {
       toast.show(error.message, "error");
@@ -131,6 +131,88 @@ function PackagePicker({ connectionId, packageId, packages }: { connectionId: st
         ))}
       </select>
     </label>
+  );
+}
+
+const REVENUE_SHARE_SCOPES: [string, string][] = [
+  ["all_production", "All production (prep fees + net bank rebates)"],
+  ["prep_fees_only", "Prep fees only"],
+  ["bank_products_only", "Bank product rebates only"],
+];
+
+// What an ERO sees instead of a Package picker -- EROs split fees with their
+// PTINs the same way a Service Bureau splits with EROs, but never sell a
+// priced software/banking package, so this writes revenue_share_percent/
+// scope directly rather than going through a package at all.
+function SplitPercentInput({
+  connectionId,
+  revenueSharePercent,
+  revenueShareScope,
+}: {
+  connectionId: string;
+  revenueSharePercent: number | null;
+  revenueShareScope: string | null;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [percent, setPercent] = useState(revenueSharePercent != null ? String(revenueSharePercent) : "");
+  const [saving, setSaving] = useState(false);
+
+  async function save(patch: Record<string, unknown>) {
+    setSaving(true);
+    const { error } = await supabase.from("firm_connections").update(patch as never).eq("id", connectionId);
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  function savePercent() {
+    const trimmed = percent.trim();
+    const parsed = trimmed === "" ? null : Number(trimmed);
+    if (parsed !== null && (Number.isNaN(parsed) || parsed < 0 || parsed > 100)) {
+      toast.show("Enter a percentage between 0 and 100.", "error");
+      return;
+    }
+    save({ revenue_share_percent: parsed });
+  }
+
+  return (
+    <>
+      <label className={labelClass}>
+        Your split %
+        <input
+          type="number"
+          min={0}
+          max={100}
+          step="0.01"
+          value={percent}
+          onChange={(e) => setPercent(e.target.value)}
+          onBlur={savePercent}
+          disabled={saving}
+          placeholder="e.g. 20"
+          className={inputClass}
+        />
+      </label>
+      <label className={labelClass}>
+        Split applies to
+        <select
+          defaultValue={revenueShareScope ?? "all_production"}
+          onChange={(e) => save({ revenue_share_scope: e.target.value })}
+          disabled={saving}
+          className={inputClass}
+        >
+          {REVENUE_SHARE_SCOPES.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </>
   );
 }
 
@@ -532,7 +614,7 @@ function ProductionStats({ production }: { production: Record<string, unknown> |
   );
 }
 
-function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: string; payouts: Payout[]; hasPackage: boolean }) {
+function PayoutLedger({ connectionId, payouts, hasRevenueShare }: { connectionId: string; payouts: Payout[]; hasRevenueShare: boolean }) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
@@ -584,8 +666,8 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
           {generating ? "Calculating..." : "Calculate this month"}
         </button>
       </div>
-      {!hasPackage && (
-        <p className="mt-2 text-xs text-warning">No package assigned -- payouts will calculate with a 0% revenue share until one is set.</p>
+      {!hasRevenueShare && (
+        <p className="mt-2 text-xs text-warning">No revenue split set -- payouts will calculate at 0% until one is configured.</p>
       )}
       {payouts.length === 0 ? (
         <p className="mt-3 text-sm text-muted">No payouts calculated yet.</p>
@@ -656,8 +738,11 @@ export function FirmDetailClient({
   relationshipType,
   source,
   firmInfo,
+  canAssignPackages,
   packageId,
   packages,
+  revenueSharePercent,
+  revenueShareScope,
   bankPartnerId,
   banks,
   softwarePartnerId,
@@ -681,8 +766,11 @@ export function FirmDetailClient({
   relationshipType: string;
   source: string;
   firmInfo: FirmInfo;
+  canAssignPackages: boolean;
   packageId: string | null;
   packages: PackageOption[];
+  revenueSharePercent: number | null;
+  revenueShareScope: string | null;
   bankPartnerId: string | null;
   banks: PartnerOption[];
   softwarePartnerId: string | null;
@@ -735,7 +823,11 @@ export function FirmDetailClient({
           </dl>
         )}
         <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
-          <PackagePicker connectionId={connectionId} packageId={packageId} packages={packages} />
+          {canAssignPackages ? (
+            <PackagePicker connectionId={connectionId} packageId={packageId} packages={packages} />
+          ) : (
+            <SplitPercentInput connectionId={connectionId} revenueSharePercent={revenueSharePercent} revenueShareScope={revenueShareScope} />
+          )}
           <BankPicker connectionId={connectionId} bankPartnerId={bankPartnerId} banks={banks} />
           <SoftwarePicker connectionId={connectionId} softwarePartnerId={softwarePartnerId} softwareList={softwareList} />
         </div>
@@ -776,7 +868,7 @@ export function FirmDetailClient({
           </div>
 
           <div>
-            <PayoutLedger connectionId={connectionId} payouts={payouts} hasPackage={Boolean(packageId)} />
+            <PayoutLedger connectionId={connectionId} payouts={payouts} hasRevenueShare={revenueSharePercent != null} />
           </div>
         </>
       )}
