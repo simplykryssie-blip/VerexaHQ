@@ -17,9 +17,9 @@ export function BannerImageUpload({
   onChange,
   disabled,
   label = "Banner / letterhead image",
-  helpText = "Rendered at the top of the document, cropped to a fixed banner height -- a wide image (roughly 4:1) crops cleanest.",
+  helpText = "Rendered at the top of the document at full width, scaled to fit -- never cropped, so any aspect ratio works.",
   uploadPathPrefix = "banner",
-  imageClassName = "h-20 w-64 rounded-lg border border-border object-cover object-top",
+  imageClassName = "w-64 h-auto max-h-32 rounded-lg border border-border object-contain bg-surface",
 }: {
   workspaceId: string;
   value: string | null;

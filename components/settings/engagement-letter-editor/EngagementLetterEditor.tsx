@@ -288,7 +288,7 @@ export function EngagementLetterEditor({
                 {bannerImageUrl && (
                   <div className="mx-auto max-w-[720px] overflow-hidden rounded-t-sm">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={bannerImageUrl} alt="" className="w-full object-cover" />
+                    <img src={bannerImageUrl} alt="" className="w-full h-auto" />
                   </div>
                 )}
                 <RichTextEditor

@@ -32,7 +32,7 @@ export function PaginatedDocument({
       <div className="mx-auto w-full max-w-[816px] overflow-hidden rounded-sm bg-white shadow-lg ring-1 ring-border/60">
         {bannerImageUrl && index === 0 && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={bannerImageUrl} alt="" className="h-32 w-full object-cover object-top" />
+          <img src={bannerImageUrl} alt="" className="w-full h-auto max-h-40 object-contain" />
         )}
         <div className="min-h-[1056px]">
           {/* allowPageBreak registers the table/checklist extensions too (needed to
