@@ -62,10 +62,13 @@ type ValueKind =
   | "category"
   | "pipeline_stage"
   | "organizer_status"
+  | "document_signed_step"
   | "text"
   | "tag"
   | "number"
   | "boolean";
+
+export type DocumentSignatureStepOption = { id: string; name: string };
 
 type FieldMeta = {
   key: string;
@@ -185,7 +188,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "document_request.status", label: "Document request status", group: "Document request", valueKind: "select", options: DOCUMENT_REQUEST_STATUS_OPTIONS, ops: LIST_OPS },
   { key: "document_request.all_required_complete", label: "All required documents received", group: "Document request", valueKind: "boolean", ops: ["eq"] },
 
-  { key: "run.document_signed", label: "Document signed? (sent by \"Send a document for signature\")", group: "Workflow", valueKind: "boolean", ops: ["eq"] },
+  { key: "run.document_signed", label: "Document signed? (sent by \"Send a document for signature\")", group: "Workflow", valueKind: "document_signed_step", ops: ["eq", "neq"] },
 
   { key: "package_purchase.package_name", label: "Package name", group: "Package purchase", valueKind: "text", ops: SELECT_OPS },
   { key: "package_purchase.billing_cadence", label: "Package billing cadence", group: "Package purchase", valueKind: "select", options: ["monthly", "annual", "one_time"], ops: SELECT_OPS },
@@ -204,6 +207,7 @@ function ConditionRow({
   serviceCategories,
   pipelines,
   organizerTemplates,
+  documentSignatureSteps,
   tagOptions,
   disabled,
 }: {
@@ -215,6 +219,7 @@ function ConditionRow({
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
+  documentSignatureSteps: DocumentSignatureStepOption[];
   tagOptions: string[];
   disabled: boolean;
 }) {
@@ -226,6 +231,10 @@ function ConditionRow({
   // since a client can have responses to more than one organizer template
   // and the status alone doesn't say which one this condition means.
   const [organizerTemplateId, organizerStatusValue] = condition.value.split("|");
+  // "<step_id>|<true|false>" -- same composite-value pattern, since a
+  // workflow can send more than one document for signature and "signed?"
+  // alone doesn't say which one this condition means.
+  const [documentStepId, documentSignedValue] = condition.value.split("|");
 
   function setField(nextField: string) {
     const nextMeta = fieldMeta(nextField);
@@ -344,6 +353,40 @@ function ConditionRow({
                   </option>
                 ))}
               </select>
+            </>
+          )}
+
+          {meta.valueKind === "document_signed_step" && (
+            <>
+              <select
+                disabled={disabled}
+                value={documentStepId ?? ""}
+                onChange={(e) => setValue(`${e.target.value}|${documentSignedValue || "true"}`)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose a document
+                </option>
+                {documentSignatureSteps.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                disabled={disabled || !documentStepId}
+                value={documentSignedValue || "true"}
+                onChange={(e) => setValue(`${documentStepId ?? ""}|${e.target.value}`)}
+                className={inputClass}
+              >
+                <option value="true">Signed</option>
+                <option value="false">Not signed</option>
+              </select>
+              {documentSignatureSteps.length === 0 && (
+                <span className="text-[11px] text-warning">
+                  No &quot;Send a document for signature&quot; steps in this workflow yet -- add one first.
+                </span>
+              )}
             </>
           )}
 
@@ -483,6 +526,7 @@ export function ConditionsEditor({
   serviceCategories,
   pipelines,
   organizerTemplates,
+  documentSignatureSteps = [],
   tagOptions = [],
   disabled,
 }: {
@@ -493,6 +537,7 @@ export function ConditionsEditor({
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
+  documentSignatureSteps?: DocumentSignatureStepOption[];
   tagOptions?: string[];
   disabled?: boolean;
 }) {
@@ -548,6 +593,7 @@ export function ConditionsEditor({
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
+                documentSignatureSteps={documentSignatureSteps}
                 tagOptions={tagOptions}
                 disabled={Boolean(disabled)}
               />
@@ -577,6 +623,7 @@ export function ConditionGroupsEditor({
   serviceCategories,
   pipelines,
   organizerTemplates,
+  documentSignatureSteps = [],
   tagOptions = [],
   disabled,
 }: {
@@ -587,6 +634,7 @@ export function ConditionGroupsEditor({
   serviceCategories: TemplateOption[];
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
+  documentSignatureSteps?: DocumentSignatureStepOption[];
   tagOptions?: string[];
   disabled?: boolean;
 }) {
@@ -649,6 +697,7 @@ export function ConditionGroupsEditor({
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}
+              documentSignatureSteps={documentSignatureSteps}
               tagOptions={tagOptions}
               disabled={disabled}
             />

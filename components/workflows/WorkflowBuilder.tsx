@@ -60,6 +60,7 @@ import {
   conditionGroupsAreEmpty,
   type Condition,
   type ConditionGroup,
+  type DocumentSignatureStepOption,
 } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
@@ -324,6 +325,7 @@ export function StepCard({
   pipelines,
   staffOptions,
   automationOptions,
+  documentSignatureSteps = [],
   tagOptions = [],
   roleOptions = [],
   canManage,
@@ -344,6 +346,7 @@ export function StepCard({
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
+  documentSignatureSteps?: DocumentSignatureStepOption[];
   tagOptions?: string[];
   roleOptions?: RoleOption[];
   canManage: boolean;
@@ -724,6 +727,7 @@ export function StepCard({
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
+                documentSignatureSteps={documentSignatureSteps}
                 disabled={!canManage}
               />
             </div>

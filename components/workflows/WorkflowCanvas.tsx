@@ -1058,6 +1058,13 @@ function CanvasInner({
     }
     return map;
   }, [steps]);
+  const documentSignatureSteps = useMemo(
+    () =>
+      steps
+        .filter((s) => s.action_type === "send_document_for_signature")
+        .map((s) => ({ id: s.id, name: s.display_name ?? "Send a document for signature" })),
+    [steps]
+  );
 
   return (
     <div className="flex h-[600px] overflow-hidden rounded-xl border border-border">
@@ -1184,6 +1191,7 @@ function CanvasInner({
               pipelines={pipelines}
               staffOptions={staffOptions}
               automationOptions={automationOptions}
+              documentSignatureSteps={documentSignatureSteps}
               tagOptions={tagOptions}
               roleOptions={roleOptions}
               canManage={canManage}
@@ -1216,6 +1224,7 @@ function CanvasInner({
               serviceCategories={serviceCategories}
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}
+              documentSignatureSteps={documentSignatureSteps}
               tagOptions={tagOptions}
               canManage={canManage}
               onSaved={() => router.refresh()}
