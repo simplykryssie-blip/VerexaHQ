@@ -24,7 +24,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   const { data: canView } = await supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "firm_connections.manage" });
   if (!canView) {
     return (
-      <div className="max-w-4xl">
+      <div className="max-w-4xl px-8 py-6">
         <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
           <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
         </Link>
@@ -72,7 +72,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   ]);
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl px-8 py-6">
       <Link href="/firms" className="mb-3 inline-flex items-center gap-1 text-xs font-medium text-muted hover:text-ink">
         <ArrowLeft size={14} aria-hidden="true" /> Back to Firms
       </Link>
