@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Settings2, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { TemplateStatusCycle } from "@/components/settings/TemplateStatusCycle";
@@ -72,7 +72,7 @@ function PackageCard({ pkg, canManage, onDeleted }: { pkg: PackageRow; canManage
           href={`/settings/packages/${pkg.id}`}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-accent hover:underline"
         >
-          <Settings2 size={13} /> Manage options
+          <Pencil size={13} /> Edit package
         </Link>
         {canManage && (
           <button

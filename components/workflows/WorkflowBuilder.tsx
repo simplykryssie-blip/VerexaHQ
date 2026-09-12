@@ -44,6 +44,8 @@ import {
   ShieldCheck,
   ShieldX,
   FlaskConical,
+  FileCheck2,
+  Upload,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
@@ -58,6 +60,7 @@ import {
   conditionGroupsAreEmpty,
   type Condition,
   type ConditionGroup,
+  type DocumentSignatureStepOption,
 } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
@@ -158,6 +161,7 @@ export const ACTION_TYPES = [
   { value: "send_organizer_template", label: "Push a form to the client's portal", category: "documents_organizers", description: "Send an intake form to the client's portal.", keywords: "intake form organizer" },
   { value: "create_engagement", label: "Create the engagement", category: "pipeline_engagements", description: "Create the engagement (form-submission workflows only). Add a \"Move to a pipeline stage\" step after this to put it in a pipeline.", keywords: "engagement create" },
   { value: "send_engagement_letter", label: "Send the document for signature", category: "tax_workflow", description: "Queue the document for e-signature.", keywords: "signature sign document letter" },
+  { value: "send_document_for_signature", label: "Send a document for signature", category: "documents_organizers", description: "Upload a document once and send it to whoever this workflow is about -- a client, or a connected firm during onboarding -- for e-signature. Works without an engagement.", keywords: "signature sign document firm onboarding connection ero ptin" },
   { value: "change_stage", label: "Advance to the next pipeline stage", category: "pipeline_engagements", description: "Advance the client or engagement to the next stage in its active pipeline.", keywords: "stage advance pipeline" },
   { value: "send_document_request", label: "Send a document request", category: "documents_organizers", description: "Send a document request built from a template.", keywords: "documents upload request" },
   { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
@@ -217,6 +221,7 @@ export function actionIcon(type: string) {
   if (type === "send_organizer_template") return <BookOpen size={15} />;
   if (type === "create_engagement") return <Workflow size={15} />;
   if (type === "send_engagement_letter") return <FileSignature size={15} />;
+  if (type === "send_document_for_signature") return <FileCheck2 size={15} />;
   if (type === "change_stage") return <ArrowRightCircle size={15} />;
   if (type === "send_document_request") return <FolderInput size={15} />;
   if (type === "assign_user") return <UserCog size={15} />;
@@ -320,6 +325,7 @@ export function StepCard({
   pipelines,
   staffOptions,
   automationOptions,
+  documentSignatureSteps = [],
   tagOptions = [],
   roleOptions = [],
   canManage,
@@ -340,6 +346,7 @@ export function StepCard({
   pipelines: PipelineOption[];
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
+  documentSignatureSteps?: DocumentSignatureStepOption[];
   tagOptions?: string[];
   roleOptions?: RoleOption[];
   canManage: boolean;
@@ -389,6 +396,8 @@ export function StepCard({
   // Organizer/engagement letter templates need their full builder page to get
   // real content -- point staff at it right after the quick-create stub saves.
   const [justCreatedLink, setJustCreatedLink] = useState<{ kind: "organizer" | "engagement_letter"; id: string; name: string } | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [tagDraft, setTagDraft] = useState("");
 
   const emailOptions = [...emailTemplates, ...extraEmailTemplates.filter((e) => !emailTemplates.some((t) => t.id === e.id))];
   const smsOptions = [...smsTemplates, ...extraSmsTemplates.filter((e) => !smsTemplates.some((t) => t.id === e.id))];
@@ -424,6 +433,45 @@ export function StepCard({
     setSaved(false);
   }
 
+  // Uploaded once, directly, when the step is configured -- unlike
+  // send_engagement_letter's per-recipient rendered PDF, this same static
+  // file is what gets sent on every run of this step, so there's nothing
+  // for execute_automation_step (pure SQL, no Storage access) to render at
+  // send time -- it just points a new signature_requests row at this
+  // attachment_id.
+  async function uploadSignatureDocument(file: File) {
+    setUploadingDocument(true);
+    const path = `${workspaceId}/${step.id}/${Date.now()}-${file.name}`;
+    const { error: uploadErr } = await supabase.storage.from("client-documents").upload(path, file);
+    if (uploadErr) {
+      setUploadingDocument(false);
+      toast.show(uploadErr.message, "error");
+      return;
+    }
+    const { data, error: insertErr } = await supabase
+      .from("attachments")
+      .insert({
+        workspace_id: workspaceId,
+        entity_type: "document",
+        entity_id: step.id,
+        file_name: file.name,
+        storage_path: path,
+        mime_type: file.type || null,
+        file_size_bytes: file.size,
+        visibility: "internal",
+        category: "Signed Document",
+      })
+      .select("id")
+      .single();
+    setUploadingDocument(false);
+    if (insertErr || !data) {
+      toast.show(insertErr?.message ?? "Could not save this document", "error");
+      return;
+    }
+    setField("attachment_id", (data as { id: string }).id);
+    setField("attachment_name", file.name);
+  }
+
   function changeDelayUnit(nextUnit: "minutes" | "days") {
     const currentMinutes = delayUnit === "days" ? (parseFloat(delayValue) || 0) * 1440 : parseFloat(delayValue) || 0;
     setDelayUnit(nextUnit);
@@ -443,8 +491,24 @@ export function StepCard({
   // after that auto-save and yank away the "now edit your new template"
   // editor before it ever had a chance to show.
   async function save(configOverride?: Record<string, unknown>, options?: { silent?: boolean }) {
-    const configToSave = configOverride ?? config;
+    let configToSave = configOverride ?? config;
     if (actionType === "add_tag" || actionType === "remove_tag") {
+      // Folds in whatever's still sitting in the "Add a tag..." box, typed
+      // but never confirmed with Enter or a dropdown click -- clicking this
+      // very Save button is itself the outside-click that would normally
+      // commit it, but that commit and this save fire in the same event
+      // batch, so the tag list state it updates isn't visible yet to the
+      // `config` this function already closed over. Reading the draft
+      // directly here (kept in sync on every keystroke, not just on
+      // commit) sidesteps that race entirely.
+      const draftTag = tagDraft.trim();
+      if (draftTag) {
+        const existingTags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
+        if (!existingTags.includes(draftTag)) {
+          configToSave = { ...configToSave, tags: [...existingTags, draftTag] };
+          setConfig(configToSave);
+        }
+      }
       const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
       if (tags.length > 0 && !(await ensureTagsConfirmed(supabase, workspaceId, tags))) return;
     }
@@ -680,6 +744,7 @@ export function StepCard({
                 serviceCategories={serviceCategories}
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
+                documentSignatureSteps={documentSignatureSteps}
                 disabled={!canManage}
               />
             </div>
@@ -1186,6 +1251,44 @@ export function StepCard({
           </label>
         )}
 
+        {actionType === "send_document_for_signature" && (
+          <>
+            <label className="col-span-2 flex flex-col gap-1 text-xs text-muted">
+              Document to send
+              <div className="flex items-center gap-2">
+                <label
+                  className={`inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:bg-surfaceMuted ${
+                    !canManage || uploadingDocument ? "pointer-events-none opacity-60" : ""
+                  }`}
+                >
+                  <Upload size={13} />
+                  {uploadingDocument ? "Uploading..." : config.attachment_id ? "Replace document" : "Upload a document"}
+                  <input
+                    type="file"
+                    disabled={!canManage || uploadingDocument}
+                    onChange={(e) => e.target.files?.[0] && uploadSignatureDocument(e.target.files[0])}
+                    className="sr-only"
+                  />
+                </label>
+                {config.attachment_name ? <span className="text-xs normal-case text-ink">{config.attachment_name as string}</span> : null}
+              </div>
+              <span className="text-[11px] normal-case text-muted">
+                Uploaded once here -- every run of this step sends this same document. Goes to the client on a client-facing
+                workflow, or to the connected firm when this fires from an ERO/PTIN onboarding trigger with no client attached
+                (e.g. &quot;A connected firm purchases a package&quot;).
+              </span>
+            </label>
+            <MergeableField
+              label="Signature request title"
+              fieldKey="title"
+              config={config}
+              setField={setField}
+              canManage={canManage}
+              placeholder="Please sign this document"
+            />
+          </>
+        )}
+
         {actionType === "change_stage" && (
           <p className="col-span-2 rounded-lg border border-border bg-surfaceMuted px-3 py-2 text-xs text-muted">
             Marks the current pipeline stage complete, moving into the next stage -- the engagement&apos;s pipeline if this run has an
@@ -1621,6 +1724,7 @@ export function StepCard({
                 setConfig((c) => ({ ...c, tags: v }));
                 setSaved(false);
               }}
+              onDraftChange={setTagDraft}
               tagOptions={tagOptions}
             />
           </label>
@@ -1832,6 +1936,7 @@ export function WorkflowBuilder({
   const [conditions, setConditions] = useState<ConditionGroup[]>(() => normalizeToConditionGroups(initialConditions));
   const [savingTrigger, setSavingTrigger] = useState(false);
   const [triggerModalOpen, setTriggerModalOpen] = useState(false);
+  const [triggerTagDraft, setTriggerTagDraft] = useState("");
   const [openRunId, setOpenRunId] = useState<string | null>(null);
   const [activityOpen, setActivityOpen] = useState(initialActivityOpen);
   const [testModalOpen, setTestModalOpen] = useState(false);
@@ -1855,9 +1960,26 @@ export function WorkflowBuilder({
   }, [triggerType, triggerConfig, isEnabled, status, initialConditions]);
 
   async function saveTrigger() {
+    // Same race as StepCard's add_tag/remove_tag save: clicking "Save
+    // trigger" right after typing a tag (no Enter, no dropdown click) is
+    // itself the outside-click that would commit it, but that commit and
+    // this save happen in the same event batch -- fold in whatever's still
+    // sitting in the box before reading `config`.
+    let effectiveConfig = config;
+    if (currentTriggerType === "client.tag_added") {
+      const draftTag = triggerTagDraft.trim();
+      if (draftTag) {
+        const existingTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
+        if (!existingTags.includes(draftTag)) {
+          effectiveConfig = { ...effectiveConfig, tags: [...existingTags, draftTag] };
+          setConfig(effectiveConfig);
+        }
+      }
+    }
+
     const tagsToConfirm = new Set(collectClientTagValues(conditions.flatMap((g) => g.conditions)));
     if (currentTriggerType === "client.tag_added") {
-      const triggerTags = (config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : []);
+      const triggerTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
       triggerTags.forEach((t) => tagsToConfirm.add(t));
     }
     if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return;
@@ -1865,7 +1987,7 @@ export function WorkflowBuilder({
     setSavingTrigger(true);
     const { error } = await supabase
       .from("automations")
-      .update({ trigger_type: currentTriggerType, trigger_config: config as never, conditions: conditions as never })
+      .update({ trigger_type: currentTriggerType, trigger_config: effectiveConfig as never, conditions: conditions as never })
       .eq("id", automationId);
     setSavingTrigger(false);
     if (error) {
@@ -2121,6 +2243,7 @@ export function WorkflowBuilder({
               tagOptions={tagOptions}
               webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
               disabled={!canManage}
+              onTagDraftChange={setTriggerTagDraft}
             />
 
             <div className="mt-4 border-t border-border pt-3">

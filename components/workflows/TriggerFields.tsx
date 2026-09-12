@@ -290,6 +290,7 @@ export function TriggerFields({
   tagOptions = [],
   webhookUrl,
   disabled,
+  onTagDraftChange,
 }: {
   triggerType: string;
   onTriggerTypeChange: (t: string) => void;
@@ -301,6 +302,10 @@ export function TriggerFields({
   tagOptions?: string[];
   webhookUrl?: string;
   disabled?: boolean;
+  /** See TagListInput's onDraftChange -- lets the Save trigger button fold
+   * in a typed-but-uncommitted tag at save time instead of losing it to the
+   * same-event-batch race. */
+  onTagDraftChange?: (draft: string) => void;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
   return (
@@ -382,6 +387,7 @@ export function TriggerFields({
             disabled={disabled}
             value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
             onChange={(v) => onConfigChange({ tags: v })}
+            onDraftChange={onTagDraftChange}
             tagOptions={tagOptions}
           />
         </label>
