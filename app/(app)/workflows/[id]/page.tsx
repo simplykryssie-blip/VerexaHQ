@@ -12,6 +12,7 @@ import {
   type AutomationOption,
   type RoleOption,
   type PendingApprovalRow,
+  type PendingDecisionRow,
 } from "@/components/workflows/WorkflowBuilder";
 import { WorkflowNameEditor } from "@/components/workflows/WorkflowNameEditor";
 import type { PipelineOption, TemplateOption } from "@/components/workflows/TriggerFields";
@@ -54,6 +55,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
     { data: tagRows },
     { data: rolesRaw },
     { data: pendingApprovalsRaw },
+    { data: pendingDecisionsRaw },
   ] = await Promise.all([
       supabase
         .from("automation_steps")
@@ -148,6 +150,14 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
         .eq("status", "pending_approval")
         .eq("automation_runs.automation_id", automation.id)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("automation_pending_steps")
+        .select(
+          "id, created_at, automation_steps(display_name, action_config), automation_runs!inner(automation_id, engagements(engagement_number), clients(first_name, last_name, business_name))"
+        )
+        .eq("status", "pending_decision")
+        .eq("automation_runs.automation_id", automation.id)
+        .order("created_at", { ascending: true }),
     ]);
 
   const stepRows: WorkflowStepRow[] = (steps ?? []).map((s) => ({
@@ -178,6 +188,23 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
       created_at: p.created_at,
       step_display_name: step?.display_name ?? null,
       action_type: step?.action_type ?? "step",
+      engagement_number: run?.engagements?.engagement_number ?? null,
+      client_name: client ? client.business_name || [client.first_name, client.last_name].filter(Boolean).join(" ") || null : null,
+    };
+  });
+
+  const pendingDecisions: PendingDecisionRow[] = (pendingDecisionsRaw ?? []).map((p) => {
+    const step = p.automation_steps as unknown as { display_name: string | null; action_config: Record<string, unknown> | null } | null;
+    const run = p.automation_runs as unknown as {
+      engagements: { engagement_number: string | null } | null;
+      clients: { first_name: string | null; last_name: string | null; business_name: string | null } | null;
+    } | null;
+    const client = run?.clients;
+    return {
+      id: p.id,
+      created_at: p.created_at,
+      step_display_name: step?.display_name ?? null,
+      options: (step?.action_config?.decision_options as { key: string; label: string }[] | undefined) ?? [],
       engagement_number: run?.engagements?.engagement_number ?? null,
       client_name: client ? client.business_name || [client.first_name, client.last_name].filter(Boolean).join(" ") || null : null,
     };
@@ -262,6 +289,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: { par
           tagOptions={tagOptions}
           roleOptions={roleOptions}
           pendingApprovals={pendingApprovals}
+          pendingDecisions={pendingDecisions}
           conditions={(automation.conditions as unknown as Condition[] | ConditionGroup[]) ?? []}
           webhookToken={automation.webhook_token}
           initialActivityOpen={searchParams.activity === "1"}

@@ -929,6 +929,7 @@ export type Database = {
           approved_by: string | null
           automation_step_id: string
           created_at: string
+          decided_option: string | null
           id: string
           rejected_reason: string | null
           run_id: string
@@ -941,6 +942,7 @@ export type Database = {
           approved_by?: string | null
           automation_step_id: string
           created_at?: string
+          decided_option?: string | null
           id?: string
           rejected_reason?: string | null
           run_id: string
@@ -953,6 +955,7 @@ export type Database = {
           approved_by?: string | null
           automation_step_id?: string
           created_at?: string
+          decided_option?: string | null
           id?: string
           rejected_reason?: string | null
           run_id?: string
@@ -11593,6 +11596,10 @@ export type Database = {
       }
       current_workspace_ids: { Args: never; Returns: string[] }
       debug_whoami: { Args: never; Returns: string }
+      decide_automation_step: {
+        Args: { p_decided_option: string; p_pending_step_id: string }
+        Returns: Json
+      }
       decline_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined

@@ -61,6 +61,7 @@ import {
   type Condition,
   type ConditionGroup,
   type DocumentSignatureStepOption,
+  type DecisionStepOption,
 } from "@/components/workflows/ConditionsEditor";
 import { TemplateEditRow } from "@/components/settings/TemplateEditRow";
 import { CreateTemplateForm } from "@/components/settings/CreateTemplateForm";
@@ -98,6 +99,15 @@ export type PendingApprovalRow = {
   created_at: string;
   step_display_name: string | null;
   action_type: string;
+  engagement_number: string | null;
+  client_name: string | null;
+};
+
+export type PendingDecisionRow = {
+  id: string;
+  created_at: string;
+  step_display_name: string | null;
+  options: { key: string; label: string }[];
   engagement_number: string | null;
   client_name: string | null;
 };
@@ -326,6 +336,7 @@ export function StepCard({
   staffOptions,
   automationOptions,
   documentSignatureSteps = [],
+  decisionSteps = [],
   tagOptions = [],
   roleOptions = [],
   canManage,
@@ -347,6 +358,7 @@ export function StepCard({
   staffOptions: StaffOption[];
   automationOptions: AutomationOption[];
   documentSignatureSteps?: DocumentSignatureStepOption[];
+  decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
   roleOptions?: RoleOption[];
   canManage: boolean;
@@ -745,6 +757,7 @@ export function StepCard({
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
                 documentSignatureSteps={documentSignatureSteps}
+                decisionSteps={decisionSteps}
                 disabled={!canManage}
               />
             </div>
@@ -1891,6 +1904,7 @@ export function WorkflowBuilder({
   tagOptions = [],
   roleOptions = [],
   pendingApprovals = [],
+  pendingDecisions = [],
   conditions: initialConditions = [],
   webhookToken,
   initialActivityOpen = false,
@@ -1919,6 +1933,7 @@ export function WorkflowBuilder({
   tagOptions?: string[];
   roleOptions?: RoleOption[];
   pendingApprovals?: PendingApprovalRow[];
+  pendingDecisions?: PendingDecisionRow[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
   /** Set when a dashboard "Failed Automation Runs" card links here with
@@ -2121,6 +2136,16 @@ export function WorkflowBuilder({
     router.refresh();
   }
 
+  async function decidePendingStep(pendingStepId: string, optionKey: string) {
+    const { error } = await supabase.rpc("decide_automation_step", { p_pending_step_id: pendingStepId, p_decided_option: optionKey });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Decision recorded -- the workflow will continue", "success");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -2151,9 +2176,9 @@ export function WorkflowBuilder({
               className="relative inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-slate hover:border-accent hover:text-accent"
             >
               <History size={14} /> Activity{runs.length > 0 ? ` (${runs.length})` : ""}
-              {pendingApprovals.length > 0 && (
+              {pendingApprovals.length + pendingDecisions.length > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">
-                  {pendingApprovals.length}
+                  {pendingApprovals.length + pendingDecisions.length}
                 </span>
               )}
             </button>
@@ -2319,6 +2344,41 @@ export function WorkflowBuilder({
                           >
                             <ShieldX size={13} /> Reject
                           </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleSection>
+              </div>
+            )}
+
+            {pendingDecisions.length > 0 && (
+              <div className="mb-6">
+                <CollapsibleSection title="Awaiting decision" count={pendingDecisions.length}>
+                  <ul className="divide-y divide-border rounded-lg border border-border bg-surface text-sm">
+                    {pendingDecisions.map((p) => (
+                      <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+                        <div>
+                          <p className="font-medium text-ink">{p.step_display_name || "Decision"}</p>
+                          <p className="text-xs text-muted">
+                            {p.client_name ?? p.engagement_number ?? "--"} &middot; waiting since {new Date(p.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {p.options.length === 0 ? (
+                            <span className="text-xs text-warning">No outcomes configured on this step.</span>
+                          ) : (
+                            p.options.map((o) => (
+                              <button
+                                key={o.key}
+                                type="button"
+                                onClick={() => decidePendingStep(p.id, o.key)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-accent/30 px-2.5 py-1 text-xs font-medium text-accent hover:bg-accentSoft"
+                              >
+                                {o.label}
+                              </button>
+                            ))
+                          )}
                         </div>
                       </li>
                     ))}
