@@ -10,7 +10,7 @@ const inputClass = "mt-1 w-full max-w-xs rounded-lg border border-border px-3 py
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
 const cardClass = "rounded-2xl border border-border bg-surface p-4 shadow-soft";
 
-type FirmInfo = { ownerName: string | null; phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
+type FirmInfo = { name: string; ownerName: string | null; phone: string | null; primaryContactEmail: string | null; website: string | null; mailingAddress: string | null };
 type PackageOption = { id: string; name: string };
 type PartnerOption = { id: string; name: string };
 type Payout = {
@@ -31,6 +31,75 @@ type Payout = {
 
 function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Editable in place -- a manual firm has no workspace of its own to enter
+// this, so the parent's own record IS the source of truth (unlike the
+// read-only <dl> for a real workspace connection, whose firm controls these
+// fields from their own Settings).
+function ManualFirmInfo({ connectionId, firmInfo }: { connectionId: string; firmInfo: FirmInfo }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [name, setName] = useState(firmInfo.name);
+  const [ownerName, setOwnerName] = useState(firmInfo.ownerName ?? "");
+  const [phone, setPhone] = useState(firmInfo.phone ?? "");
+  const [email, setEmail] = useState(firmInfo.primaryContactEmail ?? "");
+  const [website, setWebsite] = useState(firmInfo.website ?? "");
+  const [address, setAddress] = useState(firmInfo.mailingAddress ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!name.trim()) {
+      toast.show("A firm name is required.", "error");
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.rpc("update_manual_firm_connection", {
+      p_connection_id: connectionId,
+      p_name: name.trim(),
+      p_owner_name: ownerName.trim() || undefined,
+      p_phone: phone.trim() || undefined,
+      p_email: email.trim() || undefined,
+      p_website: website.trim() || undefined,
+      p_address: address.trim() || undefined,
+    });
+    setSaving(false);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+      <label className={labelClass}>
+        Firm name
+        <input value={name} onChange={(e) => setName(e.target.value)} onBlur={save} disabled={saving} className={`${inputClass} max-w-none`} />
+      </label>
+      <label className={labelClass}>
+        Owner name
+        <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} onBlur={save} disabled={saving} className={`${inputClass} max-w-none`} />
+      </label>
+      <label className={labelClass}>
+        Contact email
+        <input value={email} onChange={(e) => setEmail(e.target.value)} onBlur={save} disabled={saving} className={`${inputClass} max-w-none`} />
+      </label>
+      <label className={labelClass}>
+        Phone
+        <input value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={save} disabled={saving} className={`${inputClass} max-w-none`} />
+      </label>
+      <label className={labelClass}>
+        Website
+        <input value={website} onChange={(e) => setWebsite(e.target.value)} onBlur={save} disabled={saving} className={`${inputClass} max-w-none`} />
+      </label>
+      <label className={labelClass}>
+        Mailing address
+        <input value={address} onChange={(e) => setAddress(e.target.value)} onBlur={save} disabled={saving} className={`${inputClass} max-w-none`} />
+      </label>
+    </dl>
+  );
 }
 
 function PackagePicker({ connectionId, packageId, packages }: { connectionId: string; packageId: string | null; packages: PackageOption[] }) {
@@ -585,6 +654,7 @@ function PayoutLedger({ connectionId, payouts, hasPackage }: { connectionId: str
 export function FirmDetailClient({
   connectionId,
   relationshipType,
+  source,
   firmInfo,
   packageId,
   packages,
@@ -609,6 +679,7 @@ export function FirmDetailClient({
   connectionId: string;
   parentWorkspaceId: string;
   relationshipType: string;
+  source: string;
   firmInfo: FirmInfo;
   packageId: string | null;
   packages: PackageOption[];
@@ -634,28 +705,35 @@ export function FirmDetailClient({
     <div className="mt-4 space-y-6">
       <div className={cardClass}>
         <p className="text-xs font-semibold uppercase tracking-wide text-ink">Firm info</p>
-        <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className={labelClass}>Owner name</dt>
-            <dd className="text-slate">{firmInfo.ownerName ?? "--"}</dd>
-          </div>
-          <div>
-            <dt className={labelClass}>Contact email</dt>
-            <dd className="text-slate">{firmInfo.primaryContactEmail ?? "--"}</dd>
-          </div>
-          <div>
-            <dt className={labelClass}>Phone</dt>
-            <dd className="text-slate">{firmInfo.phone ?? "--"}</dd>
-          </div>
-          <div>
-            <dt className={labelClass}>Website</dt>
-            <dd className="text-slate">{firmInfo.website ?? "--"}</dd>
-          </div>
-          <div>
-            <dt className={labelClass}>Mailing address</dt>
-            <dd className="text-slate">{firmInfo.mailingAddress ?? "--"}</dd>
-          </div>
-        </dl>
+        {source === "manual" ? (
+          <>
+            <p className="mt-1 text-xs text-muted">This firm doesn&apos;t use VerexaHQ -- you keep this info up to date yourself.</p>
+            <ManualFirmInfo connectionId={connectionId} firmInfo={firmInfo} />
+          </>
+        ) : (
+          <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className={labelClass}>Owner name</dt>
+              <dd className="text-slate">{firmInfo.ownerName ?? "--"}</dd>
+            </div>
+            <div>
+              <dt className={labelClass}>Contact email</dt>
+              <dd className="text-slate">{firmInfo.primaryContactEmail ?? "--"}</dd>
+            </div>
+            <div>
+              <dt className={labelClass}>Phone</dt>
+              <dd className="text-slate">{firmInfo.phone ?? "--"}</dd>
+            </div>
+            <div>
+              <dt className={labelClass}>Website</dt>
+              <dd className="text-slate">{firmInfo.website ?? "--"}</dd>
+            </div>
+            <div>
+              <dt className={labelClass}>Mailing address</dt>
+              <dd className="text-slate">{firmInfo.mailingAddress ?? "--"}</dd>
+            </div>
+          </dl>
+        )}
         <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
           <PackagePicker connectionId={connectionId} packageId={packageId} packages={packages} />
           <BankPicker connectionId={connectionId} bankPartnerId={bankPartnerId} banks={banks} />
@@ -682,14 +760,26 @@ export function FirmDetailClient({
         notes={notes}
       />
 
-      <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink">Production</p>
-        <ProductionStats production={production} />
-      </div>
+      {source === "manual" ? (
+        <div className={cardClass}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink">Production &amp; payouts</p>
+          <p className="mt-1 text-xs text-muted">
+            Not available for a manually-added firm -- production and payouts are calculated from activity in a connected VerexaHQ workspace, which this
+            firm doesn&apos;t have.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink">Production</p>
+            <ProductionStats production={production} />
+          </div>
 
-      <div>
-        <PayoutLedger connectionId={connectionId} payouts={payouts} hasPackage={Boolean(packageId)} />
-      </div>
+          <div>
+            <PayoutLedger connectionId={connectionId} payouts={payouts} hasPackage={Boolean(packageId)} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

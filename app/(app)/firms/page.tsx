@@ -9,6 +9,7 @@ import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
+import { AddManualFirmModal } from "@/components/firms/AddManualFirmModal";
 
 export const dynamic = "force-dynamic";
 
@@ -80,8 +81,14 @@ export default async function FirmsPage() {
           <StatTile icon={Building2} tone="violet" label="EROs" value={eroCount} />
           <StatTile icon={Building2} tone="amber" label="PTINs" value={ptinCount} />
         </div>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted">
+            A firm on VerexaHQ connects by invite (Settings &gt; Users &amp; Staff). A firm that isn&apos;t on VerexaHQ can be added here directly.
+          </p>
+          {childRelationshipTypes.length > 0 && <AddManualFirmModal workspaceId={workspace.id} availableRelationshipTypes={childRelationshipTypes} />}
+        </div>
         {firms.length === 0 ? (
-          <EmptyState message="No firms connected yet. Invite one from Settings > Users & Staff." />
+          <EmptyState message="No firms connected yet. Invite one from Settings > Users & Staff, or add one manually above." />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {firms.map((f) => (
@@ -100,7 +107,10 @@ export default async function FirmsPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <Badge tone={f.status === "active" ? "success" : "neutral"}>{f.status}</Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge tone={f.status === "active" ? "success" : "neutral"}>{f.status}</Badge>
+                    {f.source === "manual" && <Badge tone="neutral">Manual</Badge>}
+                  </div>
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
                     View <ArrowRight size={12} aria-hidden="true" />
                   </span>

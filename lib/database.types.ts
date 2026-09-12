@@ -4379,6 +4379,12 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
           notes: string | null
           onboarding_stage: string | null
           package_id: string | null
@@ -4392,6 +4398,7 @@ export type Database = {
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           software_partner_id: string | null
+          source: string
           status: string
           updated_at: string
         }
@@ -4408,6 +4415,12 @@ export type Database = {
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
+          manual_address?: string | null
+          manual_email?: string | null
+          manual_name?: string | null
+          manual_owner_name?: string | null
+          manual_phone?: string | null
+          manual_website?: string | null
           notes?: string | null
           onboarding_stage?: string | null
           package_id?: string | null
@@ -4421,6 +4434,7 @@ export type Database = {
           restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           software_partner_id?: string | null
+          source?: string
           status?: string
           updated_at?: string
         }
@@ -4437,6 +4451,12 @@ export type Database = {
           invite_expires_at?: string | null
           invite_token?: string | null
           invited_by?: string | null
+          manual_address?: string | null
+          manual_email?: string | null
+          manual_name?: string | null
+          manual_owner_name?: string | null
+          manual_phone?: string | null
+          manual_website?: string | null
           notes?: string | null
           onboarding_stage?: string | null
           package_id?: string | null
@@ -4450,6 +4470,7 @@ export type Database = {
           restrict_ptin_staff_assignment?: boolean
           shares_communications_identity?: boolean
           software_partner_id?: string | null
+          source?: string
           status?: string
           updated_at?: string
         }
@@ -10916,6 +10937,12 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
           notes: string | null
           onboarding_stage: string | null
           package_id: string | null
@@ -10929,6 +10956,7 @@ export type Database = {
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           software_partner_id: string | null
+          source: string
           status: string
           updated_at: string
         }
@@ -11279,6 +11307,12 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
           notes: string | null
           onboarding_stage: string | null
           package_id: string | null
@@ -11292,6 +11326,7 @@ export type Database = {
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           software_partner_id: string | null
+          source: string
           status: string
           updated_at: string
         }
@@ -11312,6 +11347,61 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      create_manual_firm_connection: {
+        Args: {
+          p_address?: string
+          p_email?: string
+          p_name: string
+          p_notes?: string
+          p_owner_name?: string
+          p_phone?: string
+          p_relationship_type: string
+          p_website?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          default_reviewer_id: string | null
+          filed_under_connection_id: string | null
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
+          notes: string | null
+          onboarding_stage: string | null
+          package_id: string | null
+          parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
+          preparer_credential: string | null
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
+          shares_communications_identity: boolean
+          software_partner_id: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_notification: {
         Args: {
@@ -11604,6 +11694,7 @@ export type Database = {
           shares_communications_identity: boolean
           software_partner_id: string
           software_partner_name: string
+          source: string
           status: string
           website: string
         }[]
@@ -12317,6 +12408,12 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
           notes: string | null
           onboarding_stage: string | null
           package_id: string | null
@@ -12330,6 +12427,7 @@ export type Database = {
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           software_partner_id: string | null
+          source: string
           status: string
           updated_at: string
         }
@@ -12375,6 +12473,12 @@ export type Database = {
           invite_expires_at: string | null
           invite_token: string | null
           invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
           notes: string | null
           onboarding_stage: string | null
           package_id: string | null
@@ -12388,6 +12492,7 @@ export type Database = {
           restrict_ptin_staff_assignment: boolean
           shares_communications_identity: boolean
           software_partner_id: string | null
+          source: string
           status: string
           updated_at: string
         }
@@ -12959,6 +13064,59 @@ export type Database = {
           p_status: string
         }
         Returns: undefined
+      }
+      update_manual_firm_connection: {
+        Args: {
+          p_address?: string
+          p_connection_id: string
+          p_email?: string
+          p_name: string
+          p_owner_name?: string
+          p_phone?: string
+          p_website?: string
+        }
+        Returns: {
+          allows_branding_override: boolean
+          allows_learning_hub_downline_share: boolean
+          bank_partner_id: string | null
+          billing_responsibility: string
+          child_workspace_id: string | null
+          created_at: string
+          default_reviewer_id: string | null
+          filed_under_connection_id: string | null
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          manual_address: string | null
+          manual_email: string | null
+          manual_name: string | null
+          manual_owner_name: string | null
+          manual_phone: string | null
+          manual_website: string | null
+          notes: string | null
+          onboarding_stage: string | null
+          package_id: string | null
+          parent_workspace_id: string
+          partner_software_used: string[]
+          partner_tax_programs: string[]
+          preparer_credential: string | null
+          relationship_type: string
+          responded_at: string | null
+          responded_by: string | null
+          restrict_ptin_staff_assignment: boolean
+          shares_communications_identity: boolean
+          software_partner_id: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_platform_account_holder: {
         Args: {
