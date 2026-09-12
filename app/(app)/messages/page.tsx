@@ -197,7 +197,7 @@ export default async function MessagesHubPage() {
         }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className={`grid grid-cols-2 gap-4 ${hasTeam && hasNetwork ? "sm:grid-cols-4" : "sm:grid-cols-2"}`}>
+        <div className={`grid gap-4 ${hasTeam && hasNetwork ? "grid-cols-4" : "grid-cols-3"}`}>
           {hasTeam && <StatTile icon={Users} tone="accent" label="Team threads" value={internalThreads.length} />}
           {hasNetwork && <StatTile icon={Network} tone="violet" label="Network threads" value={networkThreads.length} />}
           <StatTile icon={MailWarning} tone="rose" label="Unread" value={totalUnread} />

@@ -58,7 +58,7 @@ export default async function WebsitesPage() {
         subtitle="Public marketing sites, funnels, and lead-capture forms, hosted at your workspace's own address."
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={Globe} tone="accent" label="Websites" value={cards.length} />
           <StatTile icon={CheckCircle2} tone="emerald" label="Published" value={publishedCount} />
           <StatTile icon={PenLine} tone="amber" label="Draft" value={draftCount} />

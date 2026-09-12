@@ -163,7 +163,7 @@ export default async function ReviewQueuePage() {
         }
       />
       <div className="flex-1 space-y-8 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={FileText} tone="accent" label="Client info changes" value={clientChangeBatches.size} />
           <StatTile icon={ListChecks} tone="emerald" label="Forms submitted" value={(submittedOrganizers ?? []).length} />
           <StatTile icon={FileCheck2} tone="amber" label="Documents submitted" value={(completedDocumentRequests ?? []).length} />

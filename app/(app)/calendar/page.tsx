@@ -164,7 +164,7 @@ export default async function CalendarPage() {
         subtitle="Engagement and task due dates, and appointments, in one place."
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={Clock3} tone="accent" label="Upcoming appointments" value={upcomingAppointments} />
           <StatTile icon={CalendarDays} tone="emerald" label="Today" value={todaysAppointments} />
           <StatTile icon={Briefcase} tone="violet" label="Engagements due" value={(engagements ?? []).length} />

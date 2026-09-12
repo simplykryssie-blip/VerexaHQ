@@ -38,7 +38,7 @@ export default async function PlatformAgreementsPage() {
       <div className="flex-1 space-y-6 px-8 py-6">
         <PlatformAdminTabs active="agreements" />
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-4">
           <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="text-xs uppercase tracking-wide text-muted">Account holders</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{rows.length}</p>

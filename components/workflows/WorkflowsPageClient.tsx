@@ -58,7 +58,7 @@ export function WorkflowsPageClient({
         }
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={Zap} tone="accent" label="Workflows" value={workflows.length} />
           <StatTile icon={Power} tone="emerald" label="Enabled" value={enabledCount} />
           <StatTile icon={PlayCircle} tone="violet" label="Total runs" value={totalRuns} />

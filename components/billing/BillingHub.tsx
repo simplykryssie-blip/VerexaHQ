@@ -140,7 +140,7 @@ export function BillingHub({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-4 gap-4">
         {stats.map((s) => (
           <StatTile key={s.label} icon={s.icon} tone={s.chip} label={s.label} value={s.value} />
         ))}

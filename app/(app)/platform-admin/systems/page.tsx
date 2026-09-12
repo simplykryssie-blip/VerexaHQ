@@ -135,7 +135,7 @@ export default async function PlatformAdminSystemsPage() {
       <div className="flex-1 space-y-6 px-8 py-6">
         {isPlatformAdmin && <PlatformAdminTabs active="systems" />}
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
             <p className="text-xs uppercase tracking-wide text-muted">System failures shown</p>
             <p className="mt-1 text-2xl font-semibold text-ink">{failureRows.length}</p>

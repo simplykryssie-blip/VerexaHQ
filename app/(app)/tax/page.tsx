@@ -154,7 +154,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         {hero}
         {tabNav}
         <div className="flex-1 space-y-6 px-8 py-6">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-4 gap-4">
             <StatTile icon={FileCheck2} tone="accent" label="Total returns" value={rows.length} />
             <StatTile icon={FileCheck2} tone="emerald" label="Filed" value={filedCount} />
             <StatTile icon={FileClock} tone="amber" label="Not filed" value={notFiledCount} />
@@ -233,7 +233,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         {hero}
         {tabNav}
         <div className="flex-1 space-y-6 px-8 py-6">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <StatTile icon={FileClock} tone="accent" label="In reviewer queue" value={(rows ?? []).length} />
             <StatTile icon={AlertTriangle} tone="rose" label="Overdue" value={overdueCount} />
           </div>
@@ -322,7 +322,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         {hero}
         {tabNav}
         <div className="flex-1 space-y-6 px-8 py-6">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-3 gap-4">
             <StatTile icon={FileCheck2} tone="accent" label="Total notices" value={rows.length} />
             <StatTile icon={FileClock} tone="amber" label="Open" value={openCount} />
             <StatTile icon={AlertTriangle} tone="rose" label="Overdue response" value={overdueCount} />
@@ -413,7 +413,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
         {hero}
         {tabNav}
         <div className="flex-1 space-y-6 px-8 py-6">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <StatTile icon={CalendarClock} tone="accent" label="Extended returns" value={rows.length} />
             <StatTile icon={AlertTriangle} tone="rose" label="Overdue" value={overdueCount} />
           </div>
@@ -500,7 +500,7 @@ export default async function TaxOfficePage({ searchParams }: { searchParams: { 
       {hero}
       {tabNav}
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-4">
           <StatTile icon={TrendingUp} tone="accent" label="Total returns" value={totalReturns} />
           <StatTile icon={FileCheck2} tone="emerald" label="Filed" value={totalFiled} />
           <StatTile icon={AlertTriangle} tone="rose" label="Open notices" value={totalOpenNotices} />

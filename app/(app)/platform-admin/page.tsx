@@ -114,7 +114,7 @@ export default async function PlatformAdminPage({ searchParams }: { searchParams
 
         <div>
           <h2 className="mb-3 font-display text-sm font-semibold text-ink">Platform overview</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-4 gap-4">
             {[
               { label: "Total workspaces", value: totalWorkspaces },
               { label: "Active workspaces", value: activeCount },

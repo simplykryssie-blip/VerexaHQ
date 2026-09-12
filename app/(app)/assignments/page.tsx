@@ -145,7 +145,7 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
         subtitle="Reassign clients, tasks, and engagements across your team in bulk."
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-4">
           <StatTile icon={ListChecks} tone="accent" label={`${TABS.find((t) => t.key === tab)?.label ?? "Items"} shown`} value={rows.length} />
           <StatTile icon={UserX} tone="rose" label="Unassigned" value={unassignedCount} />
           <StatTile icon={Users} tone="emerald" label="Staff available" value={staffOptions.length} />

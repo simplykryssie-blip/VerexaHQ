@@ -68,7 +68,7 @@ export default async function IrsAuthorizationsPage() {
         subtitle="Form 8821 tax information authorizations, from identity verification through IRS status tracking."
       />
       <div className="flex-1 space-y-6 px-8 py-6">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-4">
           <StatTile icon={ShieldCheck} tone="accent" label="Total authorizations" value={rows.length} />
           <StatTile icon={CheckCircle2} tone="emerald" label="Authorized" value={authorizedCount} />
           <StatTile icon={Clock3} tone="violet" label="In progress" value={inProgressCount} />
