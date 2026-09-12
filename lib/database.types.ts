@@ -4371,6 +4371,59 @@ export type Database = {
         }
         Relationships: []
       }
+      firm_connection_contacts: {
+        Row: {
+          connection_id: string
+          created_at: string
+          display_order: number
+          email: string | null
+          first_name: string | null
+          id: string
+          is_primary: boolean
+          last_name: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_primary?: boolean
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_primary?: boolean
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_connection_contacts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firm_connections: {
         Row: {
           allows_branding_override: boolean
@@ -9145,6 +9198,7 @@ export type Database = {
           engagement_id: string | null
           external_id: string | null
           external_source: string | null
+          firm_connection_id: string | null
           id: string
           overdue_flagged_at: string | null
           priority: string | null
@@ -9166,6 +9220,7 @@ export type Database = {
           engagement_id?: string | null
           external_id?: string | null
           external_source?: string | null
+          firm_connection_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -9187,6 +9242,7 @@ export type Database = {
           engagement_id?: string | null
           external_id?: string | null
           external_source?: string | null
+          firm_connection_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -9233,6 +9289,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "tasks_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tasks_related_organizer_response_id_fkey"

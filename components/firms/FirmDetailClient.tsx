@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/EmptyState";
+import { InlineAddForm } from "@/components/InlineAddForm";
+import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
+import type { DocumentFolderRow, DocumentRow } from "@/components/documents/types";
 
 const inputClass = "mt-1 w-full max-w-xs rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -297,6 +302,285 @@ function SoftwarePicker({
         ))}
       </select>
     </label>
+  );
+}
+
+type ContactRow = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  is_primary: boolean;
+};
+
+const CONTACT_TITLE_OPTIONS = [
+  { value: "Owner", label: "Owner" },
+  { value: "Partner", label: "Partner" },
+  { value: "Office Manager", label: "Office Manager" },
+  { value: "other", label: "Other" },
+];
+
+function resolveContactTitle(v: Record<string, string>) {
+  return v.title === "other" ? v.custom_title?.trim() || "Other" : v.title || null;
+}
+
+function AddFirmContactForm({ connectionId }: { connectionId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Add a contact"
+      fields={[
+        { name: "first_name", label: "First name", required: true },
+        { name: "last_name", label: "Last name", required: true },
+        { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
+        { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
+        { name: "email", label: "Email" },
+        { name: "phone", label: "Phone" },
+      ]}
+      onSubmit={async (v) => {
+        const { error } = await supabase.from("firm_connection_contacts").insert({
+          connection_id: connectionId,
+          first_name: v.first_name,
+          last_name: v.last_name,
+          title: resolveContactTitle(v),
+          email: v.email || null,
+          phone: v.phone || null,
+        });
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+function EditFirmContactForm({ contact }: { contact: ContactRow }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const knownTitle = CONTACT_TITLE_OPTIONS.some((o) => o.value === contact.title);
+  return (
+    <InlineAddForm
+      label="Edit"
+      submitLabel="Save changes"
+      initialValues={{
+        first_name: contact.first_name ?? "",
+        last_name: contact.last_name ?? "",
+        title: contact.title ? (knownTitle ? contact.title : "other") : "",
+        custom_title: contact.title && !knownTitle ? contact.title : "",
+        email: contact.email ?? "",
+        phone: contact.phone ?? "",
+      }}
+      fields={[
+        { name: "first_name", label: "First name", required: true },
+        { name: "last_name", label: "Last name", required: true },
+        { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
+        { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
+        { name: "email", label: "Email" },
+        { name: "phone", label: "Phone" },
+      ]}
+      trigger={(openForm) => (
+        <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit contact">
+          <Pencil size={13} />
+        </button>
+      )}
+      onSubmit={async (v) => {
+        const { error } = await supabase
+          .from("firm_connection_contacts")
+          .update({
+            first_name: v.first_name,
+            last_name: v.last_name,
+            title: resolveContactTitle(v),
+            email: v.email || null,
+            phone: v.phone || null,
+          })
+          .eq("id", contact.id);
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+function DeleteFirmContactButton({ contactId }: { contactId: string }) {
+  const router = useRouter();
+  const supabase = createClient();
+  async function handleDelete() {
+    if (!window.confirm("Delete this contact? This can't be undone.")) return;
+    const { error } = await supabase.from("firm_connection_contacts").delete().eq("id", contactId);
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    router.refresh();
+  }
+  return (
+    <button type="button" onClick={handleDelete} className="text-muted hover:text-danger" aria-label="Delete contact">
+      <Trash2 size={13} />
+    </button>
+  );
+}
+
+function FirmContacts({ connectionId, contacts }: { connectionId: string; contacts: ContactRow[] }) {
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Contacts</p>
+        <AddFirmContactForm connectionId={connectionId} />
+      </div>
+      {contacts.length === 0 ? (
+        <EmptyState message="No contacts yet." />
+      ) : (
+        <ul className="mt-2 divide-y divide-border">
+          {contacts.map((c) => {
+            const name = [c.first_name, c.last_name].filter(Boolean).join(" ");
+            return (
+              <li key={c.id} className="py-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-slate">
+                    {name || "Unnamed contact"}
+                    {c.title && <span className="ml-2 text-xs font-normal text-muted">{c.title}</span>}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <EditFirmContactForm contact={c} />
+                    <DeleteFirmContactButton contactId={c.id} />
+                  </div>
+                </div>
+                <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
+                  {c.email && <span>{c.email}</span>}
+                  {c.phone && <span>{c.phone}</span>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+type StaffOption = { id: string; display_name: string | null };
+type TaskRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string | null;
+  due_date: string | null;
+  status: string;
+};
+
+function AddFirmTaskForm({ connectionId, workspaceId, staffOptions }: { connectionId: string; workspaceId: string; staffOptions: StaffOption[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  return (
+    <InlineAddForm
+      label="Add Task"
+      fields={[
+        { name: "title", label: "Title", required: true },
+        { name: "description", label: "Description", type: "richtext" },
+        {
+          name: "priority",
+          label: "Priority",
+          type: "select",
+          options: [
+            { value: "low", label: "Low" },
+            { value: "medium", label: "Medium" },
+            { value: "high", label: "High" },
+            { value: "critical", label: "Critical" },
+          ],
+        },
+        {
+          name: "assigned_staff_id",
+          label: "Assigned to",
+          type: "select",
+          options: staffOptions.map((s) => ({ value: s.id, label: s.display_name ?? "Staff" })),
+        },
+        { name: "due_date", label: "Task due date" },
+      ]}
+      onSubmit={async (v) => {
+        const description = v.description && v.description.replace(/<[^>]+>/g, "").trim() ? v.description : null;
+        // Always internal -- there's no portal concept for a connected firm,
+        // so a "visible to client" option here would silently show nothing.
+        const { error } = await supabase.from("tasks").insert({
+          workspace_id: workspaceId,
+          firm_connection_id: connectionId,
+          title: v.title,
+          description,
+          priority: v.priority || null,
+          assigned_staff_id: v.assigned_staff_id || null,
+          due_date: v.due_date || null,
+          visibility: "internal",
+          status: "pending",
+        });
+        if (error) return error.message;
+        router.refresh();
+      }}
+    />
+  );
+}
+
+function FirmTasks({
+  connectionId,
+  workspaceId,
+  tasks,
+  staffOptions,
+}: {
+  connectionId: string;
+  workspaceId: string;
+  tasks: TaskRow[];
+  staffOptions: StaffOption[];
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const toast = useToast();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  async function complete(task: TaskRow) {
+    setPendingId(task.id);
+    const { error } = await supabase.from("tasks").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", task.id);
+    setPendingId(null);
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show("Task completed", "success");
+    router.refresh();
+  }
+
+  const open = tasks.filter((t) => t.status !== "completed");
+
+  return (
+    <div className={cardClass}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink">Tasks</p>
+        <AddFirmTaskForm connectionId={connectionId} workspaceId={workspaceId} staffOptions={staffOptions} />
+      </div>
+      {open.length === 0 ? (
+        <EmptyState message="No open tasks for this firm." />
+      ) : (
+        <ul className="mt-2 divide-y divide-border">
+          {open.map((t) => (
+            <li key={t.id} className="flex items-start gap-3 py-3">
+              <input
+                type="checkbox"
+                disabled={pendingId === t.id}
+                onChange={() => complete(t)}
+                className="mt-1 h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                aria-label={`Mark "${t.title}" complete`}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-ink">{t.title}</p>
+                  {t.priority && <span className="text-xs capitalize text-muted">({t.priority})</span>}
+                </div>
+                {t.due_date && <p className="mt-1 text-xs text-muted">Due {new Date(t.due_date).toLocaleDateString()}</p>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -760,6 +1044,13 @@ export function FirmDetailClient({
   production,
   payouts,
   isActive,
+  contacts,
+  workspaceId,
+  documentFolders,
+  documents,
+  firmName,
+  tasks,
+  staffOptions,
 }: {
   connectionId: string;
   parentWorkspaceId: string;
@@ -788,6 +1079,13 @@ export function FirmDetailClient({
   production: Record<string, unknown> | null;
   payouts: Payout[];
   isActive: boolean;
+  contacts: ContactRow[];
+  workspaceId: string;
+  documentFolders: DocumentFolderRow[];
+  documents: DocumentRow[];
+  firmName: string;
+  tasks: TaskRow[];
+  staffOptions: StaffOption[];
 }) {
   return (
     <div className="mt-4 space-y-6">
@@ -845,12 +1143,38 @@ export function FirmDetailClient({
         downstreamPtinCount={downstreamPtinCount}
       />
 
+      <FirmContacts connectionId={connectionId} contacts={contacts} />
+
+      <FirmTasks connectionId={connectionId} workspaceId={workspaceId} tasks={tasks} staffOptions={staffOptions} />
+
       <PartnerAdminNotes
         connectionId={connectionId}
         partnerSoftwareUsed={partnerSoftwareUsed}
         partnerTaxPrograms={partnerTaxPrograms}
         notes={notes}
       />
+
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink">Documents</p>
+        <DocumentWorkspace
+          workspaceId={workspaceId}
+          entityType="firm_connection"
+          entityId={connectionId}
+          folders={documentFolders}
+          documents={documents}
+          requests={[]}
+          requestTemplates={[]}
+          signatureRequests={[]}
+          signatureTemplates={[]}
+          clientName={firmInfo.name}
+          clientEmail={firmInfo.primaryContactEmail}
+          firmName={firmName}
+          activity={[]}
+          canRequestDocuments={false}
+          canRequestSignatures={false}
+          additionalSigners={[]}
+        />
+      </div>
 
       {source === "manual" ? (
         <div className={cardClass}>
