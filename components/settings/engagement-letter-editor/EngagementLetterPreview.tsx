@@ -4,7 +4,7 @@ import { useState } from "react";
 import { PaginatedDocument } from "@/components/documents/PaginatedDocument";
 import { SignaturePad } from "@/components/SignaturePad";
 import { useToast } from "@/components/Toast";
-import { interpolateSample } from "@/lib/mergeFields";
+import { interpolatePreview } from "@/lib/mergeFields";
 
 /** Sandbox preview only -- interpolates {{tokens}} with realistic placeholder
  * values, not real client/engagement data (no send pipeline exists yet, same
@@ -18,14 +18,20 @@ export function EngagementLetterPreview({
   requiresSignature,
   bannerImageUrl,
   customCss,
+  firmName,
+  firmAddress,
+  firmPhone,
 }: {
   bodyHtml: string;
   requiresSignature: boolean;
   bannerImageUrl?: string | null;
   customCss?: string | null;
+  firmName?: string | null;
+  firmAddress?: string | null;
+  firmPhone?: string | null;
 }) {
   const toast = useToast();
-  const interpolated = interpolateSample(bodyHtml);
+  const interpolated = interpolatePreview(bodyHtml, { firm_name: firmName, firm_address: firmAddress, firm_phone: firmPhone });
   const [typedName, setTypedName] = useState("Jordan Client");
   const [drawnDataUrl, setDrawnDataUrl] = useState<string | null>(null);
 
