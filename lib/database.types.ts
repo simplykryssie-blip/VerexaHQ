@@ -4464,6 +4464,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         Insert: {
@@ -4502,6 +4503,7 @@ export type Database = {
           software_partner_id?: string | null
           source?: string
           status?: string
+          tags?: string[]
           updated_at?: string
         }
         Update: {
@@ -4540,6 +4542,7 @@ export type Database = {
           software_partner_id?: string | null
           source?: string
           status?: string
+          tags?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -11058,6 +11061,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -11434,6 +11438,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -11502,6 +11507,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -12549,6 +12555,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -12616,6 +12623,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -13233,6 +13241,7 @@ export type Database = {
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
