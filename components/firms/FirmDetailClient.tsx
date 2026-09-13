@@ -9,7 +9,14 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
-import type { DocumentFolderRow, DocumentRow, DocumentRequestRow, SignatureRequestRow, DocumentRequestTemplateOption } from "@/components/documents/types";
+import type {
+  DocumentFolderRow,
+  DocumentRow,
+  DocumentRequestRow,
+  SignatureRequestRow,
+  DocumentRequestTemplateOption,
+  EngagementLetterTemplateOption,
+} from "@/components/documents/types";
 import { Modal } from "@/components/Modal";
 import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
 import { OnboardingSection, type OnboardingRecord, type OnboardingWorkflowInfo } from "@/components/firms/OnboardingSection";
@@ -1138,6 +1145,7 @@ export function FirmDetailClient({
   documents,
   documentRequests,
   documentRequestTemplates,
+  engagementLetterTemplates,
   signatureRequests,
   canRequestDocuments,
   canRequestSignatures,
@@ -1183,6 +1191,7 @@ export function FirmDetailClient({
   documents: DocumentRow[];
   documentRequests: DocumentRequestRow[];
   documentRequestTemplates: DocumentRequestTemplateOption[];
+  engagementLetterTemplates: EngagementLetterTemplateOption[];
   signatureRequests: SignatureRequestRow[];
   canRequestDocuments: boolean;
   canRequestSignatures: boolean;
@@ -1247,6 +1256,12 @@ export function FirmDetailClient({
         defaultReviewerName={defaultReviewerName}
         packageId={packageId}
         workflows={onboardingWorkflows}
+        isConnectionActive={isActive}
+        documentRequestTemplates={documentRequestTemplates}
+        engagementLetterTemplates={engagementLetterTemplates}
+        partnerOwnerName={firmInfo.ownerName}
+        partnerContactEmail={firmInfo.primaryContactEmail}
+        parentFirmName={firmName}
       />
 
       <PartnerDetails

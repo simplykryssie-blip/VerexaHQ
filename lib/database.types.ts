@@ -11532,6 +11532,15 @@ export type Database = {
         }
         Returns: string
       }
+      configure_partner_onboarding_document_request: {
+        Args: {
+          p_document_request_template_id: string
+          p_onboarding_id: string
+          p_title?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       copy_shared_engagement: {
         Args: { p_engagement_share_id: string }
         Returns: Json

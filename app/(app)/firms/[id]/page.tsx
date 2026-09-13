@@ -10,7 +10,7 @@ import { loadActionPermissions } from "@/lib/actionPermissions";
 import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
 import { FirmDetailClient } from "@/components/firms/FirmDetailClient";
 import { EmptyState } from "@/components/EmptyState";
-import type { DocumentFolderRow, DocumentRow, DocumentRequestRow, SignatureRequestRow, DocumentRequestTemplateOption } from "@/components/documents/types";
+import type { DocumentFolderRow, DocumentRow, DocumentRequestRow, SignatureRequestRow, DocumentRequestTemplateOption, EngagementLetterTemplateOption } from "@/components/documents/types";
 import type { OnboardingRecord, OnboardingWorkflowInfo } from "@/components/firms/OnboardingSection";
 
 export const dynamic = "force-dynamic";
@@ -112,15 +112,25 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   ]);
   const onboardingSummary = (onboardings ?? []).find((o) => o.firm_connection_id === firm.connection_id) ?? null;
 
-  const [{ data: onboardingDetail }, { data: documentRequestTemplateRows }, permissions] = await Promise.all([
+  const [{ data: onboardingDetail }, { data: documentRequestTemplateRows }, { data: engagementLetterTemplateRows }, permissions] = await Promise.all([
     onboardingSummary
       ? supabase
           .from("partner_onboardings")
-          .select("id, application_data, review_note, rejected_reason")
+          .select("id, application_data, review_note, rejected_reason, agreement_signature_request_id, document_request_id")
           .eq("id", onboardingSummary.id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supabase.from("document_request_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+    // Phase 6G: onboarding's agreement-configuration control reuses this same
+    // template catalog and the existing createSignatureRequestFromTemplate()
+    // helper -- no separate onboarding-agreement template concept exists or
+    // is introduced here.
+    supabase
+      .from("engagement_letter_templates")
+      .select("id, name, body_html, banner_image_url, source_type, pdf_storage_path, pdf_field_mode, pdf_field_mappings")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "published")
+      .order("name"),
     loadActionPermissions(supabase, workspace.id),
   ]);
 
@@ -179,6 +189,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
   }));
 
   const documentRequestTemplates: DocumentRequestTemplateOption[] = documentRequestTemplateRows ?? [];
+  const engagementLetterTemplates: EngagementLetterTemplateOption[] = engagementLetterTemplateRows ?? [];
 
   // Informational workflow strip (audit section 20/23) -- read-only, links
   // out to the existing Workflows editor. Never touches marketplace_templates
@@ -242,6 +253,8 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         application_data: (onboardingDetail?.application_data as Record<string, unknown> | null) ?? null,
         review_note: onboardingDetail?.review_note ?? null,
         rejected_reason: onboardingDetail?.rejected_reason ?? null,
+        agreement_signature_request_id: onboardingDetail?.agreement_signature_request_id ?? null,
+        document_request_id: onboardingDetail?.document_request_id ?? null,
       }
     : null;
 
@@ -295,6 +308,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         documents={documents}
         documentRequests={documentRequests}
         documentRequestTemplates={documentRequestTemplates}
+        engagementLetterTemplates={engagementLetterTemplates}
         signatureRequests={signatureRequests}
         canRequestDocuments={permissions.documentsRequest}
         canRequestSignatures={permissions.signaturesRequest}
