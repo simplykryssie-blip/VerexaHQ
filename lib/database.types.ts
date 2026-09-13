@@ -11989,6 +11989,102 @@ export type Database = {
           workspace_type: string
         }[]
       }
+      get_network_bank_software_distribution: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          connection_count: number
+          distribution_type: string
+          partner_id: string
+          partner_name: string
+        }[]
+      }
+      get_network_onboarding_summary: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          agreement_signed_count: number
+          invited_count: number
+          live_count: number
+          no_activity_14d_count: number
+          software_provisioned_count: number
+        }[]
+      }
+      get_network_package_revenue: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          active_package_revenue: number
+          active_purchase_count: number
+        }[]
+      }
+      get_network_partner_production: {
+        Args: {
+          p_period_end?: string
+          p_period_start?: string
+          p_sort_by?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          child_workspace_id: string
+          connection_id: string
+          partner_name: string
+          production: number
+          relationship_type: string
+          return_volume: number
+        }[]
+      }
+      get_network_payout_summary: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          disputed_amount: number
+          disputed_count: number
+          paid_amount: number
+          paid_count: number
+          pending_amount: number
+          pending_count: number
+        }[]
+      }
+      get_network_production: {
+        Args: {
+          p_period_end?: string
+          p_period_start?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          connection_count: number
+          gross_addon_fees: number
+          gross_bank_fees: number
+          gross_bank_product_rebates: number
+          gross_paperwork_fees: number
+          gross_prep_fees: number
+          gross_transmission_fees: number
+          net_rebates: number
+          network_production: number
+          period_end: string
+          period_start: string
+        }[]
+      }
+      get_network_revenue_share: {
+        Args: {
+          p_period_end?: string
+          p_period_start?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          connection_count: number
+          network_production_basis: number
+          network_revenue_share: number
+          period_end: string
+          period_start: string
+        }[]
+      }
+      get_network_review_status_summary: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          approved_count: number
+          awaiting_review_count: number
+          corrections_requested_count: number
+          rejected_count: number
+        }[]
+      }
       get_platform_account_holders: {
         Args: never
         Returns: {
@@ -12352,6 +12448,10 @@ export type Database = {
           period_end: string
           urgent: boolean
         }[]
+      }
+      network_child_relationship_types: {
+        Args: { p_workspace_id: string }
+        Returns: string[]
       }
       notify_organizer_information_request: {
         Args: { p_message: string; p_request_id: string }
