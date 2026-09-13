@@ -34,6 +34,18 @@ export const ONBOARDING_STATUS_LABEL: Record<string, string> = {
   withdrawn: "Withdrawn",
 };
 
+// The separate, legacy vocabulary that remains authoritative only for a
+// manual/external firm connection (source = 'manual') -- Phase 6E. A
+// VerexaHQ-workspace partner's real lifecycle uses ONBOARDING_STATUS_LABEL
+// above instead; these two vocabularies are never merged or mapped onto
+// each other.
+export const MANUAL_ONBOARDING_STAGE_LABEL: Record<string, string> = {
+  invited: "Invited",
+  agreement_signed: "Agreement signed",
+  software_provisioned: "Software provisioned",
+  live: "Live",
+};
+
 export type PartnerOnboardingRow = {
   status: string;
   agreement_required: boolean;

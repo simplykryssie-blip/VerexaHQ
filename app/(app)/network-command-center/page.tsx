@@ -28,6 +28,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { PeriodPicker } from "@/components/networkCommandCenter/PeriodPicker";
+import { ONBOARDING_STATUS_LABEL, MANUAL_ONBOARDING_STAGE_LABEL } from "@/lib/partnerOnboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +38,14 @@ function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-const ONBOARDING_STAGE_LABEL: Record<string, string> = {
-  invited: "Invited",
-  agreement_signed: "Agreement Signed",
-  software_provisioned: "Software Provisioned",
-  live: "Live",
-};
+// Phase 6E: onboarding_stage is only ever authoritative for a manual/
+// external firm; a VerexaHQ-workspace partner's real lifecycle uses
+// partner_onboardings' 8-status vocabulary (ONBOARDING_STATUS_LABEL)
+// instead. The two are never merged into one label map.
+function currentStatusLabel(population: string, status: string | null) {
+  if (!status) return "--";
+  return population === "manual" ? MANUAL_ONBOARDING_STAGE_LABEL[status] ?? status : ONBOARDING_STATUS_LABEL[status] ?? status;
+}
 
 function buildHref(searchParams: SearchParams, overrides: Partial<SearchParams>) {
   const merged: SearchParams = { ...searchParams, ...overrides };
@@ -108,6 +111,7 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
     { data: stalledPartners, error: stalledError },
     { data: assignmentRows },
     { data: threadRows },
+    { data: onboardingRecords },
   ] = await Promise.all([
     childRelationshipTypes.length
       ? supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
@@ -123,6 +127,10 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
     supabase.rpc("get_network_stalled_partners", { p_workspace_id: workspace.id }),
     supabase.rpc("get_learning_assignment_rollup", { p_owner_workspace_id: workspace.id }),
     supabase.from("network_message_threads").select("id").or(`workspace_a_id.eq.${workspace.id},workspace_b_id.eq.${workspace.id}`),
+    // Per-connection current onboarding status/completed_at for "recently
+    // activated" below -- the same already-existing, workspace-scoped RPC
+    // /firms already uses, reused rather than duplicated (Phase 6E).
+    supabase.rpc("list_partner_onboardings", { p_workspace_id: workspace.id }),
   ]);
 
   const threadIds = (threadRows ?? []).map((t) => t.id);
@@ -138,15 +146,33 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
   const allPartners = partners ?? [];
   // Connected Firms = active + pending (a firm mid-invite is still "connected"
   // in a meaningful sense); revoked connections are excluded. Distinct from
-  // Active Partners below, which stays active-only -- see Phase 5C P1
+  // Active Connections below, which stays active-only -- see Phase 5C P1
   // correction Decision 1.
   const connectedFirms = allPartners.filter((p) => p.status !== "revoked");
+  // Purely a connection-lifecycle count (firm_connections.status='active') --
+  // labeled "Active Connections," not "Active Partners," so it's never read
+  // as the Phase 6D "Operationally Active Partner" concept, which this tile
+  // does not compute and does not gate on (Phase 6E).
   const activePartners = allPartners.filter((p) => p.status === "active");
   const eroCount = connectedFirms.filter((p) => CONNECTED_CHILD_TIER_LABEL[p.relationship_type] === "ERO").length;
   const ptinCount = connectedFirms.filter((p) => CONNECTED_CHILD_TIER_LABEL[p.relationship_type] === "PTIN").length;
-  const recentlyActivated = activePartners
-    .filter((p) => p.onboarding_stage === "live")
-    .sort((a, b) => new Date(b.responded_at ?? b.created_at).getTime() - new Date(a.responded_at ?? a.created_at).getTime())
+
+  // "Recently activated" (Phase 6E): a VerexaHQ-workspace partner's real
+  // signal is partner_onboardings reaching 'ready', never the manually-set
+  // onboarding_stage; a manual firm has no partner_onboardings record at
+  // all, so 'live' remains its only available signal.
+  const onboardingByConnectionId = new Map((onboardingRecords ?? []).map((o) => [o.firm_connection_id, o]));
+  const recentlyActivatedPartners = activePartners
+    .filter((p) => p.child_workspace_id && onboardingByConnectionId.get(p.connection_id)?.status === "ready")
+    .map((p) => {
+      const record = onboardingByConnectionId.get(p.connection_id);
+      return { connectionId: p.connection_id, name: p.name, badgeLabel: "Ready", at: record?.completed_at ?? record?.updated_at ?? p.responded_at ?? p.created_at };
+    });
+  const recentlyActivatedManual = activePartners
+    .filter((p) => p.source === "manual" && p.onboarding_stage === "live")
+    .map((p) => ({ connectionId: p.connection_id, name: p.name, badgeLabel: "Live", at: p.responded_at ?? p.created_at }));
+  const recentlyActivated = [...recentlyActivatedPartners, ...recentlyActivatedManual]
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, 5);
 
   const production = productionRows?.[0] ?? null;
@@ -159,10 +185,30 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
   const stalled = stalledPartners ?? [];
   const topPartners = (partnerProductionRows ?? []).slice(0, 5);
 
-  const totalActiveOnboarding = onboarding
-    ? onboarding.invited_count + onboarding.agreement_signed_count + onboarding.software_provisioned_count + onboarding.live_count
+  // Phase 6E: population-aware. Manual/external firms are "pending" until
+  // 'live'; VerexaHQ-workspace partners are "pending" until their current
+  // onboarding reaches a terminal state (ready/rejected/withdrawn) -- a
+  // rejected or withdrawn onboarding is not "still pending," it's finished.
+  const manualTotalOnboarding = onboarding
+    ? onboarding.manual_invited_count + onboarding.manual_agreement_signed_count + onboarding.manual_software_provisioned_count + onboarding.manual_live_count
     : 0;
-  const pendingOnboardingCount = onboarding ? totalActiveOnboarding - onboarding.live_count : 0;
+  const manualPendingCount = onboarding
+    ? onboarding.manual_invited_count + onboarding.manual_agreement_signed_count + onboarding.manual_software_provisioned_count
+    : 0;
+  const partnerTotalOnboarding = onboarding
+    ? onboarding.partner_pending_count +
+      onboarding.partner_in_progress_count +
+      onboarding.partner_under_review_count +
+      onboarding.partner_approved_count +
+      onboarding.partner_setup_count +
+      onboarding.partner_ready_count +
+      onboarding.partner_rejected_count +
+      onboarding.partner_withdrawn_count
+    : 0;
+  const partnerPendingCount = onboarding
+    ? onboarding.partner_pending_count + onboarding.partner_in_progress_count + onboarding.partner_under_review_count + onboarding.partner_approved_count + onboarding.partner_setup_count
+    : 0;
+  const pendingOnboardingCount = manualPendingCount + partnerPendingCount;
 
   const assignments = assignmentRows ?? [];
   const trainingAssignedCount = assignments.length;
@@ -221,7 +267,7 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
             />
           </Link>
           <Link href="/firms" className="block">
-            <StatTile icon={Handshake} tone="emerald" label="Active Partners" value={activePartners.length} />
+            <StatTile icon={Handshake} tone="emerald" label="Active Connections" value={activePartners.length} />
           </Link>
           <Link href="/firms?onboarding=pending" className="block">
             <StatTile icon={Clock} tone="amber" label="Pending Onboarding" value={onboarding ? pendingOnboardingCount : "--"} />
@@ -270,7 +316,7 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
                   <ul className="mt-2 space-y-1 text-xs text-muted">
                     {stalled.slice(0, 5).map((p) => (
                       <li key={p.connection_id}>
-                        {p.partner_name} &middot; {ONBOARDING_STAGE_LABEL[p.onboarding_stage] ?? p.onboarding_stage}
+                        {p.partner_name} &middot; {currentStatusLabel(p.population, p.current_status)}
                       </li>
                     ))}
                   </ul>
@@ -304,30 +350,33 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
           )}
         </SectionCard>
 
-        {/* Network Health */}
-        <SectionCard title="Network Health">
+        {/* Manual Firm Progress -- onboarding_stage is only ever
+            authoritative for a manual/external connection (Phase 6E);
+            renamed from "Network Health" since it no longer covers the
+            whole network. */}
+        <SectionCard title="Manual Firm Progress">
           {onboardingError ? (
-            <SectionError label="network health" />
+            <SectionError label="manual firm progress" />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {(["invited", "agreement_signed", "software_provisioned", "live"] as const).map((stage) => {
                 const count =
                   stage === "invited"
-                    ? onboarding?.invited_count ?? 0
+                    ? onboarding?.manual_invited_count ?? 0
                     : stage === "agreement_signed"
-                      ? onboarding?.agreement_signed_count ?? 0
+                      ? onboarding?.manual_agreement_signed_count ?? 0
                       : stage === "software_provisioned"
-                        ? onboarding?.software_provisioned_count ?? 0
-                        : onboarding?.live_count ?? 0;
-                const pct = totalActiveOnboarding > 0 ? Math.round((count / totalActiveOnboarding) * 100) : 0;
+                        ? onboarding?.manual_software_provisioned_count ?? 0
+                        : onboarding?.manual_live_count ?? 0;
+                const pct = manualTotalOnboarding > 0 ? Math.round((count / manualTotalOnboarding) * 100) : 0;
                 return (
-                  <Link key={stage} href={`/firms?onboarding=${stage}`} className="block rounded-xl border border-border p-3 transition hover:border-accent">
-                    <p className="text-xs uppercase tracking-wide text-muted">{ONBOARDING_STAGE_LABEL[stage]}</p>
+                  <Link key={stage} href={`/firms?onboarding=manual_${stage}`} className="block rounded-xl border border-border p-3 transition hover:border-accent">
+                    <p className="text-xs uppercase tracking-wide text-muted">{MANUAL_ONBOARDING_STAGE_LABEL[stage]}</p>
                     <p className="mt-1 font-display text-xl font-semibold text-ink">{count}</p>
                     <div className="mt-2">
                       <ProgressBar percent={pct} tone={stage === "live" ? "gradient" : "accent"} size="sm" />
                     </div>
-                    <p className="mt-1 text-[11px] text-muted">{pct}% of active</p>
+                    <p className="mt-1 text-[11px] text-muted">{pct}% of manual firms</p>
                   </Link>
                 );
               })}
@@ -342,21 +391,16 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
           ) : (
             <>
               <p className="text-sm text-slate">
-                {totalActiveOnboarding} active connection{totalActiveOnboarding === 1 ? "" : "s"} &middot;{" "}
-                {(["invited", "agreement_signed", "software_provisioned", "live"] as const)
-                  .map(
-                    (s) =>
-                      `${
-                        s === "invited"
-                          ? onboarding?.invited_count ?? 0
-                          : s === "agreement_signed"
-                            ? onboarding?.agreement_signed_count ?? 0
-                            : s === "software_provisioned"
-                              ? onboarding?.software_provisioned_count ?? 0
-                              : onboarding?.live_count ?? 0
-                      } ${ONBOARDING_STAGE_LABEL[s].toLowerCase()}`
-                  )
-                  .join(" · ")}
+                {partnerTotalOnboarding} VerexaHQ-workspace partner{partnerTotalOnboarding === 1 ? "" : "s"} onboarding &middot; {manualTotalOnboarding} manual/external firm
+                {manualTotalOnboarding === 1 ? "" : "s"} tracked
+                {onboarding && onboarding.pending_invitations_count > 0
+                  ? ` · ${onboarding.pending_invitations_count} pending invitation${onboarding.pending_invitations_count === 1 ? "" : "s"} not yet redeemed`
+                  : ""}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Workspace partners: {onboarding?.partner_pending_count ?? 0} pending · {onboarding?.partner_in_progress_count ?? 0} in progress ·{" "}
+                {onboarding?.partner_under_review_count ?? 0} under review · {onboarding?.partner_approved_count ?? 0} approved · {onboarding?.partner_setup_count ?? 0} setup ·{" "}
+                {onboarding?.partner_ready_count ?? 0} ready
               </p>
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <div>
@@ -372,7 +416,7 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
                       {stalled.slice(0, 5).map((p) => (
                         <li key={p.connection_id} className="flex items-center justify-between px-3 py-2 text-sm">
                           <span className="text-slate">{p.partner_name}</span>
-                          <Badge tone="warning">{ONBOARDING_STAGE_LABEL[p.onboarding_stage] ?? p.onboarding_stage}</Badge>
+                          <Badge tone="warning">{currentStatusLabel(p.population, p.current_status)}</Badge>
                         </li>
                       ))}
                     </ul>
@@ -381,13 +425,13 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Recently activated</h3>
                   {recentlyActivated.length === 0 ? (
-                    <p className="mt-2 text-sm text-muted">No partners have gone live yet.</p>
+                    <p className="mt-2 text-sm text-muted">No partners have gone live or reached ready yet.</p>
                   ) : (
                     <ul className="mt-2 divide-y divide-border rounded-xl border border-border">
                       {recentlyActivated.map((p) => (
-                        <li key={p.connection_id} className="flex items-center justify-between px-3 py-2 text-sm">
+                        <li key={p.connectionId} className="flex items-center justify-between px-3 py-2 text-sm">
                           <span className="text-slate">{p.name}</span>
-                          <Badge tone="success">Live</Badge>
+                          <Badge tone="success">{p.badgeLabel}</Badge>
                         </li>
                       ))}
                     </ul>

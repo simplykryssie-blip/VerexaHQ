@@ -12301,11 +12301,20 @@ export type Database = {
       get_network_onboarding_summary: {
         Args: { p_workspace_id: string }
         Returns: {
-          agreement_signed_count: number
-          invited_count: number
-          live_count: number
-          no_activity_14d_count: number
-          software_provisioned_count: number
+          manual_agreement_signed_count: number
+          manual_invited_count: number
+          manual_live_count: number
+          manual_no_activity_14d_count: number
+          manual_software_provisioned_count: number
+          partner_approved_count: number
+          partner_in_progress_count: number
+          partner_pending_count: number
+          partner_ready_count: number
+          partner_rejected_count: number
+          partner_setup_count: number
+          partner_under_review_count: number
+          partner_withdrawn_count: number
+          pending_invitations_count: number
         }[]
       }
       get_network_package_revenue: {
@@ -12404,10 +12413,11 @@ export type Database = {
         Args: { p_inactivity_days?: number; p_workspace_id: string }
         Returns: {
           connection_id: string
-          onboarding_stage: string
+          current_status: string
+          last_activity_at: string
           partner_name: string
+          population: string
           relationship_type: string
-          updated_at: string
         }[]
       }
       get_platform_account_holders: {

@@ -10,9 +10,17 @@ import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { AddManualFirmModal } from "@/components/firms/AddManualFirmModal";
-import { deriveWaitingOn, ONBOARDING_STATUS_TONE, ONBOARDING_STATUS_LABEL, type PartnerOnboardingRow } from "@/lib/partnerOnboarding";
+import {
+  deriveWaitingOn,
+  ONBOARDING_STATUS_TONE,
+  ONBOARDING_STATUS_LABEL,
+  MANUAL_ONBOARDING_STAGE_LABEL,
+  type PartnerOnboardingRow,
+} from "@/lib/partnerOnboarding";
 
 export const dynamic = "force-dynamic";
+
+const MANUAL_STAGES = ["invited", "agreement_signed", "software_provisioned", "live"];
 
 // Firms connected to this workspace, as their own first-class section --
 // separate from Clients, since a connected firm is a whole other workspace
@@ -75,13 +83,33 @@ export default async function FirmsPage({
   const onboardingByConnectionId = new Map((onboardings ?? []).map((o) => [o.firm_connection_id, o as PartnerOnboardingRow & { firm_connection_id: string }]));
 
   const allFirms = connectedFirms ?? [];
-  const ONBOARDING_STAGES = ["invited", "agreement_signed", "software_provisioned", "live"];
+
+  // Population-aware filtering (Phase 6E): onboarding_stage is only ever
+  // authoritative for a manual/external firm (source='manual'); a
+  // VerexaHQ-workspace partner's (child_workspace_id set) real lifecycle is
+  // partner_onboardings.status, read from the already-fetched
+  // onboardingByConnectionId map. A not-yet-redeemed invite has no
+  // onboarding lifecycle at all and is never matched by any onboarding
+  // filter -- it's a connection-invitation fact, not an onboarding fact.
+  const rawFilter = searchParams.onboarding;
+  const manualStageFilter = rawFilter && MANUAL_STAGES.includes(rawFilter.replace(/^manual_/, "")) ? rawFilter.replace(/^manual_/, "") : null;
+  const partnerStatusFilter = rawFilter?.startsWith("partner_") ? rawFilter.slice("partner_".length) : null;
+
   const firms =
-    searchParams.onboarding === "pending"
-      ? allFirms.filter((f) => f.status === "active" && f.onboarding_stage !== "live")
-      : searchParams.onboarding && ONBOARDING_STAGES.includes(searchParams.onboarding)
-        ? allFirms.filter((f) => f.status === "active" && f.onboarding_stage === searchParams.onboarding)
-        : allFirms;
+    rawFilter === "pending"
+      ? allFirms.filter((f) => {
+          if (f.status !== "active") return false;
+          if (f.child_workspace_id) {
+            const status = onboardingByConnectionId.get(f.connection_id)?.status;
+            return Boolean(status) && !["ready", "rejected", "withdrawn"].includes(status!);
+          }
+          return f.source === "manual" && f.onboarding_stage !== "live";
+        })
+      : manualStageFilter
+        ? allFirms.filter((f) => f.status === "active" && f.source === "manual" && f.onboarding_stage === manualStageFilter)
+        : partnerStatusFilter
+          ? allFirms.filter((f) => f.status === "active" && f.child_workspace_id && onboardingByConnectionId.get(f.connection_id)?.status === partnerStatusFilter)
+          : allFirms;
   const activeCount = firms.filter((f) => f.status === "active").length;
   const eroCount = firms.filter((f) => CONNECTED_CHILD_TIER_LABEL[f.relationship_type] === "ERO").length;
   const ptinCount = firms.filter((f) => CONNECTED_CHILD_TIER_LABEL[f.relationship_type] === "PTIN").length;
@@ -108,9 +136,13 @@ export default async function FirmsPage({
         {searchParams.onboarding && (
           <div className="flex items-center justify-between rounded-xl border border-accent/30 bg-accentSoft px-4 py-2 text-xs text-accent">
             <span>
-              {searchParams.onboarding === "pending"
-                ? "Showing active connections that haven't reached \"live\" yet."
-                : `Showing active connections at stage "${searchParams.onboarding.replace(/_/g, " ")}".`}
+              {rawFilter === "pending"
+                ? "Showing active connections still onboarding -- not yet ready (VerexaHQ-workspace partners) or live (manual/external firms)."
+                : manualStageFilter
+                  ? `Showing manual/external firms at stage "${manualStageFilter.replace(/_/g, " ")}".`
+                  : partnerStatusFilter
+                    ? `Showing VerexaHQ-workspace partners at onboarding status "${partnerStatusFilter.replace(/_/g, " ")}".`
+                    : `Showing connections matching "${rawFilter?.replace(/_/g, " ")}".`}
             </span>
             <Link href="/firms" className="font-medium underline">
               Clear filter
@@ -164,6 +196,15 @@ export default async function FirmsPage({
                     <div className="flex items-center gap-1.5 border-t border-border pt-2">
                       <Badge tone={ONBOARDING_STATUS_TONE[onboarding.status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[onboarding.status] ?? onboarding.status}</Badge>
                       <span className="truncate text-[11px] text-muted">{waiting.label}</span>
+                    </div>
+                  )}
+                  {/* Manual/external firms have no partner_onboardings record --
+                      onboarding_stage is their only progress signal, shown the
+                      same way, so they aren't silently left with no onboarding
+                      badge at all (Phase 6E). */}
+                  {f.source === "manual" && f.onboarding_stage && f.onboarding_stage !== "live" && (
+                    <div className="flex items-center gap-1.5 border-t border-border pt-2">
+                      <Badge tone="neutral">{MANUAL_ONBOARDING_STAGE_LABEL[f.onboarding_stage] ?? f.onboarding_stage}</Badge>
                     </div>
                   )}
                 </Link>

@@ -141,7 +141,9 @@ export default async function EroNetworkPage({ searchParams }: { searchParams: S
 
   const allPartners = partners ?? [];
   // Connected Partners = active + pending, revoked excluded -- same formula
-  // established and approved in Phase 5C. Active Partners stays active-only.
+  // established and approved in Phase 5C. Active Connections stays
+  // active-only -- a pure connection-lifecycle count, not the Phase 6D
+  // "Operationally Active Partner" concept (Phase 6E labeling correction).
   const connectedPartners = allPartners.filter((p) => p.status !== "revoked");
   const activePartners = allPartners.filter((p) => p.status === "active");
 
@@ -201,7 +203,7 @@ export default async function EroNetworkPage({ searchParams }: { searchParams: S
             <StatTile icon={Building2} tone="accent" label="Connected Partners" value={connectedPartners.length} />
           </Link>
           <Link href="/firms" className="block">
-            <StatTile icon={Handshake} tone="emerald" label="Active Partners" value={activePartners.length} />
+            <StatTile icon={Handshake} tone="emerald" label="Active Connections" value={activePartners.length} />
           </Link>
           <Link href="/review-queue" className="block">
             <StatTile icon={ClipboardCheck} tone="rose" label="Awaiting Review" value={reviewStatus ? awaitingReviewCount : "--"} />

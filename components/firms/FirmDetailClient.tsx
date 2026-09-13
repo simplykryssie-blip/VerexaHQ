@@ -767,6 +767,7 @@ const PREPARER_CREDENTIALS: [string, string][] = [
 function PartnerDetails({
   connectionId,
   relationshipType,
+  source,
   efinLast4,
   ptinLast4,
   onboardingStage,
@@ -777,6 +778,14 @@ function PartnerDetails({
 }: {
   connectionId: string;
   relationshipType: string;
+  // Manual/external progress tracking (onboarding_stage) is only ever the
+  // source of truth for a manual connection (Phase 6E) -- a real
+  // VerexaHQ-workspace partner's lifecycle lives in partner_onboardings via
+  // OnboardingSection above, and a not-yet-redeemed invite has no onboarding
+  // lifecycle at all yet. The server enforces this too (see the
+  // enforce_onboarding_stage_source_of_truth trigger) -- this prop only
+  // controls whether the now-pointless control is even rendered.
+  source: string;
   efinLast4: string | null;
   ptinLast4: string | null;
   onboardingStage: string | null;
@@ -806,7 +815,11 @@ function PartnerDetails({
   return (
     <div className={cardClass}>
       <p className="text-xs font-semibold uppercase tracking-wide text-ink">{isEro ? "ERO details" : isPtin ? "PTIN details" : "Partner details"}</p>
-      <p className="mt-1 text-xs text-muted">Onboarding stage, credential, and filing links are your own record -- the firm doesn&apos;t see or control any of this.</p>
+      <p className="mt-1 text-xs text-muted">
+        {source === "manual"
+          ? "Onboarding stage, credential, and filing links are your own record -- the firm doesn't see or control any of this."
+          : "Credential and filing links are your own record -- the firm doesn't see or control any of this. Onboarding is tracked above."}
+      </p>
       <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         {isEro && (
           <>
@@ -827,23 +840,26 @@ function PartnerDetails({
           </div>
         )}
       </dl>
+      {(source === "manual" || isPtin) && (
       <div className="mt-4 grid grid-cols-1 gap-4 border-t border-border pt-4 sm:grid-cols-3">
-        <label className={labelClass}>
-          Onboarding stage
-          <select
-            defaultValue={onboardingStage ?? ""}
-            onChange={(e) => save({ onboarding_stage: e.target.value || null })}
-            disabled={saving}
-            className={inputClass}
-          >
-            <option value="">Not set</option>
-            {ONBOARDING_STAGES.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {source === "manual" && (
+          <label className={labelClass}>
+            Onboarding stage
+            <select
+              defaultValue={onboardingStage ?? ""}
+              onChange={(e) => save({ onboarding_stage: e.target.value || null })}
+              disabled={saving}
+              className={inputClass}
+            >
+              <option value="">Not set</option>
+              {ONBOARDING_STAGES.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {isPtin && (
           <>
             <label className={labelClass}>
@@ -881,6 +897,7 @@ function PartnerDetails({
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -1235,6 +1252,7 @@ export function FirmDetailClient({
       <PartnerDetails
         connectionId={connectionId}
         relationshipType={relationshipType}
+        source={source}
         efinLast4={efinLast4}
         ptinLast4={ptinLast4}
         onboardingStage={onboardingStage}
