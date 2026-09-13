@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/EmptyState";
 import { InlineAddForm } from "@/components/InlineAddForm";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
-import type { DocumentFolderRow, DocumentRow } from "@/components/documents/types";
+import type { DocumentFolderRow, DocumentRow, DocumentRequestRow, SignatureRequestRow, DocumentRequestTemplateOption } from "@/components/documents/types";
 import { Modal } from "@/components/Modal";
 import { InvoiceQuoteForm } from "@/components/billing/InvoiceQuoteForm";
+import { OnboardingSection, type OnboardingRecord, type OnboardingWorkflowInfo } from "@/components/firms/OnboardingSection";
 
 const inputClass = "mt-1 w-full max-w-xs rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
 const labelClass = "block text-xs font-medium uppercase tracking-wide text-muted";
@@ -1118,10 +1119,19 @@ export function FirmDetailClient({
   workspaceId,
   documentFolders,
   documents,
+  documentRequests,
+  documentRequestTemplates,
+  signatureRequests,
+  canRequestDocuments,
+  canRequestSignatures,
   firmName,
   tasks,
   staffOptions,
   invoices,
+  onboarding,
+  canManageOnboarding,
+  defaultReviewerName,
+  onboardingWorkflows,
 }: {
   connectionId: string;
   parentWorkspaceId: string;
@@ -1154,10 +1164,19 @@ export function FirmDetailClient({
   workspaceId: string;
   documentFolders: DocumentFolderRow[];
   documents: DocumentRow[];
+  documentRequests: DocumentRequestRow[];
+  documentRequestTemplates: DocumentRequestTemplateOption[];
+  signatureRequests: SignatureRequestRow[];
+  canRequestDocuments: boolean;
+  canRequestSignatures: boolean;
   firmName: string;
   tasks: TaskRow[];
   staffOptions: StaffOption[];
   invoices: FirmInvoiceRow[];
+  onboarding: OnboardingRecord | null;
+  canManageOnboarding: boolean;
+  defaultReviewerName: string | null;
+  onboardingWorkflows: OnboardingWorkflowInfo[];
 }) {
   return (
     <div className="mt-4 space-y-6">
@@ -1203,6 +1222,16 @@ export function FirmDetailClient({
         </div>
       </div>
 
+      <OnboardingSection
+        workspaceId={workspaceId}
+        connectionId={connectionId}
+        onboarding={onboarding}
+        canManage={canManageOnboarding}
+        defaultReviewerName={defaultReviewerName}
+        packageId={packageId}
+        workflows={onboardingWorkflows}
+      />
+
       <PartnerDetails
         connectionId={connectionId}
         relationshipType={relationshipType}
@@ -1236,16 +1265,16 @@ export function FirmDetailClient({
           entityId={connectionId}
           folders={documentFolders}
           documents={documents}
-          requests={[]}
-          requestTemplates={[]}
-          signatureRequests={[]}
+          requests={documentRequests}
+          requestTemplates={documentRequestTemplates}
+          signatureRequests={signatureRequests}
           signatureTemplates={[]}
           clientName={firmInfo.name}
           clientEmail={firmInfo.primaryContactEmail}
           firmName={firmName}
           activity={[]}
-          canRequestDocuments={false}
-          canRequestSignatures={false}
+          canRequestDocuments={canRequestDocuments}
+          canRequestSignatures={canRequestSignatures}
           additionalSigners={[]}
         />
       </div>

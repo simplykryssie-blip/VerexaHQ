@@ -10,6 +10,7 @@ import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
 import { AddManualFirmModal } from "@/components/firms/AddManualFirmModal";
+import { deriveWaitingOn, ONBOARDING_STATUS_TONE, ONBOARDING_STATUS_LABEL, type PartnerOnboardingRow } from "@/lib/partnerOnboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +62,17 @@ export default async function FirmsPage({
 
   const childRelationshipTypes = CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE[workspace.workspace_type] ?? [];
 
-  const { data: connectedFirms } = childRelationshipTypes.length
-    ? await supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
-    : { data: [] as never[] };
+  const [{ data: connectedFirms }, { data: onboardings }] = await Promise.all([
+    childRelationshipTypes.length
+      ? supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
+      : Promise.resolve({ data: [] as never[] }),
+    // One batched call for every connection's onboarding record -- avoids a
+    // query per firm card. Purely additive alongside the existing
+    // onboarding_stage filter below, which is left untouched (Phase 6C audit
+    // section 28: the two systems are not reconciled yet).
+    supabase.rpc("list_partner_onboardings", { p_workspace_id: workspace.id }),
+  ]);
+  const onboardingByConnectionId = new Map((onboardings ?? []).map((o) => [o.firm_connection_id, o as PartnerOnboardingRow & { firm_connection_id: string }]));
 
   const allFirms = connectedFirms ?? [];
   const ONBOARDING_STAGES = ["invited", "agreement_signed", "software_provisioned", "live"];
@@ -124,32 +133,42 @@ export default async function FirmsPage({
           />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {firms.map((f) => (
-              <Link
-                key={f.connection_id}
-                href={`/firms/${f.connection_id}`}
-                className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
-                    <Building2 size={16} aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="font-medium text-slate">{f.name}</p>
-                    <p className="text-xs text-muted">{CONNECTED_CHILD_TIER_LABEL[f.relationship_type] ?? "Firm"}</p>
+            {firms.map((f) => {
+              const onboarding = onboardingByConnectionId.get(f.connection_id);
+              const waiting = onboarding ? deriveWaitingOn(onboarding) : null;
+              return (
+                <Link
+                  key={f.connection_id}
+                  href={`/firms/${f.connection_id}`}
+                  className="flex flex-col gap-2 rounded-2xl border border-border bg-surface p-4 shadow-soft transition hover:shadow-softHover"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accentSoft text-accent">
+                      <Building2 size={16} aria-hidden="true" />
+                    </span>
+                    <div>
+                      <p className="font-medium text-slate">{f.name}</p>
+                      <p className="text-xs text-muted">{CONNECTED_CHILD_TIER_LABEL[f.relationship_type] ?? "Firm"}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Badge tone={f.status === "active" ? "success" : "neutral"}>{f.status}</Badge>
-                    {f.source === "manual" && <Badge tone="neutral">Manual</Badge>}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Badge tone={f.status === "active" ? "success" : "neutral"}>{f.status}</Badge>
+                      {f.source === "manual" && <Badge tone="neutral">Manual</Badge>}
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
+                      View <ArrowRight size={12} aria-hidden="true" />
+                    </span>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-accent">
-                    View <ArrowRight size={12} aria-hidden="true" />
-                  </span>
-                </div>
-              </Link>
-            ))}
+                  {onboarding && waiting && onboarding.status !== "ready" && (
+                    <div className="flex items-center gap-1.5 border-t border-border pt-2">
+                      <Badge tone={ONBOARDING_STATUS_TONE[onboarding.status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[onboarding.status] ?? onboarding.status}</Badge>
+                      <span className="truncate text-[11px] text-muted">{waiting.label}</span>
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>
