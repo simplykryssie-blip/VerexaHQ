@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   TrendingUp,
   Kanban,
+  Network,
 } from "lucide-react";
 import type { IconChipTone } from "@/components/ui/IconChip";
 
@@ -83,5 +84,12 @@ export const REPORT_CATEGORIES: ReportCategory[] = [
     description: "New clients and engagements over time.",
     icon: TrendingUp,
     tone: "emerald",
+  },
+  {
+    slug: "network",
+    title: "Network",
+    description: "Partner production and payout activity across your connected network. ERO/Service Bureau only.",
+    icon: Network,
+    tone: "violet",
   },
 ];

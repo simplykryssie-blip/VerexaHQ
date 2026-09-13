@@ -12038,6 +12038,21 @@ export type Database = {
           return_volume: number
         }[]
       }
+      get_network_payout_export: {
+        Args: {
+          p_period_end?: string
+          p_period_start?: string
+          p_status?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          amount_owed: number
+          partner_name: string
+          period_end: string
+          period_start: string
+          status: string
+        }[]
+      }
       get_network_payout_summary: {
         Args: { p_workspace_id: string }
         Returns: {

@@ -34,3 +34,15 @@ export function isServiceBureauTier(workspace: WorkspaceTypeLike): boolean {
 export function isEroOfficeTier(workspace: WorkspaceTypeLike): boolean {
   return workspace.workspace_type === "ero_office";
 }
+
+// Phase 5E: Reports > Network is for a workspace that actually has a
+// downstream network to report on -- an ERO office or a Service Bureau.
+// multi_office_firm is deliberately excluded (same unresolved
+// classification noted on isEroOfficeTier); an Independent PTIN has no
+// downline network at all (CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE has
+// no entry for it). Single source of truth shared by the Reports index
+// tile visibility and the /reports/network route's own server-side gate,
+// so the two can never drift apart.
+export function isNetworkReportTier(workspace: WorkspaceTypeLike): boolean {
+  return isEroOfficeTier(workspace) || isServiceBureauTier(workspace);
+}
