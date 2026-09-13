@@ -39,6 +39,7 @@ export function Sidebar({
   softwareLinks,
   showEroManagement,
   showServiceBureauNetwork,
+  showEroNetwork,
   currentUser,
   reviewQueueHasItems,
 }: {
@@ -73,6 +74,12 @@ export function Sidebar({
    *  An ERO/multi-office workspace still gets the rest of that section
    *  (ERO Dashboard, Firms) unchanged. */
   showServiceBureauNetwork?: boolean;
+  /** True only for a plain ERO office workspace (isEroOfficeTier, narrower
+   *  than isEroManagementTier) -- shows the "ERO Network" command-center
+   *  item and, since /ero-dashboard now just redirects there, hides the
+   *  now-redundant "ERO Dashboard" item for this tier specifically.
+   *  Service Bureau/multi-office keep "ERO Dashboard" exactly as before. */
+  showEroNetwork?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
   currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
   /** True when anything is sitting in Review Queue -- client info changes, submitted organizers, or (for an ERO/SB) shared engagements awaiting a decision -- shown as a small dot on the nav item so staff don't have to open the page to find out. */
@@ -305,6 +312,8 @@ export function Sidebar({
                   .filter((item) => item.label !== "Learning Hub" || showLearningHub)
                   .filter((item) => item.label !== "Partner Dashboard" || showPartnerDashboard)
                   .filter((item) => item.label !== "Service Bureau Network" || showServiceBureauNetwork)
+                  .filter((item) => item.label !== "ERO Network" || showEroNetwork)
+                  .filter((item) => item.label !== "ERO Dashboard" || !showEroNetwork)
                   .map((item) => {
                   const Icon = item.icon;
 

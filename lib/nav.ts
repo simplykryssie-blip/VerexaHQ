@@ -176,9 +176,15 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
   // Service-Bureau-only -- filtered out for ERO/multi-office in Sidebar
   // (see showServiceBureauNetwork). Placed first since it's the primary,
-  // network-first landing experience for that tier; "ERO Dashboard" below
-  // stays exactly as-is and remains reachable for every tier that had it.
+  // network-first landing experience for that tier.
   { label: "Service Bureau Network", href: "/network-command-center", icon: Network },
+  // ero_office-only -- filtered out for Service Bureau/multi-office in
+  // Sidebar (see showEroNetwork). /ero-dashboard now just redirects here
+  // (Phase 5D), so "ERO Dashboard" below is hidden for ero_office
+  // specifically (it would be a second nav entry to the identical
+  // destination) but stays exactly as-is for Service Bureau/multi-office,
+  // whose /ero-dashboard experience this phase does not change.
+  { label: "ERO Network", href: "/ero-network", icon: Network },
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Firms", href: "/firms", icon: Building2 },
 ];

@@ -25,3 +25,12 @@ export function isEroManagementTier(workspace: WorkspaceTypeLike): boolean {
 export function isServiceBureauTier(workspace: WorkspaceTypeLike): boolean {
   return workspace.workspace_type === "service_bureau";
 }
+
+// Narrower than isEroManagementTier on purpose: the ERO Network Command
+// Center (Phase 5D) is scoped to a plain ERO office only, deliberately
+// excluding Service Bureau (already served by its own Phase 5C command
+// center) and multi_office_firm (an unresolved product classification --
+// see Phase 5D audit). Mirrors isServiceBureauTier's exact shape.
+export function isEroOfficeTier(workspace: WorkspaceTypeLike): boolean {
+  return workspace.workspace_type === "ero_office";
+}
