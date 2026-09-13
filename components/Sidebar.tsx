@@ -33,6 +33,7 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  showAssignments,
   showLearningHub,
   showPartnerDashboard,
   softwareLinks,
@@ -56,6 +57,8 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
+  /** An ERO/SB always has staff capability; an Independent PTIN only has anyone to assign work to once it actually has another active member. */
+  showAssignments?: boolean;
   /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
   showLearningHub?: boolean;
   /** Only relevant to a workspace connected upstream to a parent firm (get_my_ero_connection returns a row) -- an unconnected workspace has no split/production to see. */
@@ -292,6 +295,7 @@ export function Sidebar({
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
+                  .filter((item) => item.label !== "Assignments" || showAssignments)
                   .filter((item) => item.label !== "Learning Hub" || showLearningHub)
                   .filter((item) => item.label !== "Partner Dashboard" || showPartnerDashboard)
                   .map((item) => {

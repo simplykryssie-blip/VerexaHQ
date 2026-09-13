@@ -86,25 +86,30 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: lastEntry } = await supabase
-    .from("client_ledger")
-    .select("balance_after")
-    .eq("client_id", payment.client_id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const balanceAfter = (lastEntry?.balance_after ?? 0) + refundAmount;
+  // A firm-billed payment (no client_id) has no client_ledger to post to --
+  // client_ledger.client_id is NOT NULL, so this must be skipped rather than
+  // attempted with a null id.
+  if (payment.client_id) {
+    const { data: lastEntry } = await supabase
+      .from("client_ledger")
+      .select("balance_after")
+      .eq("client_id", payment.client_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const balanceAfter = (lastEntry?.balance_after ?? 0) + refundAmount;
 
-  await supabase.from("client_ledger").insert({
-    workspace_id: payment.workspace_id,
-    client_id: payment.client_id,
-    entry_type: "refund",
-    reference_table: "payments",
-    reference_id: payment.id,
-    amount: refundAmount,
-    balance_after: balanceAfter,
-    description: "Payment refunded",
-  });
+    await supabase.from("client_ledger").insert({
+      workspace_id: payment.workspace_id,
+      client_id: payment.client_id,
+      entry_type: "refund",
+      reference_table: "payments",
+      reference_id: payment.id,
+      amount: refundAmount,
+      balance_after: balanceAfter,
+      description: "Payment refunded",
+    });
+  }
 
   return NextResponse.json({ configured: true, refund: result.data });
 }

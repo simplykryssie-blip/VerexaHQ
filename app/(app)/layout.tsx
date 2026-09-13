@@ -11,7 +11,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isIndependentTier } from "@/lib/workspaceCapabilities";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
@@ -135,6 +135,11 @@ export default async function AppLayout({ children, modal }: { children: React.R
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
+  // An ERO/SB always has staff capability (included seats), so Assignments
+  // is always relevant there -- an Independent PTIN has none by default and
+  // can't yet purchase a seat (that's Phase 7 work), so today this only ever
+  // shows for a PTIN once it actually has another active member.
+  const showAssignments = !isIndependentTier(workspace) || hasTeammates;
   const billingCard = (billingCardRows ?? [])[0] ?? null;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
@@ -202,6 +207,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
+            showAssignments={showAssignments}
             showLearningHub={isEroManagementTier(workspace) || (visibleLearningCourseCount ?? 0) > 0}
             showPartnerDashboard={(myEroConnection ?? []).length > 0}
             softwareLinks={softwareLinks ?? []}

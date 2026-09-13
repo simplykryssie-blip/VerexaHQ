@@ -1,4 +1,4 @@
-export type EntityType = "client" | "engagement";
+export type EntityType = "client" | "engagement" | "firm_connection";
 
 export type Audience = "staff" | "portal";
 

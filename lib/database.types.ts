@@ -929,6 +929,7 @@ export type Database = {
           approved_by: string | null
           automation_step_id: string
           created_at: string
+          decided_option: string | null
           id: string
           rejected_reason: string | null
           run_id: string
@@ -941,6 +942,7 @@ export type Database = {
           approved_by?: string | null
           automation_step_id: string
           created_at?: string
+          decided_option?: string | null
           id?: string
           rejected_reason?: string | null
           run_id: string
@@ -953,6 +955,7 @@ export type Database = {
           approved_by?: string | null
           automation_step_id?: string
           created_at?: string
+          decided_option?: string | null
           id?: string
           rejected_reason?: string | null
           run_id?: string
@@ -4371,6 +4374,59 @@ export type Database = {
         }
         Relationships: []
       }
+      firm_connection_contacts: {
+        Row: {
+          connection_id: string
+          created_at: string
+          display_order: number
+          email: string | null
+          first_name: string | null
+          id: string
+          is_primary: boolean
+          last_name: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_primary?: boolean
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          is_primary?: boolean
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_connection_contacts_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       firm_connections: {
         Row: {
           allows_branding_override: boolean
@@ -4402,10 +4458,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         Insert: {
@@ -4438,10 +4497,13 @@ export type Database = {
           responded_at?: string | null
           responded_by?: string | null
           restrict_ptin_staff_assignment?: boolean
+          revenue_share_percent?: number | null
+          revenue_share_scope?: string | null
           shares_communications_identity?: boolean
           software_partner_id?: string | null
           source?: string
           status?: string
+          tags?: string[]
           updated_at?: string
         }
         Update: {
@@ -4474,10 +4536,13 @@ export type Database = {
           responded_at?: string | null
           responded_by?: string | null
           restrict_ptin_staff_assignment?: boolean
+          revenue_share_percent?: number | null
+          revenue_share_scope?: string | null
           shares_communications_identity?: boolean
           software_partner_id?: string | null
           source?: string
           status?: string
+          tags?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -4972,13 +5037,14 @@ export type Database = {
       invoices: {
         Row: {
           amount_paid: number
-          client_id: string
+          client_id: string | null
           created_at: string
           created_by: string | null
           discount_amount: number
           due_date: string | null
           engagement_id: string | null
           expected_deposit_date: string | null
+          firm_connection_id: string | null
           id: string
           invoice_number: string | null
           issue_date: string
@@ -4997,13 +5063,14 @@ export type Database = {
         }
         Insert: {
           amount_paid?: number
-          client_id: string
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           discount_amount?: number
           due_date?: string | null
           engagement_id?: string | null
           expected_deposit_date?: string | null
+          firm_connection_id?: string | null
           id?: string
           invoice_number?: string | null
           issue_date?: string
@@ -5022,13 +5089,14 @@ export type Database = {
         }
         Update: {
           amount_paid?: number
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           created_by?: string | null
           discount_amount?: number
           due_date?: string | null
           engagement_id?: string | null
           expected_deposit_date?: string | null
+          firm_connection_id?: string | null
           id?: string
           invoice_number?: string | null
           issue_date?: string
@@ -5080,6 +5148,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "invoices_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "invoices_workspace_id_fkey"
@@ -6861,9 +6936,10 @@ export type Database = {
       payments: {
         Row: {
           amount: number
-          client_id: string
+          client_id: string | null
           created_at: string
           currency: string
+          firm_connection_id: string | null
           id: string
           invoice_id: string | null
           notes: string | null
@@ -6880,9 +6956,10 @@ export type Database = {
         }
         Insert: {
           amount: number
-          client_id: string
+          client_id?: string | null
           created_at?: string
           currency?: string
+          firm_connection_id?: string | null
           id?: string
           invoice_id?: string | null
           notes?: string | null
@@ -6899,9 +6976,10 @@ export type Database = {
         }
         Update: {
           amount?: number
-          client_id?: string
+          client_id?: string | null
           created_at?: string
           currency?: string
+          firm_connection_id?: string | null
           id?: string
           invoice_id?: string | null
           notes?: string | null
@@ -6922,6 +7000,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
             referencedColumns: ["id"]
           },
           {
@@ -9139,6 +9224,7 @@ export type Database = {
           engagement_id: string | null
           external_id: string | null
           external_source: string | null
+          firm_connection_id: string | null
           id: string
           overdue_flagged_at: string | null
           priority: string | null
@@ -9160,6 +9246,7 @@ export type Database = {
           engagement_id?: string | null
           external_id?: string | null
           external_source?: string | null
+          firm_connection_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -9181,6 +9268,7 @@ export type Database = {
           engagement_id?: string | null
           external_id?: string | null
           external_source?: string | null
+          firm_connection_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
           priority?: string | null
@@ -9227,6 +9315,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "tasks_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tasks_related_organizer_response_id_fkey"
@@ -10960,10 +11055,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -11073,6 +11171,10 @@ export type Database = {
       }
       archive_config_object_share: {
         Args: { p_share_id: string }
+        Returns: undefined
+      }
+      assign_firm_package: {
+        Args: { p_connection_id: string; p_package_id: string }
         Returns: undefined
       }
       assign_learning_course: {
@@ -11330,10 +11432,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -11396,10 +11501,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -11494,6 +11602,10 @@ export type Database = {
       }
       current_workspace_ids: { Args: never; Returns: string[] }
       debug_whoami: { Args: never; Returns: string }
+      decide_automation_step: {
+        Args: { p_decided_option: string; p_pending_step_id: string }
+        Returns: Json
+      }
       decline_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -11697,6 +11809,8 @@ export type Database = {
           relationship_type: string
           responded_at: string
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number
+          revenue_share_scope: string
           shares_communications_identity: boolean
           software_partner_id: string
           software_partner_name: string
@@ -12146,6 +12260,10 @@ export type Database = {
         Args: { p_entity_id: string; p_entity_type: string }
         Returns: boolean
       }
+      is_service_bureau_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       is_valid_config_table: { Args: { p_table: string }; Returns: boolean }
       is_workspace_admin: { Args: { p_workspace_id: string }; Returns: boolean }
       is_workspace_ghl_connected: {
@@ -12431,10 +12549,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -12496,10 +12617,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {
@@ -13111,10 +13235,13 @@ export type Database = {
           responded_at: string | null
           responded_by: string | null
           restrict_ptin_staff_assignment: boolean
+          revenue_share_percent: number | null
+          revenue_share_scope: string | null
           shares_communications_identity: boolean
           software_partner_id: string | null
           source: string
           status: string
+          tags: string[]
           updated_at: string
         }
         SetofOptions: {

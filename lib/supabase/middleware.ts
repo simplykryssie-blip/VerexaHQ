@@ -8,6 +8,24 @@ const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
 const PORTAL_BASIC_INFO_EXEMPT_PATHS = ["/portal/login", "/portal/accept-invitation", "/portal/basic-info"];
 const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
 
+// How long a brand-new session gets before the missing-"remember me"-marker
+// check (below) starts enforcing -- covers the moment right after login,
+// where the client is still in the middle of confirming the sb_remember
+// cookie landed (see app/login/page.tsx), so a single slow request in that
+// window doesn't sign a user out of the session they just created.
+const REMEMBER_MARKER_GRACE_PERIOD_SECONDS = 120;
+
+function getSessionIssuedAt(accessToken: string): number | null {
+  try {
+    const payload = accessToken.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(base64));
+    return typeof json.iat === "number" ? json.iat : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   try {
     // Verify environment variables are set
@@ -88,6 +106,16 @@ export async function updateSession(request: NextRequest) {
       // marker is gone while the auth cookies remain, the browser was closed and
       // reopened on a session the user asked not to be remembered -- sign out.
       if (user && !isPublicPath && !request.cookies.get("sb_remember")) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const issuedAt = session ? getSessionIssuedAt(session.access_token) : null;
+        const withinGracePeriod = issuedAt !== null && Date.now() / 1000 - issuedAt < REMEMBER_MARKER_GRACE_PERIOD_SECONDS;
+
+        if (withinGracePeriod) {
+          return response;
+        }
+
         await supabase.auth.signOut();
         const redirectUrl = new URL(loginPath, request.url);
         const signedOutResponse = NextResponse.redirect(redirectUrl);

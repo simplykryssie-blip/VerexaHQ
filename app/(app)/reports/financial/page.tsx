@@ -22,7 +22,8 @@ type InvoiceRow = {
   amount_paid: number;
   due_date: string | null;
   issue_date: string;
-  client_id: string;
+  client_id: string | null;
+  firm_connection_id: string | null;
   clientLabel: string;
 };
 
@@ -54,10 +55,12 @@ export default async function FinancialReportPage({
     );
   }
 
-  const [{ data: invoices }, { data: payments }] = await Promise.all([
+  const [{ data: invoices }, { data: payments }, { data: firmConnRows }] = await Promise.all([
     supabase
       .from("invoices")
-      .select("id, invoice_number, status, total_amount, amount_paid, due_date, issue_date, client_id, clients(first_name, last_name, business_name, client_type)")
+      .select(
+        "id, invoice_number, status, total_amount, amount_paid, due_date, issue_date, client_id, firm_connection_id, clients(first_name, last_name, business_name, client_type)"
+      )
       .eq("workspace_id", workspace.id)
       .order("issue_date", { ascending: false }),
     supabase
@@ -66,7 +69,17 @@ export default async function FinancialReportPage({
       .eq("workspace_id", workspace.id)
       .eq("status", "succeeded")
       .order("payment_date"),
+    supabase.from("firm_connections").select("id, manual_name, child_workspace_id").eq("parent_workspace_id", workspace.id),
   ]);
+
+  const childWorkspaceIds = (firmConnRows ?? []).map((f) => f.child_workspace_id).filter((id): id is string => Boolean(id));
+  const { data: firmWorkspaceRows } = childWorkspaceIds.length
+    ? await supabase.from("workspaces").select("id, name").in("id", childWorkspaceIds)
+    : { data: [] as { id: string; name: string }[] };
+  const workspaceNameById = new Map((firmWorkspaceRows ?? []).map((w) => [w.id, w.name]));
+  const firmNameByConnectionId = new Map(
+    (firmConnRows ?? []).map((f) => [f.id, (f.child_workspace_id && workspaceNameById.get(f.child_workspace_id)) || f.manual_name || "Connected firm"])
+  );
 
   let rows: InvoiceRow[] = (invoices ?? []).map((i) => ({
     id: i.id,
@@ -77,7 +90,8 @@ export default async function FinancialReportPage({
     due_date: i.due_date,
     issue_date: i.issue_date,
     client_id: i.client_id,
-    clientLabel: clientLabel(i.clients as never),
+    firm_connection_id: i.firm_connection_id,
+    clientLabel: i.client_id ? clientLabel(i.clients as never) : (firmNameByConnectionId.get(i.firm_connection_id ?? "") ?? "Connected firm"),
   }));
 
   if (searchParams.filter === "outstanding") {
@@ -104,7 +118,7 @@ export default async function FinancialReportPage({
       key: "invoice_number",
       label: "Invoice",
       render: (r) => (
-        <Link href={`/clients/${r.client_id}`} className="font-medium text-accent hover:underline">
+        <Link href={r.client_id ? `/clients/${r.client_id}` : `/firms/${r.firm_connection_id}`} className="font-medium text-accent hover:underline">
           {r.invoice_number ?? "Invoice"}
         </Link>
       ),

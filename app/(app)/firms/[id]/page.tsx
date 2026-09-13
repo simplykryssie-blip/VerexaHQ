@@ -3,12 +3,13 @@ import Link from "next/link";
 import { ArrowLeft, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE, CONNECTED_CHILD_TIER_LABEL } from "@/lib/firmConnections";
 import { getWorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { ConnectedPtinRow } from "@/app/(app)/settings/connections/ConnectedPtinRow";
 import { FirmDetailClient } from "@/components/firms/FirmDetailClient";
 import { EmptyState } from "@/components/EmptyState";
+import type { DocumentFolderRow, DocumentRow } from "@/components/documents/types";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
 
   const reviewerOptions = members.map((m) => ({ id: m.user_id, display_name: m.display_name }));
 
-  const [{ data: production }, { data: payouts }] = await Promise.all([
+  const [{ data: production }, { data: payouts }, { data: contacts }, { data: attachments }, { data: folders }] = await Promise.all([
     firm.status === "active" && firm.child_workspace_id
       ? supabase.rpc("get_firm_production", { p_connection_id: firm.connection_id })
       : Promise.resolve({ data: null }),
@@ -69,7 +70,43 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
       )
       .eq("connection_id", firm.connection_id)
       .order("period_start", { ascending: false }),
+    supabase
+      .from("firm_connection_contacts")
+      .select("id, first_name, last_name, title, email, phone, is_primary")
+      .eq("connection_id", firm.connection_id)
+      .order("display_order"),
+    supabase
+      .from("attachments")
+      .select("id, file_name, storage_path, category, tags, version, mime_type, file_size_bytes, folder_id, is_favorite, is_archived, is_locked, visibility, created_at, uploaded_by")
+      .eq("entity_type", "firm_connection")
+      .eq("entity_id", firm.connection_id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("document_folders")
+      .select("id, name, parent_folder_id, display_order")
+      .eq("entity_type", "firm_connection")
+      .eq("entity_id", firm.connection_id)
+      .order("display_order"),
   ]);
+
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("id, title, description, priority, due_date, status")
+    .eq("firm_connection_id", firm.connection_id)
+    .order("due_date", { ascending: true, nullsFirst: false });
+
+  const { data: firmInvoices } = await supabase
+    .from("invoices")
+    .select("id, invoice_number, total_amount, amount_paid, status, due_date")
+    .eq("firm_connection_id", firm.connection_id)
+    .order("created_at", { ascending: false });
+
+  const staffById = new Map(members.map((m) => [m.user_id, { id: m.user_id, display_name: m.display_name }]));
+  const documents: DocumentRow[] = (attachments ?? []).map((d) => ({
+    ...d,
+    uploaded_by: d.uploaded_by ? staffById.get(d.uploaded_by) ?? null : null,
+  }));
+  const documentFolders: DocumentFolderRow[] = folders ?? [];
 
   return (
     <div className="max-w-4xl px-8 py-6">
@@ -93,8 +130,11 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
           website: firm.website,
           mailingAddress: firm.mailing_address,
         }}
+        canAssignPackages={isServiceBureauTier(workspace)}
         packageId={firm.package_id}
         packages={packages ?? []}
+        revenueSharePercent={firm.revenue_share_percent}
+        revenueShareScope={firm.revenue_share_scope}
         bankPartnerId={firm.bank_partner_id}
         banks={banks ?? []}
         softwarePartnerId={firm.software_partner_id}
@@ -112,6 +152,14 @@ export default async function FirmDetailPage({ params }: { params: { id: string 
         production={production as Record<string, unknown> | null}
         payouts={payouts ?? []}
         isActive={firm.status === "active"}
+        contacts={contacts ?? []}
+        workspaceId={workspace.id}
+        documentFolders={documentFolders}
+        documents={documents}
+        firmName={workspace.name}
+        tasks={tasks ?? []}
+        staffOptions={reviewerOptions}
+        invoices={firmInvoices ?? []}
       />
 
       {firm.status === "active" && firm.source !== "manual" && (

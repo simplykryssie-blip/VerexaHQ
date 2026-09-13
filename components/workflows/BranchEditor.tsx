@@ -10,6 +10,7 @@ import {
   conditionGroupsAreEmpty,
   type ConditionGroup,
   type DocumentSignatureStepOption,
+  type DecisionStepOption,
 } from "@/components/workflows/ConditionsEditor";
 import type { StaffOption, WorkflowStepEdgeRow } from "@/components/workflows/WorkflowBuilder";
 import type { TemplateOption, PipelineOption } from "@/components/workflows/TriggerFields";
@@ -59,6 +60,7 @@ export function BranchEditor({
   pipelines,
   organizerTemplates,
   documentSignatureSteps = [],
+  decisionSteps = [],
   tagOptions = [],
   canManage,
   onSaved,
@@ -76,6 +78,7 @@ export function BranchEditor({
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
   documentSignatureSteps?: DocumentSignatureStepOption[];
+  decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
   canManage: boolean;
   onSaved: () => void;
@@ -210,6 +213,7 @@ export function BranchEditor({
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}
               documentSignatureSteps={documentSignatureSteps}
+              decisionSteps={decisionSteps}
               tagOptions={tagOptions}
               disabled={!canManage}
             />

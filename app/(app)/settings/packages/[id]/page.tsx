@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
+import { isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { PackageOptionGroupsEditor, type OptionGroupRow } from "@/components/settings/PackageOptionGroupsEditor";
 import { PackageEditForm } from "@/components/settings/PackageEditForm";
 
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function PackageDetailPage({ params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
+  if (!isServiceBureauTier(workspace)) redirect("/settings/services");
 
   const supabase = createClient();
 

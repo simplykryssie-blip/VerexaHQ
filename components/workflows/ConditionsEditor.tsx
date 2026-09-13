@@ -63,12 +63,14 @@ type ValueKind =
   | "pipeline_stage"
   | "organizer_status"
   | "document_signed_step"
+  | "decision_step"
   | "text"
   | "tag"
   | "number"
   | "boolean";
 
 export type DocumentSignatureStepOption = { id: string; name: string };
+export type DecisionStepOption = { id: string; name: string; options: { key: string; label: string }[] };
 
 type FieldMeta = {
   key: string;
@@ -189,6 +191,7 @@ const CONDITION_FIELDS: FieldMeta[] = [
   { key: "document_request.all_required_complete", label: "All required documents received", group: "Document request", valueKind: "boolean", ops: ["eq"] },
 
   { key: "run.document_signed", label: "Document signed? (sent by \"Send a document for signature\")", group: "Workflow", valueKind: "document_signed_step", ops: ["eq", "neq"] },
+  { key: "run.decision", label: "Decision made? (from a manual decision step)", group: "Workflow", valueKind: "decision_step", ops: ["eq", "neq"] },
 
   { key: "package_purchase.package_name", label: "Package name", group: "Package purchase", valueKind: "text", ops: SELECT_OPS },
   { key: "package_purchase.billing_cadence", label: "Package billing cadence", group: "Package purchase", valueKind: "select", options: ["monthly", "annual", "one_time"], ops: SELECT_OPS },
@@ -208,6 +211,7 @@ function ConditionRow({
   pipelines,
   organizerTemplates,
   documentSignatureSteps,
+  decisionSteps,
   tagOptions,
   disabled,
 }: {
@@ -220,6 +224,7 @@ function ConditionRow({
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
   documentSignatureSteps: DocumentSignatureStepOption[];
+  decisionSteps: DecisionStepOption[];
   tagOptions: string[];
   disabled: boolean;
 }) {
@@ -235,6 +240,11 @@ function ConditionRow({
   // workflow can send more than one document for signature and "signed?"
   // alone doesn't say which one this condition means.
   const [documentStepId, documentSignedValue] = condition.value.split("|");
+  // "<step_id>|<option_key>" -- a workflow can have more than one decision
+  // step, and each one's own decision_options are step-specific, so the
+  // second half's valid values depend entirely on which step is chosen.
+  const [decisionStepId, decisionOptionValue] = condition.value.split("|");
+  const selectedDecisionStep = decisionSteps.find((s) => s.id === decisionStepId);
 
   function setField(nextField: string) {
     const nextMeta = fieldMeta(nextField);
@@ -390,6 +400,44 @@ function ConditionRow({
             </>
           )}
 
+          {meta.valueKind === "decision_step" && (
+            <>
+              <select
+                disabled={disabled}
+                value={decisionStepId ?? ""}
+                onChange={(e) => setValue(`${e.target.value}|`)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose a decision step
+                </option>
+                {decisionSteps.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                disabled={disabled || !decisionStepId}
+                value={decisionOptionValue || ""}
+                onChange={(e) => setValue(`${decisionStepId ?? ""}|${e.target.value}`)}
+                className={inputClass}
+              >
+                <option value="" disabled>
+                  Choose an outcome
+                </option>
+                {(selectedDecisionStep?.options ?? []).map((o) => (
+                  <option key={o.key} value={o.key}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              {decisionSteps.length === 0 && (
+                <span className="text-[11px] text-warning">No manual decision steps in this workflow yet -- add one first.</span>
+              )}
+            </>
+          )}
+
           {meta.valueKind === "lead_stage" && (
             <select disabled={disabled} value={condition.value} onChange={(e) => setValue(e.target.value)} className={inputClass}>
               <option value="" disabled>
@@ -527,6 +575,7 @@ export function ConditionsEditor({
   pipelines,
   organizerTemplates,
   documentSignatureSteps = [],
+  decisionSteps = [],
   tagOptions = [],
   disabled,
 }: {
@@ -538,6 +587,7 @@ export function ConditionsEditor({
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
   documentSignatureSteps?: DocumentSignatureStepOption[];
+  decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
   disabled?: boolean;
 }) {
@@ -594,6 +644,7 @@ export function ConditionsEditor({
                 pipelines={pipelines}
                 organizerTemplates={organizerTemplates}
                 documentSignatureSteps={documentSignatureSteps}
+                decisionSteps={decisionSteps}
                 tagOptions={tagOptions}
                 disabled={Boolean(disabled)}
               />
@@ -624,6 +675,7 @@ export function ConditionGroupsEditor({
   pipelines,
   organizerTemplates,
   documentSignatureSteps = [],
+  decisionSteps = [],
   tagOptions = [],
   disabled,
 }: {
@@ -635,6 +687,7 @@ export function ConditionGroupsEditor({
   pipelines: PipelineOption[];
   organizerTemplates: TemplateOption[];
   documentSignatureSteps?: DocumentSignatureStepOption[];
+  decisionSteps?: DecisionStepOption[];
   tagOptions?: string[];
   disabled?: boolean;
 }) {
@@ -698,6 +751,7 @@ export function ConditionGroupsEditor({
               pipelines={pipelines}
               organizerTemplates={organizerTemplates}
               documentSignatureSteps={documentSignatureSteps}
+              decisionSteps={decisionSteps}
               tagOptions={tagOptions}
               disabled={disabled}
             />
