@@ -11,7 +11,7 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
-import { isEroManagementTier, isIndependentTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isIndependentTier, isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
@@ -215,6 +215,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
               (pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0 || (respondedOrganizerItemCount ?? 0) > 0
             }
             showEroManagement={isEroManagementTier(workspace)}
+            showServiceBureauNetwork={isServiceBureauTier(workspace)}
             currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-16 pt-14 lg:pt-0">

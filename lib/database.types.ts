@@ -11998,6 +11998,13 @@ export type Database = {
           partner_name: string
         }[]
       }
+      get_network_filing_volume: {
+        Args: { p_tax_year?: number; p_workspace_id: string }
+        Returns: {
+          tax_year: number
+          total_returns: number
+        }[]
+      }
       get_network_onboarding_summary: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -12083,6 +12090,16 @@ export type Database = {
           awaiting_review_count: number
           corrections_requested_count: number
           rejected_count: number
+        }[]
+      }
+      get_network_stalled_partners: {
+        Args: { p_inactivity_days?: number; p_workspace_id: string }
+        Returns: {
+          connection_id: string
+          onboarding_stage: string
+          partner_name: string
+          relationship_type: string
+          updated_at: string
         }[]
       }
       get_platform_account_holders: {

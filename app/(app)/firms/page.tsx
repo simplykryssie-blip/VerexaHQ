@@ -20,7 +20,15 @@ export const dynamic = "force-dynamic";
 // under it (see isEroManagementTier()) -- Service Bureau gets exactly the
 // same access as an ERO here, since it's the same capability tier, just
 // bigger.
-export default async function FirmsPage() {
+export default async function FirmsPage({
+  searchParams,
+}: {
+  /** Optional deep-link from the Service Bureau Network Command Center --
+   *  "pending" shows active connections that haven't reached "live" yet.
+   *  Absent (the normal case, arriving from this page's own nav item)
+   *  shows every connected firm exactly as before. */
+  searchParams: { onboarding?: string };
+}) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
   if (!isEroManagementTier(workspace)) redirect("/dashboard");
@@ -57,7 +65,14 @@ export default async function FirmsPage() {
     ? await supabase.rpc("get_ero_connected_partners", { p_workspace_id: workspace.id, p_relationship_types: childRelationshipTypes })
     : { data: [] as never[] };
 
-  const firms = connectedFirms ?? [];
+  const allFirms = connectedFirms ?? [];
+  const ONBOARDING_STAGES = ["invited", "agreement_signed", "software_provisioned", "live"];
+  const firms =
+    searchParams.onboarding === "pending"
+      ? allFirms.filter((f) => f.status === "active" && f.onboarding_stage !== "live")
+      : searchParams.onboarding && ONBOARDING_STAGES.includes(searchParams.onboarding)
+        ? allFirms.filter((f) => f.status === "active" && f.onboarding_stage === searchParams.onboarding)
+        : allFirms;
   const activeCount = firms.filter((f) => f.status === "active").length;
   const eroCount = firms.filter((f) => CONNECTED_CHILD_TIER_LABEL[f.relationship_type] === "ERO").length;
   const ptinCount = firms.filter((f) => CONNECTED_CHILD_TIER_LABEL[f.relationship_type] === "PTIN").length;
@@ -81,6 +96,18 @@ export default async function FirmsPage() {
           <StatTile icon={Building2} tone="violet" label="EROs" value={eroCount} />
           <StatTile icon={Building2} tone="amber" label="PTINs" value={ptinCount} />
         </div>
+        {searchParams.onboarding && (
+          <div className="flex items-center justify-between rounded-xl border border-accent/30 bg-accentSoft px-4 py-2 text-xs text-accent">
+            <span>
+              {searchParams.onboarding === "pending"
+                ? "Showing active connections that haven't reached \"live\" yet."
+                : `Showing active connections at stage "${searchParams.onboarding.replace(/_/g, " ")}".`}
+            </span>
+            <Link href="/firms" className="font-medium underline">
+              Clear filter
+            </Link>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted">
             A firm on VerexaHQ connects by invite (Settings &gt; Users &amp; Staff). A firm that isn&apos;t on VerexaHQ can be added here directly.
@@ -88,7 +115,13 @@ export default async function FirmsPage() {
           {childRelationshipTypes.length > 0 && <AddManualFirmModal workspaceId={workspace.id} availableRelationshipTypes={childRelationshipTypes} />}
         </div>
         {firms.length === 0 ? (
-          <EmptyState message="No firms connected yet. Invite one from Settings > Users & Staff, or add one manually above." />
+          <EmptyState
+            message={
+              searchParams.onboarding
+                ? "No active connections match this filter."
+                : "No firms connected yet. Invite one from Settings > Users & Staff, or add one manually above."
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {firms.map((f) => (

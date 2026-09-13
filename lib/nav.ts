@@ -36,6 +36,7 @@ import {
   CalendarOff,
   UserCircle,
   MapPin,
+  Network,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -173,6 +174,11 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  * rather than kept as a second door to the same screen.
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
+  // Service-Bureau-only -- filtered out for ERO/multi-office in Sidebar
+  // (see showServiceBureauNetwork). Placed first since it's the primary,
+  // network-first landing experience for that tier; "ERO Dashboard" below
+  // stays exactly as-is and remains reachable for every tier that had it.
+  { label: "Service Bureau Network", href: "/network-command-center", icon: Network },
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Firms", href: "/firms", icon: Building2 },
 ];
