@@ -12672,6 +12672,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_operationally_active_partner: {
+        Args: { p_firm_connection_id: string }
+        Returns: boolean
+      }
       is_pending_signer_for_signature_request: {
         Args: { p_signature_request_id: string; p_workspace_id: string }
         Returns: boolean
@@ -13880,6 +13884,10 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: undefined
+      }
+      workspace_is_active: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
       }
     }
     Enums: {
