@@ -12,7 +12,6 @@ import {
   Package,
   UserPlus,
   Send,
-  Eye,
   Lock,
   AlertTriangle,
   Clock,
@@ -137,9 +136,14 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
     : { count: 0 };
 
   const allPartners = partners ?? [];
+  // Connected Firms = active + pending (a firm mid-invite is still "connected"
+  // in a meaningful sense); revoked connections are excluded. Distinct from
+  // Active Partners below, which stays active-only -- see Phase 5C P1
+  // correction Decision 1.
+  const connectedFirms = allPartners.filter((p) => p.status !== "revoked");
   const activePartners = allPartners.filter((p) => p.status === "active");
-  const eroCount = allPartners.filter((p) => CONNECTED_CHILD_TIER_LABEL[p.relationship_type] === "ERO").length;
-  const ptinCount = allPartners.filter((p) => CONNECTED_CHILD_TIER_LABEL[p.relationship_type] === "PTIN").length;
+  const eroCount = connectedFirms.filter((p) => CONNECTED_CHILD_TIER_LABEL[p.relationship_type] === "ERO").length;
+  const ptinCount = connectedFirms.filter((p) => CONNECTED_CHILD_TIER_LABEL[p.relationship_type] === "PTIN").length;
   const recentlyActivated = activePartners
     .filter((p) => p.onboarding_stage === "live")
     .sort((a, b) => new Date(b.responded_at ?? b.created_at).getTime() - new Date(a.responded_at ?? a.created_at).getTime())
@@ -169,8 +173,12 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
   const trainingCompletionRate = trainingAssignedCount > 0 ? Math.round((trainingCompletedCount / trainingAssignedCount) * 100) : null;
 
   const unreadCount = networkUnread ?? 0;
-  const needsAttentionCount =
-    stalled.length + (reviewStatus?.awaiting_review_count ?? 0) + trainingOverdueCount + unreadCount;
+  // Matches Review Queue's own definition of "awaiting your review" --
+  // pending + corrections_requested -- so this headline number never
+  // undercounts relative to what /review-queue itself shows. See Phase 5C
+  // P1 correction Decision 3.
+  const awaitingReviewCount = reviewStatus ? reviewStatus.awaiting_review_count + reviewStatus.corrections_requested_count : 0;
+  const needsAttentionCount = stalled.length + awaitingReviewCount + trainingOverdueCount + unreadCount;
 
   return (
     <>
@@ -204,7 +212,7 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
               label="Connected Firms"
               value={
                 <>
-                  {allPartners.length}
+                  {connectedFirms.length}
                   <span className="mt-0.5 block text-[11px] font-normal normal-case text-muted">
                     {eroCount} ERO{eroCount === 1 ? "" : "s"} &middot; {ptinCount} PTIN{ptinCount === 1 ? "" : "s"}
                   </span>
@@ -219,10 +227,10 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
             <StatTile icon={Clock} tone="amber" label="Pending Onboarding" value={onboarding ? pendingOnboardingCount : "--"} />
           </Link>
           <Link href="/review-queue" className="block">
-            <StatTile icon={ClipboardCheck} tone="rose" label="Filing Information Awaiting Review" value={reviewStatus?.awaiting_review_count ?? "--"} />
+            <StatTile icon={ClipboardCheck} tone="rose" label="Filing Information Awaiting Review" value={reviewStatus ? awaitingReviewCount : "--"} />
           </Link>
           <Link href="/tax" className="block">
-            <StatTile icon={Landmark} tone="violet" label={`Network Filings ${filingVolume ? `(${filingVolume.tax_year})` : "This Year"}`} value={filingVolume ? Number(filingVolume.total_returns) : "--"} />
+            <StatTile icon={Landmark} tone="violet" label={filingVolume?.tax_year ? `Network Filings (${filingVolume.tax_year})` : "Network Filings"} value={filingVolume ? Number(filingVolume.total_returns) : "--"} />
           </Link>
           <Link href="/firms" className="block">
             <StatTile
@@ -268,9 +276,9 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
                   </ul>
                 </li>
               )}
-              {(reviewStatus?.awaiting_review_count ?? 0) > 0 && (
+              {awaitingReviewCount > 0 && (
                 <li className="flex items-center justify-between rounded-xl border border-border p-3">
-                  <p className="text-sm font-medium text-ink">{reviewStatus!.awaiting_review_count} filing{reviewStatus!.awaiting_review_count === 1 ? "" : "s"} awaiting review</p>
+                  <p className="text-sm font-medium text-ink">{awaitingReviewCount} filing{awaitingReviewCount === 1 ? "" : "s"} awaiting review</p>
                   <Link href="/review-queue" className="text-xs font-medium text-accent hover:underline">
                     Review Queue
                   </Link>
@@ -401,6 +409,9 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
                 {production.period_start} to {production.period_end} &middot; {production.connection_count} active connection
                 {production.connection_count === 1 ? "" : "s"}
               </p>
+              {Number(production.network_production) === 0 && (
+                <p className="text-xs text-muted">No network production for this period.</p>
+              )}
               <Link href="#partner-performance" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
                 <TrendingUp size={12} aria-hidden="true" /> See partner-level production
               </Link>
@@ -562,7 +573,6 @@ export default async function NetworkCommandCenterPage({ searchParams }: { searc
               { label: "Send Network Message", href: "/messages", icon: Send, chip: "bg-accentSoft text-accent" },
               { label: "Manage Training", href: "/learning/manage", icon: GraduationCap, chip: "bg-emeraldSoft text-emerald" },
               { label: "Manage Banks & Software", href: "/settings/bank-partners", icon: Wallet, chip: "bg-amberSoft text-amber" },
-              { label: "View Payouts", href: "/firms", icon: Eye, chip: "bg-amberSoft text-amber" },
               { label: "Manage Packages", href: "/settings/packages", icon: Package, chip: "bg-roseSoft text-rose" },
             ].map((a) => (
               <Link
