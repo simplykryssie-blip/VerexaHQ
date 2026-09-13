@@ -84,6 +84,8 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Email & SMS", href: "/automations" },
       { label: "Form Templates", href: "/templates" },
+      { label: "Marketplace", href: "/templates/marketplace" },
+      { label: "My Templates", href: "/templates/my-templates" },
     ],
   },
   { label: "Support", href: "/support", icon: LifeBuoy },

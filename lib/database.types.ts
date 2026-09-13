@@ -5795,6 +5795,51 @@ export type Database = {
           },
         ]
       }
+      marketplace_templates: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          eligible_workspace_types: string[]
+          id: string
+          name: string
+          slug: string
+          source_object_id: string
+          source_table: string
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          description?: string | null
+          eligible_workspace_types?: string[]
+          id?: string
+          name: string
+          slug: string
+          source_object_id: string
+          source_table: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          eligible_workspace_types?: string[]
+          id?: string
+          name?: string
+          slug?: string
+          source_object_id?: string
+          source_table?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
       message_threads: {
         Row: {
           channel: string
@@ -10293,6 +10338,54 @@ export type Database = {
           },
         ]
       }
+      workspace_template_installations: {
+        Row: {
+          copy_object_id: string
+          id: string
+          installed_at: string
+          installed_by: string | null
+          installed_version: number
+          marketplace_template_id: string
+          source_table: string
+          workspace_id: string
+        }
+        Insert: {
+          copy_object_id: string
+          id?: string
+          installed_at?: string
+          installed_by?: string | null
+          installed_version: number
+          marketplace_template_id: string
+          source_table: string
+          workspace_id: string
+        }
+        Update: {
+          copy_object_id?: string
+          id?: string
+          installed_at?: string
+          installed_by?: string | null
+          installed_version?: number
+          marketplace_template_id?: string
+          source_table?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_template_installations_marketplace_template_id_fkey"
+            columns: ["marketplace_template_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_template_installations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_usage_meters: {
         Row: {
           free_units_consumed: number
@@ -11631,6 +11724,10 @@ export type Database = {
       decrypt_zoom_secret: { Args: { p_ciphertext: string }; Returns: string }
       delete_client_email: { Args: { p_email_id: string }; Returns: undefined }
       delete_client_phone: { Args: { p_phone_id: string }; Returns: undefined }
+      delete_installed_template: {
+        Args: { p_installation_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
       delete_platform_system_credential: {
         Args: { p_id: string }
         Returns: undefined
@@ -11669,6 +11766,14 @@ export type Database = {
           p_new_name?: string
           p_table: string
           p_target_workspace_id?: string
+        }
+        Returns: string
+      }
+      duplicate_installed_template: {
+        Args: {
+          p_installation_id: string
+          p_new_name?: string
+          p_workspace_id: string
         }
         Returns: string
       }
@@ -12319,6 +12424,14 @@ export type Database = {
         Args: { p_rows: Json; p_workspace_id: string }
         Returns: Json
       }
+      install_marketplace_template: {
+        Args: {
+          p_marketplace_template_id: string
+          p_name?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       invite_portal_user: {
         Args: {
           p_client_id: string
@@ -12422,6 +12535,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      list_marketplace_templates: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          category: string
+          description: string
+          id: string
+          installation_id: string
+          is_installed: boolean
+          name: string
+          slug: string
+          source_table: string
+          update_available: boolean
+          version: number
+        }[]
+      }
       list_workspace_tags_with_usage: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -12429,6 +12557,24 @@ export type Database = {
           client_count: number
           id: string
           name: string
+        }[]
+      }
+      list_workspace_templates: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          category: string
+          copy_id: string
+          copy_status: string
+          copy_updated_at: string
+          current_master_version: number
+          installation_id: string
+          installed_at: string
+          installed_version: number
+          is_customized: boolean
+          marketplace_name: string
+          marketplace_template_id: string
+          name: string
+          source_table: string
         }[]
       }
       mark_all_notifications_read: {
@@ -13034,6 +13180,14 @@ export type Database = {
           p_regular_office_hours?: Json
           p_supported_filing_states?: string[]
           p_tax_season_hours?: Json
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      set_installed_template_enabled: {
+        Args: {
+          p_enabled: boolean
+          p_installation_id: string
           p_workspace_id: string
         }
         Returns: undefined
