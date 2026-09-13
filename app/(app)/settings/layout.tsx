@@ -18,12 +18,18 @@ export default async function SettingsLayout({ children }: { children: React.Rea
   // a package. The page itself already redirects anyone else to Services,
   // so the nav link shouldn't be there to click in the first place.
   const hidePackages = !workspace || !isServiceBureauTier(workspace);
+  // Banks & Software (a standard fee schedule assigned per connected PTIN)
+  // is broader than Packages -- any workspace that can have firms connected
+  // under it needs this, not just a Service Bureau. The page itself already
+  // gates on isEroManagementTier (settings/bank-partners/page.tsx); the nav
+  // link needs the same gate, not Packages' narrower one.
+  const hideBankPartners = !workspace || !isEroManagementTier(workspace);
 
   return (
     <>
       <PageHeader title="Settings" description="Configure your workspace." />
       <div className="flex flex-1 flex-col lg:flex-row">
-        <SettingsNav hideFirmProfile={!showFirmProfile} hidePackages={hidePackages} />
+        <SettingsNav hideFirmProfile={!showFirmProfile} hidePackages={hidePackages} hideBankPartners={hideBankPartners} />
         <div className="min-w-0 flex-1 px-4 py-6 sm:px-8">{children}</div>
       </div>
     </>

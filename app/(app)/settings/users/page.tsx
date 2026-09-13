@@ -13,6 +13,7 @@ import { ResendInvitationButton } from "./ResendInvitationButton";
 import { RemoveMemberButton } from "./RemoveMemberButton";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
+import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE } from "@/lib/firmConnections";
 import { getWorkspaceMemberWorkload, type WorkspaceMemberWorkload } from "@/lib/workspaceStaff";
 import { timeAgo } from "@/lib/timeAgo";
 import { ConnectionInviteGenerator } from "../connections/ConnectionInviteGenerator";
@@ -36,16 +37,6 @@ type InvitationRow = {
   status: string;
   expires_at: string;
   role_name: string | null;
-};
-
-// firm_connections supports three tiers (ero_ptin, service_bureau_ero,
-// service_bureau_ptin) but a workspace can only ever invite the tier
-// directly below its own -- an ERO invites PTINs, a Service Bureau invites
-// EROs or PTINs directly. Independent PTINs and multi-office firms have no
-// tier below them, so they get no invite generator at all.
-const CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE: Record<string, string[]> = {
-  ero_office: ["ero_ptin"],
-  service_bureau: ["service_bureau_ero", "service_bureau_ptin"],
 };
 
 const CONNECTED_CHILD_TIER_LABEL: Record<string, string> = {
