@@ -10,6 +10,11 @@ export type PipelineOption = { id: string; name: string; stages: { id: string; n
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
 
+// Matches partner_onboardings.status's own CHECK constraint exactly (Phase 6B).
+export const PARTNER_ONBOARDING_STATUS_OPTIONS = [
+  "pending", "in_progress", "under_review", "approved", "setup", "ready", "rejected", "withdrawn",
+];
+
 // Matches the review_status enum's own labels exactly (set_organizer_response_review_status
 // takes these verbatim) -- displayLabel mirrors the wording already used in ReviewWorkspace.tsx's
 // own REVIEW_STATUS_LABELS so "Rejected"/"Denied" and "Corrections Requested"/"Needs info" read
@@ -86,6 +91,8 @@ export const TRIGGER_TYPES = [
   { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
   { value: "firm_package.purchased", label: "A connected firm purchases a package", category: "ero_ptin", description: "Fires in your workspace when a connected firm checks out and pays for the package you assigned them (e.g. a tax software or bank product package) -- use it to automate onboarding onto whatever they chose.", keywords: "package purchase checkout software bank connected firm ero ptin" },
   { value: "firm_package.canceled", label: "A connected firm's package is canceled", category: "ero_ptin", description: "Fires in your workspace when a connected firm's package purchase is canceled (a recurring subscription ending, most commonly) -- use it to automate revoking access.", keywords: "package canceled subscription ended connected firm ero ptin" },
+  { value: "partner_onboarding.created", label: "A partner enters onboarding", category: "ero_ptin", description: "Fires once, the moment a partner (a connected ERO/PTIN) enters the Verexa onboarding process -- e.g. right after a package purchase. Use it to kick off a welcome message or an internal task, not to react to individual onboarding steps.", keywords: "partner onboarding created new connected firm ero ptin" },
+  { value: "partner_onboarding.status_changed", label: "A partner's onboarding status changes to", category: "ero_ptin", description: "Fires when a partner's onboarding record moves to a specific status (under review, approved, ready, rejected, etc).", keywords: "partner onboarding status approved rejected ready review connected firm ero ptin" },
 ];
 
 const QUOTE_TRIGGER_TYPES = new Set(["quote.created", "quote.sent", "quote.accepted", "quote.declined"]);
@@ -100,6 +107,7 @@ export function defaultTriggerConfig(triggerType: string): Record<string, unknow
   if (triggerType === "engagement.status_changed") return { to_status: ENGAGEMENT_STATUS_OPTIONS[0] };
   if (triggerType === "appointment.status_changed") return { to_status: APPOINTMENT_STATUS_OPTIONS[0] };
   if (triggerType === "organizer_response.review_decided") return { to_status: ORGANIZER_REVIEW_STATUS_OPTIONS[0].value };
+  if (triggerType === "partner_onboarding.status_changed") return { to_status: PARTNER_ONBOARDING_STATUS_OPTIONS[0] };
   if (DATE_REMINDER_TRIGGER_TYPES.has(triggerType)) return { direction: "before", days: 3 };
   return {};
 }
@@ -275,6 +283,12 @@ export function triggerSummary(
   }
   if (triggerType === "firm_package.canceled") {
     return "When a connected firm's package is canceled";
+  }
+  if (triggerType === "partner_onboarding.created") {
+    return "When a partner enters onboarding";
+  }
+  if (triggerType === "partner_onboarding.status_changed") {
+    return `When a partner's onboarding status changes to "${config.to_status ?? "?"}"`;
   }
   return triggerType;
 }
@@ -693,6 +707,24 @@ export function TriggerFields({
             className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           >
             {APPOINTMENT_STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {triggerType === "partner_onboarding.status_changed" && (
+        <label className="flex flex-col gap-1 text-xs text-muted">
+          Status
+          <select
+            disabled={disabled}
+            value={(config.to_status as string) ?? ""}
+            onChange={(e) => onConfigChange({ to_status: e.target.value })}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+          >
+            {PARTNER_ONBOARDING_STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
                 {s.replace(/_/g, " ")}
               </option>

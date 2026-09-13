@@ -6851,6 +6851,149 @@ export type Database = {
           },
         ]
       }
+      partner_onboardings: {
+        Row: {
+          agreement_required: boolean
+          agreement_signature_request_id: string | null
+          application_data: Json
+          application_submitted_at: string | null
+          assigned_staff_id: string | null
+          bank_software_setup_completed_at: string | null
+          bank_software_setup_required: boolean
+          completed_at: string | null
+          created_at: string
+          document_request_id: string | null
+          documents_required: boolean
+          firm_connection_id: string
+          firm_package_purchase_id: string | null
+          id: string
+          learning_course_id: string | null
+          package_id: string | null
+          rejected_at: string | null
+          rejected_reason: string | null
+          review_decision: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          training_completed_at: string | null
+          training_required: boolean
+          updated_at: string
+          withdrawn_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          agreement_required?: boolean
+          agreement_signature_request_id?: string | null
+          application_data?: Json
+          application_submitted_at?: string | null
+          assigned_staff_id?: string | null
+          bank_software_setup_completed_at?: string | null
+          bank_software_setup_required?: boolean
+          completed_at?: string | null
+          created_at?: string
+          document_request_id?: string | null
+          documents_required?: boolean
+          firm_connection_id: string
+          firm_package_purchase_id?: string | null
+          id?: string
+          learning_course_id?: string | null
+          package_id?: string | null
+          rejected_at?: string | null
+          rejected_reason?: string | null
+          review_decision?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          training_completed_at?: string | null
+          training_required?: boolean
+          updated_at?: string
+          withdrawn_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          agreement_required?: boolean
+          agreement_signature_request_id?: string | null
+          application_data?: Json
+          application_submitted_at?: string | null
+          assigned_staff_id?: string | null
+          bank_software_setup_completed_at?: string | null
+          bank_software_setup_required?: boolean
+          completed_at?: string | null
+          created_at?: string
+          document_request_id?: string | null
+          documents_required?: boolean
+          firm_connection_id?: string
+          firm_package_purchase_id?: string | null
+          id?: string
+          learning_course_id?: string | null
+          package_id?: string | null
+          rejected_at?: string | null
+          rejected_reason?: string | null
+          review_decision?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          training_completed_at?: string | null
+          training_required?: boolean
+          updated_at?: string
+          withdrawn_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_onboardings_agreement_signature_request_id_fkey"
+            columns: ["agreement_signature_request_id"]
+            isOneToOne: false
+            referencedRelation: "signature_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_onboardings_document_request_id_fkey"
+            columns: ["document_request_id"]
+            isOneToOne: false
+            referencedRelation: "document_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_onboardings_firm_connection_id_fkey"
+            columns: ["firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_onboardings_firm_package_purchase_id_fkey"
+            columns: ["firm_package_purchase_id"]
+            isOneToOne: true
+            referencedRelation: "firm_package_purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_onboardings_learning_course_id_fkey"
+            columns: ["learning_course_id"]
+            isOneToOne: false
+            referencedRelation: "learning_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_onboardings_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "firm_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_onboardings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_methods: {
         Row: {
           brand: string | null
@@ -11069,6 +11212,23 @@ export type Database = {
         }
         Returns: boolean
       }
+      _get_or_create_partner_onboarding: {
+        Args: {
+          p_firm_connection_id: string
+          p_firm_package_purchase_id: string
+          p_package_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      _maybe_enter_review: {
+        Args: { p_onboarding_id: string }
+        Returns: undefined
+      }
+      _maybe_reach_partner_onboarding_ready: {
+        Args: { p_onboarding_id: string }
+        Returns: undefined
+      }
       _notify_admins_of_new_public_lead: {
         Args: { p_client_id: string; p_workspace_id: string }
         Returns: undefined
@@ -11644,6 +11804,14 @@ export type Database = {
         }
         Returns: string
       }
+      create_partner_onboarding: {
+        Args: {
+          p_firm_connection_id: string
+          p_package_id?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       create_workflow_pipeline: {
         Args: { p_name: string; p_workspace_id: string }
         Returns: string
@@ -12079,6 +12247,26 @@ export type Database = {
           software_partner_id: string
           software_partner_name: string
           website: string
+        }[]
+      }
+      get_my_partner_onboarding: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          agreement_required: boolean
+          agreement_signed: boolean
+          application_submitted_at: string
+          bank_software_setup_completed_at: string
+          bank_software_setup_required: boolean
+          completed_at: string
+          created_at: string
+          documents_completed: boolean
+          documents_required: boolean
+          id: string
+          rejected_reason: string
+          review_note: string
+          status: string
+          training_completed_at: string
+          training_required: boolean
         }[]
       }
       get_my_workspaces: {
@@ -12550,6 +12738,31 @@ export type Database = {
           version: number
         }[]
       }
+      list_partner_onboardings: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          agreement_required: boolean
+          agreement_signed: boolean
+          application_submitted_at: string
+          assigned_staff_id: string
+          bank_software_setup_completed_at: string
+          bank_software_setup_required: boolean
+          completed_at: string
+          created_at: string
+          documents_completed: boolean
+          documents_required: boolean
+          firm_connection_id: string
+          id: string
+          package_id: string
+          package_name: string
+          partner_name: string
+          relationship_type: string
+          status: string
+          training_completed_at: string
+          training_required: boolean
+          updated_at: string
+        }[]
+      }
       list_workspace_tags_with_usage: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -12771,6 +12984,15 @@ export type Database = {
       }
       record_login_result: {
         Args: { p_email: string; p_success: boolean; p_workspace_id?: string }
+        Returns: undefined
+      }
+      record_partner_onboarding_review: {
+        Args: {
+          p_decision: string
+          p_note?: string
+          p_onboarding_id: string
+          p_workspace_id: string
+        }
         Returns: undefined
       }
       record_provider_check: {
@@ -13220,6 +13442,39 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_partner_onboarding_agreement_request: {
+        Args: {
+          p_onboarding_id: string
+          p_signature_request_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      set_partner_onboarding_bank_software_setup: {
+        Args: {
+          p_completed: boolean
+          p_onboarding_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      set_partner_onboarding_document_request: {
+        Args: {
+          p_document_request_id: string
+          p_onboarding_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      set_partner_onboarding_training: {
+        Args: {
+          p_completed: boolean
+          p_learning_course_id?: string
+          p_onboarding_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       set_platform_admin: {
         Args: { p_is_platform_admin: boolean; p_user_email: string }
         Returns: undefined
@@ -13407,6 +13662,14 @@ export type Database = {
         Args: { p_response_id: string }
         Returns: undefined
       }
+      submit_partner_onboarding_application: {
+        Args: {
+          p_application_data: Json
+          p_onboarding_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       submit_portal_basic_info: {
         Args: {
           p_business_name?: string
@@ -13537,6 +13800,17 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_partner_onboarding_requirements: {
+        Args: {
+          p_agreement_required?: boolean
+          p_bank_software_setup_required?: boolean
+          p_documents_required?: boolean
+          p_onboarding_id: string
+          p_training_required?: boolean
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
       update_platform_account_holder: {
         Args: {
           p_company_name: string
@@ -13597,6 +13871,14 @@ export type Database = {
       }
       withdraw_engagement_share: {
         Args: { p_engagement_share_id: string }
+        Returns: undefined
+      }
+      withdraw_partner_onboarding: {
+        Args: {
+          p_onboarding_id: string
+          p_reason?: string
+          p_workspace_id: string
+        }
         Returns: undefined
       }
     }
