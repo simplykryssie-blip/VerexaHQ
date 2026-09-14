@@ -2,21 +2,21 @@ import { redirect } from "next/navigation";
 import { Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isServiceBureauTier } from "@/lib/workspaceCapabilities";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 import { PackagesManager, type PackageRow } from "@/components/settings/PackagesManager";
 
 export const dynamic = "force-dynamic";
 
-// Packages are what an ERO/Service Bureau offers to the PTIN firms
-// connected to it (a partnership tier), which is a different customer
-// relationship than Services (what a firm sells its own tax clients) --
-// kept as its own table/page rather than folded into Services. Only makes
-// sense for a workspace that can have firms connected under it.
+// Packages are what a Service Bureau sells to the EROs/PTINs connected to
+// it -- a priced software/banking bundle. An ERO or multi-office firm still
+// manages its own connected PTINs, but never resells a package, so this is
+// gated on the narrower Service Bureau tier, not the general
+// isEroManagementTier set.
 export default async function PackagesPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
-  if (!isEroManagementTier(workspace)) redirect("/settings/services");
+  if (!isServiceBureauTier(workspace)) redirect("/settings/services");
 
   const supabase = createClient();
   const [{ data: packages }, { data: canManage }] = await Promise.all([

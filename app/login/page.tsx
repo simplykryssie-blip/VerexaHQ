@@ -58,11 +58,24 @@ export default function LoginPage() {
         return;
       }
 
-      await fetch("/api/auth/set-remember", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ remember: rememberMe }),
-      });
+      // Must succeed before we navigate -- the middleware force-signs out
+      // any session missing this marker (see lib/supabase/middleware.ts),
+      // so proceeding to /dashboard without confirming it landed would
+      // leave a freshly-logged-in user one request away from being kicked
+      // right back out. One retry covers a transient network hiccup.
+      const setRemember = async () => {
+        const res = await fetch("/api/auth/set-remember", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ remember: rememberMe }),
+        });
+        return res.ok;
+      };
+      const ok = (await setRemember()) || (await setRemember());
+      if (!ok) {
+        setError("Signed in, but couldn't finish setting up your session. Please try signing in again.");
+        return;
+      }
 
       router.push(next ?? "/dashboard");
       router.refresh();

@@ -24,6 +24,7 @@ export function InvoiceQuoteForm({
   kind,
   workspaceId,
   clientId,
+  firmConnectionId,
   engagementId,
   firmName,
   clientName,
@@ -33,7 +34,10 @@ export function InvoiceQuoteForm({
 }: {
   kind: "invoice" | "quote";
   workspaceId: string;
-  clientId: string;
+  // Exactly one of these is set for a new invoice -- a quote always targets
+  // a client (firmConnectionId is invoice-only; quotes has no such column).
+  clientId?: string;
+  firmConnectionId?: string;
   engagementId?: string;
   firmName: string;
   clientName: string;
@@ -131,7 +135,6 @@ export function InvoiceQuoteForm({
 
     const payload = {
       workspace_id: workspaceId,
-      client_id: clientId,
       engagement_id: engagementId ?? null,
       line_items: cleanItems,
       subtotal,
@@ -144,10 +147,23 @@ export function InvoiceQuoteForm({
 
     const { error: insertError } =
       kind === "invoice"
-        ? await supabase.from("invoices").insert({ ...payload, status: "sent", due_date: dueDate || null })
+        ? await supabase.from("invoices").insert({
+            ...payload,
+            client_id: clientId ?? null,
+            firm_connection_id: firmConnectionId ?? null,
+            status: "sent",
+            due_date: dueDate || null,
+          })
         : await supabase
             .from("quotes")
-            .insert({ ...payload, title: title.trim(), status: "sent", valid_until: dueDate || null, service_id: needsService ? serviceId : null });
+            .insert({
+              ...payload,
+              client_id: clientId as string,
+              title: title.trim(),
+              status: "sent",
+              valid_until: dueDate || null,
+              service_id: needsService ? serviceId : null,
+            });
 
     setSaving(false);
     if (insertError) {

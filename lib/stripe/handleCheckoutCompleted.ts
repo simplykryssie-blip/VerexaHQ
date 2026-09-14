@@ -66,7 +66,7 @@ export async function handleCheckoutSessionCompleted(
     return { skipped: "no invoice reference" };
   }
 
-  const { data: invoice } = await supabase.from("invoices").select("client_id").eq("id", invoiceId).single();
+  const { data: invoice } = await supabase.from("invoices").select("client_id, firm_connection_id").eq("id", invoiceId).single();
   if (!invoice) {
     return { skipped: "invoice not found" };
   }
@@ -79,6 +79,7 @@ export async function handleCheckoutSessionCompleted(
     .insert({
       workspace_id: workspaceId,
       client_id: invoice.client_id,
+      firm_connection_id: invoice.firm_connection_id,
       invoice_id: invoiceId,
       amount: session.amount_total / 100,
       status: "succeeded",
@@ -134,7 +135,7 @@ export async function handlePaymentIntentFailed(
     return { skipped: "no invoice reference" };
   }
 
-  const { data: invoice } = await supabase.from("invoices").select("client_id").eq("id", invoiceId).single();
+  const { data: invoice } = await supabase.from("invoices").select("client_id, firm_connection_id").eq("id", invoiceId).single();
   if (!invoice) {
     return { skipped: "invoice not found" };
   }
@@ -142,6 +143,7 @@ export async function handlePaymentIntentFailed(
   await supabase.from("payments").insert({
     workspace_id: workspaceId,
     client_id: invoice.client_id,
+    firm_connection_id: invoice.firm_connection_id,
     invoice_id: invoiceId,
     amount: intent.amount / 100,
     status: "failed",

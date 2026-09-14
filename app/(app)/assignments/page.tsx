@@ -84,7 +84,7 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
   } else if (tab === "tasks") {
     const { data } = await supabase
       .from("tasks")
-      .select("id, title, due_date, assigned_staff_id, engagement_id, client_id")
+      .select("id, title, due_date, assigned_staff_id, engagement_id, client_id, firm_connection_id")
       .eq("workspace_id", workspace.id)
       .neq("status", "completed")
       .order("due_date", { ascending: true, nullsFirst: false })
@@ -92,11 +92,41 @@ export default async function AssignmentsPage({ searchParams }: { searchParams: 
     table = "tasks";
     field = "assigned_staff_id";
     emptyMessage = "No open tasks.";
+
+    // Onboarding tasks carry firm_connection_id, not engagement_id/client_id --
+    // resolve the connected partner's name the same way get_ero_connected_partners
+    // already does (child workspace name, falling back to the manual name for a
+    // firm that isn't on VerexaHQ), so a review task is identifiable at a glance
+    // instead of just "Unassigned" with no context (Phase 6H).
+    const firmConnectionIds = Array.from(new Set((data ?? []).map((t) => t.firm_connection_id).filter((id): id is string => Boolean(id))));
+    const firmNameById = new Map<string, string>();
+    if (firmConnectionIds.length > 0) {
+      const { data: firmRows } = await supabase.from("firm_connections").select("id, child_workspace_id, manual_name").in("id", firmConnectionIds);
+      const childWorkspaceIds = (firmRows ?? []).map((f) => f.child_workspace_id).filter((id): id is string => Boolean(id));
+      const { data: childWorkspaceRows } = childWorkspaceIds.length
+        ? await supabase.from("workspaces").select("id, name").in("id", childWorkspaceIds)
+        : { data: [] as { id: string; name: string }[] };
+      const childWorkspaceNameById = new Map((childWorkspaceRows ?? []).map((w) => [w.id, w.name]));
+      for (const f of firmRows ?? []) {
+        firmNameById.set(f.id, (f.child_workspace_id ? childWorkspaceNameById.get(f.child_workspace_id) : null) ?? f.manual_name ?? "Connected firm");
+      }
+    }
+
     rows = (data ?? []).map((t) => ({
       id: t.id,
       label: t.title,
-      sublabel: t.due_date ? `Due ${new Date(t.due_date).toLocaleDateString()}` : null,
-      href: t.engagement_id ? `/engagements/${t.engagement_id}` : t.client_id ? `/clients/${t.client_id}` : null,
+      sublabel: t.firm_connection_id
+        ? `Partner: ${firmNameById.get(t.firm_connection_id) ?? "Connected firm"}`
+        : t.due_date
+          ? `Due ${new Date(t.due_date).toLocaleDateString()}`
+          : null,
+      href: t.engagement_id
+        ? `/engagements/${t.engagement_id}`
+        : t.client_id
+          ? `/clients/${t.client_id}`
+          : t.firm_connection_id
+            ? `/firms/${t.firm_connection_id}`
+            : null,
       currentAssigneeName: t.assigned_staff_id ? (staffNameById.get(t.assigned_staff_id) ?? "Unknown") : null,
     }));
   } else {

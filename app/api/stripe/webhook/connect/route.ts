@@ -39,11 +39,23 @@ export async function POST(request: Request) {
     workspaceId = workspace?.id;
   }
 
-  const { data: logRow } = await supabase
-    .from("webhook_events")
-    .insert({ provider: "stripe", event_type: event.type, external_id: event.id, payload: event as never, workspace_id: workspaceId ?? null })
-    .select("id")
+  // Atomic claim: same event-level dedup as the platform webhook (see
+  // claim_stripe_webhook_event) -- the database decides exactly once
+  // whether this event.id should be processed. workspace_id is stamped in
+  // afterward via markWebhookProcessed, same as before.
+  const { data: claim, error: claimError } = await supabase
+    .rpc("claim_stripe_webhook_event", { p_event_id: event.id, p_event_type: event.type, p_payload: event as never })
     .single();
+
+  if (claimError) {
+    return NextResponse.json({ error: "Could not record webhook event" }, { status: 500 });
+  }
+
+  const logRow = { id: claim?.id };
+
+  if (!claim?.should_process) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
   try {
     if (event.type === "checkout.session.completed") {

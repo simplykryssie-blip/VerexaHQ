@@ -36,6 +36,7 @@ import {
   CalendarOff,
   UserCircle,
   MapPin,
+  Network,
 } from "lucide-react";
 
 export type NavLeaf = {
@@ -83,6 +84,8 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: "Email & SMS", href: "/automations" },
       { label: "Form Templates", href: "/templates" },
+      { label: "Marketplace", href: "/templates/marketplace" },
+      { label: "My Templates", href: "/templates/my-templates" },
     ],
   },
   { label: "Support", href: "/support", icon: LifeBuoy },
@@ -173,6 +176,17 @@ export const PLATFORM_HOME_NAV_SECTIONS: NavSection[] = [{ label: "Verexa HQ", i
  * rather than kept as a second door to the same screen.
  */
 export const ERO_MANAGEMENT_NAV_ITEMS: NavItem[] = [
+  // Service-Bureau-only -- filtered out for ERO/multi-office in Sidebar
+  // (see showServiceBureauNetwork). Placed first since it's the primary,
+  // network-first landing experience for that tier.
+  { label: "Service Bureau Network", href: "/network-command-center", icon: Network },
+  // ero_office-only -- filtered out for Service Bureau/multi-office in
+  // Sidebar (see showEroNetwork). /ero-dashboard now just redirects here
+  // (Phase 5D), so "ERO Dashboard" below is hidden for ero_office
+  // specifically (it would be a second nav entry to the identical
+  // destination) but stays exactly as-is for Service Bureau/multi-office,
+  // whose /ero-dashboard experience this phase does not change.
+  { label: "ERO Network", href: "/ero-network", icon: Network },
   { label: "ERO Dashboard", href: "/ero-dashboard", icon: LayoutDashboard },
   { label: "Firms", href: "/firms", icon: Building2 },
 ];

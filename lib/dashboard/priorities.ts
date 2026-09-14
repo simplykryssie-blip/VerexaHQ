@@ -46,7 +46,7 @@ export function computeTodaysPriorities(data: DashboardData, limit = 5): Priorit
       id: `invoice-${i.id}`,
       label: `${i.invoice_number ?? "Invoice"} overdue`,
       detail: `$${i.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })} due, ${daysOverdue} day${daysOverdue === 1 ? "" : "s"} late`,
-      href: `/clients/${i.client_id}`,
+      href: i.client_id ? `/clients/${i.client_id}` : `/firms/${i.firm_connection_id}`,
       weight: 80 + Math.min(daysOverdue, 20),
     });
   }

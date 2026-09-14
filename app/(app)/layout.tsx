@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { Sidebar } from "@/components/Sidebar";
 import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
+import { SponsorshipTransitionBanner } from "@/components/SponsorshipTransitionBanner";
+import { SuspendedWorkspaceScreen } from "@/components/SuspendedWorkspaceScreen";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, isSuspensionRecoveryPath } from "@/lib/workspace";
 import { getPortalIdentity } from "@/lib/portal";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectiveBranding } from "@/lib/branding";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isIndependentTier, isServiceBureauTier, isEroOfficeTier } from "@/lib/workspaceCapabilities";
 import { hexToRgbTriplet, lightenHexToRgbTriplet } from "@/lib/color";
 import { AcceptTermsGate } from "@/components/legal/AcceptTermsGate";
 import { LEGAL_VERSION } from "@/lib/legal";
@@ -63,6 +66,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { count: visibleLearningCourseCount },
     { data: softwareLinks },
     { data: myEroConnection },
+    { data: sponsorshipTransitionRows },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -123,6 +127,11 @@ export default async function AppLayout({ children, modal }: { children: React.R
     // Partner Dashboard nav item only makes sense when there's an upstream
     // connection with a split/production to see.
     supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
+    // Tied to auth.uid(), not this workspace -- a released staff member may
+    // be viewing any workspace they still belong to when this notice needs
+    // to show, so it's fetched unconditionally rather than gated on
+    // workspace.is_owner like needs_billing_card above.
+    supabase.rpc("get_my_sponsorship_transition"),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -131,11 +140,39 @@ export default async function AppLayout({ children, modal }: { children: React.R
     return <AcceptTermsGate version={LEGAL_VERSION} />;
   }
 
+  // Phase 3 suspension enforcement: a billing-suspended workspace loses
+  // normal operational access for every member (not just the owner), but
+  // must always be able to reach the billing-recovery surface -- Verexa's
+  // own Plan & Usage page (payment method, subscription status), the
+  // released-staff "Set Up My Billing" flow (briefly loads pages in this
+  // same suspended workspace before redirecting to Stripe Checkout), and
+  // Support. Platform admins bypass this entirely -- they need to be able
+  // to open any tenant's workspace to investigate/resolve the suspension
+  // itself, same as every other admin-bypass check in this layout.
+  const pathname = headers().get("x-pathname") ?? "";
+  if (workspace.status === "suspended" && !isPlatformAdmin && !isSuspensionRecoveryPath(pathname)) {
+    return <SuspendedWorkspaceScreen suspensionReason={workspace.suspension_reason} />;
+  }
+
   // Messages is relevant either for cross-firm network messaging (ERO/SB or
   // a connected PTIN) or plain staff-to-staff DMs within this workspace --
   // the latter just needs another active teammate to message.
   const hasTeammates = (teammateCount ?? 0) > 1;
+  // An ERO/SB always has staff capability (included seats), so Assignments
+  // is always relevant there -- an Independent PTIN has none by default and
+  // can't yet purchase a seat (that's Phase 7 work), so today this only ever
+  // shows for a PTIN once it actually has another active member.
+  const showAssignments = !isIndependentTier(workspace) || hasTeammates;
   const billingCard = (billingCardRows ?? [])[0] ?? null;
+  const sponsorshipTransitionRow = (sponsorshipTransitionRows ?? [])[0] ?? null;
+  const sponsorshipTransition = sponsorshipTransitionRow
+    ? {
+        sponsorWorkspaceName: sponsorshipTransitionRow.sponsor_workspace_name,
+        sponsorshipEndDate: sponsorshipTransitionRow.sponsorship_end_date,
+        planName: sponsorshipTransitionRow.plan_name,
+        basePriceCents: sponsorshipTransitionRow.base_price_cents,
+      }
+    : null;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
   // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
@@ -202,6 +239,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             isPlatformHomeWorkspace={workspace.is_platform_home}
             switchableWorkspaces={switchableWorkspaces}
             showMessages={Boolean(canUseNetworkMessaging) || hasTeammates}
+            showAssignments={showAssignments}
             showLearningHub={isEroManagementTier(workspace) || (visibleLearningCourseCount ?? 0) > 0}
             showPartnerDashboard={(myEroConnection ?? []).length > 0}
             softwareLinks={softwareLinks ?? []}
@@ -209,12 +247,15 @@ export default async function AppLayout({ children, modal }: { children: React.R
               (pendingClientChangeCount ?? 0) > 0 || (submittedOrganizerCount ?? 0) > 0 || (respondedOrganizerItemCount ?? 0) > 0
             }
             showEroManagement={isEroManagementTier(workspace)}
+            showServiceBureauNetwork={isServiceBureauTier(workspace)}
+            showEroNetwork={isEroOfficeTier(workspace)}
             currentUser={currentUser}
           />
           <main id="main-content" className="flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-16 pt-14 lg:pt-0">
             <ScrollToTopOnNavigate containerId="main-content" />
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
+            <SponsorshipTransitionBanner transition={sponsorshipTransition} />
             <BillingCardPrompt
               needed={Boolean(billingCard?.needed)}
               urgent={Boolean(billingCard?.urgent)}

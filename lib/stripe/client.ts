@@ -23,6 +23,27 @@ function toFormBody(params: Record<string, string | number | undefined>) {
 
 export type StripeResult<T> = { ok: true; data: T } | { ok: false; reason: string };
 
+// Every Stripe subscription Verexa creates today (the platform base
+// subscription and firm-connection billing takeover, both via
+// createSubscriptionCheckoutSession's single inline price_data line item)
+// has exactly one item -- there is no seat-billing or other multi-item
+// subscription in production yet. Rather than blindly indexing
+// items.data[0] (which would silently act on the wrong item the moment a
+// second one exists), every call site that needs "the" item goes through
+// this: it requires there to genuinely be exactly one and fails safely
+// otherwise, so a future multi-item subscription surfaces as an explicit,
+// actionable "ambiguous" result instead of silently modifying the wrong
+// item.
+export function getSoleSubscriptionItem<T>(items: T[]): StripeResult<T> {
+  if (items.length === 0) {
+    return { ok: false, reason: "This subscription has no items." };
+  }
+  if (items.length > 1) {
+    return { ok: false, reason: "This subscription has multiple items; a specific item must be identified explicitly rather than assumed." };
+  }
+  return { ok: true, data: items[0] };
+}
+
 export async function createCheckoutSession({
   amount,
   currency = "usd",
@@ -270,11 +291,9 @@ export async function getSubscriptionPrimaryItemId(stripeSubscriptionId: string)
     return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
   }
   const data = (await res.json()) as { items: { data: { id: string }[] } };
-  const itemId = data.items.data[0]?.id;
-  if (!itemId) {
-    return { ok: false, reason: "This subscription has no items." };
-  }
-  return { ok: true, data: { id: itemId } };
+  const itemResult = getSoleSubscriptionItem(data.items.data);
+  if (!itemResult.ok) return itemResult;
+  return { ok: true, data: { id: itemResult.data.id } };
 }
 
 export type CustomerDefaultPaymentMethod = { brand: string; last4: string; expMonth: number; expYear: number } | null;
@@ -465,6 +484,103 @@ export async function previewUpcomingInvoiceAmount(stripeSubscriptionId: string)
 }
 
 /**
+ * Staff-seat billing: previews exactly what Stripe would prorate for
+ * adding/incrementing the dedicated seat subscription item, without
+ * mutating the live subscription (read-only -- safe to call as many times
+ * as needed while the admin is deciding). Sums only the line items Stripe
+ * itself flags as `proration: true`, rather than trusting the preview's
+ * top-level amount_due (which reflects the whole upcoming invoice and
+ * could include unrelated unbilled items) -- this is what keeps the seat
+ * charge isolated to just this change.
+ *
+ * existingItemId null means this is the workspace's first paid seat ever
+ * (no dedicated item exists yet); Stripe previews it as a new price_data
+ * line item. Never assumes items.data[0] -- the item is always identified
+ * by its own stored id, or explicitly absent.
+ */
+export async function previewSeatProrationAmount({
+  stripeSubscriptionId,
+  existingItemId,
+  priceCents,
+  newQuantity,
+}: {
+  stripeSubscriptionId: string;
+  existingItemId: string | null;
+  priceCents: number;
+  newQuantity: number;
+}): Promise<StripeResult<{ amountCents: number; currency: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const params = new URLSearchParams({ subscription: stripeSubscriptionId });
+  if (existingItemId) {
+    params.set("subscription_items[0][id]", existingItemId);
+  } else {
+    params.set("subscription_items[0][price_data][currency]", "usd");
+    params.set("subscription_items[0][price_data][product_data][name]", "Additional staff seat");
+    params.set("subscription_items[0][price_data][unit_amount]", String(priceCents));
+    params.set("subscription_items[0][price_data][recurring][interval]", "month");
+  }
+  params.set("subscription_items[0][quantity]", String(newQuantity));
+
+  const res = await fetch(`${STRIPE_API}/invoices/upcoming?${params.toString()}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { currency: string; lines: { data: { amount: number; proration: boolean }[] } };
+  const amountCents = data.lines.data.filter((line) => line.proration).reduce((sum, line) => sum + line.amount, 0);
+  return { ok: true, data: { amountCents, currency: data.currency } };
+}
+
+/**
+ * Staff-seat billing: creates the dedicated seat subscription item on
+ * first use, or updates its quantity thereafter. Always proration_behavior
+ * "none" -- the prorated amount for an increase was already collected as
+ * an isolated direct charge via chargeOffSession (see
+ * previewSeatProrationAmount's doc comment for why), and a decrease must
+ * never generate a Stripe-side credit. Never assumes items.data[0] -- the
+ * item is created once and its id is the only thing ever targeted again.
+ */
+export async function ensureSeatSubscriptionItemQuantity({
+  stripeSubscriptionId,
+  existingItemId,
+  priceCents,
+  quantity,
+}: {
+  stripeSubscriptionId: string;
+  existingItemId: string | null;
+  priceCents: number;
+  quantity: number;
+}): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  if (existingItemId) {
+    return updateSubscriptionItemQuantity({ subscriptionItemId: existingItemId, quantity });
+  }
+
+  const body = toFormBody({
+    subscription: stripeSubscriptionId,
+    "price_data[currency]": "usd",
+    "price_data[product_data][name]": "Additional staff seat",
+    "price_data[unit_amount]": priceCents,
+    "price_data[recurring][interval]": "month",
+    quantity,
+    proration_behavior: "none",
+  });
+  const res = await fetch(`${STRIPE_API}/subscription_items`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string };
+  return { ok: true, data: { id: data.id } };
+}
+
+/**
  * Off-session charge against a saved card -- used for the pre-cycle
  * (3-days-early) dunning attempt, not a customer-present checkout. A
  * decline surfaces as a non-2xx response with an error payload rather than
@@ -477,6 +593,7 @@ export async function chargeOffSession({
   currency = "usd",
   description,
   metadata,
+  idempotencyKey,
 }: {
   customerId: string;
   paymentMethodId: string;
@@ -484,6 +601,13 @@ export async function chargeOffSession({
   currency?: string;
   description: string;
   metadata: Record<string, string>;
+  // Optional: when a caller can retry the exact same charge (e.g. a cron
+  // tick that might re-run before its own bookkeeping catches up), passing
+  // a stable key here makes Stripe return the SAME PaymentIntent instead of
+  // creating a second charge -- see the auto-topup cron for why that
+  // matters when the charge and the resulting balance credit aren't the
+  // same atomic step.
+  idempotencyKey?: string;
 }): Promise<StripeResult<{ id: string; status: string }>> {
   if (!isStripeConfigured()) {
     return { ok: false, reason: "Stripe is not configured for this environment." };
@@ -505,7 +629,10 @@ export async function chargeOffSession({
     body.set(`metadata[${key}]`, value);
   }
 
-  const res = await fetch(`${STRIPE_API}/payment_intents`, { method: "POST", headers: authHeaders(), body });
+  const headers = authHeaders();
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+
+  const res = await fetch(`${STRIPE_API}/payment_intents`, { method: "POST", headers, body });
   const data = (await res.json().catch(() => ({}))) as { id?: string; status?: string; error?: { message?: string; decline_code?: string } };
   if (!res.ok || !data.id) {
     return { ok: false, reason: data.error?.decline_code ?? data.error?.message ?? `Stripe responded with ${res.status}` };

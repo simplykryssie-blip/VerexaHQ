@@ -8,11 +8,41 @@ const PORTAL_PUBLIC_PATHS = ["/portal/login", "/portal/accept-invitation"];
 const PORTAL_BASIC_INFO_EXEMPT_PATHS = ["/portal/login", "/portal/accept-invitation", "/portal/basic-info"];
 const MFA_EXEMPT_STAFF_PATHS = ["/mfa-challenge", "/settings/security", "/login"];
 
+// How long a brand-new session gets before the missing-"remember me"-marker
+// check (below) starts enforcing -- covers the moment right after login,
+// where the client is still in the middle of confirming the sb_remember
+// cookie landed (see app/login/page.tsx), so a single slow request in that
+// window doesn't sign a user out of the session they just created.
+const REMEMBER_MARKER_GRACE_PERIOD_SECONDS = 120;
+
+function getSessionIssuedAt(accessToken: string): number | null {
+  try {
+    const payload = accessToken.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(base64));
+    return typeof json.iat === "number" ? json.iat : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   try {
     // Verify environment variables are set
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    // Threads the current pathname to app/(app)/layout.tsx via a request
+    // header -- a Server Component layout has no other way to know the
+    // route it's rendering for, and the Phase 3 suspension gate needs it to
+    // let the billing-recovery page (and only that page) through. Built
+    // once and passed to every NextResponse.next({ request }) call below
+    // (including the one inside setAll, which otherwise reconstructs a
+    // fresh response and would silently drop a header set directly on a
+    // response instead of the request).
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", request.nextUrl.pathname);
+    const nextRequestInit = { request: { headers: requestHeaders } };
 
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error(
@@ -23,10 +53,10 @@ export async function updateSession(request: NextRequest) {
         }
       );
       // Return next() to allow request to proceed without auth
-      return NextResponse.next({ request });
+      return NextResponse.next(nextRequestInit);
     }
 
-    let response = NextResponse.next({ request });
+    let response = NextResponse.next(nextRequestInit);
 
     const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -35,7 +65,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next(nextRequestInit);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );
@@ -88,6 +118,16 @@ export async function updateSession(request: NextRequest) {
       // marker is gone while the auth cookies remain, the browser was closed and
       // reopened on a session the user asked not to be remembered -- sign out.
       if (user && !isPublicPath && !request.cookies.get("sb_remember")) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const issuedAt = session ? getSessionIssuedAt(session.access_token) : null;
+        const withinGracePeriod = issuedAt !== null && Date.now() / 1000 - issuedAt < REMEMBER_MARKER_GRACE_PERIOD_SECONDS;
+
+        if (withinGracePeriod) {
+          return response;
+        }
+
         await supabase.auth.signOut();
         const redirectUrl = new URL(loginPath, request.url);
         const signedOutResponse = NextResponse.redirect(redirectUrl);

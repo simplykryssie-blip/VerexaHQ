@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Wallet, Building2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -5,6 +6,13 @@ import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
 import { StatTile } from "@/components/ui/StatTile";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/Badge";
+import {
+  deriveChecklist,
+  deriveWaitingOn,
+  ONBOARDING_STATUS_TONE,
+  ONBOARDING_STATUS_LABEL,
+  type PartnerOnboardingRow,
+} from "@/lib/partnerOnboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -63,8 +71,15 @@ export default async function PartnerDashboardPage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const { data: connections } = await supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id });
+  const [{ data: connections }, { data: onboardingRows }] = await Promise.all([
+    supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
+    supabase.rpc("get_my_partner_onboarding", { p_workspace_id: workspace.id }),
+  ]);
   const connection = (connections ?? [])[0] ?? null;
+  // Disappears once ready (spec section 24) -- a partner doesn't need to
+  // keep seeing a finished checklist on their main dashboard.
+  const onboarding = ((onboardingRows ?? [])[0] as PartnerOnboardingRow & { id: string; review_note: string | null; rejected_reason: string | null }) ?? null;
+  const showOnboarding = Boolean(onboarding && onboarding.status !== "ready");
 
   if (!connection) {
     return (
@@ -118,6 +133,56 @@ export default async function PartnerDashboardPage() {
       />
 
       <div className="flex-1 space-y-6 px-8 py-6">
+        {showOnboarding && onboarding && (
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink">Your Onboarding</p>
+                <Badge tone={ONBOARDING_STATUS_TONE[onboarding.status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[onboarding.status] ?? onboarding.status}</Badge>
+              </div>
+              <Link href="/partner-dashboard/onboarding" className="text-xs font-medium text-accent hover:underline">
+                {onboarding.status === "pending" || onboarding.status === "in_progress" ? "Continue Application" : "View Application"}
+              </Link>
+            </div>
+            {(() => {
+              const waiting = deriveWaitingOn(onboarding);
+              const checklist = deriveChecklist(onboarding);
+              return (
+                <>
+                  <p className="mt-2 text-sm text-slate">{waiting.detail}</p>
+                  <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-3">
+                    {checklist.map((item) => (
+                      <li key={item.key} className="flex items-center gap-1.5 text-xs">
+                        <span
+                          className={
+                            item.state === "complete"
+                              ? "text-success"
+                              : item.state === "not_required"
+                                ? "text-muted line-through"
+                                : item.state === "active"
+                                  ? "font-medium text-accent"
+                                  : "text-muted"
+                          }
+                        >
+                          {item.state === "complete" ? "✓" : item.state === "not_required" ? "−" : "○"} {item.label}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {onboarding.status === "in_progress" && onboarding.review_note && (
+                    <p className="mt-3 rounded-lg border border-warning/30 bg-warningSoft px-3 py-2 text-xs text-warning">
+                      Information requested: {onboarding.review_note}
+                    </p>
+                  )}
+                  {onboarding.status === "rejected" && onboarding.rejected_reason && (
+                    <p className="mt-3 rounded-lg border border-danger/30 bg-dangerSoft px-3 py-2 text-xs text-danger">{onboarding.rejected_reason}</p>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink">{relationshipLabel}</p>
           <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">

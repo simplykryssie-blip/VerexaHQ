@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 import { getSubscriptionPrimaryItemId, updateSubscriptionItemQuantity } from "@/lib/stripe/client";
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  if (workspace.status === "suspended") {
+    return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
 
   const supabase = createClient();

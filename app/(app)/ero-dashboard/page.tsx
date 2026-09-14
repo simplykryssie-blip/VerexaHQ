@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Users, Briefcase, Clock, Receipt, ArrowRight, Building2, Lock, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
-import { isEroManagementTier } from "@/lib/workspaceCapabilities";
+import { isEroManagementTier, isEroOfficeTier } from "@/lib/workspaceCapabilities";
 import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE } from "@/lib/firmConnections";
 import { getDashboardData } from "@/lib/dashboard/data";
 import { computeTodaysPriorities } from "@/lib/dashboard/priorities";
@@ -29,6 +30,11 @@ export const dynamic = "force-dynamic";
 export default async function EroDashboardPage() {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
+
+  // Phase 5D: an ERO office has its own dedicated network command center
+  // now -- everyone else who could reach this route before (Service
+  // Bureau, multi_office_firm) keeps exactly the page below, unchanged.
+  if (isEroOfficeTier(workspace)) redirect("/ero-network");
 
   const supabase = createClient();
   // This is a firm-wide rollup of every staff member's workload plus

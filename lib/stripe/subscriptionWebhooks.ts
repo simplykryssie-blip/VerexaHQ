@@ -1,5 +1,11 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { updateSubscriptionItemPrice, retrieveSetupIntentPaymentMethod, retrieveCardDetails, setCustomerDefaultPaymentMethod } from "@/lib/stripe/client";
+import {
+  updateSubscriptionItemPrice,
+  retrieveSetupIntentPaymentMethod,
+  retrieveCardDetails,
+  setCustomerDefaultPaymentMethod,
+  getSoleSubscriptionItem,
+} from "@/lib/stripe/client";
 import type { Database } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
@@ -125,8 +131,15 @@ export async function handleSubscriptionCreated(
   const workspaceId = subscription.metadata?.workspace_id;
   if (!workspaceId) return { skipped: "missing workspace_id metadata" };
 
-  const priceId = subscription.items.data[0]?.price?.id;
-  let { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("stripe_price_id", priceId).maybeSingle();
+  // Doesn't assume items.data[0] is the right item -- if this subscription
+  // ever has more than one item, priceId is left undefined here and
+  // resolution falls straight through to the plan_slug fallback below
+  // rather than risking a match against the wrong item's price.
+  const itemResult = getSoleSubscriptionItem(subscription.items.data);
+  const priceId = itemResult.ok ? itemResult.data.price?.id : undefined;
+  let { data: plan } = priceId
+    ? await supabase.from("platform_subscription_plans").select("*").eq("stripe_price_id", priceId).maybeSingle()
+    : { data: null };
   // Platform plans don't have real Stripe Price objects yet (their checkout
   // session is built from an ad-hoc price_data line item, same as Packages
   // -- see createSubscriptionCheckoutSession) -- fall back to the plan slug
@@ -156,10 +169,15 @@ export async function handleSubscriptionCreated(
   // workspace was under -- a past-due pause or a prior cancellation.
   await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
 
-  // One-time only, per grant_workspace_usage_meters -- a workspace that
-  // already has meter rows (e.g. re-subscribing after a cancellation) does
-  // not get a second free bucket.
-  await supabase.rpc("grant_workspace_usage_meters", { p_workspace_id: workspaceId });
+  // Deliberately does NOT grant the free usage allowance here.
+  // subscription.created fires the moment Stripe creates the subscription
+  // object -- before the card is actually confirmed -- so granting here
+  // would hand out free usage capacity that was never actually paid for.
+  // The allowance is granted from handleInvoicePaymentSucceeded instead,
+  // which only fires once the first invoice is genuinely paid. See
+  // grant_workspace_usage_meters's own ON CONFLICT DO NOTHING for why
+  // calling it from every invoice.payment_succeeded (renewals included) is
+  // still exactly one-time.
 
   return {};
 }
@@ -200,7 +218,13 @@ export async function handleSubscriptionUpdated(
     new Date(existing.price_change_effective_date) <= new Date(subscription.current_period_start * 1000)
   ) {
     const { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("id", existing.plan_id).single();
-    const subscriptionItemId = subscription.items.data[0]?.id;
+    // Doesn't assume items.data[0] is the item to migrate -- if this
+    // subscription ever has more than one item, the migration is skipped
+    // for this cycle (price_change_effective_date/notice are left
+    // untouched, so it safely retries next cycle) rather than risking a
+    // price change on the wrong item.
+    const itemResult = getSoleSubscriptionItem(subscription.items.data);
+    const subscriptionItemId = itemResult.ok ? itemResult.data.id : undefined;
     if (plan?.stripe_price_id && subscriptionItemId) {
       const result = await updateSubscriptionItemPrice({ subscriptionItemId, priceId: plan.stripe_price_id });
       if (result.ok) {
@@ -342,6 +366,22 @@ export async function handleInvoicePaymentSucceeded(
     },
     { onConflict: "stripe_invoice_id" }
   );
+
+  // If this payment is for a released staff member's own personal
+  // workspace, this is the actual moment their sponsorship transition
+  // completes -- not subscription.created (that fires on checkout, before
+  // the card is confirmed; gating there would repeat the exact
+  // grant-before-payment bug already flagged for usage meters). No-op for
+  // every other invoice, since the RPC only acts when a
+  // billing_setup_required transition exists for this workspace.
+  await supabase.rpc("complete_sponsorship_transition_on_payment", { p_workspace_id: sub.workspace_id });
+
+  // The free usage allowance is granted here -- the first genuinely
+  // successful subscription payment -- never from subscription.created.
+  // Safe to call on every payment (renewals, plan changes, etc.) because
+  // grant_workspace_usage_meters' own ON CONFLICT DO NOTHING makes every
+  // call after the first a no-op; the allowance itself never resets.
+  await supabase.rpc("grant_workspace_usage_meters", { p_workspace_id: sub.workspace_id });
 
   return {};
 }

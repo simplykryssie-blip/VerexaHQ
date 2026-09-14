@@ -21,7 +21,14 @@ export type OverdueTask = {
   client_id: string | null;
   related_organizer_response_id: string | null;
 };
-export type OverdueInvoice = { id: string; invoice_number: string | null; client_id: string; due_date: string; balance: number };
+export type OverdueInvoice = {
+  id: string;
+  invoice_number: string | null;
+  client_id: string | null;
+  firm_connection_id: string | null;
+  due_date: string;
+  balance: number;
+};
 export type ReviewItem = {
   workflow_stage_id: string;
   stage_name: string;
@@ -170,7 +177,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .lt("due_date", startOfToday.toISOString()),
     supabase
       .from("invoices")
-      .select("id, invoice_number, client_id, due_date, total_amount, amount_paid, status")
+      .select("id, invoice_number, client_id, firm_connection_id, due_date, total_amount, amount_paid, status")
       .eq("workspace_id", workspaceId)
       .not("status", "in", '("paid","void","draft")'),
     supabase.from("message_threads").select("id").eq("workspace_id", workspaceId).eq("status", "open"),
@@ -200,6 +207,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       id: i.id,
       invoice_number: i.invoice_number,
       client_id: i.client_id,
+      firm_connection_id: i.firm_connection_id,
       due_date: i.due_date as string,
       balance: i.total_amount - i.amount_paid,
     }));

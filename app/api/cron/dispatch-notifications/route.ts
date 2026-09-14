@@ -271,7 +271,8 @@ async function dispatchOne(supabase: ReturnType<typeof createServiceClient>, job
   try {
     const clientId = resolveClientIdFromContext(context, job.entity_type, job.entity_id);
     const { portalLink, portalInviteLink } = resolvePortalMergeFieldsFromContext(context, clientId);
-    const payload: Record<string, unknown> = { ...basePayload, portal_link: portalLink };
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const payload: Record<string, unknown> = { ...basePayload, portal_link: portalLink, dashboard_url: `${appUrl}/dashboard` };
     if (portalInviteLink) payload.portal_invite_link = portalInviteLink;
 
     if (job.channel === "Email") {

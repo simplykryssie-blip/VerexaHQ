@@ -23,7 +23,10 @@ export default async function PlanUsagePage() {
       )
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
-    supabase.from("workspace_usage_meters").select("resource_type, free_units_granted, free_units_consumed, prepaid_balance").eq("workspace_id", workspace.id),
+    supabase
+      .from("workspace_usage_meters")
+      .select("resource_type, free_units_granted, free_units_consumed, prepaid_balance, auto_topup_enabled, auto_topup_amount_cents")
+      .eq("workspace_id", workspace.id),
     supabase.from("attachments").select("file_size_bytes").eq("workspace_id", workspace.id).eq("is_archived", false),
     supabase
       .from("workspace_phone_numbers")
@@ -51,7 +54,19 @@ export default async function PlanUsagePage() {
       />
 
       <div className="mt-6">
-        {!subscription || subscription.stripe_status !== "active" || !plan ? (
+        {workspace.status === "suspended" && (
+          <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-4">
+            <p className="text-sm font-semibold text-danger">Workspace suspended</p>
+            <p className="mt-1 text-sm text-ink">
+              {workspace.suspension_reason === "subscription_canceled"
+                ? "Your Verexa subscription was canceled."
+                : "Your Verexa subscription payment is past due."}{" "}
+              Normal workspace access is unavailable until billing is resolved
+              {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
+            </p>
+          </div>
+        )}
+        {!subscription || !plan ? (
           <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState message="This workspace isn't on an active paid plan yet, so usage isn't metered." />
           </div>
@@ -67,9 +82,12 @@ export default async function PlanUsagePage() {
               />
             </SettingsCard>
           )}
+          {subscription.stripe_status === "active" && (
+          <>
           <div className="mt-6">
           <SettingsCard title={plan.name} description="Contact Verexa to change plans.">
             <PlanUsageManager
+              workspaceId={workspace.id}
               isOwner={workspace.is_owner}
               emailRateCentsPer1000={plan.email_overage_rate_cents_per_1000}
               smsRateCents={plan.sms_overage_rate_cents}
@@ -78,16 +96,22 @@ export default async function PlanUsagePage() {
                 granted: meterByType.get("email")?.free_units_granted ?? 0,
                 consumed: meterByType.get("email")?.free_units_consumed ?? 0,
                 prepaidBalance: meterByType.get("email")?.prepaid_balance ?? 0,
+                autoTopupEnabled: meterByType.get("email")?.auto_topup_enabled ?? false,
+                autoTopupAmountCents: meterByType.get("email")?.auto_topup_amount_cents ?? null,
               }}
               sms={{
                 granted: meterByType.get("sms")?.free_units_granted ?? 0,
                 consumed: meterByType.get("sms")?.free_units_consumed ?? 0,
                 prepaidBalance: meterByType.get("sms")?.prepaid_balance ?? 0,
+                autoTopupEnabled: meterByType.get("sms")?.auto_topup_enabled ?? false,
+                autoTopupAmountCents: meterByType.get("sms")?.auto_topup_amount_cents ?? null,
               }}
               storage={{
                 granted: meterByType.get("storage")?.free_units_granted ?? 0,
                 prepaidBalance: meterByType.get("storage")?.prepaid_balance ?? 0,
                 usedGb: storageBytesUsed / 1073741824,
+                autoTopupEnabled: meterByType.get("storage")?.auto_topup_enabled ?? false,
+                autoTopupAmountCents: meterByType.get("storage")?.auto_topup_amount_cents ?? null,
               }}
             />
           </SettingsCard>
@@ -107,6 +131,8 @@ export default async function PlanUsagePage() {
             />
           </SettingsCard>
           </div>
+          </>
+          )}
           </>
         )}
       </div>

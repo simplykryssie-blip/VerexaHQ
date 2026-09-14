@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 
 // Assigns (or clears, with clientId: null) which client a workspace's phone
 // number sends/receives for. Writes go through the service client because
@@ -25,6 +25,9 @@ export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "No active workspace" }, { status: 400 });
+  }
+  if (workspace.status === "suspended") {
+    return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
   if (!workspace.is_owner) {
     return NextResponse.json({ error: "Only the workspace owner can reassign phone numbers." }, { status: 403 });

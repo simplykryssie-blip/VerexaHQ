@@ -33,10 +33,13 @@ export function Sidebar({
   isPlatformHomeWorkspace,
   switchableWorkspaces,
   showMessages,
+  showAssignments,
   showLearningHub,
   showPartnerDashboard,
   softwareLinks,
   showEroManagement,
+  showServiceBureauNetwork,
+  showEroNetwork,
   currentUser,
   reviewQueueHasItems,
 }: {
@@ -56,6 +59,8 @@ export function Sidebar({
   switchableWorkspaces?: { id: string; name: string; workspaceType: string; isHome: boolean; isActive: boolean }[];
   /** Internal network messaging is only relevant to an ERO/SB and PTINs connected to one -- a standalone workspace has no one to message. */
   showMessages?: boolean;
+  /** An ERO/SB always has staff capability; an Independent PTIN only has anyone to assign work to once it actually has another active member. */
+  showAssignments?: boolean;
   /** An ERO/SB can always author content; an Independent PTIN only gets the nav slot once a connection actually makes something visible (RLS-checked server-side, not re-derived here). */
   showLearningHub?: boolean;
   /** Only relevant to a workspace connected upstream to a parent firm (get_my_ero_connection returns a row) -- an unconnected workspace has no split/production to see. */
@@ -64,6 +69,17 @@ export function Sidebar({
   softwareLinks?: { id: string; name: string; url: string }[];
   /** True for an ERO/Service Bureau/multi-office workspace (isEroManagementTier) -- adds the "ERO Management" section (ERO Dashboard, Team -- which also holds Connections -- ERO Profile) to the main nav. Assignments lives in the regular Daily section instead, since every workspace tier needs to reassign work, not just ERO/SB. */
   showEroManagement?: boolean;
+  /** True only for a Service Bureau workspace (isServiceBureauTier) -- shows
+   *  the "Service Bureau Network" command-center item within ERO Management.
+   *  An ERO/multi-office workspace still gets the rest of that section
+   *  (ERO Dashboard, Firms) unchanged. */
+  showServiceBureauNetwork?: boolean;
+  /** True only for a plain ERO office workspace (isEroOfficeTier, narrower
+   *  than isEroManagementTier) -- shows the "ERO Network" command-center
+   *  item and, since /ero-dashboard now just redirects there, hides the
+   *  now-redundant "ERO Dashboard" item for this tier specifically.
+   *  Service Bureau/multi-office keep "ERO Dashboard" exactly as before. */
+  showEroNetwork?: boolean;
   /** The signed-in staff member, shown in the footer above sign-out. Optional so a caller mid-migration (or a page that hasn't threaded it through yet) still renders a valid sidebar. */
   currentUser?: { name: string | null; avatarUrl: string | null; roleLabel: string | null } | null;
   /** True when anything is sitting in Review Queue -- client info changes, submitted organizers, or (for an ERO/SB) shared engagements awaiting a decision -- shown as a small dot on the nav item so staff don't have to open the page to find out. */
@@ -292,8 +308,12 @@ export function Sidebar({
               <div className="space-y-1">
                 {section.items
                   .filter((item) => item.label !== "Messages" || showMessages)
+                  .filter((item) => item.label !== "Assignments" || showAssignments)
                   .filter((item) => item.label !== "Learning Hub" || showLearningHub)
                   .filter((item) => item.label !== "Partner Dashboard" || showPartnerDashboard)
+                  .filter((item) => item.label !== "Service Bureau Network" || showServiceBureauNetwork)
+                  .filter((item) => item.label !== "ERO Network" || showEroNetwork)
+                  .filter((item) => item.label !== "ERO Dashboard" || !showEroNetwork)
                   .map((item) => {
                   const Icon = item.icon;
 

@@ -17,6 +17,7 @@ import {
   handleInvoicePaymentFailed,
   handleSetupCheckoutCompleted,
 } from "@/lib/stripe/subscriptionWebhooks";
+import { handleStaffSeatPaymentIntentSucceeded, handleStaffSeatPaymentIntentFailed } from "@/lib/stripe/handleStaffSeatPurchase";
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -37,11 +38,29 @@ export async function POST(request: Request) {
   };
 
   const supabase = createServiceClient();
-  const { data: logRow } = await supabase
-    .from("webhook_events")
-    .insert({ provider: "stripe", event_type: event.type, external_id: event.id, payload: event as never })
-    .select("id")
+
+  // Atomic claim: the database (not application memory, not a later check
+  // against the business row) decides exactly once whether this event.id
+  // should actually be processed -- a genuine duplicate delivery or a
+  // concurrent second delivery both come back should_process: false and
+  // are safely ignored below. See claim_stripe_webhook_event for how a
+  // retry after a real failure is still allowed through.
+  const { data: claim, error: claimError } = await supabase
+    .rpc("claim_stripe_webhook_event", { p_event_id: event.id, p_event_type: event.type, p_payload: event as never })
     .single();
+
+  if (claimError) {
+    // Couldn't even record the event -- unknown dedup state, so fail loudly
+    // (500) rather than silently processing or silently dropping it. Stripe
+    // will retry.
+    return NextResponse.json({ error: "Could not record webhook event" }, { status: 500 });
+  }
+
+  const logRow = { id: claim?.id };
+
+  if (!claim?.should_process) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
   try {
     if (event.type === "checkout.session.completed") {
@@ -64,9 +83,27 @@ export async function POST(request: Request) {
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });
       }
+    } else if (event.type === "payment_intent.succeeded") {
+      const intent = event.data.object as Parameters<typeof handleStaffSeatPaymentIntentSucceeded>[1];
+      // The only payment_intent.succeeded flow this app currently acts on --
+      // every other successful off-session/checkout charge is already
+      // handled via its own checkout.session.completed or
+      // invoice.payment_succeeded event, so anything else here is a no-op.
+      const result =
+        intent.metadata?.type === "staff_seat_purchase" ? await handleStaffSeatPaymentIntentSucceeded(supabase, intent) : { skipped: "not a staff seat purchase" };
+      await markWebhookProcessed(supabase, logRow?.id, intent.metadata?.workspace_id);
+      if (result.skipped) {
+        return NextResponse.json({ received: true, skipped: result.skipped });
+      }
     } else if (event.type === "payment_intent.payment_failed") {
-      const intent = event.data.object as Parameters<typeof handlePaymentIntentFailed>[1];
-      const result = await handlePaymentIntentFailed(supabase, intent);
+      const intent = event.data.object as Parameters<typeof handlePaymentIntentFailed>[1] & Parameters<typeof handleStaffSeatPaymentIntentFailed>[1];
+      // Staff-seat purchases route to their own dedicated handler instead
+      // of the generic client-invoice one, which has no concept of a seat
+      // and is left completely untouched for every other caller.
+      const result =
+        intent.metadata?.type === "staff_seat_purchase"
+          ? await handleStaffSeatPaymentIntentFailed(supabase, intent)
+          : await handlePaymentIntentFailed(supabase, intent);
       await markWebhookProcessed(supabase, logRow?.id, intent.metadata?.workspace_id);
       if (result.skipped) {
         return NextResponse.json({ received: true, skipped: result.skipped });

@@ -7,7 +7,7 @@ import { Star, Archive, ArchiveRestore, Trash2, Pencil, RotateCw, Lock, FileText
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
-import type { DocumentFolderRow, DocumentRow } from "./types";
+import type { DocumentFolderRow, DocumentRow, EntityType } from "./types";
 
 function formatSize(bytes: number | null) {
   if (!bytes) return "--";
@@ -32,7 +32,7 @@ export function DocumentList({
   workspaceId: string;
   // Fixed for a single entity's Files tab. Omit both when `documents` already
   // carries its own entity_type/entity_id per row (the workspace-wide list).
-  entityType?: "client" | "engagement";
+  entityType?: EntityType;
   entityId?: string;
   // Workspace-wide list only: which client/engagement each row belongs to.
   entityLabels?: Map<string, { label: string; href: string }>;
