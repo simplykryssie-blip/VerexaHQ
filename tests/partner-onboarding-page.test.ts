@@ -12,6 +12,7 @@ const WORKSPACE_FIXTURE = { id: "workspace-partner-1", name: "Child Workspace", 
 
 const CONNECTION_FIXTURE = {
   connection_id: "connection-1",
+  ero_workspace_id: "parent-workspace-1",
   name: "Parent ERO",
   relationship_type: "ero_ptin",
   package_name: null,
@@ -21,6 +22,15 @@ const CONNECTION_FIXTURE = {
   phone: null,
   bank_partner_name: null,
   software_partner_name: null,
+};
+
+const DOCUMENT_REQUEST_FIXTURE = {
+  id: "request-1",
+  title: "W-9",
+  due_date: null,
+  status: "open",
+  created_at: "2026-01-01T00:00:00Z",
+  items: [{ id: "item-1", name: "Signed W-9", is_required: true, status: "pending", category: null, due_date: null }],
 };
 
 function baseOnboarding(overrides: Record<string, unknown> = {}) {
@@ -184,5 +194,102 @@ describe("/partner-dashboard/onboarding page", () => {
     const result = await Page();
     const app = findElement(result, typeNamed("PartnerOnboardingApplication"));
     expect((app?.props.applicationData as Record<string, unknown> | null)?.legal_business_name).toBe("Prefilled Co");
+  });
+
+  // Phase 6J-3: agreement token lookup and document-request fetch, gated
+  // correctly on required/signed/status so a signed or closed onboarding
+  // never triggers a needless (or, for rejected/withdrawn, forbidden-by-
+  // policy-intent) new lookup.
+  it("looks up an agreement token and passes it through when the agreement is required but not yet signed", async () => {
+    setSupabase(
+      { partner_onboardings: { data: [{ application_data: {} }] } },
+      {
+        get_my_ero_connection: { data: [CONNECTION_FIXTURE] },
+        get_my_partner_onboarding: { data: [baseOnboarding({ status: "in_progress", agreement_required: true, agreement_signed: false })] },
+        get_my_partner_onboarding_agreement_token: { data: "tok_abc123" },
+      }
+    );
+    const { default: Page } = await import("@/app/(app)/partner-dashboard/onboarding/page");
+    const result = await Page();
+    const app = findElement(result, typeNamed("PartnerOnboardingApplication"));
+    expect(app?.props.agreementRequired).toBe(true);
+    expect(app?.props.agreementSigned).toBe(false);
+    expect(app?.props.agreementToken).toBe("tok_abc123");
+  });
+
+  it("does not look up an agreement token once the agreement is already signed", async () => {
+    let tokenRpcCalled = false;
+    setSupabase(
+      { partner_onboardings: { data: [{ application_data: {} }] } },
+      {
+        get_my_ero_connection: { data: [CONNECTION_FIXTURE] },
+        get_my_partner_onboarding: { data: [baseOnboarding({ status: "setup", agreement_required: true, agreement_signed: true })] },
+      }
+    );
+    const original = (state.supabase as { rpc: (name: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc.bind(state.supabase);
+    (state.supabase as { rpc: (name: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc = (name, args) => {
+      if (name === "get_my_partner_onboarding_agreement_token") tokenRpcCalled = true;
+      return original(name, args);
+    };
+    const { default: Page } = await import("@/app/(app)/partner-dashboard/onboarding/page");
+    const result = await Page();
+    const app = findElement(result, typeNamed("PartnerOnboardingApplication"));
+    expect(app?.props.agreementSigned).toBe(true);
+    expect(app?.props.agreementToken).toBeNull();
+    expect(tokenRpcCalled).toBe(false);
+  });
+
+  it("does not look up an agreement token or documents for a rejected onboarding", async () => {
+    let tokenRpcCalled = false;
+    setSupabase(
+      { partner_onboardings: { data: [{ application_data: {} }] }, document_requests: { data: [DOCUMENT_REQUEST_FIXTURE] } },
+      {
+        get_my_ero_connection: { data: [CONNECTION_FIXTURE] },
+        get_my_partner_onboarding: {
+          data: [baseOnboarding({ status: "rejected", agreement_required: true, agreement_signed: false, documents_required: true })],
+        },
+      }
+    );
+    const original = (state.supabase as { rpc: (name: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc.bind(state.supabase);
+    (state.supabase as { rpc: (name: string, args?: Record<string, unknown>) => Promise<unknown> }).rpc = (name, args) => {
+      if (name === "get_my_partner_onboarding_agreement_token") tokenRpcCalled = true;
+      return original(name, args);
+    };
+    const { default: Page } = await import("@/app/(app)/partner-dashboard/onboarding/page");
+    const result = await Page();
+    const app = findElement(result, typeNamed("PartnerOnboardingApplication"));
+    expect(tokenRpcCalled).toBe(false);
+    expect(app?.props.agreementToken).toBeNull();
+    expect(app?.props.documentRequests).toEqual([]);
+  });
+
+  it("fetches document requests scoped to the connection when documents are required", async () => {
+    setSupabase(
+      { partner_onboardings: { data: [{ application_data: {} }] }, document_requests: { data: [DOCUMENT_REQUEST_FIXTURE] } },
+      {
+        get_my_ero_connection: { data: [CONNECTION_FIXTURE] },
+        get_my_partner_onboarding: { data: [baseOnboarding({ status: "under_review", documents_required: true })] },
+      }
+    );
+    const { default: Page } = await import("@/app/(app)/partner-dashboard/onboarding/page");
+    const result = await Page();
+    const app = findElement(result, typeNamed("PartnerOnboardingApplication"));
+    expect(app?.props.documentRequests).toEqual([DOCUMENT_REQUEST_FIXTURE]);
+    expect(app?.props.parentWorkspaceId).toBe("parent-workspace-1");
+    expect(app?.props.firmConnectionId).toBe("connection-1");
+  });
+
+  it("passes an empty document list through when documents are not required", async () => {
+    setSupabase(
+      { partner_onboardings: { data: [{ application_data: {} }] }, document_requests: { data: [DOCUMENT_REQUEST_FIXTURE] } },
+      {
+        get_my_ero_connection: { data: [CONNECTION_FIXTURE] },
+        get_my_partner_onboarding: { data: [baseOnboarding({ status: "under_review", documents_required: false })] },
+      }
+    );
+    const { default: Page } = await import("@/app/(app)/partner-dashboard/onboarding/page");
+    const result = await Page();
+    const app = findElement(result, typeNamed("PartnerOnboardingApplication"));
+    expect(app?.props.documentRequests).toEqual([]);
   });
 });

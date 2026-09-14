@@ -1,6 +1,14 @@
 export type EntityType = "client" | "engagement" | "firm_connection";
 
-export type Audience = "staff" | "portal";
+// "partner" (Phase 6J-3): a connected firm's own workspace member viewing
+// their own firm_connection's document requests -- authorization comes
+// entirely from RLS (is_partner_workspace_for_firm_connection), not from
+// this value. Every existing `=== "staff"` / `=== "portal"` check already
+// treats "partner" correctly with no further change: staff-only controls
+// (create request, mark received, edit due date) stay hidden, and the
+// upload visibility ternary falls through to "internal" (there is no
+// client-portal concept for a firm_connection entity).
+export type Audience = "staff" | "portal" | "partner";
 
 export type StaffRef = { id: string; display_name: string | null } | null;
 

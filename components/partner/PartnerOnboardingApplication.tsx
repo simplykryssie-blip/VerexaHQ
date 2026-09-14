@@ -6,6 +6,8 @@ import { CheckCircle2, Circle, MinusCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { Badge } from "@/components/ui/Badge";
+import { RequestsPanel } from "@/components/documents/RequestsPanel";
+import type { DocumentRequestRow } from "@/components/documents/types";
 import {
   PARTNER_ONBOARDING_ENTITY_TYPES,
   PARTNER_ONBOARDING_ENTITY_TYPE_LABELS,
@@ -62,6 +64,68 @@ function summaryValue(f: FormState, key: keyof FormState): string {
   return typeof v === "string" && v.trim() !== "" ? v : "--";
 }
 
+function AgreementSection({ required, signed, token }: { required: boolean; signed: boolean; token: string | null }) {
+  if (!required) return null;
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+      <h2 className="text-sm font-semibold text-ink">Agreement</h2>
+      {signed ? (
+        <div className="mt-2 flex items-center gap-2 text-sm text-success">
+          <CheckCircle2 size={16} aria-hidden="true" />
+          Agreement Signed
+        </div>
+      ) : token ? (
+        <div className="mt-2">
+          <div className="flex items-center gap-2 text-sm text-accent">
+            <Circle size={16} aria-hidden="true" />
+            Agreement Ready
+          </div>
+          <a
+            href={`/sign/${token}`}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
+          >
+            Sign Agreement
+          </a>
+        </div>
+      ) : (
+        <div className="mt-2 flex items-center gap-2 text-sm text-muted">
+          <MinusCircle size={16} aria-hidden="true" />
+          Agreement pending setup by your ERO or Service Bureau.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DocumentsSection({
+  required,
+  completed,
+  requests,
+  workspaceId,
+  entityId,
+}: {
+  required: boolean;
+  completed: boolean;
+  requests: DocumentRequestRow[];
+  workspaceId: string;
+  entityId: string;
+}) {
+  if (!required) return null;
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+      <h2 className="text-sm font-semibold text-ink">Documents</h2>
+      {requests.length === 0 ? (
+        <p className="mt-2 text-sm text-muted">Document requests are pending setup by your ERO or Service Bureau.</p>
+      ) : (
+        <div className="mt-3">
+          <RequestsPanel requests={requests} templates={[]} workspaceId={workspaceId} entityType="firm_connection" entityId={entityId} audience="partner" canCreate={false} />
+        </div>
+      )}
+      {completed && requests.length > 0 && <p className="mt-2 text-xs text-success">All requested documents have been provided.</p>}
+    </div>
+  );
+}
+
 export function PartnerOnboardingApplication({
   workspaceId,
   onboardingId,
@@ -73,6 +137,14 @@ export function PartnerOnboardingApplication({
   trainingCompletedAt,
   bankSoftwareSetupRequired,
   bankSoftwareSetupCompletedAt,
+  agreementRequired,
+  agreementSigned,
+  agreementToken,
+  documentsRequired,
+  documentsCompleted,
+  documentRequests,
+  parentWorkspaceId,
+  firmConnectionId,
 }: {
   workspaceId: string;
   onboardingId: string;
@@ -84,6 +156,14 @@ export function PartnerOnboardingApplication({
   trainingCompletedAt: string | null;
   bankSoftwareSetupRequired: boolean;
   bankSoftwareSetupCompletedAt: string | null;
+  agreementRequired: boolean;
+  agreementSigned: boolean;
+  agreementToken: string | null;
+  documentsRequired: boolean;
+  documentsCompleted: boolean;
+  documentRequests: DocumentRequestRow[];
+  parentWorkspaceId: string;
+  firmConnectionId: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -138,10 +218,20 @@ export function PartnerOnboardingApplication({
   // that's Phase 6J-3.
   if (status === "ready") {
     return (
-      <div className="rounded-2xl border border-border bg-surface p-6 text-center shadow-soft">
-        <CheckCircle2 className="mx-auto text-success" size={28} aria-hidden="true" />
-        <p className="mt-3 text-sm font-semibold text-ink">Your onboarding is complete.</p>
-        <p className="mt-1 text-sm text-muted">There is nothing further to do here.</p>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border bg-surface p-6 text-center shadow-soft">
+          <CheckCircle2 className="mx-auto text-success" size={28} aria-hidden="true" />
+          <p className="mt-3 text-sm font-semibold text-ink">Your onboarding is complete.</p>
+          <p className="mt-1 text-sm text-muted">There is nothing further to do here.</p>
+        </div>
+        <AgreementSection required={agreementRequired} signed={agreementSigned} token={agreementToken} />
+        <DocumentsSection
+          required={documentsRequired}
+          completed={documentsCompleted}
+          requests={documentRequests}
+          workspaceId={parentWorkspaceId}
+          entityId={firmConnectionId}
+        />
       </div>
     );
   }
@@ -173,26 +263,36 @@ export function PartnerOnboardingApplication({
       { label: "Bank / Software Setup", required: bankSoftwareSetupRequired, completedAt: bankSoftwareSetupCompletedAt },
     ];
     return (
-      <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
-        <Badge tone={ONBOARDING_STATUS_TONE[status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[status] ?? status}</Badge>
-        <p className="mt-3 text-sm text-ink">Your application has been approved. Your onboarding is being finalized.</p>
-        <ul className="mt-4 space-y-2">
-          {items.map((item) => (
-            <li key={item.label} className="flex items-center gap-2 text-sm">
-              {!item.required ? (
-                <MinusCircle size={16} className="text-muted" aria-hidden="true" />
-              ) : item.completedAt ? (
-                <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
-              ) : (
-                <Circle size={16} className="text-accent" aria-hidden="true" />
-              )}
-              <span className={!item.required ? "text-muted line-through" : "text-slate"}>
-                {item.label} {!item.required && "(not required)"}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-xs text-muted">This checklist is managed by your ERO or Service Bureau.</p>
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
+          <Badge tone={ONBOARDING_STATUS_TONE[status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[status] ?? status}</Badge>
+          <p className="mt-3 text-sm text-ink">Your application has been approved. Your onboarding is being finalized.</p>
+          <ul className="mt-4 space-y-2">
+            {items.map((item) => (
+              <li key={item.label} className="flex items-center gap-2 text-sm">
+                {!item.required ? (
+                  <MinusCircle size={16} className="text-muted" aria-hidden="true" />
+                ) : item.completedAt ? (
+                  <CheckCircle2 size={16} className="text-success" aria-hidden="true" />
+                ) : (
+                  <Circle size={16} className="text-accent" aria-hidden="true" />
+                )}
+                <span className={!item.required ? "text-muted line-through" : "text-slate"}>
+                  {item.label} {!item.required && "(not required)"}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-xs text-muted">This checklist is managed by your ERO or Service Bureau.</p>
+        </div>
+        <AgreementSection required={agreementRequired} signed={agreementSigned} token={agreementToken} />
+        <DocumentsSection
+          required={documentsRequired}
+          completed={documentsCompleted}
+          requests={documentRequests}
+          workspaceId={parentWorkspaceId}
+          entityId={firmConnectionId}
+        />
       </div>
     );
   }
@@ -217,6 +317,14 @@ export function PartnerOnboardingApplication({
               ))}
           </dl>
         </div>
+        <AgreementSection required={agreementRequired} signed={agreementSigned} token={agreementToken} />
+        <DocumentsSection
+          required={documentsRequired}
+          completed={documentsCompleted}
+          requests={documentRequests}
+          workspaceId={parentWorkspaceId}
+          entityId={firmConnectionId}
+        />
       </div>
     );
   }
@@ -231,6 +339,7 @@ export function PartnerOnboardingApplication({
   }
 
   return (
+    <div className="space-y-6">
     <form onSubmit={handleSubmit} className="space-y-6">
       {isInfoRequested && (
         <div className="rounded-2xl border border-warning/30 bg-warningSoft p-4">
@@ -427,5 +536,15 @@ export function PartnerOnboardingApplication({
         </button>
       </div>
     </form>
+
+    <AgreementSection required={agreementRequired} signed={agreementSigned} token={agreementToken} />
+    <DocumentsSection
+      required={documentsRequired}
+      completed={documentsCompleted}
+      requests={documentRequests}
+      workspaceId={parentWorkspaceId}
+      entityId={firmConnectionId}
+    />
+    </div>
   );
 }
