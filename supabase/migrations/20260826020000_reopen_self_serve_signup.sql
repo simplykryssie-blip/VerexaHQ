@@ -1,0 +1,23 @@
+-- Self-serve signup is being reopened at the user's explicit request, now
+-- that a real trial-signup funnel exists on the marketing site driving
+-- traffic to it. This reverses the intentional lockdown from
+-- lock_self_serve_signup / close_self_serve_signup_gap /
+-- remove_auto_workspace_creation_from_signup_trigger -- but unlike the
+-- accidental regression those migrations fixed (a stray default grant left
+-- behind by an unrelated CREATE OR REPLACE, reachable with zero invite
+-- validation via a legacy auth trigger), this is one deliberate grant on
+-- the function that was always the correct entry point.
+--
+-- create_workspace(text, text, text, uuid) already does everything a
+-- self-serve signup needs safely with no code changes: when
+-- p_owner_user_id is omitted (the only way an authenticated caller can use
+-- it -- passing it explicitly raises unless the caller is service_role) it
+-- falls back to auth.uid(), so a workspace can only ever be created for the
+-- real signed-in user making the call, and it already rejects
+-- client_portal_users accounts. The legacy handle_new_auth_user trigger
+-- that caused the earlier hole (auto-creating a workspace before email
+-- confirmation, bypassing every grant check) stays removed -- this grant
+-- alone does not reintroduce that path, since /login's sign-up form only
+-- reaches create_workspace via /onboarding, after a real signed-in session
+-- exists.
+grant execute on function public.create_workspace(text, text, text, uuid) to authenticated;
