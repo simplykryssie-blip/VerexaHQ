@@ -169,10 +169,15 @@ export async function handleSubscriptionCreated(
   // workspace was under -- a past-due pause or a prior cancellation.
   await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
 
-  // One-time only, per grant_workspace_usage_meters -- a workspace that
-  // already has meter rows (e.g. re-subscribing after a cancellation) does
-  // not get a second free bucket.
-  await supabase.rpc("grant_workspace_usage_meters", { p_workspace_id: workspaceId });
+  // Deliberately does NOT grant the free usage allowance here.
+  // subscription.created fires the moment Stripe creates the subscription
+  // object -- before the card is actually confirmed -- so granting here
+  // would hand out free usage capacity that was never actually paid for.
+  // The allowance is granted from handleInvoicePaymentSucceeded instead,
+  // which only fires once the first invoice is genuinely paid. See
+  // grant_workspace_usage_meters's own ON CONFLICT DO NOTHING for why
+  // calling it from every invoice.payment_succeeded (renewals included) is
+  // still exactly one-time.
 
   return {};
 }
@@ -370,6 +375,13 @@ export async function handleInvoicePaymentSucceeded(
   // every other invoice, since the RPC only acts when a
   // billing_setup_required transition exists for this workspace.
   await supabase.rpc("complete_sponsorship_transition_on_payment", { p_workspace_id: sub.workspace_id });
+
+  // The free usage allowance is granted here -- the first genuinely
+  // successful subscription payment -- never from subscription.created.
+  // Safe to call on every payment (renewals, plan changes, etc.) because
+  // grant_workspace_usage_meters' own ON CONFLICT DO NOTHING makes every
+  // call after the first a no-op; the allowance itself never resets.
+  await supabase.rpc("grant_workspace_usage_meters", { p_workspace_id: sub.workspace_id });
 
   return {};
 }

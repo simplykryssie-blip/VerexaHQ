@@ -10614,35 +10614,129 @@ export type Database = {
           },
         ]
       }
+      workspace_usage_auto_topup_charges: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          credited_at: string | null
+          id: string
+          resource_type: string
+          status: string
+          stripe_payment_intent_id: string
+          units: number | null
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          credited_at?: string | null
+          id?: string
+          resource_type: string
+          status?: string
+          stripe_payment_intent_id: string
+          units?: number | null
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          credited_at?: string | null
+          id?: string
+          resource_type?: string
+          status?: string
+          stripe_payment_intent_id?: string
+          units?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_usage_auto_topup_charges_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_usage_ledger: {
+        Row: {
+          created_at: string
+          entry_type: string
+          id: string
+          metadata: Json
+          resource_type: string
+          units: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          entry_type: string
+          id?: string
+          metadata?: Json
+          resource_type: string
+          units: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          entry_type?: string
+          id?: string
+          metadata?: Json
+          resource_type?: string
+          units?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_usage_ledger_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_usage_meters: {
         Row: {
+          auto_topup_amount_cents: number | null
+          auto_topup_enabled: boolean
           free_units_consumed: number
           free_units_granted: number
           granted_at: string
           id: string
           prepaid_balance: number
+          prepaid_units_granted_lifetime: number
           resource_type: string
           updated_at: string
+          warning_80_sent_at: string | null
           workspace_id: string
         }
         Insert: {
+          auto_topup_amount_cents?: number | null
+          auto_topup_enabled?: boolean
           free_units_consumed?: number
           free_units_granted?: number
           granted_at?: string
           id?: string
           prepaid_balance?: number
+          prepaid_units_granted_lifetime?: number
           resource_type: string
           updated_at?: string
+          warning_80_sent_at?: string | null
           workspace_id: string
         }
         Update: {
+          auto_topup_amount_cents?: number | null
+          auto_topup_enabled?: boolean
           free_units_consumed?: number
           free_units_granted?: number
           granted_at?: string
           id?: string
           prepaid_balance?: number
+          prepaid_units_granted_lifetime?: number
           resource_type?: string
           updated_at?: string
+          warning_80_sent_at?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -11584,6 +11678,16 @@ export type Database = {
         Args: { p_additional_bytes: number; p_workspace_id: string }
         Returns: boolean
       }
+      claim_auto_topup_charge: {
+        Args: {
+          p_amount_cents: number
+          p_resource_type: string
+          p_stripe_payment_intent_id: string
+          p_units: number
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
       claim_stripe_webhook_event: {
         Args: { p_event_id: string; p_event_type: string; p_payload: Json }
         Returns: {
@@ -12100,6 +12204,17 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: string
+      }
+      find_workspaces_needing_auto_topup: {
+        Args: never
+        Returns: {
+          amount_cents: number
+          default_payment_method_id: string
+          rate_cents: number
+          resource_type: string
+          stripe_customer_id: string
+          workspace_id: string
+        }[]
       }
       fire_date_reminder_automations: { Args: never; Returns: number }
       fire_invoice_overdue_automations: { Args: never; Returns: number }
@@ -12942,6 +13057,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      mark_auto_topup_charge_credited: {
+        Args: { p_stripe_payment_intent_id: string }
+        Returns: undefined
+      }
       mark_client_lost: {
         Args: { p_client_id: string; p_reason?: string }
         Returns: undefined
@@ -12972,6 +13091,15 @@ export type Database = {
       }
       mark_organizer_information_request_viewed: {
         Args: { p_request_id: string }
+        Returns: undefined
+      }
+      maybe_queue_usage_warning: {
+        Args: {
+          p_resource_type: string
+          p_total_capacity: number
+          p_total_consumed: number
+          p_workspace_id: string
+        }
         Returns: undefined
       }
       merge_clients: {
@@ -13698,6 +13826,15 @@ export type Database = {
       }
       set_signature_request_expiry: {
         Args: { p_expires_at: string; p_signature_request_id: string }
+        Returns: undefined
+      }
+      set_usage_auto_topup: {
+        Args: {
+          p_amount_cents: number
+          p_enabled: boolean
+          p_resource_type: string
+          p_workspace_id: string
+        }
         Returns: undefined
       }
       set_workspace_ghl_connection: {

@@ -496,6 +496,7 @@ export async function chargeOffSession({
   currency = "usd",
   description,
   metadata,
+  idempotencyKey,
 }: {
   customerId: string;
   paymentMethodId: string;
@@ -503,6 +504,13 @@ export async function chargeOffSession({
   currency?: string;
   description: string;
   metadata: Record<string, string>;
+  // Optional: when a caller can retry the exact same charge (e.g. a cron
+  // tick that might re-run before its own bookkeeping catches up), passing
+  // a stable key here makes Stripe return the SAME PaymentIntent instead of
+  // creating a second charge -- see the auto-topup cron for why that
+  // matters when the charge and the resulting balance credit aren't the
+  // same atomic step.
+  idempotencyKey?: string;
 }): Promise<StripeResult<{ id: string; status: string }>> {
   if (!isStripeConfigured()) {
     return { ok: false, reason: "Stripe is not configured for this environment." };
@@ -524,7 +532,10 @@ export async function chargeOffSession({
     body.set(`metadata[${key}]`, value);
   }
 
-  const res = await fetch(`${STRIPE_API}/payment_intents`, { method: "POST", headers: authHeaders(), body });
+  const headers = authHeaders();
+  if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+
+  const res = await fetch(`${STRIPE_API}/payment_intents`, { method: "POST", headers, body });
   const data = (await res.json().catch(() => ({}))) as { id?: string; status?: string; error?: { message?: string; decline_code?: string } };
   if (!res.ok || !data.id) {
     return { ok: false, reason: data.error?.decline_code ?? data.error?.message ?? `Stripe responded with ${res.status}` };

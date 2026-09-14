@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { createClient } from "@/lib/supabase/client";
 
-type BucketMetric = { granted: number; consumed: number; prepaidBalance: number };
-type StorageMetric = { granted: number; prepaidBalance: number; usedGb: number };
+type AutoTopupFields = { autoTopupEnabled: boolean; autoTopupAmountCents: number | null };
+type BucketMetric = { granted: number; consumed: number; prepaidBalance: number } & AutoTopupFields;
+type StorageMetric = { granted: number; prepaidBalance: number; usedGb: number } & AutoTopupFields;
 
 const MINIMUM_TOPUP_DOLLARS = 25;
 const QUICK_AMOUNTS = [25, 50, 100];
@@ -91,7 +94,53 @@ function TopUp({
   );
 }
 
+const DEFAULT_AUTO_TOPUP_CENTS = MINIMUM_TOPUP_DOLLARS * 100;
+
+function AutoTopupToggle({
+  resourceType,
+  enabled,
+  amountCents,
+  onChange,
+}: {
+  resourceType: "email" | "sms" | "storage";
+  enabled: boolean;
+  amountCents: number | null;
+  onChange: (resourceType: "email" | "sms" | "storage", enabled: boolean, amountCents: number) => void;
+}) {
+  const [amount, setAmount] = useState(String((amountCents ?? DEFAULT_AUTO_TOPUP_CENTS) / 100));
+  const [saving, setSaving] = useState(false);
+
+  async function toggle(next: boolean) {
+    setSaving(true);
+    try {
+      await onChange(resourceType, next, Math.round(Number(amount) * 100));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+      <label className="flex items-center gap-1.5">
+        <input type="checkbox" checked={enabled} disabled={saving} onChange={(e) => toggle(e.target.checked)} />
+        Automatically top up ${amount} when this runs out
+      </label>
+      {!enabled && (
+        <input
+          type="number"
+          min={MINIMUM_TOPUP_DOLLARS}
+          step="1"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-16 rounded-lg border border-border px-2 py-0.5 text-xs focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+      )}
+    </div>
+  );
+}
+
 export function PlanUsageManager({
+  workspaceId,
   isOwner,
   emailRateCentsPer1000,
   smsRateCents,
@@ -100,6 +149,7 @@ export function PlanUsageManager({
   sms,
   storage,
 }: {
+  workspaceId: string;
   isOwner: boolean;
   emailRateCentsPer1000: number;
   smsRateCents: number;
@@ -109,7 +159,28 @@ export function PlanUsageManager({
   storage: StorageMetric;
 }) {
   const toast = useToast();
+  const router = useRouter();
   const [purchasing, setPurchasing] = useState<"email" | "sms" | "storage" | null>(null);
+
+  async function setAutoTopup(resourceType: "email" | "sms" | "storage", enabled: boolean, amountCents: number) {
+    if (enabled && (!Number.isInteger(amountCents) || amountCents < MINIMUM_TOPUP_DOLLARS * 100)) {
+      toast.show(`Auto top-up amount must be at least $${MINIMUM_TOPUP_DOLLARS}.`, "error");
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase.rpc("set_usage_auto_topup", {
+      p_workspace_id: workspaceId,
+      p_resource_type: resourceType,
+      p_enabled: enabled,
+      p_amount_cents: amountCents,
+    });
+    if (error) {
+      toast.show(error.message, "error");
+      return;
+    }
+    toast.show(enabled ? "Automatic top-up turned on." : "Automatic top-up turned off.", "success");
+    router.refresh();
+  }
 
   async function buy(resourceType: "email" | "sms" | "storage", amountCents: number) {
     setPurchasing(resourceType);
@@ -149,10 +220,20 @@ export function PlanUsageManager({
         <div className="mt-1.5">
           <UsageBar used={email.consumed} total={email.granted} />
         </div>
-        {emailFreeLeft === 0 && email.prepaidBalance === 0 && (
+        {emailFreeLeft === 0 && email.prepaidBalance === 0 ? (
           <p className="mt-1.5 text-xs text-danger">Free amount used up -- sending is paused until you buy a top-up.</p>
+        ) : (
+          email.granted > 0 &&
+          email.consumed / email.granted >= 0.8 && (
+            <p className="mt-1.5 text-xs text-amber">Your email usage is at approximately 80% of your available balance.</p>
+          )
         )}
-        {isOwner && <TopUp resourceType="email" rateCents={emailRateCentsPer1000} disabled={purchasing !== null} onBuy={buy} />}
+        {isOwner && (
+          <>
+            <TopUp resourceType="email" rateCents={emailRateCentsPer1000} disabled={purchasing !== null} onBuy={buy} />
+            <AutoTopupToggle resourceType="email" enabled={email.autoTopupEnabled} amountCents={email.autoTopupAmountCents} onChange={setAutoTopup} />
+          </>
+        )}
       </div>
 
       <div>
@@ -166,10 +247,21 @@ export function PlanUsageManager({
         <div className="mt-1.5">
           <UsageBar used={sms.consumed} total={sms.granted} />
         </div>
-        {smsFreeLeft === 0 && sms.prepaidBalance === 0 && (
+        {smsFreeLeft === 0 && sms.prepaidBalance === 0 ? (
           <p className="mt-1.5 text-xs text-danger">Free amount used up -- sending is paused until you buy a top-up.</p>
+        ) : (
+          sms.granted > 0 &&
+          sms.consumed / sms.granted >= 0.8 && (
+            <p className="mt-1.5 text-xs text-amber">Your SMS usage is at approximately 80% of your available balance.</p>
+          )
         )}
-        {isOwner && <TopUp resourceType="sms" rateCents={smsRateCents} disabled={purchasing !== null} onBuy={buy} />}
+        <p className="mt-1.5 text-xs text-muted">Monthly phone number rental is deducted from this SMS balance.</p>
+        {isOwner && (
+          <>
+            <TopUp resourceType="sms" rateCents={smsRateCents} disabled={purchasing !== null} onBuy={buy} />
+            <AutoTopupToggle resourceType="sms" enabled={sms.autoTopupEnabled} amountCents={sms.autoTopupAmountCents} onChange={setAutoTopup} />
+          </>
+        )}
       </div>
 
       <div>
@@ -183,10 +275,20 @@ export function PlanUsageManager({
         <div className="mt-1.5">
           <UsageBar used={storage.usedGb} total={storageCapacityGb} />
         </div>
-        {storage.usedGb >= storageCapacityGb && (
+        {storage.usedGb >= storageCapacityGb ? (
           <p className="mt-1.5 text-xs text-danger">Storage ceiling reached -- uploads are paused until you buy more.</p>
+        ) : (
+          storageCapacityGb > 0 &&
+          storage.usedGb / storageCapacityGb >= 0.8 && (
+            <p className="mt-1.5 text-xs text-amber">Your storage usage is at approximately 80% of your available balance.</p>
+          )
         )}
-        {isOwner && <TopUp resourceType="storage" rateCents={storageRateCents} disabled={purchasing !== null} onBuy={buy} />}
+        {isOwner && (
+          <>
+            <TopUp resourceType="storage" rateCents={storageRateCents} disabled={purchasing !== null} onBuy={buy} />
+            <AutoTopupToggle resourceType="storage" enabled={storage.autoTopupEnabled} amountCents={storage.autoTopupAmountCents} onChange={setAutoTopup} />
+          </>
+        )}
       </div>
 
       {!isOwner && <p className="text-xs text-muted">Only the workspace owner can purchase top-ups.</p>}
