@@ -11272,6 +11272,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      _resolve_onboarding_default_reviewer: {
+        Args: { p_firm_connection_id: string; p_workspace_id: string }
+        Returns: string
+      }
       accept_config_object_share: {
         Args: { p_share_id: string }
         Returns: string
@@ -12278,6 +12282,10 @@ export type Database = {
           training_required: boolean
         }[]
       }
+      get_my_partner_onboarding_agreement_token: {
+        Args: { p_workspace_id: string }
+        Returns: string
+      }
       get_my_workspaces: {
         Args: never
         Returns: {
@@ -12693,6 +12701,14 @@ export type Database = {
       }
       is_operationally_active_partner: {
         Args: { p_firm_connection_id: string }
+        Returns: boolean
+      }
+      is_partner_workspace_for_firm_connection: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_workspace_id: string
+        }
         Returns: boolean
       }
       is_pending_signer_for_signature_request: {
