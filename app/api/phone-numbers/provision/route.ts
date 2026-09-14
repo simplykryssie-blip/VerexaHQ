@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isSmsConfigured } from "@/lib/providerStatus";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 
 // Buys a real Twilio number and attaches it to the workspace -- the first
 // one a workspace ever provisions is free (provision_phone_number_record
@@ -28,6 +28,9 @@ export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "No active workspace" }, { status: 400 });
+  }
+  if (workspace.status === "suspended") {
+    return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
   if (!workspace.is_owner) {
     return NextResponse.json({ error: "Only the workspace owner can purchase a phone number." }, { status: 403 });

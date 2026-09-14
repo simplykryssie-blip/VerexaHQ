@@ -32,6 +32,18 @@ export async function updateSession(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+    // Threads the current pathname to app/(app)/layout.tsx via a request
+    // header -- a Server Component layout has no other way to know the
+    // route it's rendering for, and the Phase 3 suspension gate needs it to
+    // let the billing-recovery page (and only that page) through. Built
+    // once and passed to every NextResponse.next({ request }) call below
+    // (including the one inside setAll, which otherwise reconstructs a
+    // fresh response and would silently drop a header set directly on a
+    // response instead of the request).
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-pathname", request.nextUrl.pathname);
+    const nextRequestInit = { request: { headers: requestHeaders } };
+
     if (!supabaseUrl || !supabaseAnonKey) {
       console.error(
         "MIDDLEWARE ERROR: Missing Supabase environment variables",
@@ -41,10 +53,10 @@ export async function updateSession(request: NextRequest) {
         }
       );
       // Return next() to allow request to proceed without auth
-      return NextResponse.next({ request });
+      return NextResponse.next(nextRequestInit);
     }
 
-    let response = NextResponse.next({ request });
+    let response = NextResponse.next(nextRequestInit);
 
     const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -53,7 +65,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next(nextRequestInit);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
           );

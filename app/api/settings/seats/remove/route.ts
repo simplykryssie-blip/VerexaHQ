@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 import { updateSubscriptionItemQuantity } from "@/lib/stripe/client";
 
 /**
@@ -23,6 +23,9 @@ export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "No active workspace" }, { status: 400 });
+  }
+  if (workspace.status === "suspended") {
+    return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
 
   const { seatId } = (await request.json().catch(() => ({}))) as { seatId?: string };

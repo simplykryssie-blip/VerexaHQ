@@ -54,7 +54,19 @@ export default async function PlanUsagePage() {
       />
 
       <div className="mt-6">
-        {!subscription || subscription.stripe_status !== "active" || !plan ? (
+        {workspace.status === "suspended" && (
+          <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-4">
+            <p className="text-sm font-semibold text-danger">Workspace suspended</p>
+            <p className="mt-1 text-sm text-ink">
+              {workspace.suspension_reason === "subscription_canceled"
+                ? "Your Verexa subscription was canceled."
+                : "Your Verexa subscription payment is past due."}{" "}
+              Normal workspace access is unavailable until billing is resolved
+              {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
+            </p>
+          </div>
+        )}
+        {!subscription || !plan ? (
           <div className="rounded-2xl border border-border bg-surface shadow-soft">
             <EmptyState message="This workspace isn't on an active paid plan yet, so usage isn't metered." />
           </div>
@@ -70,6 +82,8 @@ export default async function PlanUsagePage() {
               />
             </SettingsCard>
           )}
+          {subscription.stripe_status === "active" && (
+          <>
           <div className="mt-6">
           <SettingsCard title={plan.name} description="Contact Verexa to change plans.">
             <PlanUsageManager
@@ -117,6 +131,8 @@ export default async function PlanUsagePage() {
             />
           </SettingsCard>
           </div>
+          </>
+          )}
           </>
         )}
       </div>

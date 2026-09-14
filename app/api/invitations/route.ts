@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 import { sendEmailViaResend } from "@/lib/email/resend";
 import { renderEmail } from "@/lib/email/template";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -11,6 +11,9 @@ export async function POST(request: Request) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+  if (workspace.status === "suspended") {
+    return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
 
   if (!canInviteStaff(workspace)) {
