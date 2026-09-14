@@ -23,6 +23,27 @@ function toFormBody(params: Record<string, string | number | undefined>) {
 
 export type StripeResult<T> = { ok: true; data: T } | { ok: false; reason: string };
 
+// Every Stripe subscription Verexa creates today (the platform base
+// subscription and firm-connection billing takeover, both via
+// createSubscriptionCheckoutSession's single inline price_data line item)
+// has exactly one item -- there is no seat-billing or other multi-item
+// subscription in production yet. Rather than blindly indexing
+// items.data[0] (which would silently act on the wrong item the moment a
+// second one exists), every call site that needs "the" item goes through
+// this: it requires there to genuinely be exactly one and fails safely
+// otherwise, so a future multi-item subscription surfaces as an explicit,
+// actionable "ambiguous" result instead of silently modifying the wrong
+// item.
+export function getSoleSubscriptionItem<T>(items: T[]): StripeResult<T> {
+  if (items.length === 0) {
+    return { ok: false, reason: "This subscription has no items." };
+  }
+  if (items.length > 1) {
+    return { ok: false, reason: "This subscription has multiple items; a specific item must be identified explicitly rather than assumed." };
+  }
+  return { ok: true, data: items[0] };
+}
+
 export async function createCheckoutSession({
   amount,
   currency = "usd",
@@ -270,11 +291,9 @@ export async function getSubscriptionPrimaryItemId(stripeSubscriptionId: string)
     return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
   }
   const data = (await res.json()) as { items: { data: { id: string }[] } };
-  const itemId = data.items.data[0]?.id;
-  if (!itemId) {
-    return { ok: false, reason: "This subscription has no items." };
-  }
-  return { ok: true, data: { id: itemId } };
+  const itemResult = getSoleSubscriptionItem(data.items.data);
+  if (!itemResult.ok) return itemResult;
+  return { ok: true, data: { id: itemResult.data.id } };
 }
 
 export type CustomerDefaultPaymentMethod = { brand: string; last4: string; expMonth: number; expYear: number } | null;

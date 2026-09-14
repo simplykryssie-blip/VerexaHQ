@@ -37,11 +37,29 @@ export async function POST(request: Request) {
   };
 
   const supabase = createServiceClient();
-  const { data: logRow } = await supabase
-    .from("webhook_events")
-    .insert({ provider: "stripe", event_type: event.type, external_id: event.id, payload: event as never })
-    .select("id")
+
+  // Atomic claim: the database (not application memory, not a later check
+  // against the business row) decides exactly once whether this event.id
+  // should actually be processed -- a genuine duplicate delivery or a
+  // concurrent second delivery both come back should_process: false and
+  // are safely ignored below. See claim_stripe_webhook_event for how a
+  // retry after a real failure is still allowed through.
+  const { data: claim, error: claimError } = await supabase
+    .rpc("claim_stripe_webhook_event", { p_event_id: event.id, p_event_type: event.type, p_payload: event as never })
     .single();
+
+  if (claimError) {
+    // Couldn't even record the event -- unknown dedup state, so fail loudly
+    // (500) rather than silently processing or silently dropping it. Stripe
+    // will retry.
+    return NextResponse.json({ error: "Could not record webhook event" }, { status: 500 });
+  }
+
+  const logRow = { id: claim?.id };
+
+  if (!claim?.should_process) {
+    return NextResponse.json({ received: true, duplicate: true });
+  }
 
   try {
     if (event.type === "checkout.session.completed") {

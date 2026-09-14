@@ -11584,6 +11584,13 @@ export type Database = {
         Args: { p_additional_bytes: number; p_workspace_id: string }
         Returns: boolean
       }
+      claim_stripe_webhook_event: {
+        Args: { p_event_id: string; p_event_type: string; p_payload: Json }
+        Returns: {
+          id: string
+          should_process: boolean
+        }[]
+      }
       compare_config_object_versions: {
         Args: {
           p_id: string
