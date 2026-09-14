@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Wallet, Building2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -134,9 +135,14 @@ export default async function PartnerDashboardPage() {
       <div className="flex-1 space-y-6 px-8 py-6">
         {showOnboarding && onboarding && (
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink">Your Onboarding</p>
-              <Badge tone={ONBOARDING_STATUS_TONE[onboarding.status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[onboarding.status] ?? onboarding.status}</Badge>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink">Your Onboarding</p>
+                <Badge tone={ONBOARDING_STATUS_TONE[onboarding.status] ?? "neutral"}>{ONBOARDING_STATUS_LABEL[onboarding.status] ?? onboarding.status}</Badge>
+              </div>
+              <Link href="/partner-dashboard/onboarding" className="text-xs font-medium text-accent hover:underline">
+                {onboarding.status === "pending" || onboarding.status === "in_progress" ? "Continue Application" : "View Application"}
+              </Link>
             </div>
             {(() => {
               const waiting = deriveWaitingOn(onboarding);

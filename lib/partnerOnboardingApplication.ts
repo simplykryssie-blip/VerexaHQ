@@ -31,6 +31,26 @@ export const PARTNER_ONBOARDING_SERVICES_OFFERED = [
 ] as const;
 export type PartnerOnboardingServiceOffered = (typeof PARTNER_ONBOARDING_SERVICES_OFFERED)[number];
 
+// Display labels for the two fixed-option fields -- kept alongside the
+// contract itself (Phase 6J-2) rather than duplicated in a component, so
+// the option list and its labels can never drift apart.
+export const PARTNER_ONBOARDING_ENTITY_TYPE_LABELS: Record<PartnerOnboardingEntityType, string> = {
+  sole_proprietorship: "Sole Proprietorship",
+  llc: "LLC",
+  s_corp: "S-Corporation",
+  c_corp: "C-Corporation",
+  partnership: "Partnership",
+};
+
+export const PARTNER_ONBOARDING_SERVICE_LABELS: Record<PartnerOnboardingServiceOffered, string> = {
+  individual_returns: "Individual Returns",
+  business_returns: "Business Returns",
+  bookkeeping: "Bookkeeping",
+  payroll: "Payroll",
+  tax_resolution: "Tax Resolution",
+  other: "Other",
+};
+
 export type PartnerOnboardingApplicationData = {
   // Business Information
   legal_business_name: string;
@@ -187,4 +207,132 @@ export function validatePartnerOnboardingApplication(input: unknown): Validation
 
   if (errors.length > 0) return { ok: false, errors };
   return { ok: true, data: raw as PartnerOnboardingApplicationData };
+}
+
+// -----------------------------------------------------------------------
+// Phase 6J-2: plain-string form state <-> the contract above. Centralized
+// here (not in the form component) so the exact shape a partner's browser
+// produces is independently testable against validatePartnerOnboardingApplication()
+// without rendering any React component -- this repository has no
+// component-rendering test setup (no React Testing Library/jsdom), only
+// plain function tests and server-page smoke tests.
+// -----------------------------------------------------------------------
+
+// Booleans use a tri-state "", "yes", "no" form value so a required
+// boolean can be distinguished from "not answered yet", and an optional
+// one can be left genuinely unset rather than defaulting to false.
+export type PartnerOnboardingApplicationFormState = {
+  legal_business_name: string;
+  dba: string;
+  entity_type: string;
+  business_address: string;
+  business_phone: string;
+  business_email: string;
+  website: string;
+  applicant_full_name: string;
+  has_active_ptin: string;
+  has_active_efin: string;
+  years_preparing_taxes: string;
+  years_in_business: string;
+  prior_tax_software: string;
+  prior_ero_sb_relationship: string;
+  prior_ero_sb_relationship_details: string;
+  irs_suspension_or_sanction: string;
+  services_offered: PartnerOnboardingServiceOffered[];
+  expected_annual_return_volume: string;
+  individual_business_return_mix: string;
+  schedule_c_experience: string;
+  number_of_preparers: string;
+  preparer_names: string;
+  partnership_goals: string;
+  additional_information: string;
+};
+
+export function boolToYesNo(v: boolean | null | undefined): string {
+  if (v === true) return "yes";
+  if (v === false) return "no";
+  return "";
+}
+
+export function yesNoToBool(v: string): boolean | undefined {
+  if (v === "yes") return true;
+  if (v === "no") return false;
+  return undefined;
+}
+
+export function partnerOnboardingApplicationDataToFormState(data: Record<string, unknown> | null): PartnerOnboardingApplicationFormState {
+  const d = data ?? {};
+  return {
+    legal_business_name: typeof d.legal_business_name === "string" ? d.legal_business_name : "",
+    dba: typeof d.dba === "string" ? d.dba : "",
+    entity_type: typeof d.entity_type === "string" ? d.entity_type : "",
+    business_address: typeof d.business_address === "string" ? d.business_address : "",
+    business_phone: typeof d.business_phone === "string" ? d.business_phone : "",
+    business_email: typeof d.business_email === "string" ? d.business_email : "",
+    website: typeof d.website === "string" ? d.website : "",
+    applicant_full_name: typeof d.applicant_full_name === "string" ? d.applicant_full_name : "",
+    has_active_ptin: boolToYesNo(d.has_active_ptin as boolean | undefined),
+    has_active_efin: boolToYesNo(d.has_active_efin as boolean | undefined),
+    years_preparing_taxes: typeof d.years_preparing_taxes === "number" ? String(d.years_preparing_taxes) : "",
+    years_in_business: typeof d.years_in_business === "number" ? String(d.years_in_business) : "",
+    prior_tax_software: typeof d.prior_tax_software === "string" ? d.prior_tax_software : "",
+    prior_ero_sb_relationship: boolToYesNo(d.prior_ero_sb_relationship as boolean | undefined),
+    prior_ero_sb_relationship_details: typeof d.prior_ero_sb_relationship_details === "string" ? d.prior_ero_sb_relationship_details : "",
+    irs_suspension_or_sanction: boolToYesNo(d.irs_suspension_or_sanction as boolean | undefined),
+    services_offered: Array.isArray(d.services_offered) ? (d.services_offered as PartnerOnboardingServiceOffered[]) : [],
+    expected_annual_return_volume: typeof d.expected_annual_return_volume === "number" ? String(d.expected_annual_return_volume) : "",
+    individual_business_return_mix: typeof d.individual_business_return_mix === "string" ? d.individual_business_return_mix : "",
+    schedule_c_experience: boolToYesNo(d.schedule_c_experience as boolean | undefined),
+    number_of_preparers: typeof d.number_of_preparers === "number" ? String(d.number_of_preparers) : "",
+    preparer_names: Array.isArray(d.preparer_names) ? (d.preparer_names as string[]).join("\n") : "",
+    partnership_goals: typeof d.partnership_goals === "string" ? d.partnership_goals : "",
+    additional_information: typeof d.additional_information === "string" ? d.additional_information : "",
+  };
+}
+
+// Builds the exact jsonb object submit_partner_onboarding_application()
+// expects -- omitting empty optional fields entirely rather than sending
+// null/"", matching how validatePartnerOnboardingApplication() treats a
+// missing key and a null the same way. Never constructs a key outside the
+// PartnerOnboardingApplicationData shape above, so a credential-number
+// field is structurally impossible to produce from form state.
+export function partnerOnboardingFormStateToApplicationData(f: PartnerOnboardingApplicationFormState): Record<string, unknown> {
+  const data: Record<string, unknown> = {
+    legal_business_name: f.legal_business_name.trim(),
+    entity_type: f.entity_type,
+    business_address: f.business_address.trim(),
+    business_phone: f.business_phone.trim(),
+    business_email: f.business_email.trim(),
+    applicant_full_name: f.applicant_full_name.trim(),
+    services_offered: f.services_offered,
+  };
+  const ptin = yesNoToBool(f.has_active_ptin);
+  if (ptin !== undefined) data.has_active_ptin = ptin;
+  const efin = yesNoToBool(f.has_active_efin);
+  if (efin !== undefined) data.has_active_efin = efin;
+  if (f.years_preparing_taxes.trim() !== "") data.years_preparing_taxes = Number(f.years_preparing_taxes);
+  if (f.years_in_business.trim() !== "") data.years_in_business = Number(f.years_in_business);
+  if (f.prior_tax_software.trim() !== "") data.prior_tax_software = f.prior_tax_software.trim();
+  const priorRelationship = yesNoToBool(f.prior_ero_sb_relationship);
+  if (priorRelationship !== undefined) data.prior_ero_sb_relationship = priorRelationship;
+  if (priorRelationship && f.prior_ero_sb_relationship_details.trim() !== "") {
+    data.prior_ero_sb_relationship_details = f.prior_ero_sb_relationship_details.trim();
+  }
+  const suspension = yesNoToBool(f.irs_suspension_or_sanction);
+  if (suspension !== undefined) data.irs_suspension_or_sanction = suspension;
+  if (f.expected_annual_return_volume.trim() !== "") data.expected_annual_return_volume = Number(f.expected_annual_return_volume);
+  if (f.individual_business_return_mix.trim() !== "") data.individual_business_return_mix = f.individual_business_return_mix.trim();
+  const scheduleC = yesNoToBool(f.schedule_c_experience);
+  if (scheduleC !== undefined) data.schedule_c_experience = scheduleC;
+  if (f.number_of_preparers.trim() !== "") data.number_of_preparers = Number(f.number_of_preparers);
+  const preparerNames = f.preparer_names
+    .split("\n")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  if (preparerNames.length > 0) data.preparer_names = preparerNames;
+  if (f.website.trim() !== "") data.website = f.website.trim();
+  if (f.dba.trim() !== "") data.dba = f.dba.trim();
+  if (f.partnership_goals.trim() !== "") data.partnership_goals = f.partnership_goals.trim();
+  if (f.additional_information.trim() !== "") data.additional_information = f.additional_information.trim();
+  return data;
 }
