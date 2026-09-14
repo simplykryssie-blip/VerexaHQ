@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendSmsViaTwilio } from "@/lib/sms/twilio";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -25,6 +25,9 @@ export async function POST(request: Request) {
   }
 
   const workspace = await getCurrentWorkspace();
+  if (workspace && workspace.status === "suspended") {
+    return NextResponse.json({ ok: false, sent: false, error: workspaceOperationalError(workspace) }, { status: 403 });
+  }
   const result = await sendSmsViaTwilio({ to, body, ...(workspace ? { workspaceId: workspace.id } : {}), ...(clientId ? { clientId } : {}) });
   if (result.reason === undefined) {
     await recordProviderCheck("sms", result.sent, result.error);
