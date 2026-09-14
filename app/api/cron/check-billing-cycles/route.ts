@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { previewUpcomingInvoiceAmount, chargeOffSession, createCustomerBalanceCredit } from "@/lib/stripe/client";
+import { resumeWorkspaceFromBilling } from "@/lib/stripe/subscriptionWebhooks";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,16 @@ function daysBetween(fromDateStr: string, toDateStr: string): number {
  *    it: suspend the workspace. This is independent of (and can fire before)
  *    Stripe's own Smart Retries exhausting into an "unpaid" subscription
  *    status, since that can take longer than a single billing cycle.
+ *  - Phase 4A: a workspace this cron itself suspended (suspension_reason
+ *    'billing_past_due') has no Stripe-side status change to react to --
+ *    this charge is off-session and outside Stripe's own subscription
+ *    invoicing, so stripe_status can sit at "active" the entire time and no
+ *    webhook ever fires. Once suspended, every subsequent day is folded
+ *    into the same retry path as day 3/day 0 (same once-per-day guard, same
+ *    charge logic) so that adding a payment method and this cron's next
+ *    hourly tick is what actually restores access -- reusing
+ *    resumeWorkspaceFromBilling, the same function Stripe's own webhooks
+ *    call for every other billing-suspension reason.
  */
 async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
@@ -51,7 +62,7 @@ async function handleGET(request: Request) {
   const { data: subs, error } = await supabase
     .from("workspace_subscriptions")
     .select(
-      "id, workspace_id, stripe_customer_id, stripe_subscription_id, stripe_status, current_period_end, default_payment_method_id, workspaces(status)"
+      "id, workspace_id, stripe_customer_id, stripe_subscription_id, stripe_status, current_period_end, default_payment_method_id, workspaces(status, suspension_reason)"
     )
     .in("stripe_status", ["active", "trialing", "past_due"])
     .not("current_period_end", "is", null)
@@ -62,12 +73,14 @@ async function handleGET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const results = { reminded: 0, charged: 0, chargeFailed: 0, suspended: 0, skipped: 0 };
+  const results = { reminded: 0, charged: 0, chargeFailed: 0, suspended: 0, resumed: 0, skipped: 0 };
 
   for (const sub of subs ?? []) {
     const periodEnd = chicagoDateStr(new Date(sub.current_period_end as string));
     const daysUntil = daysBetween(today, periodEnd);
-    const workspaceStatus = (sub.workspaces as unknown as { status: string } | null)?.status;
+    const workspace = sub.workspaces as unknown as { status: string; suspension_reason: string | null } | null;
+    const workspaceStatus = workspace?.status;
+    const isPostSuspensionRecovery = daysUntil < 0 && workspaceStatus === "suspended" && workspace?.suspension_reason === "billing_past_due";
 
     if (daysUntil === 5 && !sub.default_payment_method_id) {
       const { data: existing } = await supabase
@@ -93,7 +106,7 @@ async function handleGET(request: Request) {
       }
     }
 
-    if (daysUntil === 3 || daysUntil === 0) {
+    if (daysUntil === 3 || daysUntil === 0 || isPostSuspensionRecovery) {
       const { data: succeeded } = await supabase
         .from("workspace_billing_charge_attempts")
         .select("id")
@@ -137,6 +150,10 @@ async function handleGET(request: Request) {
               status: "succeeded",
             });
             results.charged += 1;
+            if (isPostSuspensionRecovery) {
+              await resumeWorkspaceFromBilling(supabase, sub.workspace_id, ["billing_past_due"]);
+              results.resumed += 1;
+            }
           } else {
             const charge = await chargeOffSession({
               customerId: sub.stripe_customer_id as string,
@@ -160,6 +177,10 @@ async function handleGET(request: Request) {
                 status: "succeeded",
               });
               results.charged += 1;
+              if (isPostSuspensionRecovery) {
+                await resumeWorkspaceFromBilling(supabase, sub.workspace_id, ["billing_past_due"]);
+                results.resumed += 1;
+              }
             } else {
               const reason = charge.ok ? `Payment intent status: ${charge.data.status}` : charge.reason;
               await supabase.from("workspace_billing_charge_attempts").insert({

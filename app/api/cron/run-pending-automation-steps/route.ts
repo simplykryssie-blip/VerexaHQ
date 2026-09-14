@@ -46,7 +46,7 @@ async function handleGET(request: Request) {
 
   const { data: pending } = await supabase
     .from("automation_pending_steps")
-    .select("id, run_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
+    .select("id, run_id, automation_step_id, automation_steps(action_type), automation_runs(status, workspaces(status))")
     .eq("status", "pending_delay")
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
@@ -56,9 +56,10 @@ async function handleGET(request: Request) {
   let processed = 0;
   let stillWaiting = 0;
   let deferred = 0;
+  let suspended = 0;
   for (const row of pending ?? []) {
     if (Date.now() - startedAt > DEADLINE_MS) {
-      deferred = (pending?.length ?? 0) - processed - stillWaiting;
+      deferred = (pending?.length ?? 0) - processed - stillWaiting - suspended;
       console.log(`run-pending-automation-steps: stopping early with ${deferred} row(s) left for the next tick`);
       break;
     }
@@ -69,6 +70,19 @@ async function handleGET(request: Request) {
     const runStatus = (row.automation_runs as unknown as { status?: string } | null)?.status;
     if (runStatus !== "running") {
       await supabase.from("automation_pending_steps").delete().eq("id", row.id);
+      continue;
+    }
+    // Phase 4A: this cron runs as service role, bypassing RLS entirely, so
+    // Phase 3's suspension enforcement (applied at the RLS layer) never
+    // reaches it -- a suspended workspace's already-queued steps would
+    // otherwise keep firing (including email/SMS actions). Leave the row
+    // exactly as it is (still 'pending_delay', still due) rather than
+    // deleting or failing it, so it picks back up automatically -- with no
+    // special-casing needed -- the next time this cron runs after the
+    // workspace becomes operational again.
+    const workspaceStatus = (row.automation_runs as unknown as { workspaces?: { status?: string } | null } | null)?.workspaces?.status;
+    if (workspaceStatus !== "active") {
+      suspended++;
       continue;
     }
     const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
@@ -86,7 +100,7 @@ async function handleGET(request: Request) {
     processed++;
   }
 
-  return NextResponse.json({ processed, stillWaiting, deferred });
+  return NextResponse.json({ processed, stillWaiting, deferred, suspended });
 }
 
 export const GET = withJobLogging("run-pending-automation-steps", handleGET);

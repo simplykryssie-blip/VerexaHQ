@@ -13079,6 +13079,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      is_workspace_operational: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       learning_hub_reachable_workspaces: {
         Args: { p_owner_workspace_id: string }
         Returns: {

@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlanUsageManager } from "@/components/settings/PlanUsageManager";
 import { PhoneNumbersManager, type PhoneNumberRow } from "@/components/settings/PhoneNumbersManager";
 import { BillingCardManager } from "@/components/settings/BillingCardManager";
+import { ResumeCheckoutButton } from "@/components/settings/ResumeCheckoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +58,22 @@ export default async function PlanUsagePage() {
         {workspace.status === "suspended" && (
           <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-4">
             <p className="text-sm font-semibold text-danger">Workspace suspended</p>
-            <p className="mt-1 text-sm text-ink">
-              {workspace.suspension_reason === "subscription_canceled"
-                ? "Your Verexa subscription was canceled."
-                : "Your Verexa subscription payment is past due."}{" "}
-              Normal workspace access is unavailable until billing is resolved
-              {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
-            </p>
+            {workspace.suspension_reason === "billing_incomplete" ? (
+              <>
+                <p className="mt-1 text-sm text-ink">
+                  Your Verexa subscription was never completed. Normal workspace access is unavailable until you finish checkout.
+                </p>
+                {workspace.is_owner && <ResumeCheckoutButton />}
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-ink">
+                {workspace.suspension_reason === "subscription_canceled"
+                  ? "Your Verexa subscription was canceled."
+                  : "Your Verexa subscription payment is past due."}{" "}
+                Normal workspace access is unavailable until billing is resolved
+                {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
+              </p>
+            )}
           </div>
         )}
         {!subscription || !plan ? (
