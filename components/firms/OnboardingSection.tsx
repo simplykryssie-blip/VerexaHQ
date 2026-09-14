@@ -412,7 +412,15 @@ export function OnboardingSection({
         </div>
       )}
 
-      {canManage && onboarding.status === "under_review" && (
+      {canManage && onboarding.status === "under_review" && !isConnectionActive && (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="text-xs text-danger">
+            This connection is no longer active, so this onboarding can no longer be reviewed here.
+          </p>
+        </div>
+      )}
+
+      {canManage && onboarding.status === "under_review" && isConnectionActive && (
         <div className="mt-4 border-t border-border pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Review decision</p>
           {showNoteFor && (
@@ -453,7 +461,7 @@ export function OnboardingSection({
         </div>
       )}
 
-      {canManage && ["approved", "setup"].includes(onboarding.status) && (onboarding.training_required || onboarding.bank_software_setup_required) && (
+      {canManage && isConnectionActive && ["approved", "setup"].includes(onboarding.status) && (onboarding.training_required || onboarding.bank_software_setup_required) && (
         <div className="mt-4 border-t border-border pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Setup</p>
           <div className="mt-2 flex flex-wrap gap-2">
