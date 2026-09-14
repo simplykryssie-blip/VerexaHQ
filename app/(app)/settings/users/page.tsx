@@ -12,6 +12,7 @@ import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ResendInvitationButton } from "./ResendInvitationButton";
 import { RemoveMemberButton } from "./RemoveMemberButton";
 import { ReleaseMemberButton } from "./ReleaseMemberButton";
+import { StaffSeatsManager, type SeatSummary, type ActivePaidSeat } from "@/components/settings/StaffSeatsManager";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
 import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE } from "@/lib/firmConnections";
@@ -67,6 +68,7 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
     { data: connectedChildren },
     { data: myConnectionRows },
     { data: workspaceRow },
+    { data: isWorkspaceAdmin },
   ] = await Promise.all([
     getWorkspaceMemberWorkload(supabase, workspace.id),
     supabase
@@ -86,7 +88,26 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
       : Promise.resolve({ data: [] as never[] }),
     supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
     supabase.from("workspaces").select("allow_connected_ptin_messaging").eq("id", workspace.id).maybeSingle(),
+    // Seat billing is gated on is_workspace_admin specifically (same check
+    // every seat RPC makes internally), not the users.manage permission
+    // above -- kept separate so the two can never drift out of sync.
+    supabase.rpc("is_workspace_admin", { p_workspace_id: workspace.id }),
   ]);
+
+  const canManageSeats = Boolean(isWorkspaceAdmin) && canInviteStaff(workspace);
+  const [{ data: seatSummaryRows }, { data: activePaidSeatsRaw }] = canManageSeats
+    ? await Promise.all([
+        supabase.rpc("get_workspace_seat_summary", { p_workspace_id: workspace.id }),
+        supabase
+          .from("workspace_paid_seats")
+          .select("id, activated_at, prorated_amount_cents")
+          .eq("workspace_id", workspace.id)
+          .eq("status", "active")
+          .order("activated_at", { ascending: true }),
+      ])
+    : [{ data: null }, { data: null }];
+  const seatSummary = (seatSummaryRows ?? [])[0] as SeatSummary | undefined;
+  const activePaidSeats = (activePaidSeatsRaw ?? []) as ActivePaidSeat[];
 
   const roleNameById = new Map(roles.map((r) => [r.id, r.name]));
   const invitations: InvitationRow[] = (invitationsRaw ?? []).map((i) => ({
@@ -194,6 +215,18 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
         <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
           <DataTable columns={memberColumns} rows={members} emptyMessage="No workspace members found." />
         </div>
+
+        {canManageSeats && seatSummary && (
+          <div className="mt-8">
+            <h3 className="font-display text-sm font-semibold text-ink">Staff seats</h3>
+            <p className="mt-1 text-sm text-muted">
+              {seatSummary.included_seats} seats are included with your plan. Additional seats are billed separately from your base subscription.
+            </p>
+            <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft p-5">
+              <StaffSeatsManager summary={seatSummary} activeSeats={activePaidSeats} />
+            </div>
+          </div>
+        )}
 
         {workspace.is_owner && !canInviteStaff(workspace) && (
           <div className="mt-8">

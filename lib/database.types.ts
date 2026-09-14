@@ -10201,6 +10201,62 @@ export type Database = {
           },
         ]
       }
+      workspace_paid_seats: {
+        Row: {
+          activated_at: string | null
+          created_at: string
+          created_by: string | null
+          failure_reason: string | null
+          id: string
+          price_cents_at_purchase: number
+          prorated_amount_cents: number | null
+          removed_at: string | null
+          removed_by: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          price_cents_at_purchase: number
+          prorated_amount_cents?: number | null
+          removed_at?: string | null
+          removed_by?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          failure_reason?: string | null
+          id?: string
+          price_cents_at_purchase?: number
+          prorated_amount_cents?: number | null
+          removed_at?: string | null
+          removed_by?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_paid_seats_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_phone_numbers: {
         Row: {
           assigned_client_id: string | null
@@ -10451,6 +10507,7 @@ export type Database = {
           plan_id: string
           price_change_effective_date: string | null
           price_change_notice_sent_at: string | null
+          seat_addon_subscription_item_id: string | null
           seat_count: number
           stripe_customer_id: string | null
           stripe_status: string
@@ -10475,6 +10532,7 @@ export type Database = {
           plan_id: string
           price_change_effective_date?: string | null
           price_change_notice_sent_at?: string | null
+          seat_addon_subscription_item_id?: string | null
           seat_count?: number
           stripe_customer_id?: string | null
           stripe_status?: string
@@ -10499,6 +10557,7 @@ export type Database = {
           plan_id?: string
           price_change_effective_date?: string | null
           price_change_notice_sent_at?: string | null
+          seat_addon_subscription_item_id?: string | null
           seat_count?: number
           stripe_customer_id?: string | null
           stripe_status?: string
@@ -11526,6 +11585,17 @@ export type Database = {
         Args: { p_run_id: string }
         Returns: undefined
       }
+      activate_paid_seat: {
+        Args: {
+          p_prorated_amount_cents: number
+          p_seat_id: string
+          p_stripe_payment_intent_id: string
+        }
+        Returns: {
+          did_activate: boolean
+          seat: Database["public"]["Tables"]["workspace_paid_seats"]["Row"]
+        }[]
+      }
       add_client_address: {
         Args: {
           p_address_type?: string
@@ -11687,6 +11757,30 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: boolean
+      }
+      claim_pending_paid_seat: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          activated_at: string | null
+          created_at: string
+          created_by: string | null
+          failure_reason: string | null
+          id: string
+          price_cents_at_purchase: number
+          prorated_amount_cents: number | null
+          removed_at: string | null
+          removed_by: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_paid_seats"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       claim_stripe_webhook_event: {
         Args: { p_event_id: string; p_event_type: string; p_payload: Json }
@@ -12398,6 +12492,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_included_seats: {
+        Args: { p_workspace_type: string }
+        Returns: number
+      }
       get_invitation_preview: {
         Args: { p_token: string }
         Returns: {
@@ -12828,6 +12926,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_workspace_seat_summary: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          active_paid_seats: number
+          active_staff_count: number
+          available_seats: number
+          included_seats: number
+          pending_seats: number
+          per_seat_price_cents: number
+        }[]
+      }
       get_workspace_tags: {
         Args: { p_workspace_id: string }
         Returns: string[]
@@ -13093,6 +13202,13 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: undefined
       }
+      mark_paid_seat_failed: {
+        Args: { p_failure_reason: string; p_seat_id: string }
+        Returns: {
+          did_fail: boolean
+          seat: Database["public"]["Tables"]["workspace_paid_seats"]["Row"]
+        }[]
+      }
       maybe_queue_usage_warning: {
         Args: {
           p_resource_type: string
@@ -13285,6 +13401,14 @@ export type Database = {
         Args: { p_error?: string; p_provider: string; p_success: boolean }
         Returns: undefined
       }
+      record_seat_addon_item: {
+        Args: { p_stripe_item_id: string; p_workspace_id: string }
+        Returns: undefined
+      }
+      record_seat_payment_intent: {
+        Args: { p_seat_id: string; p_stripe_payment_intent_id: string }
+        Returns: undefined
+      }
       record_signature: {
         Args: {
           p_signature_image_path?: string
@@ -13415,6 +13539,30 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      release_paid_seat: {
+        Args: { p_seat_id: string; p_workspace_id: string }
+        Returns: {
+          activated_at: string | null
+          created_at: string
+          created_by: string | null
+          failure_reason: string | null
+          id: string
+          price_cents_at_purchase: number
+          prorated_amount_cents: number | null
+          removed_at: string | null
+          removed_by: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_paid_seats"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -14176,6 +14324,7 @@ export type Database = {
           plan_id: string
           price_change_effective_date: string | null
           price_change_notice_sent_at: string | null
+          seat_addon_subscription_item_id: string | null
           seat_count: number
           stripe_customer_id: string | null
           stripe_status: string
