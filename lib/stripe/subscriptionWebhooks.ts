@@ -343,6 +343,15 @@ export async function handleInvoicePaymentSucceeded(
     { onConflict: "stripe_invoice_id" }
   );
 
+  // If this payment is for a released staff member's own personal
+  // workspace, this is the actual moment their sponsorship transition
+  // completes -- not subscription.created (that fires on checkout, before
+  // the card is confirmed; gating there would repeat the exact
+  // grant-before-payment bug already flagged for usage meters). No-op for
+  // every other invoice, since the RPC only acts when a
+  // billing_setup_required transition exists for this workspace.
+  await supabase.rpc("complete_sponsorship_transition_on_payment", { p_workspace_id: sub.workspace_id });
+
   return {};
 }
 

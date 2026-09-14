@@ -5,6 +5,7 @@ import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
+import { SponsorshipTransitionBanner } from "@/components/SponsorshipTransitionBanner";
 import { AppHeader } from "@/components/AppHeader";
 import { IdleLogout } from "@/components/IdleLogout";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -63,6 +64,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
     { count: visibleLearningCourseCount },
     { data: softwareLinks },
     { data: myEroConnection },
+    { data: sponsorshipTransitionRows },
   ] = await Promise.all([
     supabase
       .from("workspace_security_policies")
@@ -123,6 +125,11 @@ export default async function AppLayout({ children, modal }: { children: React.R
     // Partner Dashboard nav item only makes sense when there's an upstream
     // connection with a split/production to see.
     supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
+    // Tied to auth.uid(), not this workspace -- a released staff member may
+    // be viewing any workspace they still belong to when this notice needs
+    // to show, so it's fetched unconditionally rather than gated on
+    // workspace.is_owner like needs_billing_card above.
+    supabase.rpc("get_my_sponsorship_transition"),
   ]);
 
   // Blocks the whole shell -- rendered instead of every other page, not a
@@ -141,6 +148,15 @@ export default async function AppLayout({ children, modal }: { children: React.R
   // shows for a PTIN once it actually has another active member.
   const showAssignments = !isIndependentTier(workspace) || hasTeammates;
   const billingCard = (billingCardRows ?? [])[0] ?? null;
+  const sponsorshipTransitionRow = (sponsorshipTransitionRows ?? [])[0] ?? null;
+  const sponsorshipTransition = sponsorshipTransitionRow
+    ? {
+        sponsorWorkspaceName: sponsorshipTransitionRow.sponsor_workspace_name,
+        sponsorshipEndDate: sponsorshipTransitionRow.sponsorship_end_date,
+        planName: sponsorshipTransitionRow.plan_name,
+        basePriceCents: sponsorshipTransitionRow.base_price_cents,
+      }
+    : null;
 
   // Only fetched for a platform admin -- the sidebar's demo-workspace
   // switcher (home + the PTIN/ERO/SB shells) is a demo tool for that
@@ -223,6 +239,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
             <ScrollToTopOnNavigate containerId="main-content" />
             <AppHeader workspaceId={workspace.id} userId={user?.id ?? null} currentUser={currentUser} />
             <GlobalClientDraftBanner />
+            <SponsorshipTransitionBanner transition={sponsorshipTransition} />
             <BillingCardPrompt
               needed={Boolean(billingCard?.needed)}
               urgent={Boolean(billingCard?.urgent)}

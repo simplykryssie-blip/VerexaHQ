@@ -11,6 +11,7 @@ import { InviteStaffForm } from "./InviteStaffForm";
 import { RevokeInvitationButton } from "./RevokeInvitationButton";
 import { ResendInvitationButton } from "./ResendInvitationButton";
 import { RemoveMemberButton } from "./RemoveMemberButton";
+import { ReleaseMemberButton } from "./ReleaseMemberButton";
 import { ChangeMemberRoleSelect } from "@/components/settings/ChangeMemberRoleSelect";
 import { canInviteStaff } from "@/lib/workspaceCapabilities";
 import { CHILD_RELATIONSHIP_TYPES_BY_WORKSPACE_TYPE } from "@/lib/firmConnections";
@@ -158,7 +159,10 @@ export default async function UsersPage({ searchParams }: { searchParams: { toke
       className: "text-right",
       render: (m) =>
         isAdmin && !m.is_owner && m.status === "active" ? (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            {canInviteStaff(workspace) && (
+              <ReleaseMemberButton workspaceId={workspace.id} userId={m.user_id} name={m.display_name ?? "this member"} />
+            )}
             <RemoveMemberButton workspaceId={workspace.id} userId={m.user_id} name={m.display_name ?? "this member"} />
           </div>
         ) : null,

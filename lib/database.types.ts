@@ -9138,6 +9138,91 @@ export type Database = {
           },
         ]
       }
+      sponsorship_transitions: {
+        Row: {
+          activation_confirmation_sent_at: string | null
+          completed_at: string | null
+          created_at: string
+          final_reminder_sent_at: string | null
+          id: string
+          personal_workspace_id: string | null
+          plan_id: string
+          release_notice_sent_at: string | null
+          released_at: string
+          released_by: string | null
+          sponsor_removed_at: string | null
+          sponsor_workspace_id: string
+          sponsorship_end_date: string
+          status: string
+          suspended_at: string | null
+          upcoming_reminder_sent_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          activation_confirmation_sent_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          final_reminder_sent_at?: string | null
+          id?: string
+          personal_workspace_id?: string | null
+          plan_id: string
+          release_notice_sent_at?: string | null
+          released_at?: string
+          released_by?: string | null
+          sponsor_removed_at?: string | null
+          sponsor_workspace_id: string
+          sponsorship_end_date: string
+          status?: string
+          suspended_at?: string | null
+          upcoming_reminder_sent_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          activation_confirmation_sent_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          final_reminder_sent_at?: string | null
+          id?: string
+          personal_workspace_id?: string | null
+          plan_id?: string
+          release_notice_sent_at?: string | null
+          released_at?: string
+          released_by?: string | null
+          sponsor_removed_at?: string | null
+          sponsor_workspace_id?: string
+          sponsorship_end_date?: string
+          status?: string
+          suspended_at?: string | null
+          upcoming_reminder_sent_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsorship_transitions_personal_workspace_id_fkey"
+            columns: ["personal_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsorship_transitions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsorship_transitions_sponsor_workspace_id_fkey"
+            columns: ["sponsor_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_business_hours: {
         Row: {
           created_at: string
@@ -11518,6 +11603,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      complete_sponsorship_transition_on_payment: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       compliance_inactive_users: {
         Args: { p_inactive_since?: string; p_workspace_id: string }
         Returns: {
@@ -12286,6 +12375,19 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: string
       }
+      get_my_sponsorship_transition: {
+        Args: never
+        Returns: {
+          base_price_cents: number
+          id: string
+          personal_workspace_id: string
+          plan_name: string
+          sponsor_workspace_id: string
+          sponsor_workspace_name: string
+          sponsorship_end_date: string
+          status: string
+        }[]
+      }
       get_my_workspaces: {
         Args: never
         Returns: {
@@ -12905,6 +13007,16 @@ export type Database = {
         Returns: undefined
       }
       portal_client_id: { Args: never; Returns: string }
+      process_sponsorship_transition_reminders_and_expirations: {
+        Args: never
+        Returns: {
+          completed_late: number
+          reminded_final: number
+          reminded_upcoming: number
+          sponsor_access_ended: number
+          suspended: number
+        }[]
+      }
       propose_client_contact_field: {
         Args: {
           p_field: string
@@ -13168,6 +13280,35 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "firm_connections"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      release_sponsored_staff_member: {
+        Args: { p_user_id: string; p_workspace_id: string }
+        Returns: {
+          activation_confirmation_sent_at: string | null
+          completed_at: string | null
+          created_at: string
+          final_reminder_sent_at: string | null
+          id: string
+          personal_workspace_id: string | null
+          plan_id: string
+          release_notice_sent_at: string | null
+          released_at: string
+          released_by: string | null
+          sponsor_removed_at: string | null
+          sponsor_workspace_id: string
+          sponsorship_end_date: string
+          status: string
+          suspended_at: string | null
+          upcoming_reminder_sent_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sponsorship_transitions"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -13688,6 +13829,13 @@ export type Database = {
       start_next_automation_step: {
         Args: { p_run_id: string }
         Returns: undefined
+      }
+      start_personal_billing_setup: {
+        Args: never
+        Returns: {
+          plan_slug: string
+          workspace_id: string
+        }[]
       }
       start_pipeline_run: {
         Args: {
