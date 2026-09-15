@@ -93,8 +93,12 @@ async function pauseWorkspaceForBilling(supabase: ReturnType<typeof createServic
 /**
  * Only reactivates a workspace suspended for one of the given billing
  * reasons -- never overrides a manual suspension unrelated to payment.
+ * Exported: also called from app/api/cron/check-billing-cycles/route.ts to
+ * resume a workspace suspended by that cron's own pre-emptive charge path,
+ * which (unlike Stripe's subscription-status-driven suspensions) has no
+ * webhook of its own to react to a later successful retry.
  */
-async function resumeWorkspaceFromBilling(
+export async function resumeWorkspaceFromBilling(
   supabase: ReturnType<typeof createServiceClient>,
   workspaceId: string,
   allowedReasons: string[] = ["billing_past_due"]
@@ -166,8 +170,10 @@ export async function handleSubscriptionCreated(
   );
 
   // A brand-new subscription always clears whatever billing lock the
-  // workspace was under -- a past-due pause or a prior cancellation.
-  await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
+  // workspace was under -- a past-due pause, a prior cancellation, or (Phase
+  // 4A) create_paid_workspace's own initial "not yet paid" suspension, which
+  // this event is exactly the confirmation for.
+  await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled", "billing_incomplete"]);
 
   // Deliberately does NOT grant the free usage allowance here.
   // subscription.created fires the moment Stripe creates the subscription

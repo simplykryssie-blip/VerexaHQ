@@ -60,6 +60,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This package has no price set yet -- ask your ERO to set one." }, { status: 400 });
   }
 
+  // The purchasing workspace's own suspension is already checked above; this
+  // covers the other half (Phase 4A) -- the selling firm's own workspace can
+  // be suspended independently, and nothing else in this route ever looks at
+  // it, so a suspended firm could otherwise keep collecting package sales.
+  const { data: sellerOperational } = await supabase.rpc("is_workspace_operational", { p_workspace_id: pkg.workspace_id });
+  if (!sellerOperational) {
+    return NextResponse.json({ error: "This firm's packages are temporarily unavailable for purchase." }, { status: 403 });
+  }
+
   const { data: groups } = await supabase
     .from("firm_package_option_groups")
     .select("id, name, min_select, max_select, firm_package_options(id)")

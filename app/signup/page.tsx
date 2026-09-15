@@ -116,6 +116,17 @@ export default function SignupPage() {
     });
     if (rpcError) {
       setProvisioning(false);
+      if (rpcError.message.includes("already connected to a workspace")) {
+        // Not a fresh signup -- this account already provisioned a workspace
+        // on an earlier attempt (e.g. a double-submitted confirmation link).
+        // Route into it instead of dead-ending here: /dashboard sends a
+        // still-suspended workspace straight to SuspendedWorkspaceScreen,
+        // whose "Resolve Billing" link reaches this same checkout recovery
+        // flow via ResumeCheckoutButton. Never call create_paid_workspace
+        // again for this account -- that would just repeat this error.
+        router.replace("/dashboard");
+        return;
+      }
       setError(rpcError.message);
       setAuthState("needs-workspace");
       return;

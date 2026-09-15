@@ -11450,6 +11450,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      _get_engagement_active_stage_name: {
+        Args: { p_engagement_id: string }
+        Returns: {
+          client_id: string
+          process_id: string
+          stage_name: string
+          workspace_id: string
+        }[]
+      }
       _get_or_create_partner_onboarding: {
         Args: {
           p_firm_connection_id: string
@@ -11493,6 +11502,16 @@ export type Database = {
           p_client_id: string
           p_quote_id: string
           p_response: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      _notify_workspace_admins_of_engagement_event: {
+        Args: {
+          p_engagement_id: string
+          p_event_type: string
+          p_payload?: Json
+          p_template_key: string
           p_workspace_id: string
         }
         Returns: undefined
@@ -11669,6 +11688,10 @@ export type Database = {
       }
       approve_client_pending_change: {
         Args: { p_notes?: string; p_pending_change_id: string }
+        Returns: undefined
+      }
+      approve_client_review: {
+        Args: { p_comment?: string; p_engagement_id: string }
         Returns: undefined
       }
       approve_organizer_information_request_item: {
@@ -12173,6 +12196,10 @@ export type Database = {
       decide_automation_step: {
         Args: { p_decided_option: string; p_pending_step_id: string }
         Returns: Json
+      }
+      decline_client_review_filing: {
+        Args: { p_engagement_id: string; p_reason: string }
+        Returns: undefined
       }
       decline_config_object_share: {
         Args: { p_share_id: string }
@@ -13079,6 +13106,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      is_workspace_operational: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       learning_hub_reachable_workspaces: {
         Args: { p_owner_workspace_id: string }
         Returns: {
@@ -13208,6 +13239,10 @@ export type Database = {
           did_fail: boolean
           seat: Database["public"]["Tables"]["workspace_paid_seats"]["Row"]
         }[]
+      }
+      mark_ready_for_client_review: {
+        Args: { p_engagement_id: string }
+        Returns: undefined
       }
       maybe_queue_usage_warning: {
         Args: {
@@ -13640,6 +13675,10 @@ export type Database = {
       }
       reorder_site_popup_sections: {
         Args: { p_popup_id: string; p_section_ids: string[] }
+        Returns: undefined
+      }
+      request_client_review_changes: {
+        Args: { p_comment?: string; p_engagement_id: string }
         Returns: undefined
       }
       request_finding_autofix: {

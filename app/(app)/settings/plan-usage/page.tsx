@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlanUsageManager } from "@/components/settings/PlanUsageManager";
 import { PhoneNumbersManager, type PhoneNumberRow } from "@/components/settings/PhoneNumbersManager";
 import { BillingCardManager } from "@/components/settings/BillingCardManager";
+import { ResumeCheckoutButton } from "@/components/settings/ResumeCheckoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function PlanUsagePage() {
     supabase
       .from("workspace_subscriptions")
       .select(
-        "stripe_status, card_brand, card_last4, card_exp_month, card_exp_year, platform_subscription_plans(name, email_overage_rate_cents_per_1000, sms_overage_rate_cents, storage_overage_rate_cents)"
+        "stripe_status, stripe_customer_id, card_brand, card_last4, card_exp_month, card_exp_year, platform_subscription_plans(name, email_overage_rate_cents_per_1000, sms_overage_rate_cents, storage_overage_rate_cents)"
       )
       .eq("workspace_id", workspace.id)
       .maybeSingle(),
@@ -57,13 +58,22 @@ export default async function PlanUsagePage() {
         {workspace.status === "suspended" && (
           <div className="mb-6 rounded-2xl border border-danger/30 bg-danger/5 p-4">
             <p className="text-sm font-semibold text-danger">Workspace suspended</p>
-            <p className="mt-1 text-sm text-ink">
-              {workspace.suspension_reason === "subscription_canceled"
-                ? "Your Verexa subscription was canceled."
-                : "Your Verexa subscription payment is past due."}{" "}
-              Normal workspace access is unavailable until billing is resolved
-              {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
-            </p>
+            {workspace.suspension_reason === "billing_incomplete" ? (
+              <>
+                <p className="mt-1 text-sm text-ink">
+                  Your Verexa subscription was never completed. Normal workspace access is unavailable until you finish checkout.
+                </p>
+                {workspace.is_owner && <ResumeCheckoutButton />}
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-ink">
+                {workspace.suspension_reason === "subscription_canceled"
+                  ? "Your Verexa subscription was canceled."
+                  : "Your Verexa subscription payment is past due."}{" "}
+                Normal workspace access is unavailable until billing is resolved
+                {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
+              </p>
+            )}
           </div>
         )}
         {!subscription || !plan ? (
@@ -72,7 +82,11 @@ export default async function PlanUsagePage() {
           </div>
         ) : (
           <>
-          {workspace.is_owner && (
+          {/* No Stripe customer exists yet until checkout is completed at least once
+              (see /api/signup/checkout -- Checkout creates the customer, it isn't
+              created up front) -- "Add a card" has nothing to attach a card to
+              before then, so it's hidden rather than shown and left to fail. */}
+          {workspace.is_owner && subscription.stripe_customer_id && (
             <SettingsCard title="Payment method" description="Used for your Verexa subscription and any usage top-ups.">
               <BillingCardManager
                 cardBrand={subscription.card_brand}

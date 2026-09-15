@@ -1,0 +1,63 @@
+-- Phase 4H-C: fixes NW-1 from the Phase 4H-B targeted security audit.
+--
+-- NW-1 -- any authenticated admin of ANY workspace could directly INSERT (or,
+-- as this phase's own caller audit additionally found, UPDATE) a
+-- firm_connections row setting status='active' and child_workspace_id to an
+-- ARBITRARY other workspace, with zero consent from that workspace. The
+-- forged row was then honored by every get_network_* RPC
+-- (get_network_production, get_network_partner_production, etc.), exposing
+-- the victim's real aggregate financial data (invoices, bank product
+-- revenue, return volume) to the forger. Live-proven in Phase 4H-B with a
+-- real $12,345.00 figure retrieved for a non-consenting disposable
+-- workspace.
+--
+-- Caller audit performed before this fix (full repo grep for
+-- "firm_connections" plus every SECURITY DEFINER function that touches the
+-- table):
+--   - No application code anywhere does a direct .insert() on
+--     firm_connections -- every legitimate connection is created by
+--     create_firm_connection_invite (status='pending', child_workspace_id
+--     left null, invite_token set) or create_manual_firm_connection
+--     (status='active', source='manual', child_workspace_id left null).
+--     Activation (status -> 'active' with a real child_workspace_id) only
+--     ever happens inside redeem_firm_connection_invite, after it has
+--     independently verified the redeeming admin's own workspace, the
+--     invite token, expiry, and duplicate/self-connect guards.
+--   - There ARE real, legitimate direct .update() calls on firm_connections
+--     from the browser (components/firms/FirmDetailClient.tsx,
+--     app/(app)/partners/PartnerCard.tsx, and the service-role Stripe
+--     webhook handler lib/stripe/handleFirmPackagePurchase.ts) -- but every
+--     one of them only ever patches revenue_share_percent,
+--     revenue_share_scope, partner_software_used, partner_tax_programs,
+--     notes, onboarding_stage, preparer_credential, filed_under_connection_id,
+--     bank_partner_id, software_partner_id, or package_id. None of them
+--     ever reference status or child_workspace_id. This means the RLS
+--     UPDATE policy's current lack of any restriction on status/
+--     child_workspace_id was an equally live NW-1 bypass via UPDATE, not
+--     just INSERT -- fixing INSERT alone would have left the same attack
+--     reachable through a raw UPDATE call, so this migration closes both.
+--   - Every function that legitimately sets status='active' or
+--     child_workspace_id (create_firm_connection_invite,
+--     redeem_firm_connection_invite, accept_firm_connection_invite,
+--     create_manual_firm_connection, respond_to_firm_connection,
+--     disconnect_firm_connection) is SECURITY DEFINER, owned by postgres,
+--     on a table also owned by postgres with FORCE ROW LEVEL SECURITY not
+--     set -- confirmed live via pg_class/pg_proc. Per Postgres semantics,
+--     neither RLS policies nor column-level GRANT/REVOKE apply to a table's
+--     owner, so none of these functions are affected by anything below.
+--
+-- Fix: rather than rewrite the permissive RLS policies (which would have to
+-- reason about OLD vs. NEW values in a WITH CHECK expression to allow
+-- "everything except these two columns can change"), revoke INSERT and
+-- UPDATE privilege on exactly the two columns that make a connection
+-- "real" -- status and child_workspace_id -- from authenticated and anon.
+-- This is enforced independently of and in addition to RLS: a direct
+-- INSERT that doesn't reference either column still succeeds, taking their
+-- safe defaults (status='pending', child_workspace_id=NULL); a direct
+-- INSERT or UPDATE that tries to set either column is rejected by Postgres
+-- with a column-privilege error before RLS is even evaluated. Every other
+-- column, and every legitimate SECURITY DEFINER caller, is unaffected.
+revoke insert (status, child_workspace_id) on public.firm_connections from authenticated;
+revoke insert (status, child_workspace_id) on public.firm_connections from anon;
+revoke update (status, child_workspace_id) on public.firm_connections from authenticated;
+revoke update (status, child_workspace_id) on public.firm_connections from anon;
