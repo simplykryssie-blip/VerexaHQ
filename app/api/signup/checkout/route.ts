@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createSubscriptionCheckoutSession } from "@/lib/stripe/client";
+import { createSubscriptionCheckoutSessionFromPrice } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -35,15 +35,18 @@ export async function POST(request: Request) {
 
   const { data: subscription } = await supabase
     .from("workspace_subscriptions")
-    .select("stripe_status, platform_subscription_plans(slug, name, base_price_cents)")
+    .select("stripe_status, platform_subscription_plans(slug, stripe_price_id)")
     .eq("workspace_id", workspace.id)
     .maybeSingle();
-  const plan = subscription?.platform_subscription_plans as { slug: string; name: string; base_price_cents: number } | null;
+  const plan = subscription?.platform_subscription_plans as { slug: string; stripe_price_id: string | null } | null;
   if (!subscription || !plan) {
     return NextResponse.json({ error: "This workspace has no plan to check out for." }, { status: 400 });
   }
   if (subscription.stripe_status === "active") {
     return NextResponse.json({ error: "This workspace already has an active subscription." }, { status: 400 });
+  }
+  if (!plan.stripe_price_id) {
+    return NextResponse.json({ error: "This plan isn't available for checkout yet -- contact Verexa support." }, { status: 503 });
   }
 
   if (!isStripeConfigured()) {
@@ -51,10 +54,8 @@ export async function POST(request: Request) {
   }
 
   const appUrl = getAppUrl(request);
-  const result = await createSubscriptionCheckoutSession({
-    amount: plan.base_price_cents / 100,
-    interval: "month",
-    description: `Verexa ${plan.name} plan`,
+  const result = await createSubscriptionCheckoutSessionFromPrice({
+    priceId: plan.stripe_price_id,
     successUrl: `${appUrl}/dashboard?signup=complete`,
     cancelUrl: `${appUrl}/signup?checkout=cancelled`,
     metadata: { type: "signup", workspace_id: workspace.id, plan_slug: plan.slug },
