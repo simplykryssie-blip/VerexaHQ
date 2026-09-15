@@ -4,6 +4,7 @@ import { getPortalIdentity } from "@/lib/portal";
 import { getEngagementProgressMap } from "@/lib/portalEngagementProgress";
 import { PageHeader } from "@/components/PageHeader";
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
+import { ClientReviewActions } from "@/components/portal/ClientReviewActions";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,11 @@ export default async function PortalEngagementDetailPage({ params }: { params: {
         }
       />
       <div className="flex-1 px-8 py-6">
+        {progress?.stageName === "Client Review" && (
+          <div className="mb-6">
+            <ClientReviewActions engagementId={engagement.id} />
+          </div>
+        )}
         <DocumentWorkspace
           workspaceId={identity.workspaceId}
           entityType="engagement"
