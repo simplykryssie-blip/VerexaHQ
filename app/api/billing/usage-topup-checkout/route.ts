@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createCheckoutSession } from "@/lib/stripe/client";
+import { createUsageTopupCheckoutSession } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   const units = (amountCents / rateCents) * UNITS_PER_RATE[resourceType];
   const appUrl = getAppUrl(request);
 
-  const result = await createCheckoutSession({
+  const result = await createUsageTopupCheckoutSession({
     amount: amountCents / 100,
     description: `Verexa usage top-up -- ~${units.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${RESOURCE_LABEL[resourceType]}`,
     successUrl: `${appUrl}/settings/plan-usage?topup=1`,
