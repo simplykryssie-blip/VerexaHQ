@@ -149,6 +149,62 @@ export async function createSubscriptionCheckoutSession({
   return { ok: true, data };
 }
 
+/**
+ * Same shape as createSubscriptionCheckoutSession, but for one of Verexa's
+ * own fixed-catalog platform plans (see platform_subscription_plans.
+ * stripe_price_id) -- references that pre-created Stripe Price directly
+ * instead of building an ad-hoc price_data line item on every checkout.
+ * createSubscriptionCheckoutSession itself stays as-is for per-tenant custom
+ * pricing (e.g. firm packages), where no fixed catalog Price exists to
+ * reference.
+ *
+ * No `customer` is passed -- Stripe creates one on session completion, same
+ * as before, so a brand-new workspace (stripe_customer_id still null) never
+ * needs a pre-existing Stripe Customer to check out.
+ *
+ * managed_payments is explicitly disabled: Stripe's Managed Payments default
+ * now requires a Product tax code on every Checkout line item, and Verexa
+ * hasn't made a deliberate tax/compliance decision to adopt Managed Payments
+ * (that would make Stripe the merchant of record). This restores the
+ * pre-existing checkout behavior rather than opting into something new.
+ */
+export async function createSubscriptionCheckoutSessionFromPrice({
+  priceId,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string; url: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    mode: "subscription",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "line_items[0][price]": priceId,
+    "line_items[0][quantity]": 1,
+    "managed_payments[enabled]": "false",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+    body.set(`subscription_data[metadata][${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string; url: string };
+  return { ok: true, data };
+}
+
 export async function createRefund({
   paymentIntentId,
   amount,
