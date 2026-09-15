@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createSubscriptionCheckoutSessionFromPrice } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
+import { isProductionEnvironment } from "@/lib/env";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getCurrentWorkspace } from "@/lib/workspace";
@@ -35,18 +36,34 @@ export async function POST(request: Request) {
 
   const { data: subscription } = await supabase
     .from("workspace_subscriptions")
-    .select("stripe_status, platform_subscription_plans(slug, stripe_price_id)")
+    .select("stripe_status, platform_subscription_plans(slug, stripe_price_id, stripe_test_price_id)")
     .eq("workspace_id", workspace.id)
     .maybeSingle();
-  const plan = subscription?.platform_subscription_plans as { slug: string; stripe_price_id: string | null } | null;
+  const plan = subscription?.platform_subscription_plans as { slug: string; stripe_price_id: string | null; stripe_test_price_id: string | null } | null;
   if (!subscription || !plan) {
     return NextResponse.json({ error: "This workspace has no plan to check out for." }, { status: 400 });
   }
   if (subscription.stripe_status === "active") {
     return NextResponse.json({ error: "This workspace already has an active subscription." }, { status: 400 });
   }
-  if (!plan.stripe_price_id) {
-    return NextResponse.json({ error: "This plan isn't available for checkout yet -- contact Verexa support." }, { status: 503 });
+
+  // Production always checks out against the real LIVE catalog Price;
+  // everywhere else (Preview, local dev) always uses the TEST-mode mirror --
+  // deliberately never a fallback across the two, since a fallback either
+  // direction would mean either a real customer accidentally paying against
+  // a TEST Price (silently uncharged) or a test run accidentally hitting the
+  // LIVE Price (a real charge). Missing means unconfigured for this
+  // environment, not "use the other one" -- fail closed instead.
+  const priceId = isProductionEnvironment() ? plan.stripe_price_id : plan.stripe_test_price_id;
+  if (!priceId) {
+    return NextResponse.json(
+      {
+        error: isProductionEnvironment()
+          ? "This plan isn't available for checkout yet -- contact Verexa support."
+          : "This plan has no TEST-mode Stripe price configured for this environment.",
+      },
+      { status: 503 }
+    );
   }
 
   if (!isStripeConfigured()) {
@@ -55,7 +72,7 @@ export async function POST(request: Request) {
 
   const appUrl = getAppUrl(request);
   const result = await createSubscriptionCheckoutSessionFromPrice({
-    priceId: plan.stripe_price_id,
+    priceId,
     successUrl: `${appUrl}/dashboard?signup=complete`,
     cancelUrl: `${appUrl}/signup?checkout=cancelled`,
     metadata: { type: "signup", workspace_id: workspace.id, plan_slug: plan.slug },
