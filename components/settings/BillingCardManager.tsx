@@ -27,14 +27,19 @@ export function BillingCardManager({
 
   async function addCard() {
     setRedirecting(true);
-    const res = await fetch("/api/billing/add-card", { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) {
+    try {
+      const res = await fetch("/api/billing/add-card", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setRedirecting(false);
+        toast.show(data.error ?? "Could not start card setup.", "error");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
       setRedirecting(false);
-      toast.show(data.error ?? "Could not start card setup.", "error");
-      return;
+      toast.show("Could not start card setup. Check your connection and try again.", "error");
     }
-    window.location.href = data.url;
   }
 
   return (

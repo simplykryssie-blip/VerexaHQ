@@ -14,14 +14,19 @@ export function ResumeCheckoutButton() {
 
   async function resumeCheckout() {
     setRedirecting(true);
-    const res = await fetch("/api/signup/checkout", { method: "POST" });
-    const data = await res.json();
-    if (!res.ok) {
+    try {
+      const res = await fetch("/api/signup/checkout", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        setRedirecting(false);
+        toast.show(data.error ?? "Could not start checkout.", "error");
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
       setRedirecting(false);
-      toast.show(data.error ?? "Could not start checkout.", "error");
-      return;
+      toast.show("Could not start checkout. Check your connection and try again.", "error");
     }
-    window.location.href = data.url;
   }
 
   return (
