@@ -6,7 +6,7 @@ import {
   setCustomerDefaultPaymentMethod,
   getSoleSubscriptionItem,
 } from "@/lib/stripe/client";
-import type { Database } from "@/lib/database.types";
+import type { Database, Json } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
 
@@ -44,6 +44,14 @@ type StripeInvoice = {
   period_start: number | null;
   period_end: number | null;
   hosted_invoice_url: string | null;
+  // Present once Stripe Tax is actually calculating something (automatic_tax
+  // is enabled on the Checkout Session that created the subscription -- see
+  // lib/stripe/client.ts -- and at least one tax registration exists for the
+  // customer's jurisdiction). Both null/absent on every invoice today, since
+  // the account currently has zero registrations -- see the Stripe Tax audit.
+  total?: number;
+  total_excluding_tax?: number | null;
+  total_taxes?: unknown[];
 };
 
 type PlanSnapshot = {
@@ -131,6 +139,27 @@ async function subscriptionCardFields(
 // genuinely not tied to a subscription.
 function subscriptionId(invoice: StripeInvoice): string | null {
   return refId(invoice.subscription) ?? refId(invoice.parent?.subscription_details?.subscription);
+}
+
+/**
+ * Exported for testing. Normalizes the tax-specific slice of an invoice
+ * rather than storing the whole Stripe object: tax_amount is derived (total
+ * minus total_excluding_tax) instead of trusting Stripe to sum total_taxes
+ * consistently, and tax_details is only the tax breakdown array, not the
+ * invoice itself. All three are null when total_excluding_tax is absent --
+ * either automatic_tax isn't enabled on this subscription, or (today, for
+ * every real invoice) it is but no tax registration exists yet to compute
+ * anything against.
+ */
+export function taxFieldsFromInvoice(invoice: StripeInvoice): { tax_amount: number | null; total_excluding_tax: number | null; tax_details: Json | null } {
+  if (invoice.total_excluding_tax == null || invoice.total == null) {
+    return { tax_amount: null, total_excluding_tax: null, tax_details: null };
+  }
+  return {
+    tax_amount: invoice.total - invoice.total_excluding_tax,
+    total_excluding_tax: invoice.total_excluding_tax,
+    tax_details: invoice.total_taxes && invoice.total_taxes.length > 0 ? (invoice.total_taxes as unknown as Json) : null,
+  };
 }
 
 /**
@@ -462,6 +491,7 @@ export async function handleInvoicePaymentSucceeded(
       period_end: toIso(invoice.period_end),
       paid_at: new Date().toISOString(),
       hosted_invoice_url: invoice.hosted_invoice_url,
+      ...taxFieldsFromInvoice(invoice),
     },
     { onConflict: "stripe_invoice_id" }
   );
@@ -509,6 +539,7 @@ export async function handleInvoicePaymentFailed(
       period_start: toIso(invoice.period_start),
       period_end: toIso(invoice.period_end),
       hosted_invoice_url: invoice.hosted_invoice_url,
+      ...taxFieldsFromInvoice(invoice),
     },
     { onConflict: "stripe_invoice_id" }
   );

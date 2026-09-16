@@ -7364,6 +7364,63 @@ export type Database = {
           },
         ]
       }
+      pending_signups: {
+        Row: {
+          converted_at: string | null
+          created_at: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          owner_user_id: string
+          plan_id: string
+          status: string
+          stripe_checkout_session_id: string | null
+          workspace_id: string | null
+          workspace_name: string
+        }
+        Insert: {
+          converted_at?: string | null
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          owner_user_id: string
+          plan_id: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          workspace_id?: string | null
+          workspace_name: string
+        }
+        Update: {
+          converted_at?: string | null
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          owner_user_id?: string
+          plan_id?: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          workspace_id?: string | null
+          workspace_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_signups_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_signups_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           category: string
@@ -7568,6 +7625,71 @@ export type Database = {
           {
             foreignKeyName: "pipeline_stages_workspace_id_fkey"
             columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_prospects: {
+        Row: {
+          company_name: string | null
+          converted_at: string | null
+          converted_workspace_id: string | null
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          lead_source: string | null
+          marketing_consent: boolean | null
+          owner_user_id: string | null
+          pending_signup_id: string | null
+          plan_slug: string | null
+          status: string
+          stripe_checkout_session_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string | null
+          converted_at?: string | null
+          converted_workspace_id?: string | null
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          lead_source?: string | null
+          marketing_consent?: boolean | null
+          owner_user_id?: string | null
+          pending_signup_id?: string | null
+          plan_slug?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string | null
+          converted_at?: string | null
+          converted_workspace_id?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          lead_source?: string | null
+          marketing_consent?: boolean | null
+          owner_user_id?: string | null
+          pending_signup_id?: string | null
+          plan_slug?: string | null
+          status?: string
+          stripe_checkout_session_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_prospects_converted_workspace_id_fkey"
+            columns: ["converted_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
@@ -10455,6 +10577,9 @@ export type Database = {
           period_start: string | null
           status: string
           stripe_invoice_id: string
+          tax_amount: number | null
+          tax_details: Json | null
+          total_excluding_tax: number | null
           workspace_id: string
         }
         Insert: {
@@ -10468,6 +10593,9 @@ export type Database = {
           period_start?: string | null
           status: string
           stripe_invoice_id: string
+          tax_amount?: number | null
+          tax_details?: Json | null
+          total_excluding_tax?: number | null
           workspace_id: string
         }
         Update: {
@@ -10481,6 +10609,9 @@ export type Database = {
           period_start?: string | null
           status?: string
           stripe_invoice_id?: string
+          tax_amount?: number | null
+          tax_details?: Json | null
+          total_excluding_tax?: number | null
           workspace_id?: string
         }
         Relationships: [
@@ -11426,6 +11557,15 @@ export type Database = {
       }
     }
     Functions: {
+      _advance_pipeline_stage_unchecked: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_process_id: string
+          p_process_stage_id: string
+        }
+        Returns: undefined
+      }
       _decide_client_field_change: {
         Args: {
           p_batch_id: string
@@ -11452,6 +11592,15 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: boolean
+      }
+      _get_engagement_active_stage_name: {
+        Args: { p_engagement_id: string }
+        Returns: {
+          client_id: string
+          process_id: string
+          stage_name: string
+          workspace_id: string
+        }[]
       }
       _get_or_create_partner_onboarding: {
         Args: {
@@ -11496,6 +11645,16 @@ export type Database = {
           p_client_id: string
           p_quote_id: string
           p_response: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      _notify_workspace_admins_of_engagement_event: {
+        Args: {
+          p_engagement_id: string
+          p_event_type: string
+          p_payload?: Json
+          p_template_key: string
           p_workspace_id: string
         }
         Returns: undefined
@@ -11672,6 +11831,10 @@ export type Database = {
       }
       approve_client_pending_change: {
         Args: { p_notes?: string; p_pending_change_id: string }
+        Returns: undefined
+      }
+      approve_client_review: {
+        Args: { p_comment?: string; p_engagement_id: string }
         Returns: undefined
       }
       approve_organizer_information_request_item: {
@@ -12176,6 +12339,10 @@ export type Database = {
       decide_automation_step: {
         Args: { p_decided_option: string; p_pending_step_id: string }
         Returns: Json
+      }
+      decline_client_review_filing: {
+        Args: { p_engagement_id: string; p_reason: string }
+        Returns: undefined
       }
       decline_config_object_share: {
         Args: { p_share_id: string }
@@ -13082,6 +13249,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
+      is_workspace_operational: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       learning_hub_reachable_workspaces: {
         Args: { p_owner_workspace_id: string }
         Returns: {
@@ -13211,6 +13382,10 @@ export type Database = {
           did_fail: boolean
           seat: Database["public"]["Tables"]["workspace_paid_seats"]["Row"]
         }[]
+      }
+      mark_ready_for_client_review: {
+        Args: { p_engagement_id: string }
+        Returns: undefined
       }
       maybe_queue_usage_warning: {
         Args: {
@@ -13347,6 +13522,24 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      provision_workspace_from_pending_signup: {
+        Args: {
+          p_cancel_at_period_end?: boolean
+          p_card_brand?: string
+          p_card_exp_month?: number
+          p_card_exp_year?: number
+          p_card_last4?: string
+          p_current_period_end?: string
+          p_current_period_start?: string
+          p_default_payment_method_id?: string
+          p_pending_signup_id: string
+          p_stripe_customer_id: string
+          p_stripe_status: string
+          p_stripe_subscription_id: string
+          p_trial_end?: string
+        }
+        Returns: string
+      }
       record_agent_evidence: {
         Args: {
           p_evidence_type: string
@@ -13397,6 +13590,13 @@ export type Database = {
           p_note?: string
           p_onboarding_id: string
           p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      record_pending_signup_checkout_session: {
+        Args: {
+          p_pending_signup_id: string
+          p_stripe_checkout_session_id: string
         }
         Returns: undefined
       }
@@ -13643,6 +13843,10 @@ export type Database = {
       }
       reorder_site_popup_sections: {
         Args: { p_popup_id: string; p_section_ids: string[] }
+        Returns: undefined
+      }
+      request_client_review_changes: {
+        Args: { p_comment?: string; p_engagement_id: string }
         Returns: undefined
       }
       request_finding_autofix: {
@@ -14124,6 +14328,15 @@ export type Database = {
       start_next_automation_step: {
         Args: { p_run_id: string }
         Returns: undefined
+      }
+      start_paid_signup: {
+        Args: {
+          p_first_name?: string
+          p_last_name?: string
+          p_name: string
+          p_plan_slug: string
+        }
+        Returns: string
       }
       start_personal_billing_setup: {
         Args: never

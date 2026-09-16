@@ -88,7 +88,7 @@ export function SponsorshipTransitionBanner({ transition }: { transition: Sponso
       <span className="flex items-center gap-2">
         <AlertTriangle size={14} className="shrink-0 text-warning" aria-hidden="true" />
         {sponsorWorkspaceName} has released you. You keep full access through {endDate}. After that, you&apos;ll need your own billing
-        ({planName} plan, {monthlyPrice}/month) to keep using your account.
+        ({planName} plan, {monthlyPrice}/month + applicable sales tax) to keep using your account.
       </span>
       <div className="flex shrink-0 items-center gap-4">
         <button

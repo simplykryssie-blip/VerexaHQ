@@ -3,7 +3,11 @@
 // suspends workspaces.status directly, ahead of Stripe's own webhook
 // updating stripe_status, so a workspace suspended in that window couldn't
 // resume checkout even though it genuinely needed to. See needsCheckoutResume
-// in lib/stripe/checkoutEligibility.ts, used by app/api/signup/checkout/route.ts.
+// in lib/stripe/checkoutEligibility.ts. Originally used by
+// app/api/signup/checkout/route.ts; payment-first signup moved this guard to
+// app/api/billing/resume-checkout/route.ts, the existing-customer recovery
+// path a signup never reaches (a brand-new signup has no workspace to
+// resume) -- see 20261019000000_payment_first_signup.
 import { describe, it, expect } from "vitest";
 import { needsCheckoutResume } from "@/lib/stripe/checkoutEligibility";
 

@@ -117,7 +117,7 @@ export function StaffSeatsManager({ summary, activeSeats }: { summary: SeatSumma
         </div>
       </div>
 
-      <p className="text-xs text-muted">Additional seat: {formatCents(summary.per_seat_price_cents)}/month</p>
+      <p className="text-xs text-muted">Additional seat: {formatCents(summary.per_seat_price_cents)}/month + applicable sales tax</p>
 
       {summary.pending_seats > 0 && <p className="text-xs text-amber">A seat purchase is currently processing.</p>}
 
@@ -160,7 +160,7 @@ export function StaffSeatsManager({ summary, activeSeats }: { summary: SeatSumma
             <div className="mt-2 space-y-1 text-sm text-slate">
               <p>Included seats: {summary.included_seats}</p>
               <p>Current paid seats: {summary.active_paid_seats}</p>
-              <p>Additional seat: {formatCents(summary.per_seat_price_cents)}/month</p>
+              <p>Additional seat: {formatCents(summary.per_seat_price_cents)}/month + applicable sales tax</p>
               <p className="font-medium text-ink">
                 Prorated amount due today: {proratedAmountCents !== null ? formatCents(proratedAmountCents) : "--"}
               </p>

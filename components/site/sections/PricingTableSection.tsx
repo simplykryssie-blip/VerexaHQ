@@ -94,6 +94,7 @@ export function PricingTableSection({ config }: { config?: PricingTableConfig })
                 <div className="vx-cost">
                   {money(displayCents)} <span>{cycle === "annual" ? "/year" : "/month"}</span>
                 </div>
+                <p className="vx-cost-note">+ applicable sales tax</p>
                 {cycle === "annual" && <p className="vx-cost-note">Equal to {money(Math.round(annualCents / 12))}/month, billed once a year</p>}
                 <p className="desc">{PLAN_BLURB[p.slug] ?? ""}</p>
                 <ul>
@@ -104,7 +105,7 @@ export function PricingTableSection({ config }: { config?: PricingTableConfig })
                   <li>
                     {p.signup_free_emails.toLocaleString()} free emails + {p.signup_free_sms.toLocaleString()} free SMS included
                   </li>
-                  <li>+{money(p.per_seat_price_cents)}/month per additional seat</li>
+                  <li>+{money(p.per_seat_price_cents)}/month per additional seat, + applicable sales tax</li>
                 </ul>
                 <a href={`/signup?plan=${p.slug}`} className={`vx-btn ${featured ? "vx-white" : "vx-primary"}`} style={{ marginTop: 8 }}>
                   Get Started

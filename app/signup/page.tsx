@@ -55,7 +55,7 @@ function PlanPicker({ plans, value, onChange }: { plans: PlanRow[]; value: strin
             }}
           >
             <span style={{ display: "block", fontWeight: 700, fontSize: 13 }}>{p.name}</span>
-            <span style={{ display: "block", fontSize: 12, color: "var(--muted, #64748b)" }}>{money(p.base_price_cents)}/mo</span>
+            <span style={{ display: "block", fontSize: 12, color: "var(--muted, #64748b)" }}>{money(p.base_price_cents)}/mo + applicable sales tax</span>
           </button>
         ))}
       </div>
@@ -63,14 +63,18 @@ function PlanPicker({ plans, value, onChange }: { plans: PlanRow[]; value: strin
   );
 }
 
-// Public self-serve signup -- creates a real account + a real workspace,
-// then requires a paid Stripe subscription before it's usable (no free
-// trial: see 20260925010000_remove_trial_require_paid_signup for why).
+// Public self-serve signup -- payment-first: creates a real account, but
+// NO workspace, until a Stripe subscription actually succeeds (no free
+// trial: see 20260925010000_remove_trial_require_paid_signup for why a
+// trial isn't the answer either). start_paid_signup only records a prospect
+// + a pending signup; the workspace itself is created by the Stripe webhook
+// (see lib/stripe/handleSignupCheckoutCompleted.ts) once Checkout confirms
+// payment -- see 20261019000000_payment_first_signup for the full design.
 // Structured after app/join/page.tsx (same signed-out/needs-workspace/
 // has-workspace states, same email-confirmation survival trick), minus the
 // invite-token preview/redeem branches since there's no invite here --
-// create_paid_workspace instead of accept_firm_connection_invite, and a
-// Stripe Checkout redirect instead of landing straight in the dashboard.
+// start_paid_signup instead of accept_firm_connection_invite, and a Stripe
+// Checkout redirect instead of landing straight in the dashboard.
 export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -108,21 +112,28 @@ export default function SignupPage() {
       data: { user },
     } = await supabase.auth.getUser();
     const meta = user?.user_metadata as { first_name?: string; last_name?: string } | undefined;
-    const { error: rpcError } = await supabase.rpc("create_paid_workspace", {
+    // Payment-first: this only creates a prospect + a pending signup, never
+    // a workspace -- see start_paid_signup. The workspace itself is created
+    // later, by the Stripe webhook, only once Checkout actually succeeds.
+    const { data: pendingSignupId, error: rpcError } = await supabase.rpc("start_paid_signup", {
       p_name: name,
       p_plan_slug: plan,
       p_first_name: meta?.first_name ?? undefined,
       p_last_name: meta?.last_name ?? undefined,
     });
-    if (rpcError) {
+    if (rpcError || !pendingSignupId) {
       setProvisioning(false);
-      setError(rpcError.message);
+      setError(rpcError?.message ?? "Could not start checkout.");
       setAuthState("needs-workspace");
       return;
     }
 
     setRedirecting(true);
-    const res = await fetch("/api/signup/checkout", { method: "POST" });
+    const res = await fetch("/api/signup/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pending_signup_id: pendingSignupId }),
+    });
     const data = (await res.json()) as { url?: string; error?: string };
     if (!res.ok || !data.url) {
       setProvisioning(false);

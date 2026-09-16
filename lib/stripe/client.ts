@@ -167,6 +167,18 @@ export async function createSubscriptionCheckoutSession({
  * hasn't made a deliberate tax/compliance decision to adopt Managed Payments
  * (that would make Stripe the merchant of record). This restores the
  * pre-existing checkout behavior rather than opting into something new.
+ *
+ * automatic_tax is always on: Verexa's Stripe account already has Stripe Tax
+ * active with its business origin configured (Louisiana) and tax-exclusive
+ * pricing as the account default -- see the Stripe Tax audit. billing_
+ * address_collection is required because Stripe Tax has nothing to compute
+ * tax from otherwise; Checkout shows the customer the tax and total before
+ * they pay, same as any other automatic_tax Checkout Session. Enabling this
+ * does NOT by itself collect any tax anywhere -- Stripe Tax only calculates
+ * tax in jurisdictions with an active registration, and the account
+ * currently has zero (a Dashboard action, not a code change; see the audit).
+ * Until at least one registration exists, every Checkout Session created
+ * here correctly shows $0.00 tax rather than erroring.
  */
 export async function createSubscriptionCheckoutSessionFromPrice({
   priceId,
@@ -190,6 +202,8 @@ export async function createSubscriptionCheckoutSessionFromPrice({
     "line_items[0][price]": priceId,
     "line_items[0][quantity]": 1,
     "managed_payments[enabled]": "false",
+    "automatic_tax[enabled]": "true",
+    billing_address_collection: "required",
   });
   for (const [key, value] of Object.entries(metadata)) {
     body.set(`metadata[${key}]`, value);
@@ -411,6 +425,38 @@ export async function getSubscriptionPrimaryItemId(stripeSubscriptionId: string)
   const itemResult = getSoleSubscriptionItem(data.items.data);
   if (!itemResult.ok) return itemResult;
   return { ok: true, data: { id: itemResult.data.id } };
+}
+
+export type StripeSubscriptionForProvisioning = {
+  id: string;
+  customer: string;
+  status: string;
+  default_payment_method: string | null;
+  trial_end: number | null;
+  cancel_at_period_end: boolean;
+  items: { data: { current_period_start: number; current_period_end: number }[] };
+};
+
+/**
+ * checkout.session.completed firing is not by itself proof of a paid
+ * subscription (e.g. a card can still be unconfirmed) -- signup provisioning
+ * always re-reads the actual Subscription object fresh rather than trusting
+ * the Checkout Session payload, and gates on its real status. Deliberately
+ * unexpanded (customer/default_payment_method come back as plain ids), same
+ * as every other subscription read in this file.
+ */
+export async function retrieveSubscriptionForProvisioning(subscriptionId: string): Promise<StripeResult<StripeSubscriptionForProvisioning>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as StripeSubscriptionForProvisioning;
+  return { ok: true, data };
 }
 
 export type CustomerDefaultPaymentMethod = { brand: string; last4: string; expMonth: number; expYear: number } | null;

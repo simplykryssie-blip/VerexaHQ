@@ -5,9 +5,12 @@ import { useToast } from "@/components/Toast";
 
 // The only functional next step for a suspended workspace with no working
 // checkout in progress -- SuspendedWorkspaceScreen's "Resolve Billing" link
-// and this page's own banner both only ever navigated here; nothing on this
-// page previously called /api/signup/checkout again, so a suspended
-// workspace had no way to actually complete or retry its subscription.
+// and this page's own banner both only ever navigated here. This is for an
+// existing, already-provisioned workspace whose subscription lapsed
+// (billing_past_due and similar) -- a brand-new signup never reaches this
+// button at all now, since payment-first signup means no workspace (and so
+// no Settings page) exists until Checkout succeeds. See
+// app/api/billing/resume-checkout/route.ts.
 export function ResumeCheckoutButton() {
   const toast = useToast();
   const [redirecting, setRedirecting] = useState(false);
@@ -15,7 +18,7 @@ export function ResumeCheckoutButton() {
   async function resume() {
     setRedirecting(true);
     try {
-      const res = await fetch("/api/signup/checkout", { method: "POST" });
+      const res = await fetch("/api/billing/resume-checkout", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setRedirecting(false);
