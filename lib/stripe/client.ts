@@ -205,6 +205,67 @@ export async function createSubscriptionCheckoutSessionFromPrice({
   return { ok: true, data };
 }
 
+/**
+ * Same shape as createCheckoutSession (mode "payment", ad-hoc price_data --
+ * usage top-ups have no fixed denomination, so there is no catalog Price to
+ * reference: a workspace can top up any dollar amount >= $25, computed
+ * against its plan's own overage rate at checkout time) but with
+ * managed_payments explicitly disabled, for the same reason the subscription
+ * checkout needed it: Stripe's Managed Payments default requires a Product
+ * tax code on every Checkout line item, and this ad-hoc, per-session
+ * product never has one. Kept as its own function rather than changing
+ * createCheckoutSession itself, since that function is also used by
+ * /api/firm-packages/checkout and /api/stripe/checkout-session (client
+ * invoice/installment payments) -- both out of scope here and left
+ * untouched, even though they share the same latent Managed Payments gap
+ * (see the audit report for this task).
+ *
+ * No connectedAccountId: usage top-ups are always a platform-level charge
+ * (Verexa charging the workspace itself), never a Connect direct charge.
+ */
+export async function createUsageTopupCheckoutSession({
+  amount,
+  currency = "usd",
+  description,
+  successUrl,
+  cancelUrl,
+  metadata,
+}: {
+  amount: number;
+  currency?: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string; url: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    mode: "payment",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    "line_items[0][price_data][currency]": currency,
+    "line_items[0][price_data][product_data][name]": description,
+    "line_items[0][price_data][unit_amount]": Math.round(amount * 100),
+    "line_items[0][quantity]": 1,
+    "managed_payments[enabled]": "false",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+    body.set(`payment_intent_data[metadata][${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/checkout/sessions`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string; url: string };
+  return { ok: true, data };
+}
+
 export async function createRefund({
   paymentIntentId,
   amount,
