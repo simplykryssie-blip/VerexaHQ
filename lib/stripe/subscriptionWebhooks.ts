@@ -25,6 +25,11 @@ type StripeSubscription = {
 type StripeInvoice = {
   id: string;
   subscription: string | { id: string } | null;
+  // Newer Stripe API versions moved the subscription reference here instead
+  // of the flat `subscription` field above -- see subscriptionId() below.
+  parent?: {
+    subscription_details?: { subscription?: string | { id: string } | null } | null;
+  } | null;
   amount_due: number;
   amount_paid: number;
   status: string;
@@ -70,9 +75,19 @@ function customerId(customer: StripeSubscription["customer"]): string {
   return typeof customer === "string" ? customer : customer.id;
 }
 
-function subscriptionId(subscription: StripeInvoice["subscription"]): string | null {
-  if (!subscription) return null;
-  return typeof subscription === "string" ? subscription : subscription.id;
+function refId(ref: string | { id: string } | null | undefined): string | null {
+  if (!ref) return null;
+  return typeof ref === "string" ? ref : ref.id;
+}
+
+// invoice.subscription (the flat field) is null on every LIVE invoice.payment_succeeded
+// event this app has ever received (confirmed via webhook_events.payload) -- current
+// Stripe API versions carry it at invoice.parent.subscription_details.subscription
+// instead. Check the flat field first (older API versions / any invoice that still
+// carries it) and fall back to the nested location; an invoice with neither is
+// genuinely not tied to a subscription.
+function subscriptionId(invoice: StripeInvoice): string | null {
+  return refId(invoice.subscription) ?? refId(invoice.parent?.subscription_details?.subscription);
 }
 
 /**
@@ -373,7 +388,7 @@ export async function handleInvoicePaymentSucceeded(
   supabase: ReturnType<typeof createServiceClient>,
   invoice: StripeInvoice
 ): Promise<{ skipped?: string }> {
-  const stripeSubId = subscriptionId(invoice.subscription);
+  const stripeSubId = subscriptionId(invoice);
   if (!stripeSubId) return { skipped: "not a subscription invoice" };
 
   const { data: sub } = await supabase
@@ -421,7 +436,7 @@ export async function handleInvoicePaymentFailed(
   supabase: ReturnType<typeof createServiceClient>,
   invoice: StripeInvoice
 ): Promise<{ skipped?: string }> {
-  const stripeSubId = subscriptionId(invoice.subscription);
+  const stripeSubId = subscriptionId(invoice);
   if (!stripeSubId) return { skipped: "not a subscription invoice" };
 
   const { data: sub } = await supabase
