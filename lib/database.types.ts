@@ -994,10 +994,12 @@ export type Database = {
           automation_id: string
           client_id: string | null
           completed_at: string | null
+          connection_id: string | null
           current_step_id: string | null
           engagement_id: string | null
           id: string
           is_test: boolean
+          onboarding_id: string | null
           started_at: string
           status: string
           trigger_snapshot: Json
@@ -1009,10 +1011,12 @@ export type Database = {
           automation_id: string
           client_id?: string | null
           completed_at?: string | null
+          connection_id?: string | null
           current_step_id?: string | null
           engagement_id?: string | null
           id?: string
           is_test?: boolean
+          onboarding_id?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1024,10 +1028,12 @@ export type Database = {
           automation_id?: string
           client_id?: string | null
           completed_at?: string | null
+          connection_id?: string | null
           current_step_id?: string | null
           engagement_id?: string | null
           id?: string
           is_test?: boolean
+          onboarding_id?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1046,6 +1052,20 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "partner_onboardings"
             referencedColumns: ["id"]
           },
           {
