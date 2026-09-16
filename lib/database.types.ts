@@ -1062,13 +1062,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "automation_runs_onboarding_id_fkey"
-            columns: ["onboarding_id"]
-            isOneToOne: false
-            referencedRelation: "partner_onboardings"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "automation_runs_current_step_id_fkey"
             columns: ["current_step_id"]
             isOneToOne: false
@@ -1095,6 +1088,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_reviewer_queue"
             referencedColumns: ["engagement_id"]
+          },
+          {
+            foreignKeyName: "automation_runs_onboarding_id_fkey"
+            columns: ["onboarding_id"]
+            isOneToOne: false
+            referencedRelation: "partner_onboardings"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "automation_runs_workspace_id_fkey"
@@ -7815,6 +7815,79 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_terms_acceptance_archive: {
+        Row: {
+          accepted_at: string
+          consent_record_id: string
+          created_at: string
+          generation_error: string | null
+          id: string
+          pdf_generated_at: string | null
+          pdf_storage_path: string | null
+          privacy_content_snapshot: string
+          status: string
+          terms_content_snapshot: string
+          updated_at: string
+          user_id: string | null
+          version: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at: string
+          consent_record_id: string
+          created_at?: string
+          generation_error?: string | null
+          id?: string
+          pdf_generated_at?: string | null
+          pdf_storage_path?: string | null
+          privacy_content_snapshot: string
+          status?: string
+          terms_content_snapshot: string
+          updated_at?: string
+          user_id?: string | null
+          version: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string
+          consent_record_id?: string
+          created_at?: string
+          generation_error?: string | null
+          id?: string
+          pdf_generated_at?: string | null
+          pdf_storage_path?: string | null
+          privacy_content_snapshot?: string
+          status?: string
+          terms_content_snapshot?: string
+          updated_at?: string
+          user_id?: string | null
+          version?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_terms_acceptance_archive_consent_record_id_fkey"
+            columns: ["consent_record_id"]
+            isOneToOne: true
+            referencedRelation: "compliance_consent_status_view"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_terms_acceptance_archive_consent_record_id_fkey"
+            columns: ["consent_record_id"]
+            isOneToOne: true
+            referencedRelation: "consent_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_terms_acceptance_archive_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_stages: {
         Row: {
           completion_rule: string
@@ -11622,8 +11695,10 @@ export type Database = {
         Args: {
           p_client_id: string
           p_conditions: Json
+          p_connection_id?: string
           p_context: Json
           p_engagement_id: string
+          p_onboarding_id?: string
           p_workspace_id: string
         }
         Returns: boolean
@@ -12483,8 +12558,10 @@ export type Database = {
         Args: {
           p_client_id: string
           p_conditions: Json
+          p_connection_id?: string
           p_context: Json
           p_engagement_id: string
+          p_onboarding_id?: string
           p_workspace_id: string
         }
         Returns: boolean
@@ -13028,6 +13105,20 @@ export type Database = {
           user_id: string
           workspace_id: string
           workspace_name: string
+        }[]
+      }
+      get_platform_terms_archives: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          accepted_at: string
+          accepted_by_email: string
+          accepted_by_name: string
+          generation_error: string
+          id: string
+          pdf_generated_at: string
+          pdf_storage_path: string
+          status: string
+          version: string
         }[]
       }
       get_portal_client_contact: {
@@ -14574,6 +14665,7 @@ export type Database = {
           current_period_end: string | null
           current_period_start: string | null
           default_payment_method_id: string | null
+          first_period_end: string | null
           id: string
           locked_plan_snapshot: Json | null
           plan_id: string

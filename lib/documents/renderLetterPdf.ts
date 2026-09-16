@@ -7,7 +7,10 @@ import { PAGE_BREAK_HTML_RE } from "@/lib/documents/pageBreakSplit";
 // to get readable text into the PDF without pulling in a full HTML renderer.
 export const PAGE_BREAK_SENTINEL = "@@PAGE_BREAK@@";
 
-function htmlToParagraphs(html: string): string[] {
+// Exported for reuse by other simple-HTML-to-PDF renderers (e.g. the legal
+// acceptance archive) that share this same "paragraphs, lists, the odd page
+// break" content shape.
+export function htmlToParagraphs(html: string): string[] {
   const withBreaks = (html ?? "")
     // A page break (lib/tiptap/pageBreak.ts) serializes as an empty
     // <div data-page-break>; must be swapped out before the generic
