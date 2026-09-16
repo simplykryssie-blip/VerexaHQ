@@ -493,6 +493,15 @@ export async function createInvoiceItem({
  * mode "setup" saves a payment method against the customer without
  * charging anything, same Checkout-redirect pattern as createCheckoutSession
  * above (mode "payment") rather than embedding Stripe Elements client-side.
+ *
+ * managed_payments is explicitly disabled: Managed Payments only supports
+ * Checkout Sessions in mode "subscription" or "payment" -- a mode "setup"
+ * session is unconditionally rejected while it's on, per Stripe's own error.
+ * No charge ever occurs in a setup session, so there's no tax/compliance
+ * behavior being forfeited by opting out here -- same reasoning already
+ * applied to createSubscriptionCheckoutSessionFromPrice and
+ * createUsageTopupCheckoutSession above, for their own (different) Managed
+ * Payments incompatibility.
  */
 export async function createSetupCheckoutSession({
   customerId,
@@ -515,6 +524,7 @@ export async function createSetupCheckoutSession({
     success_url: successUrl,
     cancel_url: cancelUrl,
     "payment_method_types[0]": "card",
+    "managed_payments[enabled]": "false",
   });
   for (const [key, value] of Object.entries(metadata)) {
     body.set(`metadata[${key}]`, value);
