@@ -21,24 +21,35 @@ function daysBetween(fromDateStr: string, toDateStr: string): number {
   return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
 }
 
+// The three payment-attempt days, each further out than the last so a
+// decline has multiple chances to be resolved (adding a card, a bank
+// covering funds) before the due date actually arrives.
+const ATTEMPT_DAYS = [7, 3, 1];
+
 /**
  * Platform-wide billing dunning, run hourly. Uses America/Chicago calendar
- * dates (not a fixed UTC cron offset) so the day boundaries this logic
- * keys off of -- 5 days out, 3 days out, past the cycle end -- land on true
+ * dates (not a fixed UTC cron offset) so the day boundaries this logic keys
+ * off of -- 7/3/1 days out, and the due date itself -- land on true
  * CST/CDT midnight year-round, including across the DST changeover.
  *
- * Three things happen, keyed off days-until-current_period_end in Chicago
- * calendar days:
- *  - day 5: no card on file yet -> reminder notification.
- *  - day 3 and day 0: attempt to charge the card on file for the previewed
- *    upcoming-invoice amount. A successful charge is credited to the Stripe
- *    customer's balance (not charged again) -- see createCustomerBalanceCredit
- *    for why that avoids double-charging on the real renewal date. Day 0 is
- *    a last-chance retry for anyone who added a card after a day-3 decline.
- *  - once the cycle end has passed with no successful charge recorded for
- *    it: suspend the workspace. This is independent of (and can fire before)
- *    Stripe's own Smart Retries exhausting into an "unpaid" subscription
- *    status, since that can take longer than a single billing cycle.
+ * Schedule:
+ *  - day 7, 3, and 1 before current_period_end: attempt to charge the card
+ *    on file for the previewed upcoming-invoice amount (or send a
+ *    no-card-on-file reminder on day 7 specifically, then a payment-failed
+ *    notice on every attempt day that actually declines). A successful
+ *    charge is credited to the Stripe customer's balance (not charged
+ *    again) -- see createCustomerBalanceCredit for why that avoids
+ *    double-charging on the real renewal date.
+ *  - due date (day 0): if no successful charge attempt is on record for
+ *    this cycle, suspend the workspace immediately (at the first hourly
+ *    tick on or after midnight Chicago time on the due date) rather than
+ *    waiting for the cycle to have already passed.
+ *
+ * Idempotent by construction: workspace_billing_charge_attempts is checked
+ * for an existing attempt (by workspace_id + period_end) before charging
+ * again on the same Chicago calendar day, and the suspend itself is guarded
+ * by .eq("status", "active") so a repeated cron tick after suspension is a
+ * no-op rather than a duplicate transition or a second charge.
  */
 async function handleGET(request: Request) {
   if (!isAuthorized(request)) {
@@ -69,7 +80,7 @@ async function handleGET(request: Request) {
     const daysUntil = daysBetween(today, periodEnd);
     const workspaceStatus = (sub.workspaces as unknown as { status: string } | null)?.status;
 
-    if (daysUntil === 5 && !sub.default_payment_method_id) {
+    if (daysUntil === 7 && !sub.default_payment_method_id) {
       const { data: existing } = await supabase
         .from("notification_queue")
         .select("id")
@@ -93,7 +104,7 @@ async function handleGET(request: Request) {
       }
     }
 
-    if (daysUntil === 3 || daysUntil === 0) {
+    if (ATTEMPT_DAYS.includes(daysUntil)) {
       const { data: succeeded } = await supabase
         .from("workspace_billing_charge_attempts")
         .select("id")
@@ -122,9 +133,7 @@ async function handleGET(request: Request) {
             failure_reason: "No payment method on file.",
           });
           results.chargeFailed += 1;
-          if (daysUntil === 3) {
-            await notifyPaymentFailed(supabase, sub.workspace_id, "No payment method on file.", periodEnd);
-          }
+          await notifyPaymentFailed(supabase, sub.workspace_id, "No payment method on file.", periodEnd);
         } else {
           const preview = await previewUpcomingInvoiceAmount(sub.stripe_subscription_id as string);
           const amountDueCents = preview.ok ? preview.data.amountDueCents : 0;
@@ -171,9 +180,7 @@ async function handleGET(request: Request) {
                 failure_reason: reason,
               });
               results.chargeFailed += 1;
-              if (daysUntil === 3) {
-                await notifyPaymentFailed(supabase, sub.workspace_id, reason, periodEnd);
-              }
+              await notifyPaymentFailed(supabase, sub.workspace_id, reason, periodEnd);
             }
           }
         }
@@ -182,7 +189,7 @@ async function handleGET(request: Request) {
       }
     }
 
-    if (daysUntil < 0 && workspaceStatus === "active") {
+    if (daysUntil <= 0 && workspaceStatus === "active") {
       const { data: succeeded } = await supabase
         .from("workspace_billing_charge_attempts")
         .select("id")
@@ -192,8 +199,16 @@ async function handleGET(request: Request) {
         .maybeSingle();
 
       if (!succeeded) {
-        await supabase.from("workspaces").update({ status: "suspended", suspension_reason: "billing_past_due" }).eq("id", sub.workspace_id).eq("status", "active");
-        results.suspended += 1;
+        const suspendedAt = new Date().toISOString();
+        const { error: suspendError } = await supabase
+          .from("workspaces")
+          .update({ status: "suspended", suspension_reason: "billing_past_due", suspended_at: suspendedAt })
+          .eq("id", sub.workspace_id)
+          .eq("status", "active");
+        if (!suspendError) {
+          results.suspended += 1;
+          await notifyWorkspaceSuspended(supabase, sub.workspace_id, periodEnd);
+        }
       }
     }
   }
@@ -212,7 +227,22 @@ async function notifyPaymentFailed(supabase: ReturnType<typeof createServiceClie
     payload: { failure_reason: failureReason, period_end: periodEnd },
     recipient_user_id: admin.user_id,
     recipient_email: admin.email,
-    dedupe_key: `billing-payment-failed:${workspaceId}:${periodEnd}`,
+    dedupe_key: `billing-payment-failed:${workspaceId}:${periodEnd}:${new Date().toISOString().slice(0, 10)}`,
+  });
+}
+
+async function notifyWorkspaceSuspended(supabase: ReturnType<typeof createServiceClient>, workspaceId: string, periodEnd: string) {
+  const { data: admin } = await supabase.rpc("get_workspace_billing_admin", { p_workspace_id: workspaceId }).maybeSingle();
+  if (!admin?.user_id) return;
+  await supabase.from("notification_queue").insert({
+    workspace_id: workspaceId,
+    channel: "Email",
+    template_key: "billing-workspace-suspended",
+    event_type: "billing_workspace_suspended",
+    payload: { period_end: periodEnd },
+    recipient_user_id: admin.user_id,
+    recipient_email: admin.email,
+    dedupe_key: `billing-workspace-suspended:${workspaceId}:${periodEnd}`,
   });
 }
 

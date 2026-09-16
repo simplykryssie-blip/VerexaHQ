@@ -846,6 +846,28 @@ export async function createCustomerBalanceCredit({
 }
 
 /**
+ * Immediately cancels a subscription (no grace period, no proration) --
+ * used at the Day 90 permanently_archived transition, where the point is
+ * specifically that the subscription must no longer be capable of
+ * generating any recurring charge. Idempotent from the caller's side: a
+ * subscription that's already canceled returns ok:false (Stripe rejects
+ * canceling an already-canceled subscription), which the caller treats the
+ * same as "nothing left to cancel" rather than a retryable failure.
+ */
+export async function cancelSubscription(subscriptionId: string): Promise<StripeResult<{ id: string; status: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions/${subscriptionId}`, { method: "DELETE", headers: authHeaders() });
+  const data = (await res.json().catch(() => ({}))) as { id?: string; status?: string; error?: { message?: string; code?: string } };
+  if (!res.ok || !data.id) {
+    return { ok: false, reason: data.error?.message ?? `Stripe responded with ${res.status}` };
+  }
+  return { ok: true, data: { id: data.id, status: data.status ?? "canceled" } };
+}
+
+/**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.
  */

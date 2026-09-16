@@ -11002,6 +11002,7 @@ export type Database = {
       workspaces: {
         Row: {
           allow_connected_ptin_messaging: boolean
+          archived_at: string | null
           client_assignment_mode: string
           client_assignment_staff_pool: string[]
           created_at: string
@@ -11010,12 +11011,14 @@ export type Database = {
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
+          is_billing_exempt: boolean
           is_demo: boolean
           is_platform_home: boolean
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
           owner_name: string | null
+          permanently_archived_at: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string
@@ -11027,6 +11030,7 @@ export type Database = {
           stripe_connected_account_id: string | null
           stripe_details_submitted: boolean
           stripe_payouts_enabled: boolean
+          suspended_at: string | null
           suspension_reason: string | null
           timezone: string
           updated_at: string
@@ -11035,6 +11039,7 @@ export type Database = {
         }
         Insert: {
           allow_connected_ptin_messaging?: boolean
+          archived_at?: string | null
           client_assignment_mode?: string
           client_assignment_staff_pool?: string[]
           created_at?: string
@@ -11043,12 +11048,14 @@ export type Database = {
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
+          is_billing_exempt?: boolean
           is_demo?: boolean
           is_platform_home?: boolean
           mailing_address?: string | null
           name: string
           onboarding_dismissed_at?: string | null
           owner_name?: string | null
+          permanently_archived_at?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug: string
@@ -11060,6 +11067,7 @@ export type Database = {
           stripe_connected_account_id?: string | null
           stripe_details_submitted?: boolean
           stripe_payouts_enabled?: boolean
+          suspended_at?: string | null
           suspension_reason?: string | null
           timezone?: string
           updated_at?: string
@@ -11068,6 +11076,7 @@ export type Database = {
         }
         Update: {
           allow_connected_ptin_messaging?: boolean
+          archived_at?: string | null
           client_assignment_mode?: string
           client_assignment_staff_pool?: string[]
           created_at?: string
@@ -11076,12 +11085,14 @@ export type Database = {
           default_relationship_manager_id?: string | null
           default_reviewer_id?: string | null
           id?: string
+          is_billing_exempt?: boolean
           is_demo?: boolean
           is_platform_home?: boolean
           mailing_address?: string | null
           name?: string
           onboarding_dismissed_at?: string | null
           owner_name?: string | null
+          permanently_archived_at?: string | null
           phone?: string | null
           primary_contact_email?: string | null
           slug?: string
@@ -11093,6 +11104,7 @@ export type Database = {
           stripe_connected_account_id?: string | null
           stripe_details_submitted?: boolean
           stripe_payouts_enabled?: boolean
+          suspended_at?: string | null
           suspension_reason?: string | null
           timezone?: string
           updated_at?: string
@@ -14212,6 +14224,7 @@ export type Database = {
         }
         Returns: {
           allow_connected_ptin_messaging: boolean
+          archived_at: string | null
           client_assignment_mode: string
           client_assignment_staff_pool: string[]
           created_at: string
@@ -14220,12 +14233,14 @@ export type Database = {
           default_relationship_manager_id: string | null
           default_reviewer_id: string | null
           id: string
+          is_billing_exempt: boolean
           is_demo: boolean
           is_platform_home: boolean
           mailing_address: string | null
           name: string
           onboarding_dismissed_at: string | null
           owner_name: string | null
+          permanently_archived_at: string | null
           phone: string | null
           primary_contact_email: string | null
           slug: string
@@ -14237,6 +14252,7 @@ export type Database = {
           stripe_connected_account_id: string | null
           stripe_details_submitted: boolean
           stripe_payouts_enabled: boolean
+          suspended_at: string | null
           suspension_reason: string | null
           timezone: string
           updated_at: string
