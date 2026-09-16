@@ -156,6 +156,18 @@ const LEAD_STAGE_OPTIONS = [
   { value: "archived", label: "Archived" },
   { value: "lost", label: "Lost" },
 ];
+const PARTNER_ONBOARDING_STATUS_OPTIONS = [
+  "pending",
+  "in_progress",
+  "under_review",
+  "approved",
+  "setup",
+  "ready",
+  "rejected",
+  "withdrawn",
+];
+const PARTNER_ONBOARDING_REVIEW_STATUS_OPTIONS = ["approved", "rejected", "info_requested"];
+const FIRM_CONNECTION_RELATIONSHIP_TYPE_OPTIONS = ["service_bureau_ero", "ero_ptin", "service_bureau_ptin"];
 
 const CONDITION_FIELDS: FieldMeta[] = [
   { key: "client.lifecycle_status", label: "Lead / client status", group: "Lead & client", valueKind: "lead_stage", ops: LIST_OPS },
@@ -195,6 +207,18 @@ const CONDITION_FIELDS: FieldMeta[] = [
 
   { key: "package_purchase.package_name", label: "Package name", group: "Package purchase", valueKind: "text", ops: SELECT_OPS },
   { key: "package_purchase.billing_cadence", label: "Package billing cadence", group: "Package purchase", valueKind: "select", options: ["monthly", "annual", "one_time"], ops: SELECT_OPS },
+
+  { key: "partner_onboarding.status", label: "Status", group: "Partner Onboarding", valueKind: "select", options: PARTNER_ONBOARDING_STATUS_OPTIONS, ops: LIST_OPS },
+  { key: "partner_onboarding.application_submitted", label: "Application submitted?", group: "Partner Onboarding", valueKind: "boolean", ops: ["eq"] },
+  { key: "partner_onboarding.agreement_signed", label: "Agreement signed?", group: "Partner Onboarding", valueKind: "boolean", ops: ["eq"] },
+  { key: "partner_onboarding.documents_complete", label: "Documents complete?", group: "Partner Onboarding", valueKind: "boolean", ops: ["eq"] },
+  { key: "partner_onboarding.training_complete", label: "Training complete?", group: "Partner Onboarding", valueKind: "boolean", ops: ["eq"] },
+  { key: "partner_onboarding.bank_software_setup_complete", label: "Bank/software setup complete?", group: "Partner Onboarding", valueKind: "boolean", ops: ["eq"] },
+  { key: "partner_onboarding.review_status", label: "Review status", group: "Partner Onboarding", valueKind: "select", options: PARTNER_ONBOARDING_REVIEW_STATUS_OPTIONS, ops: SELECT_OPS },
+  { key: "partner_onboarding.ready", label: "Ready?", group: "Partner Onboarding", valueKind: "boolean", ops: ["eq"] },
+
+  { key: "firm_connection.relationship_type", label: "Relationship type", group: "Firm Connection", valueKind: "select", options: FIRM_CONNECTION_RELATIONSHIP_TYPE_OPTIONS, ops: LIST_OPS },
+  { key: "firm_connection.package_id", label: "Package ID", group: "Firm Connection", valueKind: "text", ops: SELECT_OPS },
 ];
 
 function fieldMeta(key: string): FieldMeta {
