@@ -7593,6 +7593,7 @@ export type Database = {
           storage_overage_rate_cents: number
           stripe_price_id: string | null
           stripe_product_id: string | null
+          stripe_test_price_id: string | null
           updated_at: string
         }
         Insert: {
@@ -7613,6 +7614,7 @@ export type Database = {
           storage_overage_rate_cents?: number
           stripe_price_id?: string | null
           stripe_product_id?: string | null
+          stripe_test_price_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -7633,6 +7635,7 @@ export type Database = {
           storage_overage_rate_cents?: number
           stripe_price_id?: string | null
           stripe_product_id?: string | null
+          stripe_test_price_id?: string | null
           updated_at?: string
         }
         Relationships: []

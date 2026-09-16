@@ -106,6 +106,28 @@ async function resumeWorkspaceFromBilling(
     .in("suspension_reason", allowedReasons);
 }
 
+// The complete set of billing suspension_reason values (matches
+// workspaces_suspension_reason_check) that a genuinely paid subscription
+// proves are resolved -- billing_incomplete is create_paid_workspace's
+// initial lock on every brand-new signup; billing_past_due/
+// subscription_canceled are the two pre-existing recovery cases. Shared by
+// handleSubscriptionCreated and handleSubscriptionUpdated so a signup's
+// lock clears identically regardless of which event happens to carry the
+// transition to "active" first (see isSubscriptionStatusPaid below).
+const REASONS_CLEARED_BY_PAID_SUBSCRIPTION = ["billing_past_due", "subscription_canceled", "billing_incomplete"];
+
+/**
+ * Exported for testing. A subscription's own status is the only thing that
+ * actually proves billing succeeded -- Stripe can create or update a
+ * subscription to a non-active status (still confirming, past_due, unpaid,
+ * canceled), and neither handleSubscriptionCreated nor handleSubscriptionUpdated
+ * may treat the workspace as paid unless this is true for that event's
+ * subscription object.
+ */
+export function isSubscriptionStatusPaid(status: string): boolean {
+  return status === "active" || status === "trialing";
+}
+
 /**
  * cancel_at_period_end: true (set via Stripe's hosted Customer Portal) means
  * the workspace already had full access through its paid term -- this event
@@ -165,9 +187,13 @@ export async function handleSubscriptionCreated(
     { onConflict: "workspace_id" }
   );
 
-  // A brand-new subscription always clears whatever billing lock the
-  // workspace was under -- a past-due pause or a prior cancellation.
-  await resumeWorkspaceFromBilling(supabase, workspaceId, ["billing_past_due", "subscription_canceled"]);
+  // subscription.created can fire with a non-active status (e.g. still
+  // confirming) -- see the comment below on the free-allowance grant for
+  // why that's treated as real here too. workspaceId is this event's own
+  // metadata, so this can never touch a different workspace's suspension.
+  if (isSubscriptionStatusPaid(subscription.status)) {
+    await resumeWorkspaceFromBilling(supabase, workspaceId, REASONS_CLEARED_BY_PAID_SUBSCRIPTION);
+  }
 
   // Deliberately does NOT grant the free usage allowance here.
   // subscription.created fires the moment Stripe creates the subscription
@@ -239,8 +265,13 @@ export async function handleSubscriptionUpdated(
 
   if (subscription.status === "unpaid") {
     await pauseWorkspaceForBilling(supabase, existing.workspace_id);
-  } else if (subscription.status === "active" || subscription.status === "trialing") {
-    await resumeWorkspaceFromBilling(supabase, existing.workspace_id);
+  } else if (isSubscriptionStatusPaid(subscription.status)) {
+    // Same billing_incomplete case as handleSubscriptionCreated above: a
+    // signup's subscription can still be created non-active and only reach
+    // "active" via a later update (e.g. a delayed payment-method
+    // confirmation) -- this is the only other point that transition can be
+    // observed, so it needs the same allowed-reasons list.
+    await resumeWorkspaceFromBilling(supabase, existing.workspace_id, REASONS_CLEARED_BY_PAID_SUBSCRIPTION);
   }
 
   return {};
