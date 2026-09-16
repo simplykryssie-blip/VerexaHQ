@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PlanUsageManager } from "@/components/settings/PlanUsageManager";
 import { PhoneNumbersManager, type PhoneNumberRow } from "@/components/settings/PhoneNumbersManager";
 import { BillingCardManager } from "@/components/settings/BillingCardManager";
+import { ResumeCheckoutButton } from "@/components/settings/ResumeCheckoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -60,9 +61,10 @@ export default async function PlanUsagePage() {
             <p className="mt-1 text-sm text-ink">
               {workspace.suspension_reason === "subscription_canceled"
                 ? "Your Verexa subscription was canceled."
-                : "Your Verexa subscription payment is past due."}{" "}
-              Normal workspace access is unavailable until billing is resolved
-              {subscription?.card_last4 ? " -- update the payment method below and it will retry automatically." : " -- add a payment method below to restore access."}
+                : workspace.suspension_reason === "billing_incomplete"
+                  ? "You haven't completed your Verexa subscription signup yet."
+                  : "Your Verexa subscription payment is past due."}{" "}
+              Normal workspace access is unavailable until billing is resolved -- resume checkout below to restore access.
             </p>
           </div>
         )}
@@ -81,6 +83,13 @@ export default async function PlanUsagePage() {
                 cardExpYear={subscription.card_exp_year}
               />
             </SettingsCard>
+          )}
+          {workspace.is_owner && subscription.stripe_status !== "active" && (
+            <div className="mt-6">
+              <SettingsCard title="Resume your subscription" description="Complete or retry your Verexa subscription payment to restore full access.">
+                <ResumeCheckoutButton />
+              </SettingsCard>
+            </div>
           )}
           {subscription.stripe_status === "active" && (
           <>

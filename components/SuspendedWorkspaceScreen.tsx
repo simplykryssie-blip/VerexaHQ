@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 const SUSPENSION_REASON_LABEL: Record<string, string> = {
   billing_past_due: "Your Verexa subscription payment is past due.",
   subscription_canceled: "Your Verexa subscription was canceled.",
+  billing_incomplete: "You haven't completed your Verexa subscription signup yet.",
 };
 
 // Replaces the normal app shell for a suspended workspace on every route

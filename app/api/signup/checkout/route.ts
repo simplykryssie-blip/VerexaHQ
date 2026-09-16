@@ -7,6 +7,7 @@ import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { getCurrentWorkspace } from "@/lib/workspace";
 import { getAppUrl } from "@/lib/appUrl";
+import { needsCheckoutResume } from "@/lib/stripe/checkoutEligibility";
 
 // Card is required at signup -- create_paid_workspace already created the
 // workspace plus a workspace_subscriptions row defaulted to 'incomplete'
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
   if (!subscription || !plan) {
     return NextResponse.json({ error: "This workspace has no plan to check out for." }, { status: 400 });
   }
-  if (subscription.stripe_status === "active") {
+  if (!needsCheckoutResume(workspace.status, subscription.stripe_status)) {
     return NextResponse.json({ error: "This workspace already has an active subscription." }, { status: 400 });
   }
 
