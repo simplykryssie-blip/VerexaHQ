@@ -10,16 +10,24 @@ import type { Database } from "@/lib/database.types";
 
 type WorkspaceSubscriptionUpdate = Database["public"]["Tables"]["workspace_subscriptions"]["Update"];
 
+type StripeSubscriptionItem = {
+  id: string;
+  price: { id: string };
+  // Billing-period dates live here, not on the subscription itself -- see
+  // subscriptionPeriod() below.
+  current_period_start: number;
+  current_period_end: number;
+};
+
 type StripeSubscription = {
   id: string;
   customer: string | { id: string };
   status: string;
-  current_period_start: number;
-  current_period_end: number;
+  default_payment_method?: string | { id: string } | null;
   trial_end: number | null;
   cancel_at_period_end?: boolean;
   metadata?: { workspace_id?: string; plan_slug?: string };
-  items: { data: Array<{ id: string; price: { id: string } }> };
+  items: { data: StripeSubscriptionItem[] };
 };
 
 type StripeInvoice = {
@@ -78,6 +86,41 @@ function customerId(customer: StripeSubscription["customer"]): string {
 function refId(ref: string | { id: string } | null | undefined): string | null {
   if (!ref) return null;
   return typeof ref === "string" ? ref : ref.id;
+}
+
+// Billing-period dates moved off the top-level Subscription object onto its
+// sole item in current Stripe API versions -- same root cause as
+// subscriptionId() above, just for a different pair of fields. Never guesses
+// items.data[0]: an unresolvable item (none, or more than one) fails closed
+// to {start: null, end: null} rather than reading the wrong item's dates.
+function subscriptionPeriod(items: StripeSubscriptionItem[]): { start: number | null; end: number | null } {
+  const itemResult = getSoleSubscriptionItem(items);
+  if (!itemResult.ok) return { start: null, end: null };
+  return { start: itemResult.data.current_period_start, end: itemResult.data.current_period_end };
+}
+
+// Captures the subscription's default payment method for the billing UI --
+// mirrors handleSetupCheckoutCompleted's own capture below, just triggered
+// from the subscription lifecycle instead of the separate "Add a card" flow.
+// Returns {} (a no-op merge) whenever there's nothing to safely report,
+// rather than writing partial/null card fields over whatever is already
+// stored -- no payment method, or a failed Stripe read, both fail closed.
+async function subscriptionCardFields(
+  defaultPaymentMethod: StripeSubscription["default_payment_method"]
+): Promise<Partial<WorkspaceSubscriptionUpdate>> {
+  const paymentMethodId = refId(defaultPaymentMethod);
+  if (!paymentMethodId) return {};
+
+  const cardResult = await retrieveCardDetails(paymentMethodId);
+  if (!cardResult.ok) return {};
+
+  return {
+    default_payment_method_id: paymentMethodId,
+    card_brand: cardResult.data.brand,
+    card_last4: cardResult.data.last4,
+    card_exp_month: cardResult.data.expMonth,
+    card_exp_year: cardResult.data.expYear,
+  };
 }
 
 // invoice.subscription (the flat field) is null on every LIVE invoice.payment_succeeded
@@ -186,6 +229,9 @@ export async function handleSubscriptionCreated(
   }
   if (!plan) return { skipped: "no plan matches this subscription's price" };
 
+  const period = subscriptionPeriod(subscription.items.data);
+  const cardFields = await subscriptionCardFields(subscription.default_payment_method);
+
   await supabase.from("workspace_subscriptions").upsert(
     {
       workspace_id: workspaceId,
@@ -193,11 +239,12 @@ export async function handleSubscriptionCreated(
       stripe_customer_id: customerId(subscription.customer),
       stripe_subscription_id: subscription.id,
       stripe_status: subscription.status,
-      current_period_start: toIso(subscription.current_period_start),
-      current_period_end: toIso(subscription.current_period_end),
+      current_period_start: toIso(period.start),
+      current_period_end: toIso(period.end),
       trial_end: toIso(subscription.trial_end),
       cancel_at_period_end: subscription.cancel_at_period_end ?? false,
       locked_plan_snapshot: snapshotFromPlan(plan),
+      ...cardFields,
     },
     { onConflict: "workspace_id" }
   );
@@ -237,26 +284,32 @@ export async function handleSubscriptionUpdated(
     return handleSubscriptionCreated(supabase, subscription);
   }
 
-  const newPeriodEnd = toIso(subscription.current_period_end);
+  const period = subscriptionPeriod(subscription.items.data);
+  const newPeriodEnd = toIso(period.end);
   const isNewCycle = existing.current_period_end !== newPeriodEnd;
+  const cardFields = await subscriptionCardFields(subscription.default_payment_method);
 
   const updates: WorkspaceSubscriptionUpdate = {
     stripe_status: subscription.status,
-    current_period_start: toIso(subscription.current_period_start),
+    current_period_start: toIso(period.start),
     current_period_end: newPeriodEnd,
     trial_end: toIso(subscription.trial_end),
     cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+    ...cardFields,
   };
 
   // Apply a pending grandfathered price migration exactly at the renewal
   // where its effective date has been reached -- never mid-cycle. Early
   // renewals before that date are already billing at the old price with no
   // action needed here, since we haven't touched the Stripe subscription's
-  // Price object yet.
+  // Price object yet. period.start being unresolvable (see
+  // subscriptionPeriod above) fails this closed for the cycle rather than
+  // risking a migration timed off a wrong/missing date.
   if (
     isNewCycle &&
     existing.price_change_effective_date &&
-    new Date(existing.price_change_effective_date) <= new Date(subscription.current_period_start * 1000)
+    period.start !== null &&
+    new Date(existing.price_change_effective_date) <= new Date(period.start * 1000)
   ) {
     const { data: plan } = await supabase.from("platform_subscription_plans").select("*").eq("id", existing.plan_id).single();
     // Doesn't assume items.data[0] is the item to migrate -- if this
