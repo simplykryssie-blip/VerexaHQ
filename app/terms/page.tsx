@@ -94,6 +94,10 @@ export default function TermsOfServicePage() {
           stated otherwise at the time of purchase. We may change our pricing on notice; continued use after a price
           change takes effect constitutes acceptance of the new price for future billing cycles.
         </p>
+        <p>
+          Prepaid balances purchased for SMS, email, or storage usage are also non-refundable and, if a workspace
+          becomes Archived as described in Section 11, any unused prepaid balance is forfeited as described there.
+        </p>
       </Section>
 
       <Section title="6. Third-party integrations">
@@ -141,23 +145,109 @@ export default function TermsOfServicePage() {
         </p>
       </Section>
 
-      <Section title="11. Termination">
+      <Section title="11. Account Lifecycle, Suspension, Archiving, and Termination">
         <p>
-          A Firm may cancel its subscription at any time from Settings. We may suspend or terminate access for breach of
-          these Terms, non-payment, or as needed to protect the platform or other Firms. Upon termination, we will make
-          Firm data available for export for a reasonable period before deletion, except where we are required to retain
-          it as described in our Privacy Policy.
+          A Firm may cancel its subscription at any time from Settings. We may also suspend or terminate access for
+          non-payment, breach of these Terms, or as needed to protect the platform or other Firms. When access is
+          suspended for non-payment, the workspace moves through the following states, measured from the date access
+          was first suspended (&ldquo;Day 0&rdquo;):
+        </p>
+        <p>
+          <strong className="text-ink">Suspended (Day 0 through Day 29).</strong> Normal workspace access for Firm
+          users is unavailable. Firm users may access only the limited billing, account-recovery, and support
+          functionality we make available for resolving the suspension. The Firm&rsquo;s existing Clients may continue
+          to use the client portal to view their file, upload documents to existing engagements, and respond to
+          outstanding requests, but no new engagements or normal business activity may be initiated. Automations and
+          third-party integrations are disabled.
+        </p>
+        <p>
+          <strong className="text-ink">Archived (beginning Day 30).</strong> If access has not been restored by Day 30,
+          the workspace becomes Archived. Client portal access ends, and all Firm access -- other than the export
+          process described in the Data Export section below -- remains unavailable. Any unused prepaid SMS, email, or
+          storage balance is forfeited at this time and will not be refunded, restored, or credited. Data continues to
+          be retained as described in our Privacy Policy.
+        </p>
+        <p>
+          <strong className="text-ink">Permanently Archived; Account Closure (beginning Day 90).</strong> If access has
+          not been restored within 90 days after the date it was first suspended (Day 0) -- not 90 days after the
+          workspace became Archived -- the workspace becomes Permanently Archived: the Verexa subscription and account
+          relationship terminates (&ldquo;Account Closure&rdquo;), and the workspace remains permanently unavailable
+          for normal use. Permanently Archiving a workspace and Account Closure are not, by themselves, a deletion of
+          data. Data associated with a Permanently Archived workspace continues to be retained and, once no longer
+          required to be retained, may eventually be deleted, as described in our Privacy Policy.
+        </p>
+        <p>We will provide notice of a Suspension using the contact information on file for the workspace.</p>
+      </Section>
+
+      <Section title="12. Data Export">
+        <p>
+          Before a workspace becomes Archived (that is, during the first 30 days after Suspension), the Firm owner may
+          use Verexa&rsquo;s self-service data export tool to obtain a copy of the workspace&rsquo;s Customer Data.
+        </p>
+        <p>
+          From the time a workspace becomes Archived through the date it becomes Permanently Archived (Day 30 through
+          Day 90 after Suspension), a Firm may still obtain an export of its Customer Data, but only through Verexa
+          Customer Support, and a $150 export assistance fee applies. This fee will be disclosed and must be agreed to
+          before the export is performed.
+        </p>
+        <p>
+          The export window closes on Day 90 after Suspension, when the workspace becomes Permanently Archived. After
+          that date, Verexa no longer offers export as a standard feature of the workspace. Closing the export window
+          does not mean the data has been deleted -- retained data continues to be handled as described in our Privacy
+          Policy. A Firm with a legitimate need to obtain data after this window has closed may contact{" "}
+          <a href="mailto:support@verexahq.com" className="text-accent hover:underline">
+            support@verexahq.com
+          </a>
+          , though Verexa is not obligated to provide export after the window closes.
         </p>
       </Section>
 
-      <Section title="12. Governing law">
+      <Section title="13. Platform Intellectual Property and Customer Data">
+        <p>
+          <strong className="text-ink">Verexa Platform IP.</strong> As between a Firm and Verexa, Verexa and its
+          licensors own all right, title, and interest in and to the Verexa platform itself, including its software,
+          source code, system architecture, database architecture, workflow engine, automation engine, pipeline engine,
+          user interface, and other platform functionality, together with any generic templates, documentation, and
+          platform configurations Verexa creates and makes generally available to Firms (&ldquo;Platform IP&rdquo;).
+          Nothing in these Terms transfers any Platform IP to a Firm; a Firm&rsquo;s subscription grants only the right
+          to use the platform as described in these Terms.
+        </p>
+        <p>
+          <strong className="text-ink">Customer Data.</strong> &ldquo;Customer Data&rdquo; means the data a Firm and
+          its Clients create, upload, or enter into Verexa, including client records, taxpayer information, uploaded
+          documents, client communications, internal notes, client contact information, engagement information,
+          pricing information, business information, and the Firm&rsquo;s own workflow configurations, pipeline
+          configurations, templates, and engagement letters. As stated in Section 2, the Firm owns and controls its own
+          Customer Data. Customer Data does not become Verexa&rsquo;s property, and is not converted into Platform IP,
+          merely because Verexa hosts it, because a workspace becomes Suspended, Archived, or Permanently Archived, or
+          because Verexa retains it for the period described in our Privacy Policy.
+        </p>
+        <p>
+          <strong className="text-ink">Customer-created content vs. platform functionality.</strong> A Firm&rsquo;s
+          specific workflow instructions, pipeline configurations, email and SMS content, documents, templates,
+          engagement letters, and internal processes are that Firm&rsquo;s Customer Data. The underlying Verexa
+          software and generic functionality that allows a Firm to build and run those things is Platform IP. Building
+          or customizing content using Verexa&rsquo;s platform functionality does not give Verexa ownership of that
+          content.
+        </p>
+        <p>
+          <strong className="text-ink">Voluntary template contributions.</strong> Verexa may in the future offer Firms
+          the ability to voluntarily submit a workflow, pipeline, or template for publication in a marketplace,
+          adaptation into a generalized template, or other use beyond the submitting Firm&rsquo;s own workspace. No
+          such use of a Firm&rsquo;s customer-created content occurs today, and none will occur without that
+          Firm&rsquo;s separate, explicit agreement presented at the time of submission -- participation in Verexa
+          alone does not grant Verexa any such rights.
+        </p>
+      </Section>
+
+      <Section title="14. Governing law">
         <p>
           These Terms are governed by the laws of the State of Louisiana, without regard to its conflict-of-laws
           principles.
         </p>
       </Section>
 
-      <Section title="13. Changes to these Terms">
+      <Section title="15. Changes to these Terms">
         <p>
           We may update these Terms from time to time. Material changes will be reflected by updating the effective date
           above, and where appropriate we will notify Firms directly. Continued use of Verexa after a change takes effect
@@ -165,7 +255,7 @@ export default function TermsOfServicePage() {
         </p>
       </Section>
 
-      <Section title="14. Contact">
+      <Section title="16. Contact">
         <p>
           Verexa HQ CRM is based in Louisiana. Questions about these Terms can be sent to{" "}
           <a href="mailto:support@verexahq.com" className="text-accent hover:underline">

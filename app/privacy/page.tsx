@@ -56,6 +56,11 @@ export default function PrivacyPolicyPage() {
           that firm directly -- they control your data and can act on requests to access, correct, or delete it. If you
           need help reaching us about how Verexa itself operates, see the Contact section below.
         </p>
+        <p>
+          Data we continue to host or retain under Section 7 -- including during a Suspended, Archived, or Permanently
+          Archived workspace -- remains the Firm&rsquo;s data. Retention for legal, contractual, or security purposes
+          does not transfer ownership of that data to Verexa or convert it into Verexa&rsquo;s own property.
+        </p>
       </Section>
 
       <Section title="2. Information we collect">
@@ -93,6 +98,16 @@ export default function PrivacyPolicyPage() {
         <p>
           We do not sell client information, and we do not use a Firm&rsquo;s client data to train third-party AI models or
           for advertising.
+        </p>
+        <p>
+          <strong className="text-ink">Marketing and use of retained data.</strong> Verexa does not use a Firm&rsquo;s
+          Customer Data -- including a Firm&rsquo;s client or taxpayer information -- to market Verexa&rsquo;s own
+          services to that Firm&rsquo;s clients, and does not treat retained Customer Data as a marketing or
+          solicitation list, whether the Firm&rsquo;s workspace is active, Suspended, Archived, or Permanently
+          Archived. If Verexa were to market to individuals whose information it holds only because a Firm entered it
+          as that Firm&rsquo;s client, it would do so only under a separate, lawful basis and consent obtained directly
+          from those individuals -- never merely because a Firm&rsquo;s account ended or because Verexa continues to
+          retain data under Section 7.
         </p>
       </Section>
 
@@ -145,13 +160,26 @@ export default function PrivacyPolicyPage() {
 
       <Section title="7. Data retention">
         <p>
-          We retain client and taxpayer information for as long as a Firm&rsquo;s account remains active, and after
-          account closure for whichever is longer of: (a) 12 months, or (b) the minimum period applicable tax
-          recordkeeping rules require for the records involved (for example, IRS recordkeeping and due-diligence rules
-          applicable to return preparers, which commonly require retaining copies of returns or the information used to
-          prepare them for at least three years). A Firm may request deletion of its data sooner, subject to any
-          independent legal retention obligations the Firm itself is subject to as the data controller. Staff account and
-          audit-log data is retained as needed for security and legal-compliance purposes.
+          We retain client and taxpayer information for as long as a Firm&rsquo;s account remains active.
+          &ldquo;Account Closure&rdquo; -- the termination of the Firm&rsquo;s Verexa subscription and account
+          relationship, which occurs when a workspace becomes Permanently Archived as described in our Terms of
+          Service -- is what starts the retention period described below. Suspension and Archiving are earlier stages
+          of the same lifecycle and do not, by themselves, constitute Account Closure.
+        </p>
+        <p>
+          Following Account Closure, we retain client and taxpayer information for whichever is longer of: (a) 12
+          months, or (b) the minimum period applicable tax recordkeeping rules require for the records involved (for
+          example, IRS recordkeeping and due-diligence rules applicable to return preparers, which commonly require
+          retaining copies of returns or the information used to prepare them for at least three years). A Firm may
+          request deletion of its data sooner, subject to any independent legal retention obligations the Firm itself
+          is subject to as the data controller. Staff account and audit-log data is retained as needed for security
+          and legal-compliance purposes.
+        </p>
+        <p>
+          Once the retention period(s) above have expired, and once any active legal hold, dispute, or security or
+          fraud investigation requiring continued retention has been resolved, eligible data is reviewed and may be
+          securely deleted. We do not delete data automatically on a fixed schedule; deletion occurs only after this
+          review confirms no further retention obligation applies.
         </p>
       </Section>
 
@@ -165,6 +193,10 @@ export default function PrivacyPolicyPage() {
         <p>
           Firm staff can update their own account information directly within Verexa (Settings &gt; My Account), and can
           disconnect optional integrations such as Zoom at any time from Settings &gt; Integrations.
+        </p>
+        <p>
+          For a Firm&rsquo;s own account-level export rights (as distinct from an individual Client&rsquo;s request
+          made directly to that Firm), see the Data Export section of our Terms of Service.
         </p>
       </Section>
 
