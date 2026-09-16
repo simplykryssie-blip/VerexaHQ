@@ -332,22 +332,24 @@ export function WorkflowList({
         ) : (
           <ul className="divide-y divide-border rounded-2xl border border-border bg-surface shadow-soft">
             {visibleWorkflows.map((w) => (
-              <li key={w.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <StarButton workspaceId={workspaceId} entityType="automation" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
-                <Link href={`/workflows/${w.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                  <Zap size={16} className={w.is_enabled ? "text-accent" : "text-muted"} />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate text-sm font-medium text-ink">{w.name}</p>
-                      {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+              <li key={w.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                  <StarButton workspaceId={workspaceId} entityType="automation" entityId={w.id} starred={w.starred} label={w.name} alwaysVisible />
+                  <Link href={`/workflows/${w.id}`} className="flex min-w-0 flex-1 items-center gap-3 py-1 -my-1">
+                    <Zap size={16} className={`shrink-0 ${w.is_enabled ? "text-accent" : "text-muted"}`} />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="break-words text-sm font-medium text-ink sm:truncate">{w.name}</p>
+                        {w.step_count === 0 && <Badge tone="warning">No steps yet</Badge>}
+                      </div>
+                      <p className="break-words text-xs text-muted sm:truncate">
+                        {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
+                        {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
+                      </p>
                     </div>
-                    <p className="truncate text-xs text-muted">
-                      {triggerSummary(w.trigger_type, w.trigger_config, organizerTemplates, services, pipelines)} &middot; {w.step_count} step
-                      {w.step_count === 1 ? "" : "s"} &middot; {w.run_count} run{w.run_count === 1 ? "" : "s"}
-                    </p>
-                  </div>
-                </Link>
-                <div className="flex shrink-0 items-center gap-3">
+                  </Link>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0 sm:gap-3">
                   {w.status === "draft" ? (
                     <Badge tone="warning">Draft</Badge>
                   ) : w.status === "archived" ? (
@@ -387,7 +389,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => duplicate(w.id, w.name)}
                         disabled={duplicatingId === w.id}
-                        className="rounded-lg p-1.5 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
+                        className="rounded-lg p-3 text-muted transition hover:bg-surfaceMuted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 sm:p-1.5"
                         aria-label="Duplicate workflow"
                       >
                         <Copy size={14} />
@@ -396,7 +398,7 @@ export function WorkflowList({
                         type="button"
                         onClick={() => remove(w.id)}
                         disabled={deletingId === w.id}
-                        className="rounded-lg p-1.5 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50"
+                        className="rounded-lg p-3 text-muted transition hover:bg-dangerSoft hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 sm:p-1.5"
                         aria-label="Delete workflow"
                       >
                         <Trash2 size={14} />
