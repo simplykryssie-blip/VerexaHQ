@@ -868,6 +868,101 @@ export async function cancelSubscription(subscriptionId: string): Promise<Stripe
 }
 
 /**
+ * Creates a bare Stripe Customer with no payment method and no
+ * subscription -- used by the legacy first-charge migration tool to give a
+ * pre-existing workspace (one that predates payment-first signup and has
+ * never had a real Stripe Customer) somewhere to attach a card via the
+ * existing setup Checkout flow. Never call this for a workspace that
+ * already has a stripe_customer_id -- the caller is responsible for that
+ * idempotency check, since Stripe has no natural dedup key here.
+ */
+export async function createCustomer({
+  email,
+  name,
+  metadata,
+}: {
+  email: string;
+  name?: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<{ id: string }>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({ email, name });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/customers`, { method: "POST", headers: authHeaders(), body });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    return { ok: false, reason: `Stripe responded with ${res.status}: ${text}` };
+  }
+  const data = (await res.json()) as { id: string };
+  return { ok: true, data };
+}
+
+/**
+ * Creates a subscription directly against the Subscriptions API (not via
+ * Checkout) with a future billing_cycle_anchor and proration_behavior
+ * "none" -- the only combination that lets Stripe hold a real,
+ * already-priced subscription with a card on file while guaranteeing zero
+ * charge occurs before the anchor date, per Stripe's own documented
+ * behavior ("this action doesn't generate an invoice at all until the
+ * first billing period... customers receive an invoice with the full
+ * subscription amount on the billing cycle anchor date"). Used exclusively
+ * by the legacy first-charge migration tool -- every other subscription in
+ * this app is created through a Checkout Session instead, where the
+ * customer confirms payment interactively.
+ *
+ * automatic_tax stays on for the same reason every other subscription
+ * creation path in this file turns it on: Stripe Tax is active on the
+ * account even though no registration exists yet (see the Stripe Tax
+ * audit), so this is a no-op today and correct the moment a registration
+ * is added. collection_method is explicit "charge_automatically" so
+ * Stripe -- not a human sending an invoice -- performs the actual charge
+ * attempt on the anchor date.
+ */
+export async function createDelayedStartSubscription({
+  customerId,
+  priceId,
+  billingCycleAnchorUnix,
+  defaultPaymentMethodId,
+  metadata,
+}: {
+  customerId: string;
+  priceId: string;
+  billingCycleAnchorUnix: number;
+  defaultPaymentMethodId: string;
+  metadata: Record<string, string>;
+}): Promise<StripeResult<StripeSubscriptionForProvisioning>> {
+  if (!isStripeConfigured()) {
+    return { ok: false, reason: "Stripe is not configured for this environment." };
+  }
+
+  const body = toFormBody({
+    customer: customerId,
+    "items[0][price]": priceId,
+    billing_cycle_anchor: billingCycleAnchorUnix,
+    proration_behavior: "none",
+    collection_method: "charge_automatically",
+    default_payment_method: defaultPaymentMethodId,
+    "automatic_tax[enabled]": "true",
+  });
+  for (const [key, value] of Object.entries(metadata)) {
+    body.set(`metadata[${key}]`, value);
+  }
+
+  const res = await fetch(`${STRIPE_API}/subscriptions`, { method: "POST", headers: authHeaders(), body });
+  const data = (await res.json().catch(() => ({}))) as StripeSubscriptionForProvisioning & { error?: { message?: string } };
+  if (!res.ok || !data.id) {
+    return { ok: false, reason: (data as { error?: { message?: string } }).error?.message ?? `Stripe responded with ${res.status}` };
+  }
+  return { ok: true, data };
+}
+
+/**
  * Verifies a Stripe webhook signature per Stripe's documented scheme
  * (t=<timestamp>,v1=<hmac>) without needing the stripe SDK.
  */

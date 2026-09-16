@@ -10636,6 +10636,7 @@ export type Database = {
           current_period_end: string | null
           current_period_start: string | null
           default_payment_method_id: string | null
+          first_period_end: string | null
           id: string
           locked_plan_snapshot: Json | null
           plan_id: string
@@ -10661,6 +10662,7 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           default_payment_method_id?: string | null
+          first_period_end?: string | null
           id?: string
           locked_plan_snapshot?: Json | null
           plan_id: string
@@ -10686,6 +10688,7 @@ export type Database = {
           current_period_end?: string | null
           current_period_start?: string | null
           default_payment_method_id?: string | null
+          first_period_end?: string | null
           id?: string
           locked_plan_snapshot?: Json | null
           plan_id?: string
