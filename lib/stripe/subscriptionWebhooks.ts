@@ -230,7 +230,8 @@ async function lockWorkspaceForCancellation(supabase: ReturnType<typeof createSe
     .from("workspaces")
     .update({ status: "suspended", suspension_reason: "subscription_canceled" })
     .eq("id", workspaceId)
-    .neq("status", "archived");
+    .neq("status", "archived")
+    .neq("status", "permanently_archived");
 }
 
 export async function handleSubscriptionCreated(

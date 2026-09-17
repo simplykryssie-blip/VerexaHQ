@@ -69,12 +69,27 @@ export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
   return data ? toCurrentWorkspace(data as unknown as { is_owner: boolean; workspaces: Parameters<typeof toCurrentWorkspace>[0]["workspaces"] }) : null;
 }
 
-// The suspension-recovery surface a suspended workspace must always be able
-// to reach -- Verexa's own subscription/payment-method page (not /billing,
-// which is this workspace's OWN client billing, an operational feature that
-// suspension correctly blocks) -- plus the released-staff "Set Up My
-// Billing" flow, which briefly loads pages in the suspended personal
-// workspace's own context before redirecting to Stripe Checkout.
+// The three non-operational lifecycle stages (ACTIVE -> PAST_DUE ->
+// SUSPENDED -> ARCHIVED -> PERMANENTLY_ARCHIVED, where PAST_DUE is a
+// workspace_subscriptions.stripe_status value, not a workspaces.status one)
+// that must all lose normal workspace access identically -- this is the one
+// place that list is spelled out; every gate below and in app/(app)/layout.tsx
+// derives from it instead of repeating "suspended" || "archived" || ... .
+const NON_OPERATIONAL_STATUSES = ["suspended", "archived", "permanently_archived"] as const;
+
+export function isNonOperationalWorkspaceStatus(status: string): boolean {
+  return (NON_OPERATIONAL_STATUSES as readonly string[]).includes(status);
+}
+
+// The suspension-recovery surface a non-operational workspace must always be
+// able to reach -- Verexa's own subscription/payment-method page (not
+// /billing, which is this workspace's OWN client billing, an operational
+// feature that suspension/archive correctly blocks) -- plus the
+// released-staff "Set Up My Billing" flow, which briefly loads pages in the
+// suspended personal workspace's own context before redirecting to Stripe
+// Checkout. Used identically for suspended/archived/permanently_archived --
+// none of them invent a narrower or wider recovery surface than what
+// already exists for suspension.
 const SUSPENSION_ALLOWED_PATH_PREFIXES = ["/settings/plan-usage", "/settings/profile", "/support"];
 
 export function isSuspensionRecoveryPath(pathname: string): boolean {
@@ -83,16 +98,23 @@ export function isSuspensionRecoveryPath(pathname: string): boolean {
 
 // Shared server-side gate for API routes/server actions that mutate
 // operational workspace data (clients, engagements, documents, invitations,
-// etc.) -- Phase 3 suspension enforcement. Page loads are blocked centrally
-// in app/(app)/layout.tsx; this covers the routes that bypass that layout.
-// Returns an error string to return as a 403 when the workspace is
-// suspended, or null when the request may proceed. Never call this from a
+// etc.) -- Phase 3 suspension enforcement, extended to archived/
+// permanently_archived. Page loads are blocked centrally in
+// app/(app)/layout.tsx; this covers the routes that bypass that layout.
+// Returns an error string to return as a 403 when the workspace is not
+// operational, or null when the request may proceed. Never call this from a
 // billing-recovery route (Stripe checkout, payment method, workspace
-// switch, seat-setup-for-released-staff) -- those must keep working while
-// suspended.
+// switch, seat-setup-for-released-staff) -- those must keep working at
+// every non-operational stage.
 export function workspaceOperationalError(workspace: Pick<CurrentWorkspace, "status">): string | null {
   if (workspace.status === "suspended") {
     return "This workspace is suspended pending billing. Resolve billing under Settings > Plan & Usage to restore access.";
+  }
+  if (workspace.status === "archived") {
+    return "This workspace has been archived and no longer has normal access. Visit Settings > Plan & Usage or contact Support for recovery/export options.";
+  }
+  if (workspace.status === "permanently_archived") {
+    return "This workspace has been permanently archived. Contact Support for data export options.";
   }
   return null;
 }
