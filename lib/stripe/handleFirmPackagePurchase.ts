@@ -34,6 +34,11 @@ export async function handleFirmPackagePurchaseCheckoutCompleted(
 
   const { data: purchase } = await supabase.from("firm_package_purchases").select("id, package_id, connection_id").eq("id", purchaseId).maybeSingle();
   if (!purchase) return { skipped: "purchase not found" };
+  // This in-app Stripe checkout path only ever runs for a connection-based
+  // purchase (a connected firm buying the package assigned to it) -- a
+  // prospect-based external purchase never reaches Stripe checkout through
+  // this route, so connection_id being null here would be unexpected.
+  if (!purchase.connection_id) return { skipped: "purchase has no connection" };
 
   await supabase
     .from("firm_package_purchases")
