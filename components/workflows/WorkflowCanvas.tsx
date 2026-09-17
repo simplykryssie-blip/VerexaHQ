@@ -451,7 +451,8 @@ function StepEdge({ id, sourceX, sourceY, targetX, targetY, style, markerEnd, da
               >
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setMenuOpen(false);
                     onInsert("condition");
                   }}
@@ -464,7 +465,8 @@ function StepEdge({ id, sourceX, sourceY, targetX, targetY, style, markerEnd, da
                     <button
                       key={t.value}
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setMenuOpen(false);
                         onInsert(t.value);
                       }}
@@ -965,9 +967,20 @@ function CanvasInner({
       return;
     }
 
+    // The connector's own "+" menu lives inside this edge's EdgeLabelRenderer
+    // portal -- React's synthetic events bubble through the React tree (not
+    // the portaled DOM position), so a menu-item click without its own
+    // stopPropagation() also reaches React Flow's edge click handling and
+    // sets selectedEdgeId to this edge. That handler runs synchronously,
+    // before this insert's awaits resolve, so clearing it here (in addition
+    // to each menu item now stopping propagation at the source) guarantees
+    // the new step -- not the edge it was inserted into -- ends up selected.
+    setSelectedEdgeId(null);
     if (actionType === "condition") {
+      setSelectedStepId(null);
       setActiveConditionStepId(newStepId);
     } else {
+      setActiveConditionStepId(null);
       setSelectedStepId(newStepId);
     }
     router.refresh();
@@ -1040,9 +1053,12 @@ function CanvasInner({
     // action type was already chosen from the full list in the Add step
     // menu, so its config panel opens immediately too, ready to fill in --
     // no separate click on the new node required.
+    setSelectedEdgeId(null);
     if (actionType === "condition") {
+      setSelectedStepId(null);
       setActiveConditionStepId((newStep as { id: string }).id);
     } else {
+      setActiveConditionStepId(null);
       setSelectedStepId((newStep as { id: string }).id);
     }
     router.refresh();
