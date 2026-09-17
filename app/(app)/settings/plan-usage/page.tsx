@@ -8,6 +8,7 @@ import { PlanUsageManager } from "@/components/settings/PlanUsageManager";
 import { PhoneNumbersManager, type PhoneNumberRow } from "@/components/settings/PhoneNumbersManager";
 import { BillingCardManager } from "@/components/settings/BillingCardManager";
 import { ResumeCheckoutButton } from "@/components/settings/ResumeCheckoutButton";
+import { LegalArchiveList, type LegalArchiveRow } from "@/components/legal/LegalArchiveList";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export default async function PlanUsagePage() {
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: subscription }, { data: meters }, { data: storageFiles }, { data: phoneNumbers }] = await Promise.all([
+  const [{ data: subscription }, { data: meters }, { data: storageFiles }, { data: phoneNumbers }, { data: legalArchives }] = await Promise.all([
     supabase
       .from("workspace_subscriptions")
       .select(
@@ -34,7 +35,27 @@ export default async function PlanUsagePage() {
       .select("id, phone_number, is_free, status, assigned_client:clients(id, first_name, last_name, business_name, client_type)")
       .eq("workspace_id", workspace.id)
       .order("created_at", { ascending: true }),
+    workspace.is_owner ? supabase.rpc("get_platform_terms_archives", { p_workspace_id: workspace.id }) : Promise.resolve({ data: null }),
   ]);
+
+  const legalArchiveRows: LegalArchiveRow[] = await Promise.all(
+    (legalArchives ?? []).map(async (a) => {
+      let viewUrl: string | null = null;
+      if (a.status === "generated" && a.pdf_storage_path) {
+        const { data: signed } = await supabase.storage.from("legal-archives").createSignedUrl(a.pdf_storage_path, 300);
+        viewUrl = signed?.signedUrl ?? null;
+      }
+      return {
+        id: a.id,
+        version: a.version,
+        status: a.status as LegalArchiveRow["status"],
+        accepted_at: a.accepted_at,
+        accepted_by_name: a.accepted_by_name,
+        accepted_by_email: a.accepted_by_email,
+        viewUrl,
+      };
+    })
+  );
 
   const plan = subscription?.platform_subscription_plans as {
     name: string;
@@ -143,6 +164,13 @@ export default async function PlanUsagePage() {
           </>
           )}
           </>
+        )}
+        {workspace.is_owner && (
+          <div className="mt-6">
+            <SettingsCard title="Legal agreements" description="Your workspace's record of accepting Verexa's Platform Terms of Service and Privacy Policy.">
+              <LegalArchiveList rows={legalArchiveRows} />
+            </SettingsCard>
+          </div>
         )}
       </div>
     </div>
