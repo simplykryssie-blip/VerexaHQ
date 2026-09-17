@@ -1,5 +1,6 @@
-// Client-side helper for the /api/auth/rate-limit check shared by the
-// login and forgot-password forms. Fails open (returns true = allowed) on
+// Client-side helper for the /api/auth/rate-limit check used by the
+// forgot-password form (the login forms now rate-limit server-side inside
+// /api/auth/login itself). Fails open (returns true = allowed) on
 // any network/parse error so an infra hiccup on the rate limiter can never
 // wedge the sign-in button in a permanent "please wait" state.
 export async function checkRateLimitClientSide(action: "login" | "password-reset", email: string): Promise<boolean> {
