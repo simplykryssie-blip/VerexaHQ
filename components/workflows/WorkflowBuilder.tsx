@@ -1974,7 +1974,15 @@ export function WorkflowBuilder({
     setConditions(normalizeToConditionGroups(initialConditions));
   }, [triggerType, triggerConfig, isEnabled, status, initialConditions]);
 
-  async function saveTrigger() {
+  // Returns whether the trigger was actually persisted -- false covers both
+  // a declined/failed tag confirmation and a failed update, so the caller
+  // (the "Save trigger" button) can tell a real save apart from an aborted
+  // one instead of assuming success just because this didn't throw. Without
+  // this, the button's own modal-close would run unconditionally even when
+  // nothing was saved -- the exact "step save leaves its editor open on
+  // failure, trigger save silently closes anyway" asymmetry that made a
+  // declined tag confirmation look like the trigger vanished.
+  async function saveTrigger(): Promise<boolean> {
     // Same race as StepCard's add_tag/remove_tag save: clicking "Save
     // trigger" right after typing a tag (no Enter, no dropdown click) is
     // itself the outside-click that would commit it, but that commit and
@@ -1997,7 +2005,7 @@ export function WorkflowBuilder({
       const triggerTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
       triggerTags.forEach((t) => tagsToConfirm.add(t));
     }
-    if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return;
+    if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return false;
 
     setSavingTrigger(true);
     const { error } = await supabase
@@ -2007,10 +2015,11 @@ export function WorkflowBuilder({
     setSavingTrigger(false);
     if (error) {
       toast.show(error.message, "error");
-      return;
+      return false;
     }
     toast.show("Trigger saved", "success");
     router.refresh();
+    return true;
   }
 
   async function toggleEnabled() {
@@ -2291,8 +2300,8 @@ export function WorkflowBuilder({
                 <button
                   type="button"
                   onClick={async () => {
-                    await saveTrigger();
-                    setTriggerModalOpen(false);
+                    const saved = await saveTrigger();
+                    if (saved) setTriggerModalOpen(false);
                   }}
                   disabled={savingTrigger}
                   className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
