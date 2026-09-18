@@ -6,6 +6,7 @@ import { reportSystemFailure, isAccountLevelResendError } from "@/lib/systemFail
 import { getAppUrl } from "@/lib/appUrl";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
 import { PORTAL_INVITE_EMAIL_DEFAULT } from "@/lib/notifications/systemTemplateDefaults";
+import { isWorkspaceStatusOperational } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -51,16 +52,34 @@ async function handleGET(request: Request) {
 
   console.log(`send-pending-portal-invites: fetched ${jobs?.length ?? 0} job(s)`, (jobs ?? []).map((j) => j.id));
 
-  const context = await resolveInviteContext(supabase, jobs ?? []);
+  // A job can sit at 'pending' from before the workspace was suspended --
+  // it must not send while the workspace is non-operational, but it also
+  // must not be marked 'failed' (that would drop it for good) or 'sent'
+  // (that would be a false success). Left untouched at 'pending', it's
+  // naturally retried by the next tick, including after the workspace
+  // recovers to active.
+  const workspaceIds = Array.from(new Set((jobs ?? []).map((j) => j.workspace_id)));
+  const { data: workspaceStatusRows } = workspaceIds.length
+    ? await supabase.from("workspaces").select("id, status").in("id", workspaceIds)
+    : { data: [] as { id: string; status: string }[] };
+  const statusByWorkspaceId = new Map((workspaceStatusRows ?? []).map((w) => [w.id, w.status]));
+
+  const operationalJobs = (jobs ?? []).filter((j) => isWorkspaceStatusOperational(statusByWorkspaceId.get(j.workspace_id) ?? "active"));
+  const blocked = (jobs?.length ?? 0) - operationalJobs.length;
+  if (blocked > 0) {
+    console.log(`send-pending-portal-invites: leaving ${blocked} job(s) pending -- workspace not currently operational`);
+  }
+
+  const context = await resolveInviteContext(supabase, operationalJobs);
 
   const startedAt = Date.now();
   let sent = 0;
   let failed = 0;
   let deferred = 0;
 
-  for (const job of jobs ?? []) {
+  for (const job of operationalJobs) {
     if (Date.now() - startedAt > DEADLINE_MS) {
-      deferred = (jobs?.length ?? 0) - sent - failed;
+      deferred = operationalJobs.length - sent - failed;
       console.log(`send-pending-portal-invites: stopping early with ${deferred} job(s) left for the next tick`);
       break;
     }
@@ -69,7 +88,7 @@ async function handleGET(request: Request) {
     else failed++;
   }
 
-  return NextResponse.json({ processed: sent + failed, sent, failed, deferred });
+  return NextResponse.json({ processed: sent + failed, sent, failed, deferred, blocked });
 }
 
 type PendingInviteJob = { id: string; workspace_id: string; client_id: string; client_portal_user_id: string };

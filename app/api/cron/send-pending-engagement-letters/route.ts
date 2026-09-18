@@ -5,6 +5,7 @@ import { renderLetterPdf } from "@/lib/documents/renderLetterPdf";
 import { renderPdfTemplate, type PdfFieldMapping } from "@/lib/documents/renderPdfTemplate";
 import { reportSystemFailure } from "@/lib/systemFailures";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { isWorkspaceStatusOperational } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -77,14 +78,30 @@ async function handleGET(request: Request) {
   const workspaceById = new Map((workspaces ?? []).map((w) => [w.id, w]));
   const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
 
+  // A job can sit at 'pending' from before the workspace was suspended --
+  // it must not render/send while the workspace is non-operational, but it
+  // also must not be marked 'failed' (dropped for good) or 'sent' (a false
+  // success). Left untouched at 'pending', it's naturally retried by the
+  // next tick, including after the workspace recovers to active.
+  const { data: workspaceStatusRows } = workspaceIds.length
+    ? await supabase.from("workspaces").select("id, status").in("id", workspaceIds)
+    : { data: [] as { id: string; status: string }[] };
+  const statusByWorkspaceId = new Map((workspaceStatusRows ?? []).map((w) => [w.id, w.status]));
+
+  const operationalJobs = (jobs ?? []).filter((j) => isWorkspaceStatusOperational(statusByWorkspaceId.get(j.workspace_id) ?? "active"));
+  const blocked = (jobs?.length ?? 0) - operationalJobs.length;
+  if (blocked > 0) {
+    console.log(`send-pending-engagement-letters: leaving ${blocked} job(s) pending -- workspace not currently operational`);
+  }
+
   const startedAt = Date.now();
   let sent = 0;
   let failed = 0;
   let deferred = 0;
 
-  for (const job of jobs ?? []) {
+  for (const job of operationalJobs) {
     if (Date.now() - startedAt > DEADLINE_MS) {
-      deferred = (jobs?.length ?? 0) - sent - failed;
+      deferred = operationalJobs.length - sent - failed;
       console.log(`send-pending-engagement-letters: stopping early with ${deferred} job(s) left for the next tick`);
       break;
     }
@@ -97,7 +114,7 @@ async function handleGET(request: Request) {
     else failed++;
   }
 
-  return NextResponse.json({ processed: sent + failed, sent, failed, deferred });
+  return NextResponse.json({ processed: sent + failed, sent, failed, deferred, blocked });
 }
 
 type EngagementLetterTemplateRow = {

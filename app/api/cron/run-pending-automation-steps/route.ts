@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { isWorkspaceStatusOperational } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -46,16 +47,29 @@ async function handleGET(request: Request) {
 
   const { data: pending } = await supabase
     .from("automation_pending_steps")
-    .select("id, run_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
+    .select("id, run_id, workspace_id, automation_step_id, automation_steps(action_type), automation_runs(status)")
     .eq("status", "pending_delay")
     .lte("scheduled_for", nowIso)
     .order("scheduled_for", { ascending: true })
     .limit(BATCH_SIZE);
 
+  // A due step's workspace can have gone non-operational since it was
+  // queued. It must not execute, but the pending_delay row must also not
+  // be deleted -- that's the only durable "still waiting" marker this step
+  // has. Left in place, the next tick (after should_advance_wait_until_step
+  // re-checks it, same as any other still-waiting row) picks it up again,
+  // including once the workspace recovers to active.
+  const pendingWorkspaceIds = Array.from(new Set((pending ?? []).map((row) => row.workspace_id)));
+  const { data: pendingWorkspaceStatusRows } = pendingWorkspaceIds.length
+    ? await supabase.from("workspaces").select("id, status").in("id", pendingWorkspaceIds)
+    : { data: [] as { id: string; status: string }[] };
+  const statusByWorkspaceId = new Map((pendingWorkspaceStatusRows ?? []).map((w) => [w.id, w.status]));
+
   const startedAt = Date.now();
   let processed = 0;
   let stillWaiting = 0;
   let deferred = 0;
+  let blocked = 0;
   for (const row of pending ?? []) {
     if (Date.now() - startedAt > DEADLINE_MS) {
       deferred = (pending?.length ?? 0) - processed - stillWaiting;
@@ -69,6 +83,10 @@ async function handleGET(request: Request) {
     const runStatus = (row.automation_runs as unknown as { status?: string } | null)?.status;
     if (runStatus !== "running") {
       await supabase.from("automation_pending_steps").delete().eq("id", row.id);
+      continue;
+    }
+    if (!isWorkspaceStatusOperational(statusByWorkspaceId.get(row.workspace_id) ?? "active")) {
+      blocked++;
       continue;
     }
     const { data: shouldAdvance } = await supabase.rpc("should_advance_wait_until_step", { p_pending_id: row.id });
@@ -86,7 +104,27 @@ async function handleGET(request: Request) {
     processed++;
   }
 
-  return NextResponse.json({ processed, stillWaiting, deferred });
+  // Runs that stopped advancing at start_next_automation_step's operational
+  // gate (blocked_at set, no pending_steps row exists yet to represent
+  // "waiting on a specific step") are otherwise never revisited by
+  // anything. Re-invoking it is safe and idempotent: the function resolves
+  // "what's next" purely from automation_runs.current_step_id, same as
+  // every other resume path in this cron.
+  const { data: blockedRuns } = await supabase
+    .from("automation_runs")
+    .select("id, workspaces(status)")
+    .eq("status", "running")
+    .not("blocked_at", "is", null)
+    .limit(BATCH_SIZE);
+  let resumed = 0;
+  for (const run of blockedRuns ?? []) {
+    const workspaceStatus = (run.workspaces as unknown as { status?: string } | null)?.status;
+    if (!isWorkspaceStatusOperational(workspaceStatus ?? "")) continue;
+    await supabase.rpc("start_next_automation_step", { p_run_id: run.id });
+    resumed++;
+  }
+
+  return NextResponse.json({ processed, stillWaiting, deferred, blocked, resumed });
 }
 
 export const GET = withJobLogging("run-pending-automation-steps", handleGET);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { previewSeatProrationAmount } from "@/lib/stripe/client";
-import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 
 // Read-only: shows the admin the current recurring seat price and the
 // exact Stripe-computed prorated amount due today, before they confirm
@@ -19,7 +19,7 @@ export async function POST() {
   if (!workspace) {
     return NextResponse.json({ error: "No active workspace" }, { status: 400 });
   }
-  if (workspace.status === "suspended") {
+  if (!isWorkspaceStatusOperational(workspace.status)) {
     return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
 

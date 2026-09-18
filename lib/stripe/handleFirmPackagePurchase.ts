@@ -33,7 +33,7 @@ export async function handleFirmPackagePurchaseCheckoutCompleted(
   if (!purchaseId) return { skipped: "missing purchase_id metadata" };
 
   const { data: purchase } = await supabase.from("firm_package_purchases").select("id, package_id, connection_id").eq("id", purchaseId).maybeSingle();
-  if (!purchase) return { skipped: "purchase not found" };
+  if (!purchase || !purchase.connection_id) return { skipped: "purchase not found" };
 
   await supabase
     .from("firm_package_purchases")

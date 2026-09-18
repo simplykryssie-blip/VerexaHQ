@@ -4,7 +4,7 @@ import { createUsageTopupCheckoutSession } from "@/lib/stripe/client";
 import { isStripeConfigured } from "@/lib/providerStatus";
 import { recordProviderCheck } from "@/lib/providerHealth";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { getCurrentWorkspace } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
 import { getAppUrl } from "@/lib/appUrl";
 
 // Workspaces top up by dollar amount, not a fixed pack size -- they buy
@@ -52,6 +52,10 @@ export async function POST(request: Request) {
   }
   if (!workspace.is_owner) {
     return NextResponse.json({ error: "Only the workspace owner can purchase usage top-ups." }, { status: 403 });
+  }
+  const operationalError = workspaceOperationalError(workspace);
+  if (operationalError) {
+    return NextResponse.json({ error: operationalError }, { status: 403 });
   }
 
   const body = (await request.json()) as { resourceType?: string; amountCents?: number };

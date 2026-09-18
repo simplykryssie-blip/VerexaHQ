@@ -24,6 +24,16 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
+  // Uses a service-role client (this route needs to read/write appointment
+  // availability across staff calendars a portal user has no RLS access
+  // to), so the client-portal Day 0-30 continuity window has to be checked
+  // explicitly here -- RLS on `appointments` alone would not have caught
+  // this booking path.
+  const { data: portalWindowActive } = await supabase.rpc("is_client_portal_window_active", { p_workspace_id: identity.workspaceId });
+  if (!portalWindowActive) {
+    return NextResponse.json({ error: "The client portal isn't available for this workspace right now." }, { status: 403 });
+  }
+
   const { data: service } = await supabase
     .from("services")
     .select(

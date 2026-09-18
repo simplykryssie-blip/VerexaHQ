@@ -992,6 +992,7 @@ export type Database = {
           acknowledged_at: string | null
           acknowledged_by: string | null
           automation_id: string
+          blocked_at: string | null
           client_id: string | null
           completed_at: string | null
           connection_id: string | null
@@ -1000,6 +1001,7 @@ export type Database = {
           id: string
           is_test: boolean
           onboarding_id: string | null
+          partner_prospect_id: string | null
           started_at: string
           status: string
           trigger_snapshot: Json
@@ -1009,6 +1011,7 @@ export type Database = {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
           automation_id: string
+          blocked_at?: string | null
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1017,6 +1020,7 @@ export type Database = {
           id?: string
           is_test?: boolean
           onboarding_id?: string | null
+          partner_prospect_id?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1026,6 +1030,7 @@ export type Database = {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
           automation_id?: string
+          blocked_at?: string | null
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1034,6 +1039,7 @@ export type Database = {
           id?: string
           is_test?: boolean
           onboarding_id?: string | null
+          partner_prospect_id?: string | null
           started_at?: string
           status?: string
           trigger_snapshot?: Json
@@ -1094,6 +1100,13 @@ export type Database = {
             columns: ["onboarding_id"]
             isOneToOne: false
             referencedRelation: "partner_onboardings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_partner_prospect_id_fkey"
+            columns: ["partner_prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
             referencedColumns: ["id"]
           },
           {
@@ -4688,58 +4701,91 @@ export type Database = {
           amount: number | null
           billing_cadence: string | null
           canceled_at: string | null
-          connection_id: string
+          connection_id: string | null
           created_at: string
+          currency: string
           current_period_end: string | null
+          external_checkout_session_id: string | null
+          external_customer_id: string | null
+          external_payment_id: string | null
           id: string
           package_id: string
           parent_workspace_id: string
+          partner_prospect_id: string | null
+          payment_provider: string | null
+          payment_reference: string | null
           purchased_at: string | null
+          purchaser_email: string | null
+          purchaser_name: string | null
+          purchaser_phone: string | null
           selected_option_ids: string[] | null
+          source: string
           status: string
           stripe_checkout_session_id: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           updated_at: string
-          workspace_id: string
+          workspace_id: string | null
         }
         Insert: {
           amount?: number | null
           billing_cadence?: string | null
           canceled_at?: string | null
-          connection_id: string
+          connection_id?: string | null
           created_at?: string
+          currency?: string
           current_period_end?: string | null
+          external_checkout_session_id?: string | null
+          external_customer_id?: string | null
+          external_payment_id?: string | null
           id?: string
           package_id: string
           parent_workspace_id: string
+          partner_prospect_id?: string | null
+          payment_provider?: string | null
+          payment_reference?: string | null
           purchased_at?: string | null
+          purchaser_email?: string | null
+          purchaser_name?: string | null
+          purchaser_phone?: string | null
           selected_option_ids?: string[] | null
+          source?: string
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string
-          workspace_id: string
+          workspace_id?: string | null
         }
         Update: {
           amount?: number | null
           billing_cadence?: string | null
           canceled_at?: string | null
-          connection_id?: string
+          connection_id?: string | null
           created_at?: string
+          currency?: string
           current_period_end?: string | null
+          external_checkout_session_id?: string | null
+          external_customer_id?: string | null
+          external_payment_id?: string | null
           id?: string
           package_id?: string
           parent_workspace_id?: string
+          partner_prospect_id?: string | null
+          payment_provider?: string | null
+          payment_reference?: string | null
           purchased_at?: string | null
+          purchaser_email?: string | null
+          purchaser_name?: string | null
+          purchaser_phone?: string | null
           selected_option_ids?: string[] | null
+          source?: string
           status?: string
           stripe_checkout_session_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           updated_at?: string
-          workspace_id?: string
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -4761,6 +4807,13 @@ export type Database = {
             columns: ["parent_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_package_purchases_partner_prospect_id_fkey"
+            columns: ["partner_prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
             referencedColumns: ["id"]
           },
           {
@@ -6884,11 +6937,12 @@ export type Database = {
           created_at: string
           document_request_id: string | null
           documents_required: boolean
-          firm_connection_id: string
+          firm_connection_id: string | null
           firm_package_purchase_id: string | null
           id: string
           learning_course_id: string | null
           package_id: string | null
+          partner_prospect_id: string | null
           rejected_at: string | null
           rejected_reason: string | null
           review_decision: string | null
@@ -6914,11 +6968,12 @@ export type Database = {
           created_at?: string
           document_request_id?: string | null
           documents_required?: boolean
-          firm_connection_id: string
+          firm_connection_id?: string | null
           firm_package_purchase_id?: string | null
           id?: string
           learning_course_id?: string | null
           package_id?: string | null
+          partner_prospect_id?: string | null
           rejected_at?: string | null
           rejected_reason?: string | null
           review_decision?: string | null
@@ -6944,11 +6999,12 @@ export type Database = {
           created_at?: string
           document_request_id?: string | null
           documents_required?: boolean
-          firm_connection_id?: string
+          firm_connection_id?: string | null
           firm_package_purchase_id?: string | null
           id?: string
           learning_course_id?: string | null
           package_id?: string | null
+          partner_prospect_id?: string | null
           rejected_at?: string | null
           rejected_reason?: string | null
           review_decision?: string | null
@@ -7006,8 +7062,91 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "partner_onboardings_partner_prospect_id_fkey"
+            columns: ["partner_prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "partner_onboardings_workspace_id_fkey"
             columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_prospects: {
+        Row: {
+          assigned_staff_id: string | null
+          created_at: string
+          email: string
+          external_customer_id: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          linked_firm_connection_id: string | null
+          linked_user_id: string | null
+          linked_workspace_id: string | null
+          owning_workspace_id: string
+          phone: string | null
+          source: string
+          tags: string[]
+          updated_at: string
+        }
+        Insert: {
+          assigned_staff_id?: string | null
+          created_at?: string
+          email: string
+          external_customer_id?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          linked_firm_connection_id?: string | null
+          linked_user_id?: string | null
+          linked_workspace_id?: string | null
+          owning_workspace_id: string
+          phone?: string | null
+          source?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Update: {
+          assigned_staff_id?: string | null
+          created_at?: string
+          email?: string
+          external_customer_id?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          linked_firm_connection_id?: string | null
+          linked_user_id?: string | null
+          linked_workspace_id?: string | null
+          owning_workspace_id?: string
+          phone?: string | null
+          source?: string
+          tags?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_prospects_linked_firm_connection_id_fkey"
+            columns: ["linked_firm_connection_id"]
+            isOneToOne: false
+            referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_prospects_linked_workspace_id_fkey"
+            columns: ["linked_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_prospects_owning_workspace_id_fkey"
+            columns: ["owning_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
@@ -9718,6 +9857,7 @@ export type Database = {
           firm_connection_id: string | null
           id: string
           overdue_flagged_at: string | null
+          partner_prospect_id: string | null
           priority: string | null
           related_organizer_response_id: string | null
           status: string
@@ -9740,6 +9880,7 @@ export type Database = {
           firm_connection_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
+          partner_prospect_id?: string | null
           priority?: string | null
           related_organizer_response_id?: string | null
           status?: string
@@ -9762,6 +9903,7 @@ export type Database = {
           firm_connection_id?: string | null
           id?: string
           overdue_flagged_at?: string | null
+          partner_prospect_id?: string | null
           priority?: string | null
           related_organizer_response_id?: string | null
           status?: string
@@ -9812,6 +9954,13 @@ export type Database = {
             columns: ["firm_connection_id"]
             isOneToOne: false
             referencedRelation: "firm_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_partner_prospect_id_fkey"
+            columns: ["partner_prospect_id"]
+            isOneToOne: false
+            referencedRelation: "partner_prospects"
             referencedColumns: ["id"]
           },
           {
@@ -10470,6 +10619,41 @@ export type Database = {
             foreignKeyName: "workspace_paid_seats_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_partner_purchase_webhooks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          endpoint_token: string
+          rotated_at: string | null
+          signing_secret_encrypted: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          endpoint_token?: string
+          rotated_at?: string | null
+          signing_secret_encrypted: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          endpoint_token?: string
+          rotated_at?: string | null
+          signing_secret_encrypted?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_partner_purchase_webhooks_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -11712,15 +11896,26 @@ export type Database = {
           workspace_id: string
         }[]
       }
-      _get_or_create_partner_onboarding: {
-        Args: {
-          p_firm_connection_id: string
-          p_firm_package_purchase_id: string
-          p_package_id: string
-          p_workspace_id: string
-        }
-        Returns: string
-      }
+      _get_or_create_partner_onboarding:
+        | {
+            Args: {
+              p_firm_connection_id: string
+              p_firm_package_purchase_id: string
+              p_package_id: string
+              p_workspace_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_firm_connection_id: string
+              p_firm_package_purchase_id: string
+              p_package_id: string
+              p_partner_prospect_id?: string
+              p_workspace_id: string
+            }
+            Returns: string
+          }
       _maybe_enter_review: {
         Args: { p_onboarding_id: string }
         Returns: undefined
@@ -11785,6 +11980,13 @@ export type Database = {
       _resolve_onboarding_default_reviewer: {
         Args: { p_firm_connection_id: string; p_workspace_id: string }
         Returns: string
+      }
+      _resolve_partner_purchase_webhook: {
+        Args: { p_endpoint_token: string }
+        Returns: {
+          signing_secret: string
+          workspace_id: string
+        }[]
       }
       accept_config_object_share: {
         Args: { p_share_id: string }
@@ -12198,19 +12400,34 @@ export type Database = {
         }
         Returns: string
       }
-      create_engagement: {
-        Args: {
-          p_assigned_staff_id?: string
-          p_case_type?: string
-          p_client_id: string
-          p_due_date?: string
-          p_priority?: Database["public"]["Enums"]["engagement_priority"]
-          p_process_id?: string
-          p_service_id?: string
-          p_workspace_id: string
-        }
-        Returns: string
-      }
+      create_engagement:
+        | {
+            Args: {
+              p_assigned_staff_id?: string
+              p_billing_rule_id?: string
+              p_case_type?: string
+              p_client_id: string
+              p_due_date?: string
+              p_priority?: Database["public"]["Enums"]["engagement_priority"]
+              p_process_id?: string
+              p_service_id?: string
+              p_workspace_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_assigned_staff_id?: string
+              p_case_type?: string
+              p_client_id: string
+              p_due_date?: string
+              p_priority?: Database["public"]["Enums"]["engagement_priority"]
+              p_process_id?: string
+              p_service_id?: string
+              p_workspace_id: string
+            }
+            Returns: string
+          }
       create_engagement_share: {
         Args: { p_engagement_id: string }
         Returns: {
@@ -12571,6 +12788,18 @@ export type Database = {
         Returns: undefined
       }
       expire_stale_engagement_shares: { Args: never; Returns: number }
+      find_or_create_partner_prospect: {
+        Args: {
+          p_email: string
+          p_external_customer_id?: string
+          p_first_name: string
+          p_last_name: string
+          p_owning_workspace_id: string
+          p_phone: string
+          p_source?: string
+        }
+        Returns: string
+      }
       find_or_create_public_lead: {
         Args: {
           p_email: string
@@ -13041,6 +13270,14 @@ export type Database = {
           relationship_type: string
         }[]
       }
+      get_partner_purchase_webhook_status: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          configured: boolean
+          endpoint_token: string
+          rotated_at: string
+        }[]
+      }
       get_platform_account_holders: {
         Args: never
         Returns: {
@@ -13312,6 +13549,10 @@ export type Database = {
       }
       is_account_locked: { Args: { p_user_id: string }; Returns: boolean }
       is_ai_sandbox_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
+      is_client_portal_window_active: {
         Args: { p_workspace_id: string }
         Returns: boolean
       }
@@ -13755,6 +13996,29 @@ export type Database = {
           p_typed_name?: string
         }
         Returns: undefined
+      }
+      record_verified_partner_purchase: {
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_external_checkout_session_id?: string
+          p_external_customer_id?: string
+          p_external_payment_id: string
+          p_owning_workspace_id: string
+          p_package_id: string
+          p_payment_provider: string
+          p_payment_reference: string
+          p_purchased_at?: string
+          p_purchaser_email: string
+          p_purchaser_name: string
+          p_purchaser_phone: string
+        }
+        Returns: {
+          did_process: boolean
+          onboarding_id: string
+          partner_prospect_id: string
+          purchase_id: string
+        }[]
       }
       redeem_firm_connection_invite: {
         Args: { p_token: string; p_workspace_id: string }
@@ -14270,6 +14534,13 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: undefined
+      }
+      set_partner_purchase_webhook: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          endpoint_token: string
+          signing_secret: string
+        }[]
       }
       set_platform_admin: {
         Args: { p_is_platform_admin: boolean; p_user_email: string }
