@@ -23,7 +23,7 @@ import { AssignmentForm } from "./AssignmentForm";
 import { TaxDetailsCard, type TaxDetailRow } from "@/components/tax/TaxDetailsCard";
 import { OrganizerResponseCard } from "@/components/organizer/OrganizerResponseCard";
 import type { ActionPermissions } from "@/lib/actionPermissions";
-import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE } from "@/lib/engagementStatus";
+import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_SHARE_STATUS_TONE, SIGNATURE_GATED_STATUSES } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 import { BankProductTransactionForm } from "@/components/billing/BankProductTransactionForm";
 import { BankProductStatusSelect } from "@/components/billing/BankProductStatusSelect";
@@ -55,6 +55,7 @@ export function OverviewTab({
   taxDetail,
   taxYears,
   workspaceId,
+  hasSignedLetter,
 }: {
   engagement: EngagementRow;
   progress: ProgressRow | null;
@@ -67,6 +68,7 @@ export function OverviewTab({
   taxDetail: TaxDetailRow;
   taxYears: number[];
   workspaceId: string;
+  hasSignedLetter: boolean;
 }) {
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const outstandingInvoices = invoices.filter((i) => i.status !== "paid" && i.status !== "void" && i.status !== "draft");
@@ -82,6 +84,11 @@ export function OverviewTab({
       {showTaxDetails && <TaxDetailsCard engagementId={engagement.id} workspaceId={workspaceId} detail={taxDetail} taxYears={taxYears} />}
 
       <Section title="Status & progress">
+        {SIGNATURE_GATED_STATUSES.includes(engagement.status) && !hasSignedLetter && (
+          <div className="mb-4 rounded-lg bg-warning/10 px-3 py-2 text-sm text-warning">
+            This engagement is at &quot;{engagement.status}&quot; without a completed, signed engagement letter on file.
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm sm:grid-cols-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted">Status</p>
