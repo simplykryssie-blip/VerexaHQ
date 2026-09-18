@@ -32,6 +32,15 @@ export const ENGAGEMENT_STATUS_TONE: Record<string, "success" | "warning" | "dan
   Archived: "neutral",
 };
 
+// Statuses that assume a signed engagement letter is on file. Staff can
+// still move an engagement here without one (a confirmation dialog warns
+// them first -- see StatusSelect/EngagementBoard), so this list also
+// drives the persistent warning shown on the engagement page itself,
+// which is the only signal for engagements that reach one of these
+// statuses through pipeline completion rather than a manual status change
+// (advance_pipeline_on_stage_completed has no UI moment to show a dialog).
+export const SIGNATURE_GATED_STATUSES = ["Waiting On Payment", "Ready To Release", "Completed"];
+
 export const ENGAGEMENT_PRIORITY_TONE: Record<string, "success" | "warning" | "danger" | "neutral" | "accent"> = {
   Low: "neutral",
   Medium: "accent",

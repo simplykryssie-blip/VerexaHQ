@@ -102,6 +102,7 @@ export function EngagementWorkspace({
   irsNotices,
   taxYears,
   additionalSigners,
+  hasSignedLetter,
 }: {
   workspace: Workspace;
   permissions: ActionPermissions;
@@ -138,6 +139,7 @@ export function EngagementWorkspace({
   irsNotices: IrsNoticeRow[];
   taxYears: number[];
   additionalSigners: AdditionalSignerOption[];
+  hasSignedLetter: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("Details");
   const showStaffRoles = !isIndependentTier(workspace);
@@ -214,6 +216,7 @@ export function EngagementWorkspace({
                 taxDetail={taxDetail}
                 taxYears={taxYears}
                 workspaceId={workspace.id}
+                hasSignedLetter={hasSignedLetter}
               />
             )}
             {tab === "IRS Notices" && (

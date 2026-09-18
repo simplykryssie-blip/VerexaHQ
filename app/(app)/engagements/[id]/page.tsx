@@ -150,6 +150,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
     { data: canShare },
     { data: activeEroConnection },
     { data: myEroConnectionRows },
+    { data: hasSignedLetter },
   ] = await Promise.all([
     supabase
       .from("pipeline_runs")
@@ -233,6 +234,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       .eq("status", "active")
       .maybeSingle(),
     supabase.rpc("get_my_ero_connection", { p_workspace_id: workspace.id }),
+    supabase.rpc("engagement_has_signed_letter", { p_engagement_id: engagement.id }),
   ]);
 
   // Whatever bank/software the ERO has assigned to this PTIN -- prefills
@@ -531,6 +533,7 @@ export default async function EngagementDetailPage({ params }: { params: { id: s
       taxDetail={(taxDetail ?? null) as never}
       irsNotices={(irsNotices ?? []) as never}
       taxYears={(taxYears ?? []).map((t) => t.year)}
+      hasSignedLetter={Boolean(hasSignedLetter)}
     />
   );
 }

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
-import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
+import { ENGAGEMENT_STATUS_OPTIONS, ENGAGEMENT_PRIORITY_TONE, SIGNATURE_GATED_STATUSES } from "@/lib/engagementStatus";
 import { Badge } from "@/components/ui/Badge";
 
 export type BoardEngagement = {
@@ -30,8 +30,6 @@ export function EngagementBoard({ engagements: initial }: { engagements: BoardEn
     status,
     items: engagements.filter((e) => e.status === status),
   }));
-
-  const SIGNATURE_GATED_STATUSES = ["Waiting On Payment", "Ready To Release", "Completed"];
 
   async function moveTo(id: string, status: string) {
     const current = engagements.find((e) => e.id === id);
