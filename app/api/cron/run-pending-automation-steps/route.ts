@@ -104,15 +104,21 @@ async function handleGET(request: Request) {
     processed++;
   }
 
-  // Runs that stopped advancing at start_next_automation_step's operational
-  // gate (blocked_at set, no pending_steps row exists yet to represent
-  // "waiting on a specific step") are otherwise never revisited by
-  // anything. Re-invoking it is safe and idempotent: the function resolves
-  // "what's next" purely from automation_runs.current_step_id, same as
-  // every other resume path in this cron.
+  // Runs left with blocked_at set are otherwise never revisited by anything.
+  // Two distinct blocked shapes exist, and they resume differently:
+  //   - blocked_step_id is null: start_next_automation_step's own gate
+  //     blocked before resolving a next step, so current_step_id is already-
+  //     completed work -- safe to resume by re-resolving "what's next" from
+  //     it, same as every other resume path in this cron.
+  //   - blocked_step_id is set: execute_automation_step's gate blocked while
+  //     that specific step was about to run (it never did). Resuming via
+  //     start_next_automation_step here would treat that never-executed step
+  //     as done and walk straight past it -- so this case re-invokes
+  //     execute_automation_step for the exact step instead, which is what
+  //     actually runs its action before advancing the run normally.
   const { data: blockedRuns } = await supabase
     .from("automation_runs")
-    .select("id, workspaces(status)")
+    .select("id, blocked_step_id, workspaces(status)")
     .eq("status", "running")
     .not("blocked_at", "is", null)
     .limit(BATCH_SIZE);
@@ -120,7 +126,11 @@ async function handleGET(request: Request) {
   for (const run of blockedRuns ?? []) {
     const workspaceStatus = (run.workspaces as unknown as { status?: string } | null)?.status;
     if (!isWorkspaceStatusOperational(workspaceStatus ?? "")) continue;
-    await supabase.rpc("start_next_automation_step", { p_run_id: run.id });
+    if (run.blocked_step_id) {
+      await supabase.rpc("execute_automation_step", { p_run_id: run.id, p_step_id: run.blocked_step_id });
+    } else {
+      await supabase.rpc("start_next_automation_step", { p_run_id: run.id });
+    }
     resumed++;
   }
 

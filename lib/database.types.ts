@@ -993,6 +993,7 @@ export type Database = {
           acknowledged_by: string | null
           automation_id: string
           blocked_at: string | null
+          blocked_step_id: string | null
           client_id: string | null
           completed_at: string | null
           connection_id: string | null
@@ -1012,6 +1013,7 @@ export type Database = {
           acknowledged_by?: string | null
           automation_id: string
           blocked_at?: string | null
+          blocked_step_id?: string | null
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1031,6 +1033,7 @@ export type Database = {
           acknowledged_by?: string | null
           automation_id?: string
           blocked_at?: string | null
+          blocked_step_id?: string | null
           client_id?: string | null
           completed_at?: string | null
           connection_id?: string | null
@@ -1051,6 +1054,13 @@ export type Database = {
             columns: ["automation_id"]
             isOneToOne: false
             referencedRelation: "automations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automation_runs_blocked_step_id_fkey"
+            columns: ["blocked_step_id"]
+            isOneToOne: false
+            referencedRelation: "automation_steps"
             referencedColumns: ["id"]
           },
           {
@@ -12400,34 +12410,19 @@ export type Database = {
         }
         Returns: string
       }
-      create_engagement:
-        | {
-            Args: {
-              p_assigned_staff_id?: string
-              p_billing_rule_id?: string
-              p_case_type?: string
-              p_client_id: string
-              p_due_date?: string
-              p_priority?: Database["public"]["Enums"]["engagement_priority"]
-              p_process_id?: string
-              p_service_id?: string
-              p_workspace_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_assigned_staff_id?: string
-              p_case_type?: string
-              p_client_id: string
-              p_due_date?: string
-              p_priority?: Database["public"]["Enums"]["engagement_priority"]
-              p_process_id?: string
-              p_service_id?: string
-              p_workspace_id: string
-            }
-            Returns: string
-          }
+      create_engagement: {
+        Args: {
+          p_assigned_staff_id?: string
+          p_case_type?: string
+          p_client_id: string
+          p_due_date?: string
+          p_priority?: Database["public"]["Enums"]["engagement_priority"]
+          p_process_id?: string
+          p_service_id?: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       create_engagement_share: {
         Args: { p_engagement_id: string }
         Returns: {
