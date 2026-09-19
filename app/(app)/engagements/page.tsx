@@ -9,18 +9,23 @@ import { EngagementBoard, type BoardEngagement } from "@/components/engagements/
 import { Badge } from "@/components/ui/Badge";
 import { buttonClasses } from "@/components/ui/Button";
 import { Avatar } from "@/components/Avatar";
-import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE } from "@/lib/engagementStatus";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, CLOSED_ENGAGEMENT_STATUSES } from "@/lib/engagementStatus";
 
 export const dynamic = 'force-dynamic';
 
 const PAGE_SIZE = 50;
 const BOARD_CAP = 500;
 
-export default async function EngagementsPage({ searchParams }: { searchParams: { page?: string; view?: string } }) {
+export default async function EngagementsPage({ searchParams }: { searchParams: { page?: string; view?: string; status?: string } }) {
   const workspace = await getCurrentWorkspace();
   if (!workspace) return null;
 
   const view = searchParams.view === "board" ? "board" : "table";
+  // "open" isn't a real engagements.status value -- it's shorthand (used
+  // consistently elsewhere, e.g. ClientWorkspaceTabs' openEngagements) for
+  // "not Completed and not Archived". Only the Dashboard's "Open Engagements"
+  // link sets this today.
+  const openOnly = searchParams.status === "open";
   const page = Math.max(Number(searchParams.page) || 1, 1);
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -29,14 +34,16 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
 
   const [{ data: engagements, count }, { data: canCreate }, { data: boardEngagements }] = await Promise.all([
     view === "table"
-      ? supabase
-          .from("engagements")
-          .select("id, engagement_number, status, priority, due_date, clients(first_name, last_name, business_name, client_type)", {
-            count: "exact",
-          })
-          .eq("workspace_id", workspace.id)
-          .order("created_at", { ascending: false })
-          .range(from, to)
+      ? (() => {
+          let query = supabase
+            .from("engagements")
+            .select("id, engagement_number, status, priority, due_date, clients(first_name, last_name, business_name, client_type)", {
+              count: "exact",
+            })
+            .eq("workspace_id", workspace.id);
+          if (openOnly) query = query.not("status", "in", `(${CLOSED_ENGAGEMENT_STATUSES.map((s) => `"${s}"`).join(",")})`);
+          return query.order("created_at", { ascending: false }).range(from, to);
+        })()
       : Promise.resolve({ data: null, count: null }),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "engagements.manage" }),
     view === "board"
@@ -64,7 +71,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader
-        title="Engagements"
+        title={openOnly ? "Open Engagements" : "Engagements"}
         description="The actual work you're doing for clients -- one engagement per service per client, each moving through its own pipeline."
         actions={
           canCreate ? (
@@ -96,7 +103,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
 
         {isEmpty ? (
           <div className="rounded-2xl border border-border bg-surface shadow-soft">
-            <EmptyState message="No engagements yet." />
+            <EmptyState message={openOnly ? "No open engagements." : "No engagements yet."} />
           </div>
         ) : view === "board" ? (
           <EngagementBoard engagements={boardItems} />
@@ -152,7 +159,13 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
                 })}
               </tbody>
             </table>
-            <Pager page={page} pageSize={PAGE_SIZE} total={count ?? engagements?.length ?? 0} basePath="/engagements" />
+            <Pager
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={count ?? engagements?.length ?? 0}
+              basePath="/engagements"
+              extraQuery={openOnly ? "status=open" : ""}
+            />
           </div>
         )}
       </div>

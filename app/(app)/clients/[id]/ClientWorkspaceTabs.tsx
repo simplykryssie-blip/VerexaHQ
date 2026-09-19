@@ -53,7 +53,7 @@ import { SectionCard as Section, Field } from "@/components/ui/SectionCard";
 import { Badge } from "@/components/ui/Badge";
 import { StatTile } from "@/components/ui/StatTile";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS } from "@/lib/engagementStatus";
+import { ENGAGEMENT_STATUS_TONE, ENGAGEMENT_PRIORITY_TONE, ENGAGEMENT_STATUS_OPTIONS, isOpenEngagementStatus } from "@/lib/engagementStatus";
 import { BILLING_DOCUMENT_STATUS_TONE, PAYMENT_STATUS_TONE } from "@/lib/billingStatus";
 
 // Mirrors lib/dashboard/data.ts's ENGAGEMENT_PIPELINE_STATUSES (which can't be
@@ -161,7 +161,7 @@ export function OverviewTab({
   );
   const unmatchedPortalUsers = portalUsers.filter((p) => !matchedPortalIds.has(p.id));
 
-  const openEngagements = engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived");
+  const openEngagements = engagements.filter((e) => isOpenEngagementStatus(e.status));
   const openTasks = tasks.filter((t) => t.status !== "completed");
   const upcomingItems = [
     ...appointments.map((a) => ({ label: a.title, date: a.start_at, kind: "Appointment" })),
@@ -191,7 +191,13 @@ export function OverviewTab({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+        {primaryEngagement ? (
+          <Link href={`/engagements/${primaryEngagement.id}`}>
+            <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+          </Link>
+        ) : (
+          <StatTile icon={Briefcase} tone="emerald" label="Current engagements" value={openEngagements.length} />
+        )}
         <StatTile icon={CheckSquare} tone="amber" label="Open tasks" value={openTasks.length} onClick={onShowTasks} />
         <StatTile icon={Receipt} tone="rose" label="Outstanding balance" value={money(outstandingBalance)} onClick={onCreateInvoice} />
       </div>

@@ -20,11 +20,11 @@ const CHIP_CLASSES = {
   rose: "bg-roseSoft text-rose",
 } as const;
 
-const ACTIONS = [
+export const ACTIONS = [
   { label: "New Client", href: "/clients", icon: UserPlus, key: "clientsCreate" as const, chip: "accent" as const },
   { label: "New Engagement", href: "/engagements/new", icon: Briefcase, key: "engagementsManage" as const, chip: "violet" as const },
   { label: "Create Invoice", href: "/clients", icon: Receipt, key: "billingManage" as const, chip: "emerald" as const },
-  { label: "Request Documents", href: "/clients", icon: ClipboardList, key: "documentsRequest" as const, chip: "amber" as const },
+  { label: "Request Documents", href: "/documents", icon: ClipboardList, key: "documentsRequest" as const, chip: "amber" as const },
   { label: "Schedule Appointment", href: "/calendar", icon: CalendarPlus, key: "appointmentsManage" as const, chip: "rose" as const },
   { label: "Invite Staff", href: "/settings/users", icon: Mail, key: "isAdmin" as const, chip: "accent" as const },
 ] as const;

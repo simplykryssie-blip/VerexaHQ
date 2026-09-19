@@ -14,6 +14,7 @@ import { clientStatusTone } from "@/lib/clientStatus";
 import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
 import { ClientInsightWidgets } from "./ClientInsightWidgets";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
+import { isOpenEngagementStatus } from "@/lib/engagementStatus";
 
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -38,7 +39,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
   const [tab, setTab] = useState<ClientTab>("Details");
   const { client, engagements, tasks, missingDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace } = props;
 
-  const openEngagement = engagements.find((e) => e.status !== "Completed" && e.status !== "Archived");
+  const openEngagement = engagements.find((e) => isOpenEngagementStatus(e.status));
   const currentServiceName = openEngagement
     ? (openEngagement as unknown as { services?: { name: string } | null }).services?.name ?? "Untitled engagement"
     : "None active";
@@ -141,8 +142,20 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
         )}
 
         <div className="grid grid-cols-2 gap-3 border-b border-border p-5 sm:grid-cols-4">
-          <StatTile icon={Briefcase} tone="accent" label="Current engagement" value={currentServiceName} />
-          <StatTile icon={FolderOpen} tone="accent" label="Open engagements" value={engagements.filter((e) => e.status !== "Completed" && e.status !== "Archived").length} />
+          <StatTile
+            icon={Briefcase}
+            tone="accent"
+            label="Current engagement"
+            value={currentServiceName}
+            onClick={openEngagement ? () => router.push(`/engagements/${openEngagement.id}`) : undefined}
+          />
+          <StatTile
+            icon={FolderOpen}
+            tone="accent"
+            label="Open engagements"
+            value={engagements.filter((e) => isOpenEngagementStatus(e.status)).length}
+            onClick={() => setTab("Details")}
+          />
           <StatTile icon={FileWarning} tone="amber" label="Missing documents" value={missingDocuments} onClick={() => setTab("Documents")} />
           <StatTile icon={ListChecks} tone="amber" label="Open tasks" value={openTasksCount} onClick={() => setTab("Tasks")} />
           <StatTile
@@ -157,6 +170,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             tone="violet"
             label="Next appointment"
             value={nextAppointment ? new Date(nextAppointment.start_at).toLocaleDateString() : "None scheduled"}
+            onClick={nextAppointment ? () => setTab("Details") : undefined}
           />
           <StatTile
             icon={MessageCircle}
