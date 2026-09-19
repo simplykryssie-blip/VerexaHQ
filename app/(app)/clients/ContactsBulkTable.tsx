@@ -17,8 +17,18 @@ function toCsvValue(value: string) {
   return value;
 }
 
+/** Same "Unassigned" / display_name fallback the Assigned Staff column
+ * itself renders (clientListColumns.tsx) -- exported as a pure function so
+ * the CSV's exact text is unit-testable without a DOM. Never exports
+ * relationship_manager_id or any other internal id, only the same
+ * human-readable name the table already shows. */
+export function assignedStaffCsvValue(assignedStaff: ClientRow["assignedStaff"]): string {
+  if (!assignedStaff) return "Unassigned";
+  return assignedStaff.display_name ?? "Staff";
+}
+
 function downloadCsv(rows: ClientRow[]) {
-  const header = ["Name", "Type", "Email", "Phone", "Status", "Tags"];
+  const header = ["Name", "Type", "Email", "Phone", "Status", "Assigned Staff", "Tags"];
   const lines = rows.map((c) =>
     [
       clientDisplayName(c),
@@ -26,6 +36,7 @@ function downloadCsv(rows: ClientRow[]) {
       c.primary_email ?? "",
       c.primary_phone ?? "",
       c.lifecycle_status,
+      assignedStaffCsvValue(c.assignedStaff),
       (c.tags ?? []).join("; "),
     ]
       .map(toCsvValue)
