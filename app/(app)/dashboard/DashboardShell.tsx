@@ -169,13 +169,13 @@ export function DashboardShell({
         return (
           <WidgetShell title="Engagements & Tasks">
             <div className="grid grid-cols-2 gap-3">
-              <div>
+              <Link href="/engagements?status=open" className="block rounded-lg -m-1 p-1 transition hover:bg-surfaceMuted">
                 <IconChip tone="accent" className="mb-3">
                   <Briefcase size={17} aria-hidden="true" />
                 </IconChip>
                 <p className="text-xs uppercase tracking-wide text-muted">Open Engagements</p>
                 <p className="mt-1 font-display text-2xl font-semibold tabular-nums tracking-tight text-ink">{data.kpis.openEngagements}</p>
-              </div>
+              </Link>
               <div>
                 <IconChip tone="amber" className="mb-3">
                   <ListChecks size={17} aria-hidden="true" />

@@ -11,6 +11,17 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import type { FailedAutomationRunItem } from "@/lib/dashboard/data";
 
+// No cross-automation "all failed runs" view exists today -- each row
+// already links straight to its own automation's activity panel
+// (/workflows/{automation_id}?activity=1). The header link reuses that same
+// real destination for the most recent failure instead of sending everyone
+// to the generic Workflows list, and is omitted entirely once there's
+// nothing failed to jump to.
+export function failedAutomationRunsReportHref(visibleItems: FailedAutomationRunItem[]): string | undefined {
+  const mostRecent = visibleItems[0];
+  return mostRecent ? `/workflows/${mostRecent.automation_id}?activity=1` : undefined;
+}
+
 export function FailedAutomationRunsWidget({ items }: { items: FailedAutomationRunItem[] }) {
   const router = useRouter();
   const supabase = createClient();
@@ -40,8 +51,8 @@ export function FailedAutomationRunsWidget({ items }: { items: FailedAutomationR
   return (
     <WidgetShell
       title="Failed Automation Runs"
-      reportHref="/workflows"
-      reportLabel="View Workflows"
+      reportHref={failedAutomationRunsReportHref(visible)}
+      reportLabel="View Latest Failure"
       action={
         visible.length > 0 ? (
           <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-semibold text-white">
