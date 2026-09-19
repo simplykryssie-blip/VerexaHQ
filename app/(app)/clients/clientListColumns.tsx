@@ -20,6 +20,18 @@ export function clientDisplayName(c: {
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
+/** Pure so the "assigned but profile row missing" fallback is directly
+ * testable. A missing user_profiles row (rather than a null
+ * relationship_manager_id) still renders as assigned, just with a generic
+ * label, instead of silently collapsing to "Unassigned". */
+export function resolveAssignedStaff(
+  managerId: string | null,
+  managerById: Map<string, { id: string; display_name: string | null }>
+): { id: string; display_name: string | null } | null {
+  if (!managerId) return null;
+  return managerById.get(managerId) ?? { id: managerId, display_name: null };
+}
+
 export type ClientRow = {
   id: string;
   client_type: string;
@@ -32,6 +44,12 @@ export type ClientRow = {
   tags: string[] | null;
   requestedService?: string | null;
   needsReview?: boolean;
+  /** clients.relationship_manager_id -- the canonical "assigned staff"
+   * relationship (same field search_clients' existing p_assigned_staff_id
+   * filter already matches against; this column only adds display, no new
+   * assignment mechanism). Undefined/null staff renders as "Unassigned",
+   * matching ClientAssignmentForm's own existing empty state. */
+  assignedStaff?: { id: string; display_name: string | null } | null;
 };
 
 export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
@@ -68,6 +86,19 @@ export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
         {c.lifecycle_status.replace(/_/g, " ")}
       </Badge>
     ),
+  },
+  {
+    key: "assignedStaff",
+    header: "Assigned Staff",
+    render: (c) =>
+      c.assignedStaff ? (
+        <div className="flex items-center gap-2">
+          <Avatar name={c.assignedStaff.display_name} size="xs" />
+          <span className="text-slate">{c.assignedStaff.display_name ?? "Staff"}</span>
+        </div>
+      ) : (
+        <span className="text-muted">Unassigned</span>
+      ),
   },
   {
     key: "tags",
