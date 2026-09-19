@@ -7,7 +7,7 @@ import { NewClientButton } from "./NewClientButton";
 import { TagFilterControl } from "./TagFilterControl";
 import { ContactsSearchBar } from "./ContactsSearchBar";
 import { ContactsBulkTable } from "./ContactsBulkTable";
-import type { ClientRow } from "./clientListColumns";
+import { resolveAssignedStaff, type ClientRow } from "./clientListColumns";
 
 export const dynamic = 'force-dynamic';
 
@@ -193,10 +193,26 @@ export default async function ClientsPage({
     : { data: [] as { client_id: string }[] };
   const clientsNeedingReview = new Set((submittedOrganizers ?? []).map((o) => o.client_id));
 
+  // search_clients' RETURNS TABLE never selects relationship_manager_id --
+  // it's only used in the RPC's own WHERE clause for the existing "Assigned
+  // to" filter -- so the Assigned Staff column needs its own scoped fetch
+  // rather than a migration to the RPC's signature. Same enrichment pattern
+  // as requestedServicesByClient/clientsNeedingReview above.
+  const { data: relationshipManagerRows } = clientIds.length > 0
+    ? await supabase.from("clients").select("id, relationship_manager_id").in("id", clientIds)
+    : { data: [] as { id: string; relationship_manager_id: string | null }[] };
+  const managerIdByClient = new Map((relationshipManagerRows ?? []).map((r) => [r.id, r.relationship_manager_id]));
+  const managerIds = Array.from(new Set((relationshipManagerRows ?? []).map((r) => r.relationship_manager_id).filter((id): id is string => Boolean(id))));
+  const { data: managerProfiles } = managerIds.length > 0
+    ? await supabase.from("user_profiles").select("id, display_name").in("id", managerIds)
+    : { data: [] as { id: string; display_name: string | null }[] };
+  const managerById = new Map((managerProfiles ?? []).map((p) => [p.id, p]));
+
   const clientRows: ClientRow[] = (clients ?? []).map((c) => ({
     ...c,
     needsReview: clientsNeedingReview.has(c.id),
     requestedService: requestedServiceLabelByClient.get(c.id) ?? null,
+    assignedStaff: resolveAssignedStaff(managerIdByClient.get(c.id) ?? null, managerById),
   }));
 
   // Every active filter, so switching status/tag or paging never silently
