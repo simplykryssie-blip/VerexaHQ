@@ -1,5 +1,28 @@
 -- Least-privilege SECURITY DEFINER RPC cleanup.
 --
+-- POST-APPLY FINDING (recorded after this migration was run against
+-- production): applying Parts 1 and 2 below and then re-checking Supabase's
+-- Security Advisor showed anon-executable SECURITY DEFINER functions drop
+-- from 213 to 206 (only -7) and authenticated-executable stay at 373 (no
+-- change) -- not the -185/-86 these REVOKE statements target. The strong
+-- suspicion is that most of these functions' EXECUTE privilege was granted
+-- to the PUBLIC pseudo-role (Postgres's own default for a newly created
+-- function) rather than to the named `anon`/`authenticated` roles directly
+-- -- `revoke ... from anon` does not remove a privilege a role holds via
+-- PUBLIC membership, only one granted to that role by name. This was NOT
+-- independently confirmed (querying pg_proc.proacl to inspect the actual
+-- grantee was blocked by a tool-access gate for the remainder of the
+-- session), so no corrective statements were added here rather than
+-- guessing. A follow-up session with working SQL read access must: (1)
+-- inspect proacl for a sample of these functions to confirm or rule out
+-- the PUBLIC-grant theory, (2) if confirmed, add `revoke ... from public`
+-- for all functions below, plus an explicit `grant execute ... to
+-- authenticated` re-grant for the 99 in Part 1 (Part 2's 86 need no
+-- re-grant), (3) re-verify via the Security Advisor that anon drops to
+-- ~28 (21 public + 7 RLS-dependency) and authenticated drops to ~287. Part
+-- 3 (the four table GRANT revokes) was never applied at all -- every
+-- attempt was blocked by the same tool-access gate.
+--
 -- Every REVOKE below was decided from real evidence, not the function's name:
 -- an app-code `.rpc(...)` call site search across app/components/lib (which role
 -- calls it -- a public pre-auth page, an authenticated staff/portal page, or a
