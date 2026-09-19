@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getCurrentWorkspace, workspaceOperationalError } from "@/lib/workspace";
+import { getCurrentWorkspace, workspaceOperationalError, isWorkspaceStatusOperational } from "@/lib/workspace";
 
 // Approving a shared engagement is the one point where the copy into the
 // ERO's workspace actually happens. The status flip + copy RPCs run under
@@ -14,7 +14,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!workspace) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
-  if (workspace.status === "suspended") {
+  if (!isWorkspaceStatusOperational(workspace.status)) {
     return NextResponse.json({ error: workspaceOperationalError(workspace) }, { status: 403 });
   }
 

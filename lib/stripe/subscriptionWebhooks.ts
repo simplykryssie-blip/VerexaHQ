@@ -180,6 +180,12 @@ async function pauseWorkspaceForBilling(supabase: ReturnType<typeof createServic
 /**
  * Only reactivates a workspace suspended for one of the given billing
  * reasons -- never overrides a manual suspension unrelated to payment.
+ * Also requires the workspace to currently be "suspended": a stale or
+ * duplicate webhook reporting a paid subscription must never reactivate a
+ * workspace that has already progressed to archived/permanently_archived
+ * (those states carry their own recovery path, not a plain status flip),
+ * even though suspension_reason is left unset by the archive-lifecycle
+ * cron and would otherwise still match.
  */
 async function resumeWorkspaceFromBilling(
   supabase: ReturnType<typeof createServiceClient>,
@@ -190,6 +196,7 @@ async function resumeWorkspaceFromBilling(
     .from("workspaces")
     .update({ status: "active", suspension_reason: null })
     .eq("id", workspaceId)
+    .eq("status", "suspended")
     .in("suspension_reason", allowedReasons);
 }
 
@@ -226,11 +233,16 @@ export function isSubscriptionStatusPaid(status: string): boolean {
  * top-ups, any unused top-up balance must be forfeited (not refunded) here.
  */
 async function lockWorkspaceForCancellation(supabase: ReturnType<typeof createServiceClient>, workspaceId: string) {
+  // Only ever moves active/suspended -> suspended. A late
+  // customer.subscription.deleted event must never regress an already
+  // archived or permanently archived workspace back to suspended --
+  // excluding just "archived" (the original guard) missed
+  // permanently_archived entirely.
   await supabase
     .from("workspaces")
     .update({ status: "suspended", suspension_reason: "subscription_canceled" })
     .eq("id", workspaceId)
-    .neq("status", "archived");
+    .in("status", ["active", "suspended"]);
 }
 
 export async function handleSubscriptionCreated(

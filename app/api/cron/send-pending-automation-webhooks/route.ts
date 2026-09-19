@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
+import { isWorkspaceStatusOperational } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -30,15 +31,32 @@ async function handleGET(request: Request) {
 
   const { data: pending } = await supabase
     .from("automation_webhook_deliveries")
-    .select("id, url, payload, attempts")
+    .select("id, workspace_id, url, payload, attempts")
     .eq("status", "pending")
     .lte("next_attempt_at", nowIso)
     .order("next_attempt_at", { ascending: true })
     .limit(BATCH_SIZE);
 
+  // A delivery can be queued from before the workspace was suspended -- it
+  // must not fire an outbound webhook while the workspace is
+  // non-operational, but it also must not be marked 'failed' (dropped for
+  // good) or 'sent' (a false success). Left untouched at 'pending' with its
+  // existing next_attempt_at, it's naturally retried by a later tick,
+  // including after the workspace recovers to active.
+  const workspaceIds = Array.from(new Set((pending ?? []).map((row) => row.workspace_id)));
+  const { data: workspaceStatusRows } = workspaceIds.length
+    ? await supabase.from("workspaces").select("id, status").in("id", workspaceIds)
+    : { data: [] as { id: string; status: string }[] };
+  const statusByWorkspaceId = new Map((workspaceStatusRows ?? []).map((w) => [w.id, w.status]));
+  const operationalPending = (pending ?? []).filter((row) => isWorkspaceStatusOperational(statusByWorkspaceId.get(row.workspace_id) ?? "active"));
+  const blocked = (pending?.length ?? 0) - operationalPending.length;
+  if (blocked > 0) {
+    console.log(`send-pending-automation-webhooks: leaving ${blocked} delivery(s) pending -- workspace not currently operational`);
+  }
+
   let sent = 0;
   let failed = 0;
-  for (const row of pending ?? []) {
+  for (const row of operationalPending) {
     try {
       const res = await fetch(row.url, {
         method: "POST",
@@ -64,7 +82,7 @@ async function handleGET(request: Request) {
     }
   }
 
-  return NextResponse.json({ sent, failed });
+  return NextResponse.json({ sent, failed, blocked });
 }
 
 export const GET = withJobLogging("send-pending-automation-webhooks", handleGET);

@@ -79,6 +79,9 @@ function createMockSupabase(config: MockConfig = {}) {
           workspacesUpdate(payload);
           return {
             eq: () => ({
+              eq: () => ({
+                in: async () => ({ data: null, error: null }),
+              }),
               in: async () => ({ data: null, error: null }),
               neq: async () => ({ data: null, error: null }),
             }),
