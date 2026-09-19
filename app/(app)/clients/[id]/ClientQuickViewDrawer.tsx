@@ -16,6 +16,27 @@ import { ClientInsightWidgets } from "./ClientInsightWidgets";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 import { isOpenEngagementStatus } from "@/lib/engagementStatus";
 
+/** Pure so it can be unit-tested without rendering the drawer or mocking
+ * next/navigation. Mirrors the same "find the open engagement, link to its
+ * existing detail route" logic the Dashboard's client widgets already use. */
+export function currentEngagementHref(engagements: { id: string; status: string }[]): string | undefined {
+  const open = engagements.find((e) => isOpenEngagementStatus(e.status));
+  return open ? `/engagements/${open.id}` : undefined;
+}
+
+export function openEngagementsCount(engagements: { status: string }[]): number {
+  return engagements.filter((e) => isOpenEngagementStatus(e.status)).length;
+}
+
+/** No per-appointment or per-client route/anchor exists on the Calendar
+ * page today (confirmed: appointments carry no href in its CalendarItem
+ * list, and AppointmentsList has no id-addressable view) -- linking to the
+ * bare route is the most specific existing destination without redesigning
+ * Calendar to add one. */
+export function nextAppointmentCalendarHref(appointments: unknown[]): string | undefined {
+  return appointments.length > 0 ? "/calendar" : undefined;
+}
+
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diffMs / 60000);
@@ -43,9 +64,12 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
   const currentServiceName = openEngagement
     ? (openEngagement as unknown as { services?: { name: string } | null }).services?.name ?? "Untitled engagement"
     : "None active";
+  const currentEngagementDestination = currentEngagementHref(engagements);
+  const openEngagementsTotal = openEngagementsCount(engagements);
   const missingDocuments = missingDocumentCount;
   const openTasksCount = tasks.length;
   const nextAppointment = appointments[0];
+  const nextAppointmentDestination = nextAppointmentCalendarHref(appointments);
   const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
   const portalStatus = portalUsers.some((p) => p.status === "active")
     ? "Portal Active"
@@ -147,14 +171,14 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             tone="accent"
             label="Current engagement"
             value={currentServiceName}
-            onClick={openEngagement ? () => router.push(`/engagements/${openEngagement.id}`) : undefined}
+            onClick={currentEngagementDestination ? () => router.push(currentEngagementDestination) : undefined}
           />
           <StatTile
             icon={FolderOpen}
             tone="accent"
             label="Open engagements"
-            value={engagements.filter((e) => isOpenEngagementStatus(e.status)).length}
-            onClick={() => setTab("Details")}
+            value={openEngagementsTotal}
+            onClick={openEngagementsTotal > 0 ? () => setTab("Details") : undefined}
           />
           <StatTile icon={FileWarning} tone="amber" label="Missing documents" value={missingDocuments} onClick={() => setTab("Documents")} />
           <StatTile icon={ListChecks} tone="amber" label="Open tasks" value={openTasksCount} onClick={() => setTab("Tasks")} />
@@ -170,7 +194,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             tone="violet"
             label="Next appointment"
             value={nextAppointment ? new Date(nextAppointment.start_at).toLocaleDateString() : "None scheduled"}
-            onClick={nextAppointment ? () => setTab("Details") : undefined}
+            onClick={nextAppointmentDestination ? () => router.push(nextAppointmentDestination) : undefined}
           />
           <StatTile
             icon={MessageCircle}
