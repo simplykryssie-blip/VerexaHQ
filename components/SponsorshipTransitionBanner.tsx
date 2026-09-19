@@ -60,7 +60,18 @@ export function SponsorshipTransitionBanner({ transition }: { transition: Sponso
         return;
       }
 
-      const checkoutRes = await fetch("/api/signup/checkout", { method: "POST" });
+      // start_personal_billing_setup already created this workspace's own
+      // workspace_subscriptions row (plan set, stripe_status defaulted to
+      // "incomplete") -- it's an existing workspace that needs its first
+      // real Stripe subscription attached, not a brand-new payment-first
+      // signup with no workspace yet. /api/signup/checkout requires a
+      // pending_signup_id, which doesn't exist (and shouldn't be invented)
+      // for this case; /api/billing/resume-checkout is the existing route
+      // built for exactly this shape (an already-provisioned workspace
+      // whose workspace_subscriptions row has no active Stripe subscription
+      // yet), and needs no request body -- it resolves the workspace from
+      // the cookie the switch above just set.
+      const checkoutRes = await fetch("/api/billing/resume-checkout", { method: "POST" });
       const checkoutBody = await checkoutRes.json().catch(() => ({}));
       if (!checkoutRes.ok || !checkoutBody.url) {
         toast.show(checkoutBody.error ?? "Could not start checkout.", "error");

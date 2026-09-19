@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { previewUpcomingInvoiceAmount, chargeOffSession, createCustomerBalanceCredit } from "@/lib/stripe/client";
 import { withJobLogging } from "@/lib/cron/withJobLogging";
 import { isFirstPeriod } from "@/lib/billing/firstPeriod";
+import { dunningIdempotencyKey } from "@/lib/billing/dunningIdempotency";
 
 export const dynamic = "force-dynamic";
 
@@ -195,6 +196,7 @@ async function handleGET(request: Request) {
               amountCents: amountDueCents,
               description: `Verexa subscription -- cycle ending ${periodEnd}`,
               metadata: { workspace_id: sub.workspace_id, period_end: periodEnd },
+              idempotencyKey: dunningIdempotencyKey(sub.workspace_id, sub.current_period_end as string),
             });
 
             if (charge.ok && charge.data.status === "succeeded") {
