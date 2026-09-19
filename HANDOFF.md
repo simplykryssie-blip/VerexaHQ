@@ -136,6 +136,66 @@ merged app (every route from both branches builds, including `/partners`,
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
 
+## Addendum — 2026-09-19: RPC / SECURITY DEFINER privilege cleanup — production-verified, isolated-environment test blocked
+
+Branch: `security/least-privilege-definer-cleanup` (not merged as of this
+writing). Two migrations, applied live to production
+(`daxpavvsotvsyqqntddc`): `20261031000000_least_privilege_security_definer_cleanup.sql`
+and `20261101000000_least_privilege_public_grant_corrective_fix.sql`
+(the second was needed because the first, though correctly targeted,
+revoked EXECUTE from the named `anon`/`authenticated` roles without also
+revoking Postgres's own default EXECUTE-to-PUBLIC grant — every role
+implicitly inherits PUBLIC's privileges, so the first migration's real
+effect was far smaller than intended until the second one revoked PUBLIC
+directly and re-granted `authenticated` explicitly where needed).
+
+**Status: RPC / SECURITY DEFINER privilege cleanup is production-verified
+at the PostgreSQL ACL and role-privilege level. Automated 18-test
+isolated-environment verification remains blocked because the sanctioned
+test project is schema-stale and the organization has reached its
+free-tier project limit. No production or unrelated project was modified
+to bypass the limitation.**
+
+Verified live via `pg_proc.proacl`/`has_function_privilege`/
+`has_table_privilege` (not just the Security Advisor's counts): anon-
+executable SECURITY DEFINER functions 213→28, authenticated-executable
+373→287, RLS-no-policy tables unchanged at 5 (no policies were added just
+to silence the advisor — out of scope by design). 21 intentional PUBLIC
+functions and 7 RLS-policy-dependent functions confirmed still callable by
+both anon/authenticated; 99 AUTH_ONLY functions confirmed callable by
+authenticated only; 86 INTERNAL functions confirmed callable by neither;
+`service_role` confirmed unaffected throughout. Four over-granted service-
+side tables (`rate_limit_hits`, `workspace_ghl_connections`,
+`workspace_jotform_connections`, `workspace_partner_purchase_webhooks`)
+had their anon/authenticated table grants removed; `appointment_external_events`
+already had none. `tsc`/`eslint`/`build` all clean; full `vitest run` at
+139 passed / 19 failed, matching the established baseline exactly (18
+environment-gated security tests + 1 pre-existing environment-gated
+`critical-paths.test.ts` — no new failures).
+
+The one thing that could **not** be done: actually running
+`tests/security-definer-anon-privilege.test.ts` (18 tests) against a live
+anon-key connection. The sanctioned isolated project (`verexahq-test`,
+`uzdlqioslnqqikiouksg`) is ~6 weeks behind the current schema — confirmed
+directly, none of 8 sampled functions the suite calls exist there, nor
+does one of the 5 tables under test. Bringing it current would mean
+replaying ~211 post-baseline migrations, which is out of scope for a
+verification step. Provisioning a fresh disposable project failed outright
+(`mcp__Supabase__create_project`): the org is capped at 2 active free
+projects, both already occupied by production and `verexahq-test`. A
+third, unrelated, already-paused project (`Full-service-CRM`,
+`kxqkocypatstfsjtlduz`) exists in the same org but has zero references
+anywhere in this repo, unconfirmed purpose, and querying it risks
+auto-waking a paused project — so it was inspected at the metadata level
+only and explicitly not used. No workaround (upgrading the Supabase plan,
+touching `Full-service-CRM`, or pointing the suite at production) was
+taken.
+
+**P2 — Provision current isolated Supabase test environment and execute
+security-definer regression suite.** Not started this session; needs
+either a Supabase plan upgrade or an explicit decision on the
+`Full-service-CRM` project before it can be picked up.
+
 ## Addendum — 2026-09-03: Manus audit triage/fixes, production data cleanup, F-05 test-project setup (blocked on missing baseline schema)
 
 Branch: `claude/verexa-remove-services-vaqbfx`. The user fed this session a
