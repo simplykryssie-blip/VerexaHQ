@@ -70,6 +70,7 @@ export default async function ClientsPage({
     { data: services },
     { data: serviceCategoriesRaw },
     { data: canCreate },
+    { data: canEdit },
     { data: workspaceTags },
     { data: activeMembers },
     { data: membership },
@@ -104,6 +105,12 @@ export default async function ClientsPage({
       .eq("workspace_id", workspace.id)
       .order("display_order"),
     supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.create" }),
+    // Bulk status/assignment mutate existing contacts, not create new ones --
+    // clients.edit is the same permission mark_client_lost and the
+    // assignments page already require for exactly this kind of write.
+    // Bulk tag/export stay on the existing clients.create-gated canManage
+    // below, unchanged, since that's how they already shipped.
+    supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "clients.edit" }),
     supabase.rpc("get_workspace_tags", { p_workspace_id: workspace.id }),
     supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
     user
@@ -267,6 +274,8 @@ export default async function ClientsPage({
             rows={clientRows}
             workspaceId={workspace.id}
             canManage={Boolean(canCreate)}
+            canEdit={Boolean(canEdit)}
+            staffOptions={staffFilterOptions}
             emptyMessage={
               q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance
                 ? "No contacts match this search."
