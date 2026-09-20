@@ -910,6 +910,7 @@ export function BillingTab({
   paymentPlansByInvoice,
   canManageBilling,
   workspaceServices = [],
+  bankProductTransactions = [],
 }: {
   clientId: string;
   clientName: string;
@@ -922,6 +923,7 @@ export function BillingTab({
   paymentPlansByInvoice: Record<string, PaymentPlanRow[]>;
   canManageBilling: boolean;
   workspaceServices?: { id: string; name: string }[];
+  bankProductTransactions?: ClientBankProductTransactionRow[];
 }) {
   const [modal, setModal] = useState<"invoice" | "quote" | null>(null);
   const [editingQuote, setEditingQuote] = useState<QuoteRow | null>(null);
@@ -1159,9 +1161,48 @@ export function BillingTab({
           </ul>
         )}
       </Section>
+
+      {bankProductTransactions.length > 0 && (
+        <Section title="Bank Products">
+          <ul className="divide-y divide-border">
+            {bankProductTransactions.map((b) => (
+              <li key={b.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <span className="text-slate">{BANK_PRODUCT_TYPE_LABEL[b.product_type] ?? b.product_type}</span>
+                  <span className="ml-2 text-xs text-muted">{b.bank_partner}</span>
+                  {b.engagement_number && (
+                    <Link href={`/engagements/${b.engagement_id}`} className="ml-2 text-xs font-medium text-accent hover:underline">
+                      {b.engagement_number}
+                    </Link>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-muted">
+                  <Badge tone={BANK_PRODUCT_STATUS_TONE[b.status] ?? "neutral"} className="capitalize">
+                    {b.status}
+                  </Badge>
+                  <span className="text-xs">{new Date(b.disbursed_at ?? b.created_at).toLocaleDateString()}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
     </div>
   );
 }
+
+const BANK_PRODUCT_TYPE_LABEL: Record<string, string> = {
+  refund_transfer: "Refund Transfer",
+  refund_advance: "Refund Advance",
+  other: "Other",
+};
+
+const BANK_PRODUCT_STATUS_TONE: Record<string, "neutral" | "warning" | "success" | "danger"> = {
+  pending: "warning",
+  funded: "neutral",
+  disbursed: "success",
+  rejected: "danger",
+};
 
 // ----------------------------------------------------------------- Timeline
 
@@ -1397,6 +1438,16 @@ export type TaskRow = {
   related_organizer_response_id: string | null;
   assigned_staff_id: string | null;
   visibility: string;
+};
+export type ClientBankProductTransactionRow = {
+  id: string;
+  engagement_id: string;
+  engagement_number: string | null;
+  bank_partner: string;
+  product_type: string;
+  status: string;
+  disbursed_at: string | null;
+  created_at: string;
 };
 export type QuoteRow = {
   id: string;

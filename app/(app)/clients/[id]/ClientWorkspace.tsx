@@ -29,6 +29,7 @@ import {
   type NoteRow,
   type ActivityRow,
   type TaskRow,
+  type ClientBankProductTransactionRow,
   type QuoteRow,
   type InvoiceRow,
   type PaymentRow,
@@ -103,6 +104,7 @@ export type ClientWorkspaceProps = {
   timeline: ActivityRow[];
   tasks: TaskRow[];
   completedTasks: TaskRow[];
+  bankProductTransactions: ClientBankProductTransactionRow[];
   missingDocumentCount: number;
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
