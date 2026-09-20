@@ -4844,9 +4844,14 @@ export type Database = {
           flat_price: number | null
           id: string
           name: string
+          purchase_purpose: string
           revenue_share_percent: number | null
           revenue_share_scope: string | null
           status: string
+          stripe_payment_link_id: string | null
+          stripe_payment_link_url: string | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -4858,9 +4863,14 @@ export type Database = {
           flat_price?: number | null
           id?: string
           name: string
+          purchase_purpose?: string
           revenue_share_percent?: number | null
           revenue_share_scope?: string | null
           status?: string
+          stripe_payment_link_id?: string | null
+          stripe_payment_link_url?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -4872,9 +4882,14 @@ export type Database = {
           flat_price?: number | null
           id?: string
           name?: string
+          purchase_purpose?: string
           revenue_share_percent?: number | null
           revenue_share_scope?: string | null
           status?: string
+          stripe_payment_link_id?: string | null
+          stripe_payment_link_url?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -10656,7 +10671,7 @@ export type Database = {
           created_by: string | null
           endpoint_token: string
           rotated_at: string | null
-          signing_secret_encrypted: string
+          signing_secret_encrypted: string | null
           workspace_id: string
         }
         Insert: {
@@ -10664,7 +10679,7 @@ export type Database = {
           created_by?: string | null
           endpoint_token?: string
           rotated_at?: string | null
-          signing_secret_encrypted: string
+          signing_secret_encrypted?: string | null
           workspace_id: string
         }
         Update: {
@@ -10672,7 +10687,7 @@ export type Database = {
           created_by?: string | null
           endpoint_token?: string
           rotated_at?: string | null
-          signing_secret_encrypted?: string
+          signing_secret_encrypted?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -12795,6 +12810,10 @@ export type Database = {
         Returns: string
       }
       ensure_next_tax_year: { Args: never; Returns: number }
+      ensure_partner_purchase_webhook: {
+        Args: { p_workspace_id: string }
+        Returns: string
+      }
       ensure_workspace_security_policy: {
         Args: { p_workspace_id: string }
         Returns: undefined
@@ -13304,6 +13323,7 @@ export type Database = {
         Returns: {
           configured: boolean
           endpoint_token: string
+          has_secret: boolean
           rotated_at: string
         }[]
       }
@@ -14387,64 +14407,36 @@ export type Database = {
         Args: { p_item_id: string; p_value: Json }
         Returns: undefined
       }
-      search_clients:
-        | {
-            Args: {
-              p_assigned_staff_id?: string
-              p_client_type?: string
-              p_has_email?: boolean
-              p_has_phone?: boolean
-              p_lifecycle_statuses?: string[]
-              p_limit?: number
-              p_missing_documents?: boolean
-              p_offset?: number
-              p_outstanding_balance?: boolean
-              p_pipeline_stage_name?: string
-              p_query?: string
-              p_service_id?: string
-              p_tag?: string
-              p_workspace_id: string
-            }
-            Returns: {
-              business_name: string
-              client_type: string
-              first_name: string
-              id: string
-              last_name: string
-              lifecycle_status: string
-              primary_email: string
-              primary_phone: string
-              tags: string[]
-              total_count: number
-            }[]
-          }
-        | {
-            Args: {
-              p_assigned_staff_id?: string
-              p_lifecycle_statuses?: string[]
-              p_limit?: number
-              p_missing_documents?: boolean
-              p_offset?: number
-              p_outstanding_balance?: boolean
-              p_pipeline_stage_name?: string
-              p_query?: string
-              p_service_id?: string
-              p_tag?: string
-              p_workspace_id: string
-            }
-            Returns: {
-              business_name: string
-              client_type: string
-              first_name: string
-              id: string
-              last_name: string
-              lifecycle_status: string
-              primary_email: string
-              primary_phone: string
-              tags: string[]
-              total_count: number
-            }[]
-          }
+      search_clients: {
+        Args: {
+          p_assigned_staff_id?: string
+          p_client_type?: string
+          p_has_email?: boolean
+          p_has_phone?: boolean
+          p_lifecycle_statuses?: string[]
+          p_limit?: number
+          p_missing_documents?: boolean
+          p_offset?: number
+          p_outstanding_balance?: boolean
+          p_pipeline_stage_name?: string
+          p_query?: string
+          p_service_id?: string
+          p_tag?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          business_name: string
+          client_type: string
+          first_name: string
+          id: string
+          last_name: string
+          lifecycle_status: string
+          primary_email: string
+          primary_phone: string
+          tags: string[]
+          total_count: number
+        }[]
+      }
       send_organizer_information_request: {
         Args: {
           p_due_date?: string
@@ -14596,12 +14588,9 @@ export type Database = {
         }
         Returns: undefined
       }
-      set_partner_purchase_webhook: {
-        Args: { p_workspace_id: string }
-        Returns: {
-          endpoint_token: string
-          signing_secret: string
-        }[]
+      set_partner_purchase_webhook_secret: {
+        Args: { p_signing_secret: string; p_workspace_id: string }
+        Returns: undefined
       }
       set_platform_admin: {
         Args: { p_is_platform_admin: boolean; p_user_email: string }
@@ -14884,6 +14873,13 @@ export type Database = {
       sync_client_relationships_for_response: {
         Args: { p_response_id: string }
         Returns: undefined
+      }
+      test_condition_evaluator_nested_field_resolution: {
+        Args: never
+        Returns: {
+          check_name: string
+          passed: boolean
+        }[]
       }
       track_signature_view_by_token: {
         Args: { p_ip_address?: string; p_token: string }

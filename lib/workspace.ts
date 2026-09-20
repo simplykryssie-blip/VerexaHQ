@@ -69,12 +69,15 @@ export async function getCurrentWorkspace(): Promise<CurrentWorkspace | null> {
   return data ? toCurrentWorkspace(data as unknown as { is_owner: boolean; workspaces: Parameters<typeof toCurrentWorkspace>[0]["workspaces"] }) : null;
 }
 
-// The suspension-recovery surface a suspended workspace must always be able
-// to reach -- Verexa's own subscription/payment-method page (not /billing,
-// which is this workspace's OWN client billing, an operational feature that
-// suspension correctly blocks) -- plus the released-staff "Set Up My
-// Billing" flow, which briefly loads pages in the suspended personal
-// workspace's own context before redirecting to Stripe Checkout.
+// The suspension-recovery surface a non-operational workspace must always be
+// able to reach -- Verexa's own subscription/payment-method page (not
+// /billing, which is this workspace's OWN client billing, an operational
+// feature that suspension/archive correctly blocks) -- plus the
+// released-staff "Set Up My Billing" flow, which briefly loads pages in the
+// suspended personal workspace's own context before redirecting to Stripe
+// Checkout. Used identically for suspended/archived/permanently_archived --
+// none of them invent a narrower or wider recovery surface than what
+// already exists for suspension.
 const SUSPENSION_ALLOWED_PATH_PREFIXES = ["/settings/plan-usage", "/settings/profile", "/support"];
 
 export function isSuspensionRecoveryPath(pathname: string): boolean {
@@ -95,16 +98,19 @@ export function isWorkspaceStatusOperational(status: string): boolean {
 // archive lifecycle. Page loads are blocked centrally in
 // app/(app)/layout.tsx; this covers the routes that bypass that layout.
 // Returns an error string to return as a 403 when the workspace is not
-// active, or null when the request may proceed. Never call this from a
+// operational, or null when the request may proceed. Never call this from a
 // billing-recovery route (Stripe checkout, payment method, workspace
-// switch, seat-setup-for-released-staff) -- those must keep working while
-// suspended.
+// switch, seat-setup-for-released-staff) -- those must keep working at
+// every non-operational stage.
 export function workspaceOperationalError(workspace: Pick<CurrentWorkspace, "status">): string | null {
   if (workspace.status === "suspended") {
     return "This workspace is suspended pending billing. Resolve billing under Settings > Plan & Usage to restore access.";
   }
-  if (workspace.status === "archived" || workspace.status === "permanently_archived") {
-    return "This workspace has been archived and no longer has normal access. Contact support for assistance.";
+  if (workspace.status === "archived") {
+    return "This workspace has been archived and no longer has normal access. Visit Settings > Plan & Usage or contact Support for recovery/export options.";
+  }
+  if (workspace.status === "permanently_archived") {
+    return "This workspace has been permanently archived. Contact Support for data export options.";
   }
   if (!isWorkspaceStatusOperational(workspace.status)) {
     return "This workspace is not currently active.";
