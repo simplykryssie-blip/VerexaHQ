@@ -453,7 +453,7 @@ export function PublicOrganizerForm({
   if (step === "done") {
     const useCustomCopy = Boolean(onSubmitConfig?.thank_you_heading || onSubmitConfig?.thank_you_body);
     return (
-      <div className="mx-auto max-w-md p-8 text-center">
+      <div className="verexa-public-organizer verexa-organizer-thankyou mx-auto max-w-md p-8 text-center">
         <h1 className="text-lg font-semibold text-ink">{useCustomCopy ? onSubmitConfig?.thank_you_heading || "Thank you" : "Thank you"}</h1>
         {useCustomCopy ? (
           <p className="mt-2 text-sm text-muted">{onSubmitConfig?.thank_you_body}</p>
@@ -472,192 +472,211 @@ export function PublicOrganizerForm({
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4 sm:p-8">
+    // The banner sits outside the centered max-w-2xl column so it can render
+    // full-width (edge-to-edge on the standalone /o/[token] route, full-width
+    // of the embedding section elsewhere) -- everything else stays inside
+    // the original centered/padded column below it, unchanged.
+    <div className="verexa-public-organizer flex flex-col gap-4">
       {template.custom_css && <style dangerouslySetInnerHTML={{ __html: template.custom_css }} />}
+
       {template.banner_image_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={template.banner_image_url} alt="" className="w-full h-auto max-h-40 rounded-lg object-contain" />
+        <div className="verexa-organizer-banner w-full overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={template.banner_image_url}
+            alt=""
+            className="verexa-organizer-banner-image h-40 w-full object-cover object-center sm:h-52 md:h-64"
+          />
+        </div>
       )}
-      <div>
-        {branding?.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
-          <img src={branding.logo_url} alt={workspace_name} className="mb-3 h-12 w-auto object-contain" />
-        ) : (
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">{workspace_name}</p>
+
+      <div className="verexa-organizer-container mx-auto flex w-full max-w-2xl flex-col gap-4 p-4 sm:p-8">
+        <div className="verexa-organizer-header">
+          {/* The logo is only shown standalone when there's no banner -- a
+              banner already carries the brand mark, so showing both is a
+              duplicate. The workspace name text isn't a brand mark, so it
+              stays either way. */}
+          {!template.banner_image_url && branding?.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element -- external, per-workspace logo URL; not part of the Next.js image pipeline.
+            <img src={branding.logo_url} alt={workspace_name} className="verexa-organizer-logo mb-3 h-12 w-auto object-contain" />
+          )}
+          <p className="verexa-organizer-workspace-name text-xs font-medium uppercase tracking-wide text-muted">{workspace_name}</p>
+          <h1 className="verexa-organizer-title text-lg font-semibold text-ink">{template.name}</h1>
+          <div className="verexa-organizer-title-accent mt-1 h-0.5 w-10 rounded-full" style={{ backgroundColor: accentColor || "currentColor" }} />
+          {template.description && (
+            <p className="verexa-organizer-description mt-2 whitespace-pre-line text-sm text-muted">{template.description}</p>
+          )}
+          {(branding?.support_phone || branding?.support_email) && (
+            <div className="verexa-organizer-support mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate">
+              {branding.support_phone && (
+                <a href={`tel:${branding.support_phone}`} className="inline-flex items-center gap-1.5 hover:text-accent">
+                  <Phone size={13} aria-hidden="true" /> {branding.support_phone}
+                </a>
+              )}
+              {branding.support_email && (
+                <a href={`mailto:${branding.support_email}`} className="inline-flex items-center gap-1.5 hover:text-accent">
+                  <Mail size={13} aria-hidden="true" /> {branding.support_email}
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        {step === "contact" && (
+          <div className="verexa-organizer-content rounded-2xl border border-border bg-surface shadow-soft p-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="verexa-organizer-field verexa-organizer-field--name sm:col-span-2">
+                <label className="verexa-organizer-label block text-sm font-medium text-ink">Name *</label>
+                <div className="mt-1">
+                  <NameInput value={name} onChange={setName} />
+                </div>
+              </div>
+              <div className="verexa-organizer-field verexa-organizer-field--email">
+                <label className="verexa-organizer-label block text-sm font-medium text-ink">Email *</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={(e) => setEmail(e.target.value.trim().toLowerCase())}
+                  className="verexa-organizer-input mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+              <div className="verexa-organizer-field verexa-organizer-field--phone">
+                <label className="verexa-organizer-label block text-sm font-medium text-ink">Phone</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(formatPhone(e.target.value))}
+                  className="verexa-organizer-input mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                />
+              </div>
+              <div className="verexa-organizer-field verexa-organizer-field--address sm:col-span-2">
+                <label className="verexa-organizer-label block text-sm font-medium text-ink">Mailing address</label>
+                <div className="mt-1">
+                  <AddressInput value={address} onChange={setAddress} />
+                </div>
+              </div>
+              {requires_portal_signup && (
+                <>
+                  <div className="verexa-organizer-field verexa-organizer-field--password">
+                    <label className="verexa-organizer-label block text-sm font-medium text-ink">Create a password *</label>
+                    <PasswordInput
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      wrapperClassName="mt-1"
+                      className="verexa-organizer-input w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                    <p className="verexa-organizer-help mt-1 text-xs text-muted">{passwordRequirementsHint(minPasswordLength)}</p>
+                  </div>
+                  <div className="verexa-organizer-field verexa-organizer-field--password">
+                    <label className="verexa-organizer-label block text-sm font-medium text-ink">Confirm password *</label>
+                    <PasswordInput
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      wrapperClassName="mt-1"
+                      className="verexa-organizer-input w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                    />
+                  </div>
+                </>
+              )}
+              {serviceOptions.length > 0 && (
+                <div className="verexa-organizer-field verexa-organizer-field--services sm:col-span-2">
+                  <label className="verexa-organizer-label block text-sm font-medium text-ink">What do you need help with? *</label>
+                  <p className="verexa-organizer-help mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {serviceOptions.map((s) => (
+                      <label
+                        key={s.id}
+                        className={`verexa-organizer-choice flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                          selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedServiceIds.includes(s.id)}
+                          onChange={() => toggleService(s.id)}
+                          className="verexa-organizer-checkbox h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        />
+                        {s.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {requires_portal_signup && (
+              <p className="verexa-organizer-help mt-2 text-xs text-muted">
+                This form requires a free client portal account so you can track your progress -- it&apos;s created automatically when you continue.
+              </p>
+            )}
+            {error && <p className="verexa-organizer-error mt-2 text-sm text-danger">{error}</p>}
+            <button
+              type="button"
+              onClick={continueFromContact}
+              disabled={capturingLead}
+              className="verexa-organizer-primary-button mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {capturingLead ? "Please wait..." : "Continue"}
+            </button>
+          </div>
         )}
-        <h1 className="text-lg font-semibold text-ink">{template.name}</h1>
-        <div className="mt-1 h-0.5 w-10 rounded-full" style={{ backgroundColor: accentColor || "currentColor" }} />
-        {template.description && <p className="mt-2 whitespace-pre-line text-sm text-muted">{template.description}</p>}
-        {(branding?.support_phone || branding?.support_email) && (
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate">
-            {branding.support_phone && (
-              <a href={`tel:${branding.support_phone}`} className="inline-flex items-center gap-1.5 hover:text-accent">
-                <Phone size={13} aria-hidden="true" /> {branding.support_phone}
-              </a>
+
+        {step === "form" && (
+          <div className="verexa-organizer-content space-y-4 rounded-2xl border border-border bg-surface p-4 shadow-soft sm:p-6">
+            {pages.length > 1 && (
+              <p className="verexa-organizer-page-indicator text-xs font-medium text-muted">
+                Page {currentIndex + 1} of {pages.length}
+                {currentPage.title ? ` -- ${currentPage.title}` : ""}
+              </p>
             )}
-            {branding.support_email && (
-              <a href={`mailto:${branding.support_email}`} className="inline-flex items-center gap-1.5 hover:text-accent">
-                <Mail size={13} aria-hidden="true" /> {branding.support_email}
-              </a>
-            )}
+            <div className="verexa-organizer-fields @container grid grid-cols-12 gap-x-5 gap-y-6">
+              {currentPage.fields.map((field) =>
+                field.field_type === "repeating_section" ? (
+                  <PublicRepeatingSection
+                    key={field.id}
+                    token={token}
+                    field={field}
+                    childFields={childFieldsByParent.get(field.id) ?? []}
+                    rows={repeaterRows[field.id] ?? []}
+                    onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
+                  />
+                ) : (
+                  <PublicFieldInput key={field.id} token={token} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
+                )
+              )}
+            </div>
+
+            {error && <p className="verexa-organizer-error text-sm text-danger">{error}</p>}
+            <div className="verexa-organizer-navigation flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => (currentIndex === 0 ? setStep("contact") : setPageIndex((i) => i - 1))}
+                className="verexa-organizer-secondary-button rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
+              >
+                Back
+              </button>
+              {isLastPage ? (
+                <button
+                  type="button"
+                  onClick={submitWithValidation}
+                  disabled={submitting}
+                  className="verexa-organizer-primary-button rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {submitting ? "Submitting..." : "Submit"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={goNext}
+                  className="verexa-organizer-primary-button rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
+                >
+                  Next
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
-
-      {step === "contact" && (
-        <div className="rounded-2xl border border-border bg-surface shadow-soft p-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink">Name *</label>
-              <div className="mt-1">
-                <NameInput value={name} onChange={setName} />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink">Email *</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={(e) => setEmail(e.target.value.trim().toLowerCase())}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink">Phone</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-ink">Mailing address</label>
-              <div className="mt-1">
-                <AddressInput value={address} onChange={setAddress} />
-              </div>
-            </div>
-            {requires_portal_signup && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-ink">Create a password *</label>
-                  <PasswordInput
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    wrapperClassName="mt-1"
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                  />
-                  <p className="mt-1 text-xs text-muted">{passwordRequirementsHint(minPasswordLength)}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-ink">Confirm password *</label>
-                  <PasswordInput
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    wrapperClassName="mt-1"
-                    className="w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                  />
-                </div>
-              </>
-            )}
-            {serviceOptions.length > 0 && (
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium text-ink">What do you need help with? *</label>
-                <p className="mt-0.5 text-xs text-muted">Select everything that applies -- you can pick more than one.</p>
-                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {serviceOptions.map((s) => (
-                    <label
-                      key={s.id}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                        selectedServiceIds.includes(s.id) ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:bg-surfaceMuted"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedServiceIds.includes(s.id)}
-                        onChange={() => toggleService(s.id)}
-                        className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
-                      />
-                      {s.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          {requires_portal_signup && (
-            <p className="mt-2 text-xs text-muted">
-              This form requires a free client portal account so you can track your progress -- it&apos;s created automatically when you continue.
-            </p>
-          )}
-          {error && <p className="mt-2 text-sm text-danger">{error}</p>}
-          <button
-            type="button"
-            onClick={continueFromContact}
-            disabled={capturingLead}
-            className="mt-3 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {capturingLead ? "Please wait..." : "Continue"}
-          </button>
-        </div>
-      )}
-
-      {step === "form" && (
-        <div className="space-y-4">
-          {pages.length > 1 && (
-            <p className="text-xs font-medium text-muted">
-              Page {currentIndex + 1} of {pages.length}
-              {currentPage.title ? ` -- ${currentPage.title}` : ""}
-            </p>
-          )}
-          <div className="@container grid grid-cols-12 gap-x-5 gap-y-6">
-            {currentPage.fields.map((field) =>
-              field.field_type === "repeating_section" ? (
-                <PublicRepeatingSection
-                  key={field.id}
-                  token={token}
-                  field={field}
-                  childFields={childFieldsByParent.get(field.id) ?? []}
-                  rows={repeaterRows[field.id] ?? []}
-                  onChange={(rows) => setRepeaterRows((prev) => ({ ...prev, [field.id]: rows }))}
-                />
-              ) : (
-                <PublicFieldInput key={field.id} token={token} field={field} value={answers[field.id] ?? ""} onChange={setAnswer} />
-              )
-            )}
-          </div>
-
-          {error && <p className="text-sm text-danger">{error}</p>}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => (currentIndex === 0 ? setStep("contact") : setPageIndex((i) => i - 1))}
-              className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-slate hover:border-accent hover:text-accent"
-            >
-              Back
-            </button>
-            {isLastPage ? (
-              <button
-                type="button"
-                onClick={submitWithValidation}
-                disabled={submitting}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-              >
-                {submitting ? "Submitting..." : "Submit"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={goNext}
-                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/90"
-              >
-                Next
-              </button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -676,11 +695,11 @@ function PublicRepeatingSection({
   onChange: (rows: Record<string, string>[]) => void;
 }) {
   return (
-    <div className="col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
-      <label className="block text-sm font-semibold text-ink">
-        {field.label} {field.is_required && <span className="text-danger">*</span>}
+    <div className="verexa-organizer-field verexa-organizer-field--repeating col-span-12 rounded-2xl border border-border bg-surfaceMuted/60 p-5">
+      <label className="verexa-organizer-label block text-sm font-semibold text-ink">
+        {field.label} {field.is_required && <span className="verexa-organizer-required text-danger">*</span>}
       </label>
-      {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+      {field.help_text && <p className="verexa-organizer-help mt-0.5 text-xs text-muted">{field.help_text}</p>}
 
       <div className="mt-3 space-y-3">
         {rows.length === 0 && <p className="text-xs text-muted">None added yet.</p>}
@@ -693,7 +712,7 @@ function PublicRepeatingSection({
               <button
                 type="button"
                 onClick={() => onChange(rows.filter((_, i) => i !== index))}
-                className="text-xs font-medium text-danger hover:underline"
+                className="verexa-organizer-secondary-button text-xs font-medium text-danger hover:underline"
               >
                 Remove
               </button>
@@ -715,7 +734,11 @@ function PublicRepeatingSection({
         ))}
       </div>
 
-      <button type="button" onClick={() => onChange([...rows, {}])} className="mt-3 text-xs font-semibold text-accent hover:underline">
+      <button
+        type="button"
+        onClick={() => onChange([...rows, {}])}
+        className="verexa-organizer-secondary-button mt-3 text-xs font-semibold text-accent hover:underline"
+      >
         + Add another
       </button>
     </div>
@@ -806,25 +829,25 @@ function PublicFieldInput({
 }) {
   const options = normalizeOptions(field.options);
   const inputClass =
-    "w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
+    "verexa-organizer-input w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm shadow-sm transition focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30";
 
   if (field.field_type === "section") {
     return (
-      <div className="col-span-12 flex items-start gap-3 border-l-[3px] border-accent py-1 pl-3.5">
+      <div className="verexa-organizer-field verexa-organizer-field--section col-span-12 flex items-start gap-3 border-l-[3px] border-accent py-1 pl-3.5">
         {field.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={field.image_url} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
         )}
         <div>
           <h3 className="text-lg font-semibold text-ink">{field.label}</h3>
-          {field.help_text && <p className="mt-0.5 text-sm text-muted">{field.help_text}</p>}
+          {field.help_text && <p className="verexa-organizer-help mt-0.5 text-sm text-muted">{field.help_text}</p>}
         </div>
       </div>
     );
   }
   if (field.field_type === "rich_text") {
     return (
-      <div className="col-span-12">
+      <div className="verexa-organizer-field verexa-organizer-field--rich-text col-span-12">
         <RichTextEditor content={field.body_html ?? ""} editable={false} bare />
       </div>
     );
@@ -833,13 +856,13 @@ function PublicFieldInput({
   const showHeader = !(field.field_type === "checkbox" && !field.label.trim());
 
   return (
-    <div className={fieldColSpanClass(field.field_type, field.layout_width)}>
+    <div className={`${fieldColSpanClass(field.field_type, field.layout_width)} verexa-organizer-field verexa-organizer-field--${field.field_type}`}>
       {showHeader && (
         <>
-          <label htmlFor={`field-${field.id}`} className="block text-sm font-semibold text-ink">
-            {field.label} {field.is_required && <span className="text-danger">*</span>}
+          <label htmlFor={`field-${field.id}`} className="verexa-organizer-label block text-sm font-semibold text-ink">
+            {field.label} {field.is_required && <span className="verexa-organizer-required text-danger">*</span>}
           </label>
-          {field.help_text && <p className="mt-0.5 text-xs text-muted">{field.help_text}</p>}
+          {field.help_text && <p className="verexa-organizer-help mt-0.5 text-xs text-muted">{field.help_text}</p>}
         </>
       )}
 
@@ -874,13 +897,13 @@ function PublicFieldInput({
         ) : field.field_type === "yes_no" ? (
           <div className="flex gap-4">
             {YES_NO_OPTIONS.map((o) => (
-              <label key={o.value} className="flex items-center gap-2 text-sm text-slate">
+              <label key={o.value} className="verexa-organizer-choice flex items-center gap-2 text-sm text-slate">
                 <input
                   type="radio"
                   name={`field-${field.id}`}
                   checked={value === o.value}
                   onChange={() => onChange(field.id, o.value)}
-                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                  className="verexa-organizer-radio h-4 w-4 border-border text-accent focus:ring-accent"
                 />
                 {o.label}
               </label>
@@ -895,7 +918,7 @@ function PublicFieldInput({
             id={`field-${field.id}`}
             value={value}
             onChange={(e) => onChange(field.id, e.target.value)}
-            className={inputClass}
+            className={`${inputClass} verexa-organizer-select`}
           >
             <option value="">Select...</option>
             {options.map((o, i) => (
@@ -907,13 +930,13 @@ function PublicFieldInput({
         ) : field.field_type === "radio_button" ? (
           <div className="space-y-1.5">
             {options.map((o, i) => (
-              <label key={i} className="flex items-center gap-2 text-sm text-slate">
+              <label key={i} className="verexa-organizer-choice flex items-center gap-2 text-sm text-slate">
                 <input
                   type="radio"
                   name={`field-${field.id}`}
                   checked={value === o.value}
                   onChange={() => onChange(field.id, o.value)}
-                  className="h-4 w-4 border-border text-accent focus:ring-accent"
+                  className="verexa-organizer-radio h-4 w-4 border-border text-accent focus:ring-accent"
                 />
                 {o.label}
               </label>
@@ -924,7 +947,7 @@ function PublicFieldInput({
             {options.map((o, i) => {
               const selected = value ? value.split(",") : [];
               return (
-                <label key={i} className="flex items-center gap-2 text-sm text-slate">
+                <label key={i} className="verexa-organizer-choice flex items-center gap-2 text-sm text-slate">
                   <input
                     type="checkbox"
                     checked={selected.includes(o.value)}
@@ -932,7 +955,7 @@ function PublicFieldInput({
                       const next = e.target.checked ? [...selected, o.value] : selected.filter((v) => v !== o.value);
                       onChange(field.id, next.join(","));
                     }}
-                    className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                    className="verexa-organizer-checkbox h-4 w-4 rounded border-border text-accent focus:ring-accent"
                   />
                   {o.label}
                 </label>
@@ -997,7 +1020,7 @@ function PublicFieldInput({
                 el.style.height = `${el.scrollHeight}px`;
               }
             }}
-            className={`${inputClass} resize-none overflow-hidden`}
+            className={`${inputClass} verexa-organizer-textarea resize-none overflow-hidden`}
           />
         )}
       </div>
