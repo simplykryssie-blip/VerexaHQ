@@ -65,15 +65,21 @@ export function createFakeSupabase(options: {
   const tables = options.tables ?? {};
   const rpcs = options.rpcs ?? {};
   const user = options.user ?? { id: "staff-user-1" };
+  // Recorded for tests that need to assert exactly what a page passed to an
+  // RPC (e.g. a filter's args), without needing every existing test (which
+  // ignores this) to change.
+  const rpcCalls: { name: string; args?: Record<string, unknown> }[] = [];
 
   return {
     from(table: string) {
       return buildQueryBuilder(tables[table] ?? { data: [], count: 0, error: null });
     },
-    rpc(name: string, _args?: Record<string, unknown>) {
+    rpc(name: string, args?: Record<string, unknown>) {
+      rpcCalls.push({ name, args });
       const fixture = rpcs[name] ?? { data: null, error: null };
       return Promise.resolve(fixture);
     },
+    rpcCalls,
     auth: {
       getUser: () => Promise.resolve({ data: { user }, error: null }),
     },

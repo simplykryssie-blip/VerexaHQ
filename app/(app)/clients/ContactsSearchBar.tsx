@@ -25,6 +25,10 @@ export function ContactsSearchBar({
   activeStage,
   missingDocuments,
   outstandingBalance,
+  clientTypes,
+  activeClientType,
+  hasEmail,
+  hasPhone,
 }: {
   initialQuery: string;
   basePath: string;
@@ -36,6 +40,10 @@ export function ContactsSearchBar({
   activeStage: string;
   missingDocuments: boolean;
   outstandingBalance: boolean;
+  clientTypes: FilterOption[];
+  activeClientType: string;
+  hasEmail: boolean | undefined;
+  hasPhone: boolean | undefined;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialQuery);
@@ -96,6 +104,7 @@ export function ContactsSearchBar({
       {pipelineStages.length > 0 && (
         <FilterDropdown label="Pipeline stage" options={pipelineStages} activeValue={activeStage} param="stage" basePath={basePath} />
       )}
+      <FilterDropdown label="Type" options={clientTypes} activeValue={activeClientType} param="clientType" basePath={basePath} />
 
       <Link
         href={toggleLink("missingDocs", "1")}
@@ -112,6 +121,38 @@ export function ContactsSearchBar({
         }`}
       >
         Outstanding balance
+      </Link>
+      <Link
+        href={toggleLink("hasEmail", "1")}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+          hasEmail === true ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+        }`}
+      >
+        Has email
+      </Link>
+      <Link
+        href={toggleLink("hasEmail", "0")}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+          hasEmail === false ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+        }`}
+      >
+        No email
+      </Link>
+      <Link
+        href={toggleLink("hasPhone", "1")}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+          hasPhone === true ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+        }`}
+      >
+        Has phone
+      </Link>
+      <Link
+        href={toggleLink("hasPhone", "0")}
+        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+          hasPhone === false ? "bg-accent text-white" : "bg-surfaceMuted text-slate hover:bg-border"
+        }`}
+      >
+        No phone
       </Link>
     </div>
   );

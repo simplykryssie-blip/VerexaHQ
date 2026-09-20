@@ -14352,33 +14352,64 @@ export type Database = {
         Args: { p_item_id: string; p_value: Json }
         Returns: undefined
       }
-      search_clients: {
-        Args: {
-          p_assigned_staff_id?: string
-          p_lifecycle_statuses?: string[]
-          p_limit?: number
-          p_missing_documents?: boolean
-          p_offset?: number
-          p_outstanding_balance?: boolean
-          p_pipeline_stage_name?: string
-          p_query?: string
-          p_service_id?: string
-          p_tag?: string
-          p_workspace_id: string
-        }
-        Returns: {
-          business_name: string
-          client_type: string
-          first_name: string
-          id: string
-          last_name: string
-          lifecycle_status: string
-          primary_email: string
-          primary_phone: string
-          tags: string[]
-          total_count: number
-        }[]
-      }
+      search_clients:
+        | {
+            Args: {
+              p_assigned_staff_id?: string
+              p_client_type?: string
+              p_has_email?: boolean
+              p_has_phone?: boolean
+              p_lifecycle_statuses?: string[]
+              p_limit?: number
+              p_missing_documents?: boolean
+              p_offset?: number
+              p_outstanding_balance?: boolean
+              p_pipeline_stage_name?: string
+              p_query?: string
+              p_service_id?: string
+              p_tag?: string
+              p_workspace_id: string
+            }
+            Returns: {
+              business_name: string
+              client_type: string
+              first_name: string
+              id: string
+              last_name: string
+              lifecycle_status: string
+              primary_email: string
+              primary_phone: string
+              tags: string[]
+              total_count: number
+            }[]
+          }
+        | {
+            Args: {
+              p_assigned_staff_id?: string
+              p_lifecycle_statuses?: string[]
+              p_limit?: number
+              p_missing_documents?: boolean
+              p_offset?: number
+              p_outstanding_balance?: boolean
+              p_pipeline_stage_name?: string
+              p_query?: string
+              p_service_id?: string
+              p_tag?: string
+              p_workspace_id: string
+            }
+            Returns: {
+              business_name: string
+              client_type: string
+              first_name: string
+              id: string
+              last_name: string
+              lifecycle_status: string
+              primary_email: string
+              primary_phone: string
+              tags: string[]
+              total_count: number
+            }[]
+          }
       send_organizer_information_request: {
         Args: {
           p_due_date?: string
