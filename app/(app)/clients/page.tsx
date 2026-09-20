@@ -8,6 +8,7 @@ import { TagFilterControl } from "./TagFilterControl";
 import { ContactsSearchBar } from "./ContactsSearchBar";
 import { ContactsBulkTable } from "./ContactsBulkTable";
 import { resolveAssignedStaff, type ClientRow } from "./clientListColumns";
+import type { SearchClientsFilters } from "./bulkContactActions";
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,24 @@ export default async function ClientsPage({
   const hasEmail = searchParams.hasEmail === "1" ? true : searchParams.hasEmail === "0" ? false : undefined;
   const hasPhone = searchParams.hasPhone === "1" ? true : searchParams.hasPhone === "0" ? false : undefined;
 
+  // Shared verbatim with ContactsBulkTable's "select all matching" (Phase
+  // 3) so it can reissue this exact query, unpaginated, without the two
+  // ever drifting out of sync with each other or with search_clients' own
+  // parameter names.
+  const searchFilters: SearchClientsFilters = {
+    p_query: q || undefined,
+    p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
+    p_tag: tag || undefined,
+    p_service_id: serviceFilter || undefined,
+    p_assigned_staff_id: staffFilter || undefined,
+    p_pipeline_stage_name: stageFilter || undefined,
+    p_missing_documents: missingDocuments ? true : undefined,
+    p_outstanding_balance: outstandingBalance ? true : undefined,
+    p_client_type: clientType || undefined,
+    p_has_email: hasEmail,
+    p_has_phone: hasPhone,
+  };
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -103,17 +122,7 @@ export default async function ClientsPage({
     // pagination stays correct against the filtered set.
     supabase.rpc("search_clients", {
       p_workspace_id: workspace.id,
-      p_query: q || undefined,
-      p_lifecycle_statuses: status ? [status] : ALL_LIFECYCLE_STATUSES,
-      p_tag: tag || undefined,
-      p_service_id: serviceFilter || undefined,
-      p_assigned_staff_id: staffFilter || undefined,
-      p_pipeline_stage_name: stageFilter || undefined,
-      p_missing_documents: missingDocuments ? true : undefined,
-      p_outstanding_balance: outstandingBalance ? true : undefined,
-      p_client_type: clientType || undefined,
-      p_has_email: hasEmail,
-      p_has_phone: hasPhone,
+      ...searchFilters,
       p_limit: PAGE_SIZE,
       p_offset: from,
     }),
@@ -323,6 +332,8 @@ export default async function ClientsPage({
             canManage={Boolean(canCreate)}
             canEdit={Boolean(canEdit)}
             staffOptions={staffFilterOptions}
+            activeFilters={searchFilters}
+            totalCount={count ?? clients.length}
             emptyMessage={
               q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance || clientType || hasEmail !== undefined || hasPhone !== undefined
                 ? "No contacts match this search."

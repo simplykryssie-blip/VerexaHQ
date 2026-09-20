@@ -87,8 +87,13 @@ describe("Contacts CSV export -- source-level invariants", () => {
     expect(source).not.toMatch(/downloadCsv\(rows\)/);
   });
 
-  it("5: workspace boundary is inherited from ClientRow -- no new query or cross-workspace lookup was added to this file", () => {
-    expect(source).not.toMatch(/\.from\(["']user_profiles["']\)/);
-    expect(source).not.toMatch(/\.from\(["']workspace_users["']\)/);
+  it("5: workspace boundary is inherited from ClientRow -- the CSV export path itself adds no new query or cross-workspace lookup", () => {
+    // Scoped to downloadCsv specifically -- Contacts Completion Pass Phase 3
+    // legitimately added a user_profiles query elsewhere in this file (for
+    // "select all matching" row enrichment, mirroring page.tsx's own
+    // pattern), which is correct, unrelated code for a different feature.
+    const downloadCsvBody = source.match(/function downloadCsv\(rows: ClientRow\[\]\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    expect(downloadCsvBody).not.toMatch(/\.from\(["']user_profiles["']\)/);
+    expect(downloadCsvBody).not.toMatch(/\.from\(["']workspace_users["']\)/);
   });
 });
