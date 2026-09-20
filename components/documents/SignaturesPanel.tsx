@@ -232,6 +232,9 @@ export function SignaturesPanel({
         body: JSON.stringify({ signatureRequestId: parentRequest.id }),
       }).catch(() => {});
     }
+    // Completes the audit trail for this path the same way PublicSignView's
+    // token flow does -- navigator.userAgent is the only source for this.
+    void supabase.rpc("set_signature_user_agent", { p_signer_id: signingId, p_user_agent: navigator.userAgent });
     closeSigningModal();
     toast.show("Signature recorded", "success");
     router.refresh();
