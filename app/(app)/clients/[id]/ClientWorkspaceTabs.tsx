@@ -70,6 +70,13 @@ function money(n: number | null | undefined) {
   return `$${(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Notes now store rich-text HTML (Contacts Reconciliation Audit, item #8),
+ * but a short plain-text preview is still needed for the Overview widget's
+ * single-line list -- rendering the raw HTML there would show literal tags. */
+function stripHtml(html: string) {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
 // ---------------------------------------------------------------- Overview
 
 function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
@@ -621,7 +628,7 @@ export function OverviewTab({
             {recentNotes.map((n) => (
               <li key={n.id} className="text-sm text-slate">
                 {n.subject && <span className="font-semibold text-ink">{n.subject}: </span>}
-                {n.body}
+                {stripHtml(n.body)}
                 <span className="ml-2 text-xs text-muted">{new Date(n.created_at).toLocaleDateString()}</span>
               </li>
             ))}
@@ -1226,7 +1233,7 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
                 </div>
                 <EditNoteForm note={n} />
               </div>
-              <p className="whitespace-pre-wrap">{n.body}</p>
+              <div className="prose prose-sm max-w-none whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: n.body }} />
               <p className="mt-1 text-xs text-muted">{new Date(n.created_at).toLocaleString()}</p>
             </li>
           ))}

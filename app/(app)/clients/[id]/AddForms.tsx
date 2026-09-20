@@ -296,7 +296,7 @@ export function AddNoteForm({
       label="New Note"
       fields={[
         { name: "subject", label: "Subject" },
-        { name: "body", label: "Note", type: "textarea", required: true },
+        { name: "body", label: "Note", type: "richtext", required: true },
       ]}
       onSubmit={async (v) => {
         const {
@@ -327,7 +327,7 @@ export function EditNoteForm({ note }: { note: { id: string; subject: string | n
       initialValues={{ subject: note.subject ?? "", body: note.body }}
       fields={[
         { name: "subject", label: "Subject" },
-        { name: "body", label: "Note", type: "textarea", required: true },
+        { name: "body", label: "Note", type: "richtext", required: true },
       ]}
       trigger={(openForm) => (
         <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit note">
