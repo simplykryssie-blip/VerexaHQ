@@ -12395,6 +12395,23 @@ export type Database = {
         }
         Returns: Json
       }
+      create_client_from_ghl_import: {
+        Args: {
+          p_business_name?: string
+          p_client_type: string
+          p_date_of_birth?: string
+          p_ein?: string
+          p_first_name?: string
+          p_force_create?: boolean
+          p_itin?: string
+          p_last_name?: string
+          p_primary_email?: string
+          p_primary_phone?: string
+          p_ssn?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       create_client_relationship: {
         Args: {
           p_client_id: string
