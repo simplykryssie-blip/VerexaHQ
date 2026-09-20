@@ -136,6 +136,82 @@ merged app (every route from both branches builds, including `/partners`,
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
 
+## Addendum — 2026-09-20: Contacts completion pass closed out; search_clients stale-overload fixed; future cleanup backlog
+
+Branch: `claude/verexa-schema-mismatch-i8c19u` → `main`. This closes out the
+entire multi-phase Contacts completion pass (Client Type/Email/Phone
+filters, archive/restore, cross-page selection, Client Tasks CRUD, rich-text
+Notes, tax-return/bank-product display, generic signature final PDF,
+signature audit trail, GHL import automation guard — PRs #290-#299, all
+merged). Final Contacts status: 🟢 COMPLETE, 🔴 FIX NOW empty, ⚪ PRODUCT
+DECISIONS empty. Only two intentionally 🔵 DEFERRED items remain: client
+Stripe saved-payment-method/customer relationship (no client-level Stripe
+Customer object exists anywhere in this codebase — building it means
+touching the live payment-critical checkout flow, out of scope for a
+completion pass), and hard delete (never wanted — archive is the only
+removal mechanism).
+
+**Confirmed active defect, fixed (PR #299):** `search_clients` had two
+live overloads in production — a stale pre-Phase-1 11-arg version and the
+intended 14-arg version with `p_client_type`/`p_has_email`/`p_has_phone`.
+`20261031000000_search_clients_type_email_phone_filters.sql` added those
+params via `CREATE OR REPLACE FUNCTION`, which Postgres treats as a new
+function identity when the argument list changes rather than an in-place
+replacement — the stale 11-arg version stayed live and callable alongside
+the new one, and an ordinary unfiltered Contacts search could resolve
+against either overload via PostgREST. Fixed by
+`20261031050000_drop_stale_search_clients_overload.sql` (a plain `DROP
+FUNCTION IF EXISTS` targeting the exact stale positional-type signature).
+Verified post-apply via direct production reads: exactly one
+`search_clients` identity remains, with the canonical 14-arg signature and
+`SECURITY DEFINER` intact.
+
+**This is the fourth confirmed occurrence of the same bug class** in this
+codebase's history — `create_engagement`
+(`20260819142823_drop_stale_create_client_overload.sql` and its own prior
+fix), `create_client`, and `set_firm_tax_profile`
+(`20260923040000_fix_set_firm_tax_profile_duplicate_overload.sql`) all hit
+this exact trap before. `tests/contacts-search-clients-stale-overload.test.ts`
+guards this one specific function going forward, but the underlying trap
+(`CREATE OR REPLACE FUNCTION` with a changed argument list silently
+registers a new overload instead of replacing) is not systematically
+guarded anywhere else in the codebase.
+
+**🟡 Confirmed cleanup backlog item (not acted on this session — out of
+scope for a feature-completion pass, needs its own dedicated pass):**
+
+- **What**: a repo-wide audit for other duplicate function overloads
+  introduced the same way (a later migration's `CREATE OR REPLACE
+  FUNCTION public.some_function(...)` with an argument list that doesn't
+  exactly match an earlier `CREATE OR REPLACE FUNCTION public.some_function(...)`
+  for the same name, with no corresponding `DROP FUNCTION` for the old
+  signature in between).
+- **Why it's flagged**: four confirmed real occurrences of this exact
+  pattern so far (`create_engagement`, `create_client`,
+  `set_firm_tax_profile`, `search_clients`) — enough of a recurring pattern
+  in this codebase's migration history to be worth a systematic pass
+  rather than assuming it's now fully caught.
+- **How to find candidates**: query live production
+  (`select proname, count(*) from pg_proc where pronamespace =
+  'public'::regnamespace group by proname having count(*) > 1 order by
+  count(*) desc;`) to list every function name with more than one live
+  overload, then check each one's overloads against its own migration
+  history to tell a genuine intentional overload (if any exist) apart from
+  an accidental stale one exactly like the four above.
+- **Recommended cleanup/removal condition**: only after confirming, per
+  function, that (a) it has multiple live overloads, (b) the older
+  overload's exact call shape has no legitimate caller (same repo-wide
+  grep-for-callers method used for `search_clients` in this session), and
+  (c) a `DROP FUNCTION` targeting the exact stale signature (this repo's
+  now well-established convention) is written and applied the same way as
+  this session's fix.
+- **Production existence**: not yet confirmed for anything beyond
+  `search_clients` (already fixed) — this is a candidate query to run, not
+  a list of already-confirmed additional stale functions.
+- **Do not treat this as authorization to touch any specific function** —
+  it's a scoped starting point for a future dedicated cleanup pass, not a
+  cleanup ticket for "every old-looking function."
+
 ## Addendum — 2026-09-03: Manus audit triage/fixes, production data cleanup, F-05 test-project setup (blocked on missing baseline schema)
 
 Branch: `claude/verexa-remove-services-vaqbfx`. The user fed this session a
