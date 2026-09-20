@@ -44,6 +44,7 @@ export function ClientTabsBody({
     complianceDefault,
     engagements,
     tasks,
+    completedTasks,
     appointments,
     invoices,
     notes,
@@ -108,7 +109,15 @@ export function ClientTabsBody({
             onShowTasks={() => onTabChange("Tasks")}
           />
         )}
-        {tab === "Tasks" && <TasksTab clientId={client.id} tasks={tasks} />}
+        {tab === "Tasks" && (
+          <TasksTab
+            clientId={client.id}
+            workspaceId={workspace.id}
+            tasks={tasks}
+            completedTasks={completedTasks}
+            staffOptions={staffOptions}
+          />
+        )}
         {tab === "Documents" && (
           <DocumentWorkspace
             workspaceId={workspace.id}

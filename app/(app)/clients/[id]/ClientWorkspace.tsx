@@ -102,6 +102,7 @@ export type ClientWorkspaceProps = {
   messages: MessageRow[];
   timeline: ActivityRow[];
   tasks: TaskRow[];
+  completedTasks: TaskRow[];
   missingDocumentCount: number;
   documentRequestTemplates: { id: string; name: string }[];
   organizerTemplates: { id: string; name: string }[];
