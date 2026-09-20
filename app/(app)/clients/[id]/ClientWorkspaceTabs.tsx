@@ -35,6 +35,10 @@ import {
   AddPortalUserForm,
   AddNoteForm,
   EditNoteForm,
+  AddClientTaskForm,
+  EditTaskForm,
+  DeleteTaskButton,
+  ReopenTaskButton,
 } from "./AddForms";
 import {
   AddEmailForm,
@@ -1232,11 +1236,24 @@ export function NotesTab({ clientId, workspaceId, notes }: { clientId: string; w
   );
 }
 
-export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow[] }) {
+export function TasksTab({
+  clientId,
+  workspaceId,
+  tasks,
+  completedTasks,
+  staffOptions,
+}: {
+  clientId: string;
+  workspaceId: string;
+  tasks: TaskRow[];
+  completedTasks: TaskRow[];
+  staffOptions: StaffOption[];
+}) {
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   async function complete(task: TaskRow) {
     setPendingId(task.id);
@@ -1261,7 +1278,7 @@ export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow
   });
 
   return (
-    <Section title="Tasks">
+    <Section title="Tasks" action={<AddClientTaskForm clientId={clientId} workspaceId={workspaceId} staffOptions={staffOptions} />}>
       {sorted.length === 0 ? (
         <EmptyState message="No open tasks for this client." />
       ) : (
@@ -1296,10 +1313,40 @@ export function TasksTab({ clientId, tasks }: { clientId: string; tasks: TaskRow
                     )}
                   </div>
                 </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <EditTaskForm task={t} staffOptions={staffOptions} />
+                  <DeleteTaskButton taskId={t.id} />
+                </div>
               </li>
             );
           })}
         </ul>
+      )}
+      {completedTasks.length > 0 && (
+        <div className="mt-4 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => setShowCompleted((s) => !s)}
+            className="text-xs font-medium text-muted hover:text-ink"
+          >
+            {showCompleted ? "Hide" : "Show"} {completedTasks.length} completed task{completedTasks.length === 1 ? "" : "s"}
+          </button>
+          {showCompleted && (
+            <ul className="mt-2 divide-y divide-border">
+              {completedTasks.map((t) => (
+                <li key={t.id} className="flex items-start justify-between gap-3 py-2.5">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-muted line-through">{t.title}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <ReopenTaskButton taskId={t.id} />
+                    <DeleteTaskButton taskId={t.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </Section>
   );
@@ -1341,6 +1388,8 @@ export type TaskRow = {
   engagement_id: string | null;
   client_id: string | null;
   related_organizer_response_id: string | null;
+  assigned_staff_id: string | null;
+  visibility: string;
 };
 export type QuoteRow = {
   id: string;

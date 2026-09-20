@@ -407,6 +407,8 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
       : Promise.resolve({ data: [] as { id: string; subject: string; status: string; sent_at: string | null; created_at: string }[] }),
   ]);
 
+  const TASK_COLUMNS =
+    "id, title, description, status, priority, due_date, engagement_id, client_id, related_organizer_response_id, assigned_staff_id, visibility";
   let tasks: {
     id: string;
     title: string;
@@ -417,16 +419,28 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     engagement_id: string | null;
     client_id: string | null;
     related_organizer_response_id: string | null;
+    assigned_staff_id: string | null;
+    visibility: string;
   }[] = [];
+  let completedTasks: typeof tasks = [];
   {
     const engagementFilter = engagementIds.length > 0 ? `engagement_id.in.(${engagementIds.join(",")})` : "";
-    const { data: taskRows } = await supabase
-      .from("tasks")
-      .select("id, title, description, status, priority, due_date, engagement_id, client_id, related_organizer_response_id")
-      .or([engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(","))
-      .neq("status", "completed")
-      .order("due_date");
+    const taskFilter = [engagementFilter, `client_id.eq.${client.id}`].filter(Boolean).join(",");
+    const [{ data: taskRows }, { data: completedTaskRows }] = await Promise.all([
+      supabase.from("tasks").select(TASK_COLUMNS).or(taskFilter).neq("status", "completed").order("due_date"),
+      // Completed tasks are fetched separately (rather than widening the
+      // query above) so the "Upcoming tasks" widget, which reuses `tasks`,
+      // never has to filter completed ones back out itself.
+      supabase
+        .from("tasks")
+        .select(TASK_COLUMNS)
+        .or(taskFilter)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(20),
+    ]);
     tasks = taskRows ?? [];
+    completedTasks = completedTaskRows ?? [];
   }
 
   // Real pending-item count on this client's open document requests
@@ -550,6 +564,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     messages: threadMessages ?? [],
     timeline,
     tasks,
+    completedTasks,
     missingDocumentCount,
     organizerTemplates: organizerTemplates ?? [],
     pendingOrganizerTemplateIds,
