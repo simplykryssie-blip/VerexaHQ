@@ -28,6 +28,18 @@ const STATUS_FILTERS = [
   { value: "archived", label: "Archived" },
 ];
 
+// Mirrors clients_client_type_check exactly -- the Type column already
+// shows this, this just makes it filterable too (Contacts Reconciliation
+// Audit, Product Decision #12: "Account Type" was found to be a duplicate
+// of this field, not a separate concept, so it gets no filter of its own).
+const CLIENT_TYPE_FILTERS = [
+  { value: "individual", label: "Individual" },
+  { value: "business", label: "Business" },
+  { value: "trust", label: "Trust" },
+  { value: "estate", label: "Estate" },
+  { value: "organization", label: "Organization" },
+];
+
 export default async function ClientsPage({
   searchParams,
 }: {
@@ -41,6 +53,9 @@ export default async function ClientsPage({
     stage?: string;
     missingDocs?: string;
     balance?: string;
+    clientType?: string;
+    hasEmail?: string;
+    hasPhone?: string;
   };
 }) {
   const workspace = await getCurrentWorkspace();
@@ -60,6 +75,12 @@ export default async function ClientsPage({
   const stageFilter = searchParams.stage?.trim() || "";
   const missingDocuments = searchParams.missingDocs === "1";
   const outstandingBalance = searchParams.balance === "1";
+  const clientType = CLIENT_TYPE_FILTERS.some((f) => f.value === searchParams.clientType) ? (searchParams.clientType as string) : "";
+  // "1" = has one on file, "0" = missing -- anything else (unset) means the
+  // filter isn't applied, matching search_clients' own null-means-ignore
+  // pattern for p_has_email/p_has_phone.
+  const hasEmail = searchParams.hasEmail === "1" ? true : searchParams.hasEmail === "0" ? false : undefined;
+  const hasPhone = searchParams.hasPhone === "1" ? true : searchParams.hasPhone === "0" ? false : undefined;
 
   const {
     data: { user },
@@ -90,6 +111,9 @@ export default async function ClientsPage({
       p_pipeline_stage_name: stageFilter || undefined,
       p_missing_documents: missingDocuments ? true : undefined,
       p_outstanding_balance: outstandingBalance ? true : undefined,
+      p_client_type: clientType || undefined,
+      p_has_email: hasEmail,
+      p_has_phone: hasPhone,
       p_limit: PAGE_SIZE,
       p_offset: from,
     }),
@@ -227,6 +251,9 @@ export default async function ClientsPage({
       ["stage", stageFilter],
       ["missingDocs", missingDocuments ? "1" : ""],
       ["balance", outstandingBalance ? "1" : ""],
+      ["clientType", clientType],
+      ["hasEmail", hasEmail === undefined ? "" : hasEmail ? "1" : "0"],
+      ["hasPhone", hasPhone === undefined ? "" : hasPhone ? "1" : "0"],
     ] as [string, string][]
   ).filter(([, v]) => v);
   const extraQuery = activeParams.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
@@ -265,6 +292,10 @@ export default async function ClientsPage({
           activeStage={stageFilter}
           missingDocuments={missingDocuments}
           outstandingBalance={outstandingBalance}
+          clientTypes={CLIENT_TYPE_FILTERS}
+          activeClientType={clientType}
+          hasEmail={hasEmail}
+          hasPhone={hasPhone}
         />
         <div className="mb-2 flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => (
@@ -293,14 +324,24 @@ export default async function ClientsPage({
             canEdit={Boolean(canEdit)}
             staffOptions={staffFilterOptions}
             emptyMessage={
-              q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance
+              q || serviceFilter || staffFilter || stageFilter || missingDocuments || outstandingBalance || clientType || hasEmail !== undefined || hasPhone !== undefined
                 ? "No contacts match this search."
                 : status
                 ? `No clients with status "${STATUS_FILTERS.find((f) => f.value === status)?.label}".`
                 : "No clients yet. Add your first client to get started."
             }
             emptyAction={
-              !status && !q && !serviceFilter && !staffFilter && !stageFilter && !missingDocuments && !outstandingBalance && canCreate ? (
+              !status &&
+              !q &&
+              !serviceFilter &&
+              !staffFilter &&
+              !stageFilter &&
+              !missingDocuments &&
+              !outstandingBalance &&
+              !clientType &&
+              hasEmail === undefined &&
+              hasPhone === undefined &&
+              canCreate ? (
                 <NewClientButton
               workspaceId={workspace.id}
               workspaceName={workspace.name}
