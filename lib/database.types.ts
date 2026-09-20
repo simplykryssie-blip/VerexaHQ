@@ -8844,6 +8844,7 @@ export type Database = {
           declined_at: string | null
           expires_at: string | null
           id: string
+          ip_address: string | null
           resolved_document_html: string | null
           sign_order: number
           signature_image_path: string | null
@@ -8855,6 +8856,7 @@ export type Database = {
           status: string
           typed_name: string | null
           user_agent: string | null
+          viewed_at: string | null
         }
         Insert: {
           access_token?: string
@@ -8865,6 +8867,7 @@ export type Database = {
           declined_at?: string | null
           expires_at?: string | null
           id?: string
+          ip_address?: string | null
           resolved_document_html?: string | null
           sign_order?: number
           signature_image_path?: string | null
@@ -8876,6 +8879,7 @@ export type Database = {
           status?: string
           typed_name?: string | null
           user_agent?: string | null
+          viewed_at?: string | null
         }
         Update: {
           access_token?: string
@@ -8886,6 +8890,7 @@ export type Database = {
           declined_at?: string | null
           expires_at?: string | null
           id?: string
+          ip_address?: string | null
           resolved_document_html?: string | null
           sign_order?: number
           signature_image_path?: string | null
@@ -8897,6 +8902,7 @@ export type Database = {
           status?: string
           typed_name?: string | null
           user_agent?: string | null
+          viewed_at?: string | null
         }
         Relationships: [
           {
@@ -12389,6 +12395,23 @@ export type Database = {
         }
         Returns: Json
       }
+      create_client_from_ghl_import: {
+        Args: {
+          p_business_name?: string
+          p_client_type: string
+          p_date_of_birth?: string
+          p_ein?: string
+          p_first_name?: string
+          p_force_create?: boolean
+          p_itin?: string
+          p_last_name?: string
+          p_primary_email?: string
+          p_primary_phone?: string
+          p_ssn?: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       create_client_relationship: {
         Args: {
           p_client_id: string
@@ -14618,6 +14641,14 @@ export type Database = {
         Args: { p_expires_at: string; p_signature_request_id: string }
         Returns: undefined
       }
+      set_signature_user_agent: {
+        Args: { p_signer_id: string; p_user_agent: string }
+        Returns: undefined
+      }
+      set_signature_user_agent_by_token: {
+        Args: { p_token: string; p_user_agent: string }
+        Returns: undefined
+      }
       set_usage_auto_topup: {
         Args: {
           p_amount_cents: number
@@ -14852,6 +14883,10 @@ export type Database = {
       }
       sync_client_relationships_for_response: {
         Args: { p_response_id: string }
+        Returns: undefined
+      }
+      track_signature_view_by_token: {
+        Args: { p_ip_address?: string; p_token: string }
         Returns: undefined
       }
       turn_on_service: {

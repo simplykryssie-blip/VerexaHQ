@@ -419,7 +419,14 @@ export async function POST(request: Request) {
     // rather than fail the whole row.
     const fallbackLastName = !isBusiness && !firstName && !lastName ? email?.split("@")[0] || "Unnamed" : undefined;
 
-    const { data: createResult, error: createError } = await supabase.rpc("create_client", {
+    // create_client_from_ghl_import (not create_client) -- identical
+    // behavior, but it also suppresses trg_auto_start_lead_pipeline_on_create
+    // for this one insert. That DB-level trigger fires unconditionally on
+    // any new lead-status client, so it wasn't covered by PAUSE_TRIGGER_TYPES
+    // above (which only pauses automations-table rows, not DB triggers) --
+    // every imported contact was auto-enrolling in the workspace's default
+    // lead pipeline regardless of the pause.
+    const { data: createResult, error: createError } = await supabase.rpc("create_client_from_ghl_import", {
       p_workspace_id: workspace.id,
       p_client_type: isBusiness ? "business" : "individual",
       p_first_name: isBusiness ? undefined : firstName,
