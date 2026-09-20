@@ -77,6 +77,15 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       setError(rpcError.message);
       return;
     }
+    // Best-effort -- the signature itself is already recorded and safe;
+    // filing the final flattened PDF is a no-op until every signer is done
+    // and can be retried later if this fails (same pattern
+    // PublicEngagementLetterSign.tsx already uses for its own filing call).
+    fetch("/api/sign/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => {});
     setData((d) => ({ ...d, signer_status: "signed", signed_at: new Date().toISOString() }));
   }
 

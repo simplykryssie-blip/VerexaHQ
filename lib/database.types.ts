@@ -8922,6 +8922,7 @@ export type Database = {
           created_by: string | null
           due_date: string | null
           engagement_letter_template_id: string | null
+          final_pdf_attachment_id: string | null
           id: string
           organizer_template_id: string | null
           status: string
@@ -8935,6 +8936,7 @@ export type Database = {
           created_by?: string | null
           due_date?: string | null
           engagement_letter_template_id?: string | null
+          final_pdf_attachment_id?: string | null
           id?: string
           organizer_template_id?: string | null
           status?: string
@@ -8948,6 +8950,7 @@ export type Database = {
           created_by?: string | null
           due_date?: string | null
           engagement_letter_template_id?: string | null
+          final_pdf_attachment_id?: string | null
           id?: string
           organizer_template_id?: string | null
           status?: string
@@ -8975,6 +8978,13 @@ export type Database = {
             columns: ["engagement_letter_template_id"]
             isOneToOne: false
             referencedRelation: "engagement_letter_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signature_requests_final_pdf_attachment_id_fkey"
+            columns: ["final_pdf_attachment_id"]
+            isOneToOne: false
+            referencedRelation: "attachments"
             referencedColumns: ["id"]
           },
           {
