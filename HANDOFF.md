@@ -1,3 +1,190 @@
+# Addendum — 2026-09-20: Contacts closed; Stripe Payment Link architecture clarified
+
+**READ THIS FIRST.** This is the newest handoff state.
+
+## Contacts: 🟢 COMPLETE
+The full Contacts completion pass is closed (PRs #290–#299): remaining filters, archive/restore, cross-page selection, tasks, rich Notes, billing transaction display, signature PDF/audit trail, GHL guard, navigation, CSV, and the final stale `search_clients` overload fix.
+
+The stale 11-argument `search_clients` overload was removed by `20261031050000_drop_stale_search_clients_overload.sql`. Production was verified to have exactly one canonical 14-argument function with `SECURITY DEFINER` intact.
+
+Contacts deferred:
+- 🔵 Client-level Stripe Customer / saved-payment-method relationship.
+- 🔵 Hard delete; archive is the intended removal mechanism.
+
+Future 🟡 cleanup: repo-wide audit of accidental PostgreSQL overloads. Four confirmed historical examples are `create_engagement`, `create_client`, `set_firm_tax_profile`, and `search_clients`. Do not delete other overloads without per-function caller/migration verification.
+
+---
+
+## CRITICAL: The real package sales flow uses external Stripe Payment Links
+
+The user's actual setup is:
+1. Package/product created in Stripe.
+2. Stripe **Payment Link** created.
+3. Payment Link placed directly in the public website HTML.
+4. Corresponding package separately created in **Verexa → Packages**.
+
+The Verexa Packages UI currently does **not** ask for a Stripe Payment Link, Stripe Price ID, or Stripe Product ID.
+
+Therefore the real architecture gap is:
+
+> **How does a Stripe Payment Link purchase tell Verexa which Verexa package was purchased?**
+
+Do not infer this from customer name or price alone.
+
+### Existing code verified
+
+`app/api/stripe/webhook/connect/route.ts` verifies the Stripe signature, maps `event.account` to the connected Verexa workspace, claims events for idempotency, handles `checkout.session.completed`, and expects metadata such as `type` and `purchase_id`. For `type === "firm_package_purchase"` it calls `handleFirmPackagePurchaseCheckoutCompleted()`.
+
+`lib/stripe/handleFirmPackagePurchase.ts` expects `session.metadata.purchase_id`, finds the existing `firm_package_purchases` row, marks it active, stores Stripe IDs, and updates the related `firm_connections.package_id`.
+
+The DB chain is:
+
+**purchase active → `fire_firm_package_purchase_automations` → `_get_or_create_partner_onboarding()` → `partner_onboardings` → `partner_onboarding.created` → onboarding automation**
+
+That chain is valid only after Verexa can identify the correct package/purchase/connection. A manually-created external Payment Link may complete without the Verexa `purchase_id` metadata the current handler expects. Do not claim the real website flow is currently end-to-end.
+
+---
+
+## Preferred long-term architecture
+
+Keep Stripe as the payment processor and keep the public website's Stripe Payment Links.
+
+Make **Verexa Packages the business/package source of truth** and explicitly map each Verexa package to Stripe identifiers, conceptually:
+- Verexa package ID
+- Stripe connected account
+- Stripe Product ID
+- Stripe Price ID
+- Stripe Payment Link ID/URL
+
+Target flow:
+
+**Website → Stripe Payment Link → Stripe webhook → Verexa package mapping → `firm_package_purchase` → `partner_onboarding` → onboarding workflow**
+
+Do not:
+- match package by customer name;
+- match package by price alone;
+- create duplicate Verexa packages merely to mirror Stripe;
+- replace Payment Links with Verexa-hosted checkout unless an audit proves it is necessary.
+
+Stripe handles payment. Verexa owns the package/business relationship and onboarding.
+
+### Buyer identity is a separate problem
+
+We must solve:
+1. Which Verexa package did they buy?
+2. Which partner/firm/workspace/connection does the purchaser belong to?
+
+Payment Link mapping can solve #1, but not automatically #2 for a brand-new public-site purchaser. The existing canonical partner identity is `firm_connection`, not a Stripe customer name.
+
+Audit the existing public purchase/signup/onboarding flow before designing any new identity mechanism.
+
+---
+
+## 🔴 NEW FIX NOW: External Stripe Payment Link → Verexa Package/Buyer mapping
+
+**READ-ONLY AUDIT FIRST. Do not implement during the first audit.**
+
+Audit:
+- Verexa Packages create/edit UI
+- Stripe Product/Price/Payment Link storage/creation
+- public website package links
+- Connect webhook handling
+- `firm_package_purchases` creation
+- buyer identity/workspace/`firm_connection` creation
+- public signup/onboarding routes
+- Stripe metadata on the real external Payment Links, if any
+- relevant DB columns/constraints
+
+Determine:
+1. What Stripe sends when a Payment Link checkout completes.
+2. Whether the webhook receives Payment Link ID and/or Price/Product IDs.
+3. Whether the external Payment Links contain Verexa-specific metadata.
+4. How Payment Link → Verexa Package can be made deterministic.
+5. How the purchaser is currently identified.
+6. How a brand-new purchaser can become the correct partner/firm connection without guessing.
+7. Minimum schema/UI changes required.
+8. Whether Payment Links should remain the supported model or Verexa-generated Checkout Sessions are actually required.
+
+**User preference:** keep Stripe Payment Links on the public website, but explicitly connect each one to its Verexa package.
+
+---
+
+## 🔴 Existing FIX NOW: nested package-name automation condition
+
+Separate from the Stripe mapping issue.
+
+`partner_onboarding.created` context contains nested `package_purchase.package_name`, while the condition editor exposes `package_purchase.package_name`. The generic evaluator appears to treat unknown fields as literal top-level keys instead of traversing dotted paths.
+
+Verify production behavior. If broken, fix nested-field resolution narrowly. Preserve `partner_onboarding.created`. Do **not** replace it with `firm_package.purchased` and do not redesign the Stripe/package flow as part of that fix.
+
+---
+
+## Partner onboarding architecture remains
+
+**Service Bureau → ERO → PTIN → Tax Clients**
+
+or **ERO → PTIN → Tax Clients**
+
+or **Independent PTIN → Tax Clients**
+
+Partner onboarding is separate from Verexa platform customer onboarding. `firm_connections` is the canonical partner relationship.
+
+`firm_package.purchased` remains the generic purchase/business event.
+
+`partner_onboarding.created` remains the onboarding-specific trigger.
+
+---
+
+## Current roadmap
+
+### 🟢 Complete
+1. Policies & Account Lifecycle
+2. Legal Acceptance & Archive
+3. Suspension/Archive
+4. Billing live verification
+5. Dashboard Easy-Fix #1
+6. Contacts completion
+
+### 🔴 Fix Now
+1. External Stripe Payment Link → Verexa Package/Buyer mapping — **audit first**
+2. `partner_onboarding.created` nested `package_purchase.package_name` resolution — **verify first**
+
+### 🟡 Backlog
+- repo-wide accidental PostgreSQL overload audit
+- billing hardening: usage-meter reconciliation, phone-rental row locking, suspension notification dedupe, payment-failed timezone dedupe, DB non-negativity, generic client-payment Stripe-ID uniqueness, paid-seat auto-removal, broader automation concurrency/row claiming
+- partner automation visibility
+- remaining module roadmap
+
+### 🔵 Deferred
+- client-level Stripe Customer / saved payment methods
+- hard delete
+- IRS Transcript/8821
+- other documented deferred items
+
+### ⚪ Product decisions
+- Multi-office Firm details
+- Workspace PTIN leave/take-client-history behavior
+- platform-admin included-seat naming
+- SMS activation-fee decision
+- other documented decisions
+
+---
+
+## Next Claude session rules
+1. **Audit first.**
+2. State what existing code actually does.
+3. Identify the smallest architectural gap.
+4. Resolve product decisions before coding.
+5. Write a narrow implementation prompt.
+6. Implement only after audit approval.
+7. Test.
+8. Verify production where appropriate.
+9. Update `HANDOFF.md` with what actually shipped.
+
+Never claim live verification unless it actually happened.
+
+---
+
 # Session Handoff — 2026-08-13
 
 Written for whichever Claude session picks this project up next, likely on
