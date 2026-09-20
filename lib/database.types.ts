@@ -12163,6 +12163,7 @@ export type Database = {
         Args: { p_item_id: string }
         Returns: undefined
       }
+      archive_client: { Args: { p_client_id: string }; Returns: undefined }
       archive_config_object_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -14283,6 +14284,7 @@ export type Database = {
         Args: { p_accept: boolean; p_connection_id: string }
         Returns: undefined
       }
+      restore_client: { Args: { p_client_id: string }; Returns: undefined }
       resubmit_engagement_share: {
         Args: { p_engagement_share_id: string }
         Returns: undefined

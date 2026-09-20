@@ -2,14 +2,12 @@
 // ContactsBulkTable.tsx so it's directly unit-testable without mocking
 // Supabase or next/navigation.
 //
-// Bulk status intentionally excludes "lost" and "archived": "lost" goes
-// through the mark_client_lost RPC (cascades to engagements/invoices/
-// document requests -- a bare update would silently skip all of that), and
-// "archived" has no existing single-client mechanism anywhere in the app to
-// preserve (confirmed by a full-repo search -- nothing ever writes
-// lifecycle_status = 'archived' today), so this bulk action doesn't invent
-// one. Selected contacts already in either of those two statuses are
-// skipped, never silently mutated.
+// Bulk status intentionally excludes "lost" and "archived": both go through
+// their own dedicated RPCs (mark_client_lost, archive_client/restore_client)
+// because both cascade to engagements/document requests (and, for lost,
+// invoices too) -- a bare status update would silently skip all of that.
+// Selected contacts already in either of those two statuses are skipped by
+// bulk status, never silently mutated by it.
 export const BULK_STATUS_OPTIONS = [
   { value: "lead", label: "Lead" },
   { value: "active", label: "Active" },
@@ -46,4 +44,30 @@ export function tagsAfterBulkRemove(tags: string[] | null, tag: string): string[
  * selection doesn't fire a no-op update against every row. */
 export function rowsHavingTag<T extends { tags: string[] | null }>(rows: T[], tag: string): T[] {
   return rows.filter((r) => (r.tags ?? []).includes(tag));
+}
+
+/** Bulk archive shares its eligible set with bulk status (lead/active/
+ * inactive) -- "lost" and already-"archived" contacts are skipped, not
+ * re-archived or silently converted. A named wrapper around
+ * partitionForBulkStatus for call-site clarity, since archive is a distinct
+ * action (goes through archive_client, not a bare status write) even though
+ * the eligibility set happens to match. */
+export function partitionForBulkArchive<T extends { lifecycle_status: string }>(
+  rows: T[]
+): { eligible: T[]; skipped: T[] } {
+  return partitionForBulkStatus(rows);
+}
+
+export function isEligibleForBulkRestore(currentStatus: string): boolean {
+  return currentStatus === "archived";
+}
+
+/** Bulk restore's eligible set is the mirror image of archive's -- only
+ * already-archived contacts can be restored; everything else is skipped. */
+export function partitionForBulkRestore<T extends { lifecycle_status: string }>(
+  rows: T[]
+): { eligible: T[]; skipped: T[] } {
+  const eligible = rows.filter((r) => isEligibleForBulkRestore(r.lifecycle_status));
+  const skipped = rows.filter((r) => !isEligibleForBulkRestore(r.lifecycle_status));
+  return { eligible, skipped };
 }
