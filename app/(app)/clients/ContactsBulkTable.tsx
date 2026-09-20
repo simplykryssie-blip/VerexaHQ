@@ -2,13 +2,21 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Tag, Download, X, UserCog, Tags as TagsIcon, ChevronDown } from "lucide-react";
+import { Tag, Download, X, UserCog, Tags as TagsIcon, ChevronDown, Archive, ArchiveRestore } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { ensureTagConfirmed } from "@/lib/ensureTag";
 import { CLIENT_COLUMNS, clientDisplayName, type ClientRow } from "./clientListColumns";
-import { BULK_STATUS_OPTIONS, partitionForBulkStatus, tagsAfterBulkRemove, rowsHavingTag, type BulkStatusValue } from "./bulkContactActions";
+import {
+  BULK_STATUS_OPTIONS,
+  partitionForBulkStatus,
+  partitionForBulkArchive,
+  partitionForBulkRestore,
+  tagsAfterBulkRemove,
+  rowsHavingTag,
+  type BulkStatusValue,
+} from "./bulkContactActions";
 
 type StaffOption = { value: string; label: string };
 
@@ -54,18 +62,17 @@ function downloadCsv(rows: ClientRow[]) {
   URL.revokeObjectURL(url);
 }
 
-// Tag add/remove, export, status, and assignment -- not the full original
-// wishlist (send template / create engagement / archive / restore). Those
+// Tag add/remove, export, status, assignment, archive, and restore -- not
+// the full original wishlist (send template / create engagement). Those
 // remaining actions each carry edge cases a bulk no-questions-asked loop
 // risked getting wrong: a template needs per-recipient merge fields, an
-// engagement needs a service picked, and archive/restore have no existing
-// single-client mechanism anywhere in the app to safely generalize (see
-// bulk-fix audit notes) -- "lost" specifically is excluded from bulk status
-// for the same reason: it has real cascading side effects (mark_client_lost
-// voids invoices, archives engagements, cancels document requests) that a
-// condensed bulk flow would risk silently skipping or under-communicating.
-// Tag/export/status/assignment are all direct column writes with no
-// side effects, safe to batch as independent per-row mutations.
+// engagement needs a service picked. Bulk archive/restore route through the
+// same archive_client/restore_client RPCs the single-client action uses
+// (Contacts Reconciliation Audit, Product Decision #14) rather than a bare
+// status write, so their engagement/document-request cascade always
+// applies. "Lost" stays excluded from every bulk action here (status,
+// archive) for the same reason -- mark_client_lost's cascade (voids
+// invoices too) is stronger and has its own single-client-only flow.
 export function ContactsBulkTable({
   rows,
   workspaceId,
@@ -100,6 +107,8 @@ export function ContactsBulkTable({
   const [applyingStatus, setApplyingStatus] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [applyingAssign, setApplyingAssign] = useState(false);
+  const [applyingArchive, setApplyingArchive] = useState(false);
+  const [applyingRestore, setApplyingRestore] = useState(false);
 
   const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
   const allSelected = rows.length > 0 && selected.size === rows.length;
@@ -207,9 +216,49 @@ export function ContactsBulkTable({
     router.refresh();
   }
 
+  async function applyArchive() {
+    const { eligible, skipped } = partitionForBulkArchive(selectedRows);
+    if (eligible.length === 0) {
+      toast.show("None of the selected contacts can be archived (already Lost or Archived)", "error");
+      return;
+    }
+
+    setApplyingArchive(true);
+    const results = await Promise.all(eligible.map((row) => supabase.rpc("archive_client", { p_client_id: row.id })));
+    setApplyingArchive(false);
+    const failed = results.filter((r) => r.error).length;
+    const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped -- already Lost or Archived)` : "";
+    if (failed > 0) toast.show(`Archived ${eligible.length - failed} of ${eligible.length} contacts -- ${failed} failed${skippedNote}`, "error");
+    else toast.show(`Archived ${eligible.length} contact${eligible.length === 1 ? "" : "s"}${skippedNote}`, "success");
+
+    setSelected(new Set());
+    router.refresh();
+  }
+
+  async function applyRestore() {
+    const { eligible, skipped } = partitionForBulkRestore(selectedRows);
+    if (eligible.length === 0) {
+      toast.show("None of the selected contacts are archived", "error");
+      return;
+    }
+
+    setApplyingRestore(true);
+    const results = await Promise.all(eligible.map((row) => supabase.rpc("restore_client", { p_client_id: row.id })));
+    setApplyingRestore(false);
+    const failed = results.filter((r) => r.error).length;
+    const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped -- not archived)` : "";
+    if (failed > 0) toast.show(`Restored ${eligible.length - failed} of ${eligible.length} contacts -- ${failed} failed${skippedNote}`, "error");
+    else toast.show(`Restored ${eligible.length} contact${eligible.length === 1 ? "" : "s"}${skippedNote}`, "success");
+
+    setSelected(new Set());
+    router.refresh();
+  }
+
   if (rows.length === 0) {
     return <EmptyState message={emptyMessage} action={emptyAction} />;
   }
+
+  const hasArchivedSelected = selectedRows.some((r) => r.lifecycle_status === "archived");
 
   return (
     <div>
@@ -342,6 +391,26 @@ export function ContactsBulkTable({
                 </div>
               )}
             </div>
+          )}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => void applyArchive()}
+              disabled={applyingArchive}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-surface px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-60"
+            >
+              <Archive size={13} /> {applyingArchive ? "..." : "Archive"}
+            </button>
+          )}
+          {canEdit && hasArchivedSelected && (
+            <button
+              type="button"
+              onClick={() => void applyRestore()}
+              disabled={applyingRestore}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-surface px-2.5 py-1 text-xs font-medium text-accent hover:bg-accent/10 disabled:opacity-60"
+            >
+              <ArchiveRestore size={13} /> {applyingRestore ? "..." : "Restore"}
+            </button>
           )}
           {canManage && (
             <button
