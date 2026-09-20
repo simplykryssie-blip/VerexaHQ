@@ -173,6 +173,7 @@ export function PopupBuilder({
               onUpdate={updateSectionConfig}
               organizerTemplates={organizerTemplates}
               bookableServices={[]}
+              packages={[]}
               staff={[]}
               canAdvanceToNextPage={false}
             />

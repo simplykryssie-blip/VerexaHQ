@@ -11,7 +11,8 @@ export type SectionType =
   | "footer"
   | "custom_html"
   | "booking_widget"
-  | "pricing_table";
+  | "pricing_table"
+  | "packages";
 
 export type BuilderSection = {
   id: string;
@@ -56,6 +57,16 @@ export const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   // it to their own site and get Verexa's platform pricing instead of their
   // own. Only exists where a migration placed it directly (Verexa's own site).
   pricing_table: "Pricing table (Verexa platform plans)",
+  packages: "Packages / services",
+};
+
+export type PackageOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  flat_price: number | null;
+  billing_cadence: string | null;
+  stripe_payment_link_url: string | null;
 };
 
 export const SECTION_TYPES: SectionType[] = [
@@ -67,6 +78,7 @@ export const SECTION_TYPES: SectionType[] = [
   "faq",
   "organizer_form",
   "booking_widget",
+  "packages",
   "cta_button",
   "spacer",
   "footer",

@@ -10,7 +10,8 @@ import { FooterSection } from "@/components/site/sections/FooterSection";
 import { SandboxedHtmlPreview } from "@/components/site/sections/SandboxedHtmlPreview";
 import { PricingTableSection } from "@/components/site/sections/PricingTableSection";
 import { PreviewOnlyNotice } from "@/components/site/sections/PreviewOnlyNotice";
-import type { BuilderSection, BookableServiceOption, StaffOption } from "./types";
+import { PackageCards } from "@/components/site/sections/PackageCards";
+import type { BuilderSection, BookableServiceOption, StaffOption, PackageOption } from "./types";
 
 // Reuses the real public-facing section components for everything except
 // organizer_form and booking_widget, which get static stand-ins -- they call
@@ -23,12 +24,14 @@ export function SectionPreview({
   section,
   accentColor,
   services = [],
+  packages = [],
   staff = [],
   customCss,
 }: {
   section: BuilderSection;
   accentColor?: string;
   services?: BookableServiceOption[];
+  packages?: PackageOption[];
   staff?: StaffOption[];
   customCss?: string | null;
 }) {
@@ -76,6 +79,14 @@ export function SectionPreview({
       // Read-only, no side effects (unlike organizer_form/booking_widget), so
       // it's safe to render for real here rather than a static stand-in.
       return <PricingTableSection config={section.config as never} />;
+    case "packages": {
+      // Also read-only. Renders directly from the already-fetched, workspace-
+      // scoped `packages` prop -- no network round trip needed here, unlike
+      // the live public page (PackagesSection), which fetches fresh at render.
+      const cfg = section.config as { package_ids?: string[] };
+      const selected = packages.filter((p) => (cfg.package_ids ?? []).includes(p.id));
+      return <PackageCards packages={selected} />;
+    }
     case "custom_html": {
       const cfg = section.config as { html?: string };
       return (

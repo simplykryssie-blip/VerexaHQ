@@ -14,6 +14,7 @@ import { FooterSection } from "./sections/FooterSection";
 import { CustomHtmlSection } from "./sections/CustomHtmlSection";
 import { BookingWidgetSection } from "./sections/BookingWidgetSection";
 import { PricingTableSection } from "./sections/PricingTableSection";
+import { PackagesSection } from "./sections/PackagesSection";
 import { PreviewOnlyNotice } from "./sections/PreviewOnlyNotice";
 import { SandboxedHtmlPreview } from "./sections/SandboxedHtmlPreview";
 
@@ -98,6 +99,8 @@ export function SectionRenderer({
       return <BookingWidgetSection config={section.config as never} workspaceSlug={workspaceSlug} />;
     case "pricing_table":
       return <PricingTableSection config={section.config as never} />;
+    case "packages":
+      return <PackagesSection config={section.config as never} workspaceSlug={workspaceSlug} />;
     default:
       return null;
   }

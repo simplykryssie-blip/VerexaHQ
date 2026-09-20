@@ -11,7 +11,7 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
   if (!workspace) return null;
 
   const supabase = createClient();
-  const [{ data: page }, { data: website }, { data: sections }, { data: canManage }, { data: organizerTemplates }, { data: bookableServices }, staff] =
+  const [{ data: page }, { data: website }, { data: sections }, { data: canManage }, { data: organizerTemplates }, { data: bookableServices }, { data: packages }, staff] =
     await Promise.all([
       supabase
         .from("site_pages")
@@ -25,6 +25,12 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
       supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "site_pages.manage" }),
       supabase.from("organizer_templates").select("id, name, is_public, public_token").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
       supabase.from("services").select("id, name").eq("workspace_id", workspace.id).eq("is_bookable", true).eq("is_portal_visible", true).order("name"),
+      supabase
+        .from("firm_packages")
+        .select("id, name, description, flat_price, billing_cadence, stripe_payment_link_url")
+        .eq("workspace_id", workspace.id)
+        .eq("status", "published")
+        .order("created_at"),
       getWorkspaceStaff(supabase, workspace.id),
     ]);
 
@@ -42,6 +48,7 @@ export default async function SitePageBuilderRoute({ params }: { params: { id: s
       canManage={Boolean(canManage)}
       organizerTemplates={organizerTemplates ?? []}
       bookableServices={bookableServices ?? []}
+      packages={packages ?? []}
       staff={staff.map((s) => ({ id: s.user_id, label: s.display_name ?? "Staff member" }))}
     />
   );
