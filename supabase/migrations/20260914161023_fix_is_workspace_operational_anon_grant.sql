@@ -1,0 +1,34 @@
+-- ============================================================================
+-- MIGRATION RECONCILIATION PHASE 1.6 -- RECOVERED FROM PRODUCTION
+--
+-- This file did not previously exist in Git. It was applied directly to
+-- production on 2026-09-14 (recorded version 20260914161023, name
+-- fix_is_workspace_operational_anon_grant in
+-- supabase_migrations.schema_migrations) without ever being committed here.
+--
+-- The filename below uses that REAL recorded production version verbatim
+-- (not a fictional/invented date) specifically so Supabase's own migration
+-- tooling recognizes this version as already applied to this production
+-- project and never attempts to replay it -- while still applying correctly,
+-- in its real chronological position, to any fresh project (e.g. a new
+-- baseline/test project) that has not yet seen it.
+--
+-- The SQL below is reproduced verbatim (including its original comment) from
+-- schema_migrations.statements for this version -- byte-for-byte, not
+-- reconstructed or paraphrased. Confidence: A (exact original recovered).
+--
+-- Current-state verification (2026-09-20): re-queried pg_proc.proacl for
+-- public.is_workspace_operational(uuid) directly against production; anon is
+-- NOT present in the ACL. This migration's effect is confirmed still exactly
+-- in force with zero drift since it was applied.
+-- ============================================================================
+
+-- get_advisors (security) flagged that is_workspace_operational was
+-- executable by anon despite the revoke-all in the prior migration --
+-- postgres treats "grant ... to authenticated, service_role" as additive
+-- to whatever anon already had by default (execute on functions is
+-- granted to PUBLIC unless revoked, and revoke all from public alone
+-- does not touch a role that was separately granted), so anon still had
+-- it. is_workspace_member/is_workspace_admin correctly show can_exec:
+-- false for anon; bring this function in line with that pattern.
+revoke execute on function public.is_workspace_operational(uuid) from anon;
