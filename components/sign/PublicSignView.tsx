@@ -48,6 +48,16 @@ export function PublicSignView({ token, initialData }: { token: string; initialD
       .catch(() => setFileError("Could not load the document."));
   }, [token]);
 
+  useEffect(() => {
+    // Best-effort audit-trail capture -- IP is read server-side from the
+    // request itself; user agent can only come from the browser.
+    fetch(`/api/sign/${token}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userAgent: navigator.userAgent }),
+    }).catch(() => {});
+  }, [token]);
+
   async function sign() {
     if (!typedName.trim() || !drawnDataUrl) return;
     setSubmitting(true);
