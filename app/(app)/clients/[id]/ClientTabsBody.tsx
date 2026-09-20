@@ -45,6 +45,7 @@ export function ClientTabsBody({
     engagements,
     tasks,
     completedTasks,
+    bankProductTransactions,
     appointments,
     invoices,
     notes,
@@ -163,6 +164,7 @@ export function ClientTabsBody({
             paymentPlansByInvoice={paymentPlansByInvoice}
             canManageBilling={permissions.billingManage}
             workspaceServices={workspaceServices}
+            bankProductTransactions={bankProductTransactions}
           />
         )}
         {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}

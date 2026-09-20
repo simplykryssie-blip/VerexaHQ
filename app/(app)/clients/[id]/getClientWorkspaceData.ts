@@ -443,6 +443,41 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     completedTasks = completedTaskRows ?? [];
   }
 
+  // Contacts Reconciliation Audit item #7: bank_product_transactions
+  // genuinely tracks refund transfer/advance status but was only ever
+  // surfaced on the Engagement detail page. Read-only here (the existing
+  // engagement-scoped BankProductTransactionForm/BankProductStatusSelect
+  // remain the only way to create/edit one) -- across every engagement this
+  // client has, since a returning client can have bank products from
+  // multiple tax years.
+  let bankProductTransactions: {
+    id: string;
+    engagement_id: string;
+    engagement_number: string | null;
+    bank_partner: string;
+    product_type: string;
+    status: string;
+    disbursed_at: string | null;
+    created_at: string;
+  }[] = [];
+  if (engagementIds.length > 0) {
+    const { data: bankProductRows } = await supabase
+      .from("bank_product_transactions")
+      .select("id, engagement_id, bank_partner, product_type, status, disbursed_at, created_at, engagements(engagement_number)")
+      .in("engagement_id", engagementIds)
+      .order("created_at", { ascending: false });
+    bankProductTransactions = (bankProductRows ?? []).map((b: any) => ({
+      id: b.id,
+      engagement_id: b.engagement_id,
+      engagement_number: b.engagements?.engagement_number ?? null,
+      bank_partner: b.bank_partner,
+      product_type: b.product_type,
+      status: b.status,
+      disbursed_at: b.disbursed_at,
+      created_at: b.created_at,
+    }));
+  }
+
   // Real pending-item count on this client's open document requests
   // (entity_type='client') and their engagements' (entity_type='engagement')
   // -- the same document_requests/document_request_item_statuses pair the
@@ -565,6 +600,7 @@ export async function getClientWorkspaceData(clientId: string): Promise<ClientWo
     timeline,
     tasks,
     completedTasks,
+    bankProductTransactions,
     missingDocumentCount,
     organizerTemplates: organizerTemplates ?? [],
     pendingOrganizerTemplateIds,
