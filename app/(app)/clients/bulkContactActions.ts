@@ -71,3 +71,31 @@ export function partitionForBulkRestore<T extends { lifecycle_status: string }>(
   const skipped = rows.filter((r) => !isEligibleForBulkRestore(r.lifecycle_status));
   return { eligible, skipped };
 }
+
+// Contacts Reconciliation Audit -- Phase 3 (cross-page selection). "Select
+// all matching" fetches full row data for every contact matching the
+// current filters (not just their ids) so bulk actions/export can operate
+// on them exactly like a normal selection -- but doing that for an
+// unbounded result set from the browser is both slow and a real risk with
+// large workspaces, so it's capped. Past the cap, the UI must refuse and
+// ask the user to narrow their filters rather than silently selecting only
+// a partial, arbitrary subset of what they asked for.
+export const MAX_BULK_SELECT_ALL = 500;
+
+/** The subset of search_clients' own filter parameters "select all
+ * matching" needs to reissue the same query without pagination -- kept as
+ * one type so page.tsx and ContactsBulkTable.tsx can't drift out of sync
+ * with each other or with the RPC's actual parameter names. */
+export type SearchClientsFilters = {
+  p_query?: string;
+  p_lifecycle_statuses?: string[];
+  p_tag?: string;
+  p_service_id?: string;
+  p_assigned_staff_id?: string;
+  p_pipeline_stage_name?: string;
+  p_missing_documents?: boolean;
+  p_outstanding_balance?: boolean;
+  p_client_type?: string;
+  p_has_email?: boolean;
+  p_has_phone?: boolean;
+};

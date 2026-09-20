@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
 import { ensureTagConfirmed } from "@/lib/ensureTag";
-import { CLIENT_COLUMNS, clientDisplayName, type ClientRow } from "./clientListColumns";
+import { CLIENT_COLUMNS, clientDisplayName, resolveAssignedStaff, type ClientRow } from "./clientListColumns";
 import {
   BULK_STATUS_OPTIONS,
   partitionForBulkStatus,
@@ -15,7 +15,9 @@ import {
   partitionForBulkRestore,
   tagsAfterBulkRemove,
   rowsHavingTag,
+  MAX_BULK_SELECT_ALL,
   type BulkStatusValue,
+  type SearchClientsFilters,
 } from "./bulkContactActions";
 
 type StaffOption = { value: string; label: string };
@@ -79,6 +81,8 @@ export function ContactsBulkTable({
   canManage,
   canEdit,
   staffOptions,
+  activeFilters,
+  totalCount,
   emptyMessage,
   emptyAction,
 }: {
@@ -90,6 +94,14 @@ export function ContactsBulkTable({
    * since these mutate existing contacts rather than create new ones. */
   canEdit: boolean;
   staffOptions: StaffOption[];
+  /** The exact filters this page's own search_clients call used, so
+   * "select all matching" (Phase 3) can reissue the identical query
+   * unpaginated instead of guessing at the current filter state. */
+  activeFilters: SearchClientsFilters;
+  /** search_clients' own total_count for the current filters -- lets the UI
+   * offer "select all N matching" only when there's more than the current
+   * page, and refuse rather than silently truncate past MAX_BULK_SELECT_ALL. */
+  totalCount: number;
   emptyMessage: string;
   emptyAction?: React.ReactNode;
 }) {
@@ -97,6 +109,14 @@ export function ContactsBulkTable({
   const supabase = createClient();
   const toast = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Non-null only while "select all matching" is active: full row data (not
+  // just ids) for every contact matching the current filters, fetched
+  // client-side because bulk actions need lifecycle_status/tags to partition
+  // eligibility and CSV export needs the same display fields the visible
+  // page already has. null means "selection is scoped to the current page",
+  // which is the normal/default case.
+  const [allFilteredRows, setAllFilteredRows] = useState<ClientRow[] | null>(null);
+  const [selectingAllFiltered, setSelectingAllFiltered] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tagging, setTagging] = useState(false);
   const [tagOpen, setTagOpen] = useState(false);
@@ -110,11 +130,28 @@ export function ContactsBulkTable({
   const [applyingArchive, setApplyingArchive] = useState(false);
   const [applyingRestore, setApplyingRestore] = useState(false);
 
-  const selectedRows = useMemo(() => rows.filter((r) => selected.has(r.id)), [rows, selected]);
-  const allSelected = rows.length > 0 && selected.size === rows.length;
+  const selectedRows = useMemo(
+    () => (allFilteredRows ?? rows).filter((r) => selected.has(r.id)),
+    [rows, selected, allFilteredRows]
+  );
+  const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  const canSelectAllMatching = totalCount > rows.length;
 
+  function clearSelection() {
+    setSelected(new Set());
+    setAllFilteredRows(null);
+  }
+
+  /** "Select current page" -- always resets to page scope, even if "select
+   * all matching" was previously active, per the requirement to clearly
+   * distinguish the two rather than blend them. */
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)));
+    if (allSelected && allFilteredRows === null) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(rows.map((r) => r.id)));
+      setAllFilteredRows(null);
+    }
   }
   function toggleOne(id: string) {
     setSelected((prev) => {
@@ -123,6 +160,55 @@ export function ContactsBulkTable({
       else next.add(id);
       return next;
     });
+  }
+
+  /** Fetches every contact matching the current filters (not just the
+   * visible page) so bulk actions/CSV export can act on the full set the
+   * user actually asked for -- refuses past MAX_BULK_SELECT_ALL rather than
+   * silently selecting a partial, arbitrary subset of a workspace's data. */
+  async function selectAllMatching() {
+    if (totalCount > MAX_BULK_SELECT_ALL) {
+      toast.show(
+        `This filter matches ${totalCount} contacts -- narrow your filters to ${MAX_BULK_SELECT_ALL} or fewer to select all of them at once`,
+        "error"
+      );
+      return;
+    }
+    setSelectingAllFiltered(true);
+    const { data, error } = await supabase.rpc("search_clients", {
+      p_workspace_id: workspaceId,
+      ...activeFilters,
+      p_limit: Math.max(totalCount, 1),
+      p_offset: 0,
+    });
+    if (error || !data) {
+      setSelectingAllFiltered(false);
+      toast.show(error?.message ?? "Could not load all matching contacts", "error");
+      return;
+    }
+
+    // Same relationship_manager_id -> user_profiles enrichment page.tsx
+    // does server-side, replicated client-side since this fetch never goes
+    // through the page's own server render.
+    const ids = data.map((c) => c.id);
+    const { data: managerRows } = ids.length
+      ? await supabase.from("clients").select("id, relationship_manager_id").in("id", ids)
+      : { data: [] as { id: string; relationship_manager_id: string | null }[] };
+    const managerIdByClient = new Map((managerRows ?? []).map((r) => [r.id, r.relationship_manager_id]));
+    const managerIds = Array.from(new Set((managerRows ?? []).map((r) => r.relationship_manager_id).filter((id): id is string => Boolean(id))));
+    const { data: managerProfiles } = managerIds.length
+      ? await supabase.from("user_profiles").select("id, display_name").in("id", managerIds)
+      : { data: [] as { id: string; display_name: string | null }[] };
+    const managerById = new Map((managerProfiles ?? []).map((p) => [p.id, p]));
+
+    const fullRows: ClientRow[] = data.map((c) => ({
+      ...c,
+      assignedStaff: resolveAssignedStaff(managerIdByClient.get(c.id) ?? null, managerById),
+    }));
+
+    setAllFilteredRows(fullRows);
+    setSelected(new Set(fullRows.map((r) => r.id)));
+    setSelectingAllFiltered(false);
   }
 
   async function applyTag() {
@@ -146,7 +232,7 @@ export function ContactsBulkTable({
 
     setTagInput("");
     setTagOpen(false);
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
@@ -173,7 +259,7 @@ export function ContactsBulkTable({
 
     setRemoveTagInput("");
     setRemoveTagOpen(false);
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
@@ -196,7 +282,7 @@ export function ContactsBulkTable({
     if (failed > 0) toast.show(`Set ${eligible.length - failed} of ${eligible.length} to ${label} -- ${failed} failed${skippedNote}`, "error");
     else toast.show(`Set ${eligible.length} contact${eligible.length === 1 ? "" : "s"} to ${label}${skippedNote}`, "success");
 
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
@@ -212,7 +298,7 @@ export function ContactsBulkTable({
     if (failed > 0) toast.show(`Assigned ${selectedRows.length - failed} of ${selectedRows.length} to ${label} -- ${failed} failed`, "error");
     else toast.show(`Assigned ${selectedRows.length} contact${selectedRows.length === 1 ? "" : "s"} to ${label}`, "success");
 
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
@@ -231,7 +317,7 @@ export function ContactsBulkTable({
     if (failed > 0) toast.show(`Archived ${eligible.length - failed} of ${eligible.length} contacts -- ${failed} failed${skippedNote}`, "error");
     else toast.show(`Archived ${eligible.length} contact${eligible.length === 1 ? "" : "s"}${skippedNote}`, "success");
 
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
@@ -250,7 +336,7 @@ export function ContactsBulkTable({
     if (failed > 0) toast.show(`Restored ${eligible.length - failed} of ${eligible.length} contacts -- ${failed} failed${skippedNote}`, "error");
     else toast.show(`Restored ${eligible.length} contact${eligible.length === 1 ? "" : "s"}${skippedNote}`, "success");
 
-    setSelected(new Set());
+    clearSelection();
     router.refresh();
   }
 
@@ -265,8 +351,18 @@ export function ContactsBulkTable({
       {(canManage || canEdit) && selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-accentSoft px-5 py-2.5">
           <span className="text-xs font-medium text-accent">
-            {selected.size} selected
+            {allFilteredRows ? `All ${allFilteredRows.length} matching contacts selected` : `${selected.size} selected`}
           </span>
+          {!allFilteredRows && allSelected && canSelectAllMatching && (
+            <button
+              type="button"
+              onClick={() => void selectAllMatching()}
+              disabled={selectingAllFiltered}
+              className="text-xs font-medium text-accent underline decoration-dotted hover:text-accent/80 disabled:opacity-60"
+            >
+              {selectingAllFiltered ? "Loading..." : `Select all ${totalCount} matching`}
+            </button>
+          )}
           {canManage && (
             <div className="relative">
               <button
@@ -423,7 +519,7 @@ export function ContactsBulkTable({
           )}
           <button
             type="button"
-            onClick={() => setSelected(new Set())}
+            onClick={() => clearSelection()}
             className="ml-auto inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
           >
             <X size={13} /> Clear
