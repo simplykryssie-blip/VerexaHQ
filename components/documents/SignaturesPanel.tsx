@@ -193,15 +193,15 @@ export function SignaturesPanel({
     setSigningError(null);
 
     let signatureImagePath: string | undefined;
+    const parentRequest = signatureRequests.find((r) => r.signers.some((s) => s.id === signingId));
 
     if (usingDrawnMode) {
-      const request = signatureRequests.find((r) => r.signers.some((s) => s.id === signingId));
-      if (!request) {
+      if (!parentRequest) {
         setSigningError("Could not find this signing request.");
         return;
       }
       setSubmittingSignature(true);
-      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, request.id, drawnDataUrl as string);
+      const uploadResult = await uploadSignatureImageClient(supabase, workspaceId, parentRequest.id, drawnDataUrl as string);
       if ("error" in uploadResult) {
         setSubmittingSignature(false);
         setSigningError(uploadResult.error);
@@ -222,6 +222,15 @@ export function SignaturesPanel({
     if (error) {
       setSigningError(error.message);
       return;
+    }
+    // Best-effort, same pattern PublicSignView.tsx's own token-based path
+    // uses -- a no-op until every signer is done, safe to retry.
+    if (parentRequest) {
+      fetch("/api/sign/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ signatureRequestId: parentRequest.id }),
+      }).catch(() => {});
     }
     closeSigningModal();
     toast.show("Signature recorded", "success");
