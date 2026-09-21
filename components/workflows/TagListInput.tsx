@@ -26,9 +26,23 @@ export function TagListInput({
 }) {
   function commit(raw: string) {
     const tag = raw.trim();
+    // eslint-disable-next-line no-console
+    console.log("[TAG-DEBUG] commit() called", { raw, tag, currentValue: value });
     onDraftChange("");
-    if (!tag || value.includes(tag)) return;
-    onChange([...value, tag]);
+    if (!tag) {
+      // eslint-disable-next-line no-console
+      console.log("[TAG-DEBUG] commit() bailing: empty tag");
+      return;
+    }
+    if (value.includes(tag)) {
+      // eslint-disable-next-line no-console
+      console.log("[TAG-DEBUG] commit() bailing: value already includes tag", { value, tag });
+      return;
+    }
+    const next = [...value, tag];
+    // eslint-disable-next-line no-console
+    console.log("[TAG-DEBUG] commit() calling onChange with", next);
+    onChange(next);
   }
 
   function removeTag(tag: string) {

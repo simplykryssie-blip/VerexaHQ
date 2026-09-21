@@ -371,6 +371,8 @@ export function StepCard({
   const confirm = useConfirm();
   const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
+  // eslint-disable-next-line no-console
+  console.log("[TAG-DEBUG] StepCard render/mount", { stepId: step.id, actionType, configTags: config.tags });
   // Separate from any action-specific "Title" field below (e.g. create_task's
   // task title, create_appointment's appointment title) -- those name the
   // record the step creates. This names the step itself on the canvas/step
@@ -1741,7 +1743,14 @@ export function StepCard({
               value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
               draft={tagDraft}
               onChange={(v) => {
-                setConfig((c) => ({ ...c, tags: v }));
+                // eslint-disable-next-line no-console
+                console.log("[TAG-DEBUG] StepCard tags onChange fired", { v, prevConfigTags: config.tags, canManage });
+                setConfig((c) => {
+                  const next = { ...c, tags: v };
+                  // eslint-disable-next-line no-console
+                  console.log("[TAG-DEBUG] setConfig updater running, new config.tags will be", next.tags);
+                  return next;
+                });
                 setSaved(false);
               }}
               onDraftChange={setTagDraft}
