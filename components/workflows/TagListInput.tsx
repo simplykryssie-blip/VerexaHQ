@@ -26,23 +26,9 @@ export function TagListInput({
 }) {
   function commit(raw: string) {
     const tag = raw.trim();
-    // eslint-disable-next-line no-console
-    console.log("[TAG-DEBUG] commit() called", { raw, tag, currentValue: value });
     onDraftChange("");
-    if (!tag) {
-      // eslint-disable-next-line no-console
-      console.log("[TAG-DEBUG] commit() bailing: empty tag");
-      return;
-    }
-    if (value.includes(tag)) {
-      // eslint-disable-next-line no-console
-      console.log("[TAG-DEBUG] commit() bailing: value already includes tag", { value, tag });
-      return;
-    }
-    const next = [...value, tag];
-    // eslint-disable-next-line no-console
-    console.log("[TAG-DEBUG] commit() calling onChange with", next);
-    onChange(next);
+    if (!tag || value.includes(tag)) return;
+    onChange([...value, tag]);
   }
 
   function removeTag(tag: string) {
@@ -51,6 +37,20 @@ export function TagListInput({
 
   return (
     <div className="flex flex-col gap-1.5">
+      {/* The input stays first/fixed so adding a tag never shifts it (or an
+       * open dropdown item) under the pointer -- with the pills above, the
+       * click/tap that just added a tag would land squarely on that tag's
+       * own new "remove" button the instant the pills row pushed everything
+       * down, instantly deleting the tag it had just added. */}
+      {!disabled && (
+        <TagNameInput
+          value={draft}
+          onChange={onDraftChange}
+          onCommit={commit}
+          tagOptions={tagOptions.filter((t) => !value.includes(t))}
+          placeholder="Add a tag..."
+        />
+      )}
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {value.map((t) => (
@@ -64,15 +64,6 @@ export function TagListInput({
             </span>
           ))}
         </div>
-      )}
-      {!disabled && (
-        <TagNameInput
-          value={draft}
-          onChange={onDraftChange}
-          onCommit={commit}
-          tagOptions={tagOptions.filter((t) => !value.includes(t))}
-          placeholder="Add a tag..."
-        />
       )}
     </div>
   );
