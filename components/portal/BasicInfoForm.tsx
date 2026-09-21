@@ -54,7 +54,10 @@ export function BasicInfoForm({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
-  const isBusiness = snapshot.client_type === "business";
+  // business/trust/estate/organization all share the same entity shape --
+  // one business_name column, no per-type name field -- so anything that
+  // isn't individual gets the entity-name field instead of first/last name.
+  const isBusiness = snapshot.client_type !== "individual";
   const isProfile = mode === "profile";
   const [display, setDisplay] = useState(displayName ?? "");
 

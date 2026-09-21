@@ -292,7 +292,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
         .map((q) => {
           const client = clientById.get(q.client_id);
           const clientName = client
-            ? client.client_type === "business" && client.business_name
+            ? client.client_type !== "individual" && client.business_name
               ? client.business_name
               : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
             : "Unknown client";
@@ -328,7 +328,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
   for (const o of submittedOrganizers ?? []) {
     const client = o.clients as unknown as { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null } | null;
     const clientName = client
-      ? client.client_type === "business" && client.business_name
+      ? client.client_type !== "individual" && client.business_name
         ? client.business_name
         : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
       : "Unknown client";
@@ -400,7 +400,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     .map((e) => {
       const client = riskClientById.get(e.client_id);
       const clientName = client
-        ? client.client_type === "business" && client.business_name
+        ? client.client_type !== "individual" && client.business_name
           ? client.business_name
           : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
         : "Unknown client";
@@ -439,7 +439,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
     .map((e) => {
       const client = unassignedClientById.get(e.client_id);
       const clientName = client
-        ? client.client_type === "business" && client.business_name
+        ? client.client_type !== "individual" && client.business_name
           ? client.business_name
           : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client"
         : "Unknown client";
