@@ -309,6 +309,7 @@ export function TriggerFields({
   webhookUrl,
   disabled,
   onTagDraftChange,
+  tagDraft,
 }: {
   triggerType: string;
   onTriggerTypeChange: (t: string) => void;
