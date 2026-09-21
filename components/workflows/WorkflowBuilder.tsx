@@ -518,7 +518,6 @@ export function StepCard({
         const existingTags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
         if (!existingTags.includes(draftTag)) {
           configToSave = { ...configToSave, tags: [...existingTags, draftTag] };
-          setConfig(configToSave);
         }
       }
       const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
@@ -553,6 +552,7 @@ export function StepCard({
       return;
     }
     setSaved(true);
+    if (actionType === "add_tag" || actionType === "remove_tag") setTagDraft("");
     if (!options?.silent) onSaved();
   }
 
@@ -628,6 +628,7 @@ export function StepCard({
             icon={actionIcon}
             onChange={(value) => {
               setActionType(value);
+              setTagDraft("");
               setConfig({});
               setSaved(false);
             }}
@@ -1733,6 +1734,7 @@ export function StepCard({
             <TagListInput
               disabled={!canManage}
               value={(config.tags as string[] | undefined) ?? (config.tag ? [config.tag as string] : [])}
+              draft={tagDraft}
               onChange={(v) => {
                 setConfig((c) => ({ ...c, tags: v }));
                 setSaved(false);
@@ -1969,6 +1971,7 @@ export function WorkflowBuilder({
   useEffect(() => {
     setCurrentTriggerType(triggerType);
     setConfig(triggerConfig);
+    setTriggerTagDraft("");
     setEnabled(isEnabled);
     setWorkflowStatus(status);
     setConditions(normalizeToConditionGroups(initialConditions));
@@ -1987,7 +1990,6 @@ export function WorkflowBuilder({
         const existingTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
         if (!existingTags.includes(draftTag)) {
           effectiveConfig = { ...effectiveConfig, tags: [...existingTags, draftTag] };
-          setConfig(effectiveConfig);
         }
       }
     }
@@ -2009,6 +2011,7 @@ export function WorkflowBuilder({
       toast.show(error.message, "error");
       return;
     }
+    setTriggerTagDraft("");
     toast.show("Trigger saved", "success");
     router.refresh();
   }
@@ -2259,7 +2262,10 @@ export function WorkflowBuilder({
             </div>
             <TriggerFields
               triggerType={currentTriggerType}
-              onTriggerTypeChange={setCurrentTriggerType}
+              onTriggerTypeChange={(next) => {
+                setCurrentTriggerType(next);
+                setTriggerTagDraft("");
+              }}
               config={config}
               onConfigChange={setConfig}
               organizerTemplates={organizerTemplates}
@@ -2269,6 +2275,7 @@ export function WorkflowBuilder({
               webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
               disabled={!canManage}
               onTagDraftChange={setTriggerTagDraft}
+              tagDraft={triggerTagDraft}
             />
 
             <div className="mt-4 border-t border-border pt-3">
