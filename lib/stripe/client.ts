@@ -977,6 +977,10 @@ export async function verifyStripeSignature(payload: string, signatureHeader: st
   const signature = parts.v1;
   if (!timestamp || !signature) return false;
 
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds)) return false;
+  if (Math.abs(Date.now() / 1000 - timestampSeconds) > 300) return false;
+
   const crypto = await import("crypto");
   const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
   const expectedBuf = Buffer.from(expected);
