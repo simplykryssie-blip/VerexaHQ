@@ -533,12 +533,12 @@ export function ContactsBulkTable({
           <thead>
             <tr className="border-b border-border bg-surfaceMuted text-left text-xs uppercase tracking-wide text-muted">
               {(canManage || canEdit) && (
-                <th className="w-10 px-5 py-3">
+                <th className="w-10 px-5 py-2.5">
                   <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all contacts" />
                 </th>
               )}
               {CLIENT_COLUMNS.map((col) => (
-                <th key={col.key} className={`px-5 py-3 font-medium ${col.className ?? ""}`}>
+                <th key={col.key} className={`px-5 py-2.5 font-medium ${col.className ?? ""}`}>
                   {col.header}
                 </th>
               ))}
@@ -548,7 +548,7 @@ export function ContactsBulkTable({
             {rows.map((row) => (
               <tr key={row.id} className={`transition-colors hover:bg-surfaceMuted ${selected.has(row.id) ? "bg-accentSoft/40" : ""}`}>
                 {(canManage || canEdit) && (
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-2.5">
                     <input
                       type="checkbox"
                       checked={selected.has(row.id)}
@@ -558,7 +558,7 @@ export function ContactsBulkTable({
                   </td>
                 )}
                 {CLIENT_COLUMNS.map((col) => (
-                  <td key={col.key} className={`px-5 py-3.5 ${col.className ?? ""}`}>
+                  <td key={col.key} className={`px-5 py-2.5 ${col.className ?? ""}`}>
                     {col.render(row)}
                   </td>
                 ))}
