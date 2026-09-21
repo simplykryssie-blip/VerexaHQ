@@ -2011,6 +2011,7 @@ export function WorkflowBuilder({
       toast.show(error.message, "error");
       return;
     }
+    setTriggerTagDraft("");
     toast.show("Trigger saved", "success");
     router.refresh();
   }
