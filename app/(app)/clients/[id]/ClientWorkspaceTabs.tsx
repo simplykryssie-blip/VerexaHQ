@@ -80,7 +80,9 @@ function stripHtml(html: string) {
 // ---------------------------------------------------------------- Overview
 
 function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  // Every non-individual client_type (business/trust/estate/organization)
+  // shares the same business_name column as its entity name.
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
@@ -397,7 +399,7 @@ export function OverviewTab({
           </div>
         )}
 
-        {client.client_type === "business" && (
+        {client.client_type !== "individual" && (
         <div className="mt-4 border-t border-border pt-4">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">Contacts</h3>

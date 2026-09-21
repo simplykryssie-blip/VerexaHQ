@@ -14,7 +14,9 @@ export type ClientSearchResult = {
 };
 
 export function clientSearchResultLabel(c: ClientSearchResult) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  // Every non-individual client_type (business/trust/estate/organization)
+  // shares the same business_name column as its entity name.
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 

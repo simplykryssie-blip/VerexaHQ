@@ -26,8 +26,6 @@ export function ContactsSearchBar({
   activeServiceId,
   activeStaffId,
   activeStage,
-  missingDocuments,
-  outstandingBalance,
   clientTypes,
   activeClientType,
   hasEmail,
@@ -44,10 +42,15 @@ export function ContactsSearchBar({
   activeServiceId: string;
   activeStaffId: string;
   activeStage: string;
-  missingDocuments: boolean;
-  outstandingBalance: boolean;
   clientTypes: FilterOption[];
   activeClientType: string;
+  /** Only ever set to `false` ("No email") from this component's own UI --
+   * `true` is still accepted since search_clients' own p_has_email predates
+   * this UI and a bookmarked/typed ?hasEmail=1 link must keep working, but
+   * nothing in the Filters popover offers a way to set it anymore (Contacts
+   * Filter Streamlining: the list already shows email/phone per row, so a
+   * positive "Has email" filter is redundant -- only the negative one finds
+   * something you can't already see at a glance). */
   hasEmail: boolean | undefined;
   hasPhone: boolean | undefined;
   /** Workspace's tag catalog for the Filters popover's Tag entry -- same
@@ -90,17 +93,13 @@ export function ContactsSearchBar({
     return `${basePath}?${params.toString()}`;
   }
 
-  // Counts distinct filter facets, not individual toggle buttons -- "Has
-  // email"/"No email" are two buttons for one tri-state filter (same for
-  // phone), so each counts once when set rather than twice. The free-text
-  // search box and status tabs are never part of this count.
+  // Counts distinct filter facets, not individual toggle buttons. The
+  // free-text search box and status tabs are never part of this count.
   const activeFilterCount =
     (activeServiceId ? 1 : 0) +
     (activeStaffId ? 1 : 0) +
     (activeStage ? 1 : 0) +
     (activeClientType ? 1 : 0) +
-    (missingDocuments ? 1 : 0) +
-    (outstandingBalance ? 1 : 0) +
     (hasEmail === undefined ? 0 : 1) +
     (hasPhone === undefined ? 0 : 1) +
     (activeTag ? 1 : 0);
@@ -161,19 +160,9 @@ export function ContactsSearchBar({
               </div>
 
               <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">Documents &amp; balance</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">Missing contact info</span>
                 <div className="flex flex-wrap gap-1.5">
-                  <ToggleChip href={toggleLink("missingDocs", "1")} active={missingDocuments} label="Missing documents" />
-                  <ToggleChip href={toggleLink("balance", "1")} active={outstandingBalance} label="Outstanding balance" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">Email &amp; phone on file</span>
-                <div className="flex flex-wrap gap-1.5">
-                  <ToggleChip href={toggleLink("hasEmail", "1")} active={hasEmail === true} label="Has email" />
                   <ToggleChip href={toggleLink("hasEmail", "0")} active={hasEmail === false} label="No email" />
-                  <ToggleChip href={toggleLink("hasPhone", "1")} active={hasPhone === true} label="Has phone" />
                   <ToggleChip href={toggleLink("hasPhone", "0")} active={hasPhone === false} label="No phone" />
                 </div>
               </div>

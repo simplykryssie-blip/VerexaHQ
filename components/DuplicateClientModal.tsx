@@ -50,7 +50,7 @@ export function DuplicateClientModal({
       .then(({ data }) => {
         if (cancelled || !data) return;
         setName(
-          data.client_type === "business" && data.business_name
+          data.client_type !== "individual" && data.business_name
             ? data.business_name
             : [data.first_name, data.last_name].filter(Boolean).join(" ") || null
         );

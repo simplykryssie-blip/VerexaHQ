@@ -16,7 +16,10 @@ export function clientDisplayName(c: {
   last_name: string | null;
   business_name: string | null;
 }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  // Every non-individual client_type (business/trust/estate/organization)
+  // shares the same business_name column as its entity name -- there's no
+  // per-type name field in the schema.
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
