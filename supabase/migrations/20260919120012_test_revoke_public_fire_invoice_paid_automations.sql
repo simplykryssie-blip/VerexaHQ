@@ -1,0 +1,16 @@
+-- Migration Reconciliation Phase 1.10A -- recovered from production.
+--
+-- Reverified per this phase's instruction not to blindly recover something
+-- named "test": this is a real, targeted production security fix, not a
+-- test-only artifact. fire_invoice_paid_automations() still had an implicit
+-- PUBLIC pseudo-role grant even after the same day's earlier
+-- least_privilege_security_definer_cleanup_part2 revoked the named anon and
+-- authenticated role grants directly -- PUBLIC is inherited by every role
+-- including anon/authenticated, so the named-role revokes alone were
+-- insufficient for this one function. This closes that residual gap. The
+-- literal name (a validation probe applied before a broader pass) does not
+-- change that its effect is live, real, and unrepresented anywhere in main.
+--
+-- Confidence: A -- exact original recovered from
+-- supabase_migrations.schema_migrations.statements (byte-for-byte).
+revoke execute on function public.fire_invoice_paid_automations() from public;

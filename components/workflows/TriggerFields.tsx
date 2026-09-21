@@ -90,6 +90,7 @@ export const TRIGGER_TYPES = [
   { value: "payment_plan.installment_paid", label: "A payment plan installment is paid", category: "billing", description: "Fires when a payment plan installment is paid.", keywords: "payment plan installment paid" },
   { value: "engagement_share.created", label: "A connected PTIN shares an engagement for review", category: "ero_ptin", description: "Fires in the ERO's workspace when a connected PTIN sends an engagement in for review. Runs in addition to the built-in reviewer notification -- use it for custom routing (e.g. Slack, round-robin).", keywords: "ero ptin share review connected office" },
   { value: "firm_package.purchased", label: "A connected firm purchases a package", category: "ero_ptin", description: "Fires in your workspace when a connected firm checks out and pays for the package you assigned them (e.g. a tax software or bank product package) -- use it to automate onboarding onto whatever they chose.", keywords: "package purchase checkout software bank connected firm ero ptin" },
+  { value: "partner_package.purchased", label: "A new partner purchases a package", category: "ero_ptin", description: "Fires in your workspace when someone with no Verexa workspace buys a package directly on your own website or checkout (e.g. a software/banking package) -- use it to start their onboarding without requiring them to have a Verexa account first.", keywords: "package purchase checkout new partner prospect no workspace website external" },
   { value: "firm_package.canceled", label: "A connected firm's package is canceled", category: "ero_ptin", description: "Fires in your workspace when a connected firm's package purchase is canceled (a recurring subscription ending, most commonly) -- use it to automate revoking access.", keywords: "package canceled subscription ended connected firm ero ptin" },
   { value: "partner_onboarding.created", label: "A partner enters onboarding", category: "ero_ptin", description: "Fires once, the moment a partner (a connected ERO/PTIN) enters the Verexa onboarding process -- e.g. right after a package purchase. Use it to kick off a welcome message or an internal task, not to react to individual onboarding steps.", keywords: "partner onboarding created new connected firm ero ptin" },
   { value: "partner_onboarding.status_changed", label: "A partner's onboarding status changes to", category: "ero_ptin", description: "Fires when a partner's onboarding record moves to a specific status (under review, approved, ready, rejected, etc).", keywords: "partner onboarding status approved rejected ready review connected firm ero ptin" },
@@ -280,6 +281,9 @@ export function triggerSummary(
   }
   if (triggerType === "firm_package.purchased") {
     return "When a connected firm purchases a package";
+  }
+  if (triggerType === "partner_package.purchased") {
+    return "When a new partner (no Verexa workspace) purchases a package";
   }
   if (triggerType === "firm_package.canceled") {
     return "When a connected firm's package is canceled";

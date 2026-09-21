@@ -130,8 +130,22 @@ describe("handleInvoicePaymentSucceeded -- subscription resolution", () => {
     // constraint check is out of scope for this mocked unit test.
     const { supabase, upsert, rpc } = createMockSupabase({ subscriptionRow: { workspace_id: "ws_dup" } });
 
-    const first = await handleInvoicePaymentSucceeded(supabase, newShapeInvoice);
-    const second = await handleInvoicePaymentSucceeded(supabase, newShapeInvoice);
+    // The handler stamps paid_at with new Date().toISOString() at call time
+    // (real, correct behavior -- it's recording when we processed the
+    // payment). Freeze the clock for these two back-to-back calls so that
+    // incidental field is deterministic too; without this the two calls can
+    // straddle a millisecond boundary and produce different paid_at values,
+    // failing the deep-equality check below on a field this test isn't
+    // actually about.
+    vi.useFakeTimers();
+    let first: Awaited<ReturnType<typeof handleInvoicePaymentSucceeded>>;
+    let second: Awaited<ReturnType<typeof handleInvoicePaymentSucceeded>>;
+    try {
+      first = await handleInvoicePaymentSucceeded(supabase, newShapeInvoice);
+      second = await handleInvoicePaymentSucceeded(supabase, newShapeInvoice);
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect(first).toEqual({});
     expect(second).toEqual({});
