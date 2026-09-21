@@ -4,7 +4,6 @@ import { getCurrentWorkspace } from "@/lib/workspace";
 import { PageHeader } from "@/components/PageHeader";
 import { Pager } from "@/components/Pager";
 import { NewClientButton } from "./NewClientButton";
-import { TagFilterControl } from "./TagFilterControl";
 import { ContactsSearchBar } from "./ContactsSearchBar";
 import { ContactsBulkTable } from "./ContactsBulkTable";
 import { resolveAssignedStaff, type ClientRow } from "./clientListColumns";
@@ -275,37 +274,41 @@ export default async function ClientsPage({
     <>
       <PageHeader
         title="Contacts"
-        description="Every client and lead in your workspace."
         actions={
-          canCreate ? (
-            <NewClientButton
-              workspaceId={workspace.id}
-              workspaceName={workspace.name}
-              serviceCategories={serviceCategories}
-              isOwner={isOwner}
-              staffOptions={staffOptions}
-              accountHolderName={accountHolderName}
+          <div className="flex flex-wrap items-center gap-2">
+            <ContactsSearchBar
+              initialQuery={q}
+              basePath="/clients"
+              services={serviceFilterOptions}
+              staffOptions={staffFilterOptions}
+              pipelineStages={pipelineStageOptions}
+              activeServiceId={serviceFilter}
+              activeStaffId={staffFilter}
+              activeStage={stageFilter}
+              missingDocuments={missingDocuments}
+              outstandingBalance={outstandingBalance}
+              clientTypes={CLIENT_TYPE_FILTERS}
+              activeClientType={clientType}
+              hasEmail={hasEmail}
+              hasPhone={hasPhone}
+              tags={workspaceTags ?? []}
+              activeTag={tag}
+              tagQueryBase={tagQueryBase}
             />
-          ) : null
+            {canCreate ? (
+              <NewClientButton
+                workspaceId={workspace.id}
+                workspaceName={workspace.name}
+                serviceCategories={serviceCategories}
+                isOwner={isOwner}
+                staffOptions={staffOptions}
+                accountHolderName={accountHolderName}
+              />
+            ) : null}
+          </div>
         }
       />
       <div className="flex-1 px-8 py-6">
-        <ContactsSearchBar
-          initialQuery={q}
-          basePath="/clients"
-          services={serviceFilterOptions}
-          staffOptions={staffFilterOptions}
-          pipelineStages={pipelineStageOptions}
-          activeServiceId={serviceFilter}
-          activeStaffId={staffFilter}
-          activeStage={stageFilter}
-          missingDocuments={missingDocuments}
-          outstandingBalance={outstandingBalance}
-          clientTypes={CLIENT_TYPE_FILTERS}
-          activeClientType={clientType}
-          hasEmail={hasEmail}
-          hasPhone={hasPhone}
-        />
         <div className="mb-2 flex flex-wrap gap-2">
           {STATUS_FILTERS.map((f) => (
             <Link
@@ -320,11 +323,6 @@ export default async function ClientsPage({
           ))}
         </div>
 
-        {(workspaceTags ?? []).length > 0 && (
-          <div className="mb-4">
-            <TagFilterControl tags={workspaceTags ?? []} activeTag={tag} baseHref={tagQueryBase} />
-          </div>
-        )}
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition hover:shadow-softHover">
           <ContactsBulkTable
             rows={clientRows}
