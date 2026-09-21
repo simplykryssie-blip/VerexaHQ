@@ -18,7 +18,7 @@ describe("workflow tag editor state ownership", () => {
     const source = read("components/workflows/TriggerFields.tsx");
 
     expect(source).toContain("tagDraft?: string;");
-    expect(source).toContain("draft={tagDraft ?? \"\\"}");
+    expect(source).toContain(`draft={tagDraft ?? ""}`);
     expect(source).toContain("onDraftChange={onTagDraftChange ?? (() => {})}");
   });
 
