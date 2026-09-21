@@ -16,14 +16,25 @@ type ProfileClient = {
   primary_phone: string | null;
 };
 
+const ENTITY_NAME_LABELS: Record<string, string> = {
+  business: "Business name",
+  trust: "Trust name",
+  estate: "Estate name",
+  organization: "Organization name",
+};
+
 export function EditClientProfileForm({ client, portalUsers }: { client: ProfileClient; portalUsers: PortalUserRow[] }) {
   const router = useRouter();
   const supabase = createClient();
-  const isBusiness = client.client_type === "business";
+  // Every non-individual client_type (business/trust/estate/organization)
+  // shares the same entity shape -- one business_name column, no per-type
+  // name field.
+  const isEntity = client.client_type !== "individual";
+  const entityNameLabel = ENTITY_NAME_LABELS[client.client_type] ?? "Business name";
 
-  const fields: FieldDef[] = isBusiness
+  const fields: FieldDef[] = isEntity
     ? [
-        { name: "business_name", label: "Business name", required: true },
+        { name: "business_name", label: entityNameLabel, required: true },
         { name: "primary_email", label: "Primary email", type: "email" },
         { name: "primary_phone", label: "Primary phone", type: "tel" },
       ]
@@ -61,7 +72,7 @@ export function EditClientProfileForm({ client, portalUsers }: { client: Profile
         const { error } = await supabase
           .from("clients")
           .update(
-            isBusiness
+            isEntity
               ? {
                   business_name: v.business_name,
                   primary_email: v.primary_email || null,

@@ -285,8 +285,6 @@ export default async function ClientsPage({
               activeServiceId={serviceFilter}
               activeStaffId={staffFilter}
               activeStage={stageFilter}
-              missingDocuments={missingDocuments}
-              outstandingBalance={outstandingBalance}
               clientTypes={CLIENT_TYPE_FILTERS}
               activeClientType={clientType}
               hasEmail={hasEmail}
