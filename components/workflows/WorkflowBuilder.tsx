@@ -50,6 +50,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { EmptyState } from "@/components/EmptyState";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { Badge } from "@/components/ui/Badge";
 import { ClientPickerField, type ClientOption } from "@/components/billing/ClientPickerField";
 import { TriggerFields, triggerSummary, type TemplateOption, type PipelineOption } from "@/components/workflows/TriggerFields";
@@ -367,6 +368,7 @@ export function StepCard({
 }) {
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [actionType, setActionType] = useState(step.action_type === "business_hours_delay" ? "delay" : step.action_type);
   const [config, setConfig] = useState<Record<string, unknown>>(step.action_config ?? {});
   // Separate from any action-specific "Title" field below (e.g. create_task's
@@ -521,7 +523,7 @@ export function StepCard({
         }
       }
       const tags = (configToSave.tags as string[] | undefined) ?? (configToSave.tag ? [configToSave.tag as string] : []);
-      if (tags.length > 0 && !(await ensureTagsConfirmed(supabase, workspaceId, tags))) return;
+      if (tags.length > 0 && !(await ensureTagsConfirmed(supabase, workspaceId, tags, confirm, (message) => toast.show(message, "error")))) return;
     }
 
     setSaving(true);
@@ -553,7 +555,10 @@ export function StepCard({
     }
     setSaved(true);
     if (actionType === "add_tag" || actionType === "remove_tag") setTagDraft("");
-    if (!options?.silent) onSaved();
+    if (!options?.silent) {
+      toast.show("Step saved", "success");
+      onSaved();
+    }
   }
 
   async function move(direction: "up" | "down") {
@@ -1946,6 +1951,7 @@ export function WorkflowBuilder({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [currentTriggerType, setCurrentTriggerType] = useState(triggerType);
   const [config, setConfig] = useState<Record<string, unknown>>(triggerConfig);
   const [enabled, setEnabled] = useState(isEnabled);
@@ -1999,7 +2005,7 @@ export function WorkflowBuilder({
       const triggerTags = (effectiveConfig.tags as string[] | undefined) ?? (effectiveConfig.tag ? [effectiveConfig.tag as string] : []);
       triggerTags.forEach((t) => tagsToConfirm.add(t));
     }
-    if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm]))) return;
+    if (!(await ensureTagsConfirmed(supabase, workspaceId, [...tagsToConfirm], confirm, (message) => toast.show(message, "error")))) return;
 
     setSavingTrigger(true);
     const { error } = await supabase

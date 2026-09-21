@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import {
   ConditionGroupsEditor,
   normalizeToConditionGroups,
@@ -87,6 +88,7 @@ export function BranchEditor({
 }) {
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [branches, setBranches] = useState<DraftBranch[]>(() => initialBranches(edges));
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -120,7 +122,7 @@ export function BranchEditor({
 
   async function save() {
     const tagsToConfirm = collectClientTagValues(branches.flatMap((b) => b.conditions).flatMap((g) => g.conditions));
-    if (!(await ensureTagsConfirmed(supabase, workspaceId, tagsToConfirm))) return;
+    if (!(await ensureTagsConfirmed(supabase, workspaceId, tagsToConfirm, confirm, (message) => toast.show(message, "error")))) return;
 
     setSaving(true);
     for (const id of removedIds) {
