@@ -8,7 +8,7 @@ import { NewIrsAuthorizationForm } from "./NewIrsAuthorizationForm";
 export const dynamic = "force-dynamic";
 
 function clientDisplayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 
@@ -93,7 +93,7 @@ export default async function NewIrsAuthorizationPage({ params }: { params: { id
             clientName={clientDisplayName(client)}
             clientEmail={client.primary_email}
             clientAddress={clientAddress}
-            defaultTaxpayerType={client.client_type === "business" ? "business" : "individual"}
+            defaultTaxpayerType={client.client_type !== "individual" ? "business" : "individual"}
             engagements={engagements}
             staffOptions={staffOptions}
             templates={templates ?? []}

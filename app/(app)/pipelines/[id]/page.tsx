@@ -79,7 +79,7 @@ export default async function PipelineDetailPage({ params }: { params: { id: str
       const currentStageId = (r.pipeline_stages as unknown as { process_stage_id: string | null } | null)?.process_stage_id;
       if (!client || !currentStageId) continue;
       const name =
-        client.client_type === "business" && client.business_name
+        client.client_type !== "individual" && client.business_name
           ? client.business_name
           : [client.first_name, client.last_name].filter(Boolean).join(" ") || "Unnamed client";
       const list = leadsByStage[currentStageId] ?? [];

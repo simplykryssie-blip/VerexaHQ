@@ -10,7 +10,7 @@ export const TABS = ["Details", "Tasks", "Documents", "Messages", "Billing", "No
 export type ClientTab = (typeof TABS)[number];
 
 function displayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 

@@ -22,7 +22,7 @@ type ClientRef = {
 };
 
 function clientDisplayName(c: ClientRef) {
-  if (c.client_type === "business" && c.business_name) return c.business_name;
+  if (c.client_type !== "individual" && c.business_name) return c.business_name;
   return [c.first_name, c.last_name].filter(Boolean).join(" ") || "Unnamed client";
 }
 

@@ -128,7 +128,7 @@ export default async function EngagementsPage({ searchParams }: { searchParams: 
                     client_type: string;
                   } | null;
                   const clientName = c
-                    ? c.client_type === "business" && c.business_name
+                    ? c.client_type !== "individual" && c.business_name
                       ? c.business_name
                       : [c.first_name, c.last_name].filter(Boolean).join(" ")
                     : "--";
