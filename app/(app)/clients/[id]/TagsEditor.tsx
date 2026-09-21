@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { X, Plus, Check } from "lucide-react";
 import { ensureTagConfirmed } from "@/lib/ensureTag";
+import { useConfirm } from "@/components/Confirm";
+import { useToast } from "@/components/Toast";
 
 export function TagsEditor({
   clientId,
@@ -19,6 +21,8 @@ export function TagsEditor({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [adding, setAdding] = useState(false);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,7 +43,7 @@ export function TagsEditor({
     setValue("");
     setAdding(false);
     if (!tag || tags.includes(tag)) return;
-    const confirmed = await ensureTagConfirmed(supabase, workspaceId, tag);
+    const confirmed = await ensureTagConfirmed(supabase, workspaceId, tag, confirm, (message) => toast.show(message, "error"));
     if (!confirmed) return;
     await saveTags([...tags, tag]);
   }

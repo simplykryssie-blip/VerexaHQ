@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Tag, Download, X, UserCog, Tags as TagsIcon, ChevronDown, Archive, ArchiveRestore } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 import { EmptyState } from "@/components/EmptyState";
 import { ensureTagConfirmed } from "@/lib/ensureTag";
 import { CLIENT_COLUMNS, clientDisplayName, resolveAssignedStaff, type ClientRow } from "./clientListColumns";
@@ -108,6 +109,7 @@ export function ContactsBulkTable({
   const router = useRouter();
   const supabase = createClient();
   const toast = useToast();
+  const confirm = useConfirm();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Non-null only while "select all matching" is active: full row data (not
   // just ids) for every contact matching the current filters, fetched
@@ -214,7 +216,7 @@ export function ContactsBulkTable({
   async function applyTag() {
     const tag = tagInput.trim();
     if (!tag) return;
-    if (!(await ensureTagConfirmed(supabase, workspaceId, tag))) return;
+    if (!(await ensureTagConfirmed(supabase, workspaceId, tag, confirm, (message) => toast.show(message, "error")))) return;
 
     setTagging(true);
     const results = await Promise.all(

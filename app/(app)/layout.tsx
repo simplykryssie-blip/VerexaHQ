@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { Sidebar } from "@/components/Sidebar";
 import { ScrollToTopOnNavigate } from "@/components/ScrollToTopOnNavigate";
 import { ToastProvider } from "@/components/Toast";
+import { ConfirmProvider } from "@/components/Confirm";
 import { GlobalClientDraftBanner } from "@/components/GlobalClientDraftBanner";
 import { BillingCardPrompt } from "@/components/BillingCardPrompt";
 import { SponsorshipTransitionBanner } from "@/components/SponsorshipTransitionBanner";
@@ -225,6 +226,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
   return (
     <div style={brandVars}>
       <ToastProvider>
+       <ConfirmProvider>
         <IdleLogout timeoutMinutes={securityPolicy?.session_timeout_minutes ?? 60} loginPath="/login" />
         <a
           href="#main-content"
@@ -270,6 +272,7 @@ export default async function AppLayout({ children, modal }: { children: React.R
           </main>
         </div>
         <ModalSlotGate>{modal}</ModalSlotGate>
+       </ConfirmProvider>
       </ToastProvider>
     </div>
   );
