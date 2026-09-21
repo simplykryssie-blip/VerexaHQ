@@ -15,8 +15,8 @@ const STATUS_COPY: Record<string, { heading: string; body: string; ctaLabel: str
   },
   archived: {
     heading: "Workspace archived",
-    body: "This workspace was archived after an extended billing suspension. Your data is retained per our Privacy Policy -- visit Plan & Usage to resolve billing, or contact Support for export/recovery options.",
-    ctaLabel: "Go to Plan & Usage",
+    body: "This workspace was archived after an extended billing suspension. Your data is retained per our Privacy Policy -- contact Support for export/recovery options.",
+    ctaLabel: "Contact Support",
   },
   permanently_archived: {
     heading: "Workspace permanently archived",
@@ -35,7 +35,10 @@ const STATUS_COPY: Record<string, { heading: string; body: string; ctaLabel: str
 export function SuspendedWorkspaceScreen({ status, suspensionReason }: { status: string; suspensionReason: string | null }) {
   const copy = STATUS_COPY[status] ?? STATUS_COPY.suspended;
   const reasonText = status === "suspended" ? ((suspensionReason && SUSPENSION_REASON_LABEL[suspensionReason]) ?? "Your Verexa workspace is currently suspended.") : null;
-  const ctaHref = status === "permanently_archived" ? "/support" : "/settings/plan-usage";
+  // Archived/permanently-archived recovery is a separate, not-yet-built
+  // product flow -- both point at Support rather than implying billing can
+  // self-serve reactivate an already-archived workspace.
+  const ctaHref = status === "suspended" ? "/settings/plan-usage" : "/support";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surfaceMuted px-4">

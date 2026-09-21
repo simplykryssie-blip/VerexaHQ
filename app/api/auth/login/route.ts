@@ -7,7 +7,7 @@ import { friendlyAuthError } from "@/lib/authErrors";
 /**
  * The only path that may report a login result to record_login_result --
  * anon/authenticated no longer have EXECUTE on that RPC (see
- * 20261021000000_lock_down_login_result_rpc), because success/failure used
+ * 20260917101929_lock_down_login_result_rpc), because success/failure used
  * to be a caller-supplied boolean an unauthenticated caller could fabricate
  * for any email to lock that account out. Here it's decided from the real
  * signInWithPassword call this route just made -- never from client input --
