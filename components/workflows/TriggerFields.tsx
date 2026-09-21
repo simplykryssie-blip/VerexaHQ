@@ -324,6 +324,7 @@ export function TriggerFields({
    * in a typed-but-uncommitted tag at save time instead of losing it to the
    * same-event-batch race. */
   onTagDraftChange?: (draft: string) => void;
+  tagDraft?: string;
 }) {
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
   return (
