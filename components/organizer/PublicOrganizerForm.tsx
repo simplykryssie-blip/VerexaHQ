@@ -528,7 +528,7 @@ export function PublicOrganizerForm({
               <div className="verexa-organizer-field verexa-organizer-field--name sm:col-span-2">
                 <label className="verexa-organizer-label block text-sm font-medium text-ink">Name *</label>
                 <div className="mt-1">
-                  <NameInput value={name} onChange={setName} />
+                  <NameInput value={name} onChange={setName} inputClassName="verexa-organizer-input" />
                 </div>
               </div>
               <div className="verexa-organizer-field verexa-organizer-field--email">
@@ -553,7 +553,7 @@ export function PublicOrganizerForm({
               <div className="verexa-organizer-field verexa-organizer-field--address sm:col-span-2">
                 <label className="verexa-organizer-label block text-sm font-medium text-ink">Mailing address</label>
                 <div className="mt-1">
-                  <AddressInput value={address} onChange={setAddress} />
+                  <AddressInput value={address} onChange={setAddress} inputClassName="verexa-organizer-input" />
                 </div>
               </div>
               {requires_portal_signup && (
@@ -868,7 +868,7 @@ function PublicFieldInput({
 
       <div className={showHeader ? "mt-1.5" : ""}>
         {field.field_type === "name" ? (
-          <NameInput value={value} onChange={(v) => onChange(field.id, v)} />
+          <NameInput value={value} onChange={(v) => onChange(field.id, v)} inputClassName="verexa-organizer-input" />
         ) : field.field_type === "email" ? (
           <input
             id={`field-${field.id}`}
@@ -999,7 +999,7 @@ function PublicFieldInput({
             className={inputClass}
           />
         ) : field.field_type === "address" ? (
-          <AddressInput value={value} onChange={(v) => onChange(field.id, v)} />
+          <AddressInput value={value} onChange={(v) => onChange(field.id, v)} inputClassName="verexa-organizer-input" />
         ) : field.field_type === "short_text" ? (
           <input
             id={`field-${field.id}`}
