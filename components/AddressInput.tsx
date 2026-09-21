@@ -9,14 +9,17 @@ export function AddressInput({
   value,
   onChange,
   disabled,
+  inputClassName,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  inputClassName?: string;
 }) {
   const parts = parseAddressValue(value);
   const inputClass =
-    "w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted";
+    "w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted" +
+    (inputClassName ? ` ${inputClassName}` : "");
 
   function set(patch: Partial<typeof parts>) {
     onChange(stringifyAddressValue({ ...parts, ...patch }));
