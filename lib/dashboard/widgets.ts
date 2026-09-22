@@ -21,8 +21,12 @@ export type WidgetType =
   | "recent_activity"
   | "top_services"
   | "engagement_pipeline"
-  | "stage_breakdown"
   | "deadline_risk"
+  // Retired: absorbed into another type's rendering (see IMPLEMENTED_WIDGET_TYPES)
+  // or relocated off the dashboard entirely. Still allowed in the DB CHECK
+  // constraint and left in existing dashboard_widgets/user_widget_preferences
+  // rows -- just no longer implemented, same as the reserved types below.
+  | "stage_breakdown"
   | "unassigned_engagements"
   | "overdue_requests"
   | "failed_automations"
@@ -34,7 +38,19 @@ export type WidgetType =
   | "client_health"
   | "compliance";
 
-/** Widget types with a real, live-data-backed component today. */
+/**
+ * Widget types with a real, live-data-backed component today.
+ *
+ * "kpis" (renders as "Engagements"), "calendar" (renders as "Today"), and
+ * "missing_documents" (renders as "Client Requests") each absorbed a former
+ * sibling widget's content in the dashboard consolidation pass -- see
+ * DashboardShell's renderWidget(). unassigned_engagements, overdue_requests,
+ * stage_breakdown, and failed_automations are retired the same way the
+ * reserved types below already were: dropped from this list (and so from
+ * isWidgetType()) without deleting their dashboard_widgets/
+ * user_widget_preferences rows, which is a non-destructive, purely additive
+ * change -- no migration required for the retirement itself.
+ */
 export const IMPLEMENTED_WIDGET_TYPES: WidgetType[] = [
   "revenue",
   "kpis",
@@ -48,11 +64,7 @@ export const IMPLEMENTED_WIDGET_TYPES: WidgetType[] = [
   "recent_activity",
   "top_services",
   "engagement_pipeline",
-  "stage_breakdown",
   "deadline_risk",
-  "unassigned_engagements",
-  "overdue_requests",
-  "failed_automations",
 ];
 
 /** Widgets that are inherently a wide strip rather than a card -- span the full dashboard grid row instead of one cell. */
@@ -70,11 +82,11 @@ export const WIDGET_SECTIONS: { label: string; types: WidgetType[] }[] = [
   { label: "Key Metrics", types: ["revenue", "kpis", "collections", "missing_documents", "messages"] },
   {
     label: "Action Queue",
-    types: ["todays_work", "review_queue", "deadline_risk", "unassigned_engagements", "overdue_requests", "failed_automations"],
+    types: ["todays_work", "review_queue", "deadline_risk"],
   },
   {
     label: "Reports & Planning",
-    types: ["quick_actions", "calendar", "recent_activity", "top_services", "engagement_pipeline", "stage_breakdown"],
+    types: ["quick_actions", "calendar", "recent_activity", "top_services", "engagement_pipeline"],
   },
 ];
 

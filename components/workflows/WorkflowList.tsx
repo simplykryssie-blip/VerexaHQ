@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Star, Trash2, Zap } from "lucide-react";
+import { Copy, Star, Trash2, Zap, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/EmptyState";
@@ -32,6 +32,11 @@ export type WorkflowRow = {
   folder_id: string | null;
   step_count: number;
   run_count: number;
+  /** Total runs with status = 'failed', all-time -- same figure the
+   *  workflow's own Activity panel (/workflows/{id}?activity=1) shows in its
+   *  Runs table, not a "needs attention" queue (there's no acknowledgment
+   *  concept at this list-page level). */
+  failed_run_count: number;
   starred: boolean;
 };
 
@@ -350,6 +355,15 @@ export function WorkflowList({
                   </Link>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:shrink-0 sm:gap-3">
+                  {w.failed_run_count > 0 && (
+                    <Link
+                      href={`/workflows/${w.id}?activity=1`}
+                      className="inline-flex items-center gap-1 rounded-full bg-dangerSoft px-2.5 py-0.5 text-xs font-medium text-danger hover:underline"
+                      title="View failed runs in Activity"
+                    >
+                      <XCircle size={12} aria-hidden="true" /> {w.failed_run_count} failed
+                    </Link>
+                  )}
                   {w.status === "draft" ? (
                     <Badge tone="warning">Draft</Badge>
                   ) : w.status === "archived" ? (

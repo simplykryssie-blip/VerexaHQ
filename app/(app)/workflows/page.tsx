@@ -20,7 +20,7 @@ export default async function WorkflowsPage() {
     await Promise.all([
       supabase
         .from("automations")
-        .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, folder_id, automation_steps(id), automation_runs(id)")
+        .select("id, name, slug, description, trigger_type, trigger_config, is_enabled, status, folder_id, automation_steps(id), automation_runs(id, status)")
         .eq("workspace_id", workspace.id)
         .order("name"),
       supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
@@ -40,19 +40,23 @@ export default async function WorkflowsPage() {
     ]);
   const starredIds = new Set((starredRows ?? []).map((r) => r.entity_id));
 
-  const rows: WorkflowRow[] = (automations ?? []).map((a) => ({
-    id: a.id,
-    name: a.name,
-    description: a.description,
-    trigger_type: a.trigger_type,
-    trigger_config: a.trigger_config as Record<string, unknown>,
-    is_enabled: a.is_enabled,
-    status: a.status,
-    folder_id: a.folder_id,
-    step_count: (a.automation_steps as unknown as { id: string }[]).length,
-    run_count: (a.automation_runs as unknown as { id: string }[]).length,
-    starred: starredIds.has(a.id),
-  }));
+  const rows: WorkflowRow[] = (automations ?? []).map((a) => {
+    const runs = a.automation_runs as unknown as { id: string; status: string }[];
+    return {
+      id: a.id,
+      name: a.name,
+      description: a.description,
+      trigger_type: a.trigger_type,
+      trigger_config: a.trigger_config as Record<string, unknown>,
+      is_enabled: a.is_enabled,
+      status: a.status,
+      folder_id: a.folder_id,
+      step_count: (a.automation_steps as unknown as { id: string }[]).length,
+      run_count: runs.length,
+      failed_run_count: runs.filter((r) => r.status === "failed").length,
+      starred: starredIds.has(a.id),
+    };
+  });
 
   const pipelines: PipelineOption[] = (processes ?? []).map((p) => ({
     id: p.id,
