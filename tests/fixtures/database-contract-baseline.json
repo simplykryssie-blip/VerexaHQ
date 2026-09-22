@@ -40,7 +40,14 @@
       "check_storage_capacity": { "args": "p_workspace_id uuid, p_additional_bytes bigint", "isSecurityDefiner": true },
       "claim_pending_paid_seat": { "args": "p_workspace_id uuid", "isSecurityDefiner": true },
       "release_paid_seat": { "args": "p_workspace_id uuid, p_seat_id uuid", "isSecurityDefiner": true },
-      "set_platform_admin": { "args": "p_user_email text, p_is_platform_admin boolean", "isSecurityDefiner": true }
+      "set_platform_admin": { "args": "p_user_email text, p_is_platform_admin boolean", "isSecurityDefiner": true },
+      "create_contact_share": { "args": "p_client_id uuid, p_category_keys text[]", "isSecurityDefiner": true },
+      "request_contact_share_update": { "args": "p_retained_contact_id uuid, p_category_keys text[]", "isSecurityDefiner": true },
+      "respond_to_contact_share": { "args": "p_share_id uuid, p_decision text, p_notes text", "isSecurityDefiner": true },
+      "execute_contact_share_transfer": { "args": "p_share_id uuid", "isSecurityDefiner": true },
+      "mark_contact_document_transferred": { "args": "p_transfer_id uuid", "isSecurityDefiner": true },
+      "withdraw_contact_share": { "args": "p_share_id uuid", "isSecurityDefiner": true },
+      "resubmit_contact_share": { "args": "p_share_id uuid", "isSecurityDefiner": true }
     }
   }
 }

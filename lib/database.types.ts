@@ -12771,6 +12771,82 @@ export type Database = {
         Args: { p_connection_id: string }
         Returns: undefined
       }
+      create_contact_share: {
+        Args: { p_category_keys: string[]; p_client_id: string }
+        Returns: {
+          created_at: string
+          decision_notes: string | null
+          destination_workspace_id: string
+          expires_at: string | null
+          firm_connection_id: string
+          id: string
+          initiated_by: string
+          initiated_by_user_id: string | null
+          resulting_version_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_id: string | null
+          source_client_id: string
+          source_workspace_id: string
+          status: string
+          transfer_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "contact_shares"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      request_contact_share_update: {
+        Args: { p_category_keys: string[]; p_retained_contact_id: string }
+        Returns: {
+          created_at: string
+          decision_notes: string | null
+          destination_workspace_id: string
+          expires_at: string | null
+          firm_connection_id: string
+          id: string
+          initiated_by: string
+          initiated_by_user_id: string | null
+          resulting_version_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          reviewer_id: string | null
+          source_client_id: string
+          source_workspace_id: string
+          status: string
+          transfer_kind: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "contact_shares"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      respond_to_contact_share: {
+        Args: { p_decision: string; p_notes?: string; p_share_id: string }
+        Returns: undefined
+      }
+      execute_contact_share_transfer: {
+        Args: { p_share_id: string }
+        Returns: Json
+      }
+      mark_contact_document_transferred: {
+        Args: { p_transfer_id: string }
+        Returns: undefined
+      }
+      withdraw_contact_share: {
+        Args: { p_share_id: string }
+        Returns: undefined
+      }
+      resubmit_contact_share: {
+        Args: { p_share_id: string }
+        Returns: undefined
+      }
       disconnect_workspace_ghl: {
         Args: { p_workspace_id: string }
         Returns: undefined
