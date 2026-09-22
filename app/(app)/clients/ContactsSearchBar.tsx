@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Check, ChevronDown, X, Filter } from "lucide-react";
 import { DropdownPanel, useDropdownDismiss } from "@/components/ui/Dropdown";
 import { TagFilterControl } from "./TagFilterControl";
@@ -64,6 +64,7 @@ export function ContactsSearchBar({
   tagQueryBase: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialQuery);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filtersRef = useDropdownDismiss<HTMLDivElement>(filtersOpen, () => setFiltersOpen(false));
@@ -86,7 +87,7 @@ export function ContactsSearchBar({
   }, [query]);
 
   function toggleLink(param: string, value: string) {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
     if (params.get(param) === value) params.delete(param);
     else params.set(param, value);
     params.delete("page");
@@ -209,9 +210,10 @@ function FilterDropdown({
   const [open, setOpen] = useState(false);
   const containerRef = useDropdownDismiss<HTMLDivElement>(open, () => setOpen(false));
   const activeLabel = options.find((o) => o.value === activeValue)?.label;
+  const searchParams = useSearchParams();
 
   function hrefFor(value: string) {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(param, value);
     else params.delete(param);
     params.delete("page");
