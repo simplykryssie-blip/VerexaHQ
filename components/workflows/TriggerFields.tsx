@@ -6,7 +6,7 @@ import { TagListInput } from "@/components/workflows/TagListInput";
 import { InlineStepPickerField } from "@/components/workflows/StepPicker";
 
 export type TemplateOption = { id: string; name: string };
-export type ServiceCategoryOption = { id: string; name: string };
+export type ServiceCategoryOption = { id: string; name: string; process_id?: string | null };
 export type PipelineOption = { id: string; name: string; stages: { id: string; name: string }[] };
 
 export const APPOINTMENT_STATUS_OPTIONS = ["scheduled", "confirmed", "completed", "cancelled", "no_show"];
