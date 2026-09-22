@@ -21,6 +21,26 @@ import type {
   SignatureRequestRow,
 } from "./types";
 
+// Contacts Pass 5: this panel used to render the full, unfiltered activity
+// feed (status changes, notes, payments, emails, ...) passed in from
+// whatever caller it's embedded in -- once the general Timeline tab (Pass 3)
+// became a real home for all of that, showing it a second time here just
+// duplicated it. These are every activity_type the app's own triggers
+// (record_attachment_activity, record_document_request_activity,
+// record_signature_activity -- see the baseline schema migration) actually
+// write for a document or its signature workflow; nothing here is guessed.
+const DOCUMENT_ACTIVITY_TYPES = new Set([
+  "DOCUMENT_UPLOADED",
+  "DOCUMENT_DELETED",
+  "DOCUMENT_ARCHIVED",
+  "DOCUMENT_RESTORED",
+  "DOCUMENT_RENAMED",
+  "DOCUMENT_REQUEST_CREATED",
+  "SIGNATURE_SIGNED",
+  "SIGNATURE_DECLINED",
+  "SIGNATURE_UPDATED",
+]);
+
 export function DocumentWorkspace({
   workspaceId,
   entityType,
@@ -61,6 +81,8 @@ export function DocumentWorkspace({
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [showActivity, setShowActivity] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<DocumentRow | null>(null);
+
+  const documentActivity = activity.filter((a) => DOCUMENT_ACTIVITY_TYPES.has(a.activity_type));
 
   const activeDocuments = documents.filter((d) => !d.is_archived);
   const folderCounts = useMemo(() => {
@@ -169,15 +191,15 @@ export function DocumentWorkspace({
           onClick={() => setShowActivity((v) => !v)}
           className="text-sm font-medium text-accent hover:underline"
         >
-          {showActivity ? "Hide activity" : "Show activity"}
+          {showActivity ? "Hide document activity" : "Show document activity"}
         </button>
         {showActivity && (
           <div className="mt-3 rounded-2xl border border-border bg-surface shadow-soft">
-            {activity.length === 0 ? (
+            {documentActivity.length === 0 ? (
               <EmptyState message="No document activity yet." />
             ) : (
               <ul className="divide-y divide-border">
-                {activity.map((a) => (
+                {documentActivity.map((a) => (
                   <li key={a.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                     <span className="text-slate">{a.description}</span>
                     <span className="text-xs text-muted">{new Date(a.created_at).toLocaleString()}</span>

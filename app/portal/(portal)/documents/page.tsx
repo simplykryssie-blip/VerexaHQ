@@ -29,7 +29,7 @@ export default async function PortalDocumentsPage() {
       .from("signature_requests")
       .select("id, title, status, due_date, attachment_id, created_at, attachment:attachments!signature_requests_attachment_id_fkey(file_name, entity_type, entity_id), signers:signature_request_signers(id, signer_name, signer_email, status, signed_at, access_token)")
       .order("created_at", { ascending: false }),
-    supabase.from("activity_log").select("id, description, created_at").eq("entity_type", "client").eq("entity_id", identity.clientId).order("created_at", { ascending: false }).limit(30),
+    supabase.from("activity_log").select("id, description, activity_type, created_at").eq("entity_type", "client").eq("entity_id", identity.clientId).order("created_at", { ascending: false }).limit(30),
   ]);
 
   const signatureRequests = (signatureRequestRows ?? [])
