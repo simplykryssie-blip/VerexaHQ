@@ -105,16 +105,6 @@ export function ServiceLibrary({
     setError("Could not create service -- try a slightly different name.");
   }
 
-  function slugifyCategory(name: string) {
-    return (
-      name
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "") || "category"
-    );
-  }
-
   function beginEditCategory(category: ServiceCategoryOption) {
     setEditingCategoryId(category.id);
     setCategoryName(category.name);
