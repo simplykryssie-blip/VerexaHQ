@@ -1,6 +1,125 @@
+# Addendum — 2026-09-22: Stripe/Packages work closed out; repo-wide branch audit; 66 dead branches identified (deletion blocked, needs a human)
+
+**READ THIS FIRST.** This is the newest handoff state, superseding the
+Stripe Package Purchase / Partner Onboarding sections below (the Contacts
+closeout further below is unrelated and still accurate as-is). Read those
+sections for full historical context on how the backend was built; this
+section is only the delta since then.
+
+## Stripe Package Purchase / Partner Onboarding: 🟢 now functionally complete
+
+Verified directly against production (`daxpavvsotvsyqqntddc`), not just
+against migration files, before writing this:
+- Schema (`partner_prospects`, `workspace_partner_purchase_webhooks`,
+  `firm_packages.stripe_payment_link_id/url/price_id/product_id`,
+  `firm_packages.purchase_purpose`), the trigger/RPC layer
+  (`ensure_partner_purchase_webhook`, `set_partner_purchase_webhook_secret`,
+  `get_partner_purchase_webhook_status`, `_resolve_partner_purchase_webhook`,
+  `record_verified_partner_purchase`), and the webhook receiver route
+  (`app/api/partner-purchase-webhook/[token]/route.ts`, Stripe-native
+  signature verification via `verifyStripeSignature` — **not** the
+  provider-agnostic custom-HMAC scheme the original
+  `release-fix/partner-purchase-entrypoint` branch used; that scheme was
+  superseded during Phase 1.10A) are all live on `main` and production.
+- The nested `package_purchase.package_name` condition-evaluator bug
+  (Workstream B, see the "NEXT SESSION" section below) is also already
+  fixed — confirmed via `test_condition_evaluator_nested_field_resolution`
+  in `20260920142055_partner_purchase_stripe_mapping_and_purpose.sql`.
+- **What was still missing**: the entire UI layer (Packages settings
+  pages, the per-workspace webhook-config admin card, the public packages
+  API route, and the website builder's Packages section
+  editor/canvas/renderer) — Phase 1.10A explicitly deferred this. Recovered
+  it from the unmerged `feature/stripe-package-onboarding-completion`
+  branch onto a fresh branch, `feature/packages-website-ui`, pushed but
+  **not merged to `main`**. Verified clean: typecheck, lint, full
+  production build, and 303/305 tests (2 pre-existing environment-only
+  Supabase-credential failures, not a regression) all pass. The admin
+  webhook-config card (`PartnerPurchaseWebhookCard.tsx`) was specifically
+  re-verified RPC-compatible with production's live function signatures
+  before including it — it is not tied to the old superseded HMAC scheme.
+
+**Still open, not done in this pass**: nothing else identified in the
+Stripe/Packages surface area. If a future session finds something, verify
+against production first (`pg_get_functiondef`, `information_schema.routine_privileges`)
+rather than trusting any branch's commit message or this file — several
+things below turned out to already be live despite branches/docs implying
+otherwise.
+
+## Repo-wide branch audit (2026-09-22)
+
+The repo had accumulated **181 remote branches** (183 after this session's
+2 new pushes). A full audit was run — every branch's real diff against
+current `main` (not its own stale fork point; `main` moves fast enough
+that a raw `git diff main..branch` is routinely misleading — always use
+`git merge-base` first). Findings:
+
+1. **66 branches are confirmed dead** — 60 are literal ancestors of `main`
+   (`git merge-base --is-ancestor <tip> main` true; mechanically verified,
+   not just commit-message-trusted), and 6 more were individually
+   content-verified redundant (their functional content is already live on
+   `main`/production under different commits/filenames, from the Phase
+   1.10A reconciliation and this session's work):
+   `release-fix/p0-login-lockout`, `release-fix/p1-archived-enforcement`,
+   `release-fix/partner-purchase-entrypoint`, `fix/wait-delay-shared-context`,
+   `security/least-privilege-definer-cleanup`,
+   `feature/stripe-package-onboarding-completion`.
+   **Deletion attempted and blocked**: this session's git push credentials
+   can create/push branches but get HTTP 403 on every delete attempt
+   (single branch, batch of 5, batch of 66 — all failed identically; not a
+   batch-size issue). The GitHub MCP server also has no branch-delete
+   tool. A human with real push access needs to run the delete — the full
+   list and a ready-to-run `git push origin --delete ...` command were
+   handed to the user directly (not duplicated here; ask the user if it's
+   needed again, or regenerate from `git branch -r` + `git merge-base
+   --is-ancestor` against the list above).
+
+2. **NOT dead — do not delete these three**: `security/reconcile-operational-gate-privileges`,
+   `security/reconcile-least-privilege-history`, `release-fix/p1-operational-gate-audit`.
+   The underlying security fixes (operational-gate checks on a broad set
+   of CRM/leads/engagement/documents/pipelines functions, batches 1-5) are
+   confirmed **live on production** (e.g. `add_client_address` has the
+   `is_workspace_operational()` gate right now) — there is no open
+   vulnerability. But the migration files for batches 1-5 were never
+   recovered into `main`'s git history, unlike a later "batch 6" that was
+   (`20261028010000_operational_gate_audit_batch6_git_reconciliation.sql`)
+   plus a separate, narrower Oct 30 RLS/RPC closure pass
+   (`20261030000000`/`20261030010000`) that covers different functions.
+   **This is a real, open reconciliation gap**: if the schema were ever
+   rebuilt from git migrations alone (e.g. a fresh environment, or a
+   staging rebuild like the one referenced elsewhere in this file), these
+   specific security gates would silently be missing from the rebuilt
+   copy even though production itself is fine. Recovering batches 1-5 the
+   same way Phase 1.10A and batch 6 did (byte-identical content
+   reproduced from `pg_get_functiondef` / `schema_migrations.statements`,
+   filed under the real recorded production version) is genuine
+   outstanding work, not cleanup.
+
+3. **Not yet reviewed either way** — small cluster (~5 branches, each with
+   a handful of commits, dated Sept 17-20): `fix/mkb-quickbooks-universal-intake`,
+   `fix/workflow-builder-ux-bugs`, `phase2-3-partner-automation`,
+   `claude/verexa-schema-mismatch-i8c19u`, `claude/quickbooks-consultation-intake-8ttt7j`.
+   None of these were mentioned in the Phase 1.10A reconciliation commit,
+   so they likely still contain real unmerged content, but this wasn't
+   verified the rigorous way (per-file diff against current `main`,
+   cross-checked against production) the other branches got.
+
+4. **~60 pre-consolidation branches, do not attempt to merge**: a large
+   cluster (dated July 20 – Aug 28) diverged from a point 356 commits
+   behind current `main`, some carrying 300-670 commits of their own
+   entirely separate history. The branch `archive/pre-consolidation-2026-08`
+   confirms there was a deliberate history rewrite/consolidation around
+   August 2026; these branches predate it and are incompatible history,
+   not reviewable feature branches. Whether any contain something worth
+   manually re-extracting (the way the Packages UI was pulled out of
+   `feature/stripe-package-onboarding-completion` above) was not assessed
+   — flag to the user before spending time here, this is a big, likely
+   low-yield undertaking.
+
+---
+
 # Addendum — 2026-09-20: Contacts closed; Stripe Payment Link architecture clarified
 
-**READ THIS FIRST.** This is the newest handoff state.
+**READ THIS FIRST (historical, as of 2026-09-20 — see the newer addendum above for current state).**
 
 ## Contacts: 🟢 COMPLETE
 The full Contacts completion pass is closed (PRs #290–#299): remaining filters, archive/restore, cross-page selection, tasks, rich Notes, billing transaction display, signature PDF/audit trail, GHL guard, navigation, CSV, and the final stale `search_clients` overload fix.
@@ -193,6 +312,1348 @@ system is actually built (schema, auth, permissions, every module), see
 `PLATFORM.md` in this same repo root — that's the living architecture
 reference. This file is just "what happened recently and what's still open."
 
+## 🔵 NEXT SESSION — START HERE (as of 2026-09-20): Stripe Package Purchase / Partner Onboarding completion
+
+This is the active task queued up for whichever session picks this up next.
+**Do not touch Engagements until this is fully reconciled and closed** — the
+user was explicit about that order. Read the "2026-09-17/20" addendum just
+below this section first — it documents four just-finished release-blocker
+fixes sitting on **unmerged** branches that this Stripe work must not
+collide with or duplicate.
+
+The task brief below is verbatim from the user — it already encodes prior
+discovery (the Connect webhook, `handleFirmPackagePurchaseCheckoutCompleted`,
+`firm_package_purchases`, `_get_or_create_partner_onboarding`,
+`partner_onboarding.created`, `firm_connections`, the external Stripe
+Payment Link setup on the public website, and a known nested
+`package_purchase.package_name` condition-evaluator bug). Do not
+rediscover any of it — audit only the specific gaps named, then implement.
+
+<details>
+<summary>Full task brief (click to expand — verbatim from the user, 2026-09-20)</summary>
+
+```
+VEREXA HQ — STRIPE PACKAGE PURCHASE / PARTNER ONBOARDING COMPLETION
+
+You are continuing an existing VerexaHQ engineering session.
+
+READ FIRST:
+- HANDOFF.md
+- PLATFORM.md
+- The existing Stripe/package/onboarding implementation
+- Do NOT repeat discovery that is already documented below.
+
+IMPORTANT:
+The user wants to finish the Stripe/package-purchase fixes completely, then return to Engagements.
+
+DO NOT TOUCH ENGAGEMENTS until this Stripe work is fully reconciled and closed.
+
+==================================================
+WHAT HAS ALREADY BEEN DISCOVERED — DO NOT REDISCOVER
+==================================================
+
+The user's ACTUAL sales flow is:
+
+PUBLIC WEBSITE
+→ Stripe Payment Link
+→ Customer pays Stripe
+→ Stripe webhook → Verexa
+→ Verexa identifies the purchased Verexa package
+→ firm_package_purchase
+→ partner_onboarding
+→ partner onboarding automation
+
+The user does NOT currently have Verexa generating the Stripe Checkout Session.
+
+The user has:
+
+1. Created the products/packages in Stripe.
+2. Created Stripe Payment Links for those packages.
+3. Put those Payment Links directly into the public website HTML.
+4. Separately created the corresponding packages under Verexa → Packages.
+
+CURRENT PRODUCT GAP:
+
+The Verexa Packages UI does not currently ask for:
+- Stripe Payment Link
+- Stripe Price ID
+- Stripe Product ID
+
+Therefore the external Stripe Payment Link is not currently explicitly mapped to the corresponding Verexa package.
+
+DO NOT infer package identity from:
+- customer name
+- payment amount
+- arbitrary price matching
+
+The long-term architecture decision is:
+
+STRIPE = payment processor
+VEREXA PACKAGE = business/package source of truth
+WEBSITE = sales presentation
+
+The preferred architecture is to KEEP the public Stripe Payment Links and explicitly associate each Verexa package with the corresponding Stripe identifiers.
+
+Conceptually:
+
+Verexa Package
+- package_id
+- package configuration
+- Stripe connected account
+- Stripe Product ID
+- Stripe Price ID
+- Stripe Payment Link ID/URL
+
+↓
+
+Stripe Payment Link
+
+↓
+
+Stripe webhook
+
+↓
+
+Verexa package mapping
+
+↓
+
+firm_package_purchase
+
+↓
+
+partner_onboarding
+
+↓
+
+partner onboarding workflow
+
+
+==================================================
+EXISTING CODE ALREADY VERIFIED
+==================================================
+
+DO NOT spend time rediscovering these unless implementation requires checking the exact current source.
+
+1. Connect Stripe webhook:
+
+app/api/stripe/webhook/connect/route.ts
+
+Already verified to:
+- verify Stripe signature
+- read event.account
+- map event.account to workspaces.stripe_connected_account_id
+- claim webhook event for idempotency
+- handle checkout.session.completed
+- inspect metadata
+- call handleFirmPackagePurchaseCheckoutCompleted() when:
+  metadata.type === "firm_package_purchase"
+
+2. Purchase handler:
+
+lib/stripe/handleFirmPackagePurchase.ts
+
+Already verified to expect:
+
+session.metadata.purchase_id
+
+It:
+- finds firm_package_purchases
+- marks purchase active
+- stores Stripe checkout/customer/subscription identifiers
+- updates firm_connections.package_id
+
+3. Existing database chain:
+
+firm_package_purchases
+status pending → active
+
+↓
+
+fire_firm_package_purchase_automations
+
+↓
+
+_get_or_create_partner_onboarding()
+
+↓
+
+partner_onboardings
+
+↓
+
+fire_partner_onboarding_created_automations()
+
+↓
+
+partner_onboarding.created
+
+This architecture should remain unless the audit proves a specific part is incompatible with external Payment Links.
+
+4. Partner identity:
+
+firm_connections is the canonical partner relationship.
+
+Do NOT use Stripe customer name as the identity source.
+
+5. Generic purchase trigger:
+
+firm_package.purchased
+
+remains a generic business/purchase event.
+
+6. Partner onboarding trigger:
+
+partner_onboarding.created
+
+remains the onboarding-specific trigger.
+
+DO NOT replace partner_onboarding.created with firm_package.purchased.
+
+==================================================
+KNOWN SECOND STRIPE/ONBOARDING BUG
+==================================================
+
+There is a separate known issue:
+
+The partner_onboarding.created trigger context contains:
+
+package_purchase: {
+    package_name: ...
+}
+
+The workflow condition editor exposes:
+
+package_purchase.package_name
+
+But the generic condition evaluator appears to treat unknown fields as literal top-level JSON keys instead of traversing dotted/nested paths.
+
+This is a SEPARATE issue from Stripe Payment Link mapping.
+
+It needs to be verified and fixed if confirmed.
+
+==================================================
+YOUR JOB NOW
+==================================================
+
+We are NOT doing another broad discovery audit.
+
+Perform a TARGETED completion audit only against the already-known gaps.
+
+There are TWO workstreams.
+
+--------------------------------------------------
+WORKSTREAM A — EXTERNAL STRIPE PAYMENT LINK MAPPING
+--------------------------------------------------
+
+First determine the minimum implementation required to make:
+
+PUBLIC WEBSITE STRIPE PAYMENT LINK
+→ STRIPE
+→ VEREXA
+→ CORRECT VEREXA PACKAGE
+→ CORRECT PURCHASE
+→ CORRECT PARTNER
+→ PARTNER ONBOARDING
+
+work reliably.
+
+Inspect only what is necessary to answer:
+
+A1. What identifier(s) are available in the Stripe Checkout Session generated by a Payment Link?
+
+A2. Can the existing Connect webhook reliably receive:
+- Payment Link ID
+- Price ID
+- Product ID
+- connected account
+- customer information
+
+A3. Does Stripe Payment Link configuration support the metadata/identifiers needed for deterministic mapping?
+
+A4. What is the cleanest way to store the mapping in Verexa?
+
+Prefer a direct association from Verexa package → Stripe identifier(s).
+
+A5. How should Verexa identify the purchaser?
+
+This is critical.
+
+Distinguish:
+
+PACKAGE IDENTIFICATION
+from
+BUYER/PARTNER IDENTIFICATION.
+
+Do not assume solving one solves the other.
+
+A6. Inspect the existing public signup/onboarding flow before creating a new buyer identity mechanism.
+
+We need to determine whether the purchaser:
+- already has a Verexa workspace,
+- needs a workspace created,
+- needs a firm_connection created,
+- or enters through an existing invitation/application process.
+
+Do NOT invent a new identity model if the existing architecture already supports this.
+
+--------------------------------------------------
+WORKSTREAM B — NESTED PACKAGE-NAME CONDITION
+--------------------------------------------------
+
+Verify the already-known issue:
+
+partner_onboarding.created
+→ package_purchase.package_name
+
+Determine whether the condition evaluator correctly resolves the nested field.
+
+If it is broken:
+
+FIX ONLY the nested-field resolution.
+
+Requirements:
+- support the existing dotted-path condition format
+- preserve existing top-level field behavior
+- preserve existing condition operators
+- do not break existing automation conditions
+- do not change partner_onboarding.created
+- do not replace it with firm_package.purchased
+- do not redesign the automation engine
+
+Add a focused regression test.
+
+==================================================
+IMPLEMENTATION REQUIREMENTS
+==================================================
+
+After the targeted audit, DO NOT stop and merely report the gaps.
+
+If the architecture is confirmed, implement the fixes in the same session.
+
+The goal is a COMPLETE Stripe/package/onboarding implementation.
+
+Likely implementation areas may include:
+
+- Verexa Packages UI
+- package schema/migration
+- Stripe identifier mapping
+- Stripe webhook
+- purchase creation/activation
+- buyer identity flow
+- partner onboarding creation
+- condition evaluator
+- regression tests
+
+But do NOT change files just because they are related.
+
+Keep the implementation narrow.
+
+==================================================
+PACKAGE ↔ STRIPE MAPPING DESIGN
+==================================================
+
+Prefer the smallest durable design.
+
+The package mapping must be:
+
+- deterministic
+- workspace/connected-account aware
+- unique where appropriate
+- safe against duplicate Stripe events
+- safe against the same package being represented by multiple unintended Stripe products
+- editable by the appropriate Verexa admin/owner
+- validated where possible
+- never dependent on customer name or price alone
+
+If a Payment Link ID is the most reliable mapping identifier available, use it.
+
+If Stripe's checkout event gives a more canonical Price/Product identifier, evaluate whether storing that alongside Payment Link ID is better.
+
+Do not store redundant identifiers unless they serve a real purpose.
+
+If a schema migration is required:
+- write a proper migration
+- preserve existing production data
+- do not break existing packages
+- do not invent fake Stripe IDs
+- do not make existing non-Stripe packages unusable unless product behavior requires it
+
+==================================================
+BUYER / PARTNER IDENTITY
+==================================================
+
+This is the most important architectural safety requirement.
+
+Do NOT do:
+
+Stripe customer name
+→ fuzzy search
+→ pick matching firm
+
+Do NOT do:
+
+Stripe email
+→ automatically attach to an arbitrary existing workspace
+
+unless the existing architecture already establishes that relationship safely.
+
+If the existing public purchase flow does not provide a safe identity mechanism, stop implementation of that portion and report the exact missing piece rather than guessing.
+
+If an existing signup/application/invitation mechanism can establish identity, reuse it.
+
+The system should ultimately know:
+
+buyer
+→ child workspace / partner
+→ firm_connection
+→ package
+→ purchase
+→ onboarding
+
+==================================================
+WEBHOOK SAFETY
+==================================================
+
+Preserve the existing:
+- Stripe signature verification
+- webhook event claiming/idempotency
+- retry behavior
+- connected-account scoping
+
+Do not weaken webhook security.
+
+A duplicate Stripe webhook must NOT:
+- create duplicate purchases
+- create duplicate partner onboardings
+- create duplicate connections
+- restart onboarding incorrectly
+
+Existing uniqueness constraints and idempotency mechanisms should be reused.
+
+==================================================
+ONBOARDING REQUIREMENTS
+==================================================
+
+Once the purchase is correctly identified and activated:
+
+firm_package_purchase.status = active
+
+must continue through the existing architecture:
+
+→ _get_or_create_partner_onboarding()
+→ partner_onboardings
+→ partner_onboarding.created
+→ appropriate onboarding automation
+
+Do not create a second parallel onboarding mechanism.
+
+Do not bypass partner_onboardings.
+
+==================================================
+TESTING
+==================================================
+
+Add focused tests for every changed behavior.
+
+At minimum test:
+
+1. Stripe Payment Link → correct Verexa package mapping.
+2. Wrong connected Stripe account cannot resolve another workspace's package.
+3. Unknown/unmapped Payment Link does not create the wrong package purchase.
+4. Duplicate webhook remains idempotent.
+5. Correct package purchase creates exactly one onboarding.
+6. Existing purchase/onboarding is not duplicated.
+7. Buyer identity is correctly associated using the approved existing mechanism.
+8. Nested package_name condition resolves correctly.
+9. Existing top-level automation conditions still work.
+10. Existing partner_onboarding.created behavior remains intact.
+
+If live Stripe testing is possible using the existing test infrastructure, perform it.
+
+If it is not possible, do NOT claim it was live-tested.
+
+==================================================
+PRODUCTION SAFETY
+==================================================
+
+Before applying migrations:
+
+- inspect current production schema
+- inspect existing package rows
+- inspect existing Stripe-related package fields
+- confirm migration is additive/safe
+- do not fabricate production Stripe mappings
+
+If existing production packages have no Stripe mapping, leave them unmapped until a real Stripe identifier is available.
+
+Do not automatically guess mappings from price.
+
+==================================================
+NO UNRELATED WORK
+==================================================
+
+DO NOT touch:
+- Contacts
+- Engagements
+- Review Queue
+- Calendar
+- Pipelines
+- Workflows unrelated to this package/onboarding flow
+- Client saved-payment architecture
+- hard delete
+- unrelated billing hardening
+- unrelated PostgreSQL overload cleanup
+
+The user wants to finish Stripe fixes FIRST and then return to Engagements.
+
+==================================================
+DELIVERABLE
+==================================================
+
+At the end provide a concise completion report:
+
+1. What was already correct and therefore left untouched.
+2. What Stripe/package gaps were actually confirmed.
+3. What was changed.
+4. Database migrations added/applied.
+5. How package mapping now works.
+6. How buyer identity now works.
+7. How onboarding is triggered.
+8. How nested package-name conditions were fixed.
+9. Tests run and exact results.
+10. Production verification performed.
+11. Git branch / commit / PR.
+12. Final status:
+
+🟢 Stripe Package Purchase + Partner Onboarding COMPLETE
+
+OR, if a genuine identity dependency cannot safely be implemented:
+
+🟡 BLOCKED — identify the exact remaining dependency.
+
+Do not mark the work complete merely because the code compiles.
+
+==================================================
+FINAL RULE
+==================================================
+
+You have already been given the prior discovery.
+
+DO NOT make me watch another session rediscover:
+- the existing Stripe webhook
+- handleFirmPackagePurchaseCheckoutCompleted
+- firm_package_purchases
+- _get_or_create_partner_onboarding
+- partner_onboarding.created
+- firm_connections
+- the external Stripe Payment Link setup
+- the known nested package_name condition issue
+- the Contacts completion
+
+Use HANDOFF.md as the continuity document.
+
+Audit only the remaining gaps, then fix them.
+
+After this is fully closed, we will move to Engagements.
+
+==================================================
+CRITICAL PRODUCT REQUIREMENT — THIS IS SYSTEM-WIDE
+==================================================
+
+DO NOT build this solution specifically for Doucet Financial.
+
+Doucet is only the CURRENT REAL-WORLD EXAMPLE that exposed the architecture gap.
+
+This must become a GENERIC VEREXA PLATFORM CAPABILITY.
+
+The final architecture must work for ANY Verexa workspace that:
+- has packages/products available for sale;
+- connects Stripe;
+- uses the Verexa Website Builder;
+- wants to sell those packages through its website.
+
+Do not hard-code:
+- Doucet
+- MKB
+- any specific workspace ID
+- any specific package name
+- any specific Stripe Payment Link
+- any specific price
+- any specific website
+- any specific connected account.
+
+==================================================
+WEBSITE BUILDER + PACKAGE SALES
+==================================================
+
+The long-term user experience should support this:
+
+A Verexa customer creates a package in:
+
+Verexa → Packages
+
+For example:
+
+"Tax Preparation Package"
+$499
+
+They connect their Stripe account.
+
+They then go into:
+
+Verexa → Website Builder
+
+and create/edit their website.
+
+Inside the Website Builder, they should be able to add a package/product sales section or button that can reference one of THEIR Verexa packages.
+
+For example:
+
+[ Tax Preparation Package ]
+$499
+[ Purchase Now ]
+
+The Website Builder should know:
+
+This website belongs to Workspace A.
+
+Workspace A owns Package A.
+
+Package A is connected to Stripe Price/Product/Payment Link A.
+
+Therefore:
+
+Website visitor
+→ clicks Purchase
+→ Stripe
+→ payment
+→ Stripe webhook
+→ Verexa identifies Workspace A + Package A
+→ creates the appropriate purchase
+→ starts the appropriate onboarding/workflow.
+
+==================================================
+IMPORTANT: WEBSITE BUILDER MUST NOT STORE
+ARBITRARY STRIPE LINKS AS THE PRIMARY MODEL
+==================================================
+
+Do not solve this by simply adding:
+
+"Paste Stripe Payment Link here"
+
+to every website button.
+
+That would reproduce the current problem at a different layer.
+
+The Website Builder should reference a canonical Verexa package.
+
+Conceptually:
+
+Website CTA
+    ↓
+Verexa Package ID
+    ↓
+Stripe mapping
+    ↓
+Stripe checkout/payment
+    ↓
+Verexa purchase
+
+This gives Verexa one source of truth for the package.
+
+If the website owner changes the Stripe configuration for the package, the website should not require manually editing every button that references that package.
+
+==================================================
+MULTI-WORKSPACE / TENANT ISOLATION
+==================================================
+
+This MUST be workspace-scoped.
+
+Example:
+
+Workspace A:
+- Package A
+- Stripe Account A
+- Website A
+
+Workspace B:
+- Package B
+- Stripe Account B
+- Website B
+
+A visitor on Website A must NEVER be able to purchase or resolve Workspace B's package.
+
+A Workspace A website must never expose Workspace B's:
+- packages
+- prices
+- Stripe identifiers
+- payment links
+- products
+- purchase records
+- partner relationships.
+
+All package lookup and Stripe mapping must be scoped to the owning workspace/connected account.
+
+Do not rely on frontend filtering for tenant isolation.
+
+==================================================
+WEBSITE BUILDER REQUIREMENT
+==================================================
+
+Before implementing the Stripe mapping, inspect the existing Website Builder architecture.
+
+Determine:
+
+1. How website pages are stored.
+2. How sections/components/blocks are stored.
+3. How the builder identifies the owning workspace.
+4. Whether the builder already supports dynamic records/entities.
+5. Whether buttons/CTAs currently support links/actions.
+6. Whether there is already a reusable pattern for selecting a workspace-owned record inside the builder.
+
+Then design the package selector using the EXISTING builder architecture where possible.
+
+The goal should be something like:
+
+Add Section
+→ Packages / Products
+→ Select Package
+→ choose from packages owned by this workspace
+→ configure display
+→ Publish
+
+OR, if the existing builder uses blocks:
+
+Add Block
+→ Package / Product
+→ Select Verexa Package
+→ Save
+
+Do NOT create a separate Doucet-specific website implementation.
+
+==================================================
+PACKAGE MANAGEMENT REQUIREMENT
+==================================================
+
+The Verexa Packages system should become the canonical place where a workspace manages:
+
+- package name
+- description
+- price
+- package type/category where applicable
+- included services/options
+- active/inactive status
+- Stripe mapping
+- website availability
+- any other existing package attributes
+
+Do not duplicate package definitions inside the Website Builder.
+
+The Website Builder should reference packages.
+
+==================================================
+STRIPE MAPPING REQUIREMENT
+==================================================
+
+Determine the best durable Stripe mapping.
+
+A Verexa package may need references to:
+
+- Stripe connected account
+- Stripe Product ID
+- Stripe Price ID
+- Stripe Payment Link ID
+
+Do not automatically store all three unless each has a legitimate purpose.
+
+Determine which identifier is canonical for resolving the actual checkout.
+
+The design must support:
+
+- one workspace having multiple packages;
+- multiple workspaces each having packages;
+- different Stripe connected accounts;
+- package activation/deactivation;
+- package price changes;
+- website pages referencing packages;
+- package references remaining stable if Stripe configuration changes.
+
+==================================================
+NO DUPLICATE PACKAGE DEFINITIONS
+==================================================
+
+Do NOT create:
+
+Doucet Package
++
+Stripe Package
++
+Website Package
+
+as three independent records.
+
+There should be one canonical Verexa package.
+
+Stripe is the payment configuration associated with it.
+
+Website Builder references that package.
+
+==================================================
+GENERIC PURCHASE ARCHITECTURE
+==================================================
+
+The purchase system must work generically for:
+
+Service Bureau packages
+ERO packages
+PTIN packages
+Any future package/product type Verexa supports.
+
+The code should not contain logic such as:
+
+if workspace === Doucet
+if package === Doucet Package
+if workspace === MKB
+
+The package/connection/workspace relationship must drive behavior.
+
+==================================================
+PUBLIC WEBSITE PURCHASE FLOW
+==================================================
+
+Design the public flow so that the package reference survives publication.
+
+For example:
+
+Website page
+→ package CTA
+→ canonical package reference
+→ Stripe checkout/payment link
+→ Stripe webhook
+→ package mapping
+→ purchase
+
+Do not make the browser/client responsible for telling the webhook which package was purchased.
+
+The server/webhook must be able to independently verify:
+
+- connected Stripe account
+- package
+- price/product/payment configuration
+- workspace ownership
+- purchase eligibility
+
+==================================================
+FUTURE WEBSITE BUILDER USE CASE
+==================================================
+
+The final design should allow a completely different Verexa customer to do this without developer intervention:
+
+1. Connect Stripe.
+2. Create a package in Verexa.
+3. Connect the package to Stripe.
+4. Open Website Builder.
+5. Add a Packages/Sales section.
+6. Select their Verexa package.
+7. Publish the website.
+8. Customer visits their website.
+9. Customer clicks Purchase.
+10. Stripe collects payment.
+11. Verexa receives the webhook.
+12. Verexa identifies the correct workspace/package.
+13. Verexa creates the purchase.
+14. Any configured purchase/onboarding automation runs.
+
+If a customer cannot do that without a developer manually editing HTML or database records, the architecture is incomplete.
+
+==================================================
+IMPORTANT PRODUCT BOUNDARY
+==================================================
+
+Do not assume every package purchase is a PARTNER onboarding purchase.
+
+The package system must distinguish the package's business purpose.
+
+For example, a package could eventually represent:
+
+- partner/service-bureau package
+- tax preparation service
+- consulting service
+- training
+- software/banking package
+- another product/service
+
+The existing partner onboarding flow should only activate when the package/purchase is configured for partner onboarding.
+
+Do not make:
+
+EVERY PACKAGE PURCHASE
+→ partner_onboarding
+
+That would be incorrect system-wide.
+
+Preserve the existing partner onboarding architecture for packages that actually represent partner onboarding.
+
+==================================================
+FINAL ACCEPTANCE CRITERIA
+==================================================
+
+Do not mark this work complete unless the implementation is demonstrably generic.
+
+The final implementation must answer YES to:
+
+1. Can Workspace A create its own Verexa package?
+2. Can Workspace A connect that package to its own Stripe configuration?
+3. Can Workspace A place that package on its own Verexa-built website?
+4. Can Workspace B independently do the same?
+5. Are their packages and Stripe mappings tenant-isolated?
+6. Can the website reference the canonical Verexa package rather than storing an arbitrary Stripe URL as its primary identity?
+7. Can Stripe's completed payment be deterministically mapped back to the correct workspace/package?
+8. Can Verexa create the correct purchase record?
+9. Can partner onboarding start only when the package is configured for partner onboarding?
+10. Can the system support future package types without rewriting this architecture?
+11. Can a normal Verexa customer configure this without developer/database intervention?
+
+If any answer is NO, do not mark the feature complete. Explain the remaining architectural gap.
+
+==================================================
+DoucET / MKB TESTING
+==================================================
+
+Use Doucet/MKB as a REAL TEST CASE only.
+
+They are not the architecture.
+
+The implementation must first be generic, then demonstrate that the real-world Doucet flow works using the generic system.
+
+==================================================
+DO NOT REOPEN COMPLETED WORK
+==================================================
+
+Do not revisit Contacts.
+
+Do not reopen the deferred client Stripe saved-payment architecture.
+
+Do not redesign unrelated billing.
+
+Do not move to Engagements until this Stripe/package/web-sales architecture is reconciled and closed.
+
+==================================================
+CRITICAL — NO-CODE WEBSITE BUILDER EXPERIENCE
+==================================================
+
+The package-selling architecture MUST support customers
+who build their websites entirely through Verexa's visual/
+no-code Website Builder.
+
+Do NOT assume the customer edits HTML.
+
+Do NOT require the customer to:
+- write HTML
+- edit HTML
+- paste Stripe Payment Links into HTML
+- edit JavaScript
+- edit code
+- manually enter package IDs
+- manually enter Stripe Product IDs
+- manually enter Stripe Price IDs
+- manually modify database records.
+
+The Website Builder must provide a native way for a
+workspace owner to add their Verexa packages to their website.
+
+==================================================
+EXPECTED NO-CODE USER EXPERIENCE
+==================================================
+
+The intended experience should be approximately:
+
+Verexa
+→ Website Builder
+→ Edit Page
+→ Add Section / Add Block
+→ "Packages" or "Services & Packages"
+→ Select Package(s)
+→ Configure how they display
+→ Save
+→ Publish
+
+The user should be able to select packages that already exist
+in:
+
+Verexa → Packages
+
+The builder should present the workspace's available packages
+in a selector.
+
+Example:
+
+-----------------------------------------
+SELECT PACKAGES
+
+☑ Tax Preparation Package
+☑ Business Tax Package
+☐ Bookkeeping Package
+
+[ Save Section ]
+-----------------------------------------
+
+The website builder then renders something like:
+
+-----------------------------------------
+TAX PREPARATION PACKAGE
+
+Professional tax preparation for individuals.
+
+$499
+
+[ Purchase Now ]
+-----------------------------------------
+
+The exact visual design should follow the existing Website
+Builder's component/section system.
+
+==================================================
+PACKAGE CARD / PRODUCT COMPONENT
+==================================================
+
+Audit the existing Website Builder architecture and determine
+the correct native component model.
+
+If the builder already has:
+- sections
+- blocks
+- components
+- buttons
+- dynamic content
+- repeaters
+- CMS records
+- service cards
+- pricing sections
+
+reuse the existing architecture rather than creating a
+parallel website system.
+
+The package component should reference a canonical Verexa
+package record.
+
+Conceptually:
+
+Website Component
+    ↓
+Verexa Package ID
+    ↓
+Package belongs to current workspace
+    ↓
+Stripe configuration
+    ↓
+Purchase
+
+The component should NOT make the Stripe Payment Link the
+primary identity of the product.
+
+==================================================
+NO-CODE PACKAGE SETUP
+==================================================
+
+The complete workflow for an ordinary Verexa customer should
+be:
+
+STEP 1
+Create package:
+
+Verexa → Packages → Create Package
+
+STEP 2
+Configure its Stripe connection/mapping.
+
+STEP 3
+Open:
+
+Verexa → Website Builder
+
+STEP 4
+Edit the desired page.
+
+STEP 5
+Choose:
+
+Add Section
+→ Packages
+
+OR:
+
+Add Block
+→ Package
+
+depending on the existing builder architecture.
+
+STEP 6
+Select one or more packages from the workspace's package
+catalog.
+
+STEP 7
+Choose the presentation/display options supported by the
+existing builder.
+
+Examples may include:
+- package name
+- description
+- price
+- included items
+- image
+- CTA text
+- layout
+
+Do NOT invent unnecessary design controls if the builder
+doesn't support them already.
+
+STEP 8
+Publish.
+
+The package is now available for purchase on the website.
+
+==================================================
+DYNAMIC PACKAGE REFERENCE
+==================================================
+
+The website should reference the package rather than copying
+the package's data into the page.
+
+For example:
+
+package_id = abc123
+
+NOT:
+
+package_name = "Tax Preparation Package"
+price = "$499"
+stripe_payment_link = "https://..."
+
+The package component should resolve the current package
+data when rendering.
+
+This means if the workspace changes the package description
+or other supported package information, the website does not
+require the customer to rebuild the section.
+
+==================================================
+PURCHASE BUTTON BEHAVIOR
+==================================================
+
+The "Purchase Now" button must be generated by Verexa.
+
+The customer should not have to paste a Stripe URL.
+
+Determine the safest implementation based on the existing
+Stripe architecture.
+
+Possible implementation paths include:
+
+A. Verexa-generated purchase route that resolves the package
+   and redirects/initiates the correct Stripe checkout.
+
+OR
+
+B. A package-associated Stripe Payment Link that Verexa
+   resolves server-side.
+
+OR
+
+C. Another architecture already supported by the existing
+   Stripe integration.
+
+Choose based on the existing codebase and Stripe architecture.
+
+Do NOT automatically choose a solution without auditing the
+existing Website Builder and Stripe implementation.
+
+The important product requirement is:
+
+THE WEBSITE OWNER SHOULD NOT HAVE TO MANUALLY CONFIGURE
+STRIPE LINKS IN THE WEBSITE BUILDER.
+
+==================================================
+EXTERNAL / NON-VEREXA WEBSITES
+==================================================
+
+Also determine whether Verexa Packages should support customers
+who do NOT use the Verexa Website Builder.
+
+This is a separate use case.
+
+A package created in Verexa may eventually need an option such
+as:
+
+"Get Website Sales Link"
+
+or
+
+"Copy Purchase Link"
+
+so a customer can place the package on:
+- WordPress
+- Wix
+- Squarespace
+- another website builder
+- custom HTML website
+- social media
+- email
+- other external locations.
+
+However, this external-use capability must NOT replace the
+native Website Builder experience.
+
+The native Verexa Website Builder experience must remain
+no-code.
+
+==================================================
+WEBSITE BUILDER TENANT ISOLATION
+==================================================
+
+When a user opens the Package selector inside Website Builder:
+
+ONLY show packages belonging to the website's workspace.
+
+Never expose:
+- another workspace's packages
+- another workspace's prices
+- another workspace's Stripe IDs
+- another workspace's payment links.
+
+Do not rely solely on frontend filtering.
+
+Enforce workspace ownership server-side/database-side.
+
+==================================================
+PACKAGE LIFECYCLE
+==================================================
+
+The Website Builder must gracefully handle package changes.
+
+Audit and define behavior for at least:
+
+- package active
+- package inactive
+- package deleted/archived
+- Stripe mapping missing
+- Stripe mapping invalid
+- package no longer purchasable
+
+Do not leave a broken "Purchase Now" button on a published
+website.
+
+If a package becomes unavailable, the website should have a
+safe state based on the existing Website Builder architecture,
+such as hiding the purchase CTA or showing an unavailable state.
+
+Do not silently send customers to the wrong product.
+
+==================================================
+MULTIPLE PACKAGES
+==================================================
+
+The no-code builder should support a page containing multiple
+packages.
+
+Example:
+
+              OUR SERVICES
+
+[Individual Tax]
+$299
+[Purchase]
+
+[Business Tax]
+$499
+[Purchase]
+
+[Tax + Bookkeeping]
+$899
+[Purchase]
+
+Each card references a different canonical Verexa package.
+
+The system must not create separate Stripe/website product
+records for each card.
+
+==================================================
+SYSTEM-WIDE ACCEPTANCE TEST
+==================================================
+
+Create a generic test scenario using a NEW disposable workspace,
+not Doucet.
+
+Example:
+
+Workspace:
+"Demo Tax Professionals"
+
+Packages:
+- Individual Tax — $299
+- Business Tax — $499
+
+The test should demonstrate:
+
+1. Workspace creates both packages.
+2. Workspace configures Stripe mapping.
+3. Workspace opens Website Builder.
+4. Workspace adds a native Package section/block.
+5. Workspace selects both packages from the package selector.
+6. Workspace publishes the page.
+7. Published page displays the packages.
+8. Purchase CTA resolves to the correct package.
+9. Stripe payment identifies the correct workspace/package.
+10. Verexa creates the purchase correctly.
+11. No Doucet-specific logic is involved.
+
+If this cannot be demonstrated, do NOT mark the system-wide
+package-selling architecture complete.
+
+==================================================
+IMPORTANT DISTINCTION
+==================================================
+
+There are THREE different website scenarios:
+
+1. VEREXA WEBSITE BUILDER
+   → Native Package component
+   → No code required
+   → Select package from Verexa
+
+2. EXTERNAL NO-CODE WEBSITE
+   → Customer needs a reusable Verexa purchase link/embed
+   → They may paste a link/button into their external builder
+
+3. CUSTOM HTML WEBSITE
+   → Customer may use the same Verexa purchase link or
+     integration manually.
+
+Do not confuse these three use cases.
+
+The primary requirement for this task is #1.
+
+==================================================
+FINAL QUESTION CLAUDE MUST ANSWER
+==================================================
+
+Before implementation, explicitly tell me:
+
+"How will a normal Verexa customer who knows NO HTML create
+a package and put it on their Verexa-built website?"
+
+Give the exact UI flow using the existing Website Builder.
+
+If the current Website Builder does not have the necessary
+native component/block architecture, identify the minimum
+system-wide addition required.
+
+Do not solve this by telling the customer to paste HTML.
+```
+
+</details>
+
 ## ⚠️ Branch divergence, discovered 2026-08-31 — read this before trusting anything below
 
 This file's addenda describe work done on **two different branches that
@@ -322,6 +1783,138 @@ merged app (every route from both branches builds, including `/partners`,
 **Not yet done**: pushing this merge, and a real click-through test in a
 browser (this was a code-level merge verification only) -- check whether
 those happened after this note, since it was written before either.
+
+## Addendum — 2026-09-17/20: Four release-blocker fixes (P0 usage-meter, P0 login-lockout, P0 Doucet software/banking, P1 archived-enforcement) — all on separate branches, NONE merged to `main`, and `main` has since moved on
+
+**Read this before starting the Stripe/package task above, or anything else
+on this repo — these four branches are real, tested, pushed fixes that are
+not yet part of `main` and are at real risk of being lost or silently
+reverted if `main` is treated as authoritative without reconciling them
+first.**
+
+All four were built one at a time, each on its own branch forked fresh from
+`main` at commit `a5ec6c9` (the point right after PR #278, "Add immutable
+legal acceptance archive"). Each branch's own diff against that base is
+small and clean. But `main` has advanced 55+ commits past `a5ec6c9` since
+then — including the entire 2026-09-20 Contacts completion pass documented
+in the addendum directly below this one — so a naive `git diff main..<branch>`
+today shows large, misleading deletions (Contacts-era test files that exist
+on `main` but not on these branches, since they forked before that work
+landed). **None of these four branches is a fork of current `main` anymore.
+Before merging any of them, rebase/merge current `main` into each one
+first and resolve conflicts for real — do not trust a raw diff against
+`main` as "what this branch changes."**
+
+Branches (all pushed to `origin`, none merged, no PRs opened):
+
+1. **`release-fix/p0-usage-meter-provisioning`** (commit `bc59fcd`, "Fix P0:
+   workspace_usage_meters never provisioned for payment-first signups") —
+   completed before the session window covered by the other three; not
+   re-audited in detail here. Fixes payment-first signup workspaces never
+   getting a `workspace_usage_meters` row provisioned.
+2. **`release-fix/p0-login-lockout`** (commit `7c283e7`, "Fix P0: close
+   unauthenticated login-lockout vulnerability") — `record_login_result(email,
+   success, workspace_id)` was a SECURITY DEFINER RPC grantable to
+   `anon`/`authenticated` that trusted a caller-supplied `success` boolean
+   with no proof an actual auth attempt happened, letting an unauthenticated
+   attacker lock out any known email (5-failure/15-min lockout, per
+   `20260816180000_wire_password_policy_and_lockout.sql`). Fixed by (a) a
+   new migration `20261021000000_lock_down_login_result_rpc.sql` revoking
+   `execute` on `record_login_result` from `anon`/`authenticated`/`public`
+   and granting it to `service_role` only, and (b) a new
+   `app/api/auth/login/route.ts` that now performs the real
+   `signInWithPassword` call server-side (via the service-role client) and
+   is the only caller of `check_login_lockout`/`record_login_result`.
+   `app/login/page.tsx` and `app/portal/login/page.tsx` were updated to
+   `fetch("/api/auth/login")` instead of calling Supabase auth + the lockout
+   RPCs directly from the browser. New test: `tests/auth-login-route.test.ts`
+   (5 tests). Exact 5-failure/15-min lockout behavior preserved verbatim.
+3. **`release-fix/p0-doucet-software-banking`** (commit `5a3528f`, "Fix P0:
+   wire Doucet's Service Bureau partner onboarding to the correct trigger")
+   — Doucet's "Software & Banking Setup" automation never fired because it
+   was wired to the wrong trigger family (`firm_package.purchased`-shaped,
+   not `partner_onboarding.*`) and was left disabled. The entire underlying
+   trigger/executor/status-machine infrastructure was already correct on
+   live inspection (`execute_automation_step`/`start_next_automation_step`
+   are already `is_workspace_operational`-gated and already
+   connection-aware for every action type) — this turned out to be a pure
+   data/configuration bug, not an engine bug. Fixed entirely in one
+   migration, `20261022000000_doucet_software_banking_onboarding_fix.sql`:
+   creates 3 new automations on `partner_onboarding.status_changed`
+   (idempotency-guarded via `if not exists`), retargets one existing
+   automation (id `f0085488-6bd1-4cac-83e9-c7720c0d9b8c`) from its wrong
+   trigger to the correct one and re-enables it, and inserts one new
+   `automation_steps`/`automation_step_edges` row ahead of its existing
+   entry step. **Zero application code changes** — confirms the
+   automation engine itself needs no further work for this class of bug.
+   Full E2E lifecycle tested live with disposable data
+   (created→submitted→review→approved→setup→software&banking→ready), plus
+   duplicate-protection, wrong-workspace-isolation, and
+   intentional-failure tests; all cleaned up, Doucet's real data untouched.
+   **Flagged but explicitly NOT fixed** (out of scope for that P0, still
+   open): 🟠 a "Software/Banking Package Purchased" condition that's an
+   impossible-to-satisfy condition somewhere in that same trigger config
+   (needs its own look); 🟡 an `info_requested`/`in_progress` pipeline-stage
+   overlap. Worth checking whether either of these turns out to be the
+   *same* root cause as the nested `package_purchase.package_name`
+   condition-evaluator bug named in the Stripe task above — they were
+   found in the same automation-condition surface area and never
+   cross-checked against each other.
+4. **`release-fix/p1-archived-enforcement`** (commit `e05ef47`, "Fix P1:
+   enforce archived/permanently_archived, not just suspended") — the
+   workspace lifecycle (`active → suspended → archived →
+   permanently_archived`) only had `suspended` enforced anywhere;
+   `archived`/`permanently_archived` workspaces retained full normal app,
+   portal, and CRM-mutation access indefinitely. Root cause: two hardcoded
+   `status === "suspended"` checks (`lib/workspace.ts`'s
+   `workspaceOperationalError`, and `app/(app)/layout.tsx`'s shell gate)
+   never got extended when the two later lifecycle stages were added, and
+   the Client Portal (`lib/portal.ts`, `app/portal/(portal)/layout.tsx`)
+   had zero lifecycle awareness at any stage. Also found and fixed two
+   concrete SECURITY DEFINER/RLS bypasses of the already-correct
+   `is_workspace_operational()` allow-list function: `create_client()` and
+   `create_engagement()` (the real insert path, since neither table has a
+   direct INSERT RLS policy) checked `has_permission()` but never
+   `is_workspace_operational()` — meaning even a merely-`suspended`
+   workspace could still create clients/engagements via these RPCs,
+   bypassing the app-shell gate entirely — and the `pipeline_runs_update`/
+   `pipeline_stages_update` RLS policies had the same gap. Fix introduced
+   one new function, `isNonOperationalWorkspaceStatus()` in
+   `lib/workspace.ts`, as the single place the three-status list is
+   spelled out, and threaded it through the app shell, portal layout (new
+   `PortalClosedScreen` component — portal stays open through `suspended`,
+   per the locked Day 0-30 policy, and only closes at
+   `archived`/`permanently_archived`), the Stripe cancellation webhook
+   lock, and the SQL layer (migration
+   `20261023000000_archived_permanently_archived_enforcement.sql`).
+   `execute_automation_step` needed no change — already correctly gated.
+   Full behavior matrix, all four lifecycle states tested live against a
+   disposable workspace (client/engagement creation, pipeline mutation,
+   automation execution, workspace switching), 129/130 tests passing (the
+   1 failure is the pre-existing environment-only `critical-paths.test.ts`
+   gap, not a regression). **Explicit product decision embedded in this
+   fix, not deferred**: Client Portal Lifecycle Enforcement was
+   implemented *within* this P1 rather than split out as its own item,
+   because it ended up the same size/shape as the app-shell fix (one
+   status check + one block screen) rather than "substantial" separate
+   work.
+
+**Still open / not investigated further, flagged in the P1 report as
+Remaining Issues**: a broader sweep for other SECURITY DEFINER RPCs or RLS
+UPDATE/INSERT policies that might have the same
+missing-`is_workspace_operational()` gap as the two found above — only
+these two representative high-risk paths were audited, not every RPC.
+
+**What this means for the Stripe/package task above**: none of these four
+branches touch Stripe, packages, `firm_package_purchases`, or
+`partner_onboardings` schema/RPCs directly, but #3 (Doucet) and the new P1
+migration both touch the same automation-condition/trigger surface area
+the Stripe task's Workstream B (nested `package_purchase.package_name`
+condition bug) lives in. Check `git log` on whichever branch becomes the
+Stripe work's base for whether these four have been merged yet before
+assuming the automation condition evaluator is in the state described
+above — if merged, re-verify against the actual current state rather than
+this note.
 
 ## Addendum — 2026-09-20: Contacts completion pass closed out; search_clients stale-overload fixed; future cleanup backlog
 
