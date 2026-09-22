@@ -121,12 +121,19 @@ export function DeleteContactButton({ contactId }: { contactId: string }) {
   );
 }
 
-export function AddAddressForm({ clientId, workspaceId }: Ids) {
+export function AddAddressForm({
+  clientId,
+  workspaceId,
+  open,
+  onOpenChange,
+}: Ids & { open?: boolean; onOpenChange?: (open: boolean) => void }) {
   const router = useRouter();
   const supabase = createClient();
   return (
     <InlineAddForm
       label="Add Address"
+      open={open}
+      onOpenChange={onOpenChange}
       fields={[
         {
           name: "address_type",
@@ -141,6 +148,7 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
           ],
         },
         { name: "street", label: "Street", required: true },
+        { name: "street2", label: "Apt / Suite / Unit" },
         { name: "city", label: "City" },
         { name: "state", label: "State", type: "select", options: STATE_OPTIONS },
         { name: "zip", label: "ZIP" },
@@ -151,6 +159,7 @@ export function AddAddressForm({ clientId, workspaceId }: Ids) {
           workspace_id: workspaceId,
           address_type: v.address_type,
           street: v.street,
+          street2: v.street2 || null,
           city: v.city || null,
           state: v.state || null,
           zip: v.zip || null,
@@ -179,6 +188,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
       initialValues={{
         address_type: address.address_type,
         street: address.street ?? "",
+        street2: address.street2 ?? "",
         city: address.city ?? "",
         state: address.state ?? "",
         zip: address.zip ?? "",
@@ -186,6 +196,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
       fields={[
         { name: "address_type", label: "Type", type: "select", required: true, options: ADDRESS_TYPE_OPTIONS },
         { name: "street", label: "Street", required: true },
+        { name: "street2", label: "Apt / Suite / Unit" },
         { name: "city", label: "City" },
         { name: "state", label: "State", type: "select", options: STATE_OPTIONS },
         { name: "zip", label: "ZIP" },
@@ -201,6 +212,7 @@ export function EditAddressForm({ address }: { address: AddressRow }) {
           .update({
             address_type: v.address_type,
             street: v.street,
+            street2: v.street2 || null,
             city: v.city || null,
             state: v.state || null,
             zip: v.zip || null,

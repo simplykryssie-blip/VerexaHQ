@@ -1829,6 +1829,7 @@ export type Database = {
           source_batch_id: string | null
           state: string | null
           street: string | null
+          street2: string | null
           updated_at: string
           workspace_id: string
           zip: string | null
@@ -1844,6 +1845,7 @@ export type Database = {
           source_batch_id?: string | null
           state?: string | null
           street?: string | null
+          street2?: string | null
           updated_at?: string
           workspace_id: string
           zip?: string | null
@@ -1859,6 +1861,7 @@ export type Database = {
           source_batch_id?: string | null
           state?: string | null
           street?: string | null
+          street2?: string | null
           updated_at?: string
           workspace_id?: string
           zip?: string | null

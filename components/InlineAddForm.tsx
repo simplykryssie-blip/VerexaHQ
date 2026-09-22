@@ -23,6 +23,8 @@ export function InlineAddForm({
   initialValues,
   submitLabel = "Save",
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   label: string;
   fields: FieldDef[];
@@ -31,9 +33,23 @@ export function InlineAddForm({
   initialValues?: Record<string, string>;
   submitLabel?: string;
   trigger?: (openForm: () => void) => React.ReactNode;
+  /** Controlled-open mode -- when provided (even as `false`), an external
+   *  trigger owns whether this form is shown (e.g. a single unified "+ Add
+   *  Contact Information" dropdown driving three of these at once) and this
+   *  component renders no trigger of its own while closed. Omit both props
+   *  for the existing uncontrolled "+ Label" button every other caller
+   *  already relies on -- unchanged. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const toast = useToast();
-  const [open, setOpen] = useState(defaultOpen);
+  const isControlled = controlledOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = isControlled ? controlledOpen : internalOpen;
+  function setOpen(next: boolean) {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  }
   const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,6 +70,7 @@ export function InlineAddForm({
   }
 
   if (!open) {
+    if (isControlled) return null;
     if (trigger) return <>{trigger(() => setOpen(true))}</>;
     return (
       <button
