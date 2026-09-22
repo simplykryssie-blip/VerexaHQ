@@ -8672,6 +8672,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "service_categories_process_id_fkey"
+            columns: ["process_id"]
+            isOneToOne: false
+            referencedRelation: "processes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "service_categories_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
