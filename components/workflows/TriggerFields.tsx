@@ -335,7 +335,6 @@ export function TriggerFields({
   onTagDraftChange?: (draft: string) => void;
   tagDraft?: string;
 }) {
-  const selectedService = services.find((s) => s.id === (config.service_id as string | undefined));
   const selectedPipeline = pipelines.find((p) => p.id === (config.process_id as string | undefined));
   return (
     <div className="grid grid-cols-2 gap-3">
