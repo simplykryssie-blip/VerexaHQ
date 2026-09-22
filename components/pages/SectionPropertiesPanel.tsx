@@ -1,4 +1,4 @@
-import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption, type BookableServiceOption, type StaffOption } from "./types";
+import { SECTION_TYPE_LABELS, type BuilderSection, type OrganizerTemplateOption, type BookableServiceOption, type StaffOption, type PackageOption } from "./types";
 import { HeroEditor } from "./section-editors/HeroEditor";
 import { RichTextEditorSection } from "./section-editors/RichTextEditorSection";
 import { ImageEditor } from "./section-editors/ImageEditor";
@@ -7,6 +7,7 @@ import { TestimonialEditor } from "./section-editors/TestimonialEditor";
 import { FaqEditor } from "./section-editors/FaqEditor";
 import { OrganizerFormEditor } from "./section-editors/OrganizerFormEditor";
 import { BookingWidgetEditor } from "./section-editors/BookingWidgetEditor";
+import { PackagesEditor } from "./section-editors/PackagesEditor";
 import { CtaButtonEditor } from "./section-editors/CtaButtonEditor";
 import { SpacerEditor } from "./section-editors/SpacerEditor";
 import { FooterEditor } from "./section-editors/FooterEditor";
@@ -18,6 +19,7 @@ export function SectionPropertiesPanel({
   onUpdate,
   organizerTemplates,
   bookableServices,
+  packages,
   staff,
   canAdvanceToNextPage,
 }: {
@@ -26,6 +28,7 @@ export function SectionPropertiesPanel({
   onUpdate: (id: string, patch: Record<string, unknown>) => void;
   organizerTemplates: OrganizerTemplateOption[];
   bookableServices: BookableServiceOption[];
+  packages: PackageOption[];
   staff: StaffOption[];
   canAdvanceToNextPage: boolean;
 }) {
@@ -61,6 +64,7 @@ export function SectionPropertiesPanel({
         {section.section_type === "booking_widget" && (
           <BookingWidgetEditor config={section.config as never} onChange={onChange} services={bookableServices} staff={staff} />
         )}
+        {section.section_type === "packages" && <PackagesEditor config={section.config as never} onChange={onChange} packages={packages} />}
         {section.section_type === "cta_button" && <CtaButtonEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "spacer" && <SpacerEditor config={section.config as never} onChange={onChange} />}
         {section.section_type === "footer" && <FooterEditor config={section.config as never} onChange={onChange} />}

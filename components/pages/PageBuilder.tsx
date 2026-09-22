@@ -13,7 +13,7 @@ import { SectionCanvas } from "./SectionCanvas";
 import { SectionPropertiesPanel } from "./SectionPropertiesPanel";
 import { SectionPreview } from "./SectionPreview";
 import { PageSettingsPanel } from "./PageSettingsPanel";
-import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption, BookableServiceOption, StaffOption } from "./types";
+import type { BuilderPage, BuilderSection, SectionType, OrganizerTemplateOption, BookableServiceOption, PackageOption, StaffOption } from "./types";
 
 const DEBOUNCE_MS = 600;
 
@@ -28,6 +28,7 @@ export function PageBuilder({
   canManage,
   organizerTemplates,
   bookableServices,
+  packages,
   staff,
 }: {
   workspaceSlug: string;
@@ -40,6 +41,7 @@ export function PageBuilder({
   canManage: boolean;
   organizerTemplates: OrganizerTemplateOption[];
   bookableServices: BookableServiceOption[];
+  packages: PackageOption[];
   staff: StaffOption[];
 }) {
   const supabase = createClient();
@@ -218,7 +220,7 @@ export function PageBuilder({
             .slice()
             .sort((a, b) => a.display_order - b.display_order)
             .map((s) => (
-              <SectionPreview key={s.id} section={s} services={bookableServices} staff={staff} customCss={customCss} />
+              <SectionPreview key={s.id} section={s} services={bookableServices} packages={packages} staff={staff} customCss={customCss} />
             ))}
         </div>
       ) : (
@@ -231,6 +233,7 @@ export function PageBuilder({
             onMove={moveSection}
             onDelete={deleteSection}
             services={bookableServices}
+            packages={packages}
             staff={staff}
             customCss={customCss}
             backgroundColor={backgroundColor}
@@ -242,6 +245,7 @@ export function PageBuilder({
               onUpdate={updateSectionConfig}
               organizerTemplates={organizerTemplates}
               bookableServices={bookableServices}
+              packages={packages}
               staff={staff}
               canAdvanceToNextPage={Boolean(page.funnel_id)}
             />

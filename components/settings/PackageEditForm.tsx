@@ -13,6 +13,11 @@ export type PackageDetail = {
   billing_cadence: string | null;
   revenue_share_percent: number | null;
   revenue_share_scope: string | null;
+  purchase_purpose: string;
+  stripe_payment_link_id: string | null;
+  stripe_payment_link_url: string | null;
+  stripe_price_id: string | null;
+  stripe_product_id: string | null;
 };
 
 const inputClass = "mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:bg-surfaceMuted disabled:text-muted";
@@ -32,6 +37,11 @@ export function PackageEditForm({ pkg, canManage }: { pkg: PackageDetail; canMan
   const [billingCadence, setBillingCadence] = useState(pkg.billing_cadence ?? "monthly");
   const [revenueSharePercent, setRevenueSharePercent] = useState(pkg.revenue_share_percent != null ? String(pkg.revenue_share_percent) : "");
   const [revenueShareScope, setRevenueShareScope] = useState(pkg.revenue_share_scope ?? "all_production");
+  const [purchasePurpose, setPurchasePurpose] = useState(pkg.purchase_purpose);
+  const [stripePaymentLinkId, setStripePaymentLinkId] = useState(pkg.stripe_payment_link_id ?? "");
+  const [stripePaymentLinkUrl, setStripePaymentLinkUrl] = useState(pkg.stripe_payment_link_url ?? "");
+  const [stripePriceId, setStripePriceId] = useState(pkg.stripe_price_id ?? "");
+  const [stripeProductId, setStripeProductId] = useState(pkg.stripe_product_id ?? "");
   const [saving, setSaving] = useState(false);
 
   async function save(patch: Record<string, unknown>) {
@@ -71,6 +81,16 @@ export function PackageEditForm({ pkg, canManage }: { pkg: PackageDetail; canMan
       revenue_share_percent: nextPercent.trim() ? Number(nextPercent) : null,
       revenue_share_scope: nextPercent.trim() ? nextScope : null,
     });
+  }
+
+  function savePurchasePurpose(next: string) {
+    setPurchasePurpose(next);
+    void save({ purchase_purpose: next });
+  }
+
+  function saveStripeField(field: "stripe_payment_link_id" | "stripe_payment_link_url" | "stripe_price_id" | "stripe_product_id", value: string) {
+    const trimmed = value.trim() || null;
+    void save({ [field]: trimmed });
   }
 
   if (!canManage) {
@@ -153,6 +173,68 @@ export function PackageEditForm({ pkg, canManage }: { pkg: PackageDetail; canMan
             <option value="prep_fees_only">Prep fees only</option>
           </select>
         </label>
+      </div>
+      <label className={`${labelClass} mt-3`}>
+        When purchased
+        <select value={purchasePurpose} onChange={(e) => savePurchasePurpose(e.target.value)} disabled={saving} className={inputClass}>
+          <option value="partner_onboarding">Start partner onboarding (Service Bureau/ERO/PTIN relationship)</option>
+          <option value="service_only">Record the purchase only -- no partner onboarding</option>
+        </select>
+      </label>
+      <div className="mt-4 border-t border-border pt-4">
+        <p className={labelClass}>Stripe mapping</p>
+        <p className="mt-1 text-xs text-muted">
+          Map this package to a Stripe Payment Link so a completed checkout on your public website is automatically recognized as a purchase of{" "}
+          <em>this</em> package. Set up the purchase webhook below first.
+        </p>
+        <label className={`${labelClass} mt-3`}>
+          Stripe Payment Link ID
+          <input
+            placeholder="plink_..."
+            value={stripePaymentLinkId}
+            onChange={(e) => setStripePaymentLinkId(e.target.value)}
+            onBlur={() => saveStripeField("stripe_payment_link_id", stripePaymentLinkId)}
+            disabled={saving}
+            className={inputClass}
+          />
+          <span className="mt-1 block text-[11px] font-normal normal-case text-muted">From the Payment Link&apos;s own settings in Stripe -- used to match a completed checkout back to this package.</span>
+        </label>
+        <label className={`${labelClass} mt-3`}>
+          Stripe Payment Link URL
+          <input
+            placeholder="https://buy.stripe.com/..."
+            value={stripePaymentLinkUrl}
+            onChange={(e) => setStripePaymentLinkUrl(e.target.value)}
+            onBlur={() => saveStripeField("stripe_payment_link_url", stripePaymentLinkUrl)}
+            disabled={saving}
+            className={inputClass}
+          />
+          <span className="mt-1 block text-[11px] font-normal normal-case text-muted">The actual link customers click -- used for the &quot;Purchase Now&quot; button on your website.</span>
+        </label>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <label className={labelClass}>
+            Stripe Price ID
+            <input
+              placeholder="price_..."
+              value={stripePriceId}
+              onChange={(e) => setStripePriceId(e.target.value)}
+              onBlur={() => saveStripeField("stripe_price_id", stripePriceId)}
+              disabled={saving}
+              className={inputClass}
+            />
+          </label>
+          <label className={labelClass}>
+            Stripe Product ID
+            <input
+              placeholder="prod_..."
+              value={stripeProductId}
+              onChange={(e) => setStripeProductId(e.target.value)}
+              onBlur={() => saveStripeField("stripe_product_id", stripeProductId)}
+              disabled={saving}
+              className={inputClass}
+            />
+          </label>
+        </div>
       </div>
     </div>
   );
