@@ -145,11 +145,18 @@ export function ServiceLibrary({
   }
 
   async function deleteCategory(category: ServiceCategoryOption) {
+    const { count: serviceCount } = await supabase
+      .from("services")
+      .select("id", { count: "exact", head: true })
+      .eq("service_category_id", category.id)
+      .eq("workspace_id", workspaceId);
+
     if (!window.confirm(
-      services.some((s) => s.category_name === category.name)
-        ? `Delete "${category.name}"? Services in this category will become Uncategorized. This can't be undone.`
+      (serviceCount ?? 0) > 0
+        ? `Delete "${category.name}"? ${serviceCount} service(s) will become Uncategorized. This can't be undone.`
         : `Delete "${category.name}"? This can't be undone.`
     )) return;
+
     setDeletingCategoryId(category.id);
     const { error: deleteError } = await supabase
       .from("service_categories")
@@ -168,6 +175,54 @@ export function ServiceLibrary({
   async function deleteService(id: string, serviceName: string) {
     if (!window.confirm(`Delete "${serviceName}"? This can't be undone.`)) return;
     setDeletingId(id);
+
+    const [{ count: engagementCount }, { count: quoteCount }, { count: interestCount }, { data: automationRows, error: automationError }] =
+      await Promise.all([
+        supabase.from("engagements").select("id", { count: "exact", head: true }).eq("service_id", id),
+        supabase.from("quotes").select("id", { count: "exact", head: true }).eq("service_id", id),
+        supabase.from("client_service_interests").select("id", { count: "exact", head: true }).eq("service_id", id),
+        supabase.from("automations").select("id, trigger_config, conditions").eq("workspace_id", workspaceId),
+      ]);
+
+    if (automationError) {
+      setDeletingId(null);
+      toast.show("Could not verify workflow references. Service was not deleted.", "error");
+      return;
+    }
+
+    const serviceIdText = id.toLowerCase();
+    const referencedByWorkflow = (automationRows ?? []).filter((row) =>
+      JSON.stringify(row.trigger_config ?? {}).toLowerCase().includes(serviceIdText) ||
+      JSON.stringify(row.conditions ?? []).toLowerCase().includes(serviceIdText)
+    ).length;
+
+    if ((engagementCount ?? 0) > 0 || (quoteCount ?? 0) > 0) {
+      setDeletingId(null);
+      toast.show(
+        `"${serviceName}" is in use by ${engagementCount ?? 0} engagement(s) and ${quoteCount ?? 0} quote(s). Archive it instead of deleting it.`,
+        "error"
+      );
+      return;
+    }
+
+    if (referencedByWorkflow > 0) {
+      setDeletingId(null);
+      toast.show(
+        `"${serviceName}" is referenced by ${referencedByWorkflow} workflow(s). Remove the service reference from those workflows before deleting it.`,
+        "error"
+      );
+      return;
+    }
+
+    if ((interestCount ?? 0) > 0) {
+      const { error: interestDeleteError } = await supabase.from("client_service_interests").delete().eq("service_id", id);
+      if (interestDeleteError) {
+        setDeletingId(null);
+        toast.show(interestDeleteError.message, "error");
+        return;
+      }
+    }
+
     const { error: deleteError } = await supabase.from("services").delete().eq("id", id);
     setDeletingId(null);
     if (deleteError) {
