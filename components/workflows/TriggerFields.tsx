@@ -429,7 +429,11 @@ export function TriggerFields({
             <select
               disabled={disabled}
               value={(config.service_category_id as string) ? "category" : "service"}
-              onChange={(e) => onConfigChange(e.target.value === "category" ? { service_category_id: config.service_category_id ?? "" } : { service_id: config.service_id ?? "" })}
+              onChange={(e) => onConfigChange(
+                e.target.value === "category"
+                  ? { service_category_id: config.service_category_id ?? "", service_id: undefined }
+                  : { service_id: config.service_id ?? "", service_category_id: undefined }
+              )}
               className="rounded-lg border border-border px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
             >
               <option value="service">Service</option>
