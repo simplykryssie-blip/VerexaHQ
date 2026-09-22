@@ -311,6 +311,7 @@ export function TriggerFields({
   onConfigChange,
   organizerTemplates,
   services = [],
+  serviceCategories = [],
   pipelines = [],
   tagOptions = [],
   webhookUrl,
