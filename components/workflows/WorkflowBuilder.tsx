@@ -2276,6 +2276,7 @@ export function WorkflowBuilder({
               onConfigChange={setConfig}
               organizerTemplates={organizerTemplates}
               services={services}
+              serviceCategories={serviceCategories}
               pipelines={pipelines}
               tagOptions={tagOptions}
               webhookUrl={webhookToken && typeof window !== "undefined" ? `${window.location.origin}/api/automations/webhook/${webhookToken}` : undefined}
