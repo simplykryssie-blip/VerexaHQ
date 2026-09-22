@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/ui/SectionCard";
 import { StatTile } from "@/components/ui/StatTile";
 import { QuickActions } from "./QuickActions";
 import { ConvertLeadButton } from "./ConvertLeadButton";
+import { RevertToLeadButton } from "./RevertToLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
 import { clientStatusTone } from "@/lib/clientStatus";
@@ -165,6 +166,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
 
           <div className="mt-3 flex items-center gap-2">
             <ConvertLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
+            <RevertToLeadButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <MarkLeadLostButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <ArchiveClientButton clientId={client.id} lifecycleStatus={client.lifecycle_status} />
             <QuickActions
