@@ -42,6 +42,9 @@ export default async function DashboardPage() {
     { data: appointmentsManage },
     { data: onboardingRow },
     { data: profileRow },
+    { data: services },
+    { data: serviceCategoriesRaw },
+    { data: activeMembers },
   ] = await Promise.all([
     dashboardId
       ? supabase
@@ -60,6 +63,18 @@ export default async function DashboardPage() {
     user
       ? supabase.from("user_profiles").select("seen_onboarding_steps, first_name, display_name, avatar_url").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // The dashboard's "Add Client" CTA reuses the exact same NewClientButton
+    // component the Contacts page renders -- same service-picker/staff-
+    // assignment data it already needs, fetched here rather than adding a
+    // new RPC/API route.
+    supabase
+      .from("services")
+      .select("id, name, service_category_id, service_categories(slug)")
+      .eq("workspace_id", workspace.id)
+      .eq("status", "published")
+      .order("display_order"),
+    supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
+    supabase.from("workspace_users").select("user_id").eq("workspace_id", workspace.id).eq("status", "active"),
   ]);
 
   const quickActionPermissions = {
@@ -69,6 +84,23 @@ export default async function DashboardPage() {
     documentsRequest: Boolean(documentsRequest),
     appointmentsManage: Boolean(appointmentsManage),
   };
+
+  // Same shape/derivation as app/(app)/clients/page.tsx's own NewClientButton
+  // props -- kept in sync with that page's pattern rather than introducing a
+  // second way to compute them.
+  const accountHolderName = profileRow?.display_name ?? "Me";
+  const staffUserIds = (activeMembers ?? []).map((m) => m.user_id).filter((id) => id !== user?.id);
+  const { data: staffProfiles } = staffUserIds.length
+    ? await supabase.from("user_profiles").select("id, display_name").in("id", staffUserIds)
+    : { data: [] };
+  const staffOptions = staffProfiles ?? [];
+  const serviceCategories = (serviceCategoriesRaw ?? [])
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      services: (services ?? []).filter((s) => s.service_category_id === c.id).map((s) => ({ id: s.id, name: s.name })),
+    }))
+    .filter((c) => c.services.length > 0);
 
   const widgetIds = (widgets ?? []).map((w) => w.id);
   const { data: preferences } =
@@ -222,6 +254,9 @@ export default async function DashboardPage() {
       workspaceId={workspace.id}
       onboardingSteps={onboardingDismissed ? null : onboardingSteps}
       seenOnboardingSteps={profileRow?.seen_onboarding_steps ?? []}
+      serviceCategories={serviceCategories}
+      staffOptions={staffOptions}
+      accountHolderName={accountHolderName}
     />
   );
 }

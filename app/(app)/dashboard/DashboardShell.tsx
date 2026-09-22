@@ -16,10 +16,12 @@ import {
   FileWarning,
   MessageSquare,
   ListChecks,
-  Plus,
+  LayoutDashboard,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { PageHero, HeroHighlight } from "@/components/ui/PageHero";
+import { NewClientButton, type ServiceCategory, type StaffOption } from "@/app/(app)/clients/NewClientButton";
 import { KpiWidget, type KpiTrend } from "@/components/widgets/KpiWidget";
 import { PrioritiesWidget } from "@/components/widgets/PrioritiesWidget";
 import { QuickActionsWidget, type QuickActionPermissions } from "@/components/widgets/QuickActionsWidget";
@@ -70,6 +72,9 @@ export function DashboardShell({
   workspaceId,
   onboardingSteps,
   seenOnboardingSteps,
+  serviceCategories,
+  staffOptions,
+  accountHolderName,
 }: {
   workspaceName: string;
   /** ISO timestamp taken at the start of this server render -- see
@@ -91,6 +96,11 @@ export function DashboardShell({
   /** null once dismissed or already computed away -- render nothing. */
   onboardingSteps: OnboardingStep[] | null;
   seenOnboardingSteps: string[];
+  /** Passed straight through to the "Add Client" CTA's NewClientButton --
+   *  same shape/source that Contacts' own NewClientButton uses. */
+  serviceCategories: ServiceCategory[];
+  staffOptions: StaffOption[];
+  accountHolderName: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -265,40 +275,41 @@ export function DashboardShell({
 
   return (
     <>
-      <div className="relative overflow-hidden border-b border-border px-8 py-9">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-24 -top-36 h-96 w-96 rounded-full bg-gradient-to-br from-accent to-brandGradientTo opacity-20 blur-3xl"
-        />
-        <div className="relative flex items-start justify-between gap-6">
-          <div>
-            <h1 className="font-display text-[28px] font-semibold leading-normal text-ink">
-              Welcome back, <span className="bg-gradient-to-r from-accent to-brandGradientTo bg-clip-text text-transparent">{resolvedGreetingName}</span>.
-            </h1>
-            <p className="mt-1.5 max-w-[46ch] text-sm text-slate">{heroSub}</p>
-            <div className="mt-3">
-              <FreshnessBadge generatedAt={generatedAt} />
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <button
+      <PageHero
+        icon={LayoutDashboard}
+        heading={
+          <>
+            Welcome back, <HeroHighlight>{resolvedGreetingName}</HeroHighlight>.
+          </>
+        }
+        subtitle={heroSub}
+        meta={<FreshnessBadge generatedAt={generatedAt} />}
+        actions={
+          <>
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => setCustomizing((v) => !v)}
               aria-pressed={customizing}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                customizing ? "border-accent bg-accentSoft text-accent" : "border-border text-slate hover:border-accent hover:text-accent"
-              }`}
             >
               <Settings2 size={14} aria-hidden="true" /> {customizing ? "Done" : "Customize"}
-            </button>
-            <Link href="/engagements/new">
-              <Button size="sm">
-                <Plus size={14} aria-hidden="true" /> New Engagement
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
+            </Button>
+            {quickActionPermissions.clientsCreate && (
+              <NewClientButton
+                workspaceId={workspaceId}
+                workspaceName={workspaceName}
+                serviceCategories={serviceCategories}
+                isOwner={isAdmin}
+                staffOptions={staffOptions}
+                accountHolderName={accountHolderName}
+                triggerLabel="Add Client"
+                triggerSize="sm"
+              />
+            )}
+          </>
+        }
+      />
 
       <div className="flex-1 px-8 py-6">
         {onboardingSteps && onboardingSteps.length > 0 && (
