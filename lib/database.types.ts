@@ -3228,6 +3228,7 @@ export type Database = {
           folder_id: string | null
           id: string
           name: string
+          process_id: string | null
           slug: string
           status: string
           updated_at: string
@@ -3240,6 +3241,7 @@ export type Database = {
           folder_id?: string | null
           id?: string
           name: string
+          process_id?: string | null
           slug: string
           status?: string
           updated_at?: string
@@ -3252,6 +3254,7 @@ export type Database = {
           folder_id?: string | null
           id?: string
           name?: string
+          process_id?: string | null
           slug?: string
           status?: string
           updated_at?: string
