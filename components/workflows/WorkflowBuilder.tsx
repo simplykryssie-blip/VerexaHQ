@@ -1943,8 +1943,8 @@ export function WorkflowBuilder({
   pendingDecisions?: PendingDecisionRow[];
   conditions?: Condition[] | ConditionGroup[];
   webhookToken?: string;
-  /** Set when a dashboard "Failed Automation Runs" card links here with
-   *  ?activity=1 -- opens straight on the Activity panel instead of the
+  /** Set when the Workflows list's failed-run count indicator links here
+   *  with ?activity=1 -- opens straight on the Activity panel instead of the
    *  builder canvas, so a failed run is one click away, not two. */
   initialActivityOpen?: boolean;
 }) {
