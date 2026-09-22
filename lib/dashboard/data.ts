@@ -180,7 +180,12 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .select("id, invoice_number, client_id, firm_connection_id, due_date, total_amount, amount_paid, status")
       .eq("workspace_id", workspaceId)
       .not("status", "in", '("paid","void","draft")'),
-    supabase.from("message_threads").select("id").eq("workspace_id", workspaceId).eq("status", "open"),
+    supabase
+      .from("message_threads")
+      .select("id, entity_id")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "open")
+      .eq("entity_type", "client"),
     supabase
       .from("activity_log")
       .select("id, description, activity_type, created_at")
@@ -189,6 +194,18 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       .limit(10),
     supabase.from("pipeline_runs").select("id").eq("workspace_id", workspaceId).eq("entity_type", "engagement"),
   ]);
+
+  // message_threads.entity_id has no real FK to clients (polymorphic), so a
+  // client deleted outside the normal archive flow can leave its open
+  // threads behind -- filter those out rather than counting threads no
+  // client page exists to show.
+  const openThreadClientIds = [...new Set((openThreads ?? []).map((t) => t.entity_id))];
+  const { data: existingThreadClients } =
+    openThreadClientIds.length > 0
+      ? await supabase.from("clients").select("id").in("id", openThreadClientIds)
+      : { data: [] as { id: string }[] };
+  const existingThreadClientIds = new Set((existingThreadClients ?? []).map((c) => c.id));
+  const liveOpenThreads = (openThreads ?? []).filter((t) => existingThreadClientIds.has(t.entity_id));
 
   const revenueThisMonth = (payments ?? []).reduce((sum, p) => sum + p.amount, 0);
   const revenueLastMonth = (lastMonthPayments ?? []).reduce((sum, p) => sum + p.amount, 0);
@@ -536,7 +553,7 @@ export async function getDashboardData(workspaceId: string): Promise<DashboardDa
       outstandingInvoicesTotal,
       outstandingInvoicesCount: invoiceRows.length,
       missingDocumentsCount: missingDocumentsCount ?? 0,
-      openClientMessages: openThreads?.length ?? 0,
+      openClientMessages: liveOpenThreads.length,
     },
     overdueTasks: overdueTasks as OverdueTask[],
     dueTodayTasks: dueTodayTasks as OverdueTask[],
