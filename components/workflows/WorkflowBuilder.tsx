@@ -178,7 +178,7 @@ export const ACTION_TYPES = [
   { value: "assign_user", label: "Assign staff", category: "contacts_leads", description: "Assign a staff member to the client or engagement.", keywords: "staff owner assign" },
   { value: "send_notification", label: "Notify a staff member", category: "communication", description: "Notify staff members in-app or by email.", keywords: "alert notify staff" },
   { value: "move_pipeline_stage", label: "Move to a pipeline stage", category: "pipeline_engagements", description: "Move the client or engagement forward to a specific pipeline stage.", keywords: "stage move pipeline" },
-  { value: "move_lead_to_service_pipeline", label: "Move the lead to the pipeline matching their service", category: "pipeline_engagements", description: "Start the pipeline matching the lead's selected service.", keywords: "lead pipeline service" },
+  { value: "move_lead_to_service_pipeline", label: "Move the lead to the service or category pipeline", category: "pipeline_engagements", description: "Start the pipeline configured on the selected service, or fall back to its category default pipeline.", keywords: "lead pipeline service" },
   { value: "mark_lead_lost", label: "Mark the lead lost", category: "contacts_leads", description: "Mark the lead as lost.", keywords: "lost lead close" },
   { value: "convert_lead_to_client", label: "Convert the lead to an active client", category: "contacts_leads", description: "Convert the lead into an active client.", keywords: "convert lead client" },
   { value: "update_client", label: "Update a client field", category: "contacts_leads", description: "Update a single field on the client record.", keywords: "edit field update" },
