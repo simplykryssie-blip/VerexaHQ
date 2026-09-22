@@ -257,11 +257,56 @@ export function ServiceForm({
 
   async function deleteService() {
     if (!window.confirm(`Delete "${service.name}"? This can't be undone.`)) return;
+
+    const [{ count: engagementCount }, { count: quoteCount }, { count: interestCount }, { data: automationRows, error: automationError }] =
+      await Promise.all([
+        supabase.from("engagements").select("id", { count: "exact", head: true }).eq("service_id", service.id),
+        supabase.from("quotes").select("id", { count: "exact", head: true }).eq("service_id", service.id),
+        supabase.from("client_service_interests").select("id", { count: "exact", head: true }).eq("service_id", service.id),
+        supabase.from("automations").select("id, trigger_config, conditions").eq("workspace_id", service.workspace_id),
+      ]);
+
+    if (automationError) {
+      toast.show("Could not verify workflow references. Service was not deleted.", "error");
+      return;
+    }
+
+    const serviceIdText = service.id.toLowerCase();
+    const referencedByWorkflow = (automationRows ?? []).filter((row) =>
+      JSON.stringify(row.trigger_config ?? {}).toLowerCase().includes(serviceIdText) ||
+      JSON.stringify(row.conditions ?? []).toLowerCase().includes(serviceIdText)
+    ).length;
+
+    if ((engagementCount ?? 0) > 0 || (quoteCount ?? 0) > 0) {
+      toast.show(
+        `"${service.name}" is in use by ${engagementCount ?? 0} engagement(s) and ${quoteCount ?? 0} quote(s). Archive it instead of deleting it.`,
+        "error"
+      );
+      return;
+    }
+
+    if (referencedByWorkflow > 0) {
+      toast.show(
+        `"${service.name}" is referenced by ${referencedByWorkflow} workflow(s). Remove the service reference from those workflows before deleting it.`,
+        "error"
+      );
+      return;
+    }
+
+    if ((interestCount ?? 0) > 0) {
+      const { error: interestDeleteError } = await supabase.from("client_service_interests").delete().eq("service_id", service.id);
+      if (interestDeleteError) {
+        toast.show(interestDeleteError.message, "error");
+        return;
+      }
+    }
+
     const { error: deleteError } = await supabase.from("services").delete().eq("id", service.id);
     if (deleteError) {
       toast.show(deleteError.message, "error");
       return;
     }
+    toast.show("Service deleted", "success");
     router.push("/settings/services");
   }
 

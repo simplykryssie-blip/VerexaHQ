@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -62,6 +62,10 @@ export function ServiceLibrary({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -101,9 +105,114 @@ export function ServiceLibrary({
     setError("Could not create service -- try a slightly different name.");
   }
 
+  function beginEditCategory(category: ServiceCategoryOption) {
+    setEditingCategoryId(category.id);
+    setCategoryName(category.name);
+  }
+
+  function cancelEditCategory() {
+    setEditingCategoryId(null);
+    setCategoryName("");
+  }
+
+  async function saveCategory() {
+    const trimmed = categoryName.trim();
+    if (!trimmed || !editingCategoryId) return;
+    setSavingCategory(true);
+    const { error: updateError } = await supabase
+      .from("service_categories")
+      .update({ name: trimmed })
+      .eq("id", editingCategoryId)
+      .eq("workspace_id", workspaceId);
+    setSavingCategory(false);
+    if (updateError) {
+      toast.show(updateError.message, "error");
+      return;
+    }
+    toast.show("Category updated", "success");
+    cancelEditCategory();
+    router.refresh();
+  }
+
+  async function deleteCategory(category: ServiceCategoryOption) {
+    const { count: serviceCount } = await supabase
+      .from("services")
+      .select("id", { count: "exact", head: true })
+      .eq("service_category_id", category.id)
+      .eq("workspace_id", workspaceId);
+
+    if (!window.confirm(
+      (serviceCount ?? 0) > 0
+        ? `Delete "${category.name}"? ${serviceCount} service(s) will become Uncategorized. This can't be undone.`
+        : `Delete "${category.name}"? This can't be undone.`
+    )) return;
+
+    setDeletingCategoryId(category.id);
+    const { error: deleteError } = await supabase
+      .from("service_categories")
+      .delete()
+      .eq("id", category.id)
+      .eq("workspace_id", workspaceId);
+    setDeletingCategoryId(null);
+    if (deleteError) {
+      toast.show(deleteError.message, "error");
+      return;
+    }
+    toast.show("Category deleted", "success");
+    router.refresh();
+  }
+
   async function deleteService(id: string, serviceName: string) {
     if (!window.confirm(`Delete "${serviceName}"? This can't be undone.`)) return;
     setDeletingId(id);
+
+    const [{ count: engagementCount }, { count: quoteCount }, { count: interestCount }, { data: automationRows, error: automationError }] =
+      await Promise.all([
+        supabase.from("engagements").select("id", { count: "exact", head: true }).eq("service_id", id),
+        supabase.from("quotes").select("id", { count: "exact", head: true }).eq("service_id", id),
+        supabase.from("client_service_interests").select("id", { count: "exact", head: true }).eq("service_id", id),
+        supabase.from("automations").select("id, trigger_config, conditions").eq("workspace_id", workspaceId),
+      ]);
+
+    if (automationError) {
+      setDeletingId(null);
+      toast.show("Could not verify workflow references. Service was not deleted.", "error");
+      return;
+    }
+
+    const serviceIdText = id.toLowerCase();
+    const referencedByWorkflow = (automationRows ?? []).filter((row) =>
+      JSON.stringify(row.trigger_config ?? {}).toLowerCase().includes(serviceIdText) ||
+      JSON.stringify(row.conditions ?? []).toLowerCase().includes(serviceIdText)
+    ).length;
+
+    if ((engagementCount ?? 0) > 0 || (quoteCount ?? 0) > 0) {
+      setDeletingId(null);
+      toast.show(
+        `"${serviceName}" is in use by ${engagementCount ?? 0} engagement(s) and ${quoteCount ?? 0} quote(s). Archive it instead of deleting it.`,
+        "error"
+      );
+      return;
+    }
+
+    if (referencedByWorkflow > 0) {
+      setDeletingId(null);
+      toast.show(
+        `"${serviceName}" is referenced by ${referencedByWorkflow} workflow(s). Remove the service reference from those workflows before deleting it.`,
+        "error"
+      );
+      return;
+    }
+
+    if ((interestCount ?? 0) > 0) {
+      const { error: interestDeleteError } = await supabase.from("client_service_interests").delete().eq("service_id", id);
+      if (interestDeleteError) {
+        setDeletingId(null);
+        toast.show(interestDeleteError.message, "error");
+        return;
+      }
+    }
+
     const { error: deleteError } = await supabase.from("services").delete().eq("id", id);
     setDeletingId(null);
     if (deleteError) {
@@ -135,6 +244,57 @@ export function ServiceLibrary({
           ))}
         </select>
       </div>
+
+      {canManage && (
+        <div className="mt-4 rounded-2xl border border-border bg-surface p-4 shadow-soft">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink">Service categories</p>
+            <p className="mt-1 text-[11px] text-muted">
+              Rename or remove categories. Removing a category does not delete its services; they become Uncategorized.
+            </p>
+          </div>
+          <div className="mt-3 space-y-2">
+            {categories.length === 0 ? (
+              <p className="text-sm text-muted">No categories yet.</p>
+            ) : (
+              categories.map((category) => (
+                <div key={category.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+                  {editingCategoryId === category.id ? (
+                    <>
+                      <input
+                        autoFocus
+                        value={categoryName}
+                        onChange={(e) => setCategoryName(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void saveCategory();
+                          if (e.key === "Escape") cancelEditCategory();
+                        }}
+                      />
+                      <button type="button" onClick={() => void saveCategory()} disabled={savingCategory} className="rounded-lg p-1.5 text-accent hover:bg-accentSoft disabled:opacity-60" aria-label="Save category">
+                        <Check size={14} />
+                      </button>
+                      <button type="button" onClick={cancelEditCategory} className="rounded-lg p-1.5 text-muted hover:text-ink" aria-label="Cancel">
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{category.name}</span>
+                      <button type="button" onClick={() => beginEditCategory(category)} className="rounded-lg p-1.5 text-muted hover:text-accent" aria-label={`Edit ${category.name}`}>
+                        <Pencil size={14} />
+                      </button>
+                      <button type="button" onClick={() => void deleteCategory(category)} disabled={deletingCategoryId === category.id} className="rounded-lg p-1.5 text-muted hover:text-danger disabled:opacity-60" aria-label={`Delete ${category.name}`}>
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-4">
         {filtered.length === 0 ? (
