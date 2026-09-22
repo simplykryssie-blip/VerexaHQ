@@ -39,7 +39,13 @@ begin
         or trigger_config ->> 'service_category_id' = NEW.service_category_id::text
       )
   loop
-    if public.evaluate_automation_conditions(v_automation.conditions, v_context) then
+    if public.evaluate_automation_conditions(
+      v_automation.conditions,
+      v_context,
+      NEW.workspace_id,
+      NEW.client_id,
+      v_engagement_id
+    ) then
       insert into public.automation_runs (
         workspace_id, automation_id, engagement_id, client_id,
         trigger_snapshot, status
