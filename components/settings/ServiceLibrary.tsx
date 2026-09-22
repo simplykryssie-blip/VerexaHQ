@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/Toast";
 import { EmptyState } from "@/components/EmptyState";
@@ -62,6 +62,10 @@ export function ServiceLibrary({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -99,6 +103,66 @@ export function ServiceLibrary({
     }
     setSaving(false);
     setError("Could not create service -- try a slightly different name.");
+  }
+
+  function slugifyCategory(name: string) {
+    return (
+      name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "") || "category"
+    );
+  }
+
+  function beginEditCategory(category: ServiceCategoryOption) {
+    setEditingCategoryId(category.id);
+    setCategoryName(category.name);
+  }
+
+  function cancelEditCategory() {
+    setEditingCategoryId(null);
+    setCategoryName("");
+  }
+
+  async function saveCategory() {
+    const trimmed = categoryName.trim();
+    if (!trimmed || !editingCategoryId) return;
+    setSavingCategory(true);
+    const { error: updateError } = await supabase
+      .from("service_categories")
+      .update({ name: trimmed })
+      .eq("id", editingCategoryId)
+      .eq("workspace_id", workspaceId);
+    setSavingCategory(false);
+    if (updateError) {
+      toast.show(updateError.message, "error");
+      return;
+    }
+    toast.show("Category updated", "success");
+    cancelEditCategory();
+    router.refresh();
+  }
+
+  async function deleteCategory(category: ServiceCategoryOption) {
+    if (!window.confirm(
+      services.some((s) => s.category_name === category.name)
+        ? `Delete "${category.name}"? Services in this category will become Uncategorized. This can't be undone.`
+        : `Delete "${category.name}"? This can't be undone.`
+    )) return;
+    setDeletingCategoryId(category.id);
+    const { error: deleteError } = await supabase
+      .from("service_categories")
+      .delete()
+      .eq("id", category.id)
+      .eq("workspace_id", workspaceId);
+    setDeletingCategoryId(null);
+    if (deleteError) {
+      toast.show(deleteError.message, "error");
+      return;
+    }
+    toast.show("Category deleted", "success");
+    router.refresh();
   }
 
   async function deleteService(id: string, serviceName: string) {
