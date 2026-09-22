@@ -16,7 +16,7 @@ export default async function WorkflowsPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: processes }, { data: folders }, { data: tagRows }, { data: starredRows }] =
+  const [{ data: automations }, { data: canManage }, { data: organizerTemplates }, { data: services }, { data: serviceCategories }, { data: processes }, { data: folders }, { data: tagRows }, { data: starredRows }] =
     await Promise.all([
       supabase
         .from("automations")
@@ -26,6 +26,7 @@ export default async function WorkflowsPage() {
       supabase.rpc("has_permission", { p_workspace_id: workspace.id, p_permission_key: "automations.manage" }),
       supabase.from("organizer_templates").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
       supabase.from("services").select("id, name").eq("workspace_id", workspace.id).eq("status", "published").order("name"),
+      supabase.from("service_categories").select("id, name").eq("workspace_id", workspace.id).order("display_order"),
       supabase
         .from("processes")
         .select("id, name, process_stages(id, name, display_order)")
@@ -71,6 +72,7 @@ export default async function WorkflowsPage() {
       canManage={Boolean(canManage)}
       organizerTemplates={organizerTemplates ?? []}
       services={services ?? []}
+      serviceCategories={serviceCategories ?? []}
       pipelines={pipelines}
       tagOptions={(tagRows ?? []).map((t) => t.name)}
     />
