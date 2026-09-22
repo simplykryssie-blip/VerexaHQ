@@ -255,6 +255,57 @@ export function ServiceLibrary({
         </select>
       </div>
 
+      {canManage && (
+        <div className="mt-4 rounded-2xl border border-border bg-surface p-4 shadow-soft">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink">Service categories</p>
+            <p className="mt-1 text-[11px] text-muted">
+              Rename or remove categories. Removing a category does not delete its services; they become Uncategorized.
+            </p>
+          </div>
+          <div className="mt-3 space-y-2">
+            {categories.length === 0 ? (
+              <p className="text-sm text-muted">No categories yet.</p>
+            ) : (
+              categories.map((category) => (
+                <div key={category.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2">
+                  {editingCategoryId === category.id ? (
+                    <>
+                      <input
+                        autoFocus
+                        value={categoryName}
+                        onChange={(e) => setCategoryName(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-border px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void saveCategory();
+                          if (e.key === "Escape") cancelEditCategory();
+                        }}
+                      />
+                      <button type="button" onClick={() => void saveCategory()} disabled={savingCategory} className="rounded-lg p-1.5 text-accent hover:bg-accentSoft disabled:opacity-60" aria-label="Save category">
+                        <Check size={14} />
+                      </button>
+                      <button type="button" onClick={cancelEditCategory} className="rounded-lg p-1.5 text-muted hover:text-ink" aria-label="Cancel">
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{category.name}</span>
+                      <button type="button" onClick={() => beginEditCategory(category)} className="rounded-lg p-1.5 text-muted hover:text-accent" aria-label={`Edit ${category.name}`}>
+                        <Pencil size={14} />
+                      </button>
+                      <button type="button" onClick={() => void deleteCategory(category)} disabled={deletingCategoryId === category.id} className="rounded-lg p-1.5 text-muted hover:text-danger disabled:opacity-60" aria-label={`Delete ${category.name}`}>
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4">
         {filtered.length === 0 ? (
           <EmptyState message={services.length === 0 ? "No services yet -- create one to attach a pipeline, form, and requirements." : "No services match."} />
