@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Maximize2, Pencil, X, Briefcase, FolderOpen, FileWarning, ListChecks, Wallet, CalendarClock, MessageCircle, Contact } from "lucide-react";
+import { Maximize2, X, Briefcase, FolderOpen, FileWarning, ListChecks, Wallet, CalendarClock, MessageCircle, MapPin } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { SectionCard } from "@/components/ui/SectionCard";
@@ -12,10 +11,11 @@ import { ConvertLeadButton } from "./ConvertLeadButton";
 import { MarkLeadLostButton } from "./MarkLeadLostButton";
 import { ArchiveClientButton } from "./ArchiveClientButton";
 import { clientStatusTone } from "@/lib/clientStatus";
-import { ClientTabsBody, displayName, type ClientTab } from "./ClientTabsBody";
+import { displayName } from "./ClientTabsBody";
 import { ClientInsightWidgets } from "./ClientInsightWidgets";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 import { isOpenEngagementStatus } from "@/lib/engagementStatus";
+import { formatPhone } from "@/lib/phone";
 
 /** Pure so it can be unit-tested without rendering the drawer or mocking
  * next/navigation. Mirrors the same "find the open engagement, link to its
@@ -38,6 +38,19 @@ export function nextAppointmentCalendarHref(appointments: unknown[]): string | u
   return appointments.length > 0 ? "/calendar" : undefined;
 }
 
+/** Pure so the "which address counts as the quick-overview primary" rule
+ * is directly testable. Mirrors client_addresses' own is_primary flag
+ * (Pass 2: exactly one per Contact) -- falls back to the first address on
+ * file so a Contact that predates that invariant still shows something. */
+export function primaryAddressLine(addresses: { street: string | null; street2: string | null; city: string | null; state: string | null; zip: string | null; is_primary: boolean }[]): string | null {
+  const primary = addresses.find((a) => a.is_primary) ?? addresses[0];
+  if (!primary) return null;
+  const line = [primary.street, primary.street2, primary.city, [primary.state, primary.zip].filter(Boolean).join(" ")]
+    .filter(Boolean)
+    .join(", ");
+  return line || null;
+}
+
 function relativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diffMs / 60000);
@@ -52,14 +65,21 @@ function relativeTime(iso: string): string {
 
 /** The TaxFlowOS-style "peek" for a client -- opened by the intercepting
  * route at app/(app)/@modal/(.)clients/[id]/page.tsx when a row on /clients
- * is clicked. Reuses the exact same ClientTabsBody the full page renders (no
- * second copy of Documents/Messages/Billing/Notes logic), plus its own
- * compact header, alert banner, and stat grid that the full page doesn't
- * need since its PageHeader already carries that context. */
+ * is clicked.
+ *
+ * Contacts Pass 3: this used to also embed the full ClientTabsBody (every
+ * Details/Tasks/Documents/Messages/Billing/Notes tab, identical to the full
+ * record page) -- the audit's whole point was that a flyout containing
+ * "essentially everything from the full Contact record" isn't a quick
+ * overview. It's been removed; this is now identity, primary contact info,
+ * status, a handful of quick stats, existing insight widgets, recent
+ * activity, and the existing actions -- everything else is one click away
+ * via "Open full record". Still reuses the exact same ClientWorkspaceProps
+ * getClientWorkspaceData() already fetches for the full page -- no second,
+ * lighter query was added just to shrink what's rendered. */
 export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
   const router = useRouter();
-  const [tab, setTab] = useState<ClientTab>("Details");
-  const { client, engagements, tasks, missingDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace } = props;
+  const { client, engagements, tasks, missingDocumentCount, appointments, messages, outstandingBalance, portalUsers, permissions, organizerTemplates, pendingOrganizerTemplateIds, workspace, addresses } = props;
 
   const openEngagement = engagements.find((e) => isOpenEngagementStatus(e.status));
   const currentServiceName = openEngagement
@@ -77,6 +97,7 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
     : portalUsers.length > 0
       ? "Portal Invited"
       : null;
+  const primaryAddress = primaryAddressLine(addresses);
 
   function close() {
     router.back();
@@ -101,7 +122,15 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
               <Avatar name={displayName(client)} size="lg" />
               <div>
                 <p className="font-display text-lg font-semibold text-ink">{displayName(client)}</p>
-                <p className="text-sm text-muted">{[client.primary_email, client.primary_phone].filter(Boolean).join(" · ") || "No contact info on file"}</p>
+                <p className="text-sm text-muted">
+                  {[client.primary_email, client.primary_phone ? formatPhone(client.primary_phone) : null].filter(Boolean).join(" · ") ||
+                    "No contact info on file"}
+                </p>
+                {primaryAddress && (
+                  <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                    <MapPin size={11} aria-hidden="true" /> {primaryAddress}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -113,15 +142,6 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
                 className="rounded-lg p-2 text-muted transition hover:bg-surfaceMuted hover:text-ink"
               >
                 <Maximize2 size={16} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab("Details")}
-                title="Edit details"
-                aria-label="Edit details"
-                className="rounded-lg p-2 text-muted transition hover:bg-surfaceMuted hover:text-ink"
-              >
-                <Pencil size={16} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -175,21 +195,15 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             value={currentServiceName}
             onClick={currentEngagementDestination ? () => router.push(currentEngagementDestination) : undefined}
           />
-          <StatTile
-            icon={FolderOpen}
-            tone="accent"
-            label="Open engagements"
-            value={openEngagementsTotal}
-            onClick={openEngagementsTotal > 0 ? () => setTab("Details") : undefined}
-          />
-          <StatTile icon={FileWarning} tone="amber" label="Missing documents" value={missingDocuments} onClick={() => setTab("Documents")} />
-          <StatTile icon={ListChecks} tone="amber" label="Open tasks" value={openTasksCount} onClick={() => setTab("Tasks")} />
+          <StatTile icon={FolderOpen} tone="accent" label="Open engagements" value={openEngagementsTotal} onClick={openEngagementsTotal > 0 ? expand : undefined} />
+          <StatTile icon={FileWarning} tone="amber" label="Missing documents" value={missingDocuments} onClick={missingDocuments > 0 ? expand : undefined} />
+          <StatTile icon={ListChecks} tone="amber" label="Open tasks" value={openTasksCount} onClick={openTasksCount > 0 ? expand : undefined} />
           <StatTile
             icon={Wallet}
             tone="rose"
             label="Outstanding balance"
             value={`$${outstandingBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            onClick={() => setTab("Billing")}
+            onClick={outstandingBalance > 0 ? expand : undefined}
           />
           <StatTile
             icon={CalendarClock}
@@ -198,19 +212,10 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
             value={nextAppointment ? new Date(nextAppointment.start_at).toLocaleDateString() : "None scheduled"}
             onClick={nextAppointmentDestination ? () => router.push(nextAppointmentDestination) : undefined}
           />
-          <StatTile
-            icon={MessageCircle}
-            tone="emerald"
-            label="Last message"
-            value={lastMessage ? relativeTime(lastMessage.created_at) : "No messages"}
-            onClick={() => setTab("Messages")}
-          />
-          <StatTile icon={Contact} tone="accent" label="Client type" value={<span className="capitalize">{client.client_type}</span>} />
+          <StatTile icon={MessageCircle} tone="emerald" label="Last message" value={lastMessage ? relativeTime(lastMessage.created_at) : "No messages"} onClick={lastMessage ? expand : undefined} />
         </div>
 
         <ClientInsightWidgets {...props} />
-
-        <ClientTabsBody {...props} tab={tab} onTabChange={setTab} />
 
         <div className="border-t border-border p-5">
           <SectionCard title="Recent activity">
@@ -227,6 +232,16 @@ export function ClientQuickViewDrawer(props: ClientWorkspaceProps) {
               </ul>
             )}
           </SectionCard>
+        </div>
+
+        <div className="border-t border-border p-5">
+          <button
+            type="button"
+            onClick={expand}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-slate transition hover:border-accent hover:text-accent"
+          >
+            <Maximize2 size={14} aria-hidden="true" /> Open Full Record
+          </button>
         </div>
       </aside>
     </div>

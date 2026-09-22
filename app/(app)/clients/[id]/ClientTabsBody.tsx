@@ -3,10 +3,17 @@
 import { DocumentWorkspace } from "@/components/documents/DocumentWorkspace";
 import { Tabs } from "@/components/ui/Tabs";
 import { isIndependentTier } from "@/lib/workspaceCapabilities";
-import { OverviewTab, MessagesTab, BillingTab, NotesTab, TasksTab } from "./ClientWorkspaceTabs";
+import { OverviewTab, MessagesTab, BillingTab, NotesTab, TasksTab, TimelineTab } from "./ClientWorkspaceTabs";
 import type { ClientWorkspaceProps } from "./ClientWorkspace";
 
-export const TABS = ["Details", "Tasks", "Documents", "Messages", "Billing", "Notes"] as const;
+// Contacts Pass 3: Timeline was already fully built (ClientWorkspaceTabs'
+// own TimelineTab) but never wired into this tab bar -- general Contact
+// history (status changes, payments, notes, emails, organizer events,
+// signatures) had no home of its own, so Documents' "Show activity" panel
+// was the only place any of it surfaced, unfiltered. It's now a real tab,
+// which is what makes narrowing Documents' own activity panel to
+// document-specific events (Pass 5) safe to do without losing anything.
+export const TABS = ["Details", "Tasks", "Documents", "Messages", "Billing", "Notes", "Timeline"] as const;
 export type ClientTab = (typeof TABS)[number];
 
 function displayName(c: { client_type: string; first_name: string | null; last_name: string | null; business_name: string | null }) {
@@ -168,6 +175,7 @@ export function ClientTabsBody({
           />
         )}
         {tab === "Notes" && <NotesTab clientId={client.id} workspaceId={workspace.id} notes={notes} />}
+        {tab === "Timeline" && <TimelineTab timeline={timeline} />}
       </div>
     </>
   );
