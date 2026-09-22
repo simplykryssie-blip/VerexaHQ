@@ -35,8 +35,8 @@ export function AddContactForm({ clientId, workspaceId }: Ids) {
         { name: "last_name", label: "Last name", required: true },
         { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
         { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
-        { name: "email", label: "Email" },
-        { name: "phone", label: "Phone" },
+        { name: "email", label: "Email", type: "email" },
+        { name: "phone", label: "Phone", type: "tel" },
       ]}
       onSubmit={async (v) => {
         const { error } = await supabase.from("client_contacts").insert({
@@ -76,8 +76,8 @@ export function EditContactForm({ contact }: { contact: ContactRow }) {
         { name: "last_name", label: "Last name", required: true },
         { name: "title", label: "Title", type: "select", options: CONTACT_TITLE_OPTIONS },
         { name: "custom_title", label: "Custom title", showIf: (v) => v.title === "other" },
-        { name: "email", label: "Email" },
-        { name: "phone", label: "Phone" },
+        { name: "email", label: "Email", type: "email" },
+        { name: "phone", label: "Phone", type: "tel" },
       ]}
       trigger={(openForm) => (
         <button type="button" onClick={openForm} className="text-muted hover:text-ink" aria-label="Edit contact">

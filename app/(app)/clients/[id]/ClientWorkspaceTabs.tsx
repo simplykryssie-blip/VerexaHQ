@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Briefcase, CheckSquare, Receipt, ArrowUpRight, FileText, ClipboardCheck, PenLine, RefreshCw, StickyNote, DollarSign, Mail, HelpCircle } from "lucide-react";
 import { taskHref } from "@/lib/taskLink";
+import { formatPhone } from "@/lib/phone";
 import { EmptyState } from "@/components/EmptyState";
 import { Modal } from "@/components/Modal";
 import { createClient } from "@/lib/supabase/client";
@@ -254,7 +255,7 @@ export function OverviewTab({
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Field label="Name" value={clientDisplayName(client)} />
           <Field label="Primary email" value={client.primary_email} />
-          <Field label="Primary phone" value={client.primary_phone} />
+          <Field label="Primary phone" value={client.primary_phone ? formatPhone(client.primary_phone) : null} />
           {client.client_type === "individual" ? (
             <>
               <TaxIdReveal clientId={client.id} kind="ssn" last4={client.ssn_last4} />
@@ -312,7 +313,7 @@ export function OverviewTab({
                 {phones.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-2 py-2 text-sm text-slate">
                     <span>
-                      {p.phone_number}
+                      {formatPhone(p.phone_number)}
                       <span className="ml-2 text-xs capitalize text-muted">{p.phone_type}</span>
                       {p.is_primary && <span className="ml-2 text-xs text-accent">Primary</span>}
                     </span>
@@ -452,7 +453,7 @@ export function OverviewTab({
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-4 text-xs text-muted">
                       {c.email && <span>{c.email}</span>}
-                      {c.phone && <span>{c.phone}</span>}
+                      {c.phone && <span>{formatPhone(c.phone)}</span>}
                     </div>
                   </li>
                 );

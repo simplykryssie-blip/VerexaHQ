@@ -3,6 +3,7 @@ import type { DataTableColumn } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/Avatar";
 import { clientStatusTone } from "@/lib/clientStatus";
+import { formatPhone } from "@/lib/phone";
 
 // Split out of page.tsx: a Next.js App Router page.tsx file may only export
 // `default` and a small fixed set of route config fields (dynamic,
@@ -80,7 +81,7 @@ export const CLIENT_COLUMNS: DataTableColumn<ClientRow>[] = [
   },
   { key: "type", header: "Type", render: (c) => <span className="capitalize text-slate">{c.client_type}</span> },
   { key: "email", header: "Email", render: (c) => <span className="text-slate">{c.primary_email ?? "--"}</span> },
-  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ?? "--"}</span> },
+  { key: "phone", header: "Phone", render: (c) => <span className="text-slate">{c.primary_phone ? formatPhone(c.primary_phone) : "--"}</span> },
   {
     key: "status",
     header: "Status",
