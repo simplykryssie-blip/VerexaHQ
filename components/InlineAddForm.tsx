@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
+import { normalizeName } from "@/lib/name";
 import { useToast } from "@/components/Toast";
 import { RichTextEditor } from "@/components/settings/RichTextEditor";
 
 export type FieldDef = {
   name: string;
   label: string;
-  type?: "text" | "email" | "tel" | "date" | "select" | "textarea" | "richtext";
+  type?: "text" | "email" | "tel" | "date" | "select" | "textarea" | "richtext" | "name";
   required?: boolean;
   options?: { value: string; label: string }[];
   showIf?: (values: Record<string, string>) => boolean;
@@ -122,7 +123,7 @@ export function InlineAddForm({
           ) : (
             <input
               key={f.name}
-              type={f.type ?? "text"}
+              type={f.type === "name" ? "text" : f.type ?? "text"}
               required={f.required}
               placeholder={f.label}
               value={values[f.name] ?? ""}
@@ -131,9 +132,12 @@ export function InlineAddForm({
                 setValues((v) => ({ ...v, [f.name]: f.type === "tel" ? formatPhone(raw) : raw }));
               }}
               onBlur={(e) => {
-                if (f.type !== "email") return;
-                const trimmed = e.target.value.trim().toLowerCase();
-                setValues((v) => ({ ...v, [f.name]: trimmed }));
+                if (f.type === "email") {
+                  const trimmed = e.target.value.trim().toLowerCase();
+                  setValues((v) => ({ ...v, [f.name]: trimmed }));
+                } else if (f.type === "name") {
+                  setValues((v) => ({ ...v, [f.name]: normalizeName(e.target.value) }));
+                }
               }}
               className="rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
             />
