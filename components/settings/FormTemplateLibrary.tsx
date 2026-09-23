@@ -21,7 +21,6 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   const isDocumentRequests = activeTab === "document-requests";
 
   const supabase = createClient();
-  const orFilter = `workspace_id.is.null,workspace_id.eq.${workspaceId}`;
 
   const {
     data: { user },
@@ -41,7 +40,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     ? await supabase
         .from("engagement_letter_templates")
         .select("id, name, status, workspace_id, folder_id, requires_signature, merge_fields")
-        .or(orFilter)
+        .eq("workspace_id", workspaceId)
         .order("name")
     : { data: null };
 
@@ -56,7 +55,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   }));
 
   const { data: organizerTemplates } = isOrganizers
-    ? await supabase.from("organizer_templates").select("*").or(orFilter).order("name")
+    ? await supabase.from("organizer_templates").select("*").eq("workspace_id", workspaceId).order("name")
     : { data: null };
 
   const organizerTemplateIds = (organizerTemplates ?? []).map((t) => t.id);
@@ -83,7 +82,7 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
     ? await supabase
         .from("document_request_templates")
         .select("id, name, description, status, workspace_id, folder_id")
-        .or(orFilter)
+        .eq("workspace_id", workspaceId)
         .order("name")
     : { data: null };
 
@@ -117,13 +116,13 @@ export async function FormTemplateLibrary({ workspaceId, activeTabParam }: { wor
   const [{ count: engagementLetterCountRaw }, { count: organizerCountRaw }, { count: documentRequestCountRaw }] = await Promise.all([
     !isOrganizers && !isDocumentRequests
       ? Promise.resolve({ count: null as number | null })
-      : supabase.from("engagement_letter_templates").select("id", { count: "exact", head: true }).or(orFilter).neq("status", "archived"),
+      : supabase.from("engagement_letter_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "archived"),
     isOrganizers
       ? Promise.resolve({ count: null as number | null })
-      : supabase.from("organizer_templates").select("id", { count: "exact", head: true }).or(orFilter).neq("status", "archived"),
+      : supabase.from("organizer_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "archived"),
     isDocumentRequests
       ? Promise.resolve({ count: null as number | null })
-      : supabase.from("document_request_templates").select("id", { count: "exact", head: true }).or(orFilter).neq("status", "archived"),
+      : supabase.from("document_request_templates").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "archived"),
   ]);
   const engagementLetterCount = !isOrganizers && !isDocumentRequests
     ? engagementLetterCards.filter((c) => c.status !== "archived").length
