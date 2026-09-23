@@ -97,6 +97,8 @@ export function BranchEditor({
   const toast = useToast();
   const confirm = useConfirm();
   const [decisionMode, setDecisionMode] = useState<"conditions" | "review_queue">("conditions");
+  const [loadedDecisionSteps, setLoadedDecisionSteps] = useState<DecisionStepOption[]>([]);
+  const effectiveDecisionSteps = loadedDecisionSteps.length > 0 ? loadedDecisionSteps : decisionSteps;
   const [branches, setBranches] = useState<DraftBranch[]>(() => initialBranches(edges));
   const [removedIds, setRemovedIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -104,6 +106,24 @@ export function BranchEditor({
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Branch editing can open immediately after a Review Queue Decision step
+      // is saved. Do not depend on the parent canvas having refreshed its
+      // derived decision-step list yet; load the authoritative workflow steps
+      // here so the picker is always populated.
+      const { data: workflowSteps } = await supabase
+        .from("automation_steps")
+        .select("id, display_name, action_type, action_config")
+        .eq("automation_id", automationId);
+      if (cancelled) return;
+      const loaded = (workflowSteps ?? [])
+        .filter((s) => s.action_type === "condition" && (s.action_config as Record<string, unknown> | null)?.decision_mode === "review_queue")
+        .map((s) => ({
+          id: s.id,
+          name: s.display_name ?? "Review Queue Decision",
+          options: ((s.action_config as Record<string, unknown> | null)?.decision_options as { key: string; label: string }[] | undefined) ?? [],
+        }));
+      setLoadedDecisionSteps(loaded);
+
       const { data } = await supabase.from("automation_steps").select("action_config").eq("id", stepId).single();
       if (cancelled) return;
       const config = (data?.action_config ?? {}) as Record<string, unknown>;
